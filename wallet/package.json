@@ -62,6 +62,7 @@
         "zustand": "^5.0.0"
     },
     "devDependencies": {
+        "@expo/ngrok": "^4.1.0",
         "@testing-library/dom": "^10.4.1",
         "@testing-library/react": "^16.3.2",
         "@testing-library/react-native": "^13.3.3",
@@ -77,5 +78,10 @@
     "overrides": {
         "@react-navigation/core": "7.17.1",
         "@react-navigation/native": "7.2.1"
+    },
+    "expo": {
+        "install": {
+            "exclude": ["@react-navigation/native"]
+        }
     }
 }

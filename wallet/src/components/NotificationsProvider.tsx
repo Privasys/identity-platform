@@ -1,49 +1,60 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { Text, View, Button } from './Themed';
 
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true
-    })
-});
+async function getNotifications() {
+    return import('expo-notifications');
+}
 
 export default function NotificationsProvider() {
     const [expoPushToken, setExpoPushToken] = useState('');
-    const [channels, setChannels] = useState<Notifications.NotificationChannel[]>([]);
-    const [notification, setNotification] = useState<Notifications.Notification | undefined>(
-        undefined
-    );
+    const [channels, setChannels] = useState<{ id: string }[]>([]);
+    const [notification, setNotification] = useState<{
+        request: { content: { title?: string | null; body?: string | null; data?: Record<string, unknown> } };
+    } | undefined>(undefined);
 
     useEffect(() => {
-        registerForPushNotificationsAsync().then((token) => token && setExpoPushToken(token));
+        if (Platform.OS === 'web') return;
 
-        if (Platform.OS === 'android') {
-            Notifications.getNotificationChannelsAsync().then((value) => setChannels(value ?? []));
+        async function setup() {
+            const Notifications = await getNotifications();
+
+            Notifications.setNotificationHandler({
+                handleNotification: async () => ({
+                    shouldPlaySound: false,
+                    shouldSetBadge: false,
+                    shouldShowBanner: true,
+                    shouldShowList: true
+                })
+            });
+
+            registerForPushNotificationsAsync().then((token) => token && setExpoPushToken(token));
+
+            if (Platform.OS === 'android') {
+                Notifications.getNotificationChannelsAsync().then((value) =>
+                    setChannels(value ?? [])
+                );
+            }
+
+            const notificationListener = Notifications.addNotificationReceivedListener(
+                (n) => setNotification(n)
+            );
+            const responseListener = Notifications.addNotificationResponseReceivedListener(
+                (response) => console.log(response)
+            );
+
+            return () => {
+                notificationListener.remove();
+                responseListener.remove();
+            };
         }
-        const notificationListener = Notifications.addNotificationReceivedListener(
-            (notification) => {
-                setNotification(notification);
-            }
-        );
 
-        const responseListener = Notifications.addNotificationResponseReceivedListener(
-            (response) => {
-                console.log(response);
-            }
-        );
-
-        return () => {
-            notificationListener.remove();
-            responseListener.remove();
-        };
+        let cleanup: (() => void) | undefined;
+        setup().then((c) => { cleanup = c; });
+        return () => cleanup?.();
     }, []);
 
     return (
@@ -84,6 +95,7 @@ export default function NotificationsProvider() {
 }
 
 async function schedulePushNotification() {
+    const Notifications = await getNotifications();
     await Notifications.scheduleNotificationAsync({
         content: {
             title: "You've got mail! 📬",
@@ -95,6 +107,7 @@ async function schedulePushNotification() {
 }
 
 async function registerForPushNotificationsAsync() {
+    const Notifications = await getNotifications();
     let token;
 
     if (Platform.OS === 'android') {
@@ -117,9 +130,6 @@ async function registerForPushNotificationsAsync() {
             alert('Failed to get push token for push notification!');
             return;
         }
-        // Learn more about projectId:
-        // https://docs.expo.dev/push-notifications/push-notifications-setup/#configure-projectid
-        // EAS projectId is used here.
         try {
             const projectId =
                 Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;

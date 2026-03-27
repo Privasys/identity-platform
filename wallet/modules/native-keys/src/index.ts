@@ -1,10 +1,11 @@
 // Copyright (c) Privasys. All rights reserved.
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { Platform } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 import type { KeyInfo, SignatureResult } from './NativeKeys.types.js';
 
-const NativeKeys = requireNativeModule('NativeKeys');
+const NativeKeys = Platform.OS !== 'web' ? requireNativeModule('NativeKeys') : null;
 
 /**
  * Generate a P-256 key pair in the platform's secure hardware.
@@ -22,6 +23,7 @@ const NativeKeys = requireNativeModule('NativeKeys');
  * @returns Key metadata including the base64url public key.
  */
 export async function generateKey(keyId: string, requireBiometric = true): Promise<KeyInfo> {
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
     const json: string = await NativeKeys.generateKey(keyId, requireBiometric);
     return JSON.parse(json);
 }
@@ -37,6 +39,7 @@ export async function generateKey(keyId: string, requireBiometric = true): Promi
  * @returns Base64url-encoded DER ECDSA signature.
  */
 export async function sign(keyId: string, data: string): Promise<SignatureResult> {
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
     const json: string = await NativeKeys.sign(keyId, data);
     return JSON.parse(json);
 }
@@ -48,6 +51,7 @@ export async function sign(keyId: string, data: string): Promise<SignatureResult
  * @returns `true` if the key exists.
  */
 export async function keyExists(keyId: string): Promise<boolean> {
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
     return NativeKeys.keyExists(keyId);
 }
 
@@ -57,6 +61,7 @@ export async function keyExists(keyId: string): Promise<boolean> {
  * @param keyId  Key identifier.
  */
 export async function deleteKey(keyId: string): Promise<void> {
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
     await NativeKeys.deleteKey(keyId);
 }
 
@@ -67,6 +72,7 @@ export async function deleteKey(keyId: string): Promise<void> {
  * @returns Key metadata, or throws if the key doesn't exist.
  */
 export async function getPublicKey(keyId: string): Promise<KeyInfo> {
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
     const json: string = await NativeKeys.getPublicKey(keyId);
     return JSON.parse(json);
 }

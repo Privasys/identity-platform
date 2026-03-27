@@ -19,7 +19,7 @@
         "@expo/vector-icons": "^15.1.1",
         "@noble/hashes": "^2.0.1",
         "@noble/secp256k1": "^3.0.0",
-        "@react-navigation/native": "^7.1.28",
+        "@react-navigation/native": "7.2.1",
         "@sentry/react-native": "~7.11.0",
         "base64-js": "^1.5.1",
         "eas": "^0.1.0",
@@ -73,5 +73,9 @@
         "postinstall-postinstall": "^2.1.0",
         "typescript": "~5.9.3",
         "typescript-eslint": "^8.56.1"
+    },
+    "overrides": {
+        "@react-navigation/core": "7.17.1",
+        "@react-navigation/native": "7.2.1"
     }
 }

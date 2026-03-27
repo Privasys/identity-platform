@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/utils/storage';
 import { useEffect, useState } from 'react';
 
 const UUID_KEY = 'v0-secure-device-uuid';

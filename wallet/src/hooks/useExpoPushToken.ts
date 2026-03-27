@@ -1,36 +1,41 @@
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useRef } from 'react';
 import { Platform } from 'react-native';
 
-// Configure how notifications are handled when received
-Notifications.setNotificationHandler({
-    handleNotification: async (_notification: Notifications.Notification) => {
-        return {
-            shouldShowAlert: true,
-            shouldPlaySound: true,
-            shouldSetBadge: true,
-            shouldShowBanner: true,
-            shouldShowList: true
-        };
+let _notificationsSetup = false;
+
+async function getNotifications() {
+    const Notifications = await import('expo-notifications');
+    if (!_notificationsSetup && Platform.OS !== 'web') {
+        _notificationsSetup = true;
+        Notifications.setNotificationHandler({
+            handleNotification: async () => ({
+                shouldShowAlert: true,
+                shouldPlaySound: true,
+                shouldSetBadge: true,
+                shouldShowBanner: true,
+                shouldShowList: true
+            })
+        });
     }
-});
+    return Notifications;
+}
 
 let ambientPushToken: string | null = null;
 
 export function useExpoPushToken() {
     const [expoPushToken, setExpoPushToken] = useState<string | null>(ambientPushToken);
     const router = useRouter();
-    const responseListener = useRef<Notifications.EventSubscription | null>(null);
+    const responseListener = useRef<{ remove(): void } | null>(null);
 
     useEffect(() => {
-        async function registerForPushNotifications() {
-            if (!Device.isDevice) {
-                return;
-            }
+        if (Platform.OS === 'web') return;
 
-            // Ask for permission
+        async function registerForPushNotifications() {
+            if (!Device.isDevice) return;
+            const Notifications = await getNotifications();
+
             const { status: existingStatus } = await Notifications.getPermissionsAsync();
             let finalStatus = existingStatus;
 
@@ -39,11 +44,8 @@ export function useExpoPushToken() {
                 finalStatus = status;
             }
 
-            if (finalStatus !== 'granted') {
-                return;
-            }
+            if (finalStatus !== 'granted') return;
 
-            // Get the Expo push token
             const token = (await Notifications.getExpoPushTokenAsync()).data;
             ambientPushToken = token;
             setExpoPushToken(token);
@@ -56,23 +58,26 @@ export function useExpoPushToken() {
             }
         }
 
-        registerForPushNotifications();
-
-        // Handle push notification taps — navigate to connect flow for auth requests
-        responseListener.current = Notifications.addNotificationResponseReceivedListener(
-            (response: Notifications.NotificationResponse) => {
-                const data = response.notification.request.content.data;
-                if (data?.type === 'auth-request' && data.origin && data.sessionId && data.rpId) {
-                    const payload = JSON.stringify({
-                        origin: data.origin,
-                        sessionId: data.sessionId,
-                        rpId: data.rpId,
-                        brokerUrl: data.brokerUrl
-                    });
-                    router.push({ pathname: '/connect', params: { payload } });
+        async function setupResponseListener() {
+            const Notifications = await getNotifications();
+            responseListener.current = Notifications.addNotificationResponseReceivedListener(
+                (response) => {
+                    const data = response.notification.request.content.data;
+                    if (data?.type === 'auth-request' && data.origin && data.sessionId && data.rpId) {
+                        const payload = JSON.stringify({
+                            origin: data.origin,
+                            sessionId: data.sessionId,
+                            rpId: data.rpId,
+                            brokerUrl: data.brokerUrl
+                        });
+                        router.push({ pathname: '/connect', params: { payload } });
+                    }
                 }
-            }
-        );
+            );
+        }
+
+        registerForPushNotifications();
+        setupResponseListener();
 
         return () => {
             responseListener.current?.remove();

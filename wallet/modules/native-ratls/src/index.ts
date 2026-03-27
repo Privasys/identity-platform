@@ -1,10 +1,11 @@
 // Copyright (c) Privasys. All rights reserved.
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { Platform } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 import type { AttestationResult, AttestationError, VerificationPolicy } from './NativeRaTls.types.js';
 
-const NativeRaTls = requireNativeModule('NativeRaTls');
+const NativeRaTls = Platform.OS !== 'web' ? requireNativeModule('NativeRaTls') : null;
 
 /**
  * Connect to an enclave and inspect its RA-TLS attestation certificate.
@@ -22,6 +23,7 @@ export async function inspect(
     port: number,
     caCertPath?: string
 ): Promise<AttestationResult> {
+    if (!NativeRaTls) throw new Error('NativeRaTls is not available on web');
     const json: string = await NativeRaTls.inspect(host, port, caCertPath ?? null);
     const result: AttestationResult | AttestationError = JSON.parse(json);
     if ('error' in result) throw new Error(result.error);
@@ -47,6 +49,7 @@ export async function verify(
     policy: VerificationPolicy,
     caCertPath?: string
 ): Promise<AttestationResult> {
+    if (!NativeRaTls) throw new Error('NativeRaTls is not available on web');
     const policyJson = JSON.stringify(policy);
     const json: string = await NativeRaTls.verify(host, port, caCertPath ?? null, policyJson);
     const result: AttestationResult | AttestationError = JSON.parse(json);

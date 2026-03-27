@@ -38,4 +38,29 @@ if (!config.resolver.resolveRequest)
         return ctx.resolveRequest(ctx, moduleName, platform);
     };
 
+// Force a single copy of @react-navigation packages to avoid React context
+// singleton mismatches (expo-router bundles its own copies otherwise).
+const reactNavDedup = {
+    '@react-navigation/core': path.resolve(projectRoot, 'node_modules/@react-navigation/core'),
+    '@react-navigation/native': path.resolve(projectRoot, 'node_modules/@react-navigation/native'),
+};
+
+const originalResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (ctx, moduleName, platform) => {
+    // Deduplicate @react-navigation packages
+    for (const [pkg, resolvedPath] of Object.entries(reactNavDedup)) {
+        if (moduleName === pkg || moduleName.startsWith(pkg + '/')) {
+            const redirected = moduleName === pkg
+                ? resolvedPath
+                : path.join(resolvedPath, moduleName.slice(pkg.length));
+            return ctx.resolveRequest(
+                { ...ctx, originModulePath: path.join(projectRoot, 'index.js') },
+                redirected,
+                platform
+            );
+        }
+    }
+    return originalResolveRequest(ctx, moduleName, platform);
+};
+
 module.exports = config;

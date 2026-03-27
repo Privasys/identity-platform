@@ -9,7 +9,7 @@ export default function TabLayout() {
                 name="index"
                 options={{
                     title: 'Home',
-                    tabBarIcon: ({ color, size }) => (
+                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                         <Ionicons name="home" size={size} color={color} />
                     ),
                 }}
@@ -18,7 +18,7 @@ export default function TabLayout() {
                 name="scan"
                 options={{
                     title: 'Scan',
-                    tabBarIcon: ({ color, size }) => (
+                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                         <Ionicons name="qr-code-outline" size={size} color={color} />
                     ),
                 }}
@@ -27,7 +27,7 @@ export default function TabLayout() {
                 name="about"
                 options={{
                     title: 'About',
-                    tabBarIcon: ({ color, size }) => (
+                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                         <Ionicons name="information-circle" size={size} color={color} />
                     ),
                 }}

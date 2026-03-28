@@ -6,12 +6,13 @@
  * Welcome → biometric check → hardware key generation → done.
  */
 
+import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter, Stack } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { StyleSheet, Pressable, ActivityIndicator, View as RNView } from 'react-native';
 
-import { Text, View, Image } from '@/components/Themed';
+import { Text, Image } from '@/components/Themed';
 import { useAuthStore } from '@/stores/auth';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -80,68 +81,91 @@ export default function OnboardingScreen() {
     return (
         <>
             <Stack.Screen options={{ headerShown: false }} />
-            <View style={styles.container}>
-                <Image
-                    style={styles.logo}
-                    source={require('@/assets/images/privasys-logo.svg')}
-                    contentFit="contain"
-                    transition={500}
-                />
+            <LinearGradient
+                colors={['#34E89E', '#00BCF2']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.gradient}
+            >
+                <RNView style={styles.container}>
+                    <Image
+                        style={styles.logo}
+                        source={require('@/assets/images/privasys-logo.svg')}
+                        contentFit="contain"
+                        tintColor="#FFFFFF"
+                        transition={500}
+                    />
 
-                {step === 'welcome' && (
-                    <>
-                        <Text style={styles.title}>Welcome to Privasys Wallet</Text>
-                        <Text style={styles.subtitle}>
-                            Your identity, verified by hardware.{'\n'}
-                            No passwords. No trust required.
-                        </Text>
-                        <Pressable style={styles.primaryButton} onPress={handleStart}>
-                            <Text style={styles.primaryButtonText}>Create your identity</Text>
-                        </Pressable>
-                    </>
-                )}
+                    {step === 'welcome' && (
+                        <>
+                            <Text style={styles.title}>Welcome to Privasys Wallet</Text>
+                            <Text style={styles.subtitle}>
+                                Your identity, verified by hardware.{'\n'}
+                                No passwords. No trust required.
+                            </Text>
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.primaryButton,
+                                    pressed && styles.primaryButtonPressed
+                                ]}
+                                onPress={handleStart}
+                            >
+                                <Text style={styles.primaryButtonText}>Create your identity</Text>
+                            </Pressable>
+                        </>
+                    )}
 
-                {step === 'biometric' && (
-                    <>
-                        <Text style={styles.title}>Biometric Setup</Text>
-                        <Text style={styles.subtitle}>
-                            Authenticate to confirm your biometrics work correctly.
-                        </Text>
-                        <ActivityIndicator size="large" color="#007AFF" />
-                    </>
-                )}
+                    {step === 'biometric' && (
+                        <>
+                            <Text style={styles.title}>Biometric Setup</Text>
+                            <Text style={styles.subtitle}>
+                                Authenticate to confirm your biometrics work correctly.
+                            </Text>
+                            <ActivityIndicator size="large" color="#FFFFFF" />
+                        </>
+                    )}
 
-                {step === 'keygen' && (
-                    <>
-                        <Text style={styles.title}>Creating Your Key</Text>
-                        <Text style={styles.subtitle}>
-                            Generating a hardware-backed signing key...{'\n'}
-                            This key never leaves your device's secure hardware.
-                        </Text>
-                        {loading && <ActivityIndicator size="large" color="#007AFF" />}
-                    </>
-                )}
+                    {step === 'keygen' && (
+                        <>
+                            <Text style={styles.title}>Creating Your Key</Text>
+                            <Text style={styles.subtitle}>
+                                Generating a hardware-backed signing key...{'\n'}
+                                This key never leaves your device's secure hardware.
+                            </Text>
+                            {loading && <ActivityIndicator size="large" color="#FFFFFF" />}
+                        </>
+                    )}
 
-                {step === 'done' && (
-                    <>
-                        <Text style={styles.title}>You're all set!</Text>
-                        <Text style={styles.subtitle}>
-                            Your Privasys Wallet is ready.{'\n'}
-                            Scan a QR code to connect to your first service.
-                        </Text>
-                        <Pressable style={styles.primaryButton} onPress={handleFinish}>
-                            <Text style={styles.primaryButtonText}>Get started</Text>
-                        </Pressable>
-                    </>
-                )}
+                    {step === 'done' && (
+                        <>
+                            <Text style={styles.title}>You're all set!</Text>
+                            <Text style={styles.subtitle}>
+                                Your Privasys Wallet is ready.{'\n'}
+                                Scan a QR code to connect to your first service.
+                            </Text>
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.primaryButton,
+                                    pressed && styles.primaryButtonPressed
+                                ]}
+                                onPress={handleFinish}
+                            >
+                                <Text style={styles.primaryButtonText}>Get started</Text>
+                            </Pressable>
+                        </>
+                    )}
 
-                {error && <Text style={styles.error}>{error}</Text>}
-            </View>
+                    {error && <Text style={styles.error}>{error}</Text>}
+                </RNView>
+            </LinearGradient>
         </>
     );
 }
 
 const styles = StyleSheet.create({
+    gradient: {
+        flex: 1
+    },
     container: {
         flex: 1,
         alignItems: 'center',
@@ -149,41 +173,53 @@ const styles = StyleSheet.create({
         paddingHorizontal: 40
     },
     logo: {
-        width: 100,
-        height: 100,
-        marginBottom: 30,
+        width: 180,
+        height: 44,
+        marginBottom: 48,
         backgroundColor: 'transparent'
     },
     title: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 28,
+        fontWeight: '700',
         textAlign: 'center',
-        marginBottom: 12
+        marginBottom: 12,
+        color: '#FFFFFF',
+        letterSpacing: -0.5
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 17,
         textAlign: 'center',
-        opacity: 0.7,
-        marginBottom: 30,
-        lineHeight: 24
+        color: 'rgba(255, 255, 255, 0.85)',
+        marginBottom: 40,
+        lineHeight: 26
     },
     primaryButton: {
-        backgroundColor: '#007AFF',
-        borderRadius: 12,
-        paddingHorizontal: 32,
-        paddingVertical: 14,
-        minWidth: 200,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: 'rgba(255, 255, 255, 0.4)',
+        paddingHorizontal: 36,
+        paddingVertical: 16,
+        minWidth: 220,
         alignItems: 'center'
     },
+    primaryButtonPressed: {
+        backgroundColor: 'rgba(255, 255, 255, 0.35)'
+    },
     primaryButtonText: {
-        color: '#fff',
+        color: '#FFFFFF',
         fontSize: 17,
-        fontWeight: '600'
+        fontWeight: '600',
+        letterSpacing: 0.3
     },
     error: {
-        color: '#FF3B30',
-        marginTop: 20,
+        color: '#FFFFFF',
+        backgroundColor: 'rgba(255, 59, 48, 0.3)',
+        borderRadius: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        marginTop: 24,
         textAlign: 'center',
-        paddingHorizontal: 20
+        overflow: 'hidden'
     }
 });

@@ -3,7 +3,7 @@
 
 import { Platform } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
-import type { AttestationResult, AttestationError, VerificationPolicy } from './NativeRaTls.types.js';
+import type { AttestationResult, AttestationError, VerificationPolicy, PostResult } from './NativeRaTls.types.js';
 
 const NativeRaTls = Platform.OS !== 'web' ? requireNativeModule('NativeRaTls') : null;
 
@@ -57,4 +57,31 @@ export async function verify(
     return result;
 }
 
-export type { AttestationResult, AttestationError, VerificationPolicy } from './NativeRaTls.types.js';
+/**
+ * Connect to an enclave via RA-TLS and make an HTTP POST request.
+ *
+ * The connection uses the same RA-TLS handshake as inspect/verify,
+ * so it accepts the enclave's self-signed attestation certificate.
+ *
+ * @param host  Enclave hostname or IP address.
+ * @param port  Enclave port number.
+ * @param path  HTTP path (e.g. "/fido2/register/begin").
+ * @param body  JSON request body string.
+ * @param caCertPath  Optional path to a CA PEM file on disk.
+ * @returns Parsed response with status code and body.
+ */
+export async function post(
+    host: string,
+    port: number,
+    path: string,
+    body: string,
+    caCertPath?: string
+): Promise<PostResult> {
+    if (!NativeRaTls) throw new Error('NativeRaTls is not available on web');
+    const json: string = await NativeRaTls.post(host, port, path, body, caCertPath ?? null);
+    const result: PostResult | AttestationError = JSON.parse(json);
+    if ('error' in result) throw new Error(result.error);
+    return result;
+}
+
+export type { AttestationResult, AttestationError, VerificationPolicy, PostResult } from './NativeRaTls.types.js';

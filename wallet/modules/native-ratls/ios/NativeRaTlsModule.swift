@@ -59,5 +59,34 @@ public class NativeRaTlsModule: Module {
                 }
             }
         }
+
+        AsyncFunction("post") { (host: String, port: Int, path: String, body: String, caCertPath: String?) -> String in
+            return await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let result = host.withCString { hostPtr in
+                        path.withCString { pathPtr in
+                            body.withCString { bodyPtr in
+                                if let caPath = caCertPath {
+                                    return caPath.withCString { caPtr in
+                                        ratls_post(hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr)
+                                    }
+                                } else {
+                                    return ratls_post(hostPtr, UInt16(port), nil, pathPtr, bodyPtr)
+                                }
+                            }
+                        }
+                    }
+
+                    guard let result else {
+                        continuation.resume(returning: "{\"error\":\"FFI returned null\"}")
+                        return
+                    }
+
+                    let json = String(cString: result)
+                    ratls_free_string(result)
+                    continuation.resume(returning: json)
+                }
+            }
+        }
     }
 }

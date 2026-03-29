@@ -10,6 +10,7 @@
  */
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
+import * as NativeRaTls from '../../modules/native-ratls/src/index';
 
 // ── Wire types matching the enclave's Fido2Request/Fido2Response ────────
 
@@ -72,17 +73,22 @@ function base64urlDecode(str: string): Uint8Array {
 }
 
 async function fido2Fetch<T extends object>(origin: string, path: string, body?: object): Promise<T> {
-    const res = await fetch(`https://${origin}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-    });
+    const url = new URL(`https://${origin}`);
+    const host = url.hostname;
+    const port = parseInt(url.port || '443', 10);
 
-    if (!res.ok) {
-        throw new Error(`FIDO2 request failed: ${res.status} ${res.statusText}`);
+    const result = await NativeRaTls.post(
+        host,
+        port,
+        path,
+        body ? JSON.stringify(body) : '{}',
+    );
+
+    if (result.status < 200 || result.status >= 300) {
+        throw new Error(`FIDO2 request failed: ${result.status}`);
     }
 
-    const json: Fido2Response<T> = await res.json();
+    const json: Fido2Response<T> = JSON.parse(result.body);
     if ('error' in json) {
         throw new Error(`FIDO2 error: ${(json as Fido2Error).error.message}`);
     }

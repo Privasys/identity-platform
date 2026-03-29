@@ -33,3 +33,8 @@ export interface VerificationPolicy {
 export interface AttestationError {
     error: string;
 }
+
+export interface PostResult {
+    status: number;
+    body: string;
+}

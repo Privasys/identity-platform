@@ -15,6 +15,8 @@ extern "C" {
 char *ratls_inspect(const char *host, uint16_t port, const char *ca_cert_path);
 char *ratls_verify(const char *host, uint16_t port, const char *ca_cert_path,
                    const char *policy_json);
+char *ratls_post(const char *host, uint16_t port, const char *ca_cert_path,
+                 const char *path, const char *body);
 void ratls_free_string(char *ptr);
 
 #ifdef __cplusplus

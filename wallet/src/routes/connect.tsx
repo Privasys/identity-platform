@@ -92,6 +92,7 @@ export default function ConnectScreen() {
             return;
         }
 
+        console.log('[CONNECT] QR parsed:', JSON.stringify(parsed));
         setQr(parsed);
         startFlow(parsed);
     }, []);
@@ -99,8 +100,10 @@ export default function ConnectScreen() {
     const startFlow = useCallback(
         async (payload: QRPayload) => {
             setStep('verifying');
+            console.log(`[CONNECT] startFlow — inspecting attestation for ${payload.origin}`);
             try {
                 const result = await inspectAttestation(payload.origin);
+                console.log(`[CONNECT] attestation OK — mrenclave=${result.mrenclave?.substring(0, 16)}...`);
                 setAttestation(result);
 
                 // Check if this is a trusted app with matching attestation
@@ -133,6 +136,7 @@ export default function ConnectScreen() {
                 // New app — show full attestation details
                 setStep('attestation');
             } catch (e: any) {
+                console.error(`[CONNECT] attestation FAILED:`, e.message, e);
                 setError(`Attestation verification failed: ${e.message}`);
                 setStep('error');
             }
@@ -171,6 +175,7 @@ export default function ConnectScreen() {
 
     const doRegister = async (payload: QRPayload) => {
         setStep('authenticating');
+        console.log(`[CONNECT] doRegister — origin=${payload.origin}, rpId=${payload.rpId}`);
         try {
             const keyAlias = `fido2-${payload.rpId}`;
             const result = await fido2.register(payload.origin, keyAlias, payload.sessionId);
@@ -210,6 +215,7 @@ export default function ConnectScreen() {
             setStep('done');
             setTimeout(() => router.replace('/(tabs)'), 1500);
         } catch (e: any) {
+            console.error(`[CONNECT] registration FAILED:`, e.message, e);
             setError(`Registration failed: ${e.message}`);
             setStep('error');
         }
@@ -221,6 +227,7 @@ export default function ConnectScreen() {
         credentialId: string
     ) => {
         setStep('authenticating');
+        console.log(`[CONNECT] doAuthenticate — origin=${payload.origin}, credentialId=${credentialId.substring(0, 16)}...`);
         try {
             const result = await fido2.authenticate(
                 payload.origin,
@@ -240,6 +247,7 @@ export default function ConnectScreen() {
             setStep('done');
             setTimeout(() => router.replace('/(tabs)'), 1500);
         } catch (e: any) {
+            console.error(`[CONNECT] authentication FAILED:`, e.message, e);
             setError(`Authentication failed: ${e.message}`);
             setStep('error');
         }

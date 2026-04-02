@@ -77,20 +77,33 @@ async function fido2Fetch<T extends object>(origin: string, path: string, body?:
     const host = url.hostname;
     const port = parseInt(url.port || '443', 10);
 
-    const result = await NativeRaTls.post(
-        host,
-        port,
-        path,
-        body ? JSON.stringify(body) : '{}',
-    );
+    console.log(`[FIDO2] fetch ${path} → ${host}:${port}`);
+    if (body) console.log(`[FIDO2] request body: ${JSON.stringify(body).substring(0, 300)}`);
+
+    let result;
+    try {
+        result = await NativeRaTls.post(
+            host,
+            port,
+            path,
+            body ? JSON.stringify(body) : '{}',
+        );
+    } catch (e: any) {
+        console.error(`[FIDO2] ${path} — NativeRaTls.post threw: ${e.message}`, e);
+        throw e;
+    }
+
+    console.log(`[FIDO2] ${path} — status=${result.status}, body=${result.body.substring(0, 300)}`);
 
     if (result.status < 200 || result.status >= 300) {
-        throw new Error(`FIDO2 request failed: ${result.status}`);
+        throw new Error(`FIDO2 request failed: ${result.status} — ${result.body.substring(0, 200)}`);
     }
 
     const json: Fido2Response<T> = JSON.parse(result.body);
     if ('error' in json) {
-        throw new Error(`FIDO2 error: ${(json as Fido2Error).error.message}`);
+        const msg = (json as Fido2Error).error.message;
+        console.error(`[FIDO2] ${path} — enclave error: ${msg}`);
+        throw new Error(`FIDO2 error: ${msg}`);
     }
     return json as T;
 }

@@ -24,9 +24,21 @@ export async function inspect(
     caCertPath?: string
 ): Promise<AttestationResult> {
     if (!NativeRaTls) throw new Error('NativeRaTls is not available on web');
-    const json: string = await NativeRaTls.inspect(host, port, caCertPath ?? null);
+    console.log(`[RA-TLS] inspect → ${host}:${port}`);
+    let json: string;
+    try {
+        json = await NativeRaTls.inspect(host, port, caCertPath ?? null);
+    } catch (e: any) {
+        console.error(`[RA-TLS] inspect NATIVE THREW: ${e.message}`, e);
+        throw e;
+    }
+    console.log(`[RA-TLS] inspect raw response (${json.length} chars): ${json.substring(0, 300)}`);
     const result: AttestationResult | AttestationError = JSON.parse(json);
-    if ('error' in result) throw new Error(result.error);
+    if ('error' in result) {
+        console.error(`[RA-TLS] inspect error from native: ${result.error}`);
+        throw new Error(result.error);
+    }
+    console.log(`[RA-TLS] inspect OK — mrenclave=${result.mrenclave?.substring(0, 16)}...`);
     return result;
 }
 
@@ -78,9 +90,21 @@ export async function post(
     caCertPath?: string
 ): Promise<PostResult> {
     if (!NativeRaTls) throw new Error('NativeRaTls is not available on web');
-    const json: string = await NativeRaTls.post(host, port, path, body, caCertPath ?? null);
+    console.log(`[RA-TLS] post → ${host}:${port}${path} (${body.length} bytes)`);
+    let json: string;
+    try {
+        json = await NativeRaTls.post(host, port, path, body, caCertPath ?? null);
+    } catch (e: any) {
+        console.error(`[RA-TLS] post NATIVE THREW: ${e.message}`, e);
+        throw e;
+    }
+    console.log(`[RA-TLS] post raw response (${json.length} chars): ${json.substring(0, 500)}`);
     const result: PostResult | AttestationError = JSON.parse(json);
-    if ('error' in result) throw new Error(result.error);
+    if ('error' in result) {
+        console.error(`[RA-TLS] post error from native: ${result.error}`);
+        throw new Error(result.error);
+    }
+    console.log(`[RA-TLS] post OK — status=${result.status}, body=${result.body.substring(0, 200)}`);
     return result;
 }
 

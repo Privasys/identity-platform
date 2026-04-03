@@ -190,6 +190,7 @@ export default function BatchConnectScreen() {
             try {
                 const credential = getCredentialForRp(app.rpId);
                 let sessionToken: string;
+                let pendingCredential: Parameters<typeof addCredential>[0] | null = null;
 
                 if (credential) {
                     const result = await fido2.authenticate(
@@ -204,7 +205,8 @@ export default function BatchConnectScreen() {
                     const result = await fido2.register(app.rpId, keyAlias, app.sessionId);
                     sessionToken = result.sessionToken;
 
-                    addCredential({
+                    // Persist after relay succeeds (below)
+                    pendingCredential = {
                         credentialId: result.credentialId,
                         rpId: app.rpId,
                         origin: app.rpId,
@@ -212,7 +214,19 @@ export default function BatchConnectScreen() {
                         userHandle: result.userHandle,
                         userName: result.userName,
                         registeredAt: Math.floor(Date.now() / 1000),
-                    });
+                    };
+                }
+
+                updatedApps[i] = { ...app, status: 'authenticated' };
+                setApps([...updatedApps]);
+
+                // Relay token to browser
+                setStep('relaying');
+                await relaySessionToken(payload.brokerUrl, app.sessionId, sessionToken, pushToken);
+
+                // Relay succeeded — now persist locally
+                if (pendingCredential) {
+                    addCredential(pendingCredential);
 
                     if (app.attestation) {
                         addTrustedApp({
@@ -224,17 +238,11 @@ export default function BatchConnectScreen() {
                             configRoot: app.attestation.config_merkle_root,
                             teeType: app.attestation.tee_type || 'sgx',
                             lastVerified: Math.floor(Date.now() / 1000),
-                            credentialId: result.credentialId,
+                            credentialId: pendingCredential.credentialId,
                         });
                     }
                 }
 
-                updatedApps[i] = { ...app, status: 'authenticated' };
-                setApps([...updatedApps]);
-
-                // Relay token to browser
-                setStep('relaying');
-                await relaySessionToken(payload.brokerUrl, app.sessionId, sessionToken, pushToken);
                 updatedApps[i] = { ...app, status: 'relayed' };
                 setApps([...updatedApps]);
             } catch (e: any) {

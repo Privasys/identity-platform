@@ -52,7 +52,16 @@ export default function HomeScreen() {
                     >
                         <Text style={styles.sectionTitle}>CONNECTED SERVICES</Text>
                         {apps.map((app) => (
-                            <RNView key={app.rpId} style={styles.serviceCard}>
+                            <Pressable
+                                key={app.rpId}
+                                style={styles.serviceCard}
+                                onPress={() =>
+                                    router.push({
+                                        pathname: '/service-detail',
+                                        params: { rpId: app.rpId }
+                                    })
+                                }
+                            >
                                 <RNView
                                     style={[
                                         styles.serviceIcon,
@@ -73,7 +82,7 @@ export default function HomeScreen() {
                                     </Text>
                                 </RNView>
                                 <Ionicons name="chevron-forward" size={18} color="#C0C0C0" />
-                            </RNView>
+                            </Pressable>
                         ))}
                     </ScrollView>
                 )}

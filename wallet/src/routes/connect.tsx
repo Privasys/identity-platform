@@ -180,6 +180,17 @@ export default function ConnectScreen() {
             const keyAlias = `fido2-${payload.rpId}`;
             const result = await fido2.register(payload.origin, keyAlias, payload.sessionId);
 
+            // Relay to browser BEFORE persisting — if relay fails the
+            // credential must not appear in "Connected Services".
+            setStep('relaying');
+            await relaySessionToken(
+                payload.brokerUrl,
+                payload.sessionId,
+                result.sessionToken,
+                pushToken
+            );
+
+            // Relay succeeded — now persist locally.
             addCredential({
                 credentialId: result.credentialId,
                 rpId: payload.rpId,
@@ -203,14 +214,6 @@ export default function ConnectScreen() {
                     credentialId: result.credentialId
                 });
             }
-
-            setStep('relaying');
-            await relaySessionToken(
-                payload.brokerUrl,
-                payload.sessionId,
-                result.sessionToken,
-                pushToken
-            );
 
             setStep('done');
             setTimeout(() => router.replace('/(tabs)'), 1500);

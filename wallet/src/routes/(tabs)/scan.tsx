@@ -13,11 +13,13 @@ export default function TabScanScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const [rerenderTrigger, setRerenderTrigger] = useState(0);
     const navigating = useRef(false);
+    const [cameraKey, setCameraKey] = useState(0);
 
     useFocusEffect(
         useCallback(() => {
             setServiceUrl(undefined);
             navigating.current = false;
+            setCameraKey(k => k + 1);
         }, [])
     );
 
@@ -124,6 +126,7 @@ export default function TabScanScreen() {
     return (
         <View style={styles.container}>
             <CameraView
+                key={cameraKey}
                 style={styles.camera}
                 facing={facing}
                 autofocus="on"

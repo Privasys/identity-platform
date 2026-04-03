@@ -9,6 +9,8 @@
  * (the RA-TLS connection is already established at this point).
  */
 
+import { sha256 } from '@noble/hashes/sha2';
+
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
 
@@ -208,15 +210,11 @@ export async function register(
 
     // 4. Build authenticatorData
     //    rpIdHash (32) + flags (1) + signCount (4) + attestedCredentialData
-    const rpIdHash = new Uint8Array(
-        await crypto.subtle.digest('SHA-256', new TextEncoder().encode(options.rp.id))
-    );
+    const rpIdHash = sha256(new TextEncoder().encode(options.rp.id));
 
     // Credential ID from the public key (hash of public key)
     const pubKeyBytes = base64urlDecode(keyInfo.publicKey);
-    const credentialIdBytes = new Uint8Array(
-        await crypto.subtle.digest('SHA-256', pubKeyBytes as BufferSource)
-    );
+    const credentialIdBytes = sha256(pubKeyBytes);
 
     // COSE Key encoding for P-256 (ES256)
     // {1: 2, 3: -7, -1: 1, -2: x, -3: y}
@@ -243,7 +241,7 @@ export async function register(
     const authData = concat([rpIdHash, flags, signCount, attestedCredData]);
 
     // 5. Sign: authData || SHA-256(clientDataJSON) per WebAuthn spec
-    const clientDataHash = new Uint8Array(await crypto.subtle.digest('SHA-256', clientDataBytes));
+    const clientDataHash = sha256(clientDataBytes);
     const signedData = concat([authData, clientDataHash]);
     const signedDataB64 = base64urlEncode(signedData);
     const sigResult = await NativeKeys.sign(keyAlias, signedDataB64);
@@ -311,9 +309,7 @@ export async function authenticate(
     const clientDataB64 = base64urlEncode(clientDataBytes);
 
     // 3. Build authenticatorData (simpler — no attested credential data)
-    const rpIdHash = new Uint8Array(
-        await crypto.subtle.digest('SHA-256', new TextEncoder().encode(origin.split(':')[0]))
-    );
+    const rpIdHash = sha256(new TextEncoder().encode(origin.split(':')[0]));
     const flags = new Uint8Array([0x05]); // UP | UV
     const signCount = new Uint8Array([0, 0, 0, 1]); // Incremented
 
@@ -321,7 +317,7 @@ export async function authenticate(
     const authDataB64 = base64urlEncode(authData);
 
     // 4. Sign: SHA-256(authData || SHA-256(clientDataJSON))
-    const clientDataHash = new Uint8Array(await crypto.subtle.digest('SHA-256', clientDataBytes));
+    const clientDataHash = sha256(clientDataBytes);
     const signedData = concat([authData, clientDataHash]);
     const signedDataB64 = base64urlEncode(signedData);
     const sigResult = await NativeKeys.sign(keyAlias, signedDataB64);

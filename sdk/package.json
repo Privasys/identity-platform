@@ -17,10 +17,12 @@
         "./react": {
             "types": "./dist/react.d.ts",
             "import": "./dist/react.js"
-        }
+        },
+        "./iife": "./dist/privasys-auth.iife.js"
     },
     "scripts": {
-        "build": "tsc",
+        "build": "tsc && npm run build:iife",
+        "build:iife": "esbuild src/iife.ts --bundle --format=iife --global-name=Privasys --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth.iife.js",
         "dev": "tsc --watch"
     },
     "peerDependencies": {
@@ -33,6 +35,7 @@
     },
     "devDependencies": {
         "@types/react": "^19.2.14",
+        "esbuild": "^0.28.0",
         "react": "^19.0.0",
         "typescript": "~5.9.0"
     }

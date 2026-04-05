@@ -138,6 +138,14 @@ export class WebAuthnClient {
             if (opts.type !== 'register_options') throw new Error(`Unexpected response: ${opts.type}`);
 
             // 2. Build PublicKeyCredentialCreationOptions
+            //    Pass through the enclave's authenticator_selection (which
+            //    specifies cross-platform to route to Privasys Wallet).
+            const enclaveAuthSel = opts.authenticator_selection ?? {};
+            const authSel = {
+                authenticatorAttachment: (enclaveAuthSel.authenticator_attachment ?? 'cross-platform') as AuthenticatorAttachment,
+                residentKey: (enclaveAuthSel.resident_key ?? 'preferred') as ResidentKeyRequirement,
+                userVerification: (enclaveAuthSel.user_verification ?? 'preferred') as UserVerificationRequirement,
+            };
             const createOptions: CredentialCreationOptions = {
                 publicKey: {
                     challenge: base64urlDecode(opts.challenge),
@@ -155,9 +163,7 @@ export class WebAuthnClient {
                     ),
                     timeout: this.config.timeout,
                     attestation: (opts.attestation ?? 'none') as AttestationConveyancePreference,
-                    authenticatorSelection: opts.authenticator_selection ?? {
-                        userVerification: 'preferred',
-                    },
+                    authenticatorSelection: authSel,
                     ...(opts.exclude_credentials
                         ? {
                               excludeCredentials: opts.exclude_credentials.map(
@@ -237,12 +243,14 @@ export class WebAuthnClient {
                                   (c: { id: string; transports?: string[] }) => ({
                                       type: 'public-key' as const,
                                       id: base64urlDecode(c.id),
-                                      transports: c.transports as AuthenticatorTransport[] | undefined,
+                                      ...(c.transports?.length
+                                          ? { transports: c.transports as AuthenticatorTransport[] }
+                                          : {}),
                                   }),
                               ),
                           }
                         : {}),
-                },
+                } as PublicKeyCredentialRequestOptions,
             };
 
             this.setState('ceremony');

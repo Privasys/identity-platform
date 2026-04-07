@@ -85,37 +85,63 @@ export default function TabScanScreen() {
     const handleBarcode = (result: BarcodeScanningResult) => {
         if (navigating.current) return;
         if (result.type === 'qr') {
-            try {
-                // Try parsing as JSON payload (new format)
-                const parsed = JSON.parse(result.data);
-
-                // Batch payload: { origin, sessionId, brokerUrl, apps: [...] }
-                if (parsed.apps && Array.isArray(parsed.apps)) {
-                    navigating.current = true;
-                    router.push({
-                        pathname: '/batch-connect',
-                        params: { payload: result.data }
-                    });
-                    return;
+            // Helper: decode a base64url string to UTF-8
+            const decodeB64Url = (s: string): string | null => {
+                try {
+                    let padded = s.replace(/-/g, '+').replace(/_/g, '/');
+                    while (padded.length % 4 !== 0) padded += '=';
+                    return atob(padded);
+                } catch {
+                    return null;
                 }
+            };
 
-                // Single-app payload: { origin, sessionId, rpId, brokerUrl }
-                if (parsed.origin && parsed.sessionId && parsed.rpId) {
-                    navigating.current = true;
-                    router.push({
-                        pathname: '/connect',
-                        params: { payload: result.data }
-                    });
-                    return;
+            // Helper: try to route a parsed JSON payload
+            const routePayload = (json: string): boolean => {
+                try {
+                    const parsed = JSON.parse(json);
+
+                    // Batch payload: { origin, sessionId, brokerUrl, apps: [...] }
+                    if (parsed.apps && Array.isArray(parsed.apps)) {
+                        navigating.current = true;
+                        router.push({
+                            pathname: '/batch-connect',
+                            params: { payload: json }
+                        });
+                        return true;
+                    }
+
+                    // Single-app payload: { origin, sessionId, rpId, brokerUrl }
+                    if (parsed.origin && parsed.sessionId && parsed.rpId) {
+                        navigating.current = true;
+                        router.push({
+                            pathname: '/connect',
+                            params: { payload: json }
+                        });
+                        return true;
+                    }
+                } catch {
+                    // Not valid JSON
                 }
-            } catch {
-                // Not JSON — try as URL (legacy format)
-            }
+                return false;
+            };
 
+            // 1. Try raw JSON payload (backward-compatible)
+            if (routePayload(result.data)) return;
+
+            // 2. Try universal link URL: https://privasys.id/scp?p=<base64url>
             try {
                 const url = new URL(result.data);
+                const b64 = url.searchParams.get('p');
+                if (b64 && url.pathname.startsWith('/scp')) {
+                    const json = decodeB64Url(b64);
+                    if (json && routePayload(json)) return;
+                }
+
+                // Legacy URL format: /_/ prefix
                 if (url.pathname.startsWith('/_/')) {
                     setServiceUrl(url.toString());
+                    return;
                 }
             } catch {
                 // Not a valid URL

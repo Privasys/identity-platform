@@ -138,11 +138,14 @@ export class WebAuthnClient {
             if (opts.type !== 'register_options') throw new Error(`Unexpected response: ${opts.type}`);
 
             // 2. Build PublicKeyCredentialCreationOptions
-            //    Pass through the enclave's authenticator_selection (which
-            //    specifies cross-platform to route to Privasys Wallet).
+            //    Force authenticatorAttachment to "platform" so only the
+            //    current device's authenticator (Windows Hello, Touch ID) is
+            //    offered.  Cross-device passkeys (phone QR) use the Privasys
+            //    Wallet relay flow instead — the CTAP2 hybrid QR protocol is
+            //    incompatible with the wallet's custom QR format.
             const enclaveAuthSel = opts.authenticator_selection ?? {};
-            const authSel = {
-                authenticatorAttachment: (enclaveAuthSel.authenticator_attachment ?? 'cross-platform') as AuthenticatorAttachment,
+            const authSel: AuthenticatorSelectionCriteria = {
+                authenticatorAttachment: 'platform' as AuthenticatorAttachment,
                 residentKey: (enclaveAuthSel.resident_key ?? 'preferred') as ResidentKeyRequirement,
                 userVerification: (enclaveAuthSel.user_verification ?? 'preferred') as UserVerificationRequirement,
             };

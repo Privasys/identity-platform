@@ -10,6 +10,9 @@ export function generateSessionId(): string {
     return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** Deep-link host used for universal links (iOS applinks / Android intent). */
+const DEEPLINK_HOST = 'privasys.id';
+
 /**
  * QR payload that the wallet scans to begin authentication.
  */
@@ -21,8 +24,28 @@ export interface QRPayload {
 }
 
 /**
+ * Encode a JSON QR payload as a universal-link URL.
+ *
+ * When a regular phone camera scans the QR, it opens the URL:
+ *   - If the Privasys Wallet is installed, iOS/Android routes it to the app
+ *     via the registered `applinks:privasys.id` associated domain.
+ *   - Otherwise the browser opens `https://privasys.id/scp` which can show
+ *     install instructions.
+ *
+ * The wallet's QR scanner handles both formats (URL and raw JSON).
+ */
+function wrapAsUniversalLink(json: string): string {
+    // Base64url-encode the JSON (no padding) so it's URL-safe
+    const b64 = btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return `https://${DEEPLINK_HOST}/scp?p=${b64}`;
+}
+
+/**
  * Generate the JSON payload to encode in a QR code.
  * The wallet scans this and connects to the broker to pair with the browser.
+ *
+ * The returned `payload` is a universal-link URL that wraps the JSON,
+ * so both the wallet's QR scanner and a regular phone camera work.
  */
 export function generateQRPayload(opts: {
     rpId: string;
@@ -31,12 +54,12 @@ export function generateQRPayload(opts: {
 }): { sessionId: string; payload: string } {
     const sessionId = opts.sessionId ?? generateSessionId();
     const qr: QRPayload = {
-        origin: globalThis.location?.origin ?? '',
+        origin: opts.rpId,
         sessionId,
         rpId: opts.rpId,
         brokerUrl: opts.brokerUrl,
     };
-    return { sessionId, payload: JSON.stringify(qr) };
+    return { sessionId, payload: wrapAsUniversalLink(JSON.stringify(qr)) };
 }
 
 /**
@@ -65,10 +88,10 @@ export function generateBatchQRPayload(opts: {
         sessionId: app.sessionId ?? generateSessionId(),
     }));
     const qr: BatchQRPayload = {
-        origin: globalThis.location?.origin ?? '',
+        origin: opts.apps[0]?.rpId ?? '',
         sessionId,
         brokerUrl: opts.brokerUrl,
         apps: appSessions,
     };
-    return { sessionId, appSessions, payload: JSON.stringify(qr) };
+    return { sessionId, appSessions, payload: wrapAsUniversalLink(JSON.stringify(qr)) };
 }

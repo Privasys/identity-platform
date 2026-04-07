@@ -1,0 +1,61 @@
+# Copyright (c) Privasys. All rights reserved.
+# Licensed under the GNU Affero General Public License v3.0.
+
+name: Build SDK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sdk/**'
+      - '.github/workflows/build-sdk.yaml'
+  pull_request:
+    paths:
+      - 'sdk/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        working-directory: sdk
+        run: npm ci
+
+      - name: Type-check
+        working-directory: sdk
+        run: npx tsc --noEmit
+
+      - name: Build ESM + declarations
+        working-directory: sdk
+        run: npx tsc
+
+      - name: Build IIFE bundle
+        working-directory: sdk
+        run: npm run build:iife
+
+      - name: Verify output
+        working-directory: sdk
+        run: |
+          test -f dist/index.js || (echo "Missing dist/index.js" && exit 1)
+          test -f dist/index.d.ts || (echo "Missing dist/index.d.ts" && exit 1)
+          test -f dist/privasys-auth.iife.js || (echo "Missing IIFE bundle" && exit 1)
+          echo "SDK build output:"
+          ls -lh dist/
+          echo ""
+          echo "IIFE bundle size: $(wc -c < dist/privasys-auth.iife.js) bytes"
+
+      - name: Upload IIFE bundle
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: privasys-auth-iife
+          path: |
+            sdk/dist/privasys-auth.iife.js
+            sdk/dist/privasys-auth.iife.js.map
+          retention-days: 90

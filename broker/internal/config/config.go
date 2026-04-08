@@ -12,7 +12,7 @@ import (
 type Config struct {
 	Port          int
 	ExpoPushURL   string
-	SigningKey    string // RSA private key PEM for JWT signing
+	SigningKey    string // EC P-256 private key PEM for JWT signing (ES256)
 	IssuerURL     string // Public URL of this broker (JWT "iss")
 	ASAudience    string // Attestation server audience claim
 	ASRole        string // Attestation server role claim

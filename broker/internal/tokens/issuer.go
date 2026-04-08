@@ -4,15 +4,15 @@
 // Package tokens issues short-lived JWTs for the attestation server.
 //
 // The broker acts as a lightweight OIDC provider: it signs JWTs with an
-// RSA private key and exposes /.well-known/openid-configuration and /jwks
-// endpoints so the attestation server can validate the tokens via standard
-// OIDC discovery.
+// ECDSA P-256 private key and exposes /.well-known/openid-configuration
+// and /jwks endpoints so the attestation server can validate the tokens
+// via standard OIDC discovery.
 package tokens
 
 import (
-	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -27,7 +27,7 @@ import (
 
 // Issuer manages JWT signing and JWKS publication.
 type Issuer struct {
-	privateKey *rsa.PrivateKey
+	privateKey *ecdsa.PrivateKey
 	keyID      string
 	issuerURL  string // e.g. https://relay.privasys.org
 	audience   string // attestation server audience
@@ -36,7 +36,7 @@ type Issuer struct {
 
 // Config for creating an Issuer.
 type Config struct {
-	// PrivateKeyPEM is an RSA private key in PEM format.
+	// PrivateKeyPEM is an EC P-256 private key in PEM format.
 	PrivateKeyPEM string
 
 	// IssuerURL is the public URL of this broker (used as JWT "iss").
@@ -60,18 +60,22 @@ func NewIssuer(cfg Config) (*Issuer, error) {
 		return nil, errors.New("failed to parse PEM block from SIGNING_KEY")
 	}
 
-	var privKey *rsa.PrivateKey
-	// Try PKCS#8 first, then PKCS#1.
+	var privKey *ecdsa.PrivateKey
+	// Try PKCS#8 first, then SEC1 (EC PRIVATE KEY).
 	if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
 		var ok bool
-		privKey, ok = key.(*rsa.PrivateKey)
+		privKey, ok = key.(*ecdsa.PrivateKey)
 		if !ok {
-			return nil, errors.New("PKCS#8 key is not RSA")
+			return nil, errors.New("PKCS#8 key is not ECDSA")
 		}
-	} else if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+	} else if key, err := x509.ParseECPrivateKey(block.Bytes); err == nil {
 		privKey = key
 	} else {
-		return nil, fmt.Errorf("failed to parse RSA private key: %v", err)
+		return nil, fmt.Errorf("failed to parse EC private key: %v", err)
+	}
+
+	if privKey.Curve != elliptic.P256() {
+		return nil, errors.New("only P-256 keys are supported (ES256)")
 	}
 
 	// Derive a stable key ID from the public key hash.
@@ -95,7 +99,7 @@ func NewIssuer(cfg Config) (*Issuer, error) {
 func (iss *Issuer) Issue(subject string) (string, error) {
 	now := time.Now()
 	header := map[string]string{
-		"alg": "RS256",
+		"alg": "ES256",
 		"typ": "JWT",
 		"kid": iss.keyID,
 	}
@@ -117,10 +121,19 @@ func (iss *Issuer) Issue(subject string) (string, error) {
 	signingInput := headerB64 + "." + claimsB64
 
 	hash := sha256.Sum256([]byte(signingInput))
-	sig, err := rsa.SignPKCS1v15(rand.Reader, iss.privateKey, crypto.SHA256, hash[:])
+	r, s, err := ecdsa.Sign(rand.Reader, iss.privateKey, hash[:])
 	if err != nil {
 		return "", fmt.Errorf("sign: %w", err)
 	}
+
+	// ES256 signature is r || s, each zero-padded to 32 bytes.
+	curveBits := iss.privateKey.Curve.Params().BitSize
+	keyBytes := (curveBits + 7) / 8
+	sig := make([]byte, 2*keyBytes)
+	rBytes := r.Bytes()
+	sBytes := s.Bytes()
+	copy(sig[keyBytes-len(rBytes):keyBytes], rBytes)
+	copy(sig[2*keyBytes-len(sBytes):], sBytes)
 
 	sigB64 := base64.RawURLEncoding.EncodeToString(sig)
 	return signingInput + "." + sigB64, nil
@@ -132,12 +145,13 @@ func (iss *Issuer) HandleJWKS(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]interface{}{
 		"keys": []map[string]string{
 			{
-				"kty": "RSA",
+				"kty": "EC",
 				"use": "sig",
-				"alg": "RS256",
+				"alg": "ES256",
+				"crv": "P-256",
 				"kid": iss.keyID,
-				"n":   base64.RawURLEncoding.EncodeToString(pub.N.Bytes()),
-				"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pub.E)).Bytes()),
+				"x":   base64.RawURLEncoding.EncodeToString(padToKeySize(pub.X, 32)),
+				"y":   base64.RawURLEncoding.EncodeToString(padToKeySize(pub.Y, 32)),
 			},
 		},
 	}
@@ -153,9 +167,20 @@ func (iss *Issuer) HandleOIDCDiscovery(w http.ResponseWriter, r *http.Request) {
 		"jwks_uri":                              iss.issuerURL + "/jwks",
 		"response_types_supported":              []string{"id_token"},
 		"subject_types_supported":               []string{"public"},
-		"id_token_signing_alg_values_supported": []string{"RS256"},
+		"id_token_signing_alg_values_supported": []string{"ES256"},
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// padToKeySize left-pads b with zeros to reach size bytes.
+func padToKeySize(n *big.Int, size int) []byte {
+	b := n.Bytes()
+	if len(b) >= size {
+		return b
+	}
+	padded := make([]byte, size)
+	copy(padded[size-len(b):], b)
+	return padded
 }

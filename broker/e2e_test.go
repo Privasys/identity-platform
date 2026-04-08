@@ -10,9 +10,9 @@
 package main_test
 
 import (
-	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -43,16 +43,20 @@ import (
 // This validates the entire chain without needing a real Apple/Google
 // attestation or a deployed attestation server.
 func TestE2E_AppAttest_To_AttestationServer(t *testing.T) {
-	// ── Setup: generate RSA key and start broker test server ──────────
+	// ── Setup: generate EC P-256 key and start broker test server ────
 
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		t.Fatalf("generate RSA key: %v", err)
+		t.Fatalf("generate EC key: %v", err)
 	}
 
+	ecDER, err := x509.MarshalECPrivateKey(privKey)
+	if err != nil {
+		t.Fatalf("marshal EC key: %v", err)
+	}
 	privKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
+		Type:  "EC PRIVATE KEY",
+		Bytes: ecDER,
 	})
 
 	// We need the server URL before creating the issuer (for the iss claim),
@@ -269,8 +273,9 @@ func TestE2E_AppAttest_To_AttestationServer(t *testing.T) {
 				Kty string `json:"kty"`
 				Kid string `json:"kid"`
 				Alg string `json:"alg"`
-				N   string `json:"n"`
-				E   string `json:"e"`
+				Crv string `json:"crv"`
+				X   string `json:"x"`
+				Y   string `json:"y"`
 			} `json:"keys"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
@@ -280,17 +285,20 @@ func TestE2E_AppAttest_To_AttestationServer(t *testing.T) {
 			t.Fatalf("expected 1 key, got %d", len(jwks.Keys))
 		}
 		key := jwks.Keys[0]
-		if key.Kty != "RSA" {
-			t.Fatalf("expected RSA key, got %s", key.Kty)
+		if key.Kty != "EC" {
+			t.Fatalf("expected EC key, got %s", key.Kty)
 		}
-		if key.Alg != "RS256" {
-			t.Fatalf("expected RS256, got %s", key.Alg)
+		if key.Alg != "ES256" {
+			t.Fatalf("expected ES256, got %s", key.Alg)
+		}
+		if key.Crv != "P-256" {
+			t.Fatalf("expected P-256, got %s", key.Crv)
 		}
 		if key.Kid == "" {
 			t.Fatal("kid is empty")
 		}
-		if key.N == "" || key.E == "" {
-			t.Fatal("n or e is empty")
+		if key.X == "" || key.Y == "" {
+			t.Fatal("x or y is empty")
 		}
 	})
 
@@ -320,8 +328,8 @@ func TestE2E_AppAttest_To_AttestationServer(t *testing.T) {
 			t.Fatalf("parse header: %v", err)
 		}
 
-		if header.Alg != "RS256" {
-			t.Fatalf("expected alg=RS256, got %s", header.Alg)
+		if header.Alg != "ES256" {
+			t.Fatalf("expected alg=ES256, got %s", header.Alg)
 		}
 		if header.Typ != "JWT" {
 			t.Fatalf("expected typ=JWT, got %s", header.Typ)
@@ -411,49 +419,57 @@ func TestE2E_AppAttest_To_AttestationServer(t *testing.T) {
 		var jwks struct {
 			Keys []struct {
 				Kid string `json:"kid"`
-				N   string `json:"n"`
-				E   string `json:"e"`
+				X   string `json:"x"`
+				Y   string `json:"y"`
 			} `json:"keys"`
 		}
 		json.NewDecoder(jwksResp.Body).Decode(&jwks)
 
 		// Find the key matching the JWT's kid.
-		var nB64, eB64 string
+		var xB64, yB64 string
 		for _, k := range jwks.Keys {
 			if k.Kid == header.Kid {
-				nB64 = k.N
-				eB64 = k.E
+				xB64 = k.X
+				yB64 = k.Y
 				break
 			}
 		}
-		if nB64 == "" {
+		if xB64 == "" {
 			t.Fatalf("key %q not found in JWKS", header.Kid)
 		}
 
-		// Reconstruct the RSA public key from JWKS.
-		nBytes, err := base64.RawURLEncoding.DecodeString(nB64)
+		// Reconstruct the EC public key from JWKS.
+		xBytes, err := base64.RawURLEncoding.DecodeString(xB64)
 		if err != nil {
-			t.Fatalf("decode n: %v", err)
+			t.Fatalf("decode x: %v", err)
 		}
-		eBytes, err := base64.RawURLEncoding.DecodeString(eB64)
+		yBytes, err := base64.RawURLEncoding.DecodeString(yB64)
 		if err != nil {
-			t.Fatalf("decode e: %v", err)
+			t.Fatalf("decode y: %v", err)
 		}
-		pubKey := &rsa.PublicKey{
-			N: new(big.Int).SetBytes(nBytes),
-			E: int(new(big.Int).SetBytes(eBytes).Int64()),
+		pubKey := &ecdsa.PublicKey{
+			Curve: elliptic.P256(),
+			X:     new(big.Int).SetBytes(xBytes),
+			Y:     new(big.Int).SetBytes(yBytes),
 		}
 
-		// Verify RS256 signature.
+		// Verify ES256 signature.
 		signingInput := []byte(parts[0] + "." + parts[1])
 		sigBytes, err := base64.RawURLEncoding.DecodeString(parts[2])
 		if err != nil {
 			t.Fatalf("decode signature: %v", err)
 		}
 
+		// ES256: sig is r || s, each 32 bytes.
+		if len(sigBytes) != 64 {
+			t.Fatalf("expected 64-byte signature, got %d", len(sigBytes))
+		}
+		r := new(big.Int).SetBytes(sigBytes[:32])
+		s := new(big.Int).SetBytes(sigBytes[32:])
+
 		hash := sha256.Sum256(signingInput)
-		if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hash[:], sigBytes); err != nil {
-			t.Fatalf("signature verification failed: %v", err)
+		if !ecdsa.Verify(pubKey, hash[:], r, s) {
+			t.Fatal("ECDSA signature verification failed")
 		}
 
 		t.Log("JWT signature verified successfully via JWKS")

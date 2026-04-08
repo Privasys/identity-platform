@@ -77,7 +77,7 @@ export default (context: ConfigContext): ExpoConfig => {
         ...defaultConfig,
         name: config.name,
         description:
-            'Privasys Wallet is a digital wallet for managing your connection keys to Privasys services.',
+            'Privasys Wallet is a digital identity wallet. Connect to services that prove their integrity before you prove yours.',
         slug: 'privasys-wallet',
         owner: 'privasys',
         icon: config.icon,

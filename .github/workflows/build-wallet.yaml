@@ -348,7 +348,7 @@ jobs:
       - name: Download IPA
         uses: actions/download-artifact@v4
         with:
-          name: wallet-ios-preview
+          name: wallet-ios-${{ inputs.profile || 'preview' }}
           path: wallet/build/
 
       - name: Install dependencies

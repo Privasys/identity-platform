@@ -16,7 +16,8 @@ import { StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-nati
 
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
-import { inspectAttestation } from '@/services/attestation';
+import { getAttestationServerToken } from '@/services/app-attest';
+import { inspectAttestation, verifyAttestation } from '@/services/attestation';
 import { relaySessionToken } from '@/services/broker';
 import * as fido2 from '@/services/fido2';
 import { useAuthStore } from '@/stores/auth';
@@ -100,9 +101,23 @@ export default function ConnectScreen() {
     const startFlow = useCallback(
         async (payload: QRPayload) => {
             setStep('verifying');
-            console.log(`[CONNECT] startFlow — inspecting attestation for ${payload.origin}`);
+            console.log(`[CONNECT] startFlow — verifying attestation for ${payload.origin}`);
             try {
-                const result = await inspectAttestation(payload.origin);
+                let result: AttestationResult;
+                try {
+                    // Obtain an AS token via App Attest, then verify through the attestation server
+                    const asToken = await getAttestationServerToken();
+                    console.log('[CONNECT] obtained AS token, calling verify()');
+                    result = await verifyAttestation(payload.origin, {
+                        tee: 'sgx',
+                        attestation_server: 'https://as.privasys.org',
+                        attestation_server_token: asToken,
+                    });
+                } catch (verifyErr: any) {
+                    // Fallback to inspect-only (e.g. simulator, App Attest unavailable)
+                    console.warn(`[CONNECT] verify() unavailable, falling back to inspect: ${verifyErr.message}`);
+                    result = await inspectAttestation(payload.origin);
+                }
                 console.log(`[CONNECT] attestation OK — mrenclave=${result.mrenclave?.substring(0, 16)}...`);
                 setAttestation(result);
 
@@ -406,24 +421,30 @@ function AttestationView({
             </View>
 
             {/* Verification Details */}
-            <Text style={styles.sectionHeader}>Verification</Text>
-            <View style={styles.attestationCard}>
-                {attestation.quote_verification_status && (
-                    <AttestationRow
-                        label="Quote Status"
-                        value={attestation.quote_verification_status}
-                    />
-                )}
-                {attestation.attestation_servers_hash && (
-                    <AttestationRow
-                        label="Attestation Server"
-                        value={truncateHex(attestation.attestation_servers_hash)}
-                    />
-                )}
-                {attestation.dek_origin && (
-                    <AttestationRow label="DEK Origin" value={attestation.dek_origin} />
-                )}
-            </View>
+            {(attestation.quote_verification_status ||
+                attestation.attestation_servers_hash ||
+                attestation.dek_origin) && (
+                <>
+                    <Text style={styles.sectionHeader}>Verification</Text>
+                    <View style={styles.attestationCard}>
+                        {attestation.quote_verification_status && (
+                            <AttestationRow
+                                label="Quote Status"
+                                value={attestation.quote_verification_status}
+                            />
+                        )}
+                        {attestation.attestation_servers_hash && (
+                            <AttestationRow
+                                label="Attestation Server"
+                                value={truncateHex(attestation.attestation_servers_hash)}
+                            />
+                        )}
+                        {attestation.dek_origin && (
+                            <AttestationRow label="DEK Origin" value={attestation.dek_origin} />
+                        )}
+                    </View>
+                </>
+            )}
 
             {/* Enclave Identity */}
             <Text style={styles.sectionHeader}>Enclave Identity</Text>

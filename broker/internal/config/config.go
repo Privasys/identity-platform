@@ -10,8 +10,15 @@ import (
 )
 
 type Config struct {
-	Port        int
-	ExpoPushURL string
+	Port          int
+	ExpoPushURL   string
+	SigningKey    string // RSA private key PEM for JWT signing
+	IssuerURL     string // Public URL of this broker (JWT "iss")
+	ASAudience    string // Attestation server audience claim
+	ASRole        string // Attestation server role claim
+	AppleTeamID   string // Apple Developer Team ID
+	AppleBundleID string // App bundle identifier
+	Production    bool   // App Store (true) vs TestFlight/dev (false)
 }
 
 func Load() *Config {
@@ -27,9 +34,26 @@ func Load() *Config {
 		expoPush = "https://exp.host/--/api/v2/push/send"
 	}
 
+	asAudience := os.Getenv("AS_AUDIENCE")
+	if asAudience == "" {
+		asAudience = "attestation-server"
+	}
+
+	asRole := os.Getenv("AS_ROLE")
+	if asRole == "" {
+		asRole = "attestation-server:client"
+	}
+
 	return &Config{
-		Port:        port,
-		ExpoPushURL: expoPush,
+		Port:          port,
+		ExpoPushURL:   expoPush,
+		SigningKey:    os.Getenv("SIGNING_KEY"),
+		IssuerURL:     os.Getenv("ISSUER_URL"),
+		ASAudience:    asAudience,
+		ASRole:        asRole,
+		AppleTeamID:   os.Getenv("APPLE_TEAM_ID"),
+		AppleBundleID: os.Getenv("APPLE_BUNDLE_ID"),
+		Production:    os.Getenv("PRODUCTION") == "true",
 	}
 }
 

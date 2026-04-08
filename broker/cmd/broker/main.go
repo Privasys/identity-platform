@@ -18,8 +18,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Privasys/auth-broker/internal/appattest"
 	"github.com/Privasys/auth-broker/internal/config"
 	"github.com/Privasys/auth-broker/internal/relay"
+	"github.com/Privasys/auth-broker/internal/tokens"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -41,6 +43,33 @@ func main() {
 	mux.HandleFunc("POST /notify", func(w http.ResponseWriter, r *http.Request) {
 		relay.HandleNotify(w, r, cfg.ExpoPushURL)
 	})
+
+	// App Attest token exchange (optional — only if SIGNING_KEY is set)
+	if cfg.SigningKey != "" {
+		issuer, err := tokens.NewIssuer(tokens.Config{
+			PrivateKeyPEM: cfg.SigningKey,
+			IssuerURL:     cfg.IssuerURL,
+			Audience:      cfg.ASAudience,
+			Role:          cfg.ASRole,
+		})
+		if err != nil {
+			log.Fatalf("failed to create token issuer: %v", err)
+		}
+
+		attHandler := appattest.New(appattest.Config{
+			Issuer:     issuer,
+			TeamID:     cfg.AppleTeamID,
+			BundleID:   cfg.AppleBundleID,
+			Production: cfg.Production,
+		})
+
+		mux.HandleFunc("POST /app-token", attHandler.HandleAppToken)
+		mux.HandleFunc("GET /app-challenge", attHandler.HandleChallenge)
+		mux.HandleFunc("GET /.well-known/openid-configuration", issuer.HandleOIDCDiscovery)
+		mux.HandleFunc("GET /jwks", issuer.HandleJWKS)
+
+		log.Printf("app-token endpoints enabled (issuer: %s)", cfg.IssuerURL)
+	}
 
 	// Health
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {

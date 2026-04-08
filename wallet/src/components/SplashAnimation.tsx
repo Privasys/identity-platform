@@ -4,9 +4,9 @@
 /**
  * Custom animated splash overlay.
  *
- * Two stretched polygon shapes (green top-left, blue bottom-right) start
- * at the white diagonal divider, shake briefly, then slide apart vertically
- * to reveal the app beneath.
+ * Two large rotated rectangles (green top-left, blue bottom-right) form the
+ * icon's 135° diagonal split. The white gap shakes perpendicular to the
+ * diagonal, then both shapes slide apart vertically to reveal the app.
  */
 
 import { useEffect } from 'react';
@@ -17,42 +17,43 @@ import Animated, {
     withSequence,
     withTiming,
     withDelay,
-    withSpring,
     runOnJS,
     Easing
 } from 'react-native-reanimated';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-// How far the shapes slide off-screen
 const SLIDE_DISTANCE = SCREEN_H * 0.7;
+
+// cos(45°) = sin(45°) — perpendicular direction to the diagonal
+const PERP = Math.SQRT1_2;
 
 interface Props {
     onComplete: () => void;
 }
 
 export function SplashAnimation({ onComplete }: Props) {
-    const shakeX = useSharedValue(0);
-    const greenY = useSharedValue(0);
-    const blueY = useSharedValue(0);
+    const shakePerp = useSharedValue(0);
+    const greenSlideY = useSharedValue(0);
+    const blueSlideY = useSharedValue(0);
     const opacity = useSharedValue(1);
 
     useEffect(() => {
-        // Shake sequence: small quick oscillations
-        shakeX.value = withSequence(
-            withTiming(6, { duration: 60 }),
-            withTiming(-6, { duration: 60 }),
-            withTiming(5, { duration: 55 }),
-            withTiming(-5, { duration: 55 }),
-            withTiming(3, { duration: 50 }),
-            withTiming(-3, { duration: 50 }),
+        // Shake the white gap perpendicular to the 135° diagonal
+        shakePerp.value = withSequence(
+            withTiming(8, { duration: 60 }),
+            withTiming(-8, { duration: 60 }),
+            withTiming(7, { duration: 55 }),
+            withTiming(-7, { duration: 55 }),
+            withTiming(4, { duration: 50 }),
+            withTiming(-4, { duration: 50 }),
             withTiming(0, { duration: 40 })
         );
 
-        // After shake (~370ms), slide apart
+        // After shake (~370ms), slide apart vertically
         const slideDelay = 400;
 
-        greenY.value = withDelay(
+        greenSlideY.value = withDelay(
             slideDelay,
             withTiming(-SLIDE_DISTANCE, {
                 duration: 500,
@@ -60,7 +61,7 @@ export function SplashAnimation({ onComplete }: Props) {
             })
         );
 
-        blueY.value = withDelay(
+        blueSlideY.value = withDelay(
             slideDelay,
             withTiming(SLIDE_DISTANCE, {
                 duration: 500,
@@ -68,7 +69,6 @@ export function SplashAnimation({ onComplete }: Props) {
             })
         );
 
-        // Fade out slightly before slide completes, then signal done
         opacity.value = withDelay(
             slideDelay + 400,
             withTiming(0, { duration: 150 }, (finished) => {
@@ -81,40 +81,32 @@ export function SplashAnimation({ onComplete }: Props) {
 
     const greenStyle = useAnimatedStyle(() => ({
         transform: [
-            { translateX: shakeX.value },
-            { translateY: greenY.value }
+            { translateX: shakePerp.value * PERP },
+            { translateY: shakePerp.value * PERP + greenSlideY.value },
+            { rotate: '-45deg' }
         ],
         opacity: opacity.value
     }));
 
     const blueStyle = useAnimatedStyle(() => ({
         transform: [
-            { translateX: shakeX.value },
-            { translateY: blueY.value }
+            { translateX: shakePerp.value * PERP },
+            { translateY: shakePerp.value * PERP + blueSlideY.value },
+            { rotate: '-45deg' }
         ],
         opacity: opacity.value
     }));
 
     return (
         <Animated.View style={styles.overlay} pointerEvents="none">
-            {/* Green shape — top-left, slides up */}
             <Animated.View style={[styles.greenShape, greenStyle]} />
-            {/* Blue shape — bottom-right, slides down */}
             <Animated.View style={[styles.blueShape, blueStyle]} />
         </Animated.View>
     );
 }
 
-/**
- * The shapes are positioned to recreate the icon's diagonal split.
- * Each shape is a tall rectangle rotated 45° and offset so the white
- * diagonal gap between them sits in the centre of the screen.
- *
- * The diagonal goes from top-right to bottom-left (same as the icon).
- */
-
 const SHAPE_SIZE = Math.max(SCREEN_W, SCREEN_H) * 1.5;
-const GAP = 20; // white gap between shapes (half each side)
+const GAP = 20;
 
 const styles = StyleSheet.create({
     overlay: {
@@ -127,8 +119,6 @@ const styles = StyleSheet.create({
         width: SHAPE_SIZE,
         height: SHAPE_SIZE,
         backgroundColor: '#34C17B',
-        // Rotate and position so bottom-right edge sits at screen centre
-        transform: [{ rotate: '-45deg' }],
         top: -SHAPE_SIZE / 2 - GAP / 2,
         left: -SHAPE_SIZE / 2 + SCREEN_W / 2 - SCREEN_H * 0.05
     },
@@ -137,7 +127,6 @@ const styles = StyleSheet.create({
         width: SHAPE_SIZE,
         height: SHAPE_SIZE,
         backgroundColor: '#00AAEE',
-        transform: [{ rotate: '-45deg' }],
         top: SCREEN_H / 2 + GAP / 2 - SHAPE_SIZE / 2 + SCREEN_H * 0.05,
         left: SCREEN_W / 2 - SHAPE_SIZE / 2 + SCREEN_H * 0.05
     }

@@ -1,0 +1,9 @@
+{
+    "platforms": ["ios", "android"],
+    "ios": {
+        "modules": ["AppAttestModule"]
+    },
+    "android": {
+        "modules": ["org.privasys.appattest.AppAttestModule"]
+    }
+}

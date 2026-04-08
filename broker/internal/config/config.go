@@ -44,10 +44,20 @@ func Load() *Config {
 		asRole = "attestation-server:client"
 	}
 
+	signingKey := os.Getenv("SIGNING_KEY")
+	if signingKey == "" {
+		if f := os.Getenv("SIGNING_KEY_FILE"); f != "" {
+			data, err := os.ReadFile(f)
+			if err == nil {
+				signingKey = string(data)
+			}
+		}
+	}
+
 	return &Config{
 		Port:          port,
 		ExpoPushURL:   expoPush,
-		SigningKey:    os.Getenv("SIGNING_KEY"),
+		SigningKey:    signingKey,
 		IssuerURL:     os.Getenv("ISSUER_URL"),
 		ASAudience:    asAudience,
 		ASRole:        asRole,

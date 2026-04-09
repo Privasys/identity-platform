@@ -11,6 +11,11 @@ import { Text } from '@/components/Themed';
 import { useAuthStore } from '@/stores/auth';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
+function appName(rpId: string): string {
+    const dot = rpId.indexOf('.');
+    return dot > 0 ? rpId.substring(0, dot) : rpId;
+}
+
 export default function ServiceDetailScreen() {
     const router = useRouter();
     const { rpId } = useLocalSearchParams<{ rpId: string }>();
@@ -85,7 +90,8 @@ export default function ServiceDetailScreen() {
                                 color="#FFFFFF"
                             />
                         </RNView>
-                        <Text style={styles.serviceName}>{app.rpId}</Text>
+                        <Text style={styles.serviceName}>{appName(app.rpId)}</Text>
+                        <Text style={styles.serviceOrigin}>{app.rpId}</Text>
                         <Text style={styles.serviceMeta}>
                             {app.teeType.toUpperCase()} · Verified{' '}
                             {new Date(app.lastVerified * 1000).toLocaleDateString()}
@@ -175,6 +181,13 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#0F172A',
         textAlign: 'center',
+        marginBottom: 2
+    },
+    serviceOrigin: {
+        fontSize: 12,
+        color: '#94A3B8',
+        textAlign: 'center',
+        fontFamily: 'Inter',
         marginBottom: 4
     },
     serviceMeta: { fontSize: 13, color: '#64748B' },

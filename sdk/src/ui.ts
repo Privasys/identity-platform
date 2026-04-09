@@ -190,6 +190,14 @@ const MODAL_CSS = /* css */ `
     font-size: 13px;
     color: rgba(0,0,0,0.45);
 }
+
+/* Alternative actions (push-waiting fallbacks) */
+.alt-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 .link-btn {
     background: none;
     border: none;
@@ -711,16 +719,18 @@ export class AuthUI {
                 ),
             ),
             el('div', { className: 'divider' }, el('span', null, 'or')),
-            el('button', { className: 'btn-provider wallet', onClick: () => { this.cleanup(); this.startWallet(); } },
-                el('span', { html: ICON_SHIELD_PLAIN }),
-                el('span', { className: 'btn-label' }, 'Scan QR code instead'),
-                el('span', { className: 'btn-hint' }, 'New device'),
+            el('div', { className: 'alt-actions' },
+                el('button', { className: 'btn-provider wallet', onClick: () => { this.cleanup(); this.startWallet(); } },
+                    el('span', { html: ICON_SHIELD_PLAIN }),
+                    el('span', { className: 'btn-label' }, 'Scan QR code instead'),
+                    el('span', { className: 'btn-hint' }, 'New device'),
+                ),
+                hasWebAuthn ? el('button', { className: 'btn-provider', onClick: () => { this.cleanup(); this.startPasskey('authenticate'); } },
+                    el('span', { html: ICON_PASSKEY }),
+                    el('span', { className: 'btn-label' }, 'Sign in with passkey'),
+                    el('span', { className: 'btn-hint' }, 'Windows Hello, Touch ID, Face ID'),
+                ) : null,
             ),
-            hasWebAuthn ? el('button', { className: 'btn-provider', onClick: () => { this.cleanup(); this.startPasskey('authenticate'); } },
-                el('span', { html: ICON_PASSKEY }),
-                el('span', { className: 'btn-label' }, 'Sign in with passkey'),
-                el('span', { className: 'btn-hint' }, 'Windows Hello, Touch ID, Face ID'),
-            ) : null,
             el('div', { className: 'footer' },
                 el('button', { className: 'link-btn', onClick: () => this.handleCancel() }, 'Cancel'),
             ),

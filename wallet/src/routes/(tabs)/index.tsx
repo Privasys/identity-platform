@@ -6,6 +6,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/Themed';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
+/** Extract app name from rpId (e.g., "wasm-app-example" from "wasm-app-example.apps-test.privasys.org"). */
+function appName(rpId: string): string {
+    const dot = rpId.indexOf('.');
+    return dot > 0 ? rpId.substring(0, dot) : rpId;
+}
+
 export default function HomeScreen() {
     const { apps } = useTrustedAppsStore();
     const insets = useSafeAreaInsets();
@@ -75,7 +81,7 @@ export default function HomeScreen() {
                                     />
                                 </RNView>
                                 <RNView style={styles.serviceInfo}>
-                                    <Text style={styles.serviceName}>{app.rpId}</Text>
+                                    <Text style={styles.serviceName}>{appName(app.rpId)}</Text>
                                     <Text style={styles.serviceMeta}>
                                         {app.teeType.toUpperCase()} · Verified{' '}
                                         {new Date(app.lastVerified * 1000).toLocaleDateString()}

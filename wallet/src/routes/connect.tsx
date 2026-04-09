@@ -12,7 +12,8 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { StyleSheet, Pressable, ActivityIndicator, ScrollView, View as RNView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
@@ -25,6 +26,11 @@ import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
+
+function appName(rpId: string): string {
+    const dot = rpId.indexOf('.');
+    return dot > 0 ? rpId.substring(0, dot) : rpId;
+}
 
 type FlowStep =
     | 'verifying'
@@ -417,155 +423,178 @@ function AttestationView({
     onApprove: () => void;
     onReject: () => void;
 }) {
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const insets = useSafeAreaInsets();
     const appType = attestation.tee_type === 'sgx' ? 'WASM Application' : 'Container Application';
     const teeColor = attestation.tee_type === 'sgx' ? '#34E89E' : '#00BCF2';
 
     return (
-        <ScrollView contentContainerStyle={styles.attestationContainer}>
-            {isChanged && (
-                <View style={styles.warningBanner}>
-                    <Text style={styles.warningText}>
-                        ⚠ This app's attestation has changed since you last verified it.
-                    </Text>
-                </View>
-            )}
-
-            <Text style={styles.title}>{isChanged ? 'App Changed' : 'Verify Enclave'}</Text>
-            <Text style={styles.subtitle}>{rpId}</Text>
-
-            {/* Verification Status */}
-            <View
-                style={[
-                    styles.statusBanner,
-                    attestation.valid ? styles.statusBannerValid : styles.statusBannerInvalid
-                ]}
-            >
-                <Text style={styles.statusIcon}>{attestation.valid ? '✓' : '✕'}</Text>
-                <View style={styles.statusInfo}>
-                    <Text
-                        style={[
-                            styles.statusTitle,
-                            attestation.valid
-                                ? styles.statusTitleValid
-                                : styles.statusTitleInvalid
-                        ]}
-                    >
-                        {attestation.valid ? 'Attestation Valid' : 'Attestation Invalid'}
-                    </Text>
-                    <Text style={styles.statusDetail}>
-                        {appType} · {attestation.tee_type?.toUpperCase()} enclave
-                    </Text>
-                </View>
-                <View style={[styles.teeBadge, { backgroundColor: teeColor }]}>
-                    <Text style={styles.teeBadgeText}>{attestation.tee_type?.toUpperCase()}</Text>
-                </View>
-            </View>
-
-            {/* Verification Details */}
-            {(attestation.quote_verification_status ||
-                attestation.attestation_servers_hash ||
-                attestation.dek_origin) && (
-                <>
-                    <Text style={styles.sectionHeader}>Verification</Text>
-                    <View style={styles.attestationCard}>
-                        {attestation.quote_verification_status && (
-                            <AttestationRow
-                                label="Quote Status"
-                                value={attestation.quote_verification_status}
-                            />
-                        )}
-                        {attestation.attestation_servers_hash && (
-                            <AttestationRow
-                                label="Attestation Server"
-                                value={truncateHex(attestation.attestation_servers_hash)}
-                            />
-                        )}
-                        {attestation.dek_origin && (
-                            <AttestationRow label="DEK Origin" value={attestation.dek_origin} />
-                        )}
+        <RNView style={{ flex: 1 }}>
+            <ScrollView contentContainerStyle={[styles.attestationContainer, { paddingBottom: 100 + insets.bottom }]}>
+                {isChanged && (
+                    <View style={styles.warningBanner}>
+                        <Text style={styles.warningText}>
+                            ⚠ This app's attestation has changed since you last verified it.
+                        </Text>
                     </View>
-                </>
-            )}
+                )}
 
-            {/* Enclave Identity */}
-            <Text style={styles.sectionHeader}>Enclave Identity</Text>
-            <View style={styles.attestationCard}>
-                {attestation.mrenclave && (
-                    <AttestationRow
-                        label="MRENCLAVE"
-                        value={truncateHex(attestation.mrenclave)}
-                    />
-                )}
-                {attestation.mrsigner && (
-                    <AttestationRow
-                        label="MRSIGNER"
-                        value={truncateHex(attestation.mrsigner)}
-                    />
-                )}
-                {attestation.mrtd && (
-                    <AttestationRow label="MRTD" value={truncateHex(attestation.mrtd)} />
-                )}
-                {attestation.code_hash && (
-                    <AttestationRow
-                        label="Code Hash"
-                        value={truncateHex(attestation.code_hash)}
-                    />
-                )}
-                {attestation.config_merkle_root && (
-                    <AttestationRow
-                        label="Config Root"
-                        value={truncateHex(attestation.config_merkle_root)}
-                    />
-                )}
-            </View>
+                <Text style={styles.title}>{isChanged ? 'App Changed' : 'Verify Enclave'}</Text>
+                <Text style={styles.attestationAppName}>{appName(rpId)}</Text>
+                <Text style={styles.attestationOrigin}>{rpId}</Text>
 
-            {/* Certificate */}
-            <Text style={styles.sectionHeader}>Certificate</Text>
-            <View style={styles.attestationCard}>
-                <AttestationRow label="Subject" value={attestation.cert_subject} />
-                <AttestationRow label="Valid From" value={attestation.cert_not_before} />
-                <AttestationRow label="Valid Until" value={attestation.cert_not_after} />
-            </View>
-
-            {/* Advisory IDs */}
-            {attestation.advisory_ids && attestation.advisory_ids.length > 0 && (
-                <>
-                    <Text style={styles.sectionHeader}>Advisories</Text>
-                    <View style={styles.attestationCard}>
-                        {attestation.advisory_ids.map((id) => (
-                            <AttestationRow key={id} label={id} value="Known advisory" />
-                        ))}
+                {/* Verification Status */}
+                <View
+                    style={[
+                        styles.statusBanner,
+                        attestation.valid ? styles.statusBannerValid : styles.statusBannerInvalid
+                    ]}
+                >
+                    <Text style={styles.statusIcon}>{attestation.valid ? '✓' : '✕'}</Text>
+                    <View style={styles.statusInfo}>
+                        <Text
+                            style={[
+                                styles.statusTitle,
+                                attestation.valid
+                                    ? styles.statusTitleValid
+                                    : styles.statusTitleInvalid
+                            ]}
+                        >
+                            {attestation.valid ? 'Attestation Valid' : 'Attestation Invalid'}
+                        </Text>
+                        <Text style={styles.statusDetail}>
+                            {appType} · {attestation.tee_type?.toUpperCase()} enclave
+                        </Text>
                     </View>
-                </>
-            )}
-
-            {/* Custom OIDs */}
-            {attestation.custom_oids && attestation.custom_oids.length > 0 && (
-                <>
-                    <Text style={styles.sectionHeader}>Custom Extensions</Text>
-                    <View style={styles.attestationCard}>
-                        {attestation.custom_oids.map((oid) => (
-                            <AttestationRow
-                                key={oid.oid}
-                                label={oid.label || oid.oid}
-                                value={truncateHex(oid.value_hex)}
-                            />
-                        ))}
+                    <View style={[styles.teeBadge, { backgroundColor: teeColor }]}>
+                        <Text style={styles.teeBadgeText}>{attestation.tee_type?.toUpperCase()}</Text>
                     </View>
-                </>
-            )}
+                </View>
 
-            <View style={styles.buttonRow}>
-                <Pressable style={styles.rejectButton} onPress={onReject}>
-                    <Text style={styles.rejectButtonText}>Reject</Text>
+                {/* Collapsible details toggle */}
+                <Pressable
+                    style={styles.detailsToggle}
+                    onPress={() => setDetailsOpen(!detailsOpen)}
+                >
+                    <Text style={styles.detailsToggleText}>
+                        {detailsOpen ? 'Hide details' : 'Show attestation details'}
+                    </Text>
+                    <Text style={styles.detailsToggleIcon}>{detailsOpen ? '▲' : '▼'}</Text>
                 </Pressable>
-                <Pressable style={styles.approveButton} onPress={onApprove}>
-                    <Text style={styles.approveButtonText}>
-                        {isChanged ? 'Trust Anyway' : 'Approve'}
-                    </Text>
-                </Pressable>
-            </View>
-        </ScrollView>
+
+                {detailsOpen && (
+                    <>
+                        {/* Verification Details */}
+                        {(attestation.quote_verification_status ||
+                            attestation.attestation_servers_hash ||
+                            attestation.dek_origin) && (
+                            <>
+                                <Text style={styles.sectionHeader}>Verification</Text>
+                                <View style={styles.attestationCard}>
+                                    {attestation.quote_verification_status && (
+                                        <AttestationRow
+                                            label="Quote Status"
+                                            value={attestation.quote_verification_status}
+                                        />
+                                    )}
+                                    {attestation.attestation_servers_hash && (
+                                        <AttestationRow
+                                            label="Attestation Server"
+                                            value={truncateHex(attestation.attestation_servers_hash)}
+                                        />
+                                    )}
+                                    {attestation.dek_origin && (
+                                        <AttestationRow label="DEK Origin" value={attestation.dek_origin} />
+                                    )}
+                                </View>
+                            </>
+                        )}
+
+                        {/* Enclave Identity */}
+                        <Text style={styles.sectionHeader}>Enclave Identity</Text>
+                        <View style={styles.attestationCard}>
+                            {attestation.mrenclave && (
+                                <AttestationRow
+                                    label="MRENCLAVE"
+                                    value={truncateHex(attestation.mrenclave)}
+                                />
+                            )}
+                            {attestation.mrsigner && (
+                                <AttestationRow
+                                    label="MRSIGNER"
+                                    value={truncateHex(attestation.mrsigner)}
+                                />
+                            )}
+                            {attestation.mrtd && (
+                                <AttestationRow label="MRTD" value={truncateHex(attestation.mrtd)} />
+                            )}
+                            {attestation.code_hash && (
+                                <AttestationRow
+                                    label="Code Hash"
+                                    value={truncateHex(attestation.code_hash)}
+                                />
+                            )}
+                            {attestation.config_merkle_root && (
+                                <AttestationRow
+                                    label="Config Root"
+                                    value={truncateHex(attestation.config_merkle_root)}
+                                />
+                            )}
+                        </View>
+
+                        {/* Certificate */}
+                        <Text style={styles.sectionHeader}>Certificate</Text>
+                        <View style={styles.attestationCard}>
+                            <AttestationRow label="Subject" value={attestation.cert_subject} />
+                            <AttestationRow label="Valid From" value={attestation.cert_not_before} />
+                            <AttestationRow label="Valid Until" value={attestation.cert_not_after} />
+                        </View>
+
+                        {/* Advisory IDs */}
+                        {attestation.advisory_ids && attestation.advisory_ids.length > 0 && (
+                            <>
+                                <Text style={styles.sectionHeader}>Advisories</Text>
+                                <View style={styles.attestationCard}>
+                                    {attestation.advisory_ids.map((id) => (
+                                        <AttestationRow key={id} label={id} value="Known advisory" />
+                                    ))}
+                                </View>
+                            </>
+                        )}
+
+                        {/* Custom OIDs */}
+                        {attestation.custom_oids && attestation.custom_oids.length > 0 && (
+                            <>
+                                <Text style={styles.sectionHeader}>Custom Extensions</Text>
+                                <View style={styles.attestationCard}>
+                                    {attestation.custom_oids.map((oid) => (
+                                        <AttestationRow
+                                            key={oid.oid}
+                                            label={oid.label || oid.oid}
+                                            value={truncateHex(oid.value_hex)}
+                                        />
+                                    ))}
+                                </View>
+                            </>
+                        )}
+                    </>
+                )}
+            </ScrollView>
+
+            {/* Fixed bottom action buttons */}
+            <RNView style={[styles.bottomActions, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+                <View style={styles.buttonRow}>
+                    <Pressable style={styles.rejectButton} onPress={onReject}>
+                        <Text style={styles.rejectButtonText}>Reject</Text>
+                    </Pressable>
+                    <Pressable style={styles.approveButton} onPress={onApprove}>
+                        <Text style={styles.approveButtonText}>
+                            {isChanged ? 'Trust Anyway' : 'Approve'}
+                        </Text>
+                    </Pressable>
+                </View>
+            </RNView>
+        </RNView>
     );
 }
 
@@ -606,7 +635,50 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         paddingHorizontal: 20
     },
-    attestationContainer: { padding: 20, paddingTop: 80, paddingBottom: 40 },
+    attestationContainer: { padding: 20, paddingTop: 80 },
+    attestationAppName: {
+        fontSize: 22,
+        fontWeight: '700',
+        textAlign: 'center',
+        marginBottom: 4
+    },
+    attestationOrigin: {
+        fontSize: 12,
+        color: '#94A3B8',
+        textAlign: 'center',
+        fontFamily: 'Inter',
+        marginBottom: 20
+    },
+    detailsToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        marginBottom: 8,
+        borderRadius: 10,
+        backgroundColor: 'rgba(0,0,0,0.04)',
+        gap: 8
+    },
+    detailsToggleText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748B'
+    },
+    detailsToggleIcon: {
+        fontSize: 10,
+        color: '#94A3B8'
+    },
+    bottomActions: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        backgroundColor: '#F8FAFB',
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(0,0,0,0.1)'
+    },
     warningBanner: {
         backgroundColor: '#FFF3CD',
         borderRadius: 8,

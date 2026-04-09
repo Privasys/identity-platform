@@ -20,6 +20,8 @@ export interface Credential {
     userName: string;
     /** Epoch seconds of registration. */
     registeredAt: number;
+    /** The RP ID returned by the enclave during registration (for rpIdHash). */
+    enclaveRpId?: string;
 }
 
 export interface AuthState {

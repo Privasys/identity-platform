@@ -136,13 +136,13 @@ export default function ConnectScreen() {
                     const credential = getCredentialForRp(payload.rpId);
                     if (credential && checkUnlocked()) {
                         // Within grace period — authenticate silently
-                        await doAuthenticate(payload, credential.keyAlias, credential.credentialId);
+                        await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
                         return;
                     }
                     if (credential) {
                         // Trusted + has credential but outside grace period — prompt biometric
                         setStep('biometric');
-                        await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId);
+                        await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
                         return;
                     }
                     setStep('attestation');
@@ -168,7 +168,8 @@ export default function ConnectScreen() {
     const promptBiometricAndAuthenticate = useCallback(async (
         payload: QRPayload,
         keyAlias: string,
-        credentialId: string
+        credentialId: string,
+        enclaveRpId?: string
     ) => {
         const result = await LocalAuthentication.authenticateAsync({
             promptMessage: `Connect to ${payload.rpId}`,
@@ -187,7 +188,7 @@ export default function ConnectScreen() {
             setUnlocked(gracePeriodSec * 1000);
         }
 
-        await doAuthenticate(payload, keyAlias, credentialId);
+        await doAuthenticate(payload, keyAlias, credentialId, enclaveRpId);
     }, [gracePeriodSec]);
 
     const handleApprove = useCallback(async () => {
@@ -213,7 +214,7 @@ export default function ConnectScreen() {
 
         const credential = getCredentialForRp(qr.rpId);
         if (credential) {
-            await doAuthenticate(qr, credential.keyAlias, credential.credentialId);
+            await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
         } else {
             await doRegister(qr);
         }
@@ -244,7 +245,8 @@ export default function ConnectScreen() {
                 keyAlias,
                 userHandle: result.userHandle,
                 userName: result.userName,
-                registeredAt: Math.floor(Date.now() / 1000)
+                registeredAt: Math.floor(Date.now() / 1000),
+                enclaveRpId: result.enclaveRpId,
             });
 
             if (attestation) {
@@ -273,7 +275,8 @@ export default function ConnectScreen() {
     const doAuthenticate = async (
         payload: QRPayload,
         keyAlias: string,
-        credentialId: string
+        credentialId: string,
+        enclaveRpId?: string
     ) => {
         setStep('authenticating');
         console.log(`[CONNECT] doAuthenticate — origin=${payload.origin}, credentialId=${credentialId.substring(0, 16)}...`);
@@ -282,7 +285,8 @@ export default function ConnectScreen() {
                 payload.origin,
                 keyAlias,
                 credentialId,
-                payload.sessionId
+                payload.sessionId,
+                enclaveRpId
             );
 
             setStep('relaying');

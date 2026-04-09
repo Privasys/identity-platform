@@ -176,7 +176,7 @@ export async function register(
     origin: string,
     keyAlias: string,
     browserSessionId: string
-): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string }> {
+): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; enclaveRpId: string }> {
     // 1. Begin registration — get challenge and options from enclave
     //    Generate a random user handle (64 random bytes, base64url-encoded)
     const userHandleBytes = new Uint8Array(32);
@@ -267,7 +267,8 @@ export async function register(
         sessionToken: completeResp.session_token || '',
         credentialId: base64urlEncode(credentialIdBytes),
         userHandle: options.user.id,
-        userName: options.user.name
+        userName: options.user.name,
+        enclaveRpId: options.rp.id,
     };
 }
 
@@ -278,13 +279,15 @@ export async function register(
  * @param keyAlias  The hardware key alias.
  * @param credentialId  The credential ID to authenticate with.
  * @param browserSessionId  Session ID to relay the session token to the browser.
+ * @param rpId  The RP ID to use for rpIdHash (from enclave registration). Falls back to origin hostname.
  * @returns The session token for the browser.
  */
 export async function authenticate(
     origin: string,
     keyAlias: string,
     credentialId: string,
-    browserSessionId: string
+    browserSessionId: string,
+    rpId?: string
 ): Promise<{ sessionToken: string }> {
     // 1. Begin authentication
     const beginResp = await fido2Fetch<AuthenticateBeginResponse>(
@@ -309,7 +312,8 @@ export async function authenticate(
     const clientDataB64 = base64urlEncode(clientDataBytes);
 
     // 3. Build authenticatorData (simpler — no attested credential data)
-    const rpIdHash = sha256(new TextEncoder().encode(origin.split(':')[0]));
+    const effectiveRpId = rpId || origin.split(':')[0];
+    const rpIdHash = sha256(new TextEncoder().encode(effectiveRpId));
     const flags = new Uint8Array([0x05]); // UP | UV
     const signCount = new Uint8Array([0, 0, 0, 1]); // Incremented
 

@@ -24,6 +24,11 @@ async function getNotifications() {
 
 let ambientPushToken: string | null = null;
 
+/** Get the current push token without a hook (for non-component code). */
+export function getAmbientPushToken(): string | null {
+    return ambientPushToken;
+}
+
 export function useExpoPushToken() {
     const [expoPushToken, setExpoPushToken] = useState<string | null>(ambientPushToken);
     const router = useRouter();

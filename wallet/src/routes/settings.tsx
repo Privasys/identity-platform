@@ -6,10 +6,12 @@
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Clipboard from 'expo-clipboard';
 import { Stack, useRouter } from 'expo-router';
 import { StyleSheet, Pressable, Alert, ScrollView } from 'react-native';
 
 import { Text, View } from '@/components/Themed';
+import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
@@ -19,6 +21,7 @@ export default function SettingsScreen() {
     const { credentials, removeCredential } = useAuthStore();
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
+    const pushToken = useExpoPushToken();
 
     const handleClearAll = () => {
         Alert.alert(
@@ -128,11 +131,35 @@ export default function SettingsScreen() {
                     ))
                 )}
 
+                {/* Push Token */}
+                {pushToken ? (
+                    <>
+                        <Text style={styles.sectionTitle}>Push Token</Text>
+                        <Pressable
+                            style={styles.pushTokenCard}
+                            onPress={() => {
+                                Clipboard.setStringAsync(pushToken);
+                                Alert.alert('Copied', 'Push token copied to clipboard.');
+                            }}
+                        >
+                            <Text style={styles.pushTokenText} numberOfLines={2}>
+                                {pushToken}
+                            </Text>
+                            <Ionicons name="copy-outline" size={18} color="#64748B" />
+                        </Pressable>
+                    </>
+                ) : null}
+
                 {/* Danger Zone */}
                 <View style={styles.dangerSection}>
+                    <View style={styles.dangerDivider} />
                     <Text style={styles.dangerTitle}>Danger Zone</Text>
+                    <Text style={styles.dangerDescription}>
+                        This will remove all registered credentials, trusted apps, and local keys.
+                        You will need to re-register with each service.
+                    </Text>
                     <Pressable style={styles.dangerButton} onPress={handleClearAll}>
-                        <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+                        <Ionicons name="trash-outline" size={18} color="#DC2626" />
                         <Text style={styles.dangerButtonText}>Clear All Data</Text>
                     </Pressable>
                 </View>
@@ -171,7 +198,8 @@ const styles = StyleSheet.create({
     optionsRow: {
         flexDirection: 'row',
         gap: 8,
-        marginBottom: 12
+        marginBottom: 12,
+        backgroundColor: 'transparent'
     },
     optionButton: {
         flex: 1,
@@ -203,28 +231,60 @@ const styles = StyleSheet.create({
     credentialMeta: { fontSize: 12, color: '#64748B' },
     removeButton: { color: '#FF3B30', fontSize: 14, fontWeight: '500' },
 
+    pushTokenCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 8
+    },
+    pushTokenText: {
+        flex: 1,
+        fontSize: 12,
+        fontFamily: 'SpaceMono',
+        color: '#64748B',
+        lineHeight: 18
+    },
+
     dangerSection: {
         marginTop: 40,
         alignItems: 'center',
-        gap: 12
+        gap: 10,
+        backgroundColor: 'transparent'
+    },
+    dangerDivider: {
+        width: 40,
+        height: 1,
+        backgroundColor: '#E2E8F0',
+        marginBottom: 4
     },
     dangerTitle: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '600',
         color: '#94A3B8',
         textTransform: 'uppercase',
         letterSpacing: 0.5
     },
+    dangerDescription: {
+        fontSize: 13,
+        color: '#94A3B8',
+        textAlign: 'center',
+        lineHeight: 18,
+        maxWidth: 280,
+        marginBottom: 4
+    },
     dangerButton: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: '#FFF1F0',
-        borderRadius: 12,
-        paddingVertical: 14,
-        paddingHorizontal: 32,
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
         borderWidth: 1,
-        borderColor: '#FECACA'
+        borderColor: '#E2E8F0',
+        backgroundColor: 'transparent'
     },
-    dangerButtonText: { color: '#FF3B30', fontSize: 16, fontWeight: '600' }
+    dangerButtonText: { color: '#DC2626', fontSize: 14, fontWeight: '500' }
 });

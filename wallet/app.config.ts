@@ -83,6 +83,7 @@ export default (context: ConfigContext): ExpoConfig => {
         icon: config.icon,
         version: version,
         splash: {
+            image: './assets/splash-blank.png',
             resizeMode: 'contain',
             backgroundColor: '#FFFFFF'
         },

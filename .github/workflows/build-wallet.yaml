@@ -407,8 +407,9 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Write Google Play service account key
-        run: |
-          echo "${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}" > wallet/google-play-key.json
+        run: echo "$GOOGLE_PLAY_KEY" > wallet/google-play-key.json
+        env:
+          GOOGLE_PLAY_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}
 
       - name: Submit to Google Play
         working-directory: wallet

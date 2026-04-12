@@ -15,6 +15,8 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { useDeviceUuid } from '@/hooks/useDeviceUuid';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useAuthStore } from '@/stores/auth';
+import { useConsentStore } from '@/stores/consent';
+import { useProfileStore } from '@/stores/profile';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { checkDeviceSecurity } from '@/services/security';
@@ -86,6 +88,8 @@ export default function RootLayout() {
     useEffect(() => {
         Promise.all([
             useAuthStore.getState().hydrate(),
+            useProfileStore.getState().hydrate(),
+            useConsentStore.getState().hydrate(),
             useTrustedAppsStore.getState().hydrate(),
             useSettingsStore.getState().hydrate()
         ]).then(() => setStoresReady(true));

@@ -249,6 +249,10 @@ jobs:
 
       - name: Build iOS locally
         working-directory: wallet
+        env:
+          EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID }}
+          EXPO_PUBLIC_OAUTH_MICROSOFT_CLIENT_ID: ${{ secrets.OAUTH_MICROSOFT_CLIENT_ID }}
+          EXPO_PUBLIC_OAUTH_LINKEDIN_CLIENT_ID: ${{ secrets.OAUTH_LINKEDIN_CLIENT_ID }}
         run: |
           PROFILE="${{ inputs.profile || 'preview' }}"
           eas build \
@@ -313,6 +317,10 @@ jobs:
 
       - name: Build Android locally
         working-directory: wallet
+        env:
+          EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID }}
+          EXPO_PUBLIC_OAUTH_MICROSOFT_CLIENT_ID: ${{ secrets.OAUTH_MICROSOFT_CLIENT_ID }}
+          EXPO_PUBLIC_OAUTH_LINKEDIN_CLIENT_ID: ${{ secrets.OAUTH_LINKEDIN_CLIENT_ID }}
         run: |
           PROFILE="${{ inputs.profile || 'preview' }}"
           eas build \

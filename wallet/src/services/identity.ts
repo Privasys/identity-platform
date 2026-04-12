@@ -13,6 +13,7 @@
  * The linked identity is NOT used for enclave authentication — that's always FIDO2.
  */
 
+import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -52,21 +53,17 @@ export interface ProviderUserInfo {
     locale?: string;
 }
 
-const REDIRECT_URI = 'privasys-wallet://auth/callback';
+/** Build the redirect URI from the app's configured scheme. */
+function getRedirectUri(): string {
+    const scheme = Constants.expoConfig?.scheme ?? 'privasys-wallet';
+    return `${scheme}://auth/callback`;
+}
 
 /**
  * Built-in provider configurations.
  * Client IDs are configured per-environment.
  */
 export const PROVIDERS: Record<string, Omit<ProviderConfig, 'clientId'>> = {
-    github: {
-        provider: 'github',
-        displayName: 'GitHub',
-        authorizationEndpoint: 'https://github.com/login/oauth/authorize',
-        tokenEndpoint: 'https://github.com/login/oauth/access_token',
-        userinfoEndpoint: 'https://api.github.com/user',
-        scopes: ['read:user', 'user:email']
-    },
     google: {
         provider: 'google',
         displayName: 'Google',
@@ -135,9 +132,11 @@ export async function startAuthFlow(config: ProviderConfig): Promise<{
     const state = await generateState();
     const { verifier, challenge } = await generatePKCE();
 
+    const redirectUri = getRedirectUri();
+
     const params = new URLSearchParams({
         client_id: config.clientId,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: redirectUri,
         response_type: 'code',
         scope: config.scopes.join(' '),
         state,
@@ -147,7 +146,7 @@ export async function startAuthFlow(config: ProviderConfig): Promise<{
 
     const authUrl = `${config.authorizationEndpoint}?${params.toString()}`;
 
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
     if (result.type !== 'success' || !result.url) {
         throw new Error(result.type === 'cancel' ? 'Authentication cancelled' : 'Authentication failed');
@@ -180,7 +179,7 @@ export async function exchangeCode(
     const body = new URLSearchParams({
         client_id: config.clientId,
         code,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: getRedirectUri(),
         grant_type: 'authorization_code',
         code_verifier: codeVerifier
     });

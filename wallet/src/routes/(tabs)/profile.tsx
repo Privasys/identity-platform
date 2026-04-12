@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
+import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -44,6 +45,31 @@ export default function ProfileScreen() {
     const [editName, setEditName] = useState(profile?.displayName ?? '');
     const [editEmail, setEditEmail] = useState(profile?.email ?? '');
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
+    const [creatingProfile, setCreatingProfile] = useState(false);
+
+    const handleCreateProfile = async () => {
+        setCreatingProfile(true);
+        try {
+            const did = await generateDid();
+            const pairwiseSeed = await generatePairwiseSeed();
+            const canonicalDid = await generateCanonicalDid(pairwiseSeed);
+            useProfileStore.getState().createProfile({
+                displayName: 'Privasys User',
+                email: '',
+                avatarUri: '',
+                locale: '',
+                did,
+                canonicalDid,
+                pairwiseSeed,
+                linkedProviders: [],
+                attributes: []
+            });
+        } catch (e: any) {
+            Alert.alert('Error', `Failed to create profile: ${e.message}`);
+        } finally {
+            setCreatingProfile(false);
+        }
+    };
 
     if (!profile) {
         return (
@@ -52,8 +78,19 @@ export default function ProfileScreen() {
                     <Ionicons name="person-circle-outline" size={64} color="#C7C7CC" />
                     <Text style={styles.emptyTitle}>No profile yet</Text>
                     <Text style={styles.emptyText}>
-                        Complete onboarding to create your profile.
+                        Set up your identity to manage your data, link accounts, and control what apps can see.
                     </Text>
+                    <Pressable
+                        style={styles.createProfileButton}
+                        onPress={handleCreateProfile}
+                        disabled={creatingProfile}
+                    >
+                        {creatingProfile ? (
+                            <ActivityIndicator color="#FFFFFF" size="small" />
+                        ) : (
+                            <Text style={styles.createProfileButtonText}>Set Up Profile</Text>
+                        )}
+                    </Pressable>
                 </RNView>
             </RNView>
         );
@@ -445,6 +482,20 @@ const styles = StyleSheet.create({
     },
     emptyTitle: { fontSize: 20, fontWeight: '600', color: '#0F172A' },
     emptyText: { fontSize: 15, color: '#64748B', textAlign: 'center', lineHeight: 22 },
+    createProfileButton: {
+        backgroundColor: '#00BCF2',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        marginTop: 8,
+        alignItems: 'center' as const,
+        minWidth: 180
+    },
+    createProfileButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600' as const
+    },
 
     profileCard: {
         alignItems: 'center',

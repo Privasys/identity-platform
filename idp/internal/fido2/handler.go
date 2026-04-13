@@ -4,6 +4,10 @@
 // Package fido2 implements FIDO2/WebAuthn registration and authentication
 // for the Privasys IdP. The wallet connects here to register hardware-bound
 // credentials and authenticate via biometric-gated signing.
+//
+// Wire format matches the enclave's Fido2Request/Fido2Response so the
+// Privasys Wallet can speak to the IdP identically to how it speaks to
+// an enclave.
 package fido2
 
 import (
@@ -64,7 +68,6 @@ func NewHandler(cfg Config) (*Handler, error) {
 
 // --- User adapter for go-webauthn ---
 
-// idpUser implements webauthn.User for the go-webauthn library.
 type idpUser struct {
 	ID          []byte
 	Name        string
@@ -82,13 +85,13 @@ func (u *idpUser) WebAuthnCredentials() []webauthn.Credential { return u.Credent
 type challengeEntry struct {
 	sessionData *webauthn.SessionData
 	user        *idpUser
-	sessionID   string // Authorization session ID (for linking to OIDC flow)
+	sessionID   string // OIDC authorization session ID
 	expiresAt   time.Time
 }
 
 type challengeStore struct {
 	mu         sync.Mutex
-	challenges map[string]*challengeEntry // keyed by challenge string
+	challenges map[string]*challengeEntry
 }
 
 func newChallengeStore() *challengeStore {
@@ -131,165 +134,90 @@ func (cs *challengeStore) cleanup() {
 	}
 }
 
+// --- Helpers ---
+
+func writeJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(v)
+}
+
+func errorJSON(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"type": "error", "error": msg})
+}
+
+func generateUserID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func generateToken() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
 // --- Registration ---
 
-// BeginRegistration handles POST /fido2/register/begin.
-// The wallet calls this to start a new credential registration.
+// BeginRegistration handles POST /fido2/register/begin?session_id=...
+//
+// Returns standard WebAuthn PublicKeyCredentialCreationOptions.
+//
+// Request body:
+//
+//	{"userName": "...", "userHandle": "..."}
+//
+// Response (standard CredentialCreation — go-webauthn native JSON):
+//
+//	{"publicKey": {"rp": {...}, "user": {...}, "challenge": "...", ...}}
 func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("session_id")
+
 	var req struct {
-		UserID      string `json:"user_id"`
-		DisplayName string `json:"display_name"`
-		Email       string `json:"email"`
-		SessionID   string `json:"session_id"` // OIDC authorization session
+		UserName   string `json:"userName"`
+		UserHandle string `json:"userHandle"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		errorJSON(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	// Generate user ID if not provided.
-	if req.UserID == "" {
-		req.UserID = generateUserID()
+	userID := req.UserHandle
+	if userID == "" {
+		userID = generateUserID()
 	}
 
 	// Ensure user exists in DB.
 	_, err := h.db.Exec(`
 		INSERT INTO users (user_id, display_name, email) VALUES (?, ?, ?)
-		ON CONFLICT(user_id) DO UPDATE SET 
+		ON CONFLICT(user_id) DO UPDATE SET
 			display_name = CASE WHEN excluded.display_name != '' THEN excluded.display_name ELSE users.display_name END,
-			email = CASE WHEN excluded.email != '' THEN excluded.email ELSE users.email END,
 			updated_at = CURRENT_TIMESTAMP
-	`, req.UserID, req.DisplayName, req.Email)
+	`, userID, req.UserName, "")
 	if err != nil {
 		log.Printf("fido2/register/begin: user upsert failed: %v", err)
-		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
+		errorJSON(w, http.StatusInternalServerError, "database error")
 		return
 	}
 
-	// Load existing credentials for exclusion.
-	existingCreds, err := h.loadCredentials(req.UserID)
+	existingCreds, err := h.loadCredentials(userID)
 	if err != nil {
 		log.Printf("fido2/register/begin: load credentials failed: %v", err)
 	}
 
 	user := &idpUser{
-		ID:          []byte(req.UserID),
-		Name:        req.Email,
-		DisplayName: req.DisplayName,
+		ID:          []byte(userID),
+		Name:        req.UserName,
+		DisplayName: req.UserName,
 		Credentials: existingCreds,
 	}
 
 	options, sessionData, err := h.webAuthn.BeginRegistration(user)
 	if err != nil {
 		log.Printf("fido2/register/begin: %v", err)
-		http.Error(w, `{"error":"registration failed"}`, http.StatusInternalServerError)
-		return
-	}
-
-	// Store challenge for verification.
-	challengeKey := sessionData.Challenge
-	h.challenges.put(challengeKey, &challengeEntry{
-		sessionData: sessionData,
-		user:        user,
-		sessionID:   req.SessionID,
-		expiresAt:   time.Now().Add(5 * time.Minute),
-	})
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"options":       options,
-		"challenge_key": challengeKey,
-		"user_id":       req.UserID,
-	})
-}
-
-// CompleteRegistration handles POST /fido2/register/complete.
-func (h *Handler) CompleteRegistration(w http.ResponseWriter, r *http.Request) {
-	challengeKey := r.URL.Query().Get("challenge_key")
-	if challengeKey == "" {
-		challengeKey = r.Header.Get("X-Challenge-Key")
-	}
-
-	if challengeKey == "" {
-		http.Error(w, `{"error":"challenge_key required"}`, http.StatusBadRequest)
-		return
-	}
-
-	entry, ok := h.challenges.pop(challengeKey)
-	if !ok {
-		http.Error(w, `{"error":"challenge expired or not found"}`, http.StatusBadRequest)
-		return
-	}
-
-	credential, err := h.webAuthn.FinishRegistration(entry.user, *entry.sessionData, r)
-	if err != nil {
-		log.Printf("fido2/register/complete: %v", err)
-		http.Error(w, fmt.Sprintf(`{"error":"registration verification failed: %s"}`, err), http.StatusBadRequest)
-		return
-	}
-
-	// Store credential in DB.
-	credID := base64.RawURLEncoding.EncodeToString(credential.ID)
-	pubKeyBytes, _ := json.Marshal(credential.PublicKey)
-	aaguid := hex.EncodeToString(credential.Authenticator.AAGUID)
-
-	_, err = h.db.Exec(`
-		INSERT INTO credentials (credential_id, user_id, public_key, aaguid, sign_count, attestation_type)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, credID, string(entry.user.ID), pubKeyBytes, aaguid,
-		credential.Authenticator.SignCount, credential.AttestationType)
-	if err != nil {
-		log.Printf("fido2/register/complete: store credential: %v", err)
-		http.Error(w, `{"error":"credential storage failed"}`, http.StatusInternalServerError)
-		return
-	}
-
-	log.Printf("fido2: registered credential %s for user %s (aaguid: %s)",
-		credID[:16]+"...", string(entry.user.ID), aaguid)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":        "ok",
-		"credential_id": credID,
-		"user_id":       string(entry.user.ID),
-	})
-}
-
-// --- Authentication ---
-
-// BeginAuthentication handles POST /fido2/authenticate/begin.
-func (h *Handler) BeginAuthentication(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		UserID    string `json:"user_id"`
-		SessionID string `json:"session_id"` // OIDC authorization session
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
-		return
-	}
-
-	if req.UserID == "" {
-		http.Error(w, `{"error":"user_id required"}`, http.StatusBadRequest)
-		return
-	}
-
-	// Load user's credentials.
-	creds, err := h.loadCredentials(req.UserID)
-	if err != nil || len(creds) == 0 {
-		http.Error(w, `{"error":"no credentials found for user"}`, http.StatusNotFound)
-		return
-	}
-
-	user := &idpUser{
-		ID:          []byte(req.UserID),
-		Name:        req.UserID,
-		Credentials: creds,
-	}
-
-	options, sessionData, err := h.webAuthn.BeginLogin(user)
-	if err != nil {
-		log.Printf("fido2/authenticate/begin: %v", err)
-		http.Error(w, `{"error":"authentication failed"}`, http.StatusInternalServerError)
+		errorJSON(w, http.StatusInternalServerError, "registration failed")
 		return
 	}
 
@@ -297,61 +225,75 @@ func (h *Handler) BeginAuthentication(w http.ResponseWriter, r *http.Request) {
 	h.challenges.put(challengeKey, &challengeEntry{
 		sessionData: sessionData,
 		user:        user,
-		sessionID:   req.SessionID,
+		sessionID:   sessionID,
 		expiresAt:   time.Now().Add(5 * time.Minute),
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"options":       options,
-		"challenge_key": challengeKey,
-	})
+	// Return standard WebAuthn CredentialCreation options.
+	writeJSON(w, options)
 }
 
-// CompleteAuthentication handles POST /fido2/authenticate/complete.
-// On success, it generates an authorization code and marks the OIDC session as authenticated.
-func (h *Handler) CompleteAuthentication(
+// CompleteRegistration handles POST /fido2/register/complete?challenge=...
+//
+// The request body is a standard WebAuthn AuthenticatorAttestationResponse.
+// go-webauthn parses and verifies it directly from the request.
+//
+// Request body (standard WebAuthn):
+//
+//	{"id": "...", "rawId": "...", "type": "public-key",
+//	 "response": {"clientDataJSON": "...", "attestationObject": "..."}}
+//
+// Response:
+//
+//	{"status": "ok", "sessionToken": "..."}
+func (h *Handler) CompleteRegistration(
 	codeStore *oidc.CodeStore,
 	sessionStore *oidc.SessionStore,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		challengeKey := r.URL.Query().Get("challenge_key")
-		if challengeKey == "" {
-			challengeKey = r.Header.Get("X-Challenge-Key")
-		}
-		if challengeKey == "" {
-			http.Error(w, `{"error":"challenge_key required"}`, http.StatusBadRequest)
+		challenge := r.URL.Query().Get("challenge")
+		if challenge == "" {
+			errorJSON(w, http.StatusBadRequest, "missing challenge parameter")
 			return
 		}
 
-		entry, ok := h.challenges.pop(challengeKey)
+		entry, ok := h.challenges.pop(challenge)
 		if !ok {
-			http.Error(w, `{"error":"challenge expired or not found"}`, http.StatusBadRequest)
+			errorJSON(w, http.StatusBadRequest, "challenge expired or not found")
 			return
 		}
 
-		credential, err := h.webAuthn.FinishLogin(entry.user, *entry.sessionData, r)
+		// Body is standard WebAuthn JSON — go-webauthn reads it directly.
+		credential, err := h.webAuthn.FinishRegistration(entry.user, *entry.sessionData, r)
 		if err != nil {
-			log.Printf("fido2/authenticate/complete: %v", err)
-			http.Error(w, fmt.Sprintf(`{"error":"authentication verification failed: %s"}`, err),
-				http.StatusBadRequest)
+			log.Printf("fido2/register/complete: %v", err)
+			errorJSON(w, http.StatusBadRequest, fmt.Sprintf("registration verification failed: %s", err))
 			return
 		}
 
-		// Update sign count.
+		// Store credential in DB.
 		credID := base64.RawURLEncoding.EncodeToString(credential.ID)
-		h.db.Exec("UPDATE credentials SET sign_count = ? WHERE credential_id = ?",
-			credential.Authenticator.SignCount, credID)
+		pubKeyBytes, _ := json.Marshal(credential.PublicKey)
+		aaguid := hex.EncodeToString(credential.Authenticator.AAGUID)
+
+		_, err = h.db.Exec(`
+			INSERT INTO credentials (credential_id, user_id, public_key, aaguid, sign_count, attestation_type)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, credID, string(entry.user.ID), pubKeyBytes, aaguid,
+			credential.Authenticator.SignCount, credential.AttestationType)
+		if err != nil {
+			log.Printf("fido2/register/complete: store credential: %v", err)
+			errorJSON(w, http.StatusInternalServerError, "credential storage failed")
+			return
+		}
 
 		userID := string(entry.user.ID)
-		log.Printf("fido2: authenticated user %s (credential %s...)", userID, credID[:16])
+		log.Printf("fido2: registered credential %s for user %s (aaguid: %s)",
+			credID[:16]+"...", userID, aaguid)
 
-		resp := map[string]interface{}{
-			"status":  "ok",
-			"user_id": userID,
-		}
+		sessionToken := generateToken()
 
-		// If this is part of an OIDC authorization flow, generate an auth code.
+		// Mark OIDC session complete (first-time users register, not authenticate).
 		if entry.sessionID != "" {
 			session, ok := sessionStore.Get(entry.sessionID)
 			if ok {
@@ -365,18 +307,152 @@ func (h *Handler) CompleteAuthentication(
 					CodeChallengeMethod: session.CodeChallengeMethod,
 					AuthTime:            time.Now(),
 				})
-
 				sessionStore.Complete(entry.sessionID, userID, authCode)
-
-				resp["auth_code"] = authCode
-				resp["redirect_uri"] = session.RedirectURI +
-					"?code=" + authCode +
-					"&state=" + session.State
 			}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		writeJSON(w, map[string]interface{}{
+			"status":       "ok",
+			"sessionToken": sessionToken,
+		})
+	}
+}
+
+// --- Authentication ---
+
+// BeginAuthentication handles POST /fido2/authenticate/begin?session_id=...
+//
+// Returns standard WebAuthn PublicKeyCredentialRequestOptions.
+//
+// Request body:
+//
+//	{"credentialId": "..."}
+//
+// Response (standard CredentialAssertion — go-webauthn native JSON):
+//
+//	{"publicKey": {"challenge": "...", "rpId": "...", "allowCredentials": [...], ...}}
+func (h *Handler) BeginAuthentication(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("session_id")
+
+	var req struct {
+		CredentialID string `json:"credentialId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorJSON(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Find user by credential ID.
+	var userID string
+	err := h.db.QueryRow(
+		"SELECT user_id FROM credentials WHERE credential_id = ?",
+		req.CredentialID,
+	).Scan(&userID)
+	if err != nil {
+		errorJSON(w, http.StatusNotFound, "no credentials found for user")
+		return
+	}
+
+	creds, err := h.loadCredentials(userID)
+	if err != nil || len(creds) == 0 {
+		errorJSON(w, http.StatusNotFound, "no credentials found for user")
+		return
+	}
+
+	user := &idpUser{
+		ID:          []byte(userID),
+		Name:        userID,
+		Credentials: creds,
+	}
+
+	options, sessionData, err := h.webAuthn.BeginLogin(user)
+	if err != nil {
+		log.Printf("fido2/authenticate/begin: %v", err)
+		errorJSON(w, http.StatusInternalServerError, "authentication failed")
+		return
+	}
+
+	challengeKey := sessionData.Challenge
+	h.challenges.put(challengeKey, &challengeEntry{
+		sessionData: sessionData,
+		user:        user,
+		sessionID:   sessionID,
+		expiresAt:   time.Now().Add(5 * time.Minute),
+	})
+
+	// Return standard WebAuthn CredentialAssertion options.
+	writeJSON(w, options)
+}
+
+// CompleteAuthentication handles POST /fido2/authenticate/complete?challenge=...
+//
+// The request body is a standard WebAuthn AuthenticatorAssertionResponse.
+// go-webauthn parses and verifies it directly from the request.
+//
+// Request body (standard WebAuthn):
+//
+//	{"id": "...", "rawId": "...", "type": "public-key",
+//	 "response": {"clientDataJSON": "...", "authenticatorData": "...", "signature": "..."}}
+//
+// Response:
+//
+//	{"status": "ok", "sessionToken": "..."}
+func (h *Handler) CompleteAuthentication(
+	codeStore *oidc.CodeStore,
+	sessionStore *oidc.SessionStore,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		challenge := r.URL.Query().Get("challenge")
+		if challenge == "" {
+			errorJSON(w, http.StatusBadRequest, "missing challenge parameter")
+			return
+		}
+
+		entry, ok := h.challenges.pop(challenge)
+		if !ok {
+			errorJSON(w, http.StatusBadRequest, "challenge expired or not found")
+			return
+		}
+
+		// Body is standard WebAuthn JSON — go-webauthn reads it directly.
+		credential, err := h.webAuthn.FinishLogin(entry.user, *entry.sessionData, r)
+		if err != nil {
+			log.Printf("fido2/authenticate/complete: %v", err)
+			errorJSON(w, http.StatusBadRequest, fmt.Sprintf("authentication verification failed: %s", err))
+			return
+		}
+
+		credID := base64.RawURLEncoding.EncodeToString(credential.ID)
+		h.db.Exec("UPDATE credentials SET sign_count = ? WHERE credential_id = ?",
+			credential.Authenticator.SignCount, credID)
+
+		userID := string(entry.user.ID)
+		log.Printf("fido2: authenticated user %s (credential %s...)", userID, credID[:16])
+
+		sessionToken := generateToken()
+
+		// Generate OIDC auth code and mark session complete.
+		if entry.sessionID != "" {
+			session, ok := sessionStore.Get(entry.sessionID)
+			if ok {
+				authCode := codeStore.Create(&oidc.AuthCode{
+					ClientID:            session.ClientID,
+					RedirectURI:         session.RedirectURI,
+					UserID:              userID,
+					Scope:               session.Scope,
+					Nonce:               session.Nonce,
+					CodeChallenge:       session.CodeChallenge,
+					CodeChallengeMethod: session.CodeChallengeMethod,
+					AuthTime:            time.Now(),
+				})
+				sessionStore.Complete(entry.sessionID, userID, authCode)
+			}
+		}
+
+		writeJSON(w, map[string]interface{}{
+			"status":       "ok",
+			"sessionToken": sessionToken,
+		})
 	}
 }
 
@@ -421,10 +497,4 @@ func (h *Handler) loadCredentials(userID string) ([]webauthn.Credential, error) 
 	}
 
 	return creds, nil
-}
-
-func generateUserID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
 }

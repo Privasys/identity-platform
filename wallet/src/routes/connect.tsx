@@ -126,6 +126,37 @@ export default function ConnectScreen() {
                     result = await inspectAttestation(payload.origin);
                 }
                 console.log(`[CONNECT] attestation OK — mrenclave=${result.mrenclave?.substring(0, 16)}...`);
+
+                // Non-enclave backend: no enclave measurements → skip attestation approval.
+                if (!result.mrenclave && !result.mrtd) {
+                    console.log('[CONNECT] no enclave measurements — skipping attestation approval');
+                    const credential = getCredentialForRp(payload.rpId);
+                    if (credential) {
+                        // Returning user — show confirmation ("Sign in?")
+                        setIsTrusted(true);
+                        setStep('confirm');
+                        return;
+                    }
+                    // First time — biometric then register (no attestation to approve)
+                    setStep('biometric');
+                    const bioResult = await LocalAuthentication.authenticateAsync({
+                        promptMessage: `Connect to ${payload.rpId}`,
+                        fallbackLabel: 'Use Passcode',
+                        cancelLabel: 'Cancel',
+                        disableDeviceFallback: false,
+                    });
+                    if (!bioResult.success) {
+                        setError('Authentication cancelled');
+                        setStep('error');
+                        return;
+                    }
+                    if (gracePeriodSec > 0) {
+                        setUnlocked(gracePeriodSec * 1000);
+                    }
+                    await doRegister(payload);
+                    return;
+                }
+
                 setAttestation(result);
 
                 // Check if this is a trusted app with matching attestation
@@ -163,7 +194,7 @@ export default function ConnectScreen() {
                 setStep('error');
             }
         },
-        [getApp, isAttestationMatch, getCredentialForRp, checkUnlocked]
+        [getApp, isAttestationMatch, getCredentialForRp, checkUnlocked, gracePeriodSec]
     );
 
     const promptBiometricAndAuthenticate = useCallback(async (

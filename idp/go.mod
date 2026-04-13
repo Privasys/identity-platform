@@ -15,6 +15,7 @@ require (
 	github.com/google/go-tpm v0.9.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 )

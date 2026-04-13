@@ -14,47 +14,39 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
 
-// ── Wire types matching the enclave's Fido2Request/Fido2Response ────────
-// Enclave uses serde(tag = "type") — responses are flat with a `type` field.
+// ── Wire types matching the WebAuthn specification ──────────────────────
+// Server returns standard PublicKeyCredentialCreationOptions / RequestOptions.
+// Wallet sends standard AuthenticatorAttestationResponse / AssertionResponse.
 
-interface RegisterBeginResponse {
-    type: 'register_options';
-    challenge: string;
-    rp: { id: string; name: string };
-    user: { id: string; name: string; display_name: string };
-    pub_key_cred_params: Array<{ type: string; alg: number }>;
-    authenticator_selection: {
-        authenticator_attachment: string;
-        user_verification: string;
+interface CredentialCreationOptions {
+    publicKey: {
+        rp: { id: string; name: string };
+        user: { id: string; name: string; displayName: string };
+        challenge: string; // base64url
+        pubKeyCredParams: Array<{ type: string; alg: number }>;
+        timeout?: number;
+        authenticatorSelection?: {
+            authenticatorAttachment?: string;
+            userVerification?: string;
+        };
+        attestation?: string;
     };
-    attestation: string;
 }
 
-interface RegisterCompleteResponse {
-    type: 'register_ok';
+interface CredentialAssertionOptions {
+    publicKey: {
+        challenge: string; // base64url
+        timeout?: number;
+        rpId?: string;
+        allowCredentials?: Array<{ type: string; id: string }>;
+        userVerification?: string;
+    };
+}
+
+interface CompleteResponse {
     status: string;
-    session_token?: string;
+    sessionToken?: string;
 }
-
-interface AuthenticateBeginResponse {
-    type: 'authenticate_options';
-    challenge: string;
-    allow_credentials?: Array<{ type: string; id: string }>;
-    user_verification: string;
-}
-
-interface AuthenticateCompleteResponse {
-    type: 'authenticate_ok';
-    status: string;
-    session_token?: string;
-}
-
-interface Fido2Error {
-    type: 'error';
-    error: string;
-}
-
-type Fido2Response<T> = T | Fido2Error;
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -104,13 +96,13 @@ async function fido2Fetch<T extends object>(origin: string, path: string, body?:
         throw new Error(`FIDO2 request failed: ${result.status} — ${result.body.substring(0, 200)}`);
     }
 
-    const json: Fido2Response<T> = JSON.parse(result.body);
-    if ('type' in json && (json as any).type === 'error') {
-        const msg = (json as Fido2Error).error;
-        console.error(`[FIDO2] ${path} — enclave error: ${msg}`);
+    const json: T = JSON.parse(result.body);
+    if ('error' in json && typeof (json as any).error === 'string') {
+        const msg = (json as any).error;
+        console.error(`[FIDO2] ${path} — server error: ${msg}`);
         throw new Error(`FIDO2 error: ${msg}`);
     }
-    return json as T;
+    return json;
 }
 
 // ── CBOR encoding (minimal, for WebAuthn attestation objects) ───────────
@@ -177,23 +169,21 @@ export async function register(
     keyAlias: string,
     browserSessionId: string
 ): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; enclaveRpId: string }> {
-    // 1. Begin registration — get challenge and options from enclave
-    //    Generate a random user handle (64 random bytes, base64url-encoded)
+    // 1. Begin registration — get challenge and options from server
+    //    Generate a random user handle (32 random bytes, base64url-encoded)
     const userHandleBytes = new Uint8Array(32);
     crypto.getRandomValues(userHandleBytes);
     const userHandle = base64urlEncode(userHandleBytes);
 
-    const beginResp = await fido2Fetch<RegisterBeginResponse>(
+    const beginResp = await fido2Fetch<CredentialCreationOptions>(
         origin,
-        '/fido2/register/begin',
+        `/fido2/register/begin?session_id=${encodeURIComponent(browserSessionId)}`,
         {
-            type: 'register_begin',
-            user_name: keyAlias,
-            user_handle: userHandle,
-            browser_session_id: browserSessionId,
+            userName: keyAlias,
+            userHandle,
         }
     );
-    const options = beginResp;
+    const options = beginResp.publicKey;
 
     // 2. Generate or retrieve hardware key
     const keyInfo = await NativeKeys.generateKey(keyAlias, true);
@@ -249,23 +239,25 @@ export async function register(
     // 6. Build attestation object CBOR: { "fmt": "none", "attStmt": {}, "authData": <bytes> }
     const attestationObject = buildAttestationObject(authData);
 
-    // 7. Complete registration
-    const completeResp = await fido2Fetch<RegisterCompleteResponse>(
+    // 7. Complete registration — send standard WebAuthn credential response
+    const credentialIdB64 = base64urlEncode(credentialIdBytes);
+    const completeResp = await fido2Fetch<CompleteResponse>(
         origin,
-        '/fido2/register/complete',
+        `/fido2/register/complete?challenge=${encodeURIComponent(options.challenge)}`,
         {
-            type: 'register_complete',
-            challenge: options.challenge,
-            credential_id: base64urlEncode(credentialIdBytes),
-            client_data_json: clientDataB64,
-            attestation_object: base64urlEncode(attestationObject),
-            browser_session_id: browserSessionId,
+            id: credentialIdB64,
+            rawId: credentialIdB64,
+            type: 'public-key',
+            response: {
+                clientDataJSON: clientDataB64,
+                attestationObject: base64urlEncode(attestationObject),
+            },
         }
     );
 
     return {
-        sessionToken: completeResp.session_token || '',
-        credentialId: base64urlEncode(credentialIdBytes),
+        sessionToken: completeResp.sessionToken || '',
+        credentialId: credentialIdB64,
         userHandle: options.user.id,
         userName: options.user.name,
         enclaveRpId: options.rp.id,
@@ -290,16 +282,14 @@ export async function authenticate(
     rpId?: string
 ): Promise<{ sessionToken: string }> {
     // 1. Begin authentication
-    const beginResp = await fido2Fetch<AuthenticateBeginResponse>(
+    const beginResp = await fido2Fetch<CredentialAssertionOptions>(
         origin,
-        '/fido2/authenticate/begin',
+        `/fido2/authenticate/begin?session_id=${encodeURIComponent(browserSessionId)}`,
         {
-            type: 'authenticate_begin',
-            credential_id: credentialId,
-            browser_session_id: browserSessionId,
+            credentialId,
         }
     );
-    const options = beginResp;
+    const options = beginResp.publicKey;
 
     // 2. Build clientDataJSON
     const clientData = JSON.stringify({
@@ -320,28 +310,29 @@ export async function authenticate(
     const authData = concat([rpIdHash, flags, signCount]);
     const authDataB64 = base64urlEncode(authData);
 
-    // 4. Sign: SHA-256(authData || SHA-256(clientDataJSON))
+    // 4. Sign: authData || SHA-256(clientDataJSON) per WebAuthn spec
     const clientDataHash = sha256(clientDataBytes);
     const signedData = concat([authData, clientDataHash]);
     const signedDataB64 = base64urlEncode(signedData);
     const sigResult = await NativeKeys.sign(keyAlias, signedDataB64);
 
-    // 5. Complete authentication
-    const completeResp = await fido2Fetch<AuthenticateCompleteResponse>(
+    // 5. Complete authentication — send standard WebAuthn assertion response
+    const completeResp = await fido2Fetch<CompleteResponse>(
         origin,
-        '/fido2/authenticate/complete',
+        `/fido2/authenticate/complete?challenge=${encodeURIComponent(options.challenge)}`,
         {
-            type: 'authenticate_complete',
-            challenge: options.challenge,
-            credential_id: credentialId,
-            client_data_json: clientDataB64,
-            authenticator_data: authDataB64,
-            signature: sigResult.signature,
-            browser_session_id: browserSessionId,
+            id: credentialId,
+            rawId: credentialId,
+            type: 'public-key',
+            response: {
+                clientDataJSON: clientDataB64,
+                authenticatorData: authDataB64,
+                signature: sigResult.signature,
+            },
         }
     );
 
-    return { sessionToken: completeResp.session_token || '' };
+    return { sessionToken: completeResp.sessionToken || '' };
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────

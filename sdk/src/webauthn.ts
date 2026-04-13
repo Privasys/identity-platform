@@ -124,18 +124,20 @@ export class WebAuthnClient {
             const userHandle = base64urlEncode(
                 crypto.getRandomValues(new Uint8Array(32)).buffer,
             );
-            const browserSessionId = randomHex(16);
+            const sessionId = randomHex(16);
 
-            // 1. Get registration options from the enclave
-            const opts = await this.fido2Fetch({
-                type: 'register_begin',
-                user_name: userName ?? globalThis.location?.hostname ?? 'user',
-                user_handle: userHandle,
-                browser_session_id: browserSessionId,
-            });
+            // 1. Get standard WebAuthn registration options from the enclave
+            const opts = await this.fido2Fetch(
+                'register/begin',
+                {
+                    userName: userName ?? globalThis.location?.hostname ?? 'user',
+                    userHandle,
+                },
+                { session_id: sessionId },
+            );
 
-            if (opts.type === 'error') throw new Error(opts.error ?? 'Registration begin failed');
-            if (opts.type !== 'register_options') throw new Error(`Unexpected response: ${opts.type}`);
+            const publicKey = opts.publicKey;
+            if (!publicKey) throw new Error('Missing publicKey in registration options');
 
             // 2. Build PublicKeyCredentialCreationOptions
             //    Force authenticatorAttachment to "platform" so only the
@@ -143,33 +145,31 @@ export class WebAuthnClient {
             //    offered.  Cross-device passkeys (phone QR) use the Privasys
             //    Wallet relay flow instead — the CTAP2 hybrid QR protocol is
             //    incompatible with the wallet's custom QR format.
-            const enclaveAuthSel = opts.authenticator_selection ?? {};
-            const authSel: AuthenticatorSelectionCriteria = {
-                authenticatorAttachment: 'platform' as AuthenticatorAttachment,
-                residentKey: (enclaveAuthSel.resident_key ?? 'preferred') as ResidentKeyRequirement,
-                userVerification: (enclaveAuthSel.user_verification ?? 'preferred') as UserVerificationRequirement,
-            };
             const createOptions: CredentialCreationOptions = {
                 publicKey: {
-                    challenge: base64urlDecode(opts.challenge),
-                    rp: { id: opts.rp.id, name: opts.rp.name },
+                    challenge: base64urlDecode(publicKey.challenge),
+                    rp: { id: publicKey.rp.id, name: publicKey.rp.name },
                     user: {
-                        id: base64urlDecode(opts.user.id),
-                        name: opts.user.name,
-                        displayName: opts.user.display_name ?? opts.user.name,
+                        id: base64urlDecode(publicKey.user.id),
+                        name: publicKey.user.name,
+                        displayName: publicKey.user.displayName ?? publicKey.user.name,
                     },
-                    pubKeyCredParams: (opts.pub_key_cred_params ?? []).map(
+                    pubKeyCredParams: (publicKey.pubKeyCredParams ?? []).map(
                         (p: { type?: string; alg: number }) => ({
                             type: (p.type ?? 'public-key') as PublicKeyCredentialType,
                             alg: p.alg,
                         }),
                     ),
                     timeout: this.config.timeout,
-                    attestation: (opts.attestation ?? 'none') as AttestationConveyancePreference,
-                    authenticatorSelection: authSel,
-                    ...(opts.exclude_credentials
+                    attestation: (publicKey.attestation ?? 'none') as AttestationConveyancePreference,
+                    authenticatorSelection: {
+                        authenticatorAttachment: 'platform' as AuthenticatorAttachment,
+                        residentKey: (publicKey.authenticatorSelection?.residentKey ?? 'preferred') as ResidentKeyRequirement,
+                        userVerification: (publicKey.authenticatorSelection?.userVerification ?? 'preferred') as UserVerificationRequirement,
+                    },
+                    ...(publicKey.excludeCredentials
                         ? {
-                              excludeCredentials: opts.exclude_credentials.map(
+                              excludeCredentials: publicKey.excludeCredentials.map(
                                   (c: { id: string }) => ({
                                       type: 'public-key' as const,
                                       id: base64urlDecode(c.id),
@@ -191,21 +191,23 @@ export class WebAuthnClient {
 
             this.setState('verifying');
 
-            // 4. Send attestation to the enclave
+            // 4. Send standard WebAuthn attestation response to the enclave
             const response = credential.response as AuthenticatorAttestationResponse;
-            const result = await this.fido2Fetch({
-                type: 'register_complete',
-                challenge: opts.challenge,
-                attestation_object: base64urlEncode(response.attestationObject),
-                client_data_json: base64urlEncode(response.clientDataJSON),
-                credential_id: base64urlEncode(credential.rawId),
-                browser_session_id: browserSessionId,
-            });
+            const result = await this.fido2Fetch(
+                'register/complete',
+                {
+                    id: base64urlEncode(credential.rawId),
+                    rawId: base64urlEncode(credential.rawId),
+                    type: 'public-key',
+                    response: {
+                        attestationObject: base64urlEncode(response.attestationObject),
+                        clientDataJSON: base64urlEncode(response.clientDataJSON),
+                    },
+                },
+                { challenge: publicKey.challenge },
+            );
 
-            if (result.type === 'error') throw new Error(result.error ?? 'Registration failed');
-            if (result.type !== 'register_ok') throw new Error(`Unexpected: ${result.type}`);
-
-            return this.complete(result.session_token ?? '', browserSessionId);
+            return this.complete(result.sessionToken ?? '', sessionId);
         } catch (err) {
             return this.fail(err);
         }
@@ -222,27 +224,28 @@ export class WebAuthnClient {
         this.setState('requesting-options');
 
         try {
-            const browserSessionId = randomHex(16);
+            const sessionId = randomHex(16);
 
-            // 1. Get authentication options from the enclave
-            const opts = await this.fido2Fetch({
-                type: 'authenticate_begin',
-                browser_session_id: browserSessionId,
-            });
+            // 1. Get standard WebAuthn authentication options from the enclave
+            const opts = await this.fido2Fetch(
+                'authenticate/begin',
+                {},
+                { session_id: sessionId },
+            );
 
-            if (opts.type === 'error') throw new Error(opts.error ?? 'Authentication begin failed');
-            if (opts.type !== 'authenticate_options') throw new Error(`Unexpected response: ${opts.type}`);
+            const publicKey = opts.publicKey;
+            if (!publicKey) throw new Error('Missing publicKey in authentication options');
 
             // 2. Build PublicKeyCredentialRequestOptions
             const getOptions: CredentialRequestOptions = {
                 publicKey: {
-                    challenge: base64urlDecode(opts.challenge),
-                    rpId: opts.rp_id,
+                    challenge: base64urlDecode(publicKey.challenge),
+                    rpId: publicKey.rpId,
                     timeout: this.config.timeout,
-                    userVerification: (opts.user_verification ?? 'preferred') as UserVerificationRequirement,
-                    ...(opts.allow_credentials?.length
+                    userVerification: (publicKey.userVerification ?? 'preferred') as UserVerificationRequirement,
+                    ...(publicKey.allowCredentials?.length
                         ? {
-                              allowCredentials: opts.allow_credentials.map(
+                              allowCredentials: publicKey.allowCredentials.map(
                                   (c: { id: string; transports?: string[] }) => ({
                                       type: 'public-key' as const,
                                       id: base64urlDecode(c.id),
@@ -267,22 +270,24 @@ export class WebAuthnClient {
 
             this.setState('verifying');
 
-            // 4. Send assertion to the enclave
+            // 4. Send standard WebAuthn assertion response to the enclave
             const response = assertion.response as AuthenticatorAssertionResponse;
-            const result = await this.fido2Fetch({
-                type: 'authenticate_complete',
-                challenge: opts.challenge,
-                credential_id: base64urlEncode(assertion.rawId),
-                authenticator_data: base64urlEncode(response.authenticatorData),
-                signature: base64urlEncode(response.signature),
-                client_data_json: base64urlEncode(response.clientDataJSON),
-                browser_session_id: browserSessionId,
-            });
+            const result = await this.fido2Fetch(
+                'authenticate/complete',
+                {
+                    id: base64urlEncode(assertion.rawId),
+                    rawId: base64urlEncode(assertion.rawId),
+                    type: 'public-key',
+                    response: {
+                        clientDataJSON: base64urlEncode(response.clientDataJSON),
+                        authenticatorData: base64urlEncode(response.authenticatorData),
+                        signature: base64urlEncode(response.signature),
+                    },
+                },
+                { challenge: publicKey.challenge },
+            );
 
-            if (result.type === 'error') throw new Error(result.error ?? 'Authentication failed');
-            if (result.type !== 'authenticate_ok') throw new Error(`Unexpected: ${result.type}`);
-
-            return this.complete(result.session_token ?? '', browserSessionId);
+            return this.complete(result.sessionToken ?? '', sessionId);
         } catch (err) {
             return this.fail(err);
         }
@@ -297,10 +302,19 @@ export class WebAuthnClient {
 
     // ---- internals ----
 
-    private async fido2Fetch(body: Record<string, unknown>): Promise<Record<string, any>> {
+    private async fido2Fetch(
+        action: string,
+        body: Record<string, unknown>,
+        params?: Record<string, string>,
+    ): Promise<Record<string, any>> {
         const base = this.config.apiBase.replace(/\/+$/, '');
-        const url = `${base}/api/v1/apps/${encodeURIComponent(this.config.appName)}/fido2`;
-        const res = await fetch(url, {
+        const url = new URL(`${base}/api/v1/apps/${encodeURIComponent(this.config.appName)}/fido2/${action}`);
+        if (params) {
+            for (const [k, v] of Object.entries(params)) {
+                url.searchParams.set(k, v);
+            }
+        }
+        const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),

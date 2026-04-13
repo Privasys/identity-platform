@@ -94,7 +94,8 @@ func main() {
 
 	// FIDO2 endpoints — wallet connects here for registration/authentication.
 	mux.HandleFunc("POST /fido2/register/begin", fido2Handler.BeginRegistration)
-	mux.HandleFunc("POST /fido2/register/complete", fido2Handler.CompleteRegistration)
+	mux.HandleFunc("POST /fido2/register/complete",
+		fido2Handler.CompleteRegistration(codeStore, sessionStore))
 	mux.HandleFunc("POST /fido2/authenticate/begin", fido2Handler.BeginAuthentication)
 	mux.HandleFunc("POST /fido2/authenticate/complete",
 		fido2Handler.CompleteAuthentication(codeStore, sessionStore))

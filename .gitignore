@@ -44,6 +44,7 @@ ios/
 # ── Go ──────────────────────────────────────────────────────────
 broker/broker
 broker/auth-broker
+idp/privasys-idp
 *.exe
 *.test
 *.out

@@ -10,6 +10,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"net/url"
@@ -19,6 +21,7 @@ import (
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 // HandleDiscovery returns the OIDC discovery document.
@@ -216,7 +219,8 @@ func (ss *SessionStore) cleanup() {
 // --- /authorize ---
 
 // HandleAuthorize handles the OIDC authorization request.
-// Returns a JSON response with a session ID and QR payload for the wallet.
+// Serves an HTML page that displays a QR code for the Privasys Wallet,
+// polls for session completion, and redirects back to the relying party.
 func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -284,26 +288,179 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		sessions.Create(session)
 
 		// Return the session info for the browser to render a QR code.
-		// The browser SDK knows how to display this.
 		qrPayload := map[string]string{
-			"origin":    issuerURL,
+			"origin":    "privasys.id",
 			"sessionId": sessionID,
 			"rpId":      "privasys.id",
-			"brokerUrl": "wss://relay.privasys.org/relay",
-			"type":      "oidc-authorize",
+			"brokerUrl": "wss://broker.privasys.org/relay",
 		}
 
-		resp := map[string]interface{}{
-			"session_id": sessionID,
-			"qr_payload": qrPayload,
-			"expires_in": 300,
-			"poll_url":   issuerURL + "/session/status?session_id=" + sessionID,
+		qrJSON, _ := json.Marshal(qrPayload)
+		// Base64url-encode the QR payload as a universal link for the wallet.
+		b64 := base64.RawURLEncoding.EncodeToString(qrJSON)
+		universalLink := fmt.Sprintf("https://privasys.id/scp?p=%s", b64)
+
+		// Generate QR code as PNG and embed as data URI.
+		qrPNG, err := qrcode.Encode(universalLink, qrcode.Medium, 280)
+		if err != nil {
+			log.Printf("authorize: QR encode error: %v", err)
+			errorResponse(w, http.StatusInternalServerError, "server_error", "Failed to generate QR code")
+			return
+		}
+		qrDataURI := "data:image/png;base64," + base64.StdEncoding.EncodeToString(qrPNG)
+
+		data := authPageData{
+			SessionID: sessionID,
+			QRPayload: universalLink,
+			QRDataURI: template.URL(qrDataURI),
+			PollURL:   issuerURL + "/session/status?session_id=" + sessionID,
+			ExpiresIn: 300,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		if err := authPageTmpl.Execute(w, data); err != nil {
+			log.Printf("authorize: template error: %v", err)
+		}
 	}
 }
+
+// authPageData is the template data for the authorization page.
+type authPageData struct {
+	SessionID string
+	QRPayload string       // Universal link URL for the wallet
+	QRDataURI template.URL // data:image/png;base64,... (trusted data URI)
+	PollURL   string
+	ExpiresIn int
+}
+
+// authPageTmpl is the HTML page served at /authorize.
+// It renders a server-generated QR code, polls for wallet authentication, and redirects on success.
+var authPageTmpl = template.Must(template.New("authorize").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in with Privasys ID</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f8f9fa;
+    color: #1a1a2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 48px 40px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+  }
+  .logo {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 24px;
+  }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+  .subtitle { font-size: 14px; color: #666; margin-bottom: 32px; }
+  .qr-frame {
+    display: inline-block;
+    padding: 16px;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e8e8e8;
+    margin-bottom: 24px;
+  }
+  .qr-frame img { display: block; width: 280px; height: 280px; }
+  .status { font-size: 14px; color: #666; margin-bottom: 8px; }
+  .timer { font-size: 13px; color: #999; }
+  .status.ok { color: #16a34a; font-weight: 600; }
+  .status.err { color: #dc2626; font-weight: 600; }
+  .spinner {
+    display: none; width: 32px; height: 32px;
+    border: 3px solid #e8e8e8; border-top-color: #3b82f6;
+    border-radius: 50%; animation: spin .8s linear infinite;
+    margin: 16px auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .wallet-btn {
+    display: none; margin-top: 16px;
+  }
+  .wallet-btn a {
+    display: inline-block; padding: 12px 24px;
+    background: #1a1a2e; color: #fff; text-decoration: none;
+    border-radius: 8px; font-size: 15px; font-weight: 500;
+  }
+  @media (max-width: 640px) {
+    .wallet-btn { display: block; }
+    .qr-frame { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="48" height="48" rx="10" fill="#1a1a2e"/>
+      <path d="M12 36L24 12L36 36" stroke="#4ade80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M18 28L24 16L30 28" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <h1>Sign in with Privasys ID</h1>
+  <p class="subtitle">Scan the QR code with your Privasys Wallet</p>
+  <div class="qr-frame"><img src="{{.QRDataURI}}" alt="QR Code"></div>
+  <div class="wallet-btn">
+    <a href="{{.QRPayload}}">Open Privasys Wallet</a>
+  </div>
+  <div class="spinner" id="spinner"></div>
+  <p class="status" id="status">Waiting for wallet&hellip;</p>
+  <p class="timer" id="timer"></p>
+</div>
+<script>
+(function(){
+  var pollURL   = "{{.PollURL}}";
+  var remaining = {{.ExpiresIn}};
+  var timerEl   = document.getElementById("timer");
+  var statusEl  = document.getElementById("status");
+  var spinnerEl = document.getElementById("spinner");
+
+  function pad(n){ return n < 10 ? "0"+n : ""+n; }
+  function tick(){
+    timerEl.textContent = "Expires in " + Math.floor(remaining/60) + ":" + pad(remaining%60);
+  }
+  tick();
+
+  var countdown = setInterval(function(){
+    if(--remaining <= 0){
+      clearInterval(countdown); clearInterval(poller);
+      statusEl.textContent = "Session expired. Please try again.";
+      statusEl.className = "status err";
+      timerEl.textContent = "";
+    } else { tick(); }
+  }, 1000);
+
+  var poller = setInterval(function(){
+    fetch(pollURL).then(function(r){ return r.json(); }).then(function(d){
+      if(d.authenticated){
+        clearInterval(poller); clearInterval(countdown);
+        statusEl.textContent = "Authenticated! Redirecting\u2026";
+        statusEl.className = "status ok";
+        spinnerEl.style.display = "block";
+        timerEl.textContent = "";
+        window.location.href = d.redirect_uri;
+      }
+    }).catch(function(){});
+  }, 2000);
+})();
+</script>
+</body>
+</html>`))
 
 // --- /session/status ---
 

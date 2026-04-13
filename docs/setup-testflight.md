@@ -28,7 +28,7 @@ bunx eas project:info
 
 ### b) Add it as a GitHub secret
 
-1. Go to **github.com/Privasys/wallet → Settings → Secrets and variables → Actions**
+1. Go to **github.com/Privasys/privasys-id → Settings → Secrets and variables → Actions**
 2. Add secret: `EXPO_TOKEN` = (the token you just copied)
 
 ## 3. Apple Developer Setup
@@ -96,7 +96,7 @@ bunx eas build:list
 
 Push to `main` or use the manual workflow dispatch:
 
-1. Go to **github.com/Privasys/wallet → Actions → Build Wallet**
+1. Go to **github.com/Privasys/privasys-id → Actions → Build Wallet**
 2. Click **Run workflow**
 3. Select platform: `ios`, profile: `preview`, use EAS Cloud: `true`
 

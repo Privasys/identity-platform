@@ -43,7 +43,7 @@ Thank you for your interest in contributing! This monorepo contains the Privasys
 
 ## Reporting Issues
 
-If you find a bug or have a suggestion, please [open an issue](https://github.com/Privasys/wallet/issues).
+If you find a bug or have a suggestion, please [open an issue](https://github.com/Privasys/privasys-id/issues).
 
 ## License
 

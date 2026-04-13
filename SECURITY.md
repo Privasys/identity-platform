@@ -7,4 +7,4 @@ in this repository, please report it responsibly through one of the
 following channels:
 
 - **Email:** [security@privasys.org](mailto:security@privasys.org)
-- **GitHub:** Open a [private security advisory](https://github.com/Privasys/wallet/security/advisories/new)
+- **GitHub:** Open a [private security advisory](https://github.com/Privasys/privasys-id/security/advisories/new)

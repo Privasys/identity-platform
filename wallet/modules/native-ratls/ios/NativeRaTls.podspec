@@ -6,7 +6,7 @@ Pod::Spec.new do |s|
   s.name           = 'NativeRaTls'
   s.version        = package['version']
   s.summary        = 'RA-TLS attestation verification for Privasys Wallet'
-  s.homepage       = 'https://github.com/Privasys/wallet'
+  s.homepage       = 'https://github.com/Privasys/privasys-id'
   s.license        = { type: 'AGPL-3.0-only' }
   s.author         = 'Privasys'
   s.source         = { git: '' }

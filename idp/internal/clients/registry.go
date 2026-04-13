@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/Privasys/idp/internal/store"
 )
 
@@ -18,7 +20,9 @@ import (
 type Client struct {
 	ClientID     string   `json:"client_id"`
 	ClientName   string   `json:"client_name"`
+	ClientSecret string   `json:"client_secret,omitempty"` // only returned on registration
 	RedirectURIs []string `json:"redirect_uris"`
+	Confidential bool     `json:"confidential"` // true if client has a secret
 }
 
 // ValidRedirectURI checks if the given URI is in the client's registered redirect URIs.
@@ -43,11 +47,11 @@ func NewRegistry(db *store.DB) *Registry {
 
 // Get retrieves a client by ID.
 func (reg *Registry) Get(clientID string) (*Client, error) {
-	var name, redirectURIsJSON string
+	var name, secretHash, redirectURIsJSON string
 	err := reg.db.QueryRow(
-		"SELECT client_name, redirect_uris FROM clients WHERE client_id = ?",
+		"SELECT client_name, client_secret, redirect_uris FROM clients WHERE client_id = ?",
 		clientID,
-	).Scan(&name, &redirectURIsJSON)
+	).Scan(&name, &secretHash, &redirectURIsJSON)
 	if err != nil {
 		return nil, fmt.Errorf("client not found: %w", err)
 	}
@@ -59,20 +63,30 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 		ClientID:     clientID,
 		ClientName:   name,
 		RedirectURIs: uris,
+		Confidential: secretHash != "",
 	}, nil
 }
 
 // Register creates a new OIDC client.
-func (reg *Registry) Register(name string, redirectURIs []string) (*Client, error) {
+func (reg *Registry) Register(name string, redirectURIs []string, secret string) (*Client, error) {
 	b := make([]byte, 16)
 	rand.Read(b)
 	clientID := hex.EncodeToString(b)
 
+	var secretHash string
+	if secret != "" {
+		h, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, fmt.Errorf("hash secret: %w", err)
+		}
+		secretHash = string(h)
+	}
+
 	urisJSON, _ := json.Marshal(redirectURIs)
 
 	_, err := reg.db.Exec(
-		"INSERT INTO clients (client_id, client_name, redirect_uris) VALUES (?, ?, ?)",
-		clientID, name, string(urisJSON),
+		"INSERT INTO clients (client_id, client_name, client_secret, redirect_uris) VALUES (?, ?, ?, ?)",
+		clientID, name, secretHash, string(urisJSON),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("register client: %w", err)
@@ -81,18 +95,29 @@ func (reg *Registry) Register(name string, redirectURIs []string) (*Client, erro
 	return &Client{
 		ClientID:     clientID,
 		ClientName:   name,
+		ClientSecret: secret, // return plaintext only on creation
 		RedirectURIs: redirectURIs,
+		Confidential: secret != "",
 	}, nil
 }
 
 // RegisterWithID creates a client with a specific client_id (for pre-known clients like Zitadel).
-func (reg *Registry) RegisterWithID(clientID, name string, redirectURIs []string) (*Client, error) {
+func (reg *Registry) RegisterWithID(clientID, name string, redirectURIs []string, secret string) (*Client, error) {
+	var secretHash string
+	if secret != "" {
+		h, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, fmt.Errorf("hash secret: %w", err)
+		}
+		secretHash = string(h)
+	}
+
 	urisJSON, _ := json.Marshal(redirectURIs)
 
 	_, err := reg.db.Exec(
-		`INSERT INTO clients (client_id, client_name, redirect_uris) VALUES (?, ?, ?)
-		 ON CONFLICT(client_id) DO UPDATE SET client_name = excluded.client_name, redirect_uris = excluded.redirect_uris`,
-		clientID, name, string(urisJSON),
+		`INSERT INTO clients (client_id, client_name, client_secret, redirect_uris) VALUES (?, ?, ?, ?)
+		 ON CONFLICT(client_id) DO UPDATE SET client_name = excluded.client_name, client_secret = excluded.client_secret, redirect_uris = excluded.redirect_uris`,
+		clientID, name, secretHash, string(urisJSON),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("register client: %w", err)
@@ -101,8 +126,24 @@ func (reg *Registry) RegisterWithID(clientID, name string, redirectURIs []string
 	return &Client{
 		ClientID:     clientID,
 		ClientName:   name,
+		ClientSecret: secret,
 		RedirectURIs: redirectURIs,
+		Confidential: secret != "",
 	}, nil
+}
+
+// VerifySecret checks whether the provided secret matches the client's stored hash.
+// Returns true for public clients (no secret set) when secret is empty.
+func (reg *Registry) VerifySecret(clientID, secret string) (bool, error) {
+	var secretHash string
+	err := reg.db.QueryRow("SELECT client_secret FROM clients WHERE client_id = ?", clientID).Scan(&secretHash)
+	if err != nil {
+		return false, fmt.Errorf("client not found: %w", err)
+	}
+	if secretHash == "" {
+		return true, nil // public client
+	}
+	return bcrypt.CompareHashAndPassword([]byte(secretHash), []byte(secret)) == nil, nil
 }
 
 // HandleRegister is the HTTP handler for POST /clients.
@@ -120,6 +161,7 @@ func HandleRegister(reg *Registry, adminToken string) http.HandlerFunc {
 		var req struct {
 			ClientID     string   `json:"client_id,omitempty"`
 			ClientName   string   `json:"client_name"`
+			ClientSecret string   `json:"client_secret,omitempty"`
 			RedirectURIs []string `json:"redirect_uris"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -135,9 +177,9 @@ func HandleRegister(reg *Registry, adminToken string) http.HandlerFunc {
 		var client *Client
 		var err error
 		if req.ClientID != "" {
-			client, err = reg.RegisterWithID(req.ClientID, req.ClientName, req.RedirectURIs)
+			client, err = reg.RegisterWithID(req.ClientID, req.ClientName, req.RedirectURIs, req.ClientSecret)
 		} else {
-			client, err = reg.Register(req.ClientName, req.RedirectURIs)
+			client, err = reg.Register(req.ClientName, req.RedirectURIs, req.ClientSecret)
 		}
 		if err != nil {
 			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusInternalServerError)

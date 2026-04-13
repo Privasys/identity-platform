@@ -45,6 +45,7 @@ func migrate(db *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS clients (
 			client_id    TEXT PRIMARY KEY,
 			client_name  TEXT NOT NULL,
+			client_secret TEXT NOT NULL DEFAULT '',  -- bcrypt hash; empty = public client
 			redirect_uris TEXT NOT NULL,  -- JSON array
 			created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
@@ -81,5 +82,36 @@ func migrate(db *sql.DB) error {
 			PRIMARY KEY (user_id, key)
 		);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Migration: add client_secret column to existing databases.
+	var hasSecret bool
+	rows, err := db.Query("PRAGMA table_info(clients)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull int
+		var dfltValue *string
+		var pk int
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if name == "client_secret" {
+			hasSecret = true
+		}
+	}
+	if !hasSecret {
+		_, err = db.Exec("ALTER TABLE clients ADD COLUMN client_secret TEXT NOT NULL DEFAULT ''")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

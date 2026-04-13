@@ -35,8 +35,8 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		"subject_types_supported":               []string{"pairwise"},
 		"id_token_signing_alg_values_supported": []string{"ES256"},
 		"scopes_supported":                      []string{"openid", "profile", "email"},
-		"token_endpoint_auth_methods_supported": []string{"none"},
-		"code_challenge_methods_supported":       []string{"S256"},
+		"token_endpoint_auth_methods_supported": []string{"none", "client_secret_post"},
+		"code_challenge_methods_supported":      []string{"S256"},
 		"claims_supported": []string{
 			"sub", "name", "email", "email_verified", "picture",
 			"attestation_level", "auth_time", "iss", "aud", "exp", "iat",
@@ -357,6 +357,18 @@ func HandleToken(reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer,
 		redirectURI := r.FormValue("redirect_uri")
 		codeVerifier := r.FormValue("code_verifier")
 		clientID := r.FormValue("client_id")
+		clientSecret := r.FormValue("client_secret")
+
+		// Validate client_secret for confidential clients.
+		ok, err := reg.VerifySecret(clientID, clientSecret)
+		if err != nil {
+			errorResponse(w, http.StatusBadRequest, "invalid_client", "Unknown client")
+			return
+		}
+		if !ok {
+			errorResponse(w, http.StatusUnauthorized, "invalid_client", "Invalid client credentials")
+			return
+		}
 
 		// Consume the authorization code (single-use).
 		ac, ok := codes.Consume(code)

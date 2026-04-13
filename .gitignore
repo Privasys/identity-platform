@@ -58,3 +58,6 @@ build/
 *.ipa
 *.apk
 *.aab
+
+# -- Deployment docs with secrets ---------------------------------
+idp/docs/zitadel-federation.md

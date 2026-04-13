@@ -41,9 +41,9 @@ type Handler struct {
 // NewHandler creates a FIDO2 handler with the given configuration.
 func NewHandler(cfg Config) (*Handler, error) {
 	wconfig := &webauthn.Config{
-		RPID:          cfg.RPID,
-		RPDisplayName: cfg.RPDisplayName,
-		RPOrigins:     cfg.RPOrigins,
+		RPID:                  cfg.RPID,
+		RPDisplayName:         cfg.RPDisplayName,
+		RPOrigins:             cfg.RPOrigins,
 		AttestationPreference: protocol.PreferDirectAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			UserVerification: protocol.VerificationRequired,

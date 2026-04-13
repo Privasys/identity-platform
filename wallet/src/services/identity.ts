@@ -66,11 +66,17 @@ function getRedirectUri(): string {
  * OAuth client types keyed to bundle ID / package name + signing cert).
  */
 export function getClientId(providerKey: string): string {
-    if (providerKey === 'google') {
-        const suffix = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
-        return process.env[`EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_${suffix}`] ?? '';
-    }
-    return process.env[`EXPO_PUBLIC_OAUTH_${providerKey.toUpperCase()}_CLIENT_ID`] ?? '';
+    // IMPORTANT: Expo's Metro/Babel transform only inlines process.env.EXPO_PUBLIC_*
+    // with static member access. Dynamic keys like process.env[`EXPO_PUBLIC_${x}`]
+    // are NOT replaced and resolve to undefined at runtime.
+    const clientIds: Record<string, string> = {
+        google:
+            Platform.OS === 'ios'
+                ? (process.env.EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_IOS ?? '')
+                : (process.env.EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_ANDROID ?? ''),
+        microsoft: process.env.EXPO_PUBLIC_OAUTH_MICROSOFT_CLIENT_ID ?? '',
+    };
+    return clientIds[providerKey] ?? '';
 }
 
 /**

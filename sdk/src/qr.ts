@@ -27,7 +27,7 @@ export interface QRPayload {
  * Encode a JSON QR payload as a universal-link URL.
  *
  * When a regular phone camera scans the QR, it opens the URL:
- *   - If Privasys ID is installed, iOS/Android routes it to the app
+ *   - If the Privasys Wallet is installed, iOS/Android routes it to the app
  *     via the registered `applinks:privasys.id` associated domain.
  *   - Otherwise the browser opens `https://privasys.id/scp` which can show
  *     install instructions.

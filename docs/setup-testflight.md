@@ -1,6 +1,6 @@
 # Expo + GitHub + TestFlight Setup Guide
 
-Step-by-step instructions to get Privasys ID building in CI and deploying to TestFlight.
+Step-by-step instructions to get Privasys Wallet building in CI and deploying to TestFlight.
 
 ---
 
@@ -28,7 +28,7 @@ bunx eas project:info
 
 ### b) Add it as a GitHub secret
 
-1. Go to **github.com/Privasys/privasys-id → Settings → Secrets and variables → Actions**
+1. Go to **github.com/Privasys/identity-platform → Settings → Secrets and variables → Actions**
 2. Add secret: `EXPO_TOKEN` = (the token you just copied)
 
 ## 3. Apple Developer Setup
@@ -42,7 +42,7 @@ You need an active [Apple Developer Program](https://developer.apple.com/program
 1. Go to [developer.apple.com/account/resources/identifiers](https://developer.apple.com/account/resources/identifiers/list)
 2. Register a new **App ID** (type: App):
    - **Bundle ID:** `org.privasys.wallet`
-   - **Description:** Privasys ID
+   - **Description:** Privasys Wallet
 3. Enable capabilities:
    - ✅ Associated Domains
    - ✅ Push Notifications
@@ -52,7 +52,7 @@ You need an active [Apple Developer Program](https://developer.apple.com/program
 1. Go to [appstoreconnect.apple.com](https://appstoreconnect.apple.com)
 2. **My Apps → +** → New App
    - **Platform:** iOS
-   - **Name:** Privasys ID
+   - **Name:** Privasys Wallet
    - **Bundle ID:** `org.privasys.wallet` (select from dropdown)
    - **SKU:** `org.privasys.wallet`
    - **Primary Language:** English (U.S.)
@@ -96,7 +96,7 @@ bunx eas build:list
 
 Push to `main` or use the manual workflow dispatch:
 
-1. Go to **github.com/Privasys/privasys-id → Actions → Build Wallet**
+1. Go to **github.com/Privasys/identity-platform → Actions → Build Wallet**
 2. Click **Run workflow**
 3. Select platform: `ios`, profile: `preview`, use EAS Cloud: `true`
 

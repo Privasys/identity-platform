@@ -1,5 +1,5 @@
 {
-    "name": "privasys-id",
+    "name": "privasys-wallet",
     "version": "1.1.0",
     "private": true,
     "main": "expo-router/entry",

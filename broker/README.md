@@ -1,6 +1,6 @@
 # Auth Broker
 
-A Go WebSocket relay that pairs browser sessions with Privasys ID, with optional OIDC-based app attestation token issuance.
+A Go WebSocket relay that pairs browser sessions with the Privasys Wallet, with optional OIDC-based app attestation token issuance.
 
 ## Endpoints
 

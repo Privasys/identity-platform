@@ -8,7 +8,7 @@ import { SessionManager } from './session';
 const DEFAULT_TIMEOUT = 120_000;
 
 /**
- * Main client for Privasys ID authentication from a browser.
+ * Main client for Privasys Wallet authentication from a browser.
  *
  * Usage:
  * ```ts

@@ -6,7 +6,7 @@ Pod::Spec.new do |s|
   s.name           = 'NativeKeys'
   s.version        = package['version']
   s.summary        = 'Secure Enclave key management for Privasys Wallet'
-  s.homepage       = 'https://github.com/Privasys/privasys-id'
+  s.homepage       = 'https://github.com/Privasys/identity-platform'
   s.license        = { type: 'AGPL-3.0-only' }
   s.author         = 'Privasys'
   s.source         = { git: '' }

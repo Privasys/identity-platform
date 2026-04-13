@@ -21,7 +21,7 @@ const EXPO_PROJECT_ID =
 //     process.env.SENTRY_URL;
 
 console.log(
-    `Building Privasys ID version ${version}. Running app.config.ts for stage: ${STAGE}...`
+    `Building Privasys Wallet version ${version}. Running app.config.ts for stage: ${STAGE}...`
 );
 
 // let sentryUrl = undefined;
@@ -38,21 +38,21 @@ process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KE
 
 const envConfig = {
     development: {
-        name: 'Privasys ID Dev',
+        name: 'Privasys Wallet Dev',
         scheme: 'privasys-wallet-dev',
         bundle: 'org.privasys.wallet',
         icon: './assets/icon.development.png',
         adaptiveIconBackgroundColor: '#F0F9FF'
     },
     preview: {
-        name: 'Privasys ID Preview',
+        name: 'Privasys Wallet Preview',
         scheme: 'privasys-wallet-preview',
         bundle: 'org.privasys.wallet',
         icon: './assets/icon.preview.png',
         adaptiveIconBackgroundColor: '#F0FFF4'
     },
     production: {
-        name: 'Privasys ID',
+        name: 'Privasys Wallet',
         scheme: 'privasys-wallet',
         bundle: 'org.privasys.wallet',
         icon: './assets/icon.production.png',
@@ -77,7 +77,7 @@ export default (context: ConfigContext): ExpoConfig => {
         ...defaultConfig,
         name: config.name,
         description:
-            'Privasys ID is a digital identity wallet. Connect to services that prove their integrity before you prove yours.',
+            'Privasys Wallet is a digital identity wallet. Connect to services that prove their integrity before you prove yours.',
         slug: 'privasys-wallet',
         owner: 'privasys',
         icon: config.icon,

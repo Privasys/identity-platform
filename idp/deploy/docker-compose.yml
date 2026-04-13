@@ -1,0 +1,29 @@
+# Privasys IdP deployment — docker-compose.yml
+#
+# Deploy alongside the existing auth-broker and privasys.id website
+# on vm-ovh-fr-par-1 (51.38.37.232).
+#
+# Nginx routes OIDC paths to this service:
+#   /authorize, /token, /userinfo, /.well-known/openid-configuration,
+#   /jwks, /fido2/*, /session/*, /clients, /healthz → port 8091
+
+services:
+  idp:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8091:8091"
+    environment:
+      IDP_PORT: "8091"
+      IDP_ISSUER_URL: "https://privasys.id"
+      IDP_RP_ID: "privasys.id"
+      IDP_RP_ORIGINS: "https://privasys.id"
+      IDP_SIGNING_KEY_FILE: "/data/signing-key.pem"
+      IDP_DB_PATH: "/data/idp.db"
+      IDP_ADMIN_TOKEN: "${IDP_ADMIN_TOKEN}"
+      IDP_BROKER_URL: "https://relay.privasys.org"
+    volumes:
+      - idp-data:/data
+
+volumes:
+  idp-data:

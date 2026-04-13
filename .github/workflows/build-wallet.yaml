@@ -1,7 +1,7 @@
 # Copyright (c) Privasys. All rights reserved.
 # Licensed under the GNU Affero General Public License v3.0.
 #
-# Privasys Wallet — Full CI/CD pipeline
+# Privasys ID — Full CI/CD pipeline
 #
 # Builds the Rust native RA-TLS library for iOS & Android,
 # then builds the Expo app with EAS Build (cloud) or locally

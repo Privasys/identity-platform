@@ -1,6 +1,6 @@
-# Contributing to Privasys Wallet
+# Contributing to Privasys ID
 
-Thank you for your interest in contributing! This monorepo contains the Privasys Wallet mobile app, the `@privasys/auth` browser SDK, and the authentication broker.
+Thank you for your interest in contributing! This monorepo contains the Privasys ID mobile app, the `@privasys/auth` browser SDK, and the authentication broker.
 
 ## Getting Started
 

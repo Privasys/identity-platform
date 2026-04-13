@@ -3,8 +3,8 @@
 
 // Privasys IdP — OIDC authorization server backed by FIDO2 authentication.
 //
-// This is the bridge between the Privasys Wallet and the developer platform.
-// Users authenticate via hardware-bound FIDO2 keys in their wallet, and
+// This is the bridge between Privasys ID and the developer platform.
+// Users authenticate via hardware-bound FIDO2 keys in the app, and
 // the IdP issues standard OIDC tokens that Zitadel (and any other OIDC
 // client) can consume.
 //

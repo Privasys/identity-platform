@@ -36,7 +36,7 @@ export interface UsePrivasysAuthReturn {
 }
 
 /**
- * React hook for Privasys Wallet authentication.
+ * React hook for Privasys ID authentication.
  *
  * ```tsx
  * const { state, qrPayload, startQR, result } = usePrivasysAuth({

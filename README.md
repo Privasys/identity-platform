@@ -1,4 +1,4 @@
-# Privasys Wallet
+# Privasys ID
 
 A mobile authenticator for the [Privasys](https://privasys.org) confidential computing platform. Authenticate to web applications using hardware-attested enclaves, FIDO2-grade cryptography, and on-device biometrics. No passwords.No trust assumptions.
 
@@ -61,7 +61,7 @@ See [broker/README.md](broker/README.md) for configuration, app-token endpoints,
 
 1. A relying party embeds the `@privasys/auth` SDK.
 2. The SDK generates a session and displays a QR code.
-3. The user scans the QR with Privasys Wallet.
+3. The user scans the QR with Privasys ID.
 4. The wallet performs RA-TLS attestation against the platform's enclaves.
 5. On success, the wallet signs a FIDO2 assertion using on-device biometrics.
 6. The signed result is relayed back to the SDK through the broker.

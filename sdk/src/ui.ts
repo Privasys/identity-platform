@@ -484,7 +484,7 @@ function renderQRSvg(payload: string): string {
  * Built-in authentication UI overlay for Privasys enclaves.
  *
  * Shows a centered sign-in modal (similar to Google / Microsoft) with:
- * - **Continue with Privasys Wallet** — QR code + broker relay
+ * - **Continue with Privasys ID** — QR code + broker relay
  * - **Sign in with passkey** — Browser WebAuthn (Touch ID, Windows Hello)
  *
  * Usage:
@@ -649,13 +649,13 @@ export class AuthUI {
             // Push-first: if we have a push token from a previous session
             hasPush ? el('button', { className: 'btn-provider wallet', onClick: () => this.startPush() },
                 el('span', { html: ICON_PHONE }),
-                el('span', { className: 'btn-label' }, 'Connect with Privasys Wallet'),
+                el('span', { className: 'btn-label' }, 'Connect with Privasys ID'),
                 el('span', { className: 'btn-hint' }, 'Notification to your phone'),
             ) : null,
             // QR wallet button — primary when no push token, secondary otherwise
             el('button', { className: 'btn-provider wallet', onClick: () => this.startWallet() },
                 el('span', { html: ICON_SHIELD_PLAIN }),
-                el('span', { className: 'btn-label' }, hasPush ? 'Scan QR code instead' : 'Continue with Privasys Wallet'),
+                el('span', { className: 'btn-label' }, hasPush ? 'Scan QR code instead' : 'Continue with Privasys ID'),
                 el('span', { className: 'btn-hint' }, hasPush ? 'New device' : 'Attestation verified'),
             ),
             // Divider + passkey
@@ -685,7 +685,7 @@ export class AuthUI {
                 el('div', { className: 'qr-frame', html: renderQRSvg(payload) }),
                 el('div', { className: 'scan-label' },
                     el('span', { className: 'pulse' }),
-                    'Scan with Privasys Wallet',
+                    'Scan with Privasys ID',
                 ),
                 el('p', { className: 'scan-hint' },
                     'Open the wallet app on your phone and scan this QR code to authenticate.',
@@ -804,7 +804,7 @@ export class AuthUI {
             ? '\u25CF'.repeat(8) + this.sessionToken.slice(-6)
             : '\u2014';
 
-        const methodLabel = this.method === 'wallet' ? 'Privasys Wallet' : 'Passkey';
+        const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
         const methodDetail = this.method === 'wallet' ? 'Attestation verified' : 'This device';
 
         return el('div', { className: 'modal' },

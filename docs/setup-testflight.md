@@ -1,6 +1,6 @@
 # Expo + GitHub + TestFlight Setup Guide
 
-Step-by-step instructions to get the Privasys Wallet building in CI and deploying to TestFlight.
+Step-by-step instructions to get Privasys ID building in CI and deploying to TestFlight.
 
 ---
 
@@ -42,7 +42,7 @@ You need an active [Apple Developer Program](https://developer.apple.com/program
 1. Go to [developer.apple.com/account/resources/identifiers](https://developer.apple.com/account/resources/identifiers/list)
 2. Register a new **App ID** (type: App):
    - **Bundle ID:** `org.privasys.wallet`
-   - **Description:** Privasys Wallet
+   - **Description:** Privasys ID
 3. Enable capabilities:
    - ✅ Associated Domains
    - ✅ Push Notifications
@@ -52,7 +52,7 @@ You need an active [Apple Developer Program](https://developer.apple.com/program
 1. Go to [appstoreconnect.apple.com](https://appstoreconnect.apple.com)
 2. **My Apps → +** → New App
    - **Platform:** iOS
-   - **Name:** Privasys Wallet
+   - **Name:** Privasys ID
    - **Bundle ID:** `org.privasys.wallet` (select from dropdown)
    - **SKU:** `org.privasys.wallet`
    - **Primary Language:** English (U.S.)

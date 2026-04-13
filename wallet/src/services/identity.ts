@@ -16,6 +16,7 @@
 import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 
 import type { LinkedProvider, ProfileAttribute } from '@/stores/profile';
 
@@ -60,6 +61,19 @@ function getRedirectUri(): string {
 }
 
 /**
+ * Resolve the OAuth client ID for a provider.
+ * Google requires platform-specific client IDs (iOS vs Android use different
+ * OAuth client types keyed to bundle ID / package name + signing cert).
+ */
+export function getClientId(providerKey: string): string {
+    if (providerKey === 'google') {
+        const suffix = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
+        return process.env[`EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_${suffix}`] ?? '';
+    }
+    return process.env[`EXPO_PUBLIC_OAUTH_${providerKey.toUpperCase()}_CLIENT_ID`] ?? '';
+}
+
+/**
  * Built-in provider configurations.
  * Client IDs are configured per-environment.
  */
@@ -79,14 +93,6 @@ export const PROVIDERS: Record<string, Omit<ProviderConfig, 'clientId'>> = {
             'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
         tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
         userinfoEndpoint: 'https://graph.microsoft.com/oidc/userinfo',
-        scopes: ['openid', 'profile', 'email']
-    },
-    linkedin: {
-        provider: 'linkedin',
-        displayName: 'LinkedIn',
-        authorizationEndpoint: 'https://www.linkedin.com/oauth/v2/authorization',
-        tokenEndpoint: 'https://www.linkedin.com/oauth/v2/accessToken',
-        userinfoEndpoint: 'https://api.linkedin.com/v2/userinfo',
         scopes: ['openid', 'profile', 'email']
     }
 };

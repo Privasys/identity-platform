@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
-import { linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
+import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
 
@@ -126,8 +126,7 @@ export default function ProfileScreen() {
             const providerTemplate = PROVIDERS[providerKey];
             if (!providerTemplate) throw new Error(`Unknown provider: ${providerKey}`);
 
-            const clientId =
-                process.env[`EXPO_PUBLIC_OAUTH_${providerKey.toUpperCase()}_CLIENT_ID`] ?? '';
+            const clientId = getClientId(providerKey);
             if (!clientId) {
                 Alert.alert(
                     'Not configured',

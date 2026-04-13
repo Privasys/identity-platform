@@ -1,0 +1,22 @@
+[Unit]
+Description=Privasys IdP (OIDC + FIDO2)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/privasys-idp
+EnvironmentFile=/etc/privasys/idp.env
+Restart=always
+RestartSec=3
+User=nobody
+Group=nogroup
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/privasys
+ReadOnlyPaths=/etc/privasys
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

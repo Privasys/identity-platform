@@ -24,7 +24,7 @@
 # Custom domain:
 #   gcloud run domain-mappings create \
 #     --service auth-broker \
-#     --domain broker.privasys.org \
+#     --domain relay.privasys.org \
 #     --region europe-west1
 
 # GitHub Actions workflow for CI/CD

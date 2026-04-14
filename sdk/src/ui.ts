@@ -518,7 +518,7 @@ export class AuthUI {
 
     constructor(config: AuthUIConfig) {
         this.cfg = {
-            brokerUrl: 'wss://broker.privasys.org/relay',
+            brokerUrl: 'wss://relay.privasys.org/relay',
             timeout: 120_000,
             ...config,
         };

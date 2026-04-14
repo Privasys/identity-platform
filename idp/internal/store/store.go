@@ -148,6 +148,52 @@ func migrate(db *sql.DB) error {
 	return nil
 }
 
+// --- User operations ---
+
+// UserInfo holds user details returned by ListUsers.
+type UserInfo struct {
+	UserID      string   `json:"user_id"`
+	DisplayName string   `json:"display_name"`
+	Email       string   `json:"email"`
+	CreatedAt   string   `json:"created_at"`
+	Roles       []string `json:"roles"`
+}
+
+// ListUsers returns all users with their roles.
+func (db *DB) ListUsers() ([]UserInfo, error) {
+	rows, err := db.Query(`
+		SELECT u.user_id, u.display_name, u.email, u.created_at
+		FROM users u ORDER BY u.created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []UserInfo
+	for rows.Next() {
+		var u UserInfo
+		if err := rows.Scan(&u.UserID, &u.DisplayName, &u.Email, &u.CreatedAt); err != nil {
+			continue
+		}
+		u.Roles = []string{}
+		users = append(users, u)
+	}
+
+	// Fetch roles for all users.
+	for i := range users {
+		roles, err := db.GetRoles(users[i].UserID)
+		if err == nil && roles != nil {
+			users[i].Roles = roles
+		}
+	}
+
+	if users == nil {
+		users = []UserInfo{}
+	}
+	return users, nil
+}
+
 // --- Role operations ---
 
 // GetRoles returns all roles for a user.

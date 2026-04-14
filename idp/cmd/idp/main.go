@@ -108,6 +108,7 @@ func main() {
 	mux.HandleFunc("POST /clients", clients.HandleRegister(clientReg, cfg.AdminToken))
 
 	// Admin: role management.
+	mux.HandleFunc("GET /admin/users", admin.HandleListUsers(db, cfg.AdminToken))
 	mux.HandleFunc("POST /admin/roles", admin.HandleGrantRole(db, cfg.AdminToken))
 	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
 	mux.HandleFunc("GET /admin/roles", admin.HandleListRoles(db, cfg.AdminToken))

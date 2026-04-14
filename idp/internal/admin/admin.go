@@ -18,6 +18,24 @@ import (
 	"github.com/Privasys/idp/internal/store"
 )
 
+// HandleListUsers handles GET /admin/users — list all users with roles.
+func HandleListUsers(db *store.DB, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !checkAdmin(w, r, adminToken) {
+			return
+		}
+
+		users, err := db.ListUsers()
+		if err != nil {
+			log.Printf("admin/users: list failed: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to list users")
+			return
+		}
+
+		writeJSON(w, http.StatusOK, users)
+	}
+}
+
 // HandleGrantRole handles POST /admin/roles — assign a role to a user.
 //
 //	Request: {"user_id": "...", "role": "platform:admin"}

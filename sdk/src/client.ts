@@ -14,7 +14,7 @@ const DEFAULT_TIMEOUT = 120_000;
  * ```ts
  * const auth = new PrivasysAuth({
  *   rpId: 'myapp.apps.privasys.org',
- *   brokerUrl: 'wss://broker.privasys.org',
+ *   brokerUrl: 'wss://relay.privasys.org',
  * });
  *
  * const { sessionId, payload } = auth.createQR();

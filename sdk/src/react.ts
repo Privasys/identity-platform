@@ -41,7 +41,7 @@ export interface UsePrivasysAuthReturn {
  * ```tsx
  * const { state, qrPayload, startQR, result } = usePrivasysAuth({
  *   rpId: 'myapp.apps.privasys.org',
- *   brokerUrl: 'wss://broker.privasys.org',
+ *   brokerUrl: 'wss://relay.privasys.org',
  * });
  * ```
  */

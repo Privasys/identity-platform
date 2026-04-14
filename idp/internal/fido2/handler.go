@@ -279,6 +279,12 @@ func (h *Handler) CompleteRegistration(
 		_, err = h.db.Exec(`
 			INSERT INTO credentials (credential_id, user_id, public_key, aaguid, sign_count, attestation_type)
 			VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT(credential_id) DO UPDATE SET
+				public_key = excluded.public_key,
+				aaguid = excluded.aaguid,
+				sign_count = excluded.sign_count,
+				attestation_type = excluded.attestation_type
+			WHERE credentials.user_id = excluded.user_id
 		`, credID, string(entry.user.ID), pubKeyBytes, aaguid,
 			credential.Authenticator.SignCount, credential.AttestationType)
 		if err != nil {

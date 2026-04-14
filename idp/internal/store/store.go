@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -81,6 +82,37 @@ func migrate(db *sql.DB) error {
 			source  TEXT NOT NULL DEFAULT 'manual',
 			PRIMARY KEY (user_id, key)
 		);
+
+		-- User roles for authorization.
+		CREATE TABLE IF NOT EXISTS roles (
+			user_id    TEXT NOT NULL REFERENCES users(user_id),
+			role       TEXT NOT NULL,
+			scope      TEXT NOT NULL DEFAULT '*',
+			granted_by TEXT NOT NULL DEFAULT '',
+			granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (user_id, role)
+		);
+
+		-- Refresh tokens for long-lived sessions.
+		CREATE TABLE IF NOT EXISTS refresh_tokens (
+			token_hash  TEXT PRIMARY KEY,       -- SHA-256 hash of the token
+			user_id     TEXT NOT NULL REFERENCES users(user_id),
+			client_id   TEXT NOT NULL,
+			scope       TEXT NOT NULL DEFAULT '',
+			expires_at  DATETIME NOT NULL,
+			created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+
+		-- Service accounts (machine users for JWT-bearer grant).
+		CREATE TABLE IF NOT EXISTS service_accounts (
+			account_id   TEXT PRIMARY KEY,
+			display_name TEXT NOT NULL DEFAULT '',
+			public_key   TEXT NOT NULL,          -- PEM-encoded RSA or EC public key
+			key_id       TEXT NOT NULL DEFAULT '',
+			created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
 	`)
 	if err != nil {
 		return err
@@ -114,4 +146,98 @@ func migrate(db *sql.DB) error {
 	}
 
 	return nil
+}
+
+// --- Role operations ---
+
+// GetRoles returns all roles for a user.
+func (db *DB) GetRoles(userID string) ([]string, error) {
+	rows, err := db.Query("SELECT role FROM roles WHERE user_id = ?", userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var roles []string
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			continue
+		}
+		roles = append(roles, role)
+	}
+	return roles, nil
+}
+
+// GrantRole assigns a role to a user.
+func (db *DB) GrantRole(userID, role, grantedBy string) error {
+	_, err := db.Exec(
+		`INSERT INTO roles (user_id, role, granted_by) VALUES (?, ?, ?)
+		 ON CONFLICT(user_id, role) DO NOTHING`,
+		userID, role, grantedBy,
+	)
+	return err
+}
+
+// RevokeRole removes a role from a user.
+func (db *DB) RevokeRole(userID, role string) error {
+	_, err := db.Exec("DELETE FROM roles WHERE user_id = ? AND role = ?", userID, role)
+	return err
+}
+
+// --- Refresh token operations ---
+
+// StoreRefreshToken stores a hashed refresh token.
+func (db *DB) StoreRefreshToken(tokenHash, userID, clientID, scope string, expiresAt time.Time) error {
+	_, err := db.Exec(
+		"INSERT INTO refresh_tokens (token_hash, user_id, client_id, scope, expires_at) VALUES (?, ?, ?, ?, ?)",
+		tokenHash, userID, clientID, scope, expiresAt,
+	)
+	return err
+}
+
+// ConsumeRefreshToken retrieves and deletes a refresh token (single-use rotation).
+// Returns userID, clientID, scope.
+func (db *DB) ConsumeRefreshToken(tokenHash string) (string, string, string, error) {
+	var userID, clientID, scope string
+	var expiresAt time.Time
+	err := db.QueryRow(
+		"SELECT user_id, client_id, scope, expires_at FROM refresh_tokens WHERE token_hash = ?",
+		tokenHash,
+	).Scan(&userID, &clientID, &scope, &expiresAt)
+	if err != nil {
+		return "", "", "", fmt.Errorf("refresh token not found: %w", err)
+	}
+	// Delete consumed token (rotation: caller issues a new one).
+	db.Exec("DELETE FROM refresh_tokens WHERE token_hash = ?", tokenHash)
+	if time.Now().After(expiresAt) {
+		return "", "", "", fmt.Errorf("refresh token expired")
+	}
+	return userID, clientID, scope, nil
+}
+
+// CleanupExpiredRefreshTokens removes expired refresh tokens.
+func (db *DB) CleanupExpiredRefreshTokens() {
+	db.Exec("DELETE FROM refresh_tokens WHERE expires_at < ?", time.Now())
+}
+
+// --- Service account operations ---
+
+// GetServiceAccount retrieves a service account by ID.
+func (db *DB) GetServiceAccount(accountID string) (publicKeyPEM, keyID string, err error) {
+	err = db.QueryRow(
+		"SELECT public_key, key_id FROM service_accounts WHERE account_id = ?",
+		accountID,
+	).Scan(&publicKeyPEM, &keyID)
+	return
+}
+
+// CreateServiceAccount stores a new service account.
+func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID string) error {
+	_, err := db.Exec(
+		`INSERT INTO service_accounts (account_id, display_name, public_key, key_id) VALUES (?, ?, ?, ?)
+		 ON CONFLICT(account_id) DO UPDATE SET display_name = excluded.display_name, public_key = excluded.public_key, key_id = excluded.key_id`,
+		accountID, displayName, publicKeyPEM, keyID,
+	)
+	return err
 }

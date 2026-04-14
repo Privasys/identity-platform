@@ -32,6 +32,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Privasys/idp/internal/admin"
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/config"
 	"github.com/Privasys/idp/internal/fido2"
@@ -106,11 +107,31 @@ func main() {
 	// Client registration (admin endpoint).
 	mux.HandleFunc("POST /clients", clients.HandleRegister(clientReg, cfg.AdminToken))
 
+	// Admin: role management.
+	mux.HandleFunc("POST /admin/roles", admin.HandleGrantRole(db, cfg.AdminToken))
+	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
+	mux.HandleFunc("GET /admin/roles", admin.HandleListRoles(db, cfg.AdminToken))
+
+	// Admin: service account management.
+	mux.HandleFunc("POST /admin/service-accounts", admin.HandleCreateServiceAccount(db, cfg.AdminToken))
+
 	// Health.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	// Bootstrap admin user if configured.
+	admin.MaybeBootstrapAdmin(db, cfg.BootstrapAdmin)
+
+	// Periodic cleanup of expired refresh tokens.
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			db.CleanupExpiredRefreshTokens()
+		}
+	}()
 
 	// CORS middleware.
 	handler := corsMiddleware(mux)
@@ -145,7 +166,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Max-Age", "86400")

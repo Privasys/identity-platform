@@ -85,7 +85,7 @@ func TestIssueAccessToken(t *testing.T) {
 		t.Fatalf("NewIssuer: %v", err)
 	}
 
-	token, err := iss.IssueAccessToken("user-456", "client-xyz")
+	token, err := iss.IssueAccessToken("user-456", "client-xyz", nil)
 	if err != nil {
 		t.Fatalf("IssueAccessToken: %v", err)
 	}

@@ -8,16 +8,18 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"math/big"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // Issuer signs JWTs and serves JWKS.
@@ -86,6 +88,11 @@ func NewIssuer(keyPath, issuerURL string) (*Issuer, error) {
 	}, nil
 }
 
+// IssuerURL returns the configured issuer URL.
+func (iss *Issuer) IssuerURL() string {
+	return iss.issuerURL
+}
+
 // IDTokenClaims are the claims included in an ID token.
 type IDTokenClaims struct {
 	Subject          string
@@ -101,12 +108,12 @@ type IDTokenClaims struct {
 // IssueIDToken creates a signed OIDC ID token.
 func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 	now := time.Now()
-	c := map[string]interface{}{
+	c := jwt.MapClaims{
 		"iss":               iss.issuerURL,
 		"sub":               claims.Subject,
 		"aud":               claims.Audience,
 		"iat":               now.Unix(),
-		"exp":               now.Add(1 * time.Hour).Unix(),
+		"exp":               now.Add(5 * time.Minute).Unix(),
 		"auth_time":         claims.AuthTime.Unix(),
 		"attestation_level": claims.AttestationLevel,
 	}
@@ -126,114 +133,78 @@ func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 	return iss.sign(c)
 }
 
-// IssueAccessToken creates a signed access token (opaque JWT).
-func (iss *Issuer) IssueAccessToken(subject, audience string) (string, error) {
+// IssueAccessToken creates a signed access token (JWT) with optional role claims.
+func (iss *Issuer) IssueAccessToken(subject, audience string, roles []string) (string, error) {
 	now := time.Now()
-	c := map[string]interface{}{
+	c := jwt.MapClaims{
 		"iss": iss.issuerURL,
 		"sub": subject,
 		"aud": audience,
 		"iat": now.Unix(),
-		"exp": now.Add(1 * time.Hour).Unix(),
+		"exp": now.Add(5 * time.Minute).Unix(),
 		"typ": "at+jwt",
+	}
+	if len(roles) > 0 {
+		c["roles"] = roles
 	}
 	return iss.sign(c)
 }
 
-// VerifyAccessToken parses and validates a JWT, returning claims.
+// VerifyAccessToken parses and validates a JWT signed by this issuer.
 func (iss *Issuer) VerifyAccessToken(tokenStr string) (map[string]interface{}, error) {
-	parts := splitJWT(tokenStr)
-	if parts == nil {
-		return nil, fmt.Errorf("malformed JWT")
-	}
-
-	// Verify signature.
-	signingInput := parts[0] + "." + parts[1]
-	sigBytes, err := base64.RawURLEncoding.DecodeString(parts[2])
-	if err != nil {
-		return nil, fmt.Errorf("decode signature: %w", err)
-	}
-
-	hash := sha256.Sum256([]byte(signingInput))
-
-	// ES256 signature is r || s, each 32 bytes.
-	if len(sigBytes) != 64 {
-		return nil, fmt.Errorf("invalid ES256 signature length: %d", len(sigBytes))
-	}
-	r := new(big.Int).SetBytes(sigBytes[:32])
-	s := new(big.Int).SetBytes(sigBytes[32:])
-	if !ecdsa.Verify(&iss.privateKey.PublicKey, hash[:], r, s) {
-		return nil, fmt.Errorf("invalid signature")
-	}
-
-	// Decode claims.
-	claimsJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return nil, fmt.Errorf("decode claims: %w", err)
-	}
-	var claims map[string]interface{}
-	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
-		return nil, fmt.Errorf("parse claims: %w", err)
-	}
-
-	// Check expiry.
-	if exp, ok := claims["exp"].(float64); ok {
-		if time.Now().Unix() > int64(exp) {
-			return nil, fmt.Errorf("token expired")
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodECDSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
+		return &iss.privateKey.PublicKey, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
 	return claims, nil
 }
 
-func splitJWT(token string) []string {
-	var parts []string
-	start := 0
-	count := 0
-	for i := 0; i < len(token); i++ {
-		if token[i] == '.' {
-			parts = append(parts, token[start:i])
-			start = i + 1
-			count++
-		}
+// VerifyServiceAccountJWT verifies a JWT assertion signed by a service account's RSA key.
+func VerifyServiceAccountJWT(tokenStr string, publicKeyPEM string, expectedAudience string) (map[string]interface{}, error) {
+	block, _ := pem.Decode([]byte(publicKeyPEM))
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block in service account public key")
 	}
-	if count == 2 {
-		parts = append(parts, token[start:])
-		return parts
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse public key: %w", err)
 	}
-	return nil
+	rsaPub, ok := pub.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("public key is not RSA")
+	}
+
+	opts := []jwt.ParserOption{jwt.WithValidMethods([]string{"RS256"})}
+	if expectedAudience != "" {
+		opts = append(opts, jwt.WithAudience(expectedAudience))
+	}
+
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		return rsaPub, nil
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+	return claims, nil
 }
 
 func (iss *Issuer) sign(claims map[string]interface{}) (string, error) {
-	header := map[string]string{
-		"alg": "ES256",
-		"typ": "JWT",
-		"kid": iss.keyID,
-	}
-
-	headerJSON, _ := json.Marshal(header)
-	claimsJSON, _ := json.Marshal(claims)
-
-	headerB64 := base64.RawURLEncoding.EncodeToString(headerJSON)
-	claimsB64 := base64.RawURLEncoding.EncodeToString(claimsJSON)
-
-	signingInput := headerB64 + "." + claimsB64
-	hash := sha256.Sum256([]byte(signingInput))
-
-	r, s, err := ecdsa.Sign(rand.Reader, iss.privateKey, hash[:])
-	if err != nil {
-		return "", fmt.Errorf("sign: %w", err)
-	}
-
-	// Fixed-size r || s (32 bytes each for P-256).
-	sig := make([]byte, 64)
-	rBytes := r.Bytes()
-	sBytes := s.Bytes()
-	copy(sig[32-len(rBytes):32], rBytes)
-	copy(sig[64-len(sBytes):64], sBytes)
-
-	sigB64 := base64.RawURLEncoding.EncodeToString(sig)
-	return signingInput + "." + sigB64, nil
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims(claims))
+	token.Header["kid"] = iss.keyID
+	return token.SignedString(iss.privateKey)
 }
 
 // HandleJWKS serves the public key in JWK Set format.

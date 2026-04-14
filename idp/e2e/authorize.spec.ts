@@ -91,7 +91,7 @@ test.describe("/authorize page", () => {
     // Verify structure matches SDK's QRPayload interface
     expect(payload).toHaveProperty("origin", "privasys.id");
     expect(payload).toHaveProperty("rpId", "privasys.id");
-    expect(payload).toHaveProperty("brokerUrl", "wss://broker.privasys.org/relay");
+    expect(payload).toHaveProperty("brokerUrl", "wss://relay.privasys.org/relay");
     expect(payload).toHaveProperty("sessionId");
     expect(typeof payload.sessionId).toBe("string");
     expect(payload.sessionId.length).toBeGreaterThan(0);

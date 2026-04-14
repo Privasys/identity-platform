@@ -15,6 +15,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,15 +35,16 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		"jwks_uri":                              issuerURL + "/jwks",
 		"registration_endpoint":                 issuerURL + "/clients",
 		"response_types_supported":              []string{"code"},
-		"grant_types_supported":                 []string{"authorization_code"},
+		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"},
 		"subject_types_supported":               []string{"pairwise"},
 		"id_token_signing_alg_values_supported": []string{"ES256"},
-		"scopes_supported":                      []string{"openid", "profile", "email"},
+		"scopes_supported":                      []string{"openid", "profile", "email", "offline_access"},
 		"token_endpoint_auth_methods_supported": []string{"none", "client_secret_post"},
 		"code_challenge_methods_supported":      []string{"S256"},
 		"claims_supported": []string{
 			"sub", "name", "email", "email_verified", "picture",
 			"attestation_level", "auth_time", "iss", "aud", "exp", "iat",
+			"roles",
 		},
 	}
 
@@ -233,6 +235,22 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		nonce := q.Get("nonce")
 		codeChallenge := q.Get("code_challenge")
 		codeChallengeMethod := q.Get("code_challenge_method")
+		prompt := q.Get("prompt")
+
+		// Handle prompt=none (silent auth not supported — always requires wallet interaction).
+		if prompt == "none" {
+			if redirectURI != "" {
+				sep := "?"
+				if strings.Contains(redirectURI, "?") {
+					sep = "&"
+				}
+				http.Redirect(w, r, redirectURI+sep+"error=login_required&state="+url.QueryEscape(state), http.StatusFound)
+				return
+			}
+			errorResponse(w, http.StatusBadRequest, "login_required",
+				"Silent authentication is not supported — wallet interaction required")
+			return
+		}
 
 		// Validate response_type.
 		if responseType != "code" {
@@ -292,7 +310,7 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 			"origin":    "privasys.id",
 			"sessionId": sessionID,
 			"rpId":      "privasys.id",
-			"brokerUrl": "wss://broker.privasys.org/relay",
+			"brokerUrl": "wss://relay.privasys.org/relay",
 		}
 
 		qrJSON, _ := json.Marshal(qrPayload)
@@ -495,7 +513,8 @@ func HandleSessionStatus(sessions *SessionStore) http.HandlerFunc {
 
 // --- /token ---
 
-// HandleToken handles the OIDC token exchange (authorization code → tokens).
+// HandleToken handles the OIDC token exchange (authorization code → tokens,
+// refresh_token → tokens, jwt-bearer → tokens).
 func HandleToken(reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -504,100 +523,324 @@ func HandleToken(reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer,
 		}
 
 		grantType := r.FormValue("grant_type")
-		if grantType != "authorization_code" {
+
+		switch grantType {
+		case "authorization_code":
+			handleAuthorizationCodeGrant(w, r, reg, codes, issuer, db)
+		case "refresh_token":
+			handleRefreshTokenGrant(w, r, reg, issuer, db)
+		case "urn:ietf:params:oauth:grant-type:jwt-bearer":
+			handleJWTBearerGrant(w, r, issuer, db)
+		default:
 			errorResponse(w, http.StatusBadRequest, "unsupported_grant_type",
-				"Only 'authorization_code' is supported")
-			return
+				"Supported: authorization_code, refresh_token, urn:ietf:params:oauth:grant-type:jwt-bearer")
 		}
-
-		code := r.FormValue("code")
-		redirectURI := r.FormValue("redirect_uri")
-		codeVerifier := r.FormValue("code_verifier")
-		clientID := r.FormValue("client_id")
-		clientSecret := r.FormValue("client_secret")
-
-		// Validate client_secret for confidential clients.
-		ok, err := reg.VerifySecret(clientID, clientSecret)
-		if err != nil {
-			errorResponse(w, http.StatusBadRequest, "invalid_client", "Unknown client")
-			return
-		}
-		if !ok {
-			errorResponse(w, http.StatusUnauthorized, "invalid_client", "Invalid client credentials")
-			return
-		}
-
-		// Consume the authorization code (single-use).
-		ac, ok := codes.Consume(code)
-		if !ok {
-			errorResponse(w, http.StatusBadRequest, "invalid_grant", "Invalid or expired authorization code")
-			return
-		}
-
-		// Validate client_id matches.
-		if ac.ClientID != clientID {
-			errorResponse(w, http.StatusBadRequest, "invalid_grant", "client_id mismatch")
-			return
-		}
-
-		// Validate redirect_uri matches.
-		if ac.RedirectURI != redirectURI {
-			errorResponse(w, http.StatusBadRequest, "invalid_grant", "redirect_uri mismatch")
-			return
-		}
-
-		// Verify PKCE code_verifier.
-		if !verifyPKCE(ac.CodeChallenge, codeVerifier) {
-			errorResponse(w, http.StatusBadRequest, "invalid_grant", "PKCE verification failed")
-			return
-		}
-
-		// Look up user profile.
-		user, err := getUserProfile(db, ac.UserID)
-		if err != nil {
-			log.Printf("token: user lookup failed: %v", err)
-			errorResponse(w, http.StatusInternalServerError, "server_error", "User lookup failed")
-			return
-		}
-
-		// Issue ID token.
-		idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{
-			Subject:          ac.UserID,
-			Email:            user.Email,
-			Name:             user.DisplayName,
-			Picture:          user.AvatarURL,
-			AttestationLevel: "verified",
-			Audience:         ac.ClientID,
-			Nonce:            ac.Nonce,
-			AuthTime:         ac.AuthTime,
-		})
-		if err != nil {
-			log.Printf("token: ID token issuance failed: %v", err)
-			errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
-			return
-		}
-
-		// Issue access token.
-		accessToken, err := issuer.IssueAccessToken(ac.UserID, ac.ClientID)
-		if err != nil {
-			log.Printf("token: access token issuance failed: %v", err)
-			errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
-			return
-		}
-
-		resp := map[string]interface{}{
-			"access_token": accessToken,
-			"token_type":   "Bearer",
-			"expires_in":   3600,
-			"id_token":     idToken,
-			"scope":        ac.Scope,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Pragma", "no-cache")
-		json.NewEncoder(w).Encode(resp)
 	}
+}
+
+const refreshTokenTTL = 30 * 24 * time.Hour // 30 days
+
+func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
+	reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer, db *store.DB) {
+
+	code := r.FormValue("code")
+	redirectURI := r.FormValue("redirect_uri")
+	codeVerifier := r.FormValue("code_verifier")
+	clientID := r.FormValue("client_id")
+	clientSecret := r.FormValue("client_secret")
+
+	// Validate client_secret for confidential clients.
+	ok, err := reg.VerifySecret(clientID, clientSecret)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid_client", "Unknown client")
+		return
+	}
+	if !ok {
+		errorResponse(w, http.StatusUnauthorized, "invalid_client", "Invalid client credentials")
+		return
+	}
+
+	// Consume the authorization code (single-use).
+	ac, ok := codes.Consume(code)
+	if !ok {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "Invalid or expired authorization code")
+		return
+	}
+
+	// Validate client_id matches.
+	if ac.ClientID != clientID {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "client_id mismatch")
+		return
+	}
+
+	// Validate redirect_uri matches.
+	if ac.RedirectURI != redirectURI {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "redirect_uri mismatch")
+		return
+	}
+
+	// Verify PKCE code_verifier.
+	if !verifyPKCE(ac.CodeChallenge, codeVerifier) {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "PKCE verification failed")
+		return
+	}
+
+	// Look up user profile.
+	user, err := getUserProfile(db, ac.UserID)
+	if err != nil {
+		log.Printf("token: user lookup failed: %v", err)
+		errorResponse(w, http.StatusInternalServerError, "server_error", "User lookup failed")
+		return
+	}
+
+	// Get user roles.
+	roles, _ := db.GetRoles(ac.UserID)
+
+	// Issue ID token.
+	idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{
+		Subject:          ac.UserID,
+		Email:            user.Email,
+		Name:             user.DisplayName,
+		Picture:          user.AvatarURL,
+		AttestationLevel: "verified",
+		Audience:         ac.ClientID,
+		Nonce:            ac.Nonce,
+		AuthTime:         ac.AuthTime,
+	})
+	if err != nil {
+		log.Printf("token: ID token issuance failed: %v", err)
+		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
+		return
+	}
+
+	// Issue access token (with roles).
+	accessToken, err := issuer.IssueAccessToken(ac.UserID, ac.ClientID, roles)
+	if err != nil {
+		log.Printf("token: access token issuance failed: %v", err)
+		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
+		return
+	}
+
+	resp := map[string]interface{}{
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+		"expires_in":   3600,
+		"id_token":     idToken,
+		"scope":        ac.Scope,
+	}
+
+	// Issue refresh token if offline_access was requested.
+	if strings.Contains(ac.Scope, "offline_access") {
+		refreshToken, err := issueRefreshToken(db, ac.UserID, ac.ClientID, ac.Scope)
+		if err != nil {
+			log.Printf("token: refresh token issuance failed: %v", err)
+		} else {
+			resp["refresh_token"] = refreshToken
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
+	reg *clients.Registry, issuer *tokens.Issuer, db *store.DB) {
+
+	refreshToken := r.FormValue("refresh_token")
+	clientID := r.FormValue("client_id")
+	clientSecret := r.FormValue("client_secret")
+
+	if refreshToken == "" {
+		errorResponse(w, http.StatusBadRequest, "invalid_request", "refresh_token required")
+		return
+	}
+
+	// Validate client.
+	ok, err := reg.VerifySecret(clientID, clientSecret)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid_client", "Unknown client")
+		return
+	}
+	if !ok {
+		errorResponse(w, http.StatusUnauthorized, "invalid_client", "Invalid client credentials")
+		return
+	}
+
+	// Consume the refresh token (rotation: old token is invalidated).
+	tokenHash := hashRefreshToken(refreshToken)
+	userID, storedClientID, scope, err := db.ConsumeRefreshToken(tokenHash)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "Invalid or expired refresh token")
+		return
+	}
+
+	// Ensure the client_id matches.
+	if storedClientID != clientID {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "client_id mismatch")
+		return
+	}
+
+	// Look up user profile.
+	user, err := getUserProfile(db, userID)
+	if err != nil {
+		log.Printf("refresh: user lookup failed for %s: %v", userID, err)
+		errorResponse(w, http.StatusInternalServerError, "server_error", "User lookup failed")
+		return
+	}
+
+	// Get current roles.
+	roles, _ := db.GetRoles(userID)
+
+	// Issue new access token (with current roles).
+	accessToken, err := issuer.IssueAccessToken(userID, clientID, roles)
+	if err != nil {
+		log.Printf("refresh: access token issuance failed: %v", err)
+		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
+		return
+	}
+
+	// Issue new ID token.
+	idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{
+		Subject:          userID,
+		Email:            user.Email,
+		Name:             user.DisplayName,
+		Picture:          user.AvatarURL,
+		AttestationLevel: "verified",
+		Audience:         clientID,
+		AuthTime:         time.Now(),
+	})
+	if err != nil {
+		log.Printf("refresh: ID token issuance failed: %v", err)
+		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
+		return
+	}
+
+	// Issue new refresh token (rotation).
+	newRefreshToken, err := issueRefreshToken(db, userID, clientID, scope)
+	if err != nil {
+		log.Printf("refresh: new refresh token issuance failed: %v", err)
+		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
+		return
+	}
+
+	resp := map[string]interface{}{
+		"access_token":  accessToken,
+		"token_type":    "Bearer",
+		"expires_in":    3600,
+		"id_token":      idToken,
+		"refresh_token": newRefreshToken,
+		"scope":         scope,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func handleJWTBearerGrant(w http.ResponseWriter, r *http.Request,
+	issuer *tokens.Issuer, db *store.DB) {
+
+	assertion := r.FormValue("assertion")
+	scope := r.FormValue("scope")
+
+	if assertion == "" {
+		errorResponse(w, http.StatusBadRequest, "invalid_request", "assertion required")
+		return
+	}
+
+	// Decode assertion header to get kid, then decode claims to get iss/sub.
+	parts := strings.SplitN(assertion, ".", 3)
+	if len(parts) != 3 {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "Malformed JWT assertion")
+		return
+	}
+
+	claimsJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "Cannot decode assertion claims")
+		return
+	}
+	var assertionClaims map[string]interface{}
+	if err := json.Unmarshal(claimsJSON, &assertionClaims); err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "Cannot parse assertion claims")
+		return
+	}
+
+	// The subject of the assertion is the service account ID.
+	accountID, _ := assertionClaims["sub"].(string)
+	if accountID == "" {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "Assertion missing sub claim")
+		return
+	}
+
+	// Look up the service account's public key.
+	publicKeyPEM, _, err := db.GetServiceAccount(accountID)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "Unknown service account")
+		return
+	}
+
+	// Verify the JWT assertion.
+	_, err = tokens.VerifyServiceAccountJWT(assertion, publicKeyPEM, issuer.IssuerURL())
+	if err != nil {
+		log.Printf("jwt-bearer: verification failed for %s: %v", accountID, err)
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "JWT assertion verification failed")
+		return
+	}
+
+	// Get service account roles.
+	roles, _ := db.GetRoles(accountID)
+
+	// Determine audience from scope (e.g. "audience:management-service").
+	audience := ""
+	for _, s := range strings.Fields(scope) {
+		if strings.HasPrefix(s, "audience:") {
+			audience = strings.TrimPrefix(s, "audience:")
+			break
+		}
+	}
+
+	// Issue access token.
+	accessToken, err := issuer.IssueAccessToken(accountID, audience, roles)
+	if err != nil {
+		log.Printf("jwt-bearer: access token issuance failed: %v", err)
+		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
+		return
+	}
+
+	resp := map[string]interface{}{
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+		"expires_in":   3600,
+		"scope":        scope,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// issueRefreshToken generates a random refresh token, stores its hash, and returns the plaintext.
+func issueRefreshToken(db *store.DB, userID, clientID, scope string) (string, error) {
+	b := make([]byte, 32)
+	rand.Read(b)
+	token := base64.RawURLEncoding.EncodeToString(b)
+	tokenHash := hashRefreshToken(token)
+
+	err := db.StoreRefreshToken(tokenHash, userID, clientID, scope, time.Now().Add(refreshTokenTTL))
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func hashRefreshToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
 }
 
 // --- /userinfo ---
@@ -646,6 +889,12 @@ func HandleUserInfo(issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 		}
 		if user.AvatarURL != "" {
 			resp["picture"] = user.AvatarURL
+		}
+
+		// Include roles.
+		roles, _ := db.GetRoles(sub)
+		if len(roles) > 0 {
+			resp["roles"] = roles
 		}
 
 		w.Header().Set("Content-Type", "application/json")

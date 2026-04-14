@@ -20,6 +20,7 @@ type Config struct {
 	DBPath         string // SQLite database path
 	AdminToken     string // Bearer token for admin endpoints
 	BrokerURL      string // WebSocket broker URL (for push notifications)
+	BootstrapAdmin string // User ID to auto-grant platform:admin on startup
 }
 
 // ListenAddr returns the formatted listen address.
@@ -44,6 +45,7 @@ func Load() *Config {
 		DBPath:         envStr("IDP_DB_PATH", "/var/lib/privasys/idp.db"),
 		AdminToken:     envStr("IDP_ADMIN_TOKEN", ""),
 		BrokerURL:      envStr("IDP_BROKER_URL", "https://relay.privasys.org"),
+		BootstrapAdmin: envStr("IDP_BOOTSTRAP_ADMIN", ""),
 	}
 }
 

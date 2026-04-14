@@ -59,7 +59,7 @@ export default function ConnectScreen() {
     const pushToken = useExpoPushToken();
 
     // Stores
-    const { addCredential, getCredentialForRp, checkUnlocked, setUnlocked } = useAuthStore();
+    const { addCredential, removeCredential, getCredentialForRp, checkUnlocked, setUnlocked } = useAuthStore();
     const { getApp, isAttestationMatch, addOrUpdate: addTrustedApp } = useTrustedAppsStore();
     const { gracePeriodSec } = useSettingsStore();
 
@@ -69,6 +69,7 @@ export default function ConnectScreen() {
     const [attestation, setAttestation] = useState<AttestationResult | null>(null);
     const [qr, setQr] = useState<QRPayload | null>(null);
     const [isTrusted, setIsTrusted] = useState(false);
+    const [attestationChanged, setAttestationChanged] = useState(false);
     const hasStarted = useRef(false);
 
     // Parse QR payload
@@ -182,6 +183,7 @@ export default function ConnectScreen() {
                 }
 
                 if (trustedApp) {
+                    setAttestationChanged(true);
                     setStep('attestation-changed');
                     return;
                 }
@@ -258,13 +260,20 @@ export default function ConnectScreen() {
             setUnlocked(gracePeriodSec * 1000);
         }
 
+        // If attestation changed, the enclave has a new KV store and our
+        // old credential no longer exists server-side.  Remove it and
+        // re-register so the user gets a fresh credential.
         const credential = getCredentialForRp(qr.rpId);
-        if (credential) {
+        if (credential && attestationChanged) {
+            console.log('[CONNECT] attestation changed — removing old credential and re-registering');
+            removeCredential(credential.credentialId);
+            await doRegister(qr);
+        } else if (credential) {
             await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
         } else {
             await doRegister(qr);
         }
-    }, [qr, attestation, gracePeriodSec]);
+    }, [qr, attestation, attestationChanged, gracePeriodSec]);
 
     const doRegister = async (payload: QRPayload) => {
         setStep('authenticating');

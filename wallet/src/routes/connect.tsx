@@ -419,7 +419,7 @@ export default function ConnectScreen() {
                 {step === 'verifying' && (
                     <View style={styles.centered}>
                         <ActivityIndicator size="large" color="#007AFF" />
-                        <Text style={styles.statusText}>Verifying enclave attestation...</Text>
+                        <Text style={styles.statusText}>Verifying server attestation...</Text>
                     </View>
                 )}
 

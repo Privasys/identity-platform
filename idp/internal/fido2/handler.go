@@ -24,6 +24,7 @@ import (
 	"github.com/Privasys/idp/internal/oidc"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/protocol/webauthncose"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -268,6 +269,15 @@ func (h *Handler) CompleteRegistration(
 		if err != nil {
 			log.Printf("fido2/register/complete: %v", err)
 			errorJSON(w, http.StatusBadRequest, fmt.Sprintf("registration verification failed: %s", err))
+			return
+		}
+
+		// Validate that the public key is parseable — go-webauthn with "none"
+		// attestation does not parse the key during registration.
+		if _, err := webauthncose.ParsePublicKey(credential.PublicKey); err != nil {
+			log.Printf("fido2/register/complete: credential public key is not parseable (len=%d): %v",
+				len(credential.PublicKey), err)
+			errorJSON(w, http.StatusBadRequest, "registration failed: unsupported public key format")
 			return
 		}
 

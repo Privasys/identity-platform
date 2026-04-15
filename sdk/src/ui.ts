@@ -750,7 +750,7 @@ export class AuthUI {
                         el('span', { className: 'step-icon' }, '\u2713'), firstStep,
                     ),
                     el('div', { className: `step ${isAuth ? 'done' : 'active'}` },
-                        el('span', { className: 'step-icon' }, isAuth ? '\u2713' : '\u2022'), 'Verifying enclave attestation',
+                        el('span', { className: 'step-icon' }, isAuth ? '\u2713' : '\u2022'), 'Verifying server attestation',
                     ),
                     el('div', { className: `step ${isAuth ? 'active' : ''}` },
                         el('span', { className: 'step-icon' }, '\u2022'), 'FIDO2 biometric ceremony',

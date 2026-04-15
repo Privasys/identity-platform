@@ -201,7 +201,7 @@ class PasskeyActivity : Activity() {
 
     private fun showVerifying(rpId: String) {
         spinner.visibility = android.view.View.VISIBLE
-        statusText.text = "Verifying enclave…"
+        statusText.text = "Verifying server…"
         detailText.text = rpId
         approveButton.visibility = android.view.View.GONE
     }
@@ -221,7 +221,7 @@ class PasskeyActivity : Activity() {
 
                     if (valid) {
                         spinner.visibility = android.view.View.GONE
-                        statusText.text = "Enclave Verified ✓"
+                        statusText.text = "Server Verified ✓"
 
                         val teeType = json?.optString("tee_type", "") ?: ""
                         val codeHash = json?.optString("code_hash", "") ?: ""
@@ -238,7 +238,7 @@ class PasskeyActivity : Activity() {
                     } else {
                         spinner.visibility = android.view.View.GONE
                         statusText.text = "Attestation Failed"
-                        detailText.text = "$rpId\nCould not verify enclave integrity."
+                        detailText.text = "$rpId\nCould not verify server integrity."
                         approveButton.visibility = android.view.View.GONE
                         cancelButton.postDelayed({ callback(false) }, 2000)
                     }

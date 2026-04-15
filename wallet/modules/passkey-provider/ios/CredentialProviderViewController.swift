@@ -250,14 +250,14 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
 
     private func showVerifying(rpId: String) {
         spinner.startAnimating()
-        statusLabel.text = "Verifying enclave…"
+        statusLabel.text = "Verifying server…"
         detailLabel.text = rpId
         approveButton.isHidden = true
     }
 
     private func showAttestationResult(_ att: [String: Any], rpId: String, completion: @escaping (Bool) -> Void) {
         spinner.stopAnimating()
-        statusLabel.text = "Enclave Verified ✓"
+        statusLabel.text = "Server Verified ✓"
 
         var lines: [String] = [rpId]
         if let tee = att["tee_type"] as? String { lines.append("TEE: \(tee)") }
@@ -271,7 +271,7 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
     private func showAttestationFailed(rpId: String) {
         spinner.stopAnimating()
         statusLabel.text = "Attestation Failed"
-        detailLabel.text = "\(rpId)\nCould not verify enclave integrity."
+        detailLabel.text = "\(rpId)\nCould not verify server integrity."
         approveButton.isHidden = true
     }
 

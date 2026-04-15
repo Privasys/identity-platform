@@ -107,9 +107,10 @@ export function useExpoPushToken() {
                             origin: data.origin,
                             sessionId: data.sessionId,
                             rpId: data.rpId,
-                            brokerUrl: data.brokerUrl
+                            brokerUrl: data.brokerUrl,
+                            userAgent: data.userAgent,
                         });
-                        router.push({ pathname: '/connect', params: { payload } });
+                        router.push({ pathname: '/connect', params: { payload, source: 'push' } });
                     }
                     // auth-renew taps are ignored — they're handled silently
                 }

@@ -27,7 +27,7 @@ export default function ScpRedirect() {
                 return { pathname: '/batch-connect' as const, params: { payload: json } };
             }
             if (parsed.origin && parsed.sessionId && parsed.rpId) {
-                return { pathname: '/connect' as const, params: { payload: json } };
+                return { pathname: '/connect' as const, params: { payload: json, source: 'qr' as const } };
             }
         } catch {
             // Invalid payload

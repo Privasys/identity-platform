@@ -273,7 +273,7 @@ func (h *Handler) CompleteRegistration(
 
 		// Store credential in DB.
 		credID := base64.RawURLEncoding.EncodeToString(credential.ID)
-		pubKeyBytes, _ := json.Marshal(credential.PublicKey)
+		pubKeyBytes := credential.PublicKey // raw COSE key bytes
 		aaguid := hex.EncodeToString(credential.Authenticator.AAGUID)
 
 		_, err = h.db.Exec(`
@@ -486,9 +486,6 @@ func (h *Handler) loadCredentials(userID string) ([]webauthn.Credential, error) 
 
 		credID, _ := base64.RawURLEncoding.DecodeString(credIDStr)
 		aaguid, _ := hex.DecodeString(aaguidStr)
-
-		var pubKey interface{}
-		json.Unmarshal(pubKeyBytes, &pubKey)
 
 		cred := webauthn.Credential{
 			ID:              credID,

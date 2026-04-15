@@ -145,6 +145,17 @@ func migrate(db *sql.DB) error {
 		}
 	}
 
+	// Migration: backfill users rows for existing service accounts so that
+	// FK constraints (roles, etc.) work uniformly for all principal types.
+	_, err = db.Exec(`
+		INSERT INTO users (user_id, display_name)
+		SELECT account_id, display_name FROM service_accounts
+		WHERE account_id NOT IN (SELECT user_id FROM users)
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -279,11 +290,33 @@ func (db *DB) GetServiceAccount(accountID string) (publicKeyPEM, keyID string, e
 }
 
 // CreateServiceAccount stores a new service account.
+// It also inserts a row into the users table so that foreign-key constraints
+// (e.g. roles.user_id → users.user_id) are satisfied for service accounts.
 func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID string) error {
-	_, err := db.Exec(
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Ensure a users row exists so FKs (roles, etc.) work for service accounts.
+	_, err = tx.Exec(
+		`INSERT INTO users (user_id, display_name) VALUES (?, ?)
+		 ON CONFLICT(user_id) DO UPDATE SET display_name = excluded.display_name`,
+		accountID, displayName,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(
 		`INSERT INTO service_accounts (account_id, display_name, public_key, key_id) VALUES (?, ?, ?, ?)
 		 ON CONFLICT(account_id) DO UPDATE SET display_name = excluded.display_name, public_key = excluded.public_key, key_id = excluded.key_id`,
 		accountID, displayName, publicKeyPEM, keyID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

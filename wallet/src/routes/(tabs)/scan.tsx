@@ -41,7 +41,7 @@ export default function TabScanScreen() {
 
     useEffect(() => {
         if (!serviceUrl) return;
-        router.push({ pathname: '/connect', params: { serviceUrl } });
+        router.push({ pathname: '/connect', params: { serviceUrl, source: 'qr' } });
     }, [serviceUrl]);
 
     if (!permission) {

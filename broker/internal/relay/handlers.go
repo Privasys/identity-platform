@@ -125,6 +125,7 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 			"rpId":      req.RpID,
 			"origin":    req.Origin,
 			"brokerUrl": req.BrokerURL,
+			"userAgent": r.Header.Get("User-Agent"),
 		},
 	}
 
@@ -134,8 +135,8 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 	} else {
 		// Visible notification for initial auth requests
 		pushMsg["sound"] = "default"
-		pushMsg["title"] = "Authentication Request"
-		pushMsg["body"] = "Sign in to " + req.RpID
+		pushMsg["title"] = "Sign-in request"
+		pushMsg["body"] = req.RpID + " wants to sign you in"
 	}
 
 	pushBody, _ := json.Marshal(pushMsg)

@@ -39,7 +39,7 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		"subject_types_supported":               []string{"pairwise"},
 		"id_token_signing_alg_values_supported": []string{"ES256"},
 		"scopes_supported":                      []string{"openid", "profile", "email", "offline_access"},
-		"token_endpoint_auth_methods_supported": []string{"none", "client_secret_post"},
+		"token_endpoint_auth_methods_supported": []string{"none", "client_secret_post", "client_secret_basic"},
 		"code_challenge_methods_supported":      []string{"S256"},
 		"claims_supported": []string{
 			"sub", "name", "email", "email_verified", "picture",
@@ -549,6 +549,14 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 	clientID := r.FormValue("client_id")
 	clientSecret := r.FormValue("client_secret")
 
+	// Support client_secret_basic (HTTP Basic Auth) as fallback.
+	if clientID == "" {
+		if id, secret, ok := r.BasicAuth(); ok {
+			clientID = id
+			clientSecret = secret
+		}
+	}
+
 	// Validate client_secret for confidential clients.
 	ok, err := reg.VerifySecret(clientID, clientSecret)
 	if err != nil {
@@ -651,6 +659,14 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	refreshToken := r.FormValue("refresh_token")
 	clientID := r.FormValue("client_id")
 	clientSecret := r.FormValue("client_secret")
+
+	// Support client_secret_basic (HTTP Basic Auth) as fallback.
+	if clientID == "" {
+		if id, secret, ok := r.BasicAuth(); ok {
+			clientID = id
+			clientSecret = secret
+		}
+	}
 
 	if refreshToken == "" {
 		errorResponse(w, http.StatusBadRequest, "invalid_request", "refresh_token required")

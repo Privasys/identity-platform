@@ -3,10 +3,16 @@
 
 /**
  * Connect flow — the core authentication journey:
- * 1. Parse QR payload (origin, sessionId, rpId, brokerUrl)
+ * 1. Parse QR/push payload (origin, sessionId, rpId, brokerUrl)
  * 2. RA-TLS attestation verification
  * 3. FIDO2 registration or authentication
  * 4. Relay session token to browser via broker
+ *
+ * Entry points pass `source` to control UX:
+ * - `source='qr'`   — user scanned a QR code; skip "Sign in?" confirmation,
+ *                      go straight to biometric → FIDO2.
+ * - `source='push'`  — push notification tap; show "Sign in?" confirmation
+ *                      first so the user can reject unexpected requests.
  */
 
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -32,6 +38,24 @@ function appName(rpId: string): string {
     return dot > 0 ? rpId.substring(0, dot) : rpId;
 }
 
+function friendlyBrowser(ua?: string): string | null {
+    if (!ua) return null;
+    const browser =
+        /Edg\//.test(ua) ? 'Edge' :
+        /OPR\/|Opera/.test(ua) ? 'Opera' :
+        /Chrome\//.test(ua) ? 'Chrome' :
+        /Safari\//.test(ua) && !/Chrome/.test(ua) ? 'Safari' :
+        /Firefox\//.test(ua) ? 'Firefox' : null;
+    const os =
+        /Windows/.test(ua) ? 'Windows' :
+        /Mac OS X/.test(ua) ? 'macOS' :
+        /Linux/.test(ua) ? 'Linux' :
+        /Android/.test(ua) ? 'Android' : null;
+    if (browser && os) return `${browser} on ${os}`;
+    if (browser) return browser;
+    return null;
+}
+
 type FlowStep =
     | 'verifying'
     | 'confirm'
@@ -48,6 +72,7 @@ interface QRPayload {
     sessionId: string;
     rpId: string;
     brokerUrl: string;
+    userAgent?: string;
 }
 
 export default function ConnectScreen() {
@@ -55,7 +80,9 @@ export default function ConnectScreen() {
     const params = useLocalSearchParams<{
         payload?: string; // JSON-encoded QRPayload
         serviceUrl?: string; // Legacy fallback
+        source?: 'qr' | 'push'; // How the flow was initiated
     }>();
+    const isFromPush = params.source === 'push';
     const pushToken = useExpoPushToken();
 
     // Stores
@@ -133,9 +160,19 @@ export default function ConnectScreen() {
                     console.log('[CONNECT] no enclave measurements — skipping attestation approval');
                     const credential = getCredentialForRp(payload.rpId);
                     if (credential) {
-                        // Returning user — show confirmation ("Sign in?")
                         setIsTrusted(true);
-                        setStep('confirm');
+                        if (isFromPush) {
+                            // Push-initiated: show "Sign in?" confirmation
+                            setStep('confirm');
+                            return;
+                        }
+                        // QR-initiated: skip confirmation, go straight to auth
+                        if (checkUnlocked()) {
+                            await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+                        } else {
+                            setStep('biometric');
+                            await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+                        }
                         return;
                     }
                     // First time — biometric then register (no attestation to approve)
@@ -174,8 +211,18 @@ export default function ConnectScreen() {
                     setIsTrusted(true);
                     const credential = getCredentialForRp(payload.rpId);
                     if (credential) {
-                        // Trusted + has credential — show confirmation before proceeding
-                        setStep('confirm');
+                        if (isFromPush) {
+                            // Push-initiated: show "Sign in?" confirmation
+                            setStep('confirm');
+                            return;
+                        }
+                        // QR-initiated: skip confirmation, go straight to auth
+                        if (checkUnlocked()) {
+                            await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+                        } else {
+                            setStep('biometric');
+                            await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+                        }
                         return;
                     }
                     setStep('attestation');
@@ -381,16 +428,18 @@ export default function ConnectScreen() {
                         <View style={styles.confirmIcon}>
                             <Text style={styles.confirmIconText}>{appName(qr.rpId).charAt(0).toUpperCase()}</Text>
                         </View>
-                        <Text style={styles.title}>Sign in?</Text>
+                        <Text style={styles.title}>Sign-in request</Text>
                         <Text style={styles.confirmDomain}>{qr.rpId}</Text>
-                        <Text style={styles.confirmHint}>
-                            Make sure you initiated this from your browser.
-                        </Text>
+                        {friendlyBrowser(qr.userAgent) && (
+                            <Text style={styles.confirmHint}>
+                                From {friendlyBrowser(qr.userAgent)}
+                            </Text>
+                        )}
                         <Pressable style={styles.confirmButton} onPress={handleConfirm}>
-                            <Text style={styles.confirmButtonText}>It's me</Text>
+                            <Text style={styles.confirmButtonText}>Approve</Text>
                         </Pressable>
                         <Pressable style={styles.cancelButton} onPress={handleReject}>
-                            <Text style={styles.cancelButtonText}>Not me</Text>
+                            <Text style={styles.cancelButtonText}>Deny</Text>
                         </Pressable>
                     </View>
                 )}

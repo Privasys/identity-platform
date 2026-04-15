@@ -5,8 +5,7 @@
  * FIDO2 client-side operations.
  *
  * Handles the WebAuthn registration and authentication ceremonies by
- * communicating with the enclave's FIDO2 endpoints over HTTPS
- * (the RA-TLS connection is already established at this point).
+ * communicating with the FIDO2 server over an RA-TLS connection.
  */
 
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -157,9 +156,9 @@ const PRIVASYS_WALLET_AAGUID = new Uint8Array([
 // ── Public API ──────────────────────────────────────────────────────────
 
 /**
- * Register a new FIDO2 credential with an enclave.
+ * Register a new FIDO2 credential with a server.
  *
- * @param origin  The enclave's origin (hostname:port).
+ * @param origin  The server origin (hostname or hostname:port).
  * @param keyAlias  The hardware key alias to use (from native-keys).
  * @param browserSessionId  Session ID to relay the session token to the browser.
  * @returns The session token for the browser and the credential ID.
@@ -168,7 +167,7 @@ export async function register(
     origin: string,
     keyAlias: string,
     browserSessionId: string
-): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; enclaveRpId: string }> {
+): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string }> {
     // 1. Begin registration — get challenge and options from server
     //    Generate a random user handle (32 random bytes, base64url-encoded)
     const userHandleBytes = new Uint8Array(32);
@@ -260,18 +259,18 @@ export async function register(
         credentialId: credentialIdB64,
         userHandle: options.user.id,
         userName: options.user.name,
-        enclaveRpId: options.rp.id,
+        serverRpId: options.rp.id,
     };
 }
 
 /**
  * Authenticate with an existing FIDO2 credential.
  *
- * @param origin  The enclave's origin (hostname:port).
+ * @param origin  The server origin (hostname or hostname:port).
  * @param keyAlias  The hardware key alias.
  * @param credentialId  The credential ID to authenticate with.
  * @param browserSessionId  Session ID to relay the session token to the browser.
- * @param rpId  The RP ID to use for rpIdHash (from enclave registration). Falls back to origin hostname.
+ * @param rpId  The RP ID to use for rpIdHash (from registration). Falls back to origin hostname.
  * @returns The session token for the browser.
  */
 export async function authenticate(

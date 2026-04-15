@@ -168,10 +168,10 @@ export default function ConnectScreen() {
                         }
                         // QR-initiated: skip confirmation, go straight to auth
                         if (checkUnlocked()) {
-                            await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+                            await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
                         } else {
                             setStep('biometric');
-                            await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+                            await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
                         }
                         return;
                     }
@@ -218,10 +218,10 @@ export default function ConnectScreen() {
                         }
                         // QR-initiated: skip confirmation, go straight to auth
                         if (checkUnlocked()) {
-                            await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+                            await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
                         } else {
                             setStep('biometric');
-                            await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+                            await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
                         }
                         return;
                     }
@@ -250,7 +250,7 @@ export default function ConnectScreen() {
         payload: QRPayload,
         keyAlias: string,
         credentialId: string,
-        enclaveRpId?: string
+        serverRpId?: string
     ) => {
         const result = await LocalAuthentication.authenticateAsync({
             promptMessage: `Connect to ${payload.rpId}`,
@@ -269,7 +269,7 @@ export default function ConnectScreen() {
             setUnlocked(gracePeriodSec * 1000);
         }
 
-        await doAuthenticate(payload, keyAlias, credentialId, enclaveRpId);
+        await doAuthenticate(payload, keyAlias, credentialId, serverRpId);
     }, [gracePeriodSec]);
 
     const handleConfirm = useCallback(async () => {
@@ -279,10 +279,10 @@ export default function ConnectScreen() {
 
         if (checkUnlocked()) {
             // Within grace period — skip biometric
-            await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+            await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
         } else {
             setStep('biometric');
-            await promptBiometricAndAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+            await promptBiometricAndAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
         }
     }, [qr, gracePeriodSec]);
 
@@ -316,7 +316,7 @@ export default function ConnectScreen() {
             removeCredential(credential.credentialId);
             await doRegister(qr);
         } else if (credential) {
-            await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.enclaveRpId);
+            await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
         } else {
             await doRegister(qr);
         }
@@ -348,7 +348,7 @@ export default function ConnectScreen() {
                 userHandle: result.userHandle,
                 userName: result.userName,
                 registeredAt: Math.floor(Date.now() / 1000),
-                enclaveRpId: result.enclaveRpId,
+                serverRpId: result.serverRpId,
             });
 
             if (attestation) {
@@ -378,7 +378,7 @@ export default function ConnectScreen() {
         payload: QRPayload,
         keyAlias: string,
         credentialId: string,
-        enclaveRpId?: string
+        serverRpId?: string
     ) => {
         setStep('authenticating');
         console.log(`[CONNECT] doAuthenticate — origin=${payload.origin}, credentialId=${credentialId.substring(0, 16)}...`);
@@ -388,7 +388,7 @@ export default function ConnectScreen() {
                 keyAlias,
                 credentialId,
                 payload.sessionId,
-                enclaveRpId
+                serverRpId
             );
 
             setStep('relaying');

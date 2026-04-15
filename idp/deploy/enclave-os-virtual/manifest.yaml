@@ -1,0 +1,39 @@
+# Privasys IdP — enclave-os-virtual manifest
+#
+# This manifest deploys the IdP inside a TDX confidential VM.
+# The signing key and SQLite database are stored on a per-container
+# LUKS2+AEAD encrypted volume with a BYOK passphrase.
+#
+# IMPORTANT: The IDP_ADMIN_TOKEN is passed via vault_token at container
+# load time (not in this manifest) so it is NOT measured into attestation.
+# This lets operators rotate the admin token without changing the
+# attested configuration.
+#
+# All env vars in this file ARE measured into the per-container Config
+# Merkle Tree and will appear in RA-TLS certificate OID extensions.
+
+version: "1"
+
+platform:
+  hostname: privasys.id
+  ca_cert: /etc/enclave-os/tls/ca.pem
+  ca_key: /etc/enclave-os/tls/ca-key.pem
+  attestation_backend: tdx
+
+containers:
+  - name: idp
+    image: "ghcr.io/privasys/idp@sha256:REPLACE_WITH_PINNED_DIGEST"
+    hostname: privasys.id
+    port: 8091
+    storage: 1G
+    env:
+      IDP_PORT: "8091"
+      IDP_ISSUER_URL: "https://privasys.id"
+      IDP_RP_ID: "privasys.id"
+      IDP_RP_ORIGINS: "https://privasys.id"
+      IDP_BROKER_URL: "https://relay.privasys.org"
+    health_check:
+      http: "http://127.0.0.1:8091/healthz"
+      interval_seconds: 10
+      timeout_seconds: 3
+      retries: 3

@@ -36,14 +36,21 @@ func Load() *Config {
 	rpID := envStr("IDP_RP_ID", "privasys.id")
 	rpOrigins := strings.Split(envStr("IDP_RP_ORIGINS", issuerURL), ",")
 
+	// VAULT_TOKEN is injected by enclave-os-virtual as a runtime secret
+	// (not measured into attestation). Fall back to it for admin auth.
+	adminToken := envStr("IDP_ADMIN_TOKEN", "")
+	if adminToken == "" {
+		adminToken = envStr("VAULT_TOKEN", "")
+	}
+
 	return &Config{
 		Port:           port,
 		IssuerURL:      issuerURL,
 		RPID:           rpID,
 		RPOrigins:      rpOrigins,
-		SigningKeyPath: envStr("IDP_SIGNING_KEY_FILE", "/etc/privasys/idp-signing-key.pem"),
-		DBPath:         envStr("IDP_DB_PATH", "/var/lib/privasys/idp.db"),
-		AdminToken:     envStr("IDP_ADMIN_TOKEN", ""),
+		SigningKeyPath: envStr("IDP_SIGNING_KEY_FILE", "/data/signing-key.pem"),
+		DBPath:         envStr("IDP_DB_PATH", "/data/idp.db"),
+		AdminToken:     adminToken,
 		BrokerURL:      envStr("IDP_BROKER_URL", "https://relay.privasys.org"),
 		BootstrapAdmin: envStr("IDP_BOOTSTRAP_ADMIN", ""),
 	}

@@ -14,7 +14,7 @@ Group=nogroup
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/privasys
+ReadWritePaths=/var/lib/privasys /data
 ReadOnlyPaths=/etc/privasys
 PrivateTmp=true
 

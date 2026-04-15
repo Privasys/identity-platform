@@ -81,11 +81,11 @@ export default function ServiceDetailScreen() {
                         <RNView
                             style={[
                                 styles.serviceIcon,
-                                { backgroundColor: app.teeType === 'sgx' ? '#34E89E' : '#00BCF2' }
+                                { backgroundColor: app.teeType === 'sgx' ? '#34E89E' : app.teeType === 'tdx' ? '#00BCF2' : '#8B5CF6' }
                             ]}
                         >
                             <Ionicons
-                                name={app.teeType === 'sgx' ? 'lock-closed' : 'shield-checkmark'}
+                                name={app.teeType === 'sgx' ? 'lock-closed' : app.teeType === 'tdx' ? 'shield-checkmark' : 'key'}
                                 size={28}
                                 color="#FFFFFF"
                             />
@@ -93,15 +93,15 @@ export default function ServiceDetailScreen() {
                         <Text style={styles.serviceName}>{appName(app.rpId)}</Text>
                         <Text style={styles.serviceOrigin}>{app.rpId}</Text>
                         <Text style={styles.serviceMeta}>
-                            {app.teeType.toUpperCase()} · Verified{' '}
+                            {app.teeType === 'none' ? 'Passkey' : app.teeType.toUpperCase()} · Connected{' '}
                             {new Date(app.lastVerified * 1000).toLocaleDateString()}
                         </Text>
                     </RNView>
 
                     {/* Attestation details */}
                     <RNView style={styles.card}>
-                        <Text style={styles.cardTitle}>Attestation</Text>
-                        <DetailRow label="TEE Type" value={app.teeType.toUpperCase()} />
+                        <Text style={styles.cardTitle}>{app.teeType === 'none' ? 'Connection' : 'Attestation'}</Text>
+                        <DetailRow label="Type" value={app.teeType === 'none' ? 'Passkey (no enclave)' : app.teeType.toUpperCase()} />
                         {app.mrenclave && <DetailRow label="MRENCLAVE" value={app.mrenclave} mono />}
                         {app.mrtd && <DetailRow label="MRTD" value={app.mrtd} mono />}
                         {app.codeHash && <DetailRow label="Code Hash" value={app.codeHash} mono />}

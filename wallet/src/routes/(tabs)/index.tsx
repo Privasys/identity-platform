@@ -47,7 +47,7 @@ export default function HomeScreen() {
                         </RNView>
                         <Text style={styles.emptyTitle}>Ready to connect</Text>
                         <Text style={styles.emptyText}>
-                            Scan a QR code to verify and connect{`\n`}to your first enclave service.
+                            Scan a QR code to connect{`\n`}to your first service.
                         </Text>
                     </RNView>
                 ) : (
@@ -71,11 +71,11 @@ export default function HomeScreen() {
                                 <RNView
                                     style={[
                                         styles.serviceIcon,
-                                        { backgroundColor: app.teeType === 'sgx' ? '#34E89E' : '#00BCF2' }
+                                        { backgroundColor: app.teeType === 'sgx' ? '#34E89E' : app.teeType === 'tdx' ? '#00BCF2' : '#8B5CF6' }
                                     ]}
                                 >
                                     <Ionicons
-                                        name={app.teeType === 'sgx' ? 'lock-closed' : 'shield-checkmark'}
+                                        name={app.teeType === 'sgx' ? 'lock-closed' : app.teeType === 'tdx' ? 'shield-checkmark' : 'key'}
                                         size={18}
                                         color="#FFFFFF"
                                     />
@@ -83,7 +83,7 @@ export default function HomeScreen() {
                                 <RNView style={styles.serviceInfo}>
                                     <Text style={styles.serviceName}>{appName(app.rpId)}</Text>
                                     <Text style={styles.serviceMeta}>
-                                        {app.teeType.toUpperCase()} · Verified{' '}
+                                        {app.teeType === 'none' ? 'Passkey' : app.teeType.toUpperCase()} · Connected{' '}
                                         {new Date(app.lastVerified * 1000).toLocaleDateString()}
                                     </Text>
                                 </RNView>

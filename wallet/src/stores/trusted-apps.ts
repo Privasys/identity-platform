@@ -16,8 +16,8 @@ export interface TrustedApp {
     codeHash?: string;
     /** Config Merkle root from the last verification. */
     configRoot?: string;
-    /** TEE type: 'sgx' | 'tdx'. */
-    teeType: 'sgx' | 'tdx';
+    /** TEE type: 'sgx' | 'tdx' | 'none' (standard server, no enclave). */
+    teeType: 'sgx' | 'tdx' | 'none';
     /** Epoch seconds of last successful attestation verification. */
     lastVerified: number;
     /** Credential ID registered with this app. */

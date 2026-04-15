@@ -363,6 +363,14 @@ export default function ConnectScreen() {
                     lastVerified: Math.floor(Date.now() / 1000),
                     credentialId: result.credentialId
                 });
+            } else {
+                addTrustedApp({
+                    rpId: payload.rpId,
+                    origin: payload.origin,
+                    teeType: 'none',
+                    lastVerified: Math.floor(Date.now() / 1000),
+                    credentialId: result.credentialId
+                });
             }
 
             setStep('done');

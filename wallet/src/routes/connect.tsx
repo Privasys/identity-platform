@@ -26,8 +26,10 @@ import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, verifyAttestation } from '@/services/attestation';
 import { relaySessionToken } from '@/services/broker';
+import { deriveAppSub } from '@/services/did';
 import * as fido2 from '@/services/fido2';
 import { useAuthStore } from '@/stores/auth';
+import { useProfileStore } from '@/stores/profile';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
@@ -56,6 +58,45 @@ function friendlyBrowser(ua?: string): string | null {
     return null;
 }
 
+/**
+ * Resolve profile attributes based on what the app requested via
+ * `requestedAttributes` in the QR payload.  Returns undefined if
+ * nothing was requested or the profile is empty.
+ */
+async function resolveRequestedAttributes(
+    payload: QRPayload,
+    profile: import('@/stores/profile').UserProfile | null,
+): Promise<Record<string, string> | undefined> {
+    const requested = payload.requestedAttributes;
+    if (!requested?.length || !profile) return undefined;
+
+    const attrs: Record<string, string> = {};
+
+    for (const attr of requested) {
+        switch (attr) {
+            case 'sub':
+                if (profile.pairwiseSeed) {
+                    try { attrs.sub = await deriveAppSub(profile.pairwiseSeed, payload.rpId); } catch {}
+                }
+                break;
+            case 'email':
+                if (profile.email) attrs.email = profile.email;
+                break;
+            case 'name':
+                if (profile.displayName) attrs.name = profile.displayName;
+                break;
+            default: {
+                // Fall back to the extended ProfileAttribute bag.
+                const pa = profile.attributes?.find((a) => a.key === attr);
+                if (pa?.value) attrs[attr] = pa.value;
+                break;
+            }
+        }
+    }
+
+    return Object.keys(attrs).length > 0 ? attrs : undefined;
+}
+
 type FlowStep =
     | 'verifying'
     | 'confirm'
@@ -73,6 +114,7 @@ interface QRPayload {
     rpId: string;
     brokerUrl: string;
     userAgent?: string;
+    requestedAttributes?: string[];
 }
 
 export default function ConnectScreen() {
@@ -89,6 +131,7 @@ export default function ConnectScreen() {
     const { addCredential, removeCredential, getCredentialForRp, checkUnlocked, setUnlocked } = useAuthStore();
     const { getApp, isAttestationMatch, addOrUpdate: addTrustedApp } = useTrustedAppsStore();
     const { gracePeriodSec } = useSettingsStore();
+    const profile = useProfileStore((s) => s.profile);
 
     // State
     const [step, setStep] = useState<FlowStep>('verifying');
@@ -332,11 +375,16 @@ export default function ConnectScreen() {
             // Relay to browser BEFORE persisting — if relay fails the
             // credential must not appear in "Connected Services".
             setStep('relaying');
+
+            // Resolve only the attributes the app actually requested.
+            const attributes = await resolveRequestedAttributes(payload, profile);
+
             await relaySessionToken(
                 payload.brokerUrl,
                 payload.sessionId,
                 result.sessionToken,
-                pushToken
+                pushToken,
+                attributes
             );
 
             // Relay succeeded — now persist locally.
@@ -400,11 +448,16 @@ export default function ConnectScreen() {
             );
 
             setStep('relaying');
+
+            // Resolve only the attributes the app actually requested.
+            const attributes = await resolveRequestedAttributes(payload, profile);
+
             await relaySessionToken(
                 payload.brokerUrl,
                 payload.sessionId,
                 result.sessionToken,
-                pushToken
+                pushToken,
+                attributes
             );
 
             setStep('done');

@@ -26,12 +26,14 @@ export interface BrokerConnection {
  * @param sessionId  Session ID shared with the browser (from QR or push).
  * @param sessionToken  The opaque session token from the enclave's FIDO2 endpoint.
  * @param pushToken  Expo push token for future auth requests.
+ * @param attributes  Optional profile attributes resolved from the wallet's local store.
  */
 export function relaySessionToken(
     brokerUrl: string,
     sessionId: string,
     sessionToken: string,
-    pushToken: string | null
+    pushToken: string | null,
+    attributes?: Record<string, string>
 ): Promise<void> {
     return new Promise((resolve, reject) => {
         let settled = false;
@@ -49,13 +51,15 @@ export function relaySessionToken(
 
         const sendResult = () => {
             if (settled) return;
-            ws.send(
-                JSON.stringify({
-                    type: 'auth-result',
-                    sessionToken,
-                    pushToken
-                })
-            );
+            const msg: Record<string, unknown> = {
+                type: 'auth-result',
+                sessionToken,
+                pushToken,
+            };
+            if (attributes) {
+                msg.attributes = attributes;
+            }
+            ws.send(JSON.stringify(msg));
             settled = true;
             clearTimeout(timeout);
             ws.close();

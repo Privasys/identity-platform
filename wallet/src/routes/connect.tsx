@@ -18,16 +18,29 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { StyleSheet, Pressable, ActivityIndicator, ScrollView, View as RNView } from 'react-native';
+import {
+    StyleSheet,
+    Pressable,
+    ActivityIndicator,
+    ScrollView,
+    View as RNView,
+    TextInput,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { Ionicons } from '@expo/vector-icons';
 
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, verifyAttestation } from '@/services/attestation';
 import { relaySessionToken } from '@/services/broker';
-import { deriveAppSub } from '@/services/did';
+import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import * as fido2 from '@/services/fido2';
+import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 import { useSettingsStore } from '@/stores/settings';
@@ -97,6 +110,46 @@ async function resolveRequestedAttributes(
     return Object.keys(attrs).length > 0 ? attrs : undefined;
 }
 
+/**
+ * Determine which requested attributes are missing from the user's profile.
+ * Returns the list of attribute keys that the app wants but the profile
+ * doesn't have values for. 'sub' is excluded since it's always derivable.
+ */
+function getMissingAttributes(
+    payload: QRPayload,
+    profile: import('@/stores/profile').UserProfile | null,
+): string[] {
+    const requested = payload.requestedAttributes;
+    if (!requested?.length) return [];
+
+    const missing: string[] = [];
+    for (const attr of requested) {
+        switch (attr) {
+            case 'sub':
+                // Always derivable from pairwiseSeed — never "missing"
+                break;
+            case 'email':
+                if (!profile?.email) missing.push('email');
+                break;
+            case 'name':
+                if (!profile?.displayName) missing.push('name');
+                break;
+            default: {
+                const pa = profile?.attributes?.find((a) => a.key === attr);
+                if (!pa?.value) missing.push(attr);
+                break;
+            }
+        }
+    }
+    return missing;
+}
+
+/** Human-friendly labels for requested attribute keys. */
+const ATTRIBUTE_LABELS: Record<string, string> = {
+    email: 'Email',
+    name: 'Display Name',
+};
+
 type FlowStep =
     | 'verifying'
     | 'confirm'
@@ -104,6 +157,7 @@ type FlowStep =
     | 'attestation-changed'
     | 'biometric'
     | 'authenticating'
+    | 'acquire-attributes'
     | 'relaying'
     | 'done'
     | 'error';
@@ -141,6 +195,21 @@ export default function ConnectScreen() {
     const [isTrusted, setIsTrusted] = useState(false);
     const [attestationChanged, setAttestationChanged] = useState(false);
     const hasStarted = useRef(false);
+
+    // Attribute acquisition state — holds FIDO2 result while user provides missing profile data
+    const [missingAttrs, setMissingAttrs] = useState<string[]>([]);
+    const pendingRelay = useRef<{
+        payload: QRPayload;
+        sessionToken: string;
+        /** Only set for registration (not authentication) */
+        credential?: {
+            credentialId: string;
+            keyAlias: string;
+            userHandle?: string;
+            userName?: string;
+            serverRpId?: string;
+        };
+    } | null>(null);
 
     // Parse QR payload
     useEffect(() => {
@@ -372,6 +441,27 @@ export default function ConnectScreen() {
             const keyAlias = `fido2-${payload.rpId}`;
             const result = await fido2.register(payload.origin, keyAlias, payload.sessionId);
 
+            // Check for missing attributes before relaying
+            const currentProfile = useProfileStore.getState().profile;
+            const missing = getMissingAttributes(payload, currentProfile);
+            if (missing.length > 0) {
+                console.log(`[CONNECT] missing attributes: ${missing.join(', ')} — prompting acquisition`);
+                pendingRelay.current = {
+                    payload,
+                    sessionToken: result.sessionToken,
+                    credential: {
+                        credentialId: result.credentialId,
+                        keyAlias,
+                        userHandle: result.userHandle,
+                        userName: result.userName,
+                        serverRpId: result.serverRpId,
+                    },
+                };
+                setMissingAttrs(missing);
+                setStep('acquire-attributes');
+                return;
+            }
+
             // Relay to browser BEFORE persisting — if relay fails the
             // credential must not appear in "Connected Services".
             setStep('relaying');
@@ -388,38 +478,7 @@ export default function ConnectScreen() {
             );
 
             // Relay succeeded — now persist locally.
-            addCredential({
-                credentialId: result.credentialId,
-                rpId: payload.rpId,
-                origin: payload.origin,
-                keyAlias,
-                userHandle: result.userHandle,
-                userName: result.userName,
-                registeredAt: Math.floor(Date.now() / 1000),
-                serverRpId: result.serverRpId,
-            });
-
-            if (attestation) {
-                addTrustedApp({
-                    rpId: payload.rpId,
-                    origin: payload.origin,
-                    mrenclave: attestation.mrenclave,
-                    mrtd: attestation.mrtd,
-                    codeHash: attestation.code_hash,
-                    configRoot: attestation.config_merkle_root,
-                    teeType: attestation.tee_type || 'sgx',
-                    lastVerified: Math.floor(Date.now() / 1000),
-                    credentialId: result.credentialId
-                });
-            } else {
-                addTrustedApp({
-                    rpId: payload.rpId,
-                    origin: payload.origin,
-                    teeType: 'none',
-                    lastVerified: Math.floor(Date.now() / 1000),
-                    credentialId: result.credentialId
-                });
-            }
+            persistCredentialAndTrust(payload, result.credentialId, keyAlias, result.userHandle, result.userName, result.serverRpId);
 
             setStep('done');
             setTimeout(() => router.replace('/(tabs)'), 1500);
@@ -447,6 +506,17 @@ export default function ConnectScreen() {
                 serverRpId
             );
 
+            // Check for missing attributes before relaying
+            const currentProfile = useProfileStore.getState().profile;
+            const missing = getMissingAttributes(payload, currentProfile);
+            if (missing.length > 0) {
+                console.log(`[CONNECT] missing attributes: ${missing.join(', ')} — prompting acquisition`);
+                pendingRelay.current = { payload, sessionToken: result.sessionToken };
+                setMissingAttrs(missing);
+                setStep('acquire-attributes');
+                return;
+            }
+
             setStep('relaying');
 
             // Resolve only the attributes the app actually requested.
@@ -472,6 +542,102 @@ export default function ConnectScreen() {
     const handleReject = () => {
         router.replace('/(tabs)');
     };
+
+    /** Persist credential and trusted app after a successful relay. */
+    const persistCredentialAndTrust = (
+        payload: QRPayload,
+        credentialId: string,
+        keyAlias: string,
+        userHandle = '',
+        userName = '',
+        serverRpId?: string,
+    ) => {
+        addCredential({
+            credentialId,
+            rpId: payload.rpId,
+            origin: payload.origin,
+            keyAlias,
+            userHandle,
+            userName,
+            registeredAt: Math.floor(Date.now() / 1000),
+            serverRpId,
+        });
+
+        if (attestation) {
+            addTrustedApp({
+                rpId: payload.rpId,
+                origin: payload.origin,
+                mrenclave: attestation.mrenclave,
+                mrtd: attestation.mrtd,
+                codeHash: attestation.code_hash,
+                configRoot: attestation.config_merkle_root,
+                teeType: attestation.tee_type || 'sgx',
+                lastVerified: Math.floor(Date.now() / 1000),
+                credentialId,
+            });
+        } else {
+            addTrustedApp({
+                rpId: payload.rpId,
+                origin: payload.origin,
+                teeType: 'none',
+                lastVerified: Math.floor(Date.now() / 1000),
+                credentialId,
+            });
+        }
+    };
+
+    /**
+     * Called when the user has finished providing missing attributes.
+     * Re-reads the profile, resolves attributes, and completes the relay.
+     */
+    const handleAttributesAcquired = useCallback(async () => {
+        const pending = pendingRelay.current;
+        if (!pending) return;
+
+        // Re-check: are attributes still missing?
+        const updatedProfile = useProfileStore.getState().profile;
+        const stillMissing = getMissingAttributes(pending.payload, updatedProfile);
+        if (stillMissing.length > 0) {
+            Alert.alert(
+                'Missing information',
+                `Please provide: ${stillMissing.map((k) => ATTRIBUTE_LABELS[k] ?? k).join(', ')}`,
+            );
+            return;
+        }
+
+        setStep('relaying');
+        try {
+            const attributes = await resolveRequestedAttributes(pending.payload, updatedProfile);
+
+            await relaySessionToken(
+                pending.payload.brokerUrl,
+                pending.payload.sessionId,
+                pending.sessionToken,
+                pushToken,
+                attributes,
+            );
+
+            // For registration, persist the credential now
+            if (pending.credential) {
+                persistCredentialAndTrust(
+                    pending.payload,
+                    pending.credential.credentialId,
+                    pending.credential.keyAlias,
+                    pending.credential.userHandle,
+                    pending.credential.userName,
+                    pending.credential.serverRpId,
+                );
+            }
+
+            pendingRelay.current = null;
+            setStep('done');
+            setTimeout(() => router.replace('/(tabs)'), 1500);
+        } catch (e: any) {
+            console.error(`[CONNECT] relay after acquisition FAILED:`, e.message, e);
+            setError(`Failed to complete sign-in: ${e.message}`);
+            setStep('error');
+        }
+    }, [pushToken]);
 
     return (
         <>
@@ -552,6 +718,15 @@ export default function ConnectScreen() {
                             <Text style={styles.cancelButtonText}>Cancel</Text>
                         </Pressable>
                     </View>
+                )}
+
+                {step === 'acquire-attributes' && qr && (
+                    <AttributeAcquisitionView
+                        rpId={qr.rpId}
+                        missingAttributes={missingAttrs}
+                        onComplete={handleAttributesAcquired}
+                        onCancel={handleReject}
+                    />
                 )}
 
                 {step === 'relaying' && (
@@ -792,6 +967,427 @@ function truncateHex(hex: string): string {
     if (hex.length <= 16) return hex;
     return `${hex.slice(0, 8)}…${hex.slice(-8)}`;
 }
+
+// ── Attribute acquisition view ──────────────────────────────────────────
+
+const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+    google: 'logo-google',
+    microsoft: 'logo-microsoft',
+};
+
+function AttributeAcquisitionView({
+    rpId,
+    missingAttributes,
+    onComplete,
+    onCancel,
+}: {
+    rpId: string;
+    missingAttributes: string[];
+    onComplete: () => void;
+    onCancel: () => void;
+}) {
+    const insets = useSafeAreaInsets();
+    const { updateProfile, setAttribute, createProfile } = useProfileStore();
+    const profile = useProfileStore((s) => s.profile);
+
+    const [mode, setMode] = useState<'choose' | 'manual'>('choose');
+    const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
+    const [manualValues, setManualValues] = useState<Record<string, string>>({});
+    const profileCreated = useRef(false);
+
+    // Auto-create a bare profile if one doesn't exist yet
+    useEffect(() => {
+        if (profile || profileCreated.current) return;
+        profileCreated.current = true;
+        (async () => {
+            try {
+                const did = await generateDid();
+                const pairwiseSeed = await generatePairwiseSeed();
+                const canonicalDid = await generateCanonicalDid(pairwiseSeed);
+                useProfileStore.getState().createProfile({
+                    displayName: '',
+                    email: '',
+                    avatarUri: '',
+                    locale: '',
+                    did,
+                    canonicalDid,
+                    pairwiseSeed,
+                    linkedProviders: [],
+                    attributes: [],
+                });
+            } catch (e: any) {
+                console.error('[CONNECT] failed to auto-create profile:', e.message);
+            }
+        })();
+    }, [profile]);
+
+    // Check if all missing attributes are now present in the profile
+    const stillMissing = missingAttributes.filter((attr) => {
+        switch (attr) {
+            case 'email': return !profile?.email;
+            case 'name': return !profile?.displayName;
+            default: return !profile?.attributes?.find((a) => a.key === attr)?.value;
+        }
+    });
+
+    const handleLinkProvider = async (providerKey: string) => {
+        setLinkingProvider(providerKey);
+        try {
+            const providerTemplate = PROVIDERS[providerKey];
+            if (!providerTemplate) throw new Error(`Unknown provider: ${providerKey}`);
+
+            const clientId = getClientId(providerKey);
+            if (!clientId) {
+                Alert.alert(
+                    'Not configured',
+                    `OAuth client ID for ${providerTemplate.displayName} is not configured yet.`,
+                );
+                return;
+            }
+
+            const config: ProviderConfig = { ...providerTemplate, clientId };
+            const result = await linkIdentityProvider(config);
+
+            // Update profile with provider data
+            const store = useProfileStore.getState();
+            store.linkProvider(result.provider);
+
+            // Seed profile fields from provider
+            if (result.userInfo.name && !profile?.displayName) {
+                store.updateProfile({ displayName: result.userInfo.name });
+            }
+            if (result.userInfo.email && !profile?.email) {
+                store.updateProfile({ email: result.userInfo.email });
+            }
+
+            // Store as profile attributes too
+            for (const attr of result.seedAttributes) {
+                store.setAttribute(attr);
+            }
+        } catch (e: any) {
+            if (e.message !== 'Authentication cancelled') {
+                Alert.alert('Link failed', e.message);
+            }
+        } finally {
+            setLinkingProvider(null);
+        }
+    };
+
+    const handleManualSave = () => {
+        const store = useProfileStore.getState();
+        for (const attr of missingAttributes) {
+            const value = manualValues[attr]?.trim();
+            if (!value) continue;
+
+            switch (attr) {
+                case 'email':
+                    store.updateProfile({ email: value });
+                    store.setAttribute({
+                        key: 'email', label: 'Email', value, source: 'manual', verified: false,
+                    });
+                    break;
+                case 'name':
+                    store.updateProfile({ displayName: value });
+                    store.setAttribute({
+                        key: 'displayName', label: 'Display Name', value, source: 'manual', verified: false,
+                    });
+                    break;
+                default:
+                    store.setAttribute({
+                        key: attr, label: attr, value, source: 'manual', verified: false,
+                    });
+                    break;
+            }
+        }
+    };
+
+    const manualAllFilled = missingAttributes.every((attr) => manualValues[attr]?.trim());
+
+    return (
+        <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+            <RNView style={{ flex: 1 }}>
+                <ScrollView
+                    contentContainerStyle={[acqStyles.container, { paddingBottom: 100 + insets.bottom }]}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <RNView style={acqStyles.iconContainer}>
+                        <Ionicons name="person-add-outline" size={36} color="#007AFF" />
+                    </RNView>
+
+                    <Text style={styles.title}>Profile needed</Text>
+                    <Text style={acqStyles.description}>
+                        <Text style={acqStyles.bold}>{appName(rpId)}</Text>
+                        {' needs the following to complete sign-in:'}
+                    </Text>
+
+                    {/* Show what's needed */}
+                    <RNView style={acqStyles.attributeList}>
+                        {missingAttributes.map((attr) => {
+                            const isFilled = !stillMissing.includes(attr);
+                            return (
+                                <RNView key={attr} style={acqStyles.attributeRow}>
+                                    <Ionicons
+                                        name={isFilled ? 'checkmark-circle' : 'ellipse-outline'}
+                                        size={20}
+                                        color={isFilled ? '#34C759' : '#94A3B8'}
+                                    />
+                                    <Text style={[acqStyles.attributeLabel, isFilled && acqStyles.attributeFilled]}>
+                                        {ATTRIBUTE_LABELS[attr] ?? attr}
+                                    </Text>
+                                    {isFilled && (
+                                        <Text style={acqStyles.attributeValue} numberOfLines={1}>
+                                            {attr === 'email' ? profile?.email :
+                                             attr === 'name' ? profile?.displayName :
+                                             profile?.attributes?.find((a) => a.key === attr)?.value ?? ''}
+                                        </Text>
+                                    )}
+                                </RNView>
+                            );
+                        })}
+                    </RNView>
+
+                    {stillMissing.length === 0 ? (
+                        /* All attributes acquired — show continue */
+                        <RNView style={acqStyles.readySection}>
+                            <Ionicons name="checkmark-circle" size={32} color="#34C759" />
+                            <Text style={acqStyles.readyText}>All set! Tap continue to finish signing in.</Text>
+                        </RNView>
+                    ) : mode === 'choose' ? (
+                        /* Provider linking options */
+                        <>
+                            <Text style={acqStyles.sectionTitle}>Link an account for instant setup</Text>
+                            {Object.entries(PROVIDERS).map(([key, config]) => {
+                                const isLinking = linkingProvider === key;
+                                return (
+                                    <Pressable
+                                        key={key}
+                                        style={acqStyles.providerButton}
+                                        onPress={() => handleLinkProvider(key)}
+                                        disabled={isLinking || linkingProvider !== null}
+                                    >
+                                        <Ionicons
+                                            name={PROVIDER_ICONS[key] ?? 'globe-outline'}
+                                            size={20}
+                                            color="#FFFFFF"
+                                        />
+                                        {isLinking ? (
+                                            <ActivityIndicator size="small" color="#FFFFFF" />
+                                        ) : (
+                                            <Text style={acqStyles.providerButtonText}>
+                                                Continue with {config.displayName}
+                                            </Text>
+                                        )}
+                                    </Pressable>
+                                );
+                            })}
+
+                            <RNView style={acqStyles.divider}>
+                                <RNView style={acqStyles.dividerLine} />
+                                <Text style={acqStyles.dividerText}>or</Text>
+                                <RNView style={acqStyles.dividerLine} />
+                            </RNView>
+
+                            <Pressable
+                                style={acqStyles.manualButton}
+                                onPress={() => setMode('manual')}
+                            >
+                                <Ionicons name="create-outline" size={18} color="#007AFF" />
+                                <Text style={acqStyles.manualButtonText}>Enter manually</Text>
+                            </Pressable>
+                        </>
+                    ) : (
+                        /* Manual entry form */
+                        <>
+                            <Text style={acqStyles.sectionTitle}>Enter your information</Text>
+                            {missingAttributes.map((attr) => {
+                                if (!stillMissing.includes(attr)) return null;
+                                const label = ATTRIBUTE_LABELS[attr] ?? attr;
+                                return (
+                                    <RNView key={attr} style={acqStyles.inputContainer}>
+                                        <Text style={acqStyles.inputLabel}>{label}</Text>
+                                        <TextInput
+                                            style={acqStyles.input}
+                                            value={manualValues[attr] ?? ''}
+                                            onChangeText={(v) => setManualValues((prev) => ({ ...prev, [attr]: v }))}
+                                            placeholder={attr === 'email' ? 'you@example.com' : `Your ${label.toLowerCase()}`}
+                                            placeholderTextColor="#94A3B8"
+                                            keyboardType={attr === 'email' ? 'email-address' : 'default'}
+                                            autoCapitalize={attr === 'email' ? 'none' : 'words'}
+                                            autoComplete={attr === 'email' ? 'email' : attr === 'name' ? 'name' : 'off'}
+                                        />
+                                    </RNView>
+                                );
+                            })}
+
+                            <Pressable
+                                style={[acqStyles.saveButton, !manualAllFilled && acqStyles.saveButtonDisabled]}
+                                onPress={handleManualSave}
+                                disabled={!manualAllFilled}
+                            >
+                                <Text style={acqStyles.saveButtonText}>Save</Text>
+                            </Pressable>
+
+                            <Pressable
+                                style={acqStyles.backLink}
+                                onPress={() => setMode('choose')}
+                            >
+                                <Text style={acqStyles.backLinkText}>← Link an account instead</Text>
+                            </Pressable>
+                        </>
+                    )}
+                </ScrollView>
+
+                {/* Bottom action buttons */}
+                <RNView style={[acqStyles.bottomActions, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+                    <RNView style={styles.buttonRow}>
+                        <Pressable style={styles.rejectButton} onPress={onCancel}>
+                            <Text style={styles.rejectButtonText}>Cancel</Text>
+                        </Pressable>
+                        <Pressable
+                            style={[styles.approveButton, stillMissing.length > 0 && acqStyles.continueDisabled]}
+                            onPress={onComplete}
+                            disabled={stillMissing.length > 0}
+                        >
+                            <Text style={styles.approveButtonText}>Continue</Text>
+                        </Pressable>
+                    </RNView>
+                </RNView>
+            </RNView>
+        </KeyboardAvoidingView>
+    );
+}
+
+const acqStyles = StyleSheet.create({
+    container: { padding: 20, paddingTop: 80 },
+    iconContainer: {
+        width: 72,
+        height: 72,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0,122,255,0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    description: {
+        fontSize: 15,
+        color: '#64748B',
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 22,
+    },
+    bold: { fontWeight: '600', color: '#1E293B' },
+    attributeList: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 24,
+        gap: 12,
+    },
+    attributeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    attributeLabel: { fontSize: 15, color: '#334155', flex: 1 },
+    attributeFilled: { color: '#166534' },
+    attributeValue: { fontSize: 13, color: '#64748B', maxWidth: 160 },
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#64748B',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    providerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#1E293B',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        marginBottom: 10,
+        gap: 10,
+    },
+    providerButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 16,
+        gap: 12,
+    },
+    dividerLine: {
+        flex: 1,
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: '#CBD5E1',
+    },
+    dividerText: { fontSize: 13, color: '#94A3B8' },
+    manualButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#007AFF',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        gap: 8,
+    },
+    manualButtonText: { color: '#007AFF', fontSize: 16, fontWeight: '600' },
+    inputContainer: { marginBottom: 16 },
+    inputLabel: { fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 },
+    input: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        fontSize: 16,
+        color: '#1E293B',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    saveButton: {
+        backgroundColor: '#007AFF',
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    saveButtonDisabled: { opacity: 0.4 },
+    saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    backLink: { alignItems: 'center', paddingVertical: 16 },
+    backLinkText: { fontSize: 14, color: '#007AFF' },
+    readySection: {
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 20,
+    },
+    readyText: {
+        fontSize: 15,
+        color: '#166534',
+        textAlign: 'center',
+    },
+    continueDisabled: { opacity: 0.4 },
+    bottomActions: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        backgroundColor: '#F8FAFB',
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(0,0,0,0.1)',
+    },
+});
 
 const styles = StyleSheet.create({
     container: { flex: 1 },

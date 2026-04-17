@@ -133,8 +133,8 @@ func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 	return iss.sign(c)
 }
 
-// IssueAccessToken creates a signed access token (JWT) with optional role claims.
-func (iss *Issuer) IssueAccessToken(subject, audience string, roles []string) (string, error) {
+// IssueAccessToken creates a signed access token (JWT) with optional role and profile claims.
+func (iss *Issuer) IssueAccessToken(subject, audience string, roles []string, attributes map[string]string) (string, error) {
 	now := time.Now()
 	c := jwt.MapClaims{
 		"iss": iss.issuerURL,
@@ -146,6 +146,11 @@ func (iss *Issuer) IssueAccessToken(subject, audience string, roles []string) (s
 	}
 	if len(roles) > 0 {
 		c["roles"] = roles
+	}
+	for k, v := range attributes {
+		if v != "" {
+			c[k] = v
+		}
 	}
 	return iss.sign(c)
 }

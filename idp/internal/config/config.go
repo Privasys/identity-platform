@@ -21,6 +21,16 @@ type Config struct {
 	AdminToken     string // Bearer token for admin endpoints
 	BrokerURL      string // WebSocket broker URL (for push notifications)
 	BootstrapAdmin string // User ID to auto-grant platform:admin on startup
+
+	// Social IdP configuration
+	GitHubClientID        string
+	GitHubClientSecret    string
+	GoogleClientID        string
+	GoogleClientSecret    string
+	MicrosoftClientID     string
+	MicrosoftClientSecret string
+	LinkedInClientID      string
+	LinkedInClientSecret  string
 }
 
 // ListenAddr returns the formatted listen address.
@@ -53,6 +63,15 @@ func Load() *Config {
 		AdminToken:     adminToken,
 		BrokerURL:      envStr("IDP_BROKER_URL", "https://relay.privasys.org"),
 		BootstrapAdmin: envStr("IDP_BOOTSTRAP_ADMIN", ""),
+
+		GitHubClientID:        envStr("IDP_GITHUB_CLIENT_ID", ""),
+		GitHubClientSecret:    envStr("IDP_GITHUB_CLIENT_SECRET", ""),
+		GoogleClientID:        envStr("IDP_GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:    envStr("IDP_GOOGLE_CLIENT_SECRET", ""),
+		MicrosoftClientID:     envStr("IDP_MICROSOFT_CLIENT_ID", ""),
+		MicrosoftClientSecret: envStr("IDP_MICROSOFT_CLIENT_SECRET", ""),
+		LinkedInClientID:      envStr("IDP_LINKEDIN_CLIENT_ID", ""),
+		LinkedInClientSecret:  envStr("IDP_LINKEDIN_CLIENT_SECRET", ""),
 	}
 }
 

@@ -63,3 +63,13 @@ build/
 
 # -- Deployment docs with secrets ---------------------------------
 idp/docs/zitadel-federation.md
+
+# -- Temporary dev artifacts --------------------------------------
+idp/Dockerfile.*
+idp/fix-*.sh
+idp/setup-*.sh
+idp/query.sh
+idp/test-*.mjs
+idp/idp-binary
+idp/idp-linux
+idp/idp-musl

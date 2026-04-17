@@ -15,7 +15,7 @@
 
 import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
@@ -293,16 +293,12 @@ export async function downloadAndCacheAvatar(url: string): Promise<string> {
         url,
     );
     const ext = url.match(/\.(png|gif|webp)/i)?.[1] ?? 'jpg';
-    const localUri = `${FileSystem.cacheDirectory}avatar-${hash.substring(0, 16)}.${ext}`;
+    const destination = new File(Paths.cache, `avatar-${hash.substring(0, 16)}.${ext}`);
 
-    const info = await FileSystem.getInfoAsync(localUri);
-    if (info.exists) return localUri;
+    if (destination.exists) return destination.uri;
 
-    const result = await FileSystem.downloadAsync(url, localUri);
-    if (result.status < 200 || result.status >= 300) {
-        throw new Error(`Failed to download avatar: ${result.status}`);
-    }
-    return localUri;
+    const downloaded = await File.downloadFileAsync(url, destination, { idempotent: true });
+    return downloaded.uri;
 }
 
 /**

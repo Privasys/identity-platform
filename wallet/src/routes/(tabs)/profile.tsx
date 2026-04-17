@@ -409,7 +409,7 @@ export default function ProfileScreen() {
 
                 <Pressable
                     style={styles.sharingCard}
-                    onPress={() => router.push('/consent-history')}
+                    onPress={() => router.push('/consent-history' as never)}
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
@@ -429,7 +429,7 @@ export default function ProfileScreen() {
 
                 <Pressable
                     style={styles.sharingCard}
-                    onPress={() => router.push('/consent-history')}
+                    onPress={() => router.push('/consent-history' as never)}
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
@@ -637,6 +637,7 @@ function AttributeCard({ attr, onRemove }: { attr: ProfileAttribute; onRemove: (
                             )}
                         </RNView>
                     )}
+
                 </RNView>
                 </RNView>
             </Pressable>

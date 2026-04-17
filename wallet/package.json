@@ -57,6 +57,7 @@
         "react": "19.2.0",
         "react-dom": "19.2.0",
         "react-native": "0.83.2",
+        "react-native-gesture-handler": "^2.31.1",
         "react-native-get-random-values": "~1.11.0",
         "react-native-reanimated": "4.2.1",
         "react-native-safe-area-context": "~5.6.2",
@@ -89,7 +90,9 @@
     },
     "expo": {
         "install": {
-            "exclude": ["@react-navigation/native"]
+            "exclude": [
+                "@react-navigation/native"
+            ]
         }
     }
 }

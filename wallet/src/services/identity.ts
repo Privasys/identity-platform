@@ -19,6 +19,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
 import type { LinkedProvider, ProfileAttribute } from '@/stores/profile';
+import { normalizeProviderClaims, claimsToProfileAttributes } from '@/services/attributes';
 
 // Ensure web browser sessions are cleaned up on redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -215,11 +216,13 @@ export async function exchangeCode(
 
 /**
  * Fetch user info from the provider's userinfo endpoint.
+ * Returns normalised canonical claims AND the raw provider response
+ * (needed for verification claim extraction like email_verified).
  */
 export async function fetchUserInfo(
     config: ProviderConfig,
     accessToken: string
-): Promise<ProviderUserInfo> {
+): Promise<{ userInfo: ProviderUserInfo; raw: Record<string, unknown> }> {
     const response = await fetch(config.userinfoEndpoint, {
         headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -231,16 +234,20 @@ export async function fetchUserInfo(
         throw new Error(`Userinfo request failed: ${response.status}`);
     }
 
-    const data = await response.json();
+    const raw: Record<string, unknown> = await response.json();
 
-    // Normalise across providers
-    return {
-        sub: data.sub || data.id?.toString() || '',
-        name: data.name || data.displayName || data.login || undefined,
-        email: data.email || undefined,
-        picture: data.picture || data.avatar_url || undefined,
-        locale: data.locale || undefined
+    // Normalise provider-specific claims into our canonical attribute names.
+    const normalised = normalizeProviderClaims(config.provider, raw);
+
+    const userInfo: ProviderUserInfo = {
+        sub: normalised.sub || String(raw.sub ?? raw.id ?? ''),
+        name: normalised.name || undefined,
+        email: normalised.email || undefined,
+        picture: normalised.picture || undefined,
+        locale: normalised.locale || undefined
     };
+
+    return { userInfo, raw };
 }
 
 /**
@@ -257,8 +264,8 @@ export async function linkIdentityProvider(config: ProviderConfig): Promise<{
     // 2. Token exchange
     const tokens = await exchangeCode(config, code, codeVerifier);
 
-    // 3. Fetch user info
-    const userInfo = await fetchUserInfo(config, tokens.access_token);
+    // 3. Fetch user info (normalised + raw for verification claim extraction)
+    const { userInfo, raw } = await fetchUserInfo(config, tokens.access_token);
 
     // 4. Build LinkedProvider
     const provider: LinkedProvider = {
@@ -270,38 +277,15 @@ export async function linkIdentityProvider(config: ProviderConfig): Promise<{
         refreshToken: tokens.refresh_token
     };
 
-    // 5. Build seed attributes from provider data
-    const seedAttributes: ProfileAttribute[] = [];
-    if (userInfo.name) {
-        seedAttributes.push({
-            key: 'displayName',
-            label: 'Display Name',
-            value: userInfo.name,
-            source: 'provider',
-            sourceProvider: config.provider,
-            verified: true
-        });
-    }
-    if (userInfo.email) {
-        seedAttributes.push({
-            key: 'email',
-            label: 'Email',
-            value: userInfo.email,
-            source: 'provider',
-            sourceProvider: config.provider,
-            verified: true
-        });
-    }
-    if (userInfo.picture) {
-        seedAttributes.push({
-            key: 'avatarUri',
-            label: 'Avatar',
-            value: userInfo.picture,
-            source: 'provider',
-            sourceProvider: config.provider,
-            verified: false
-        });
-    }
+    // 5. Build seed attributes from normalised provider data, passing raw
+    //    claims so verification status (email_verified, etc.) is extracted.
+    const normalisedClaims: Record<string, string> = {};
+    if (userInfo.name) normalisedClaims.name = userInfo.name;
+    if (userInfo.email) normalisedClaims.email = userInfo.email;
+    if (userInfo.picture) normalisedClaims.picture = userInfo.picture;
+    if (userInfo.locale) normalisedClaims.locale = userInfo.locale;
+
+    const seedAttributes = claimsToProfileAttributes(normalisedClaims, config.provider, raw);
 
     return { provider, userInfo, seedAttributes };
 }

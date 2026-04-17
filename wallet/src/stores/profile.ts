@@ -20,20 +20,52 @@ export interface LinkedProvider {
     refreshToken?: string;
 }
 
+/** Verification evidence for a verifiable attribute (email, phone, passport, etc.). */
+export interface VerificationRecord {
+    /** Who performed the verification (e.g. 'google', 'privasys.id', 'nfc-passport'). */
+    verifier: string;
+    /** Human-readable verifier name for UI display. */
+    verifierDisplayName: string;
+    /** Verification method (e.g. 'oidc_claim', 'email_code', 'nfc_bac', 'nfc_pace'). */
+    method: 'oidc_claim' | 'email_code' | 'sms_code' | 'nfc_bac' | 'nfc_pace' | 'manual';
+    /** Epoch seconds when the verification was performed. */
+    verifiedAt: number;
+    /**
+     * Raw evidence from the verifier — e.g. the `email_verified` claim value,
+     * NFC certificate chain hash, or verification code receipt ID.
+     * Stored for audit trail, never shown to other apps.
+     */
+    evidence?: string;
+}
+
 /** Personal data attribute that can be selectively disclosed to enclaves. */
 export interface ProfileAttribute {
-    /** Attribute key (e.g. 'email', 'displayName', 'phone'). */
+    /** Canonical attribute key (OIDC Standard Claims: 'email', 'name', etc.). */
     key: string;
     /** Human-readable label. */
     label: string;
     /** The value. */
     value: string;
-    /** Whether this was seeded from a linked provider or manually entered. */
-    source: 'provider' | 'manual';
-    /** Provider ID if source is 'provider'. */
+
+    // ── Provenance ──────────────────────────────────────────────────────
+    /** How this attribute was sourced. */
+    source: 'provider' | 'manual' | 'document';
+    /** Provider ID if source is 'provider' (e.g. 'google', 'microsoft'). */
     sourceProvider?: string;
-    /** Whether the user has verified this attribute (e.g. email verified by provider). */
+    /** Epoch seconds when this attribute was first acquired. */
+    acquiredAt?: number;
+    /** Epoch seconds when this attribute's value was last updated. */
+    updatedAt?: number;
+
+    // ── Verification ────────────────────────────────────────────────────
+    /** Whether this attribute has been verified by a trusted party. */
     verified: boolean;
+    /**
+     * Full verification history. Most recent first.
+     * Verifiable attributes (email, phone_number) should always have at least
+     * one record when `verified` is true.
+     */
+    verifications?: VerificationRecord[];
 }
 
 /** User profile stored locally on the device. */

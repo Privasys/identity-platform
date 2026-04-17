@@ -15,7 +15,6 @@
  *                      first so the user can reject unexpected requests.
  */
 
-import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -41,6 +40,7 @@ import { relaySessionToken } from '@/services/broker';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import * as fido2 from '@/services/fido2';
 import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
+import { attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 import { useSettingsStore } from '@/stores/settings';
@@ -86,25 +86,14 @@ async function resolveRequestedAttributes(
     const attrs: Record<string, string> = {};
 
     for (const attr of requested) {
-        switch (attr) {
-            case 'sub':
-                if (profile.pairwiseSeed) {
-                    try { attrs.sub = await deriveAppSub(profile.pairwiseSeed, payload.rpId); } catch {}
-                }
-                break;
-            case 'email':
-                if (profile.email) attrs.email = profile.email;
-                break;
-            case 'name':
-                if (profile.displayName) attrs.name = profile.displayName;
-                break;
-            default: {
-                // Fall back to the extended ProfileAttribute bag.
-                const pa = profile.attributes?.find((a) => a.key === attr);
-                if (pa?.value) attrs[attr] = pa.value;
-                break;
+        if (attr === 'sub') {
+            if (profile.pairwiseSeed) {
+                try { attrs.sub = await deriveAppSub(profile.pairwiseSeed, payload.rpId); } catch {}
             }
+            continue;
         }
+        const value = getProfileValue(profile, attr);
+        if (value) attrs[attr] = value;
     }
 
     return Object.keys(attrs).length > 0 ? attrs : undefined;
@@ -114,6 +103,7 @@ async function resolveRequestedAttributes(
  * Determine which requested attributes are missing from the user's profile.
  * Returns the list of attribute keys that the app wants but the profile
  * doesn't have values for. 'sub' is excluded since it's always derivable.
+ * Only canonical attributes are accepted — unknown keys are ignored.
  */
 function getMissingAttributes(
     payload: QRPayload,
@@ -124,31 +114,14 @@ function getMissingAttributes(
 
     const missing: string[] = [];
     for (const attr of requested) {
-        switch (attr) {
-            case 'sub':
-                // Always derivable from pairwiseSeed — never "missing"
-                break;
-            case 'email':
-                if (!profile?.email) missing.push('email');
-                break;
-            case 'name':
-                if (!profile?.displayName) missing.push('name');
-                break;
-            default: {
-                const pa = profile?.attributes?.find((a) => a.key === attr);
-                if (!pa?.value) missing.push(attr);
-                break;
-            }
+        if (attr === 'sub') continue;
+        if (!CANONICAL_KEYS.has(attr)) continue;
+        if (!profile || !getProfileValue(profile, attr)) {
+            missing.push(attr);
         }
     }
     return missing;
 }
-
-/** Human-friendly labels for requested attribute keys. */
-const ATTRIBUTE_LABELS: Record<string, string> = {
-    email: 'Email',
-    name: 'Display Name',
-};
 
 type FlowStep =
     | 'verifying'
@@ -273,36 +246,17 @@ export default function ConnectScreen() {
                     const credential = getCredentialForRp(payload.rpId);
                     if (credential) {
                         setIsTrusted(true);
-                        if (isFromPush) {
-                            // Push-initiated: show "Sign in?" confirmation
+                        if (isFromPush && !checkUnlocked()) {
+                            // Push-initiated outside grace period: show "Sign in?" confirmation
                             setStep('confirm');
                             return;
                         }
-                        // QR-initiated: skip confirmation, go straight to auth
-                        if (checkUnlocked()) {
-                            await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
-                        } else {
-                            setStep('biometric');
-                            await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
-                        }
+                        // QR-initiated or within grace period: go straight to FIDO2.
+                        // NativeKeys.sign() handles biometric — no app-level prompt needed.
+                        await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
                         return;
                     }
-                    // First time — biometric then register (no attestation to approve)
-                    setStep('biometric');
-                    const bioResult = await LocalAuthentication.authenticateAsync({
-                        promptMessage: `Connect to ${payload.rpId}`,
-                        fallbackLabel: 'Use Passcode',
-                        cancelLabel: 'Cancel',
-                        disableDeviceFallback: false,
-                    });
-                    if (!bioResult.success) {
-                        setError('Authentication cancelled');
-                        setStep('error');
-                        return;
-                    }
-                    if (gracePeriodSec > 0) {
-                        setUnlocked(gracePeriodSec * 1000);
-                    }
+                    // First time — register (FIDO2 handles biometric via NativeKeys)
                     await doRegister(payload);
                     return;
                 }
@@ -323,18 +277,14 @@ export default function ConnectScreen() {
                     setIsTrusted(true);
                     const credential = getCredentialForRp(payload.rpId);
                     if (credential) {
-                        if (isFromPush) {
-                            // Push-initiated: show "Sign in?" confirmation
+                        if (isFromPush && !checkUnlocked()) {
+                            // Push-initiated outside grace period: show "Sign in?" confirmation
                             setStep('confirm');
                             return;
                         }
-                        // QR-initiated: skip confirmation, go straight to auth
-                        if (checkUnlocked()) {
-                            await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
-                        } else {
-                            setStep('biometric');
-                            await promptBiometricAndAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
-                        }
+                        // QR-initiated or within grace period: go straight to FIDO2.
+                        // NativeKeys.sign() handles biometric — no app-level prompt needed.
+                        await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
                         return;
                     }
                     setStep('attestation');
@@ -358,66 +308,17 @@ export default function ConnectScreen() {
         [getApp, isAttestationMatch, getCredentialForRp, checkUnlocked, gracePeriodSec]
     );
 
-    const promptBiometricAndAuthenticate = useCallback(async (
-        payload: QRPayload,
-        keyAlias: string,
-        credentialId: string,
-        serverRpId?: string
-    ) => {
-        const result = await LocalAuthentication.authenticateAsync({
-            promptMessage: `Connect to ${payload.rpId}`,
-            fallbackLabel: 'Use Passcode',
-            cancelLabel: 'Cancel',
-            disableDeviceFallback: false
-        });
-
-        if (!result.success) {
-            setError('Authentication cancelled');
-            setStep('error');
-            return;
-        }
-
-        if (gracePeriodSec > 0) {
-            setUnlocked(gracePeriodSec * 1000);
-        }
-
-        await doAuthenticate(payload, keyAlias, credentialId, serverRpId);
-    }, [gracePeriodSec]);
-
     const handleConfirm = useCallback(async () => {
         if (!qr) return;
         const credential = getCredentialForRp(qr.rpId);
         if (!credential) return;
 
-        if (checkUnlocked()) {
-            // Within grace period — skip biometric
-            await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
-        } else {
-            setStep('biometric');
-            await promptBiometricAndAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
-        }
-    }, [qr, gracePeriodSec]);
+        // Go directly to FIDO2 — NativeKeys.sign() handles biometric.
+        await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
+    }, [qr]);
 
     const handleApprove = useCallback(async () => {
         if (!qr || !attestation) return;
-        setStep('biometric');
-
-        const result = await LocalAuthentication.authenticateAsync({
-            promptMessage: `Connect to ${qr.rpId}`,
-            fallbackLabel: 'Use Passcode',
-            cancelLabel: 'Cancel',
-            disableDeviceFallback: false
-        });
-
-        if (!result.success) {
-            setError('Authentication cancelled');
-            setStep('error');
-            return;
-        }
-
-        if (gracePeriodSec > 0) {
-            setUnlocked(gracePeriodSec * 1000);
-        }
 
         // If attestation changed, the enclave has a new KV store and our
         // old credential no longer exists server-side.  Remove it and
@@ -432,7 +333,7 @@ export default function ConnectScreen() {
         } else {
             await doRegister(qr);
         }
-    }, [qr, attestation, attestationChanged, gracePeriodSec]);
+    }, [qr, attestation, attestationChanged]);
 
     const doRegister = async (payload: QRPayload) => {
         setStep('authenticating');
@@ -479,6 +380,9 @@ export default function ConnectScreen() {
 
             // Relay succeeded — now persist locally.
             persistCredentialAndTrust(payload, result.credentialId, keyAlias, result.userHandle, result.userName, result.serverRpId);
+
+            // Start biometric grace period (skips push confirmation for subsequent auths).
+            if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
 
             setStep('done');
             setTimeout(() => router.replace('/(tabs)'), 1500);
@@ -529,6 +433,9 @@ export default function ConnectScreen() {
                 pushToken,
                 attributes
             );
+
+            // Start biometric grace period (skips push confirmation for subsequent auths).
+            if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
 
             setStep('done');
             setTimeout(() => router.replace('/(tabs)'), 1500);
@@ -600,7 +507,7 @@ export default function ConnectScreen() {
         if (stillMissing.length > 0) {
             Alert.alert(
                 'Missing information',
-                `Please provide: ${stillMissing.map((k) => ATTRIBUTE_LABELS[k] ?? k).join(', ')}`,
+                `Please provide: ${stillMissing.map((k) => attributeLabel(k)).join(', ')}`,
             );
             return;
         }
@@ -1022,13 +929,9 @@ function AttributeAcquisitionView({
     }, [profile]);
 
     // Check if all missing attributes are now present in the profile
-    const stillMissing = missingAttributes.filter((attr) => {
-        switch (attr) {
-            case 'email': return !profile?.email;
-            case 'name': return !profile?.displayName;
-            default: return !profile?.attributes?.find((a) => a.key === attr)?.value;
-        }
-    });
+    const stillMissing = missingAttributes.filter(
+        (attr) => !profile || !getProfileValue(profile, attr),
+    );
 
     const handleLinkProvider = async (providerKey: string) => {
         setLinkingProvider(providerKey);
@@ -1048,21 +951,20 @@ function AttributeAcquisitionView({
             const config: ProviderConfig = { ...providerTemplate, clientId };
             const result = await linkIdentityProvider(config);
 
-            // Update profile with provider data
+            // Update profile with normalised provider data
             const store = useProfileStore.getState();
             store.linkProvider(result.provider);
 
-            // Seed profile fields from provider
-            if (result.userInfo.name && !profile?.displayName) {
-                store.updateProfile({ displayName: result.userInfo.name });
-            }
-            if (result.userInfo.email && !profile?.email) {
-                store.updateProfile({ email: result.userInfo.email });
-            }
-
-            // Store as profile attributes too
             for (const attr of result.seedAttributes) {
-                store.setAttribute(attr);
+                // Only seed if the profile doesn't already have this value.
+                const existing = profile ? getProfileValue(profile, attr.key) : undefined;
+                if (!existing) {
+                    setProfileValue(store, attr.key, attr.value, 'provider', {
+                        sourceProvider: config.provider,
+                        verified: attr.verified,
+                        verifications: attr.verifications,
+                    });
+                }
             }
         } catch (e: any) {
             if (e.message !== 'Authentication cancelled') {
@@ -1078,26 +980,7 @@ function AttributeAcquisitionView({
         for (const attr of missingAttributes) {
             const value = manualValues[attr]?.trim();
             if (!value) continue;
-
-            switch (attr) {
-                case 'email':
-                    store.updateProfile({ email: value });
-                    store.setAttribute({
-                        key: 'email', label: 'Email', value, source: 'manual', verified: false,
-                    });
-                    break;
-                case 'name':
-                    store.updateProfile({ displayName: value });
-                    store.setAttribute({
-                        key: 'displayName', label: 'Display Name', value, source: 'manual', verified: false,
-                    });
-                    break;
-                default:
-                    store.setAttribute({
-                        key: attr, label: attr, value, source: 'manual', verified: false,
-                    });
-                    break;
-            }
+            setProfileValue(store, attr, value, 'manual');
         }
     };
 
@@ -1135,13 +1018,11 @@ function AttributeAcquisitionView({
                                         color={isFilled ? '#34C759' : '#94A3B8'}
                                     />
                                     <Text style={[acqStyles.attributeLabel, isFilled && acqStyles.attributeFilled]}>
-                                        {ATTRIBUTE_LABELS[attr] ?? attr}
+                                        {attributeLabel(attr)}
                                     </Text>
-                                    {isFilled && (
+                                    {isFilled && profile && (
                                         <Text style={acqStyles.attributeValue} numberOfLines={1}>
-                                            {attr === 'email' ? profile?.email :
-                                             attr === 'name' ? profile?.displayName :
-                                             profile?.attributes?.find((a) => a.key === attr)?.value ?? ''}
+                                            {getProfileValue(profile, attr) ?? ''}
                                         </Text>
                                     )}
                                 </RNView>
@@ -1204,7 +1085,7 @@ function AttributeAcquisitionView({
                             <Text style={acqStyles.sectionTitle}>Enter your information</Text>
                             {missingAttributes.map((attr) => {
                                 if (!stillMissing.includes(attr)) return null;
-                                const label = ATTRIBUTE_LABELS[attr] ?? attr;
+                                const label = attributeLabel(attr);
                                 return (
                                     <RNView key={attr} style={acqStyles.inputContainer}>
                                         <Text style={acqStyles.inputLabel}>{label}</Text>

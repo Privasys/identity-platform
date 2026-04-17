@@ -23,8 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/Themed';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
+import { exportAttributesForAudit } from '@/services/attributes';
 import { useConsentStore } from '@/stores/consent';
-import { useProfileStore } from '@/stores/profile';
+import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
 const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     github: 'logo-github',
@@ -98,6 +99,7 @@ export default function ProfileScreen() {
 
     const handleSaveEdit = () => {
         updateProfile({ displayName: editName, email: editEmail });
+        const now = Math.floor(Date.now() / 1000);
         // Also update the corresponding attributes
         if (editName !== profile.displayName) {
             setAttribute({
@@ -105,7 +107,9 @@ export default function ProfileScreen() {
                 label: 'Display Name',
                 value: editName,
                 source: 'manual',
-                verified: false
+                acquiredAt: now,
+                updatedAt: now,
+                verified: false,
             });
         }
         if (editEmail !== profile.email) {
@@ -114,7 +118,9 @@ export default function ProfileScreen() {
                 label: 'Email',
                 value: editEmail,
                 source: 'manual',
-                verified: false
+                acquiredAt: now,
+                updatedAt: now,
+                verified: false,
             });
         }
         setEditing(false);
@@ -329,31 +335,12 @@ export default function ProfileScreen() {
                         </Text>
                     </RNView>
                 ) : (
-                    profile.attributes.map((attr) => (
-                        <RNView key={attr.key} style={styles.attributeRow}>
-                            <RNView style={styles.attributeInfo}>
-                                <Text style={styles.attributeLabel}>{attr.label}</Text>
-                                <Text style={styles.attributeValue}>{attr.value}</Text>
-                                <RNView style={styles.attributeMeta}>
-                                    {attr.verified && (
-                                        <RNView style={styles.verifiedBadge}>
-                                            <Ionicons
-                                                name="checkmark-circle"
-                                                size={12}
-                                                color="#34E89E"
-                                            />
-                                            <Text style={styles.verifiedText}>Verified</Text>
-                                        </RNView>
-                                    )}
-                                    {attr.sourceProvider && (
-                                        <Text style={styles.sourceText}>
-                                            via {attr.sourceProvider}
-                                        </Text>
-                                    )}
-                                </RNView>
-                            </RNView>
-                            <Pressable
-                                onPress={() => {
+                    <>
+                        {profile.attributes.map((attr) => (
+                            <AttributeCard
+                                key={attr.key}
+                                attr={attr}
+                                onRemove={() => {
                                     Alert.alert(
                                         `Remove ${attr.label}?`,
                                         'This attribute will no longer be available for sharing.',
@@ -367,11 +354,30 @@ export default function ProfileScreen() {
                                         ]
                                     );
                                 }}
-                            >
-                                <Ionicons name="close-circle" size={20} color="#FF3B30" />
-                            </Pressable>
-                        </RNView>
-                    ))
+                            />
+                        ))}
+
+                        {/* Export all data */}
+                        <Pressable
+                            style={styles.exportButton}
+                            onPress={async () => {
+                                try {
+                                    const data = exportAttributesForAudit(profile);
+                                    const json = JSON.stringify(data, null, 2);
+                                    await Clipboard.setStringAsync(json);
+                                    Alert.alert(
+                                        'Exported',
+                                        'Profile data (JSON) copied to clipboard. Paste into a file or notes app to save.',
+                                    );
+                                } catch (e: any) {
+                                    Alert.alert('Export failed', e.message);
+                                }
+                            }}
+                        >
+                            <Ionicons name="copy-outline" size={18} color="#00BCF2" />
+                            <Text style={styles.exportButtonText}>Export All Data (JSON)</Text>
+                        </Pressable>
+                    </>
                 )}
 
                 {/* Data Sharing */}
@@ -446,6 +452,118 @@ export default function ProfileScreen() {
                 </RNView>
             </ScrollView>
         </RNView>
+    );
+}
+
+// ── Attribute card with provenance details ──────────────────────────────
+
+function AttributeCard({ attr, onRemove }: { attr: ProfileAttribute; onRemove: () => void }) {
+    const [expanded, setExpanded] = useState(false);
+
+    const sourceLabel =
+        attr.source === 'provider' && attr.sourceProvider
+            ? `via ${attr.sourceProvider}`
+            : attr.source === 'manual'
+            ? 'entered manually'
+            : attr.source === 'document'
+            ? 'from document'
+            : attr.source;
+
+    const acquiredDate = attr.acquiredAt
+        ? new Date(attr.acquiredAt * 1000).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+          })
+        : null;
+
+    const updatedDate = attr.updatedAt
+        ? new Date(attr.updatedAt * 1000).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+          })
+        : null;
+
+    return (
+        <Pressable onPress={() => setExpanded(!expanded)}>
+            <RNView style={styles.attributeRow}>
+                <RNView style={styles.attributeInfo}>
+                    <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.attributeLabel}>{attr.label}</Text>
+                        {expanded ? (
+                            <Ionicons name="chevron-up" size={12} color="#94A3B8" />
+                        ) : (
+                            <Ionicons name="chevron-down" size={12} color="#94A3B8" />
+                        )}
+                    </RNView>
+                    <Text style={styles.attributeValue}>{attr.value}</Text>
+                    <RNView style={styles.attributeMeta}>
+                        {attr.verified ? (
+                            <RNView style={styles.verifiedBadge}>
+                                <Ionicons name="checkmark-circle" size={12} color="#34E89E" />
+                                <Text style={styles.verifiedText}>Verified</Text>
+                            </RNView>
+                        ) : (
+                            <RNView style={styles.verifiedBadge}>
+                                <Ionicons name="alert-circle-outline" size={12} color="#F59E0B" />
+                                <Text style={[styles.verifiedText, { color: '#F59E0B' }]}>Unverified</Text>
+                            </RNView>
+                        )}
+                        <Text style={styles.sourceText}>{sourceLabel}</Text>
+                    </RNView>
+
+                    {expanded && (
+                        <RNView style={styles.provenanceSection}>
+                            {acquiredDate && (
+                                <RNView style={styles.provenanceRow}>
+                                    <Text style={styles.provenanceLabel}>Acquired</Text>
+                                    <Text style={styles.provenanceValue}>{acquiredDate}</Text>
+                                </RNView>
+                            )}
+                            {updatedDate && updatedDate !== acquiredDate && (
+                                <RNView style={styles.provenanceRow}>
+                                    <Text style={styles.provenanceLabel}>Updated</Text>
+                                    <Text style={styles.provenanceValue}>{updatedDate}</Text>
+                                </RNView>
+                            )}
+                            {(attr.verifications ?? []).length > 0 && (
+                                <>
+                                    <Text style={[styles.provenanceLabel, { marginTop: 8, marginBottom: 4 }]}>
+                                        Verification Records
+                                    </Text>
+                                    {attr.verifications!.map((v, i) => (
+                                        <RNView key={i} style={styles.verificationCard}>
+                                            <RNView style={styles.provenanceRow}>
+                                                <Text style={styles.provenanceLabel}>Verifier</Text>
+                                                <Text style={styles.provenanceValue}>
+                                                    {v.verifierDisplayName}
+                                                </Text>
+                                            </RNView>
+                                            <RNView style={styles.provenanceRow}>
+                                                <Text style={styles.provenanceLabel}>Method</Text>
+                                                <Text style={styles.provenanceValue}>
+                                                    {v.method.replace(/_/g, ' ')}
+                                                </Text>
+                                            </RNView>
+                                            <RNView style={styles.provenanceRow}>
+                                                <Text style={styles.provenanceLabel}>Verified</Text>
+                                                <Text style={styles.provenanceValue}>
+                                                    {new Date(v.verifiedAt * 1000).toLocaleDateString()}
+                                                </Text>
+                                            </RNView>
+                                        </RNView>
+                                    ))}
+                                </>
+                            )}
+                        </RNView>
+                    )}
+                </RNView>
+                <Pressable onPress={onRemove} hitSlop={8}>
+                    <Ionicons name="close-circle" size={20} color="#FF3B30" />
+                </Pressable>
+            </RNView>
+        </Pressable>
     );
 }
 
@@ -613,6 +731,53 @@ const styles = StyleSheet.create({
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     verifiedText: { fontSize: 11, color: '#34E89E', fontWeight: '600' },
     sourceText: { fontSize: 11, color: '#94A3B8' },
+
+    provenanceSection: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 0.5,
+        borderTopColor: '#F1F5F9',
+    },
+    provenanceRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 3,
+    },
+    provenanceLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#94A3B8',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    provenanceValue: {
+        fontSize: 12,
+        color: '#64748B',
+    },
+    verificationCard: {
+        backgroundColor: '#F8FAFB',
+        borderRadius: 8,
+        padding: 8,
+        marginBottom: 4,
+    },
+
+    exportButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#00BCF2',
+        padding: 14,
+        marginTop: 4,
+    },
+    exportButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#00BCF2',
+    },
 
     metaCard: {
         backgroundColor: '#FFFFFF',

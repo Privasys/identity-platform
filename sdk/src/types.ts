@@ -11,6 +11,8 @@ export interface AuthConfig {
     attestation?: 'required' | 'preferred' | 'none';
     /** Timeout in milliseconds (default: 120000). */
     timeout?: number;
+    /** Attribute keys the relying party needs from the wallet (e.g. ["email", "name"]). */
+    requestedAttributes?: string[];
 }
 
 /** Attestation information returned from the wallet. */
@@ -34,6 +36,8 @@ export interface AuthResult {
     sessionId: string;
     /** Push token for sending future auth requests (wallet only). */
     pushToken?: string;
+    /** Profile attributes from the wallet or social IdP (keyed by OIDC claim name). */
+    attributes?: Record<string, string>;
 }
 
 /** An active session with an enclave. */

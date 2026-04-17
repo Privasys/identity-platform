@@ -42,6 +42,13 @@ export interface WebAuthnConfig {
     appName: string;
     /** Timeout for the WebAuthn ceremony in milliseconds (default: 60000). */
     timeout?: number;
+    /** Pre-assigned session ID (OIDC mode). When set, FIDO2 requests use
+     *  this ID so the IdP can link them to the OIDC authorize session. */
+    sessionId?: string;
+    /** Direct FIDO2 endpoint base URL (e.g., "https://privasys.id/fido2").
+     *  When set, bypasses the management service URL pattern and calls
+     *  `${fido2Base}/${action}` directly (used in OIDC IdP mode). */
+    fido2Base?: string;
 }
 
 /** State of a WebAuthn operation. */
@@ -124,7 +131,7 @@ export class WebAuthnClient {
             const userHandle = base64urlEncode(
                 crypto.getRandomValues(new Uint8Array(32)).buffer,
             );
-            const sessionId = randomHex(16);
+            const sessionId = this.config.sessionId ?? randomHex(16);
 
             // 1. Get standard WebAuthn registration options from the enclave
             const opts = await this.fido2Fetch(
@@ -224,7 +231,7 @@ export class WebAuthnClient {
         this.setState('requesting-options');
 
         try {
-            const sessionId = randomHex(16);
+            const sessionId = this.config.sessionId ?? randomHex(16);
 
             // 1. Get standard WebAuthn authentication options from the enclave
             const opts = await this.fido2Fetch(
@@ -307,8 +314,10 @@ export class WebAuthnClient {
         body: Record<string, unknown>,
         params?: Record<string, string>,
     ): Promise<Record<string, any>> {
-        const base = this.config.apiBase.replace(/\/+$/, '');
-        const url = new URL(`${base}/api/v1/apps/${encodeURIComponent(this.config.appName)}/fido2/${action}`);
+        const base = (this.config.fido2Base ?? this.config.apiBase).replace(/\/+$/, '');
+        const url = this.config.fido2Base
+            ? new URL(`${base}/${action}`)
+            : new URL(`${base}/api/v1/apps/${encodeURIComponent(this.config.appName)}/fido2/${action}`);
         if (params) {
             for (const [k, v] of Object.entries(params)) {
                 url.searchParams.set(k, v);

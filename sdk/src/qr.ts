@@ -21,6 +21,7 @@ export interface QRPayload {
     sessionId: string;
     rpId: string;
     brokerUrl: string;
+    requestedAttributes?: string[];
 }
 
 /**
@@ -51,6 +52,7 @@ export function generateQRPayload(opts: {
     rpId: string;
     brokerUrl: string;
     sessionId?: string;
+    requestedAttributes?: string[];
 }): { sessionId: string; payload: string } {
     const sessionId = opts.sessionId ?? generateSessionId();
     const qr: QRPayload = {
@@ -59,6 +61,9 @@ export function generateQRPayload(opts: {
         rpId: opts.rpId,
         brokerUrl: opts.brokerUrl,
     };
+    if (opts.requestedAttributes?.length) {
+        qr.requestedAttributes = opts.requestedAttributes;
+    }
     return { sessionId, payload: wrapAsUniversalLink(JSON.stringify(qr)) };
 }
 

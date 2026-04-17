@@ -43,6 +43,9 @@ export interface AuthFrameConfig {
     timeout?: number;
     /** Origin of the auth iframe (default: "https://privasys.id"). */
     authOrigin?: string;
+    /** OIDC client_id — when set, the iframe runs an OIDC PKCE flow and
+     *  returns a signed JWT access_token (instead of an opaque session token). */
+    clientId?: string;
 }
 
 export interface SignInResult {
@@ -51,6 +54,8 @@ export interface SignInResult {
     attestation?: Record<string, unknown>;
     sessionId: string;
     pushToken?: string;
+    /** JWT access_token from the IdP (present when clientId was set in config). */
+    accessToken?: string;
 }
 
 // ---------------------------------------------------------------------------

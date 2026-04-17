@@ -141,6 +141,87 @@ async function renewSession(session: AuthSession, parentOrigin: string): Promise
     });
 }
 
+// ── OIDC PKCE helpers ───────────────────────────────────────────────────
+
+async function generatePKCE(): Promise<{ codeVerifier: string; codeChallenge: string }> {
+    const buf = new Uint8Array(32);
+    crypto.getRandomValues(buf);
+    const codeVerifier = Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
+    const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    return { codeVerifier, codeChallenge };
+}
+
+/** Poll the IdP session status until auth code is available or timeout. */
+async function pollSessionStatus(pollUrl: string, timeoutMs = 120_000): Promise<string> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const resp = await fetch(pollUrl);
+        if (!resp.ok) throw new Error(`poll failed: ${resp.status}`);
+        const data = await resp.json();
+        if (data.authenticated && data.redirect_uri) {
+            const url = new URL(data.redirect_uri, globalThis.location.origin);
+            const code = url.searchParams.get('code');
+            if (code) return code;
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+    }
+    throw new Error('OIDC session timed out');
+}
+
+/** Complete an OIDC session directly (after relay/social auth) and get the auth code. */
+async function completeSession(
+    idpBase: string,
+    sessionId: string,
+    attributes?: Record<string, string>,
+): Promise<string> {
+    const resp = await fetch(`${idpBase}/session/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            session_id: sessionId,
+            user_id: attributes?.sub || '',
+            attributes: attributes || {},
+        }),
+    });
+    if (!resp.ok) {
+        const body = await resp.json().catch(() => ({ error: resp.statusText }));
+        throw new Error(body.error_description || body.error || `Session complete failed: ${resp.status}`);
+    }
+    const data = await resp.json();
+    if (!data.code) throw new Error('No authorization code returned');
+    return data.code;
+}
+
+/** Exchange an authorization code for tokens via the IdP /token endpoint. */
+
+/** Exchange an authorization code for tokens via the IdP /token endpoint. */
+async function exchangeCode(
+    idpBase: string,
+    code: string,
+    clientId: string,
+    codeVerifier: string,
+): Promise<{ access_token: string; refresh_token?: string; expires_in: number }> {
+    const resp = await fetch(`${idpBase}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code,
+            client_id: clientId,
+            code_verifier: codeVerifier,
+        }),
+    });
+    if (!resp.ok) {
+        const body = await resp.json().catch(() => ({ error: resp.statusText }));
+        throw new Error(body.error_description || body.error || `Token exchange failed: ${resp.status}`);
+    }
+    return resp.json();
+}
+
 // ── Message handler ─────────────────────────────────────────────────────
 
 window.addEventListener('message', async (e: MessageEvent) => {
@@ -148,7 +229,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
     if (!data || typeof data.type !== 'string') return;
 
     if (data.type === 'privasys:init') {
-        const config: AuthUIConfig = data.config;
+        const config: AuthUIConfig & { clientId?: string } = data.config;
         const parentOrigin = e.origin;
 
         // Tear down any previous UI
@@ -157,7 +238,172 @@ window.addEventListener('message', async (e: MessageEvent) => {
             activeUI = null;
         }
 
-        // Check for a push token from any previous session (returning user)
+        // IdP base URL (same origin as this iframe).
+        const idpBase = globalThis.location.origin;
+        const clientId = config.clientId;
+
+        // OIDC PKCE mode: create an OIDC session, authenticate, exchange for JWT.
+        if (clientId) {
+            try {
+                // 1. Generate PKCE code_verifier + code_challenge.
+                const { codeVerifier, codeChallenge } = await generatePKCE();
+
+                // 2. Create OIDC session via JSON authorize.
+                const authorizeUrl = new URL('/authorize', idpBase);
+                authorizeUrl.searchParams.set('client_id', clientId);
+                authorizeUrl.searchParams.set('response_type', 'code');
+                authorizeUrl.searchParams.set('code_challenge', codeChallenge);
+                authorizeUrl.searchParams.set('code_challenge_method', 'S256');
+                authorizeUrl.searchParams.set('scope', 'openid email profile offline_access');
+                authorizeUrl.searchParams.set('response_mode', 'json');
+                const authResp = await fetch(authorizeUrl.toString(), {
+                    headers: { Accept: 'application/json' },
+                });
+                if (!authResp.ok) {
+                    const body = await authResp.json().catch(() => ({ error: authResp.statusText }));
+                    throw new Error(body.error_description || body.error || `Authorize failed: ${authResp.status}`);
+                }
+                const authData = await authResp.json();
+                const oidcSessionId: string = authData.session_id;
+                const pollUrl: string = authData.poll_url;
+                const requestedAttributes: string[] | undefined = authData.requested_attributes;
+
+                // 3. Fetch available social providers.
+                let socialProviders: string[] = [];
+                try {
+                    const provResp = await fetch(`${idpBase}/auth/social/providers`);
+                    if (provResp.ok) {
+                        const provData = await provResp.json();
+                        socialProviders = provData.providers ?? [];
+                    }
+                } catch { /* social not available, that's fine */ }
+
+                // 4. Launch AuthUI with the OIDC session_id so QR/passkey link
+                //    to the OIDC session. Use the iframe origin as apiBase for
+                //    FIDO2 passkey calls (they go to the IdP, not the mgmt service).
+                const pushToken = sessions.findPushToken();
+
+                // Social auth handler: opens a popup to the IdP's social redirect,
+                // then waits for the callback page to postMessage back.
+                const onSocialAuth = (provider: string): Promise<void> => {
+                    return new Promise<void>((resolve, reject) => {
+                        const w = 500, h = 650;
+                        const left = window.screenX + (window.innerWidth - w) / 2;
+                        const top = window.screenY + (window.innerHeight - h) / 2;
+                        const popupUrl = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}`;
+                        const popup = window.open(popupUrl, 'privasys-social', `width=${w},height=${h},left=${left},top=${top}`);
+
+                        if (!popup) {
+                            reject(new Error('Popup blocked — please allow popups for this site'));
+                            return;
+                        }
+
+                        const cleanup = () => {
+                            window.removeEventListener('message', onMessage);
+                            clearInterval(pollClosed);
+                        };
+
+                        const onMessage = (ev: MessageEvent) => {
+                            if (ev.source !== popup) return;
+                            if (ev.data?.type === 'privasys:social-complete') {
+                                cleanup();
+                                popup.close();
+                                resolve();
+                            } else if (ev.data?.type === 'privasys:social-error') {
+                                cleanup();
+                                popup.close();
+                                reject(new Error(ev.data.error || 'Social authentication failed'));
+                            }
+                        };
+
+                        window.addEventListener('message', onMessage);
+
+                        // Detect if user closes the popup manually.
+                        const pollClosed = setInterval(() => {
+                            if (popup.closed) {
+                                cleanup();
+                                reject(new Error('Authentication cancelled'));
+                            }
+                        }, 500);
+                    });
+                };
+
+                activeUI = new AuthUI({
+                    ...config,
+                    apiBase: idpBase,
+                    sessionId: oidcSessionId,
+                    fido2Base: `${idpBase}/fido2`,
+                    pushToken,
+                    socialProviders,
+                    onSocialAuth,
+                    requestedAttributes,
+                });
+
+                const uiResult: SignInResult = await activeUI.signIn();
+
+                // 5. Get the auth code:
+                //    - Passkey: the IdP's FIDO2 handler already marked the session
+                //      complete, so poll for it.
+                //    - Wallet (relay): call /session/complete to bridge.
+                //    - Social: the popup callback already marked it complete, so
+                //      call /session/complete to get the code (it's idempotent).
+                let code: string;
+                if (uiResult.method === 'passkey') {
+                    code = await pollSessionStatus(pollUrl);
+                } else {
+                    // Wallet: pass profile from relay. Social: auth code
+                    // already exists with profile (the popup callback created it).
+                    code = await completeSession(
+                        idpBase,
+                        oidcSessionId,
+                        uiResult.attributes,
+                    );
+                }
+
+                // 5. Exchange code for JWT tokens.
+                const tokens = await exchangeCode(idpBase, code, clientId, codeVerifier);
+
+                // 6. Store session with JWT access_token.
+                const rpId = config.rpId || config.appName;
+                const session: AuthSession = {
+                    token: tokens.access_token,
+                    rpId,
+                    origin: config.apiBase,
+                    authenticatedAt: Date.now(),
+                    pushToken: uiResult.pushToken,
+                    brokerUrl: config.brokerUrl || '',
+                };
+                sessions.store(session);
+
+                if (session.pushToken && session.brokerUrl) {
+                    scheduleRenewal(session, parentOrigin);
+                }
+
+                // 7. Send result to parent with the access_token.
+                window.parent.postMessage(
+                    {
+                        type: 'privasys:result',
+                        result: {
+                            ...uiResult,
+                            accessToken: tokens.access_token,
+                        },
+                    },
+                    parentOrigin,
+                );
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Authentication failed';
+                if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
+                    window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
+                } else {
+                    window.parent.postMessage({ type: 'privasys:error', error: msg }, parentOrigin);
+                }
+            } finally {
+                activeUI = null;
+            }
+            return;
+        }
+
+        // Non-OIDC mode (original flow): opaque session token from enclave.
         const pushToken = sessions.findPushToken();
         activeUI = new AuthUI({ ...config, pushToken });
 

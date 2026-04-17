@@ -48,6 +48,7 @@ export class PrivasysAuth {
             rpId: this.config.rpId,
             brokerUrl: this.config.brokerUrl,
             sessionId,
+            requestedAttributes: this.config.requestedAttributes,
         });
     }
 
@@ -203,6 +204,7 @@ export class PrivasysAuth {
                     sessionId,
                     attestation: msg.attestation as AttestationInfo | undefined,
                     pushToken: (msg.pushToken as string | undefined) || undefined,
+                    attributes: (msg.attributes as Record<string, string> | undefined) || undefined,
                 };
 
                 // Store session locally

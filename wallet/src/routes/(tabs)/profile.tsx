@@ -18,8 +18,10 @@ import {
     View as RNView,
     TextInput,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Image,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
@@ -212,6 +214,11 @@ export default function ProfileScreen() {
                 <RNView style={styles.profileCard}>
                     <RNView style={styles.avatarContainer}>
                         {profile.avatarUri ? (
+                            <Image
+                                source={{ uri: profile.avatarUri }}
+                                style={styles.avatarImage}
+                            />
+                        ) : profile.displayName ? (
                             <RNView style={styles.avatar}>
                                 <Text style={styles.avatarInitial}>
                                     {profile.displayName.charAt(0).toUpperCase()}
@@ -537,20 +544,40 @@ function AttributeCard({ attr, onRemove }: { attr: ProfileAttribute; onRemove: (
           })
         : null;
 
+    const isAvatar = attr.key === 'picture';
+
+    const renderRightActions = () => (
+        <Pressable
+            style={styles.swipeDeleteAction}
+            onPress={onRemove}
+        >
+            <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.swipeDeleteText}>Delete</Text>
+        </Pressable>
+    );
+
     return (
-        <Pressable onPress={() => setExpanded(!expanded)}>
-            <RNView style={styles.attributeRow}>
-                <RNView style={styles.attributeInfo}>
-                    <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.attributeLabel}>{attr.label}</Text>
-                        {expanded ? (
-                            <Ionicons name="chevron-up" size={12} color="#94A3B8" />
+        <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
+            <Pressable onPress={() => setExpanded(!expanded)}>
+                <RNView style={styles.attributeRow}>
+                    <RNView style={styles.attributeInfo}>
+                        <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={styles.attributeLabel}>{attr.label}</Text>
+                            {expanded ? (
+                                <Ionicons name="chevron-up" size={12} color="#94A3B8" />
+                            ) : (
+                                <Ionicons name="chevron-down" size={12} color="#94A3B8" />
+                            )}
+                        </RNView>
+                        {isAvatar && attr.value ? (
+                            <Image
+                                source={{ uri: attr.value }}
+                                style={styles.attributeAvatar}
+                            />
                         ) : (
-                            <Ionicons name="chevron-down" size={12} color="#94A3B8" />
+                            <Text style={styles.attributeValue}>{attr.value}</Text>
                         )}
-                    </RNView>
-                    <Text style={styles.attributeValue}>{attr.value}</Text>
-                    <RNView style={styles.attributeMeta}>
+                        <RNView style={styles.attributeMeta}>
                         {attr.verified ? (
                             <RNView style={styles.verifiedBadge}>
                                 <Ionicons name="checkmark-circle" size={12} color="#34E89E" />
@@ -611,11 +638,9 @@ function AttributeCard({ attr, onRemove }: { attr: ProfileAttribute; onRemove: (
                         </RNView>
                     )}
                 </RNView>
-                <Pressable onPress={onRemove} hitSlop={8}>
-                    <Ionicons name="close-circle" size={20} color="#FF3B30" />
-                </Pressable>
-            </RNView>
-        </Pressable>
+                </RNView>
+            </Pressable>
+        </Swipeable>
     );
 }
 
@@ -681,6 +706,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#00BCF2',
         alignItems: 'center',
         justifyContent: 'center'
+    },
+    avatarImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
     },
     avatarInitial: {
         fontSize: 32,
@@ -779,6 +809,12 @@ const styles = StyleSheet.create({
     attributeInfo: { flex: 1 },
     attributeLabel: { fontSize: 12, fontWeight: '600', color: '#94A3B8', marginBottom: 2 },
     attributeValue: { fontSize: 16, color: '#0F172A', marginBottom: 4 },
+    attributeAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        marginVertical: 4,
+    },
     attributeMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     verifiedText: { fontSize: 11, color: '#34E89E', fontWeight: '600' },
@@ -906,4 +942,20 @@ const styles = StyleSheet.create({
         borderColor: '#E2E8F0',
     },
     dangerButtonText: { color: '#DC2626', fontSize: 14, fontWeight: '500' },
+
+    swipeDeleteAction: {
+        backgroundColor: '#FF3B30',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 80,
+        borderRadius: 12,
+        marginBottom: 8,
+        marginLeft: 8,
+    },
+    swipeDeleteText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 4,
+    },
 });

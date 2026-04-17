@@ -22,6 +22,8 @@ export interface QRPayload {
     rpId: string;
     brokerUrl: string;
     requestedAttributes?: string[];
+    appName?: string;
+    privacyPolicyUrl?: string;
 }
 
 /**
@@ -53,6 +55,8 @@ export function generateQRPayload(opts: {
     brokerUrl: string;
     sessionId?: string;
     requestedAttributes?: string[];
+    appName?: string;
+    privacyPolicyUrl?: string;
 }): { sessionId: string; payload: string } {
     const sessionId = opts.sessionId ?? generateSessionId();
     const qr: QRPayload = {
@@ -64,6 +68,8 @@ export function generateQRPayload(opts: {
     if (opts.requestedAttributes?.length) {
         qr.requestedAttributes = opts.requestedAttributes;
     }
+    if (opts.appName) qr.appName = opts.appName;
+    if (opts.privacyPolicyUrl) qr.privacyPolicyUrl = opts.privacyPolicyUrl;
     return { sessionId, payload: wrapAsUniversalLink(JSON.stringify(qr)) };
 }
 

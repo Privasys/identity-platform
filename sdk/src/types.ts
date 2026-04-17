@@ -13,6 +13,10 @@ export interface AuthConfig {
     timeout?: number;
     /** Attribute keys the relying party needs from the wallet (e.g. ["email", "name"]). */
     requestedAttributes?: string[];
+    /** Human-readable app name displayed in the wallet during consent. */
+    appName?: string;
+    /** URL to the app's privacy policy. Shown to the user when sharing attributes. */
+    privacyPolicyUrl?: string;
 }
 
 /** Attestation information returned from the wallet. */

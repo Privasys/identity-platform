@@ -45,6 +45,8 @@ export interface AuthUIConfig {
     /** Callback when the user wants to start social auth. The UI calls
      *  this with the provider name; the host opens a popup. */
     onSocialAuth?: (provider: string) => Promise<void>;
+    /** URL to the app's privacy policy. Shown to the user when sharing attributes. */
+    privacyPolicyUrl?: string;
 }
 
 /** Resolved result returned by `signIn()`. */
@@ -1214,6 +1216,8 @@ export class AuthUI {
                 brokerUrl: this.cfg.brokerUrl,
                 timeout: this.cfg.timeout,
                 requestedAttributes: this.cfg.requestedAttributes,
+                appName: this.cfg.appName,
+                privacyPolicyUrl: this.cfg.privacyPolicyUrl,
             }, {
                 onStateChange: (s: AuthState) => {
                     const map: Record<string, UIState> = {

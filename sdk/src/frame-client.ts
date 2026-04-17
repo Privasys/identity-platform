@@ -75,6 +75,8 @@ export interface AuthFrameConfig {
      * @see {@link PrivasysScope} for the full list of supported scope tokens.
      */
     scope?: PrivasysScope[];
+    /** URL to the app's privacy policy. Shown to the user when sharing attributes. */
+    privacyPolicyUrl?: string;
 }
 
 export interface SignInResult {

@@ -15,6 +15,7 @@
 
 import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
+import * as FileSystem from 'expo-file-system';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
@@ -89,6 +90,8 @@ export function getClientId(providerKey: string): string {
                 ? (process.env.EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_IOS ?? '')
                 : (process.env.EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_ANDROID ?? ''),
         microsoft: process.env.EXPO_PUBLIC_OAUTH_MICROSOFT_CLIENT_ID ?? '',
+        github: process.env.EXPO_PUBLIC_OAUTH_GITHUB_CLIENT_ID ?? '',
+        linkedin: process.env.EXPO_PUBLIC_OAUTH_LINKEDIN_CLIENT_ID ?? '',
     };
     return clientIds[providerKey] ?? '';
 }
@@ -113,6 +116,22 @@ export const PROVIDERS: Record<string, Omit<ProviderConfig, 'clientId'>> = {
             'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
         tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
         userinfoEndpoint: 'https://graph.microsoft.com/oidc/userinfo',
+        scopes: ['openid', 'profile', 'email']
+    },
+    github: {
+        provider: 'github',
+        displayName: 'GitHub',
+        authorizationEndpoint: 'https://github.com/login/oauth/authorize',
+        tokenEndpoint: 'https://github.com/login/oauth/access_token',
+        userinfoEndpoint: 'https://api.github.com/user',
+        scopes: ['read:user', 'user:email']
+    },
+    linkedin: {
+        provider: 'linkedin',
+        displayName: 'LinkedIn',
+        authorizationEndpoint: 'https://www.linkedin.com/oauth/v2/authorization',
+        tokenEndpoint: 'https://www.linkedin.com/oauth/v2/accessToken',
+        userinfoEndpoint: 'https://api.linkedin.com/v2/userinfo',
         scopes: ['openid', 'profile', 'email']
     }
 };
@@ -264,6 +283,29 @@ export async function fetchUserInfo(
 }
 
 /**
+ * Download an avatar image from a remote URL and cache it locally.
+ * Returns the local file URI. If the image is already cached, returns the
+ * existing local URI without re-downloading.
+ */
+export async function downloadAndCacheAvatar(url: string): Promise<string> {
+    const hash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        url,
+    );
+    const ext = url.match(/\.(png|gif|webp)/i)?.[1] ?? 'jpg';
+    const localUri = `${FileSystem.cacheDirectory}avatar-${hash.substring(0, 16)}.${ext}`;
+
+    const info = await FileSystem.getInfoAsync(localUri);
+    if (info.exists) return localUri;
+
+    const result = await FileSystem.downloadAsync(url, localUri);
+    if (result.status < 200 || result.status >= 300) {
+        throw new Error(`Failed to download avatar: ${result.status}`);
+    }
+    return localUri;
+}
+
+/**
  * Complete the full link flow: auth → token exchange → userinfo → LinkedProvider.
  */
 export async function linkIdentityProvider(config: ProviderConfig): Promise<{
@@ -295,7 +337,14 @@ export async function linkIdentityProvider(config: ProviderConfig): Promise<{
     const normalisedClaims: Record<string, string> = {};
     if (userInfo.name) normalisedClaims.name = userInfo.name;
     if (userInfo.email) normalisedClaims.email = userInfo.email;
-    if (userInfo.picture) normalisedClaims.picture = userInfo.picture;
+    if (userInfo.picture) {
+        // Download avatar locally so we don't depend on the provider after import
+        try {
+            normalisedClaims.picture = await downloadAndCacheAvatar(userInfo.picture);
+        } catch {
+            normalisedClaims.picture = userInfo.picture; // fallback to remote URL
+        }
+    }
     if (userInfo.locale) normalisedClaims.locale = userInfo.locale;
 
     const seedAttributes = claimsToProfileAttributes(normalisedClaims, config.provider, raw);

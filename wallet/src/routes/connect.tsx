@@ -31,6 +31,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
@@ -42,6 +43,7 @@ import * as fido2 from '@/services/fido2';
 import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
 import { attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
 import { useAuthStore } from '@/stores/auth';
+import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
@@ -142,6 +144,8 @@ interface QRPayload {
     brokerUrl: string;
     userAgent?: string;
     requestedAttributes?: string[];
+    appName?: string;
+    privacyPolicyUrl?: string;
 }
 
 export default function ConnectScreen() {
@@ -630,6 +634,8 @@ export default function ConnectScreen() {
                 {step === 'acquire-attributes' && qr && (
                     <AttributeAcquisitionView
                         rpId={qr.rpId}
+                        appName={qr.appName}
+                        privacyPolicyUrl={qr.privacyPolicyUrl}
                         missingAttributes={missingAttrs}
                         onComplete={handleAttributesAcquired}
                         onCancel={handleReject}
@@ -880,15 +886,21 @@ function truncateHex(hex: string): string {
 const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     google: 'logo-google',
     microsoft: 'logo-microsoft',
+    github: 'logo-github',
+    linkedin: 'logo-linkedin',
 };
 
 function AttributeAcquisitionView({
     rpId,
+    appName: appNameProp,
+    privacyPolicyUrl,
     missingAttributes,
     onComplete,
     onCancel,
 }: {
     rpId: string;
+    appName?: string;
+    privacyPolicyUrl?: string;
     missingAttributes: string[];
     onComplete: () => void;
     onCancel: () => void;
@@ -984,7 +996,29 @@ function AttributeAcquisitionView({
         }
     };
 
+    const displayAppName = appNameProp || appName(rpId);
     const manualAllFilled = missingAttributes.every((attr) => manualValues[attr]?.trim());
+
+    const handleContinue = () => {
+        // Log consent in consent history
+        useConsentStore.getState().addRecord({
+            id: `attr-acq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            rpId,
+            origin: rpId,
+            appName: displayAppName,
+            requestedAttributes: missingAttributes,
+            approvedAttributes: missingAttributes,
+            deniedAttributes: [],
+            decision: 'approved',
+            persistent: false,
+            teeType: 'sgx',
+            enclaveMeasurement: '',
+            codeHash: '',
+            consentedAt: Math.floor(Date.now() / 1000),
+            expiresAt: 0,
+        });
+        onComplete();
+    };
 
     return (
         <KeyboardAvoidingView
@@ -1002,9 +1036,29 @@ function AttributeAcquisitionView({
 
                     <Text style={styles.title}>Profile needed</Text>
                     <Text style={acqStyles.description}>
-                        <Text style={acqStyles.bold}>{appName(rpId)}</Text>
+                        <Text style={acqStyles.bold}>{displayAppName}</Text>
                         {' needs the following to complete sign-in:'}
                     </Text>
+
+                    {/* Data sharing notice */}
+                    <RNView style={acqStyles.privacyNotice}>
+                        <Ionicons name="shield-outline" size={16} color="#F59E0B" />
+                        <Text style={acqStyles.privacyNoticeText}>
+                            These attributes will be shared with{' '}
+                            <Text style={acqStyles.bold}>{displayAppName}</Text>
+                            {' and will be under their control.'}
+                        </Text>
+                    </RNView>
+
+                    {privacyPolicyUrl ? (
+                        <Pressable
+                            style={acqStyles.privacyLink}
+                            onPress={() => WebBrowser.openBrowserAsync(privacyPolicyUrl)}
+                        >
+                            <Ionicons name="document-text-outline" size={14} color="#007AFF" />
+                            <Text style={acqStyles.privacyLinkText}>Read privacy policy</Text>
+                        </Pressable>
+                    ) : null}
 
                     {/* Show what's needed */}
                     <RNView style={acqStyles.attributeList}>
@@ -1039,7 +1093,7 @@ function AttributeAcquisitionView({
                     ) : mode === 'choose' ? (
                         /* Provider linking options */
                         <>
-                            <Text style={acqStyles.sectionTitle}>Link an account for instant setup</Text>
+                            <Text style={acqStyles.sectionTitle}>Import from an account</Text>
                             {Object.entries(PROVIDERS).map(([key, config]) => {
                                 const isLinking = linkingProvider === key;
                                 return (
@@ -1115,7 +1169,7 @@ function AttributeAcquisitionView({
                                 style={acqStyles.backLink}
                                 onPress={() => setMode('choose')}
                             >
-                                <Text style={acqStyles.backLinkText}>← Link an account instead</Text>
+                                <Text style={acqStyles.backLinkText}>← Import from an account instead</Text>
                             </Pressable>
                         </>
                     )}
@@ -1129,7 +1183,7 @@ function AttributeAcquisitionView({
                         </Pressable>
                         <Pressable
                             style={[styles.approveButton, stillMissing.length > 0 && acqStyles.continueDisabled]}
-                            onPress={onComplete}
+                            onPress={handleContinue}
                             disabled={stillMissing.length > 0}
                         >
                             <Text style={styles.approveButtonText}>Continue</Text>
@@ -1161,6 +1215,34 @@ const acqStyles = StyleSheet.create({
         lineHeight: 22,
     },
     bold: { fontWeight: '600', color: '#1E293B' },
+    privacyNotice: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        backgroundColor: '#FFFBEB',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 8,
+    },
+    privacyNoticeText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#92400E',
+        lineHeight: 18,
+    },
+    privacyLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        marginBottom: 16,
+        paddingVertical: 4,
+    },
+    privacyLinkText: {
+        fontSize: 13,
+        color: '#007AFF',
+        fontWeight: '500',
+    },
     attributeList: {
         backgroundColor: '#FFFFFF',
         borderRadius: 12,

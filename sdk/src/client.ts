@@ -49,6 +49,8 @@ export class PrivasysAuth {
             brokerUrl: this.config.brokerUrl,
             sessionId,
             requestedAttributes: this.config.requestedAttributes,
+            appName: this.config.appName,
+            privacyPolicyUrl: this.config.privacyPolicyUrl,
         });
     }
 

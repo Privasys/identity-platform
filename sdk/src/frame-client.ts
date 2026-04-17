@@ -30,6 +30,24 @@
 // Types (subset — avoids importing the full SDK)
 // ---------------------------------------------------------------------------
 
+/**
+ * Supported OIDC scope tokens.
+ *
+ * These must stay in sync with:
+ *   - IdP discovery (`scopes_supported` in oidc.go HandleDiscovery)
+ *   - IdP scope→attribute mapping (`filterAttributesByScope` in oidc.go)
+ *   - Wallet canonical attributes (`CANONICAL_ATTRIBUTES` in attributes.ts)
+ *
+ * | Scope            | Attributes granted                                      |
+ * |------------------|---------------------------------------------------------|
+ * | `openid`         | `sub` (always implied)                                  |
+ * | `email`          | `email`, `email_verified`                               |
+ * | `profile`        | `name`, `given_name`, `family_name`, `picture`, `locale`|
+ * | `phone`          | `phone_number`                                          |
+ * | `offline_access` | Issues a refresh token (no attributes)                  |
+ */
+export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'offline_access';
+
 export interface AuthFrameConfig {
     /** Management service API base URL. */
     apiBase: string;
@@ -46,6 +64,17 @@ export interface AuthFrameConfig {
     /** OIDC client_id — when set, the iframe runs an OIDC PKCE flow and
      *  returns a signed JWT access_token (instead of an opaque session token). */
     clientId?: string;
+    /**
+     * OIDC scopes to request from the IdP `/authorize` endpoint.
+     * Controls which attributes the wallet will prompt for.
+     * `'openid'` is always included automatically.
+     *
+     * @default ['openid', 'offline_access']
+     * @example ['openid', 'email', 'profile', 'offline_access']
+     *
+     * @see {@link PrivasysScope} for the full list of supported scope tokens.
+     */
+    scope?: PrivasysScope[];
 }
 
 export interface SignInResult {

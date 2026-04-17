@@ -229,7 +229,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
     if (!data || typeof data.type !== 'string') return;
 
     if (data.type === 'privasys:init') {
-        const config: AuthUIConfig & { clientId?: string } = data.config;
+        const config: AuthUIConfig & { clientId?: string; scope?: string | string[] } = data.config;
         const parentOrigin = e.origin;
 
         // Tear down any previous UI
@@ -254,7 +254,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 authorizeUrl.searchParams.set('response_type', 'code');
                 authorizeUrl.searchParams.set('code_challenge', codeChallenge);
                 authorizeUrl.searchParams.set('code_challenge_method', 'S256');
-                authorizeUrl.searchParams.set('scope', 'openid email profile offline_access');
+                const scopeStr = Array.isArray(config.scope) ? config.scope.join(' ') : (config.scope || 'openid offline_access');
+                authorizeUrl.searchParams.set('scope', scopeStr);
                 authorizeUrl.searchParams.set('response_mode', 'json');
                 const authResp = await fetch(authorizeUrl.toString(), {
                     headers: { Accept: 'application/json' },

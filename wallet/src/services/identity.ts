@@ -55,8 +55,21 @@ export interface ProviderUserInfo {
     locale?: string;
 }
 
-/** Build the redirect URI from the app's configured scheme. */
-function getRedirectUri(): string {
+/**
+ * Build the redirect URI for the OAuth callback.
+ *
+ * Google requires the reversed client ID as the URI scheme on iOS/Android.
+ * Other providers use the app's configured custom scheme.
+ */
+function getRedirectUri(providerKey?: string): string {
+    if (providerKey === 'google') {
+        const clientId = getClientId('google');
+        if (clientId) {
+            // Google requires: com.googleusercontent.apps.{CLIENT_ID_PREFIX}:/oauthredirect
+            const prefix = clientId.replace('.apps.googleusercontent.com', '');
+            return `com.googleusercontent.apps.${prefix}:/oauthredirect`;
+        }
+    }
     const scheme = Constants.expoConfig?.scheme ?? 'privasys-wallet';
     return `${scheme}://auth/callback`;
 }
@@ -145,7 +158,7 @@ export async function startAuthFlow(config: ProviderConfig): Promise<{
     const state = await generateState();
     const { verifier, challenge } = await generatePKCE();
 
-    const redirectUri = getRedirectUri();
+    const redirectUri = getRedirectUri(config.provider);
 
     const params = new URLSearchParams({
         client_id: config.clientId,
@@ -192,7 +205,7 @@ export async function exchangeCode(
     const body = new URLSearchParams({
         client_id: config.clientId,
         code,
-        redirect_uri: getRedirectUri(),
+        redirect_uri: getRedirectUri(config.provider),
         grant_type: 'authorization_code',
         code_verifier: codeVerifier
     });

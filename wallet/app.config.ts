@@ -104,7 +104,18 @@ export default (context: ConfigContext): ExpoConfig => {
             bundleIdentifier: config.bundle,
             infoPlist: {
                 ITSAppUsesNonExemptEncryption: false,
-                CFBundleAllowMixedLocalizations: true
+                CFBundleAllowMixedLocalizations: true,
+                // Google OAuth requires the reversed client ID as a registered URL scheme
+                // so iOS can route the redirect back to the app after authentication.
+                CFBundleURLTypes: [
+                    ...(process.env.EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_IOS
+                        ? [{
+                            CFBundleURLSchemes: [
+                                `com.googleusercontent.apps.${process.env.EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_IOS.replace('.apps.googleusercontent.com', '')}`
+                            ]
+                        }]
+                        : [])
+                ]
             },
             config: { usesNonExemptEncryption: false },
             associatedDomains: ['applinks:privasys.id', 'webcredentials:privasys.id']

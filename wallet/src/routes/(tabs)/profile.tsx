@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Profile tab — view and manage identity, linked providers, and data attributes.
+ * Profile tab — view and manage identity, attribute sources, and personal data.
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -24,8 +26,10 @@ import { Text } from '@/components/Themed';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
 import { exportAttributesForAudit } from '@/services/attributes';
+import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
+import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     github: 'logo-github',
@@ -37,8 +41,10 @@ const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { profile, updateProfile, linkProvider, unlinkProvider, setAttribute, removeAttribute } =
+    const { profile, updateProfile, linkProvider, unlinkProvider, setAttribute, removeAttribute, clearProfile } =
         useProfileStore();
+    const { credentials, removeCredential } = useAuthStore();
+    const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
     const consentRecordCount = useConsentStore((s) => s.records.length);
     const standingConsentCount = useConsentStore((s) => s.standingConsents.length);
 
@@ -272,10 +278,10 @@ export default function ProfileScreen() {
                     Apps receive a unique derived ID — they cannot track you across services.
                 </Text>
 
-                {/* Linked Providers */}
-                <Text style={styles.sectionTitle}>LINKED ACCOUNTS</Text>
+                {/* Attribute Sources */}
+                <Text style={styles.sectionTitle}>ATTRIBUTE SOURCES</Text>
                 <Text style={styles.sectionDescription}>
-                    Used for profile information and account recovery. Not used for enclave authentication.
+                    Sign in once to import your profile. These providers cannot access your Privasys data.
                 </Text>
 
                 {Object.entries(PROVIDERS).map(([key, config]) => {
@@ -301,11 +307,11 @@ export default function ProfileScreen() {
                                 <Text style={styles.providerName}>{config.displayName}</Text>
                                 {linked ? (
                                     <Text style={styles.providerDetail}>
-                                        {linked.email ?? linked.sub} · Linked{' '}
+                                        {linked.email ?? linked.sub} · Imported{' '}
                                         {new Date(linked.linkedAt * 1000).toLocaleDateString()}
                                     </Text>
                                 ) : (
-                                    <Text style={styles.providerDetail}>Not linked</Text>
+                                    <Text style={styles.providerDetail}>Not imported</Text>
                                 )}
                             </RNView>
                             {isLinking ? (
@@ -349,7 +355,13 @@ export default function ProfileScreen() {
                                             {
                                                 text: 'Remove',
                                                 style: 'destructive',
-                                                onPress: () => removeAttribute(attr.key)
+                                                onPress: () => {
+                                                    removeAttribute(attr.key);
+                                                    // Sync profile fields with attribute removal
+                                                    if (attr.key === 'email') updateProfile({ email: '' });
+                                                    if (attr.key === 'name') updateProfile({ displayName: '' });
+                                                    if (attr.key === 'picture') updateProfile({ avatarUri: '' });
+                                                }
                                             }
                                         ]
                                     );
@@ -364,17 +376,19 @@ export default function ProfileScreen() {
                                 try {
                                     const data = exportAttributesForAudit(profile);
                                     const json = JSON.stringify(data, null, 2);
-                                    await Clipboard.setStringAsync(json);
-                                    Alert.alert(
-                                        'Exported',
-                                        'Profile data (JSON) copied to clipboard. Paste into a file or notes app to save.',
-                                    );
+                                    const file = new File(Paths.cache, `privasys-profile-${Date.now()}.json`);
+                                    file.write(json);
+                                    await Sharing.shareAsync(file.uri, {
+                                        mimeType: 'application/json',
+                                        dialogTitle: 'Save Profile Data',
+                                        UTI: 'public.json',
+                                    });
                                 } catch (e: any) {
                                     Alert.alert('Export failed', e.message);
                                 }
                             }}
                         >
-                            <Ionicons name="copy-outline" size={18} color="#00BCF2" />
+                            <Ionicons name="download-outline" size={18} color="#00BCF2" />
                             <Text style={styles.exportButtonText}>Export All Data (JSON)</Text>
                         </Pressable>
                     </>
@@ -442,13 +456,51 @@ export default function ProfileScreen() {
                         </Text>
                     </RNView>
                     <RNView style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Linked providers</Text>
+                        <Text style={styles.metaLabel}>Attribute sources</Text>
                         <Text style={styles.metaValue}>{profile.linkedProviders.length}</Text>
                     </RNView>
                     <RNView style={styles.metaRow}>
                         <Text style={styles.metaLabel}>Data attributes</Text>
                         <Text style={styles.metaValue}>{profile.attributes.length}</Text>
                     </RNView>
+                </RNView>
+
+                {/* Danger Zone */}
+                <RNView style={styles.dangerSection}>
+                    <RNView style={styles.dangerDivider} />
+                    <Text style={styles.dangerTitle}>Danger Zone</Text>
+                    <Text style={styles.dangerDescription}>
+                        This will remove your profile, credentials, trusted apps, and all local data.
+                        You will need to re-register with each service.
+                    </Text>
+                    <Pressable
+                        style={styles.dangerButton}
+                        onPress={() => {
+                            Alert.alert(
+                                'Clear All Data',
+                                'This will permanently remove your profile, all credentials, trusted apps, and local data. This cannot be undone.',
+                                [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                        text: 'Clear Everything',
+                                        style: 'destructive',
+                                        onPress: () => {
+                                            for (const cred of credentials) {
+                                                removeCredential(cred.credentialId);
+                                            }
+                                            for (const app of apps) {
+                                                removeTrustedApp(app.rpId);
+                                            }
+                                            clearProfile();
+                                        }
+                                    }
+                                ]
+                            );
+                        }}
+                    >
+                        <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                        <Text style={styles.dangerButtonText}>Clear All Data</Text>
+                    </Pressable>
                 </RNView>
             </ScrollView>
         </RNView>
@@ -814,5 +866,44 @@ const styles = StyleSheet.create({
         justifyContent: 'center'
     },
     sharingLabel: { fontSize: 15, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
-    sharingDetail: { fontSize: 13, color: '#64748B' }
+    sharingDetail: { fontSize: 13, color: '#64748B' },
+
+    dangerSection: {
+        marginTop: 40,
+        alignItems: 'center',
+        gap: 10,
+        paddingBottom: 20,
+    },
+    dangerDivider: {
+        width: 40,
+        height: 1,
+        backgroundColor: '#E2E8F0',
+        marginBottom: 4,
+    },
+    dangerTitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#94A3B8',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    dangerDescription: {
+        fontSize: 13,
+        color: '#94A3B8',
+        textAlign: 'center',
+        lineHeight: 18,
+        maxWidth: 280,
+        marginBottom: 4,
+    },
+    dangerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    dangerButtonText: { color: '#DC2626', fontSize: 14, fontWeight: '500' },
 });

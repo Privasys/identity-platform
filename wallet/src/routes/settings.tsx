@@ -23,28 +23,6 @@ export default function SettingsScreen() {
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
     const pushToken = useExpoPushToken();
 
-    const handleClearAll = () => {
-        Alert.alert(
-            'Clear All Data',
-            'This will remove all registered credentials and trusted apps. You will need to re-register with each service.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Clear',
-                    style: 'destructive',
-                    onPress: () => {
-                        for (const cred of credentials) {
-                            removeCredential(cred.credentialId);
-                        }
-                        for (const app of apps) {
-                            removeTrustedApp(app.rpId);
-                        }
-                    }
-                }
-            ]
-        );
-    };
-
     return (
         <>
             <Stack.Screen
@@ -149,20 +127,6 @@ export default function SettingsScreen() {
                         </Pressable>
                     </>
                 ) : null}
-
-                {/* Danger Zone */}
-                <View style={styles.dangerSection}>
-                    <View style={styles.dangerDivider} />
-                    <Text style={styles.dangerTitle}>Danger Zone</Text>
-                    <Text style={styles.dangerDescription}>
-                        This will remove all registered credentials, trusted apps, and local keys.
-                        You will need to re-register with each service.
-                    </Text>
-                    <Pressable style={styles.dangerButton} onPress={handleClearAll}>
-                        <Ionicons name="trash-outline" size={18} color="#DC2626" />
-                        <Text style={styles.dangerButtonText}>Clear All Data</Text>
-                    </Pressable>
-                </View>
             </ScrollView>
         </>
     );
@@ -246,45 +210,5 @@ const styles = StyleSheet.create({
         fontFamily: 'SpaceMono',
         color: '#64748B',
         lineHeight: 18
-    },
-
-    dangerSection: {
-        marginTop: 40,
-        alignItems: 'center',
-        gap: 10,
-        backgroundColor: 'transparent'
-    },
-    dangerDivider: {
-        width: 40,
-        height: 1,
-        backgroundColor: '#E2E8F0',
-        marginBottom: 4
-    },
-    dangerTitle: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#94A3B8',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5
-    },
-    dangerDescription: {
-        fontSize: 13,
-        color: '#94A3B8',
-        textAlign: 'center',
-        lineHeight: 18,
-        maxWidth: 280,
-        marginBottom: 4
-    },
-    dangerButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        borderRadius: 10,
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        backgroundColor: 'transparent'
-    },
-    dangerButtonText: { color: '#DC2626', fontSize: 14, fontWeight: '500' }
+    }
 });

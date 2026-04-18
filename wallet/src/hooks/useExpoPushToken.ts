@@ -1,8 +1,11 @@
-import * as Device from 'expo-device';
+﻿import * as Device from 'expo-device';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useRef } from 'react';
 import { Platform } from 'react-native';
 
+let _notificationsSetup = false;
+
+async function getNotifications() {
     const Notifications = await import('expo-notifications');
     if (!_notificationsSetup && Platform.OS !== 'web') {
         _notificationsSetup = true;
@@ -10,7 +13,18 @@ import { Platform } from 'react-native';
             handleNotification: async () => {
                 return {
                     shouldShowAlert: true,
-                    shouldPlaySound: tr) => {ken: string | null = null;
+                    shouldPlaySound: true,
+                    shouldSetBadge: true,
+                    shouldShowBanner: true,
+                    shouldShowList: true,
+                };
+            },
+        });
+    }
+    return Notifications;
+}
+
+let ambientPushToken: string | null = null;
 
 /** Get the current push token without a hook (for non-component code). */
 export function getAmbientPushToken(): string | null {
@@ -55,27 +69,13 @@ export function useExpoPushToken() {
         async function setupListeners() {
             const Notifications = await getNotifications();
 
-            // Foreground notification handler — no special handling needed,
+            // Foreground notification handler - no special handling needed,
             // all notifications use the default display behavior.
             notificationListener.current = Notifications.addNotificationReceivedListener(
                 () => {},
             );
 
-            // Tap-to-open handler — fires when the user taps a notification.
-            responseListener.current = Notifications.addNotificationResponseReceivedListener(
-                (response) => {
-                            appName: data.appName,
-                            clientIP: data.clientIP,
-                        });
-                        router.push({ pathname: '/connect', params: { payload, source: 'push' } });
-                    }
-                }no special handling needed,
-            // all notifications use the default display behavior.
-            notificationListener.current = Notifications.addNotificationReceivedListener(
-                () => {},
-            );
-
-            // Tap-to-open handler — fires when the user taps a notification.
+            // Tap-to-open handler - fires when the user taps a notification.
             responseListener.current = Notifications.addNotificationResponseReceivedListener(
                 (response) => {
                     const data = response.notification.request.content.data;
@@ -91,3 +91,18 @@ export function useExpoPushToken() {
                         });
                         router.push({ pathname: '/connect', params: { payload, source: 'push' } });
                     }
+                }
+            );
+        }
+
+        registerForPushNotifications();
+        setupListeners();
+
+        return () => {
+            notificationListener.current?.remove();
+            responseListener.current?.remove();
+        };
+    }, [router]);
+
+    return expoPushToken;
+}

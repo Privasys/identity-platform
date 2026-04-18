@@ -110,6 +110,17 @@ async function renewSession(session: AuthSession, parentOrigin: string): Promise
 
 // ── OIDC PKCE helpers ───────────────────────────────────────────────────
 
+/** Check whether an access token's exp claim is within a safety margin. */
+function isTokenExpired(token: string, marginMs = 30_000): boolean {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (typeof payload.exp !== 'number') return false;
+        return payload.exp * 1000 - marginMs < Date.now();
+    } catch {
+        return false;
+    }
+}
+
 async function generatePKCE(): Promise<{ codeVerifier: string; codeChallenge: string }> {
     const buf = new Uint8Array(32);
     crypto.getRandomValues(buf);
@@ -423,7 +434,20 @@ window.addEventListener('message', async (e: MessageEvent) => {
     }
 
     if (data.type === 'privasys:check-session') {
-        const session = sessions.get(data.rpId);
+        let session = sessions.get(data.rpId);
+
+        // If the access token is expired but we have a refresh token,
+        // renew immediately before returning so the parent gets a fresh token.
+        if (session?.token && session?.refreshToken && session?.clientId && isTokenExpired(session.token)) {
+            try {
+                await renewSession(session, e.origin);
+                session = sessions.get(data.rpId);
+            } catch {
+                // Renewal failed — clear and return null so parent triggers sign-in.
+                sessions.remove(data.rpId);
+                session = undefined;
+            }
+        }
 
         // Ensure renewal is running for active sessions
         if (session?.refreshToken && session?.clientId && !renewalTimers.has(session.rpId)) {

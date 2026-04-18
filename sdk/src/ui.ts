@@ -1015,7 +1015,7 @@ export class AuthUI {
     private renderPushWaiting(): HTMLElement {
         const hasWebAuthn = WebAuthnClient.isSupported();
         return el('div', null,
-            el('p', { className: 'scan-hint', style: 'margin-bottom: 20px; max-width: none; text-align: center;' },
+            el('p', { className: 'btn-provider', style: 'margin-bottom: 20px; max-width: none; text-align: center;' },
                 'Check your phone \u2014 tap the notification to approve this connection.',
             ),
             el('div', { className: 'divider' }, el('span', null, 'or')),
@@ -1120,12 +1120,15 @@ export class AuthUI {
             );
         }
 
-        return el('div', { className: 'brand-progress' },
-            steps,
-            isSuccess ? el('div', { className: `step done`, style: 'margin-top: 2px;' },
+        if (isSuccess) {
+            steps.appendChild(el('div', { className: 'step done' },
                 el('span', { className: 'step-icon' }, '\u2713'),
                 `Authenticated via ${methodLabel}`,
-            ) : null,
+            ));
+        }
+
+        return el('div', { className: 'brand-progress' },
+            steps,
         );
     }
 

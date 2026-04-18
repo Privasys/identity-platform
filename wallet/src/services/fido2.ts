@@ -166,7 +166,8 @@ const PRIVASYS_WALLET_AAGUID = new Uint8Array([
 export async function register(
     origin: string,
     keyAlias: string,
-    browserSessionId: string
+    browserSessionId: string,
+    displayName?: string
 ): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string }> {
     // 1. Begin registration — get challenge and options from server
     //    Generate a random user handle (32 random bytes, base64url-encoded)
@@ -178,7 +179,7 @@ export async function register(
         origin,
         `/fido2/register/begin?session_id=${encodeURIComponent(browserSessionId)}`,
         {
-            userName: keyAlias,
+            userName: displayName || keyAlias,
             userHandle,
         }
     );

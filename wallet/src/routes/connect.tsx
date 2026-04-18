@@ -345,10 +345,10 @@ export default function ConnectScreen() {
         console.log(`[CONNECT] doRegister — origin=${payload.origin}, rpId=${payload.rpId}`);
         try {
             const keyAlias = `fido2-${payload.rpId}`;
-            const result = await fido2.register(payload.origin, keyAlias, payload.sessionId);
+            const currentProfile = useProfileStore.getState().profile;
+            const result = await fido2.register(payload.origin, keyAlias, payload.sessionId, currentProfile?.displayName);
 
             // Check for missing attributes before relaying
-            const currentProfile = useProfileStore.getState().profile;
             const missing = getMissingAttributes(payload, currentProfile);
             if (missing.length > 0) {
                 console.log(`[CONNECT] missing attributes: ${missing.join(', ')} — prompting acquisition`);

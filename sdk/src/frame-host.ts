@@ -70,7 +70,7 @@ function scheduleRenewal(session: AuthSession, parentOrigin: string): void {
  * Renew a session by calling the IdP's OIDC refresh_token grant.
  * No push notification or wallet involvement — just a single HTTP call.
  */
-async function renewSession(session: AuthSession, parentOrigin: string): Promise<void> {
+async function renewSession(session: AuthSession, parentOrigin: string, notify = true): Promise<void> {
     const idpBase = globalThis.location.origin;
 
     const resp = await fetch(`${idpBase}/token`, {
@@ -98,14 +98,18 @@ async function renewSession(session: AuthSession, parentOrigin: string): Promise
         authenticatedAt: Date.now(),
     });
 
-    window.parent.postMessage(
-        {
-            type: 'privasys:session-renewed',
-            rpId: session.rpId,
-            accessToken: tokens.access_token,
-        },
-        parentOrigin,
-    );
+    // Notify parent — skipped during check-session inline renewal to avoid
+    // a double-message race (session-renewed before session response).
+    if (notify) {
+        window.parent.postMessage(
+            {
+                type: 'privasys:session-renewed',
+                rpId: session.rpId,
+                accessToken: tokens.access_token,
+            },
+            parentOrigin,
+        );
+    }
 }
 
 // ── OIDC PKCE helpers ───────────────────────────────────────────────────
@@ -440,7 +444,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // renew immediately before returning so the parent gets a fresh token.
         if (session?.token && session?.refreshToken && session?.clientId && isTokenExpired(session.token)) {
             try {
-                await renewSession(session, e.origin);
+                await renewSession(session, e.origin, false);
                 session = sessions.get(data.rpId);
             } catch {
                 // Renewal failed — clear and return null so parent triggers sign-in.

@@ -209,12 +209,13 @@ export class AuthFrame {
                 } else if (data.type === 'privasys:session') {
                     clearTimeout(timeout);
 
-                    if (data.session?.pushToken && data.session?.brokerUrl) {
-                        // Keep iframe alive — frame-host runs renewal timers
+                    if (data.session) {
+                        // Keep iframe alive so the frame-host can run renewal
+                        // timers (OIDC refresh_token or legacy push-based).
                         this.sessionIframe = iframe;
                         this.sessionHandler = handler;
                     } else {
-                        // No renewal possible — clean up
+                        // No session — clean up
                         window.removeEventListener('message', handler);
                         iframe.remove();
                     }

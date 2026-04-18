@@ -1117,7 +1117,6 @@ export class AuthUI {
         }
 
         return el('div', { className: 'brand-progress' },
-            !isSuccess ? el('div', { className: 'spinner' }) : null,
             steps,
             isSuccess ? el('div', { className: 'brand-progress-label' }, 'Authenticated') : null,
             isSuccess ? el('div', { className: 'success-method' },

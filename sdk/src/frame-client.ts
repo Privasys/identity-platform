@@ -132,10 +132,9 @@ export class AuthFrame {
             iframe.src = this.authOrigin + '/auth/';
             iframe.style.cssText =
                 'position:fixed;inset:0;width:100%;height:100%;' +
-                'z-index:999999;border:none;background:transparent;';
+                'z-index:999999;border:none;background:#fff;';
             iframe.allow =
                 'publickey-credentials-get *; publickey-credentials-create *';
-            iframe.setAttribute('allowtransparency', 'true');
 
             const cleanup = () => {
                 window.removeEventListener('message', handler);

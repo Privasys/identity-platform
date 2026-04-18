@@ -113,7 +113,7 @@ func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 		"sub":               claims.Subject,
 		"aud":               claims.Audience,
 		"iat":               now.Unix(),
-		"exp":               now.Add(5 * time.Minute).Unix(),
+		"exp":               now.Add(15 * time.Minute).Unix(),
 		"auth_time":         claims.AuthTime.Unix(),
 		"attestation_level": claims.AttestationLevel,
 	}
@@ -141,7 +141,7 @@ func (iss *Issuer) IssueAccessToken(subject, audience string, roles []string, at
 		"sub": subject,
 		"aud": audience,
 		"iat": now.Unix(),
-		"exp": now.Add(5 * time.Minute).Unix(),
+		"exp": now.Add(15 * time.Minute).Unix(),
 		"typ": "at+jwt",
 	}
 	if len(roles) > 0 {

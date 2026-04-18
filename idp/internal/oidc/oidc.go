@@ -619,7 +619,7 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 	resp := map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
-		"expires_in":   3600,
+		"expires_in":   900,
 		"id_token":     idToken,
 		"scope":        ac.Scope,
 	}
@@ -741,7 +741,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	resp := map[string]interface{}{
 		"access_token":  accessToken,
 		"token_type":    "Bearer",
-		"expires_in":    3600,
+		"expires_in":    900,
 		"id_token":      idToken,
 		"refresh_token": newRefreshToken,
 		"scope":         scope,
@@ -828,7 +828,7 @@ func handleJWTBearerGrant(w http.ResponseWriter, r *http.Request,
 	resp := map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
-		"expires_in":   3600,
+		"expires_in":   900,
 		"scope":        scope,
 	}
 

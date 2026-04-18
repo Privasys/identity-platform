@@ -154,11 +154,6 @@ const MODAL_CSS = /* css */ `
     grid-template-rows: 1fr auto;
     width: 100%;
     min-height: 100vh;
-    animation: page-enter 0.25s ease-out;
-}
-@keyframes page-enter {
-    from { opacity: 0; }
-    to   { opacity: 1; }
 }
 
 /* Left: brand panel */

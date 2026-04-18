@@ -99,7 +99,7 @@ export class AuthFrame {
     private sessionIframe: HTMLIFrameElement | null = null;
     private sessionHandler: ((e: MessageEvent) => void) | null = null;
     private _onSessionExpired?: (rpId: string) => void;
-    private _onSessionRenewed?: (rpId: string) => void;
+    private _onSessionRenewed?: (rpId: string, accessToken?: string) => void;
 
     constructor(config: AuthFrameConfig) {
         const { authOrigin, ...rest } = config;
@@ -118,7 +118,7 @@ export class AuthFrame {
     }
 
     /** Register a callback for when the session is silently renewed. */
-    set onSessionRenewed(cb: ((rpId: string) => void) | undefined) {
+    set onSessionRenewed(cb: ((rpId: string, accessToken?: string) => void) | undefined) {
         this._onSessionRenewed = cb;
     }
 
@@ -221,7 +221,7 @@ export class AuthFrame {
 
                     resolve(data.session || null);
                 } else if (data.type === 'privasys:session-renewed') {
-                    this._onSessionRenewed?.(data.rpId);
+                    this._onSessionRenewed?.(data.rpId, data.accessToken);
                 } else if (data.type === 'privasys:session-expired') {
                     this._onSessionExpired?.(data.rpId);
                     this.destroySessionIframe();

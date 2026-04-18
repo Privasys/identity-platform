@@ -78,7 +78,7 @@ type notifyRequest struct {
 	AppName   string `json:"appName,omitempty"`
 	Origin    string `json:"origin"`
 	BrokerURL string `json:"brokerUrl"`
-	Type      string `json:"type,omitempty"` // "auth-request" (default) or "auth-renew"
+	Type      string `json:"type,omitempty"` // "auth-request"
 }
 
 // HandleNotify sends a push notification to the wallet via Expo push service.
@@ -112,12 +112,6 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 		return
 	}
 
-	// Determine push type
-	pushType := req.Type
-	if pushType == "" {
-		pushType = "auth-request"
-	}
-
 	// Extract client IP for wallet display.
 	clientIP := r.Header.Get("X-Forwarded-For")
 	if clientIP == "" {
@@ -131,7 +125,7 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 	pushMsg := map[string]interface{}{
 		"to": req.PushToken,
 		"data": map[string]string{
-			"type":      pushType,
+			"type":      "auth-request",
 			"sessionId": req.SessionID,
 			"rpId":      req.RpID,
 			"appName":   req.AppName,
@@ -142,19 +136,13 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 		},
 	}
 
-	if pushType == "auth-renew" {
-		// Silent push — no visible notification, wake app in background
-		pushMsg["_contentAvailable"] = true
-	} else {
-		// Visible notification for initial auth requests
-		displayName := req.AppName
-		if displayName == "" {
-			displayName = req.RpID
-		}
-		pushMsg["sound"] = "default"
-		pushMsg["title"] = "Sign-in request"
-		pushMsg["body"] = displayName + " wants to sign you in"
+	displayName := req.AppName
+	if displayName == "" {
+		displayName = req.RpID
 	}
+	pushMsg["sound"] = "default"
+	pushMsg["title"] = "Sign-in request"
+	pushMsg["body"] = displayName + " wants to sign you in"
 
 	pushBody, _ := json.Marshal(pushMsg)
 

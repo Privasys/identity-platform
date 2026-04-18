@@ -35,6 +35,7 @@ import (
 	"github.com/Privasys/idp/internal/admin"
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/config"
+	"github.com/Privasys/idp/internal/e2e"
 	"github.com/Privasys/idp/internal/fido2"
 	"github.com/Privasys/idp/internal/oidc"
 	"github.com/Privasys/idp/internal/social"
@@ -171,6 +172,12 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	// E2E test token endpoint — only active when IDP_E2E_SECRET is set.
+	if cfg.E2ESecret != "" {
+		log.Printf("WARNING: E2E test endpoint enabled — do NOT use in production")
+		mux.HandleFunc("POST /e2e/token", e2e.HandleToken(cfg.E2ESecret, issuer, db))
+	}
 
 	// Bootstrap admin user if configured.
 	admin.MaybeBootstrapAdmin(db, cfg.BootstrapAdmin)

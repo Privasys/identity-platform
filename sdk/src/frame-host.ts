@@ -10,8 +10,9 @@
  * they persist across adopter sites.
  *
  * Sessions have a 15-minute client-side TTL. The frame host automatically
- * renews sessions via push notification → wallet confirmation → broker
- * relay before the TTL expires.
+ * renews sessions via OIDC refresh_token grant before the TTL expires.
+ * No push notification or wallet involvement is needed for renewal —
+ * only the initial login requires the wallet.
  */
 
 import { AuthUI } from './ui';
@@ -23,10 +24,9 @@ const sessions = new SessionManager();
 
 let activeUI: AuthUI | null = null;
 
-// ── Session renewal ─────────────────────────────────────────────────────
+// ── Session renewal (OIDC refresh_token) ────────────────────────────────
 
 const RENEWAL_MS = 13 * 60 * 1000; // Renew at 13 min (before 15-min TTL)
-const RENEWAL_TIMEOUT_MS = 30_000;
 
 const renewalTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -41,13 +41,13 @@ function cancelRenewal(rpId: string): void {
 function scheduleRenewal(session: AuthSession, parentOrigin: string): void {
     cancelRenewal(session.rpId);
 
-    if (!session.pushToken || !session.brokerUrl) return;
+    if (!session.refreshToken || !session.clientId) return;
 
     const timer = setTimeout(async () => {
         renewalTimers.delete(session.rpId);
 
         const current = sessions.get(session.rpId);
-        if (!current?.pushToken || !current?.brokerUrl) return;
+        if (!current?.refreshToken || !current?.clientId) return;
 
         try {
             await renewSession(current, parentOrigin);
@@ -67,82 +67,45 @@ function scheduleRenewal(session: AuthSession, parentOrigin: string): void {
 }
 
 /**
- * Renew a session by sending a silent push to the wallet and waiting
- * for confirmation via the broker WebSocket relay.
+ * Renew a session by calling the IdP's OIDC refresh_token grant.
+ * No push notification or wallet involvement — just a single HTTP call.
  */
 async function renewSession(session: AuthSession, parentOrigin: string): Promise<void> {
-    const brokerUrl = session.brokerUrl!;
-    const brokerBase = brokerUrl
-        .replace('wss://', 'https://')
-        .replace('ws://', 'http://')
-        .replace(/\/relay\/?$/, '');
+    const idpBase = globalThis.location.origin;
 
-    const sessionId = crypto.randomUUID();
-
-    // Send silent renewal push
-    const resp = await fetch(`${brokerBase}/notify`, {
+    const resp = await fetch(`${idpBase}/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            pushToken: session.pushToken,
-            sessionId,
-            rpId: session.rpId,
-            origin: session.origin,
-            brokerUrl,
-            type: 'auth-renew',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: session.refreshToken!,
+            client_id: session.clientId!,
         }),
     });
 
-    if (!resp.ok) throw new Error(`Push failed: ${resp.status}`);
+    if (!resp.ok) {
+        const body = await resp.json().catch(() => ({ error: resp.statusText }));
+        throw new Error(body.error_description || body.error || `Refresh failed: ${resp.status}`);
+    }
 
-    // Wait for wallet confirmation via WebSocket
-    return new Promise<void>((resolve, reject) => {
-        const wsUrl = `${brokerUrl}?session=${encodeURIComponent(sessionId)}&role=browser`;
-        const ws = new WebSocket(wsUrl);
+    const tokens = await resp.json();
 
-        const timer = setTimeout(() => {
-            ws.close();
-            reject(new Error('Renewal timed out'));
-        }, RENEWAL_TIMEOUT_MS);
-
-        ws.onmessage = (e: MessageEvent) => {
-            try {
-                const msg = JSON.parse(typeof e.data === 'string' ? e.data : '{}');
-                if (msg.type === 'auth-result') {
-                    clearTimeout(timer);
-                    ws.close();
-
-                    // Keep the original enclave token; refresh timestamp
-                    const updatedPush = (msg.pushToken as string) || session.pushToken;
-                    sessions.store({
-                        ...session,
-                        authenticatedAt: Date.now(),
-                        pushToken: updatedPush,
-                    });
-                    if (updatedPush && session.brokerUrl && sessions.getDeviceHint()) {
-                        sessions.saveDeviceHint(updatedPush, session.brokerUrl);
-                    }
-
-                    window.parent.postMessage(
-                        { type: 'privasys:session-renewed', rpId: session.rpId },
-                        parentOrigin,
-                    );
-
-                    resolve();
-                }
-            } catch { /* ignore malformed */ }
-        };
-
-        ws.onerror = () => {
-            clearTimeout(timer);
-            reject(new Error('WebSocket error'));
-        };
-
-        ws.onclose = (e: CloseEvent) => {
-            clearTimeout(timer);
-            if (e.code !== 1000) reject(new Error(`WebSocket closed (${e.code})`));
-        };
+    // Update session with new tokens (refresh token is rotated).
+    sessions.store({
+        ...session,
+        token: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        authenticatedAt: Date.now(),
     });
+
+    window.parent.postMessage(
+        {
+            type: 'privasys:session-renewed',
+            rpId: session.rpId,
+            accessToken: tokens.access_token,
+        },
+        parentOrigin,
+    );
 }
 
 // ── OIDC PKCE helpers ───────────────────────────────────────────────────
@@ -370,7 +333,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 // 5. Exchange code for JWT tokens.
                 const tokens = await exchangeCode(idpBase, code, clientId, codeVerifier);
 
-                // 6. Store session with JWT access_token.
+                // 6. Store session with JWT access_token and refresh_token.
                 const rpId = config.rpId || config.appName;
                 const session: AuthSession = {
                     token: tokens.access_token,
@@ -379,14 +342,16 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     authenticatedAt: Date.now(),
                     pushToken: uiResult.pushToken,
                     brokerUrl: config.brokerUrl || '',
+                    refreshToken: tokens.refresh_token,
+                    clientId,
                 };
                 sessions.store(session);
                 if (session.pushToken && session.brokerUrl) {
                     if (uiResult.trustDevice || deviceTrusted) {
                         sessions.saveDeviceHint(session.pushToken, session.brokerUrl);
                     }
-                    scheduleRenewal(session, parentOrigin);
                 }
+                scheduleRenewal(session, parentOrigin);
 
                 // 7. Send result to parent with the access_token.
                 window.parent.postMessage(
@@ -461,7 +426,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const session = sessions.get(data.rpId);
 
         // Ensure renewal is running for active sessions
-        if (session?.pushToken && session?.brokerUrl && !renewalTimers.has(session.rpId)) {
+        if (session?.refreshToken && session?.clientId && !renewalTimers.has(session.rpId)) {
             scheduleRenewal(session, e.origin);
         }
 

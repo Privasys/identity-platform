@@ -167,6 +167,7 @@ const MODAL_CSS = /* css */ `
     flex-direction: column;
     justify-content: center;
     padding: 64px 48px 64px 64px;
+    min-width: 360px;
     max-width: 560px;
     margin-left: auto;
 }
@@ -413,7 +414,8 @@ const MODAL_CSS = /* css */ `
     transition: color 0.2s;
 }
 .step.active { color: #0F172A; font-weight: 500; }
-.step.done   { color: #059669; }
+.step.done   { color: #0F172A; }
+.step.done .step-icon { color: #059669; }
 .step-icon {
     width: 18px;
     text-align: center;
@@ -612,6 +614,8 @@ const MODAL_CSS = /* css */ `
     .qr-frame { border-color: rgba(255,255,255,0.1); background: #1E293B; }
     .step { color: #64748B; }
     .step.active { color: #E2E8F0; }
+    .step.done { color: #E2E8F0; }
+    .step.done .step-icon { color: #34D399; }
     .spinner { border-color: rgba(255,255,255,0.08); border-top-color: #F1F5F9; }
     .session-info { border-color: rgba(255,255,255,0.08); }
     .session-row + .session-row { border-color: rgba(255,255,255,0.08); }
@@ -623,7 +627,7 @@ const MODAL_CSS = /* css */ `
     .footer { border-color: rgba(255,255,255,0.06); color: #475569; }
     .footer .link-btn { color: #64748B; }
     .scan-label { color: #E2E8F0; }
-    .brand-progress-label { color: #34D399; }
+
     .error-title { color: #E2E8F0; }
 }
 `;
@@ -838,7 +842,7 @@ export class AuthUI {
                 brandDesc = 'Something went wrong. You can try again or choose a different method.';
                 break;
             default:
-                brandDesc = `${displayName} needs to verify your identity. Please choose one of the authentication options.`;
+                brandDesc = `<strong>${displayName}</strong> needs to verify your identity. Please choose one of the authentication options.`;
         }
 
         // Get auth panel content based on state
@@ -878,7 +882,7 @@ export class AuthUI {
                     el('div', { className: 'brand-panel-logo', html: ICON_LOGO }),
                     el('div', { className: 'brand-panel-name' }, 'Privasys'),
                 ),
-                brandDesc ? el('p', { className: 'brand-panel-desc' }, brandDesc) : null,
+                brandDesc ? el('p', { className: 'brand-panel-desc', html: brandDesc }) : null,
                 this.isFlowState() ? this.renderBrandProgress() : null,
             ),
             // Right: auth panel
@@ -1118,10 +1122,9 @@ export class AuthUI {
 
         return el('div', { className: 'brand-progress' },
             steps,
-            isSuccess ? el('div', { className: 'brand-progress-label' }, 'Authenticated') : null,
-            isSuccess ? el('div', { className: 'success-method' },
-                el('span', { className: 'method-badge' }, methodLabel),
-                methodDetail ? el('span', { className: 'method-detail' }, methodDetail) : null,
+            isSuccess ? el('div', { className: `step done`, style: 'margin-top: 2px;' },
+                el('span', { className: 'step-icon' }, '\u2713'),
+                `Authenticated via ${methodLabel}`,
             ) : null,
         );
     }

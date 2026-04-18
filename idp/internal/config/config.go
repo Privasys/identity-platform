@@ -22,6 +22,9 @@ type Config struct {
 	BrokerURL      string // WebSocket broker URL (for push notifications)
 	BootstrapAdmin string // User ID to auto-grant platform:admin on startup
 
+	// E2E test support — only set in dev/staging, NEVER in production.
+	E2ESecret string // Shared secret for POST /e2e/token
+
 	// Social IdP configuration
 	GitHubClientID        string
 	GitHubClientSecret    string
@@ -63,6 +66,7 @@ func Load() *Config {
 		AdminToken:     adminToken,
 		BrokerURL:      envStr("IDP_BROKER_URL", "https://relay.privasys.org"),
 		BootstrapAdmin: envStr("IDP_BOOTSTRAP_ADMIN", ""),
+		E2ESecret:      envStr("IDP_E2E_SECRET", ""),
 
 		GitHubClientID:        envStr("IDP_GITHUB_CLIENT_ID", ""),
 		GitHubClientSecret:    envStr("IDP_GITHUB_CLIENT_SECRET", ""),

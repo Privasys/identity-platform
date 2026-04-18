@@ -56,8 +56,12 @@ export interface AuthSession {
     authenticatedAt: number;
     /** Push token for the wallet that authenticated (if available). */
     pushToken?: string;
-    /** Broker WebSocket URL used for this session (needed for renewal). */
+    /** Broker WebSocket URL used for this session (needed for push auth). */
     brokerUrl?: string;
+    /** OIDC refresh token for silent session renewal (replaces push-based renewal). */
+    refreshToken?: string;
+    /** OIDC client_id used for this session (needed for refresh_token grant). */
+    clientId?: string;
 }
 
 /** Events emitted by the auth client. */

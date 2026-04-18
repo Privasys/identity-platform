@@ -19,7 +19,7 @@ import { handleSilentRenewal } from '@/services/silent-renew';
 
 const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND_NOTIFICATION_TASK';
 
-TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, ({ data, error }) => {
+TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => {
     if (error) {
         console.warn('[BG-NOTIFY] Task error:', error);
         return;
@@ -29,12 +29,16 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, ({ data, error }) => {
     const pushData = notification?.request?.content?.data ?? notification?.data;
 
     if (pushData?.type === 'auth-renew' && pushData.sessionId && pushData.rpId && pushData.brokerUrl) {
-        handleSilentRenewal({
-            origin: pushData.origin as string,
-            sessionId: pushData.sessionId as string,
-            rpId: pushData.rpId as string,
-            brokerUrl: pushData.brokerUrl as string,
-        }).catch((err) => console.warn('[BG-NOTIFY] Silent renewal failed:', err));
+        try {
+            await handleSilentRenewal({
+                origin: pushData.origin as string,
+                sessionId: pushData.sessionId as string,
+                rpId: pushData.rpId as string,
+                brokerUrl: pushData.brokerUrl as string,
+            });
+        } catch (err) {
+            console.warn('[BG-NOTIFY] Silent renewal failed:', err);
+        }
     }
 });
 

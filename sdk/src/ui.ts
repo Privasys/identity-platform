@@ -1085,14 +1085,23 @@ export class AuthUI {
             const viaPush = !!this.cfg.pushToken;
             const isConnected = ['wallet-connected', 'authenticating', 'success'].includes(this.state);
             const isAuth = this.state === 'authenticating' || isSuccess;
+            // For push flow: notification is sent as soon as push-waiting starts, so step 1 is done immediately.
+            // For QR flow: QR is scanned once wallet connects, so step 1 is done once connected.
+            const step1Done = viaPush
+                ? ['push-waiting', 'wallet-connected', 'authenticating', 'success'].includes(this.state)
+                : isConnected || isAuth;
+            const step1Active = !step1Done && this.state === 'qr-scanning';
             const firstLabel = viaPush ? 'Notification sent' : 'QR code scanned';
             const secondLabel = viaPush ? 'Approved on Privasys ID' : 'Server attestation verified';
+            const step2Active = viaPush
+                ? (this.state === 'push-waiting' || (isConnected && !isAuth))
+                : (isConnected && !isAuth);
             steps = el('div', { className: 'steps' },
-                el('div', { className: `step ${['push-waiting', 'qr-scanning'].includes(this.state) ? 'active' : 'done'}` },
-                    el('span', { className: 'step-icon' }, isConnected || isAuth ? '\u2713' : '\u2022'),
+                el('div', { className: `step ${step1Done ? 'done' : step1Active ? 'active' : ''}` },
+                    el('span', { className: 'step-icon' }, step1Done ? '\u2713' : '\u2022'),
                     firstLabel,
                 ),
-                el('div', { className: `step ${isConnected && !isAuth ? 'active' : isAuth ? 'done' : ''}` },
+                el('div', { className: `step ${step2Active ? 'active' : isAuth ? 'done' : ''}` },
                     el('span', { className: 'step-icon' }, isAuth ? '\u2713' : '\u2022'),
                     secondLabel,
                 ),

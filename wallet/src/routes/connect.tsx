@@ -146,6 +146,7 @@ interface QRPayload {
     requestedAttributes?: string[];
     appName?: string;
     privacyPolicyUrl?: string;
+    clientIP?: string;
 }
 
 export default function ConnectScreen() {
@@ -562,23 +563,28 @@ export default function ConnectScreen() {
                 )}
 
                 {step === 'confirm' && qr && (
-                    <View style={styles.centered}>
-                        <View style={styles.confirmIcon}>
-                            <Text style={styles.confirmIconText}>{appName(qr.rpId).charAt(0).toUpperCase()}</Text>
+                    <View style={styles.confirmContainer}>
+                        <View style={styles.confirmContent}>
+                            <View style={styles.confirmIcon}>
+                                <Text style={styles.confirmIconText}>{(qr.appName || appName(qr.rpId)).charAt(0).toUpperCase()}</Text>
+                            </View>
+                            <Text style={styles.title}>Sign-in request</Text>
+                            <Text style={styles.confirmAppName}>{qr.appName || appName(qr.rpId)}</Text>
+                            <Text style={styles.confirmDomain}>{qr.rpId}</Text>
+                            {(friendlyBrowser(qr.userAgent) || qr.clientIP) && (
+                                <Text style={styles.confirmHint}>
+                                    {[friendlyBrowser(qr.userAgent), qr.clientIP].filter(Boolean).join(' · ')}
+                                </Text>
+                            )}
                         </View>
-                        <Text style={styles.title}>Sign-in request</Text>
-                        <Text style={styles.confirmDomain}>{qr.rpId}</Text>
-                        {friendlyBrowser(qr.userAgent) && (
-                            <Text style={styles.confirmHint}>
-                                From {friendlyBrowser(qr.userAgent)}
-                            </Text>
-                        )}
-                        <Pressable style={styles.confirmButton} onPress={handleConfirm}>
-                            <Text style={styles.confirmButtonText}>Approve</Text>
-                        </Pressable>
-                        <Pressable style={styles.cancelButton} onPress={handleReject}>
-                            <Text style={styles.cancelButtonText}>Deny</Text>
-                        </Pressable>
+                        <View style={styles.confirmActions}>
+                            <Pressable style={styles.confirmDenyButton} onPress={handleReject}>
+                                <Text style={styles.confirmDenyButtonText}>Deny</Text>
+                            </Pressable>
+                            <Pressable style={styles.confirmApproveButton} onPress={handleConfirm}>
+                                <Text style={styles.confirmApproveButtonText}>Approve</Text>
+                            </Pressable>
+                        </View>
                     </View>
                 )}
 
@@ -1505,6 +1511,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24
     },
     cancelButtonText: { fontSize: 16, color: '#8E8E93' },
+    confirmContainer: {
+        flex: 1,
+        justifyContent: 'space-between',
+        paddingTop: 80,
+        paddingBottom: 48,
+        paddingHorizontal: 24,
+    },
+    confirmContent: {
+        alignItems: 'center',
+    },
     confirmIcon: {
         width: 72,
         height: 72,
@@ -1519,10 +1535,17 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#FFFFFF'
     },
+    confirmAppName: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#1E293B',
+        textAlign: 'center',
+        marginBottom: 4,
+    },
     confirmDomain: {
-        fontSize: 15,
+        fontSize: 14,
         fontFamily: 'Inter',
-        color: '#64748B',
+        color: '#94A3B8',
         textAlign: 'center',
         marginBottom: 12
     },
@@ -1530,8 +1553,35 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#94A3B8',
         textAlign: 'center',
-        marginBottom: 32,
         paddingHorizontal: 20
+    },
+    confirmActions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    confirmDenyButton: {
+        flex: 1,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 14,
+        paddingVertical: 16,
+        alignItems: 'center',
+    },
+    confirmDenyButtonText: {
+        color: '#64748B',
+        fontSize: 17,
+        fontWeight: '600',
+    },
+    confirmApproveButton: {
+        flex: 1,
+        backgroundColor: '#34C759',
+        borderRadius: 14,
+        paddingVertical: 16,
+        alignItems: 'center',
+    },
+    confirmApproveButtonText: {
+        color: '#FFFFFF',
+        fontSize: 17,
+        fontWeight: '600',
     },
     confirmButton: {
         backgroundColor: '#34C759',

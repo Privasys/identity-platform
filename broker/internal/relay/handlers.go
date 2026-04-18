@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"regexp"
 
@@ -117,6 +118,15 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 		pushType = "auth-request"
 	}
 
+	// Extract client IP for wallet display.
+	clientIP := r.Header.Get("X-Forwarded-For")
+	if clientIP == "" {
+		clientIP = r.Header.Get("X-Real-IP")
+	}
+	if clientIP == "" {
+		clientIP, _, _ = net.SplitHostPort(r.RemoteAddr)
+	}
+
 	// Build Expo push message
 	pushMsg := map[string]interface{}{
 		"to": req.PushToken,
@@ -124,9 +134,11 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 			"type":      pushType,
 			"sessionId": req.SessionID,
 			"rpId":      req.RpID,
+			"appName":   req.AppName,
 			"origin":    req.Origin,
 			"brokerUrl": req.BrokerURL,
 			"userAgent": r.Header.Get("User-Agent"),
+			"clientIP":  clientIP,
 		},
 	}
 

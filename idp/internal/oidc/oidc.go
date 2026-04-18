@@ -337,6 +337,7 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 			"origin":    "privasys.id",
 			"sessionId": sessionID,
 			"rpId":      "privasys.id",
+			"appName":   "Privasys",
 			"brokerUrl": "wss://relay.privasys.org/relay",
 		}
 

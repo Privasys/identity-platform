@@ -109,6 +109,8 @@ export function useExpoPushToken() {
                             rpId: data.rpId,
                             brokerUrl: data.brokerUrl,
                             userAgent: data.userAgent,
+                            appName: data.appName,
+                            clientIP: data.clientIP,
                         });
                         router.push({ pathname: '/connect', params: { payload, source: 'push' } });
                     }

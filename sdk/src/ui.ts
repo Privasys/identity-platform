@@ -47,6 +47,9 @@ export interface AuthUIConfig {
     onSocialAuth?: (provider: string) => Promise<void>;
     /** URL to the app's privacy policy. Shown to the user when sharing attributes. */
     privacyPolicyUrl?: string;
+    /** When true, the device is already trusted (device hint exists). The trust
+     *  prompt is suppressed and `trustDevice` is set automatically. */
+    deviceTrusted?: boolean;
 }
 
 /** Resolved result returned by `signIn()`. */
@@ -63,6 +66,8 @@ export interface SignInResult {
     pushToken?: string;
     /** Profile attributes from the wallet (keyed by OIDC claim name). */
     attributes?: Record<string, string>;
+    /** Whether the user chose to trust this device for future push-based sign-in. */
+    trustDevice?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -423,7 +428,6 @@ const MODAL_CSS = /* css */ `
 .success-method {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 8px;
     margin-bottom: 20px;
 }
@@ -437,6 +441,29 @@ const MODAL_CSS = /* css */ `
     border-radius: 999px;
 }
 .method-detail { font-size: 12px; color: #64748B; }
+
+/* Success brand panel (left column) */
+.brand-success {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-top: 24px;
+}
+.brand-success .success-icon { margin-bottom: 16px; }
+.brand-success .success-icon svg { width: 56px; height: 56px; }
+.brand-success .success-title { font-size: 22px; margin-bottom: 12px; }
+@media (max-width: 768px) {
+    .brand-success { display: none; }
+    .auth-panel .mobile-success-header { display: flex; }
+}
+.mobile-success-header {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 24px;
+}
+.mobile-success-header .success-icon svg { width: 40px; height: 40px; }
+.mobile-success-header .success-title { font-size: 18px; margin-bottom: 8px; }
 .session-info {
     text-align: left;
     border: 1px solid #E2E8F0;
@@ -765,7 +792,7 @@ export class AuthUI {
                 brandDesc = 'Complete the biometric prompt on your device to verify your identity.';
                 break;
             case 'success':
-                brandDesc = 'You\u2019ve been authenticated successfully.';
+                brandDesc = '';
                 break;
             case 'error':
                 brandDesc = 'Something went wrong. You can try again or choose a different method.';
@@ -811,11 +838,12 @@ export class AuthUI {
                     el('div', { className: 'brand-panel-logo', html: ICON_LOGO }),
                     el('div', { className: 'brand-panel-name' }, 'Privasys'),
                 ),
-                el('p', { className: 'brand-panel-desc' }, brandDesc),
+                brandDesc ? el('p', { className: 'brand-panel-desc' }, brandDesc) : null,
+                this.state === 'success' ? this.renderSuccessBrand() : null,
             ),
             // Right: auth panel
-            el('div', { className: `auth-panel${isIdle ? '' : ' auth-panel--centered'}` },
-                !isIdle ? el('button', { className: 'btn-back', onClick: () => this.goBack() },
+            el('div', { className: `auth-panel${isIdle || this.state === 'success' ? '' : ' auth-panel--centered'}` },
+                (!isIdle && this.state !== 'success') ? el('button', { className: 'btn-back', onClick: () => this.goBack() },
                     el('span', { html: ICON_ARROW_LEFT }),
                     'Back',
                 ) : null,
@@ -1020,32 +1048,59 @@ export class AuthUI {
         );
     }
 
-    private renderSuccess(): HTMLElement {
-        const masked = this.sessionToken
-            ? '\u25CF'.repeat(8) + this.sessionToken.slice(-6)
-            : '\u2014';
-
+    /** Renders the success status in the left brand panel. */
+    private renderSuccessBrand(): HTMLElement {
         const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
-        const methodDetail = this.method === 'wallet' ? 'Attestation verified' : 'This device';
+        const hasAttestation = this.method === 'wallet' && this.attestation?.valid;
+        const methodDetail = this.method === 'passkey'
+            ? 'This device'
+            : (hasAttestation ? 'Attestation verified' : null);
 
-        return el('div', null,
+        return el('div', { className: 'brand-success' },
             el('div', { className: 'success-icon', html: ICON_CHECK_CIRCLE }),
             el('div', { className: 'success-title' }, 'Authenticated'),
             el('div', { className: 'success-method' },
                 el('span', { className: 'method-badge' }, methodLabel),
-                el('span', { className: 'method-detail' }, methodDetail),
+                methodDetail ? el('span', { className: 'method-detail' }, methodDetail) : null,
             ),
-            el('div', { className: 'session-info' },
-                el('div', { className: 'session-row' },
-                    el('span', { className: 'session-label' }, 'Session'),
-                    el('span', { className: 'session-value' }, masked),
-                ),
-                el('div', { className: 'session-row' },
-                    el('span', { className: 'session-label' }, 'App'),
-                    el('span', { className: 'session-value' }, this.rpId),
+        );
+    }
+
+    private renderSuccess(): HTMLElement {
+        const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
+        const hasAttestation = this.method === 'wallet' && this.attestation?.valid;
+        const methodDetail = this.method === 'passkey'
+            ? 'This device'
+            : (hasAttestation ? 'Attestation verified' : null);
+        const showTrust = !!this.pushToken && !this.cfg.deviceTrusted;
+
+        return el('div', null,
+            // Mobile-only: show status inline since brand panel is compact
+            el('div', { className: 'mobile-success-header' },
+                el('div', { className: 'success-icon', html: ICON_CHECK_CIRCLE }),
+                el('div', { className: 'success-title' }, 'Authenticated'),
+                el('div', { className: 'success-method', style: 'justify-content: center;' },
+                    el('span', { className: 'method-badge' }, methodLabel),
+                    methodDetail ? el('span', { className: 'method-detail' }, methodDetail) : null,
                 ),
             ),
-            el('div', { className: 'footer' },
+            showTrust ? el('div', { style: 'width: 100%;' },
+                el('p', { style: 'font-size: 14px; font-weight: 500; margin-bottom: 6px;' },
+                    'Trust this device?',
+                ),
+                el('p', { className: 'scan-hint', style: 'margin-bottom: 16px; max-width: none;' },
+                    'Next time, we\u2019ll send a notification to your phone instead of showing a QR code.',
+                ),
+                el('button', { className: 'btn-provider primary', onClick: () => this.finishWithTrust(true) },
+                    el('span', { html: ICON_SHIELD }),
+                    el('span', { className: 'btn-label' }, 'Trust this device'),
+                ),
+                el('button', {
+                    className: 'link-btn',
+                    style: 'margin-top: 12px; font-size: 13px; display: block; text-align: center; width: 100%;',
+                    onClick: () => this.finishWithTrust(false),
+                }, 'Not now'),
+            ) : el('div', { className: 'footer' },
                 'Your session is ready. This dialog will close automatically.',
             ),
         );
@@ -1058,12 +1113,8 @@ export class AuthUI {
             el('div', { className: 'error-msg' }, this.errorMsg || 'An unknown error occurred.'),
             el('button', { className: 'btn-retry', onClick: () => {
                 this.errorMsg = '';
-                if (this.cfg.pushToken) {
-                    this.startPush();
-                } else {
-                    this.state = 'idle';
-                    this.render();
-                }
+                this.state = 'idle';
+                this.render();
             } },
                 'Try again',
             ),
@@ -1176,20 +1227,27 @@ export class AuthUI {
         this.state = 'success';
         this.render();
 
-        setTimeout(() => {
-            const result: SignInResult = {
-                sessionToken: this.sessionToken,
-                method: this.method,
-                attestation: this.attestation,
-                sessionId: this.sessionId,
-                pushToken: this.pushToken,
-                attributes: this.attributes,
-            };
-            this.close();
-            this.resolve?.(result);
-            this.resolve = null;
-            this.reject = null;
-        }, 1200);
+        // Wallet auth with untrusted device: wait for the user to answer the trust prompt.
+        // Already trusted / passkey / no push token: auto-close after a brief delay.
+        if (!this.pushToken || this.cfg.deviceTrusted) {
+            setTimeout(() => this.finishWithTrust(false), 1200);
+        }
+    }
+
+    private finishWithTrust(trust: boolean): void {
+        const result: SignInResult = {
+            sessionToken: this.sessionToken,
+            method: this.method,
+            attestation: this.attestation,
+            sessionId: this.sessionId,
+            pushToken: this.pushToken,
+            attributes: this.attributes,
+            trustDevice: trust,
+        };
+        this.close();
+        this.resolve?.(result);
+        this.resolve = null;
+        this.reject = null;
     }
 
     private handleCancel(): void {

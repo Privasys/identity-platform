@@ -4,6 +4,14 @@
 import type { AuthSession } from './types';
 
 const STORAGE_KEY = 'privasys_sessions';
+const HINTS_KEY = 'privasys_device_hints';
+
+/** Persists across session expiry so returning users get push instead of QR. */
+interface DeviceHint {
+    pushToken: string;
+    brokerUrl: string;
+    updatedAt: number;
+}
 
 type SessionListener = (sessions: AuthSession[]) => void;
 
@@ -47,18 +55,19 @@ export class SessionManager {
     }
 
     /**
-     * Find a push token from any stored session (most recent first).
-     * The push token is device-global, so a token from any rpId can
-     * be used to notify the wallet for a different rpId.
+     * Find a push token from any stored session, falling back to the
+     * persisted device hint. The push token is device-global, so a
+     * token from any rpId can notify the wallet for a different rpId.
      */
     findPushToken(): string | undefined {
         const sessions = this.getAll()
             .filter((s) => !!s.pushToken)
             .sort((a, b) => b.authenticatedAt - a.authenticatedAt);
-        return sessions[0]?.pushToken;
+        if (sessions[0]?.pushToken) return sessions[0].pushToken;
+        return this.getDeviceHint()?.pushToken;
     }
 
-    /** Remove a session by rpId. */
+    /** Remove a session by rpId (device hint is kept). */
     remove(rpId: string): void {
         const sessions = this.getAll().filter((s) => s.rpId !== rpId);
         this.persist(sessions);
@@ -75,6 +84,32 @@ export class SessionManager {
     subscribe(listener: SessionListener): () => void {
         this.listeners.add(listener);
         return () => this.listeners.delete(listener);
+    }
+
+    // ── Device hints (survive session expiry) ─────────────────────────
+
+    /** Save a device hint so returning users can re-auth via push. */
+    saveDeviceHint(pushToken: string, brokerUrl: string): void {
+        const hint: DeviceHint = { pushToken, brokerUrl, updatedAt: Date.now() };
+        try {
+            localStorage.setItem(HINTS_KEY, JSON.stringify(hint));
+        } catch { /* storage full or unavailable */ }
+    }
+
+    /** Get the stored device hint, if any. */
+    getDeviceHint(): DeviceHint | undefined {
+        try {
+            const raw = localStorage.getItem(HINTS_KEY);
+            if (!raw) return undefined;
+            return JSON.parse(raw) as DeviceHint;
+        } catch {
+            return undefined;
+        }
+    }
+
+    /** Explicitly clear the device hint (e.g. user logs out of all sessions). */
+    clearDeviceHint(): void {
+        localStorage.removeItem(HINTS_KEY);
     }
 
     private persist(sessions: AuthSession[]): void {

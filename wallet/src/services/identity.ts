@@ -213,14 +213,47 @@ export async function startAuthFlow(config: ProviderConfig): Promise<{
     return { code, codeVerifier: verifier };
 }
 
+/** Providers that require a server-side secret for token exchange. */
+const PROXIED_PROVIDERS = new Set(['github', 'linkedin']);
+
+/** Base URL for the broker's HTTPS endpoints. */
+const BROKER_BASE = 'https://relay.privasys.org';
+
 /**
  * Exchange an authorization code for tokens.
+ * For providers that require a client_secret (GitHub, LinkedIn), the exchange
+ * is proxied through the broker which holds the secrets server-side.
  */
 export async function exchangeCode(
     config: ProviderConfig,
     code: string,
     codeVerifier: string
 ): Promise<TokenResponse> {
+    if (PROXIED_PROVIDERS.has(config.provider)) {
+        // Route through broker proxy — secret is injected server-side
+        const response = await fetch(`${BROKER_BASE}/oauth/token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            body: JSON.stringify({
+                provider: config.provider,
+                code,
+                code_verifier: codeVerifier,
+                redirect_uri: getRedirectUri(config.provider),
+            })
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Token exchange failed: ${response.status} ${text}`);
+        }
+
+        return response.json();
+    }
+
+    // Direct exchange (Google, Microsoft — support PKCE without secret)
     const body = new URLSearchParams({
         client_id: config.clientId,
         code,

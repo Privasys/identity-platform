@@ -74,6 +74,7 @@ type notifyRequest struct {
 	PushToken string `json:"pushToken"`
 	SessionID string `json:"sessionId"`
 	RpID      string `json:"rpId"`
+	AppName   string `json:"appName,omitempty"`
 	Origin    string `json:"origin"`
 	BrokerURL string `json:"brokerUrl"`
 	Type      string `json:"type,omitempty"` // "auth-request" (default) or "auth-renew"
@@ -134,9 +135,13 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 		pushMsg["_contentAvailable"] = true
 	} else {
 		// Visible notification for initial auth requests
+		displayName := req.AppName
+		if displayName == "" {
+			displayName = req.RpID
+		}
 		pushMsg["sound"] = "default"
 		pushMsg["title"] = "Sign-in request"
-		pushMsg["body"] = req.RpID + " wants to sign you in"
+		pushMsg["body"] = displayName + " wants to sign you in"
 	}
 
 	pushBody, _ := json.Marshal(pushMsg)

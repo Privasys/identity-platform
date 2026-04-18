@@ -130,6 +130,7 @@ export class PrivasysAuth {
                 pushToken,
                 sessionId: sid,
                 rpId: this.config.rpId,
+                appName: this.config.appName,
                 origin: this.config.rpId,
                 brokerUrl: this.config.brokerUrl,
             }),

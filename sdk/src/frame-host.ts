@@ -113,11 +113,15 @@ async function renewSession(session: AuthSession, parentOrigin: string): Promise
                     ws.close();
 
                     // Keep the original enclave token; refresh timestamp
+                    const updatedPush = (msg.pushToken as string) || session.pushToken;
                     sessions.store({
                         ...session,
                         authenticatedAt: Date.now(),
-                        pushToken: (msg.pushToken as string) || session.pushToken,
+                        pushToken: updatedPush,
                     });
+                    if (updatedPush && session.brokerUrl && sessions.getDeviceHint()) {
+                        sessions.saveDeviceHint(updatedPush, session.brokerUrl);
+                    }
 
                     window.parent.postMessage(
                         { type: 'privasys:session-renewed', rpId: session.rpId },
@@ -283,6 +287,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 //    to the OIDC session. Use the iframe origin as apiBase for
                 //    FIDO2 passkey calls (they go to the IdP, not the mgmt service).
                 const pushToken = sessions.findPushToken();
+                const deviceTrusted = !!sessions.getDeviceHint();
 
                 // Social auth handler: opens a popup to the IdP's social redirect,
                 // then waits for the callback page to postMessage back.
@@ -335,6 +340,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     sessionId: oidcSessionId,
                     fido2Base: `${idpBase}/fido2`,
                     pushToken,
+                    deviceTrusted,
                     socialProviders,
                     onSocialAuth,
                     requestedAttributes,
@@ -375,8 +381,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     brokerUrl: config.brokerUrl || '',
                 };
                 sessions.store(session);
-
                 if (session.pushToken && session.brokerUrl) {
+                    if (uiResult.trustDevice || deviceTrusted) {
+                        sessions.saveDeviceHint(session.pushToken, session.brokerUrl);
+                    }
                     scheduleRenewal(session, parentOrigin);
                 }
 
@@ -406,7 +414,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
         // Non-OIDC mode (original flow): opaque session token from enclave.
         const pushToken = sessions.findPushToken();
-        activeUI = new AuthUI({ ...config, pushToken });
+        const deviceTrusted = !!sessions.getDeviceHint();
+        activeUI = new AuthUI({ ...config, pushToken, deviceTrusted });
 
         try {
             const result: SignInResult = await activeUI.signIn();
@@ -426,6 +435,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
             // Schedule automatic renewal before TTL expires
             if (session.pushToken && session.brokerUrl) {
+                if (result.trustDevice || deviceTrusted) {
+                    sessions.saveDeviceHint(session.pushToken, session.brokerUrl);
+                }
                 scheduleRenewal(session, parentOrigin);
             }
 
@@ -462,6 +474,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
     if (data.type === 'privasys:clear-session') {
         cancelRenewal(data.rpId);
         sessions.remove(data.rpId);
+        sessions.clearDeviceHint();
         window.parent.postMessage(
             { type: 'privasys:session-cleared' },
             e.origin,

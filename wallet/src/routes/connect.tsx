@@ -637,6 +637,7 @@ export default function ConnectScreen() {
                         appName={qr.appName}
                         privacyPolicyUrl={qr.privacyPolicyUrl}
                         missingAttributes={missingAttrs}
+                        attestation={attestation}
                         onComplete={handleAttributesAcquired}
                         onCancel={handleReject}
                     />
@@ -895,6 +896,7 @@ function AttributeAcquisitionView({
     appName: appNameProp,
     privacyPolicyUrl,
     missingAttributes,
+    attestation,
     onComplete,
     onCancel,
 }: {
@@ -902,6 +904,7 @@ function AttributeAcquisitionView({
     appName?: string;
     privacyPolicyUrl?: string;
     missingAttributes: string[];
+    attestation: AttestationResult | null;
     onComplete: () => void;
     onCancel: () => void;
 }) {
@@ -1011,9 +1014,9 @@ function AttributeAcquisitionView({
             deniedAttributes: [],
             decision: 'approved',
             persistent: false,
-            teeType: 'sgx',
-            enclaveMeasurement: '',
-            codeHash: '',
+            teeType: attestation?.tee_type ?? 'none',
+            enclaveMeasurement: attestation?.mrenclave ?? attestation?.mrtd ?? '',
+            codeHash: attestation?.code_hash ?? '',
             consentedAt: Math.floor(Date.now() / 1000),
             expiresAt: 0,
         });

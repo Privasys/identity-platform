@@ -20,6 +20,7 @@ import (
 
 	"github.com/Privasys/auth-broker/internal/appattest"
 	"github.com/Privasys/auth-broker/internal/config"
+	"github.com/Privasys/auth-broker/internal/oauth"
 	"github.com/Privasys/auth-broker/internal/relay"
 	"github.com/Privasys/auth-broker/internal/tokens"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -71,6 +72,33 @@ func main() {
 		mux.HandleFunc("GET /jwks", issuer.HandleJWKS)
 
 		log.Printf("app-token endpoints enabled (issuer: %s)", cfg.IssuerURL)
+	}
+
+	// OAuth token exchange proxy (optional — for providers requiring client_secret)
+	oauthProviders := make(map[string]oauth.ProviderSecret)
+	if cfg.GitHubClientID != "" && cfg.GitHubClientSecret != "" {
+		oauthProviders["github"] = oauth.ProviderSecret{
+			TokenEndpoint: "https://github.com/login/oauth/access_token",
+			ClientID:      cfg.GitHubClientID,
+			ClientSecret:  cfg.GitHubClientSecret,
+		}
+	}
+	if cfg.LinkedInClientID != "" && cfg.LinkedInClientSecret != "" {
+		oauthProviders["linkedin"] = oauth.ProviderSecret{
+			TokenEndpoint: "https://www.linkedin.com/oauth/v2/accessToken",
+			ClientID:      cfg.LinkedInClientID,
+			ClientSecret:  cfg.LinkedInClientSecret,
+		}
+	}
+	if len(oauthProviders) > 0 {
+		oauthHandler := oauth.New(oauth.Config{Providers: oauthProviders})
+		mux.HandleFunc("POST /oauth/token", oauthHandler.HandleToken)
+		mux.HandleFunc("OPTIONS /oauth/token", oauthHandler.HandleToken)
+		names := make([]string, 0, len(oauthProviders))
+		for k := range oauthProviders {
+			names = append(names, k)
+		}
+		log.Printf("oauth token proxy enabled for: %v", names)
 	}
 
 	// Health

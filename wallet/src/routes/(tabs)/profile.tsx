@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Profile tab — view and manage identity, attribute sources, and personal data.
+ * Profile tab — view and manage identity, personal data, and consent history.
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -25,9 +25,9 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
+import { CANONICAL_ATTRIBUTES, exportAttributesForAudit } from '@/services/attributes';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
-import { exportAttributesForAudit } from '@/services/attributes';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
@@ -48,13 +48,12 @@ export default function ProfileScreen() {
     const { credentials, removeCredential } = useAuthStore();
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
     const consentRecordCount = useConsentStore((s) => s.records.length);
-    const standingConsentCount = useConsentStore((s) => s.standingConsents.length);
 
-    const [editing, setEditing] = useState(false);
-    const [editName, setEditName] = useState(profile?.displayName ?? '');
-    const [editEmail, setEditEmail] = useState(profile?.email ?? '');
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
     const [creatingProfile, setCreatingProfile] = useState(false);
+    const [showImportPicker, setShowImportPicker] = useState(false);
+    const [addingAttribute, setAddingAttribute] = useState<string | null>(null);
+    const [newAttrValue, setNewAttrValue] = useState('');
 
     const handleCreateProfile = async () => {
         setCreatingProfile(true);
@@ -105,36 +104,7 @@ export default function ProfileScreen() {
         );
     }
 
-    const handleSaveEdit = () => {
-        updateProfile({ displayName: editName, email: editEmail });
-        const now = Math.floor(Date.now() / 1000);
-        // Also update the corresponding attributes
-        if (editName !== profile.displayName) {
-            setAttribute({
-                key: 'displayName',
-                label: 'Display Name',
-                value: editName,
-                source: 'manual',
-                acquiredAt: now,
-                updatedAt: now,
-                verified: false,
-            });
-        }
-        if (editEmail !== profile.email) {
-            setAttribute({
-                key: 'email',
-                label: 'Email',
-                value: editEmail,
-                source: 'manual',
-                acquiredAt: now,
-                updatedAt: now,
-                verified: false,
-            });
-        }
-        setEditing(false);
-    };
-
-    const handleLinkProvider = async (providerKey: string) => {
+    const handleImportFromProvider = async (providerKey: string) => {
         setLinkingProvider(providerKey);
         try {
             const providerTemplate = PROVIDERS[providerKey];
@@ -159,26 +129,22 @@ export default function ProfileScreen() {
                 const existing = profile.attributes.find((a) => a.key === attr.key);
                 if (!existing) {
                     setAttribute(attr);
+                    // Sync top-level profile fields
+                    if (attr.key === 'email' && attr.value) updateProfile({ email: attr.value });
+                    if (attr.key === 'name' && attr.value) updateProfile({ displayName: attr.value });
+                    if (attr.key === 'picture' && attr.value) updateProfile({ avatarUri: attr.value });
+                    if (attr.key === 'locale' && attr.value) updateProfile({ locale: attr.value });
                 }
             }
+
+            setShowImportPicker(false);
         } catch (e: any) {
             if (e.message !== 'Authentication cancelled') {
-                Alert.alert('Link failed', e.message);
+                Alert.alert('Import failed', e.message);
             }
         } finally {
             setLinkingProvider(null);
         }
-    };
-
-    const handleUnlinkProvider = (providerKey: string, displayName: string) => {
-        Alert.alert(`Unlink ${displayName}?`, 'You can re-link at any time.', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Unlink',
-                style: 'destructive',
-                onPress: () => unlinkProvider(providerKey)
-            }
-        ]);
     };
 
     const handleCopyDid = () => {
@@ -189,20 +155,67 @@ export default function ProfileScreen() {
         }
     };
 
+    const handleRemoveAttribute = (attr: ProfileAttribute) => {
+        Alert.alert(
+            `Remove ${attr.label}?`,
+            'This attribute will no longer be available for sharing.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: () => {
+                        removeAttribute(attr.key);
+                        if (attr.key === 'email') updateProfile({ email: '' });
+                        if (attr.key === 'name') updateProfile({ displayName: '' });
+                        if (attr.key === 'picture') updateProfile({ avatarUri: '' });
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleAddAttribute = (key: string) => {
+        setAddingAttribute(key);
+        setNewAttrValue('');
+    };
+
+    const handleSaveNewAttribute = () => {
+        if (!addingAttribute || !newAttrValue.trim()) return;
+        const def = CANONICAL_ATTRIBUTES.find((a) => a.key === addingAttribute);
+        if (!def) return;
+
+        const now = Math.floor(Date.now() / 1000);
+        setAttribute({
+            key: addingAttribute,
+            label: def.label,
+            value: newAttrValue.trim(),
+            source: 'manual',
+            acquiredAt: now,
+            updatedAt: now,
+            verified: false,
+        });
+
+        // Sync top-level profile fields
+        if (def.profileField === 'email') updateProfile({ email: newAttrValue.trim() });
+        if (def.profileField === 'displayName') updateProfile({ displayName: newAttrValue.trim() });
+        if (def.profileField === 'locale') updateProfile({ locale: newAttrValue.trim() });
+
+        setAddingAttribute(null);
+        setNewAttrValue('');
+    };
+
+    // Attributes that are in the canonical set but not yet in the profile
+    const existingKeys = new Set(profile.attributes.map((a) => a.key));
+    const missingAttributes = CANONICAL_ATTRIBUTES.filter(
+        (a) => !existingKeys.has(a.key) && a.key !== 'picture',
+    );
+
     return (
         <RNView style={styles.screen}>
             {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
                 <Text style={styles.headerTitle}>Profile</Text>
-                <Pressable
-                    onPress={editing ? handleSaveEdit : () => {
-                        setEditName(profile.displayName);
-                        setEditEmail(profile.email);
-                        setEditing(true);
-                    }}
-                >
-                    <Text style={styles.editButton}>{editing ? 'Save' : 'Edit'}</Text>
-                </Pressable>
             </RNView>
 
             <ScrollView
@@ -230,34 +243,10 @@ export default function ProfileScreen() {
                             </RNView>
                         )}
                     </RNView>
-
-                    {editing ? (
-                        <RNView style={styles.editFields}>
-                            <TextInput
-                                style={styles.editInput}
-                                value={editName}
-                                onChangeText={setEditName}
-                                placeholder="Display Name"
-                                placeholderTextColor="#94A3B8"
-                            />
-                            <TextInput
-                                style={styles.editInput}
-                                value={editEmail}
-                                onChangeText={setEditEmail}
-                                placeholder="Email"
-                                placeholderTextColor="#94A3B8"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                            />
-                        </RNView>
-                    ) : (
-                        <>
-                            <Text style={styles.profileName}>{profile.displayName}</Text>
-                            {profile.email ? (
-                                <Text style={styles.profileEmail}>{profile.email}</Text>
-                            ) : null}
-                        </>
-                    )}
+                    <Text style={styles.profileName}>{profile.displayName || 'Privasys User'}</Text>
+                    {profile.email ? (
+                        <Text style={styles.profileEmail}>{profile.email}</Text>
+                    ) : null}
                 </RNView>
 
                 {/* DID */}
@@ -285,126 +274,165 @@ export default function ProfileScreen() {
                     Apps receive a unique derived ID — they cannot track you across services.
                 </Text>
 
-                {/* Attribute Sources */}
-                <Text style={styles.sectionTitle}>ATTRIBUTE SOURCES</Text>
-                <Text style={styles.sectionDescription}>
-                    Sign in once to import your profile. These providers cannot access your Privasys data.
-                </Text>
-
-                {Object.entries(PROVIDERS).map(([key, config]) => {
-                    const linked = profile.linkedProviders.find((p) => p.provider === key);
-                    const isLinking = linkingProvider === key;
-                    return (
-                        <Pressable
-                            key={key}
-                            style={styles.providerRow}
-                            onPress={() =>
-                                linked
-                                    ? handleUnlinkProvider(key, config.displayName)
-                                    : handleLinkProvider(key)
-                            }
-                            disabled={isLinking}
-                        >
-                            <Ionicons
-                                name={PROVIDER_ICONS[key] ?? 'globe-outline'}
-                                size={22}
-                                color={linked ? '#34E89E' : '#94A3B8'}
-                            />
-                            <RNView style={styles.providerInfo}>
-                                <Text style={styles.providerName}>{config.displayName}</Text>
-                                {linked ? (
-                                    <Text style={styles.providerDetail}>
-                                        {linked.email ?? linked.sub} · Imported{' '}
-                                        {new Date(linked.linkedAt * 1000).toLocaleDateString()}
-                                    </Text>
-                                ) : (
-                                    <Text style={styles.providerDetail}>Not imported</Text>
-                                )}
-                            </RNView>
-                            {isLinking ? (
-                                <ActivityIndicator size="small" color="#00BCF2" />
-                            ) : (
-                                <Ionicons
-                                    name={linked ? 'close-circle-outline' : 'add-circle-outline'}
-                                    size={22}
-                                    color={linked ? '#FF3B30' : '#00BCF2'}
-                                />
-                            )}
-                        </Pressable>
-                    );
-                })}
-
-                {/* Data Attributes */}
+                {/* Personal Data */}
                 <Text style={styles.sectionTitle}>PERSONAL DATA</Text>
                 <Text style={styles.sectionDescription}>
-                    Attributes you can selectively share with attested enclaves.
+                    Attributes you can selectively share with services. Tap to expand, swipe to delete.
                 </Text>
 
                 {profile.attributes.length === 0 ? (
                     <RNView style={styles.emptyCard}>
                         <Ionicons name="document-text-outline" size={32} color="#C7C7CC" />
                         <Text style={styles.emptyCardText}>
-                            No data attributes yet. Link a provider or add manually.
+                            No attributes yet. Import from an account or add manually.
                         </Text>
                     </RNView>
                 ) : (
-                    <>
-                        {profile.attributes.map((attr) => (
-                            <AttributeCard
-                                key={attr.key}
-                                attr={attr}
-                                onRemove={() => {
-                                    Alert.alert(
-                                        `Remove ${attr.label}?`,
-                                        'This attribute will no longer be available for sharing.',
-                                        [
-                                            { text: 'Cancel', style: 'cancel' },
-                                            {
-                                                text: 'Remove',
-                                                style: 'destructive',
-                                                onPress: () => {
-                                                    removeAttribute(attr.key);
-                                                    // Sync profile fields with attribute removal
-                                                    if (attr.key === 'email') updateProfile({ email: '' });
-                                                    if (attr.key === 'name') updateProfile({ displayName: '' });
-                                                    if (attr.key === 'picture') updateProfile({ avatarUri: '' });
-                                                }
-                                            }
-                                        ]
-                                    );
-                                }}
-                            />
-                        ))}
-
-                        {/* Export all data */}
-                        <Pressable
-                            style={styles.exportButton}
-                            onPress={async () => {
-                                try {
-                                    const data = exportAttributesForAudit(profile);
-                                    const json = JSON.stringify(data, null, 2);
-                                    const file = new File(Paths.cache, `privasys-profile-${Date.now()}.json`);
-                                    file.write(json);
-                                    await Sharing.shareAsync(file.uri, {
-                                        mimeType: 'application/json',
-                                        dialogTitle: 'Save Profile Data',
-                                        UTI: 'public.json',
-                                    });
-                                } catch (e: any) {
-                                    Alert.alert('Export failed', e.message);
-                                }
+                    profile.attributes.map((attr) => (
+                        <AttributeCard
+                            key={attr.key}
+                            attr={attr}
+                            onRemove={() => handleRemoveAttribute(attr)}
+                            onEdit={(newValue) => {
+                                const now = Math.floor(Date.now() / 1000);
+                                setAttribute({
+                                    ...attr,
+                                    value: newValue,
+                                    source: 'manual',
+                                    updatedAt: now,
+                                    verified: false,
+                                    verifications: [],
+                                });
+                                if (attr.key === 'email') updateProfile({ email: newValue });
+                                if (attr.key === 'name') updateProfile({ displayName: newValue });
                             }}
+                        />
+                    ))
+                )}
+
+                {/* Add missing attribute */}
+                {addingAttribute ? (
+                    <RNView style={styles.addAttrCard}>
+                        <Text style={styles.addAttrLabel}>
+                            {CANONICAL_ATTRIBUTES.find((a) => a.key === addingAttribute)?.label}
+                        </Text>
+                        <TextInput
+                            style={styles.addAttrInput}
+                            value={newAttrValue}
+                            onChangeText={setNewAttrValue}
+                            placeholder="Enter value..."
+                            placeholderTextColor="#94A3B8"
+                            autoFocus
+                            autoCapitalize={addingAttribute === 'email' ? 'none' : 'words'}
+                            keyboardType={addingAttribute === 'email' ? 'email-address' : addingAttribute === 'phone_number' ? 'phone-pad' : 'default'}
+                        />
+                        <RNView style={styles.addAttrActions}>
+                            <Pressable onPress={() => setAddingAttribute(null)}>
+                                <Text style={styles.addAttrCancel}>Cancel</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[styles.addAttrSave, !newAttrValue.trim() && { opacity: 0.4 }]}
+                                onPress={handleSaveNewAttribute}
+                                disabled={!newAttrValue.trim()}
+                            >
+                                <Text style={styles.addAttrSaveText}>Save</Text>
+                            </Pressable>
+                        </RNView>
+                    </RNView>
+                ) : missingAttributes.length > 0 ? (
+                    <RNView style={styles.addAttrChips}>
+                        <Text style={styles.addAttrHint}>Add:</Text>
+                        {missingAttributes.map((def) => (
+                            <Pressable
+                                key={def.key}
+                                style={styles.addAttrChip}
+                                onPress={() => handleAddAttribute(def.key)}
+                            >
+                                <Ionicons name="add" size={14} color="#00BCF2" />
+                                <Text style={styles.addAttrChipText}>{def.label}</Text>
+                            </Pressable>
+                        ))}
+                    </RNView>
+                ) : null}
+
+                {/* Import from account */}
+                {showImportPicker ? (
+                    <RNView style={styles.importPickerCard}>
+                        <Text style={styles.importPickerTitle}>Import from</Text>
+                        <Text style={styles.importPickerSubtitle}>
+                            Sign in once to fill your profile. The provider cannot access your Privasys data.
+                        </Text>
+                        {Object.entries(PROVIDERS).map(([key, config]) => {
+                            const isLinking = linkingProvider === key;
+                            return (
+                                <Pressable
+                                    key={key}
+                                    style={styles.providerRow}
+                                    onPress={() => handleImportFromProvider(key)}
+                                    disabled={isLinking}
+                                >
+                                    <Ionicons
+                                        name={PROVIDER_ICONS[key] ?? 'globe-outline'}
+                                        size={22}
+                                        color="#64748B"
+                                    />
+                                    <RNView style={styles.providerInfo}>
+                                        <Text style={styles.providerName}>{config.displayName}</Text>
+                                    </RNView>
+                                    {isLinking ? (
+                                        <ActivityIndicator size="small" color="#00BCF2" />
+                                    ) : (
+                                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                                    )}
+                                </Pressable>
+                            );
+                        })}
+                        <Pressable
+                            style={styles.importPickerCancel}
+                            onPress={() => setShowImportPicker(false)}
                         >
-                            <Ionicons name="download-outline" size={18} color="#00BCF2" />
-                            <Text style={styles.exportButtonText}>Export All Data (JSON)</Text>
+                            <Text style={styles.importPickerCancelText}>Cancel</Text>
                         </Pressable>
-                    </>
+                    </RNView>
+                ) : (
+                    <Pressable
+                        style={styles.importButton}
+                        onPress={() => setShowImportPicker(true)}
+                    >
+                        <Ionicons name="cloud-download-outline" size={18} color="#00BCF2" />
+                        <Text style={styles.importButtonText}>Import from an account</Text>
+                    </Pressable>
+                )}
+
+                {/* Export all data */}
+                {profile.attributes.length > 0 && (
+                    <Pressable
+                        style={styles.exportButton}
+                        onPress={async () => {
+                            try {
+                                const data = exportAttributesForAudit(profile);
+                                const json = JSON.stringify(data, null, 2);
+                                const file = new File(Paths.cache, `privasys-profile-${Date.now()}.json`);
+                                file.write(json);
+                                await Sharing.shareAsync(file.uri, {
+                                    mimeType: 'application/json',
+                                    dialogTitle: 'Save Profile Data',
+                                    UTI: 'public.json',
+                                });
+                            } catch (e: any) {
+                                Alert.alert('Export failed', e.message);
+                            }
+                        }}
+                    >
+                        <Ionicons name="download-outline" size={18} color="#00BCF2" />
+                        <Text style={styles.exportButtonText}>Export All Data (JSON)</Text>
+                    </Pressable>
                 )}
 
                 {/* Data Sharing */}
                 <Text style={styles.sectionTitle}>DATA SHARING</Text>
                 <Text style={styles.sectionDescription}>
-                    Review what you've shared and manage auto-share rules.
+                    Review what you've shared with services.
                 </Text>
 
                 <Pressable
@@ -427,26 +455,6 @@ export default function ProfileScreen() {
                     </RNView>
                 </Pressable>
 
-                <Pressable
-                    style={styles.sharingCard}
-                    onPress={() => router.push('/consent-history' as never)}
-                >
-                    <RNView style={styles.sharingRow}>
-                        <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="repeat-outline" size={20} color="#34E89E" />
-                        </RNView>
-                        <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>Auto-share Rules</Text>
-                            <Text style={styles.sharingDetail}>
-                                {standingConsentCount === 0
-                                    ? 'None active'
-                                    : `${standingConsentCount} active rule${standingConsentCount !== 1 ? 's' : ''}`}
-                            </Text>
-                        </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                    </RNView>
-                </Pressable>
-
                 {/* Profile metadata */}
                 <Text style={styles.sectionTitle}>DETAILS</Text>
                 <RNView style={styles.metaCard}>
@@ -461,10 +469,6 @@ export default function ProfileScreen() {
                         <Text style={styles.metaValue}>
                             {new Date(profile.updatedAt * 1000).toLocaleDateString()}
                         </Text>
-                    </RNView>
-                    <RNView style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Attribute sources</Text>
-                        <Text style={styles.metaValue}>{profile.linkedProviders.length}</Text>
                     </RNView>
                     <RNView style={styles.metaRow}>
                         <Text style={styles.metaLabel}>Data attributes</Text>
@@ -516,8 +520,10 @@ export default function ProfileScreen() {
 
 // ── Attribute card with provenance details ──────────────────────────────
 
-function AttributeCard({ attr, onRemove }: { attr: ProfileAttribute; onRemove: () => void }) {
+function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onRemove: () => void; onEdit: (newValue: string) => void }) {
     const [expanded, setExpanded] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [editValue, setEditValue] = useState(attr.value);
 
     const sourceLabel =
         attr.source === 'provider' && attr.sourceProvider
@@ -546,6 +552,31 @@ function AttributeCard({ attr, onRemove }: { attr: ProfileAttribute; onRemove: (
 
     const isAvatar = attr.key === 'picture';
 
+    const handleStartEdit = () => {
+        if (isAvatar) return;
+        if (attr.verified) {
+            Alert.alert(
+                'Edit verified attribute?',
+                'This attribute has been verified. Editing it will remove the verification status.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Edit Anyway', onPress: () => { setEditing(true); setEditValue(attr.value); } },
+                ]
+            );
+        } else {
+            setEditing(true);
+            setEditValue(attr.value);
+        }
+    };
+
+    const handleSaveEdit = () => {
+        const trimmed = editValue.trim();
+        if (trimmed && trimmed !== attr.value) {
+            onEdit(trimmed);
+        }
+        setEditing(false);
+    };
+
     const renderRightActions = () => (
         <Pressable
             style={styles.swipeDeleteAction}
@@ -558,24 +589,53 @@ function AttributeCard({ attr, onRemove }: { attr: ProfileAttribute; onRemove: (
 
     return (
         <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
-            <Pressable onPress={() => setExpanded(!expanded)}>
+            <Pressable onPress={() => !editing && setExpanded(!expanded)}>
                 <RNView style={styles.attributeRow}>
                     <RNView style={styles.attributeInfo}>
                         <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <Text style={styles.attributeLabel}>{attr.label}</Text>
-                            {expanded ? (
-                                <Ionicons name="chevron-up" size={12} color="#94A3B8" />
-                            ) : (
-                                <Ionicons name="chevron-down" size={12} color="#94A3B8" />
+                            {!editing && (
+                                expanded ? (
+                                    <Ionicons name="chevron-up" size={12} color="#94A3B8" />
+                                ) : (
+                                    <Ionicons name="chevron-down" size={12} color="#94A3B8" />
+                                )
                             )}
                         </RNView>
-                        {isAvatar && attr.value ? (
+
+                        {editing ? (
+                            <RNView style={styles.inlineEditRow}>
+                                <TextInput
+                                    style={styles.inlineEditInput}
+                                    value={editValue}
+                                    onChangeText={setEditValue}
+                                    autoFocus
+                                    autoCapitalize={attr.key === 'email' ? 'none' : 'words'}
+                                    keyboardType={attr.key === 'email' ? 'email-address' : attr.key === 'phone_number' ? 'phone-pad' : 'default'}
+                                    onSubmitEditing={handleSaveEdit}
+                                    returnKeyType="done"
+                                />
+                                <Pressable onPress={handleSaveEdit}>
+                                    <Ionicons name="checkmark-circle" size={24} color="#34E89E" />
+                                </Pressable>
+                                <Pressable onPress={() => setEditing(false)}>
+                                    <Ionicons name="close-circle" size={24} color="#94A3B8" />
+                                </Pressable>
+                            </RNView>
+                        ) : isAvatar && attr.value ? (
                             <Image
                                 source={{ uri: attr.value }}
                                 style={styles.attributeAvatar}
                             />
                         ) : (
-                            <Text style={styles.attributeValue}>{attr.value}</Text>
+                            <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={[styles.attributeValue, { flex: 1 }]}>{attr.value}</Text>
+                                {!isAvatar && (
+                                    <Pressable onPress={handleStartEdit} hitSlop={8}>
+                                        <Ionicons name="pencil-outline" size={16} color="#94A3B8" />
+                                    </Pressable>
+                                )}
+                            </RNView>
                         )}
                         <RNView style={styles.attributeMeta}>
                         {attr.verified ? (
@@ -661,11 +721,6 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         letterSpacing: -0.5
     },
-    editButton: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#00BCF2'
-    },
     scrollView: { flex: 1 },
     scrollContent: { padding: 20, paddingBottom: 40 },
     emptyState: {
@@ -717,15 +772,6 @@ const styles = StyleSheet.create({
         fontSize: 32,
         fontWeight: '700',
         color: '#FFFFFF'
-    },
-    editFields: { width: '100%', gap: 8 },
-    editInput: {
-        backgroundColor: '#F1F5F9',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontSize: 16,
-        color: '#0F172A'
     },
     profileName: { fontSize: 22, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
     profileEmail: { fontSize: 15, color: '#64748B' },
@@ -780,14 +826,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 14,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#F8FAFB',
         borderRadius: 12,
-        padding: 16,
+        padding: 14,
         marginBottom: 8
     },
     providerInfo: { flex: 1 },
-    providerName: { fontSize: 16, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
-    providerDetail: { fontSize: 13, color: '#64748B' },
+    providerName: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
 
     emptyCard: {
         alignItems: 'center',
@@ -820,6 +865,22 @@ const styles = StyleSheet.create({
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     verifiedText: { fontSize: 11, color: '#34E89E', fontWeight: '600' },
     sourceText: { fontSize: 11, color: '#94A3B8' },
+
+    inlineEditRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 4,
+    },
+    inlineEditInput: {
+        flex: 1,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        fontSize: 16,
+        color: '#0F172A',
+    },
 
     provenanceSection: {
         marginTop: 8,
@@ -858,14 +919,135 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#00BCF2',
+        borderColor: '#E2E8F0',
         padding: 14,
-        marginTop: 4,
+        marginTop: 8,
     },
     exportButtonText: {
         fontSize: 15,
         fontWeight: '600',
         color: '#00BCF2',
+    },
+
+    // Add attribute
+    addAttrChips: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 4,
+        marginBottom: 4,
+    },
+    addAttrHint: {
+        fontSize: 13,
+        color: '#94A3B8',
+        fontWeight: '500',
+    },
+    addAttrChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    addAttrChipText: {
+        fontSize: 13,
+        color: '#00BCF2',
+        fontWeight: '500',
+    },
+    addAttrCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 8,
+    },
+    addAttrLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#94A3B8',
+        marginBottom: 8,
+    },
+    addAttrInput: {
+        backgroundColor: '#F1F5F9',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 16,
+        color: '#0F172A',
+        marginBottom: 12,
+    },
+    addAttrActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        gap: 16,
+    },
+    addAttrCancel: {
+        fontSize: 14,
+        color: '#94A3B8',
+        fontWeight: '500',
+    },
+    addAttrSave: {
+        backgroundColor: '#00BCF2',
+        borderRadius: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 20,
+    },
+    addAttrSaveText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+
+    // Import from account
+    importButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#00BCF2',
+        padding: 14,
+        marginTop: 8,
+    },
+    importButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#00BCF2',
+    },
+    importPickerCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 8,
+    },
+    importPickerTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 4,
+    },
+    importPickerSubtitle: {
+        fontSize: 13,
+        color: '#94A3B8',
+        marginBottom: 12,
+        lineHeight: 18,
+    },
+    importPickerCancel: {
+        alignItems: 'center',
+        paddingVertical: 10,
+        marginTop: 4,
+    },
+    importPickerCancelText: {
+        fontSize: 14,
+        color: '#94A3B8',
+        fontWeight: '500',
     },
 
     metaCard: {

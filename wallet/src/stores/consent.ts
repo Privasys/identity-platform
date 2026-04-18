@@ -32,7 +32,7 @@ export interface ConsentRecord {
     /** Whether the user checked "always share with this app". */
     persistent: boolean;
     /** TEE type at the time of consent. */
-    teeType: 'sgx' | 'tdx';
+    teeType: 'sgx' | 'tdx' | 'none';
     /** MRENCLAVE / MRTD at the time of consent. */
     enclaveMeasurement: string;
     /** Code hash at the time of consent. */

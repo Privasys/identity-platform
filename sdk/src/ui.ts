@@ -442,28 +442,68 @@ const MODAL_CSS = /* css */ `
 }
 .method-detail { font-size: 12px; color: #64748B; }
 
-/* Success brand panel (left column) */
-.brand-success {
+/* Brand progress steps (left column during flow states) */
+.brand-progress {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    margin-top: 24px;
+    margin-top: 28px;
 }
-.brand-success .success-icon { margin-bottom: 16px; }
-.brand-success .success-icon svg { width: 56px; height: 56px; }
-.brand-success .success-title { font-size: 22px; margin-bottom: 12px; }
+.brand-progress .steps {
+    max-width: none;
+    gap: 6px;
+}
+.brand-progress .step {
+    font-size: 14px;
+    gap: 10px;
+    padding: 4px 0;
+}
+.brand-progress .step-icon {
+    width: 20px;
+    font-size: 14px;
+}
+.brand-progress .spinner {
+    width: 28px;
+    height: 28px;
+    border-width: 2.5px;
+    margin-bottom: 8px;
+}
+.brand-progress .brand-progress-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #059669;
+    margin-top: 16px;
+}
+.brand-progress .success-method {
+    margin-top: 8px;
+    margin-bottom: 0;
+}
 @media (max-width: 768px) {
-    .brand-success { display: none; }
-    .auth-panel .mobile-success-header { display: flex; }
+    .brand-progress { display: none; }
+    .auth-panel .mobile-progress-header { display: flex; }
 }
-.mobile-success-header {
+.mobile-progress-header {
     display: none;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    width: 100%;
 }
-.mobile-success-header .success-icon svg { width: 40px; height: 40px; }
-.mobile-success-header .success-title { font-size: 18px; margin-bottom: 8px; }
+.mobile-progress-header .brand-progress { display: flex; align-items: center; }
+.mobile-progress-header .steps { align-items: flex-start; width: 100%; max-width: 280px; }
+.mobile-progress-header .step { font-size: 13px; }
+.mobile-progress-header .spinner { width: 24px; height: 24px; border-width: 2px; margin-bottom: 6px; }
+.mobile-progress-header .brand-progress-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #059669;
+    margin-top: 10px;
+}
+.mobile-progress-header .success-method {
+    margin-top: 6px;
+    margin-bottom: 0;
+    justify-content: center;
+}
 .session-info {
     text-align: left;
     border: 1px solid #E2E8F0;
@@ -583,7 +623,7 @@ const MODAL_CSS = /* css */ `
     .footer { border-color: rgba(255,255,255,0.06); color: #475569; }
     .footer .link-btn { color: #64748B; }
     .scan-label { color: #E2E8F0; }
-    .success-title { color: #E2E8F0; }
+    .brand-progress-label { color: #34D399; }
     .error-title { color: #E2E8F0; }
 }
 `;
@@ -839,14 +879,16 @@ export class AuthUI {
                     el('div', { className: 'brand-panel-name' }, 'Privasys'),
                 ),
                 brandDesc ? el('p', { className: 'brand-panel-desc' }, brandDesc) : null,
-                this.state === 'success' ? this.renderSuccessBrand() : null,
+                this.isFlowState() ? this.renderBrandProgress() : null,
             ),
             // Right: auth panel
-            el('div', { className: `auth-panel${isIdle || this.state === 'success' ? '' : ' auth-panel--centered'}` },
+            el('div', { className: `auth-panel${isIdle ? '' : ' auth-panel--centered'}` },
                 (!isIdle && this.state !== 'success') ? el('button', { className: 'btn-back', onClick: () => this.goBack() },
                     el('span', { html: ICON_ARROW_LEFT }),
                     'Back',
                 ) : null,
+                // Mobile-only: show progress steps inline (brand panel is compact on mobile)
+                this.isFlowState() ? el('div', { className: 'mobile-progress-header' }, this.renderBrandProgress()) : null,
                 content,
             ),
             // Footer spans both columns
@@ -969,22 +1011,8 @@ export class AuthUI {
     private renderPushWaiting(): HTMLElement {
         const hasWebAuthn = WebAuthnClient.isSupported();
         return el('div', null,
-            el('div', { className: 'progress-section' },
-                el('div', { className: 'spinner' }),
-                el('div', { className: 'steps' },
-                    el('div', { className: 'step done' },
-                        el('span', { className: 'step-icon' }, '\u2713'), 'Notification sent',
-                    ),
-                    el('div', { className: 'step active' },
-                        el('span', { className: 'step-icon' }, '\u2022'), 'Waiting for Privasys ID\u2026',
-                    ),
-                    el('div', { className: 'step' },
-                        el('span', { className: 'step-icon' }, '\u2022'), 'Biometric authentication',
-                    ),
-                ),
-                el('p', { className: 'scan-hint' },
-                    'Check your phone \u2014 tap the notification to approve this connection.',
-                ),
+            el('p', { className: 'scan-hint', style: 'margin-bottom: 20px; max-width: none; text-align: center;' },
+                'Check your phone \u2014 tap the notification to approve this connection.',
             ),
             el('div', { className: 'divider' }, el('span', null, 'or')),
             el('div', { className: 'alt-actions' },
@@ -1001,89 +1029,104 @@ export class AuthUI {
     }
 
     private renderWalletProgress(): HTMLElement {
-        const isAuth = this.state === 'authenticating';
-        const viaPush = !!this.cfg.pushToken && this.state !== 'qr-scanning';
-        const firstStep = viaPush ? 'Notification sent' : 'QR code scanned';
         return el('div', null,
-            el('div', { className: 'progress-section' },
-                el('div', { className: 'spinner' }),
-                el('div', { className: 'steps' },
-                    el('div', { className: 'step done' },
-                        el('span', { className: 'step-icon' }, '\u2713'), firstStep,
-                    ),
-                    el('div', { className: `step ${isAuth ? 'done' : 'active'}` },
-                        el('span', { className: 'step-icon' }, isAuth ? '\u2713' : '\u2022'), 'Verifying server attestation',
-                    ),
-                    el('div', { className: `step ${isAuth ? 'active' : ''}` },
-                        el('span', { className: 'step-icon' }, '\u2022'), 'FIDO2 biometric ceremony',
-                    ),
-                ),
+            el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center;' },
+                'Verifying your identity\u2026 This will only take a moment.',
             ),
         );
     }
 
     private renderPasskeyProgress(): HTMLElement {
         const phase = this.state;
+        const label = phase === 'passkey-requesting' ? 'Preparing\u2026' : 'Complete the biometric prompt on your device.';
         return el('div', null,
-            el('h2', { className: 'auth-panel-heading' },
-                phase === 'passkey-requesting' ? 'Preparing\u2026' : 'Verify your identity',
-            ),
-            el('div', { className: 'progress-section' },
-                el('div', { className: 'spinner' }),
-                el('div', { className: 'steps' },
-                    el('div', { className: `step ${phase !== 'passkey-requesting' ? 'done' : 'active'}` },
-                        el('span', { className: 'step-icon' }, phase !== 'passkey-requesting' ? '\u2713' : '\u2022'),
-                        'Requesting options from enclave',
-                    ),
-                    el('div', { className: `step ${phase === 'passkey-ceremony' ? 'active' : phase === 'passkey-verifying' ? 'done' : ''}` },
-                        el('span', { className: 'step-icon' }, phase === 'passkey-verifying' ? '\u2713' : '\u2022'),
-                        'Complete biometric prompt',
-                    ),
-                    el('div', { className: `step ${phase === 'passkey-verifying' ? 'active' : ''}` },
-                        el('span', { className: 'step-icon' }, '\u2022'),
-                        'Enclave verification',
-                    ),
-                ),
-            ),
+            el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center;' }, label),
         );
     }
 
-    /** Renders the success status in the left brand panel. */
-    private renderSuccessBrand(): HTMLElement {
+    /** Whether the current state is an in-progress or completed flow state. */
+    private isFlowState(): boolean {
+        return ['push-waiting', 'qr-scanning', 'wallet-connected', 'authenticating',
+                'passkey-requesting', 'passkey-ceremony', 'passkey-verifying', 'success'].includes(this.state);
+    }
+
+    /** Renders progress steps in the left brand panel based on current state + method. */
+    private renderBrandProgress(): HTMLElement {
+        const isSuccess = this.state === 'success';
         const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
         const hasAttestation = this.method === 'wallet' && this.attestation?.valid;
         const methodDetail = this.method === 'passkey'
             ? 'This device'
             : (hasAttestation ? 'Attestation verified' : null);
 
-        return el('div', { className: 'brand-success' },
-            el('div', { className: 'success-icon', html: ICON_CHECK_CIRCLE }),
-            el('div', { className: 'success-title' }, 'Authenticated'),
-            el('div', { className: 'success-method' },
+        let steps: HTMLElement;
+        if (this.method === 'passkey') {
+            const phase = this.state;
+            steps = el('div', { className: 'steps' },
+                el('div', { className: `step ${phase !== 'passkey-requesting' ? 'done' : 'active'}` },
+                    el('span', { className: 'step-icon' }, phase !== 'passkey-requesting' ? '\u2713' : '\u2022'),
+                    'Options received from enclave',
+                ),
+                el('div', { className: `step ${phase === 'passkey-ceremony' ? 'active' : (phase === 'passkey-verifying' || isSuccess) ? 'done' : ''}` },
+                    el('span', { className: 'step-icon' }, (phase === 'passkey-verifying' || isSuccess) ? '\u2713' : '\u2022'),
+                    'Biometric prompt completed',
+                ),
+                el('div', { className: `step ${phase === 'passkey-verifying' ? 'active' : isSuccess ? 'done' : ''}` },
+                    el('span', { className: 'step-icon' }, isSuccess ? '\u2713' : '\u2022'),
+                    'Enclave verification',
+                ),
+                el('div', { className: `step ${isSuccess ? 'done' : ''}` },
+                    el('span', { className: 'step-icon' }, isSuccess ? '\u2713' : '\u2022'),
+                    'Session established',
+                ),
+            );
+        } else {
+            // Wallet flow — QR or push
+            const viaPush = !!this.cfg.pushToken;
+            const isConnected = ['wallet-connected', 'authenticating', 'success'].includes(this.state);
+            const isAuth = this.state === 'authenticating' || isSuccess;
+            const firstLabel = viaPush ? 'Notification sent' : 'QR code scanned';
+            const secondLabel = viaPush ? 'Approved on Privasys ID' : 'Server attestation verified';
+            steps = el('div', { className: 'steps' },
+                el('div', { className: `step ${['push-waiting', 'qr-scanning'].includes(this.state) ? 'active' : 'done'}` },
+                    el('span', { className: 'step-icon' }, isConnected || isAuth ? '\u2713' : '\u2022'),
+                    firstLabel,
+                ),
+                el('div', { className: `step ${isConnected && !isAuth ? 'active' : isAuth ? 'done' : ''}` },
+                    el('span', { className: 'step-icon' }, isAuth ? '\u2713' : '\u2022'),
+                    secondLabel,
+                ),
+                el('div', { className: `step ${this.state === 'authenticating' ? 'active' : isSuccess ? 'done' : ''}` },
+                    el('span', { className: 'step-icon' }, isSuccess ? '\u2713' : '\u2022'),
+                    'Biometric authentication',
+                ),
+                el('div', { className: `step ${isSuccess ? 'done' : ''}` },
+                    el('span', { className: 'step-icon' }, isSuccess ? '\u2713' : '\u2022'),
+                    'Session established',
+                ),
+            );
+        }
+
+        return el('div', { className: 'brand-progress' },
+            !isSuccess ? el('div', { className: 'spinner' }) : null,
+            steps,
+            isSuccess ? el('div', { className: 'brand-progress-label' }, 'Authenticated') : null,
+            isSuccess ? el('div', { className: 'success-method' },
                 el('span', { className: 'method-badge' }, methodLabel),
                 methodDetail ? el('span', { className: 'method-detail' }, methodDetail) : null,
-            ),
+            ) : null,
         );
     }
 
     private renderSuccess(): HTMLElement {
+        const showTrust = !!this.pushToken && !this.cfg.deviceTrusted;
         const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
         const hasAttestation = this.method === 'wallet' && this.attestation?.valid;
         const methodDetail = this.method === 'passkey'
             ? 'This device'
             : (hasAttestation ? 'Attestation verified' : null);
-        const showTrust = !!this.pushToken && !this.cfg.deviceTrusted;
 
         return el('div', null,
-            // Mobile-only: show status inline since brand panel is compact
-            el('div', { className: 'mobile-success-header' },
-                el('div', { className: 'success-icon', html: ICON_CHECK_CIRCLE }),
-                el('div', { className: 'success-title' }, 'Authenticated'),
-                el('div', { className: 'success-method', style: 'justify-content: center;' },
-                    el('span', { className: 'method-badge' }, methodLabel),
-                    methodDetail ? el('span', { className: 'method-detail' }, methodDetail) : null,
-                ),
-            ),
             showTrust ? el('div', { style: 'width: 100%;' },
                 el('p', { style: 'font-size: 14px; font-weight: 500; margin-bottom: 6px;' },
                     'Trust this device?',

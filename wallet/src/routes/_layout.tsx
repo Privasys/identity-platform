@@ -20,6 +20,7 @@ import { useProfileStore } from '@/stores/profile';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { checkDeviceSecurity } from '@/services/security';
+import '@/services/background-notifications'; // Register background push handler early
 // import * as Sentry from '@sentry/react-native';
 
 // Sentry.init({

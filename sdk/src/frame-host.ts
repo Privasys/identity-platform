@@ -9,7 +9,7 @@
  * postMessage. Sessions are stored in privasys.id's localStorage so
  * they persist across adopter sites.
  *
- * Sessions have a 5-minute client-side TTL. The frame host automatically
+ * Sessions have a 15-minute client-side TTL. The frame host automatically
  * renews sessions via push notification → wallet confirmation → broker
  * relay before the TTL expires.
  */
@@ -25,7 +25,7 @@ let activeUI: AuthUI | null = null;
 
 // ── Session renewal ─────────────────────────────────────────────────────
 
-const RENEWAL_MS = 4 * 60 * 1000; // Renew at 4 min (before 5-min TTL)
+const RENEWAL_MS = 13 * 60 * 1000; // Renew at 13 min (before 15-min TTL)
 const RENEWAL_TIMEOUT_MS = 30_000;
 
 const renewalTimers = new Map<string, ReturnType<typeof setTimeout>>();

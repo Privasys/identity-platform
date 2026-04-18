@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Platform } from 'react-native';
 
 import { handleSilentRenewal } from '@/services/silent-renew';
+import { BACKGROUND_NOTIFICATION_TASK } from '@/services/background-notifications';
 
 let _notificationsSetup = false;
 
@@ -76,6 +77,14 @@ export function useExpoPushToken() {
                     name: 'default',
                     importance: Notifications.AndroidImportance.MAX
                 });
+            }
+
+            // Register background notification handler so auth-renew pushes
+            // are processed even when the app is backgrounded or killed.
+            try {
+                await Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
+            } catch {
+                // Task already registered or not supported — ignore.
             }
         }
 

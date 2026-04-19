@@ -305,7 +305,7 @@ export async function authenticate(
     const effectiveRpId = rpId || origin.split(':')[0];
     const rpIdHash = sha256(new TextEncoder().encode(effectiveRpId));
     const flags = new Uint8Array([0x05]); // UP | UV
-    const signCount = new Uint8Array([0, 0, 0, 1]); // Incremented
+    const signCount = new Uint8Array([0, 0, 0, 0]); // platform authenticator: always 0
 
     const authData = concat([rpIdHash, flags, signCount]);
     const authDataB64 = base64urlEncode(authData);

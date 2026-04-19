@@ -57,11 +57,13 @@ export default function OnboardingScreen() {
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
         if (!hasHardware) {
             setError('This device does not support biometric authentication.');
+            setStep('welcome');
             return;
         }
         const isEnrolled = await LocalAuthentication.isEnrolledAsync();
         if (!isEnrolled) {
             setError('Please set up Face ID or fingerprint in your device settings first.');
+            setStep('welcome');
             return;
         }
 

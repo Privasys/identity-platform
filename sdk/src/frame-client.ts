@@ -77,6 +77,12 @@ export interface AuthFrameConfig {
     scope?: readonly PrivasysScope[];
     /** URL to the app's privacy policy. Shown to the user when sharing attributes. */
     privacyPolicyUrl?: string;
+    /**
+     * Mount the auth iframe inside this element instead of as a full-screen
+     * modal overlay.  The iframe fills the container (width/height: 100%).
+     * The container should have explicit dimensions.
+     */
+    container?: HTMLElement;
 }
 
 export interface SignInResult {
@@ -95,15 +101,17 @@ export interface SignInResult {
 
 export class AuthFrame {
     private readonly authOrigin: string;
-    private readonly config: Omit<AuthFrameConfig, 'authOrigin'>;
+    private readonly config: Omit<AuthFrameConfig, 'authOrigin' | 'container'>;
+    private readonly container: HTMLElement | null;
     private sessionIframe: HTMLIFrameElement | null = null;
     private sessionHandler: ((e: MessageEvent) => void) | null = null;
     private _onSessionExpired?: (rpId: string) => void;
     private _onSessionRenewed?: (rpId: string, accessToken?: string) => void;
 
     constructor(config: AuthFrameConfig) {
-        const { authOrigin, ...rest } = config;
+        const { authOrigin, container, ...rest } = config;
         this.authOrigin = authOrigin ?? 'https://privasys.id';
+        this.container = container ?? null;
         this.config = rest;
     }
 
@@ -130,11 +138,24 @@ export class AuthFrame {
         return new Promise<SignInResult>((resolve, reject) => {
             const iframe = document.createElement('iframe');
             iframe.src = this.authOrigin + '/auth/';
-            iframe.style.cssText =
-                'position:fixed;inset:0;width:100%;height:100%;' +
-                'z-index:999999;border:none;background:#fff;';
-            iframe.allow =
-                'publickey-credentials-get *; publickey-credentials-create *';
+
+            if (this.container) {
+                // Embedded mode: fill the container element
+                iframe.style.cssText =
+                    'width:100%;height:100%;border:none;display:block;';
+                iframe.allow =
+                    'publickey-credentials-get *; publickey-credentials-create *';
+            } else {
+                // Modal mode (default): full-screen overlay
+                iframe.style.cssText =
+                    'position:fixed;inset:0;width:100%;height:100%;' +
+                    'z-index:999999;border:none;background:#fff;';
+                iframe.allow =
+                    'publickey-credentials-get *; publickey-credentials-create *';
+            }
+
+            // Append to the correct parent
+            (this.container || document.body).appendChild(iframe);
 
             const cleanup = () => {
                 window.removeEventListener('message', handler);
@@ -172,7 +193,6 @@ export class AuthFrame {
             };
 
             window.addEventListener('message', handler);
-            document.body.appendChild(iframe);
         });
     }
 

@@ -348,7 +348,8 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
         var authData = Data()
         authData.append(contentsOf: rpIdHash)
         authData.append(0x05) // flags: UP | UV
-        authData.append(contentsOf: [0x00, 0x00, 0x00, 0x01]) // signCount = 1
+        // Platform authenticator: always send signCount=0 (non-exportable key)
+        authData.append(contentsOf: [0, 0, 0, 0] as [UInt8])
 
         // Sign: authData || clientDataHash
         var signInput = authData

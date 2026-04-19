@@ -91,7 +91,6 @@ type UIState =
 // ---------------------------------------------------------------------------
 
 const MODAL_CSS = /* css */ `
-@import url('https://rsms.me/inter/inter.css');
 :host {
     all: initial;
     position: fixed;
@@ -103,7 +102,10 @@ const MODAL_CSS = /* css */ `
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-y: auto;
+    opacity: 0;
+    animation: fadeIn 0.15s ease forwards;
 }
+@keyframes fadeIn { to { opacity: 1; } }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Close button — top right */

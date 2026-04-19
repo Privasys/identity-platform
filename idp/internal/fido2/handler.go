@@ -396,7 +396,7 @@ func (h *Handler) BeginAuthentication(w http.ResponseWriter, r *http.Request) {
 		expiresAt:   time.Now().Add(5 * time.Minute),
 	})
 
-	// Return standard WebAuthn CredentialAssertion options.
+	// Return standard WebAuthn CredentialAssertion.
 	writeJSON(w, options)
 }
 

@@ -350,7 +350,7 @@ class PasskeyActivity : Activity() {
             ?: return null
 
         val rpIdHash = MessageDigest.getInstance("SHA-256").digest(rpId.toByteArray())
-        val authData = buildAssertionAuthData(rpIdHash)
+        val authData = buildAssertionAuthData(rpIdHash, credentialId)
 
         val signInput = authData + clientDataHash
         val sig = Signature.getInstance("SHA256withECDSA")
@@ -405,11 +405,15 @@ class PasskeyActivity : Activity() {
         return buf.toByteArray()
     }
 
-    private fun buildAssertionAuthData(rpIdHash: ByteArray): ByteArray {
+    private fun buildAssertionAuthData(rpIdHash: ByteArray, credentialId: ByteArray): ByteArray {
         val buf = mutableListOf<Byte>()
         buf.addAll(rpIdHash.toList())
         buf.add(0x05) // flags: UP | UV
-        buf.addAll(byteArrayOf(0, 0, 0, 1).toList()) // signCount = 1
+        // Platform authenticator: always send signCount=0 (non-exportable key)
+        buf.add(0)
+        buf.add(0)
+        buf.add(0)
+        buf.add(0)
         return buf.toByteArray()
     }
 

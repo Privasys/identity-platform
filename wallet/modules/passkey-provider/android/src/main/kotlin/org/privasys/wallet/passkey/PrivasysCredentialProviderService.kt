@@ -229,7 +229,7 @@ class PrivasysCredentialProviderService : CredentialProviderService() {
 
         // Build authenticator data (no attested credential data for assertions)
         val rpIdHash = MessageDigest.getInstance("SHA-256").digest(rpId.toByteArray())
-        val authData = buildAssertionAuthData(rpIdHash)
+        val authData = buildAssertionAuthData(rpIdHash, credentialId)
 
         // Sign: authData || clientDataHash
         val signInput = authData + clientDataHash
@@ -315,11 +315,15 @@ class PrivasysCredentialProviderService : CredentialProviderService() {
         return authData.toByteArray()
     }
 
-    private fun buildAssertionAuthData(rpIdHash: ByteArray): ByteArray {
+    private fun buildAssertionAuthData(rpIdHash: ByteArray, credentialId: ByteArray): ByteArray {
         val authData = mutableListOf<Byte>()
         authData.addAll(rpIdHash.toList())
         authData.add(0x05)                        // flags: UP | UV
-        authData.addAll(byteArrayOf(0, 0, 0, 1).toList()) // signCount = 1
+        // Platform authenticator: always send signCount=0 (non-exportable key)
+        authData.add(0)
+        authData.add(0)
+        authData.add(0)
+        authData.add(0)
         return authData.toByteArray()
     }
 

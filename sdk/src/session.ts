@@ -5,6 +5,7 @@ import type { AuthSession } from './types';
 
 const STORAGE_KEY = 'privasys_sessions';
 const HINTS_KEY = 'privasys_device_hints';
+const PASSKEY_HINT_KEY = 'privasys_passkey';
 
 /** Persists across session expiry so returning users get push instead of QR. */
 interface DeviceHint {
@@ -110,6 +111,24 @@ export class SessionManager {
     /** Explicitly clear the device hint (e.g. user logs out of all sessions). */
     clearDeviceHint(): void {
         localStorage.removeItem(HINTS_KEY);
+    }
+
+    // ── Passkey hints (survive session expiry & sign-out) ─────────────
+
+    /** Record that a discoverable passkey exists for this RP. */
+    savePasskeyHint(): void {
+        try {
+            localStorage.setItem(PASSKEY_HINT_KEY, '1');
+        } catch { /* storage full or unavailable */ }
+    }
+
+    /** Check if a discoverable passkey was previously registered. */
+    hasPasskeyHint(): boolean {
+        try {
+            return localStorage.getItem(PASSKEY_HINT_KEY) === '1';
+        } catch {
+            return false;
+        }
     }
 
     private persist(sessions: AuthSession[]): void {

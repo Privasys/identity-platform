@@ -952,8 +952,9 @@ export class AuthUI {
 
         // Passkey button
         if (hasWebAuthn) {
+            const passkeyOp = this.getWebAuthnClient().sessions.hasPasskeyHint() ? 'authenticate' : 'register';
             buttons.push(
-                el('button', { className: 'btn-provider', onClick: () => this.startPasskey('authenticate') },
+                el('button', { className: 'btn-provider', onClick: () => this.startPasskey(passkeyOp) },
                     el('span', { html: ICON_PASSKEY }),
                     el('span', { className: 'btn-label' }, 'Passkey'),
                     el('span', { className: 'btn-hint' }, 'Face ID, Touch ID, Windows Hello'),
@@ -1021,7 +1022,7 @@ export class AuthUI {
                     el('span', { html: ICON_LOGO }),
                     el('span', { className: 'btn-label' }, 'Scan QR code instead'),
                 ),
-                hasWebAuthn ? el('button', { className: 'btn-provider', onClick: () => { this.cleanup(); this.startPasskey('authenticate'); } },
+                hasWebAuthn ? el('button', { className: 'btn-provider', onClick: () => { this.cleanup(); this.startPasskey(this.getWebAuthnClient().sessions.hasPasskeyHint() ? 'authenticate' : 'register'); } },
                     el('span', { html: ICON_PASSKEY }),
                     el('span', { className: 'btn-label' }, 'Passkey'),
                 ) : null,

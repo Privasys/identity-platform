@@ -214,6 +214,7 @@ export class WebAuthnClient {
                 { challenge: publicKey.challenge },
             );
 
+            this.sessions.savePasskeyHint();
             return this.complete(result.sessionToken ?? '', sessionId);
         } catch (err) {
             return this.fail(err);

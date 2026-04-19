@@ -171,8 +171,8 @@ export class WebAuthnClient {
                     attestation: (publicKey.attestation ?? 'none') as AttestationConveyancePreference,
                     authenticatorSelection: {
                         authenticatorAttachment: 'platform' as AuthenticatorAttachment,
-                        residentKey: (publicKey.authenticatorSelection?.residentKey ?? 'preferred') as ResidentKeyRequirement,
-                        userVerification: (publicKey.authenticatorSelection?.userVerification ?? 'preferred') as UserVerificationRequirement,
+                        residentKey: 'required' as ResidentKeyRequirement,
+                        userVerification: (publicKey.authenticatorSelection?.userVerification ?? 'required') as UserVerificationRequirement,
                     },
                     ...(publicKey.excludeCredentials
                         ? {

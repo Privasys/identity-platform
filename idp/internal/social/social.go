@@ -258,6 +258,21 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if session.Authenticated {
+		// Session already authenticated (e.g. passkey). Patch the social
+		// profile attributes onto the existing auth code so the JWT
+		// carries verified email/name from the social provider.
+		if userInfo.Email != "" || userInfo.Name != "" {
+			attrs := map[string]string{}
+			if userInfo.Email != "" {
+				attrs["email"] = userInfo.Email
+			}
+			if userInfo.Name != "" {
+				attrs["name"] = userInfo.Name
+			}
+			h.codes.UpdateAttributes(session.AuthCode, attrs)
+			log.Printf("social/%s: patched attributes on existing code for session %s (email=%s, name=%s)",
+				entry.provider, entry.sessionID, userInfo.Email, userInfo.Name)
+		}
 		h.callbackSuccess(w)
 		return
 	}

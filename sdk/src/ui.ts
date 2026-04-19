@@ -1240,8 +1240,10 @@ export class AuthUI {
                 try {
                     result = await client.authenticate();
                 } catch (authErr: any) {
-                    // If no credentials found, automatically try registration
-                    if (authErr?.message?.includes('no credentials') || authErr?.message?.includes('not found')) {
+                    // If no credentials found or user dismissed an empty picker,
+                    // automatically try registration to create a new passkey.
+                    const msg = authErr?.message ?? '';
+                    if (msg.includes('no credentials') || msg.includes('not found') || msg.includes('cancelled')) {
                         this.state = 'passkey-requesting';
                         this.render();
                         result = await client.register(globalThis.location?.hostname ?? 'user');

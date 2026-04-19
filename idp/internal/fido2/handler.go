@@ -51,7 +51,9 @@ func NewHandler(cfg Config) (*Handler, error) {
 		RPOrigins:             cfg.RPOrigins,
 		AttestationPreference: protocol.PreferDirectAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			UserVerification: protocol.VerificationRequired,
+			UserVerification:   protocol.VerificationRequired,
+			ResidentKey:        protocol.ResidentKeyRequirementRequired,
+			RequireResidentKey: protocol.ResidentKeyRequired(),
 		},
 	}
 
@@ -84,10 +86,11 @@ func (u *idpUser) WebAuthnCredentials() []webauthn.Credential { return u.Credent
 // --- Challenge store ---
 
 type challengeEntry struct {
-	sessionData *webauthn.SessionData
-	user        *idpUser
-	sessionID   string // OIDC authorization session ID
-	expiresAt   time.Time
+	sessionData  *webauthn.SessionData
+	user         *idpUser
+	sessionID    string // OIDC authorization session ID
+	discoverable bool   // true when authenticate/begin had no credentialId
+	expiresAt    time.Time
 }
 
 type challengeStore struct {
@@ -358,7 +361,31 @@ func (h *Handler) BeginAuthentication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find user by credential ID.
+	// Discoverable credential flow: when no credentialId is provided,
+	// start a discoverable login so the browser offers all stored
+	// passkeys for this RP.
+	if req.CredentialID == "" {
+		options, sessionData, err := h.webAuthn.BeginDiscoverableLogin()
+		if err != nil {
+			log.Printf("fido2/authenticate/begin (discoverable): %v", err)
+			errorJSON(w, http.StatusInternalServerError, "authentication failed")
+			return
+		}
+
+		challengeKey := sessionData.Challenge
+		h.challenges.put(challengeKey, &challengeEntry{
+			sessionData:  sessionData,
+			user:         nil, // resolved during FinishDiscoverableLogin
+			sessionID:    sessionID,
+			discoverable: true,
+			expiresAt:    time.Now().Add(5 * time.Minute),
+		})
+
+		writeJSON(w, options)
+		return
+	}
+
+	// Standard flow: look up user by credential ID.
 	var userID string
 	err := h.db.QueryRow(
 		"SELECT user_id FROM credentials WHERE credential_id = ?",
@@ -430,19 +457,66 @@ func (h *Handler) CompleteAuthentication(
 			return
 		}
 
-		// Body is standard WebAuthn JSON — go-webauthn reads it directly.
-		credential, err := h.webAuthn.FinishLogin(entry.user, *entry.sessionData, r)
-		if err != nil {
-			log.Printf("fido2/authenticate/complete: %v", err)
-			errorJSON(w, http.StatusBadRequest, fmt.Sprintf("authentication verification failed: %s", err))
-			return
+		var credential *webauthn.Credential
+		var userID string
+
+		if entry.discoverable {
+			// Discoverable credential flow: resolve user from the assertion.
+			handler := func(rawID, userHandle []byte) (webauthn.User, error) {
+				credIDStr := base64.RawURLEncoding.EncodeToString(rawID)
+				var uid string
+				err := h.db.QueryRow(
+					"SELECT user_id FROM credentials WHERE credential_id = ?",
+					credIDStr,
+				).Scan(&uid)
+				if err != nil {
+					return nil, fmt.Errorf("credential not found: %w", err)
+				}
+				creds, err := h.loadCredentials(uid)
+				if err != nil || len(creds) == 0 {
+					return nil, fmt.Errorf("no credentials for user")
+				}
+				return &idpUser{
+					ID:          []byte(uid),
+					Name:        uid,
+					Credentials: creds,
+				}, nil
+			}
+
+			cred, err := h.webAuthn.FinishDiscoverableLogin(handler, *entry.sessionData, r)
+			if err != nil {
+				log.Printf("fido2/authenticate/complete (discoverable): %v", err)
+				errorJSON(w, http.StatusBadRequest, fmt.Sprintf("authentication verification failed: %s", err))
+				return
+			}
+			credential = cred
+
+			// Resolve user ID from the credential.
+			credIDStr := base64.RawURLEncoding.EncodeToString(credential.ID)
+			if err := h.db.QueryRow(
+				"SELECT user_id FROM credentials WHERE credential_id = ?",
+				credIDStr,
+			).Scan(&userID); err != nil {
+				log.Printf("fido2/authenticate/complete: user lookup failed: %v", err)
+				errorJSON(w, http.StatusInternalServerError, "user lookup failed")
+				return
+			}
+		} else {
+			// Standard flow: user was resolved during BeginLogin.
+			cred, err := h.webAuthn.FinishLogin(entry.user, *entry.sessionData, r)
+			if err != nil {
+				log.Printf("fido2/authenticate/complete: %v", err)
+				errorJSON(w, http.StatusBadRequest, fmt.Sprintf("authentication verification failed: %s", err))
+				return
+			}
+			credential = cred
+			userID = string(entry.user.ID)
 		}
 
 		credID := base64.RawURLEncoding.EncodeToString(credential.ID)
 		h.db.Exec("UPDATE credentials SET sign_count = ? WHERE credential_id = ?",
 			credential.Authenticator.SignCount, credID)
 
-		userID := string(entry.user.ID)
 		log.Printf("fido2: authenticated user %s (credential %s...)", userID, credID[:16])
 
 		sessionToken := generateToken()

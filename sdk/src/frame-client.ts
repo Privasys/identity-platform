@@ -237,6 +237,8 @@ export class AuthFrame {
                         // No session — clean up
                         window.removeEventListener('message', handler);
                         iframe.remove();
+                        this.sessionIframe = null;
+                        this.sessionHandler = null;
                     }
 
                     resolve(data.session || null);

@@ -280,17 +280,23 @@ export class WebAuthnClient {
 
             // 4. Send standard WebAuthn assertion response to the enclave
             const response = assertion.response as AuthenticatorAssertionResponse;
+            const assertionResponse: Record<string, string> = {
+                clientDataJSON: base64urlEncode(response.clientDataJSON),
+                authenticatorData: base64urlEncode(response.authenticatorData),
+                signature: base64urlEncode(response.signature),
+            };
+            // userHandle is required for discoverable credential flows so
+            // the server can identify the user from the assertion.
+            if (response.userHandle && response.userHandle.byteLength > 0) {
+                assertionResponse.userHandle = base64urlEncode(response.userHandle);
+            }
             const result = await this.fido2Fetch(
                 'authenticate/complete',
                 {
                     id: base64urlEncode(assertion.rawId),
                     rawId: base64urlEncode(assertion.rawId),
                     type: 'public-key',
-                    response: {
-                        clientDataJSON: base64urlEncode(response.clientDataJSON),
-                        authenticatorData: base64urlEncode(response.authenticatorData),
-                        signature: base64urlEncode(response.signature),
-                    },
+                    response: assertionResponse,
                 },
                 { challenge: publicKey.challenge },
             );

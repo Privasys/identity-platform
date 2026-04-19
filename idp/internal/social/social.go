@@ -261,18 +261,18 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		// Session already authenticated (e.g. passkey). Patch the social
 		// profile attributes onto the existing auth code so the JWT
 		// carries verified email/name from the social provider.
-		if userInfo.Email != "" || userInfo.Name != "" {
-			attrs := map[string]string{}
-			if userInfo.Email != "" {
-				attrs["email"] = userInfo.Email
-			}
-			if userInfo.Name != "" {
-				attrs["name"] = userInfo.Name
-			}
-			h.codes.UpdateAttributes(session.AuthCode, attrs)
-			log.Printf("social/%s: patched attributes on existing code for session %s (email=%s, name=%s)",
-				entry.provider, entry.sessionID, userInfo.Email, userInfo.Name)
+		if userInfo.Email == "" {
+			log.Printf("social/%s: no email returned for session %s — rejecting", entry.provider, entry.sessionID)
+			h.callbackError(w, "No verified email found from this provider. Please try a different one.")
+			return
 		}
+		attrs := map[string]string{"email": userInfo.Email}
+		if userInfo.Name != "" {
+			attrs["name"] = userInfo.Name
+		}
+		h.codes.UpdateAttributes(session.AuthCode, attrs)
+		log.Printf("social/%s: patched attributes on existing code for session %s (email=%s, name=%s)",
+			entry.provider, entry.sessionID, userInfo.Email, userInfo.Name)
 		h.callbackSuccess(w)
 		return
 	}
@@ -399,6 +399,12 @@ func (h *Handler) fetchUserInfo(prov *Provider, accessToken string) (*UserInfo, 
 		if v, ok := raw["login"].(string); ok && info.Name == "" {
 			info.Name = v
 		}
+		// GitHub may return null for email when the user has a private
+		// email. Fall back to the /user/emails endpoint which returns
+		// all verified emails.
+		if info.Email == "" {
+			info.Email = h.fetchGitHubPrimaryEmail(accessToken)
+		}
 	case "google":
 		if v, ok := raw["sub"].(string); ok {
 			info.ID = v
@@ -450,6 +456,48 @@ func (h *Handler) fetchUserInfo(prov *Provider, accessToken string) (*UserInfo, 
 	}
 
 	return info, nil
+}
+
+// fetchGitHubPrimaryEmail calls GET https://api.github.com/user/emails
+// and returns the primary verified email address, or "" if none found.
+func (h *Handler) fetchGitHubPrimaryEmail(accessToken string) string {
+	req, _ := http.NewRequest("GET", "https://api.github.com/user/emails", nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		log.Printf("social/github: /user/emails request failed: %v", err)
+		return ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
+		return ""
+	}
+
+	// Return the primary verified email.
+	for _, e := range emails {
+		if e.Primary && e.Verified {
+			return e.Email
+		}
+	}
+	// Fall back to any verified email.
+	for _, e := range emails {
+		if e.Verified {
+			return e.Email
+		}
+	}
+	return ""
 }
 
 // --- Callback HTML ---

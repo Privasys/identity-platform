@@ -16,15 +16,8 @@ name: Build Wallet
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'wallet/**'
-      - 'sdk/**'
-      - '.github/workflows/build-wallet.yaml'
-  pull_request:
-    paths:
-      - 'wallet/**'
-      - 'sdk/**'
+    tags:
+      - 'wallet-v*'
   workflow_dispatch:
     inputs:
       platform:

@@ -20,8 +20,10 @@ import type { ProfileAttribute, UserProfile, VerificationRecord } from '@/stores
 
 // ── Canonical attribute definitions ─────────────────────────────────────
 // Loaded from the shared JSON file (single source of truth for IdP + wallet).
+// The file is copied from auth/shared/ into wallet/src/shared/ for Metro/EAS
+// bundler compatibility (EAS builds copy only the wallet directory).
 
-import canonicalDoc from '../../../shared/canonical-attributes.json';
+import canonicalDoc from '../shared/canonical-attributes.json';
 
 export interface AttributeDefinition {
     /** Canonical key (matches OIDC Standard Claims where applicable). */

@@ -4,6 +4,7 @@
     "private": true,
     "main": "expo-router/entry",
     "scripts": {
+        "sync-shared": "cp ../shared/canonical-attributes.json src/shared/canonical-attributes.json",
         "android": "expo run:android",
         "format": "oxfmt .",
         "postinstall": "patch-package",

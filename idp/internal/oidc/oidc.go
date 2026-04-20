@@ -343,7 +343,8 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		}
 
 		// Tell the wallet which attributes the relying party needs,
-		// derived from the requested OIDC scope.
+		// derived from the requested OIDC scope, then filtered by the
+		// client's required_attributes whitelist (if set).
 		var requestedAttributes []string
 		if strings.Contains(scope, "openid") {
 			requestedAttributes = append(requestedAttributes, "sub")
@@ -353,6 +354,24 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 				requestedAttributes = append(requestedAttributes, attr.Key)
 			}
 		}
+
+		// If the client declares specific required attributes, intersect.
+		if len(client.RequiredAttributes) > 0 {
+			allowed := make(map[string]bool, len(client.RequiredAttributes))
+			for _, a := range client.RequiredAttributes {
+				allowed[a] = true
+			}
+			// Always keep "sub" if present (required by OpenID Connect).
+			allowed["sub"] = true
+			filtered := requestedAttributes[:0]
+			for _, a := range requestedAttributes {
+				if allowed[a] {
+					filtered = append(filtered, a)
+				}
+			}
+			requestedAttributes = filtered
+		}
+
 		if len(requestedAttributes) > 0 {
 			qrPayload["requestedAttributes"] = requestedAttributes
 		}
@@ -569,6 +588,18 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 
 	// Filter attributes to only those allowed by the requested scope.
 	filteredAttrs := filterAttributesByScope(attrs, ac.Scope)
+
+	// Further restrict to the client's required_attributes whitelist (if set).
+	client, _ := reg.Get(ac.ClientID)
+	if client != nil && len(client.RequiredAttributes) > 0 {
+		restricted := make(map[string]string, len(client.RequiredAttributes))
+		for _, key := range client.RequiredAttributes {
+			if v, ok := filteredAttrs[key]; ok {
+				restricted[key] = v
+			}
+		}
+		filteredAttrs = restricted
+	}
 
 	// Get user roles.
 	roles, _ := db.GetRoles(ac.UserID)

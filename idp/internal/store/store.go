@@ -211,6 +211,33 @@ func migrate(db *sql.DB) error {
 		}
 	}
 
+	// Migration: add required_attributes column to clients.
+	var hasRequiredAttrs bool
+	raRows, err := db.Query("PRAGMA table_info(clients)")
+	if err != nil {
+		return err
+	}
+	defer raRows.Close()
+	for raRows.Next() {
+		var cid int
+		var colName, ctype string
+		var notnull int
+		var dfltValue *string
+		var pk int
+		if err := raRows.Scan(&cid, &colName, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if colName == "required_attributes" {
+			hasRequiredAttrs = true
+		}
+	}
+	if !hasRequiredAttrs {
+		_, err = db.Exec("ALTER TABLE clients ADD COLUMN required_attributes TEXT NOT NULL DEFAULT '[]'")
+		if err != nil {
+			return err
+		}
+	}
+
 	// Migration: backfill users rows for existing service accounts so that
 	// FK constraints (roles, etc.) work uniformly for all principal types.
 	_, err = db.Exec(`

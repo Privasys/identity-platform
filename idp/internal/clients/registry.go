@@ -18,11 +18,12 @@ import (
 
 // Client represents a registered OIDC client.
 type Client struct {
-	ClientID     string   `json:"client_id"`
-	ClientName   string   `json:"client_name"`
-	ClientSecret string   `json:"client_secret,omitempty"` // only returned on registration
-	RedirectURIs []string `json:"redirect_uris"`
-	Confidential bool     `json:"confidential"` // true if client has a secret
+	ClientID            string   `json:"client_id"`
+	ClientName          string   `json:"client_name"`
+	ClientSecret        string   `json:"client_secret,omitempty"` // only returned on registration
+	RedirectURIs        []string `json:"redirect_uris"`
+	Confidential        bool     `json:"confidential"`                    // true if client has a secret
+	RequiredAttributes  []string `json:"required_attributes,omitempty"`   // per-app attribute whitelist; empty = all scope-derived
 }
 
 // ValidRedirectURI checks if the given URI is in the client's registered redirect URIs.
@@ -47,11 +48,11 @@ func NewRegistry(db *store.DB) *Registry {
 
 // Get retrieves a client by ID.
 func (reg *Registry) Get(clientID string) (*Client, error) {
-	var name, secretHash, redirectURIsJSON string
+	var name, secretHash, redirectURIsJSON, requiredAttrsJSON string
 	err := reg.db.QueryRow(
-		"SELECT client_name, client_secret, redirect_uris FROM clients WHERE client_id = ?",
+		"SELECT client_name, client_secret, redirect_uris, required_attributes FROM clients WHERE client_id = ?",
 		clientID,
-	).Scan(&name, &secretHash, &redirectURIsJSON)
+	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON)
 	if err != nil {
 		return nil, fmt.Errorf("client not found: %w", err)
 	}
@@ -59,16 +60,20 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 	var uris []string
 	json.Unmarshal([]byte(redirectURIsJSON), &uris)
 
+	var requiredAttrs []string
+	json.Unmarshal([]byte(requiredAttrsJSON), &requiredAttrs)
+
 	return &Client{
-		ClientID:     clientID,
-		ClientName:   name,
-		RedirectURIs: uris,
-		Confidential: secretHash != "",
+		ClientID:           clientID,
+		ClientName:         name,
+		RedirectURIs:       uris,
+		Confidential:       secretHash != "",
+		RequiredAttributes: requiredAttrs,
 	}, nil
 }
 
 // Register creates a new OIDC client.
-func (reg *Registry) Register(name string, redirectURIs []string, secret string) (*Client, error) {
+func (reg *Registry) Register(name string, redirectURIs []string, secret string, requiredAttributes []string) (*Client, error) {
 	b := make([]byte, 16)
 	rand.Read(b)
 	clientID := hex.EncodeToString(b)
@@ -83,26 +88,28 @@ func (reg *Registry) Register(name string, redirectURIs []string, secret string)
 	}
 
 	urisJSON, _ := json.Marshal(redirectURIs)
+	attrsJSON, _ := json.Marshal(requiredAttributes)
 
 	_, err := reg.db.Exec(
-		"INSERT INTO clients (client_id, client_name, client_secret, redirect_uris) VALUES (?, ?, ?, ?)",
-		clientID, name, secretHash, string(urisJSON),
+		"INSERT INTO clients (client_id, client_name, client_secret, redirect_uris, required_attributes) VALUES (?, ?, ?, ?, ?)",
+		clientID, name, secretHash, string(urisJSON), string(attrsJSON),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("register client: %w", err)
 	}
 
 	return &Client{
-		ClientID:     clientID,
-		ClientName:   name,
-		ClientSecret: secret, // return plaintext only on creation
-		RedirectURIs: redirectURIs,
-		Confidential: secret != "",
+		ClientID:           clientID,
+		ClientName:         name,
+		ClientSecret:       secret, // return plaintext only on creation
+		RedirectURIs:       redirectURIs,
+		Confidential:       secret != "",
+		RequiredAttributes: requiredAttributes,
 	}, nil
 }
 
 // RegisterWithID creates a client with a specific client_id (for pre-known clients like Zitadel).
-func (reg *Registry) RegisterWithID(clientID, name string, redirectURIs []string, secret string) (*Client, error) {
+func (reg *Registry) RegisterWithID(clientID, name string, redirectURIs []string, secret string, requiredAttributes []string) (*Client, error) {
 	var secretHash string
 	if secret != "" {
 		h, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
@@ -113,22 +120,24 @@ func (reg *Registry) RegisterWithID(clientID, name string, redirectURIs []string
 	}
 
 	urisJSON, _ := json.Marshal(redirectURIs)
+	attrsJSON, _ := json.Marshal(requiredAttributes)
 
 	_, err := reg.db.Exec(
-		`INSERT INTO clients (client_id, client_name, client_secret, redirect_uris) VALUES (?, ?, ?, ?)
-		 ON CONFLICT(client_id) DO UPDATE SET client_name = excluded.client_name, client_secret = excluded.client_secret, redirect_uris = excluded.redirect_uris`,
-		clientID, name, secretHash, string(urisJSON),
+		`INSERT INTO clients (client_id, client_name, client_secret, redirect_uris, required_attributes) VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(client_id) DO UPDATE SET client_name = excluded.client_name, client_secret = excluded.client_secret, redirect_uris = excluded.redirect_uris, required_attributes = excluded.required_attributes`,
+		clientID, name, secretHash, string(urisJSON), string(attrsJSON),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("register client: %w", err)
 	}
 
 	return &Client{
-		ClientID:     clientID,
-		ClientName:   name,
-		ClientSecret: secret,
-		RedirectURIs: redirectURIs,
-		Confidential: secret != "",
+		ClientID:           clientID,
+		ClientName:         name,
+		ClientSecret:       secret,
+		RedirectURIs:       redirectURIs,
+		Confidential:       secret != "",
+		RequiredAttributes: requiredAttributes,
 	}, nil
 }
 
@@ -159,10 +168,11 @@ func HandleRegister(reg *Registry, adminToken string) http.HandlerFunc {
 		}
 
 		var req struct {
-			ClientID     string   `json:"client_id,omitempty"`
-			ClientName   string   `json:"client_name"`
-			ClientSecret string   `json:"client_secret,omitempty"`
-			RedirectURIs []string `json:"redirect_uris"`
+			ClientID           string   `json:"client_id,omitempty"`
+			ClientName         string   `json:"client_name"`
+			ClientSecret       string   `json:"client_secret,omitempty"`
+			RedirectURIs       []string `json:"redirect_uris"`
+			RequiredAttributes []string `json:"required_attributes,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
@@ -177,9 +187,9 @@ func HandleRegister(reg *Registry, adminToken string) http.HandlerFunc {
 		var client *Client
 		var err error
 		if req.ClientID != "" {
-			client, err = reg.RegisterWithID(req.ClientID, req.ClientName, req.RedirectURIs, req.ClientSecret)
+			client, err = reg.RegisterWithID(req.ClientID, req.ClientName, req.RedirectURIs, req.ClientSecret, req.RequiredAttributes)
 		} else {
-			client, err = reg.Register(req.ClientName, req.RedirectURIs, req.ClientSecret)
+			client, err = reg.Register(req.ClientName, req.RedirectURIs, req.ClientSecret, req.RequiredAttributes)
 		}
 		if err != nil {
 			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusInternalServerError)

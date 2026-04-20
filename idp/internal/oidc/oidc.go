@@ -868,6 +868,17 @@ func HandleUserInfo(issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 			"sub": sub,
 		}
 
+		// Echo back profile claims from the access token.
+		// The IdP doesn't store profile data — but the access token carries
+		// transient attributes (email, name, etc.) that the wallet relayed
+		// during authentication. Return them so relying parties and the
+		// management-service can discover them via standard OIDC userinfo.
+		for _, key := range []string{"email", "name", "preferred_username", "nickname", "picture", "phone_number"} {
+			if v, ok := claims[key].(string); ok && v != "" {
+				resp[key] = v
+			}
+		}
+
 		// Include roles.
 		roles, _ := db.GetRoles(sub)
 		if len(roles) > 0 {

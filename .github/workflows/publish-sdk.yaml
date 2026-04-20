@@ -1,0 +1,51 @@
+# Copyright (c) Privasys. All rights reserved.
+# Licensed under the GNU Affero General Public License v3.0.
+
+name: Publish SDK
+
+on:
+  push:
+    tags:
+      - 'sdk-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version to publish (e.g. 0.1.1)'
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@privasys'
+
+      - name: Install dependencies
+        working-directory: sdk
+        run: npm ci
+
+      - name: Build
+        working-directory: sdk
+        run: npm run build
+
+      - name: Verify build output
+        working-directory: sdk
+        run: |
+          test -f dist/index.js
+          test -f dist/index.d.ts
+          test -f dist/privasys-auth.iife.js
+
+      - name: Publish to GHCR npm
+        working-directory: sdk
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

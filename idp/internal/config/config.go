@@ -34,6 +34,12 @@ type Config struct {
 	MicrosoftClientSecret string
 	LinkedInClientID      string
 	LinkedInClientSecret  string
+
+	// Email verification (Microsoft Graph API).
+	AzureTenantID     string
+	AzureClientID     string
+	AzureClientSecret string
+	MailSender        string // Sender email address (default: no-reply@privasys.org)
 }
 
 // ListenAddr returns the formatted listen address.
@@ -76,6 +82,11 @@ func Load() *Config {
 		MicrosoftClientSecret: envStr("IDP_MICROSOFT_CLIENT_SECRET", ""),
 		LinkedInClientID:      envStr("IDP_LINKEDIN_CLIENT_ID", ""),
 		LinkedInClientSecret:  envStr("IDP_LINKEDIN_CLIENT_SECRET", ""),
+
+		AzureTenantID:     envStr("IDP_AZURE_TENANT_ID", ""),
+		AzureClientID:     envStr("IDP_AZURE_CLIENT_ID", ""),
+		AzureClientSecret: envStr("IDP_AZURE_CLIENT_SECRET", ""),
+		MailSender:        envStr("IDP_MAIL_SENDER", "no-reply@privasys.org"),
 	}
 }
 

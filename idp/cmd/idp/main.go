@@ -38,6 +38,7 @@ import (
 	"github.com/Privasys/idp/internal/e2e"
 	"github.com/Privasys/idp/internal/fido2"
 	"github.com/Privasys/idp/internal/oidc"
+	"github.com/Privasys/idp/internal/recovery"
 	"github.com/Privasys/idp/internal/social"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
@@ -167,6 +168,31 @@ func main() {
 	// Admin: service account management.
 	mux.HandleFunc("POST /admin/service-accounts", admin.HandleCreateServiceAccount(db, cfg.AdminToken))
 
+	// Account recovery & email verification.
+	recoveryMailer := &recovery.Mailer{
+		TenantID:     cfg.AzureTenantID,
+		ClientID:     cfg.AzureClientID,
+		ClientSecret: cfg.AzureClientSecret,
+		Sender:       cfg.MailSender,
+	}
+	recoveryHandler := recovery.NewHandler(db, recoveryMailer, issuer)
+	mux.HandleFunc("POST /recovery/email/send", recoveryHandler.HandleSendEmailCode)
+	mux.HandleFunc("POST /recovery/email/verify", recoveryHandler.HandleVerifyEmailCode)
+	mux.HandleFunc("POST /recovery/codes", recoveryHandler.HandleGenerateRecoveryCodes)
+	mux.HandleFunc("GET /recovery/codes", recoveryHandler.HandleCheckRecoveryCodes)
+	mux.HandleFunc("POST /recovery/begin", recoveryHandler.HandleBeginRecovery)
+	mux.HandleFunc("GET /recovery/status", recoveryHandler.HandleRecoveryStatus)
+	mux.HandleFunc("POST /recovery/complete", recoveryHandler.HandleCompleteRecovery)
+	mux.HandleFunc("GET /guardians", recoveryHandler.HandleListGuardians)
+	mux.HandleFunc("POST /guardians", recoveryHandler.HandleInviteGuardian)
+	mux.HandleFunc("DELETE /guardians", recoveryHandler.HandleRemoveGuardian)
+	mux.HandleFunc("POST /guardians/respond", recoveryHandler.HandleRespondToGuardianInvite)
+	mux.HandleFunc("POST /guardians/approve", recoveryHandler.HandleApproveRecovery)
+	mux.HandleFunc("GET /guardians/invites", recoveryHandler.HandleListPendingGuardianInvites)
+	mux.HandleFunc("GET /guardians/recovery-requests", recoveryHandler.HandleListRecoveryRequests)
+	mux.HandleFunc("GET /devices", recoveryHandler.HandleListDevices)
+	mux.HandleFunc("DELETE /devices", recoveryHandler.HandleRevokeDevice)
+
 	// Health.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -182,12 +208,14 @@ func main() {
 	// Bootstrap admin user if configured.
 	admin.MaybeBootstrapAdmin(db, cfg.BootstrapAdmin)
 
-	// Periodic cleanup of expired refresh tokens.
+	// Periodic cleanup of expired refresh tokens and recovery records.
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 		for range ticker.C {
 			db.CleanupExpiredRefreshTokens()
+			db.CleanupExpiredVerifications()
+			db.CleanupExpiredRecoveryRequests()
 		}
 	}()
 

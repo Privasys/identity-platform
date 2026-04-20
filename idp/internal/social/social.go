@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/oidc"
 )
 
@@ -239,16 +240,32 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch user info.
-	userInfo, err := h.fetchUserInfo(prov, token)
+	// Fetch raw user info from the provider.
+	raw, err := h.fetchRawUserInfo(prov, token)
 	if err != nil {
 		log.Printf("social/%s: user info failed: %v", entry.provider, err)
 		h.callbackError(w, "Authentication failed — could not fetch user info")
 		return
 	}
 
+	accessToken := token // keep a reference for GitHub email fallback
+
+	// Normalise raw claims using the shared canonical mappings.
+	attrs, providerUID := attributes.NormalizeClaims(entry.provider, raw)
+
 	// Build a stable user_id: "provider:provider_id"
-	userID := fmt.Sprintf("%s:%s", entry.provider, userInfo.ID)
+	if providerUID == "" {
+		log.Printf("social/%s: could not extract user ID from provider response", entry.provider)
+		h.callbackError(w, "Authentication failed — could not identify user")
+		return
+	}
+	userID := fmt.Sprintf("%s:%s", entry.provider, providerUID)
+
+	// GitHub may return null for email when the user has a private
+	// email. Fall back to the /user/emails endpoint.
+	if attrs["email"] == "" && entry.provider == "github" {
+		attrs["email"] = h.fetchGitHubPrimaryEmail(accessToken)
+	}
 
 	// Complete the OIDC session.
 	session, ok := h.sessions.Get(entry.sessionID)
@@ -260,19 +277,15 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	if session.Authenticated {
 		// Session already authenticated (e.g. passkey). Patch the social
 		// profile attributes onto the existing auth code so the JWT
-		// carries verified email/name from the social provider.
-		if userInfo.Email == "" {
+		// carries verified claims from the social provider.
+		if attrs["email"] == "" {
 			log.Printf("social/%s: no email returned for session %s — rejecting", entry.provider, entry.sessionID)
 			h.callbackError(w, "No verified email found from this provider. Please try a different one.")
 			return
 		}
-		attrs := map[string]string{"email": userInfo.Email}
-		if userInfo.Name != "" {
-			attrs["name"] = userInfo.Name
-		}
 		h.codes.UpdateAttributes(session.AuthCode, attrs)
-		log.Printf("social/%s: patched attributes on existing code for session %s (email=%s, name=%s)",
-			entry.provider, entry.sessionID, userInfo.Email, userInfo.Name)
+		log.Printf("social/%s: patched %d attributes on existing code for session %s",
+			entry.provider, len(attrs), entry.sessionID)
 		h.callbackSuccess(w)
 		return
 	}
@@ -286,11 +299,11 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		CodeChallenge:       session.CodeChallenge,
 		CodeChallengeMethod: session.CodeChallengeMethod,
 		AuthTime:            time.Now(),
-		Attributes:          map[string]string{"email": userInfo.Email, "name": userInfo.Name},
+		Attributes:          attrs,
 	})
 	h.sessions.Complete(entry.sessionID, userID, authCode)
 
-	log.Printf("social/%s: authenticated user %s (session %s)", entry.provider, userID, entry.sessionID)
+	log.Printf("social/%s: authenticated user %s (session %s, %d attrs)", entry.provider, userID, entry.sessionID, len(attrs))
 
 	h.callbackSuccess(w)
 }
@@ -354,14 +367,9 @@ func (h *Handler) exchangeCode(prov *Provider, code string) (string, error) {
 	return tok.AccessToken, nil
 }
 
-// UserInfo contains the minimal user profile from a social provider.
-type UserInfo struct {
-	ID    string
-	Email string
-	Name  string
-}
-
-func (h *Handler) fetchUserInfo(prov *Provider, accessToken string) (*UserInfo, error) {
+// fetchRawUserInfo calls the provider's UserInfo endpoint and returns the
+// raw JSON object. Claim normalisation is handled by attributes.NormalizeClaims.
+func (h *Handler) fetchRawUserInfo(prov *Provider, accessToken string) (map[string]interface{}, error) {
 	req, _ := http.NewRequest("GET", prov.UserInfoURL, nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Accept", "application/json")
@@ -377,85 +385,11 @@ func (h *Handler) fetchUserInfo(prov *Provider, accessToken string) (*UserInfo, 
 		return nil, fmt.Errorf("userinfo response %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Parse provider-specific user info format.
 	var raw map[string]interface{}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("parse userinfo: %w", err)
 	}
-
-	info := &UserInfo{}
-
-	switch prov.Name {
-	case "github":
-		if v, ok := raw["id"]; ok {
-			info.ID = fmt.Sprintf("%v", v)
-		}
-		if v, ok := raw["email"].(string); ok {
-			info.Email = v
-		}
-		if v, ok := raw["name"].(string); ok {
-			info.Name = v
-		}
-		if v, ok := raw["login"].(string); ok && info.Name == "" {
-			info.Name = v
-		}
-		// GitHub may return null for email when the user has a private
-		// email. Fall back to the /user/emails endpoint which returns
-		// all verified emails.
-		if info.Email == "" {
-			info.Email = h.fetchGitHubPrimaryEmail(accessToken)
-		}
-	case "google":
-		if v, ok := raw["sub"].(string); ok {
-			info.ID = v
-		}
-		if v, ok := raw["email"].(string); ok {
-			info.Email = v
-		}
-		if v, ok := raw["name"].(string); ok {
-			info.Name = v
-		}
-	case "microsoft":
-		if v, ok := raw["id"].(string); ok {
-			info.ID = v
-		}
-		if v, ok := raw["mail"].(string); ok {
-			info.Email = v
-		}
-		if v, ok := raw["displayName"].(string); ok {
-			info.Name = v
-		}
-	case "linkedin":
-		if v, ok := raw["sub"].(string); ok {
-			info.ID = v
-		}
-		if v, ok := raw["email"].(string); ok {
-			info.Email = v
-		}
-		if v, ok := raw["name"].(string); ok {
-			info.Name = v
-		}
-	default:
-		// Generic: try common field names
-		for _, k := range []string{"sub", "id", "user_id"} {
-			if v, ok := raw[k]; ok {
-				info.ID = fmt.Sprintf("%v", v)
-				break
-			}
-		}
-		if v, ok := raw["email"].(string); ok {
-			info.Email = v
-		}
-		if v, ok := raw["name"].(string); ok {
-			info.Name = v
-		}
-	}
-
-	if info.ID == "" {
-		return nil, fmt.Errorf("could not extract user ID from provider response")
-	}
-
-	return info, nil
+	return raw, nil
 }
 
 // fetchGitHubPrimaryEmail calls GET https://api.github.com/user/emails

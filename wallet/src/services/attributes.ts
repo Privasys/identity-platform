@@ -19,6 +19,9 @@
 import type { ProfileAttribute, UserProfile, VerificationRecord } from '@/stores/profile';
 
 // ── Canonical attribute definitions ─────────────────────────────────────
+// Loaded from the shared JSON file (single source of truth for IdP + wallet).
+
+import canonicalDoc from '../../../shared/canonical-attributes.json';
 
 export interface AttributeDefinition {
     /** Canonical key (matches OIDC Standard Claims where applicable). */
@@ -40,22 +43,25 @@ export interface AttributeDefinition {
     verifiable: boolean;
 }
 
+// Map JSON profileField strings to the typed union.
+const PROFILE_FIELD_MAP: Record<string, keyof Pick<UserProfile, 'displayName' | 'email' | 'avatarUri' | 'locale'>> = {
+    displayName: 'displayName',
+    email: 'email',
+    avatarUri: 'avatarUri',
+    locale: 'locale',
+};
+
 /**
- * The canonical attribute list. This is the single source of truth for what
- * attributes the platform supports.
- *
- * 'sub' is excluded — it's always derived from the pairwise seed and never
- * stored or requested through this system.
+ * The canonical attribute list — loaded from shared/canonical-attributes.json.
+ * This is the single source of truth for what attributes the platform supports.
  */
-export const CANONICAL_ATTRIBUTES: AttributeDefinition[] = [
-    { key: 'email',        label: 'Email',        scope: 'email',   profileField: 'email',       verifiable: true },
-    { key: 'name',         label: 'Display Name',  scope: 'profile', profileField: 'displayName', verifiable: false },
-    { key: 'given_name',   label: 'First Name',   scope: 'profile',                              verifiable: false },
-    { key: 'family_name',  label: 'Last Name',    scope: 'profile',                              verifiable: false },
-    { key: 'picture',      label: 'Avatar',       scope: 'profile', profileField: 'avatarUri',   verifiable: false },
-    { key: 'locale',       label: 'Language',      scope: 'profile', profileField: 'locale',      verifiable: false },
-    { key: 'phone_number', label: 'Phone Number',  scope: 'phone',                                verifiable: true },
-];
+export const CANONICAL_ATTRIBUTES: AttributeDefinition[] = canonicalDoc.attributes.map((a) => ({
+    key: a.key,
+    label: a.label,
+    scope: a.scope as AttributeDefinition['scope'],
+    profileField: a.profileField ? PROFILE_FIELD_MAP[a.profileField] : undefined,
+    verifiable: a.verifiable,
+}));
 
 /** Lookup table keyed by canonical attribute key. */
 export const ATTRIBUTE_MAP: Record<string, AttributeDefinition> =
@@ -127,81 +133,19 @@ export function setProfileValue(
 }
 
 // ── Provider claim normalisation ────────────────────────────────────────
+// Loaded from the shared JSON (single source of truth for IdP + wallet).
 
-/**
- * Mapping from a provider's raw claim keys to our canonical attribute keys.
- * Each entry maps `providerClaimKey → canonicalKey`. If a provider returns
- * the same data under multiple keys, list all variants (first non-empty wins).
- */
-const PROVIDER_CLAIM_MAP: Record<string, Record<string, string>> = {
-    google: {
-        sub:         'sub',
-        name:        'name',
-        given_name:  'given_name',
-        family_name: 'family_name',
-        picture:     'picture',
-        email:       'email',
-        locale:      'locale',
-    },
-    microsoft: {
-        sub:                   'sub',
-        name:                  'name',
-        displayName:           'name',          // Graph API variant
-        given_name:            'given_name',
-        givenName:             'given_name',    // Graph API variant
-        family_name:           'family_name',
-        surname:               'family_name',   // Graph API variant
-        picture:               'picture',
-        email:                 'email',
-        mail:                  'email',         // Graph API variant
-        userPrincipalName:     'email',         // Fallback when 'mail' is absent
-        locale:                'locale',
-        preferredLanguage:     'locale',        // Graph API variant
-    },
-    github: {
-        id:         'sub',
-        name:       'name',
-        login:      'name',         // Fallback if 'name' is null
-        avatar_url: 'picture',
-        email:      'email',
-    },
-    linkedin: {
-        sub:         'sub',
-        name:        'name',
-        given_name:  'given_name',
-        family_name: 'family_name',
-        picture:     'picture',
-        email:       'email',
-        locale:      'locale',
-    },
-};
+/** Provider claim key → canonical attribute key. */
+const PROVIDER_CLAIM_MAP: Record<string, Record<string, string>> = Object.fromEntries(
+    Object.entries(canonicalDoc.providers).map(([name, prov]) => [name, prov.claimMap]),
+);
 
-/**
- * Which raw claim key indicates verification status for a given canonical key.
- * For example, Google returns `email_verified: true` alongside `email`.
- * If the verification claim is absent or false, the attribute is treated as
- * unverified.
- */
-const PROVIDER_VERIFICATION_CLAIMS: Record<string, Record<string, string>> = {
-    google: {
-        email: 'email_verified',
-        phone_number: 'phone_number_verified',
-    },
-    microsoft: {
-        // Microsoft doesn't expose email_verified in all tenant types.
-        // If present, honour it; otherwise treat as unverified.
-        email: 'email_verified',
-    },
-    github: {
-        // GitHub doesn't return email_verified in userinfo, but only returns
-        // the primary verified email when scoped to 'user:email'. Treated as
-        // verified when present.
-        email: '_always_verified',
-    },
-    linkedin: {
-        email: 'email_verified',
-    },
-};
+/** Canonical attribute key → raw claim key that indicates verification status. */
+const PROVIDER_VERIFICATION_CLAIMS: Record<string, Record<string, string>> = Object.fromEntries(
+    Object.entries(canonicalDoc.providers)
+        .filter(([, prov]) => Object.keys(prov.verificationClaims).length > 0)
+        .map(([name, prov]) => [name, prov.verificationClaims]),
+);
 
 /**
  * Normalise raw provider claims into canonical attribute key/value pairs.

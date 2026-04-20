@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Single source of truth for canonical user attributes and provider claim mappings. Used by both the Go IdP and the TypeScript wallet/SDK. Attribute keys follow OIDC Standard Claims (RFC 7519 §5.1).",
+  "attributes": [
+    { "key": "email",        "label": "Email",        "scope": "email",   "profileField": "email",       "verifiable": true },
+    { "key": "name",         "label": "Display Name", "scope": "profile", "profileField": "displayName", "verifiable": false },
+    { "key": "given_name",   "label": "First Name",   "scope": "profile", "profileField": null,          "verifiable": false },
+    { "key": "family_name",  "label": "Last Name",    "scope": "profile", "profileField": null,          "verifiable": false },
+    { "key": "nickname",     "label": "Nickname",      "scope": "profile", "profileField": null,          "verifiable": false },
+    { "key": "picture",      "label": "Avatar",        "scope": "profile", "profileField": "avatarUri",   "verifiable": false },
+    { "key": "locale",       "label": "Language",      "scope": "profile", "profileField": "locale",      "verifiable": false },
+    { "key": "phone_number", "label": "Phone Number",  "scope": "phone",  "profileField": null,          "verifiable": true }
+  ],
+  "providers": {
+    "google": {
+      "claimMap": {
+        "sub":         "sub",
+        "name":        "name",
+        "given_name":  "given_name",
+        "family_name": "family_name",
+        "picture":     "picture",
+        "email":       "email",
+        "locale":      "locale"
+      },
+      "idClaim": "sub",
+      "verificationClaims": {
+        "email": "email_verified",
+        "phone_number": "phone_number_verified"
+      }
+    },
+    "microsoft": {
+      "claimMap": {
+        "sub":               "sub",
+        "name":              "name",
+        "displayName":       "name",
+        "given_name":        "given_name",
+        "givenName":         "given_name",
+        "family_name":       "family_name",
+        "surname":           "family_name",
+        "picture":           "picture",
+        "email":             "email",
+        "mail":              "email",
+        "userPrincipalName": "email",
+        "locale":            "locale",
+        "preferredLanguage": "locale"
+      },
+      "idClaim": "sub",
+      "verificationClaims": {
+        "email": "email_verified"
+      }
+    },
+    "github": {
+      "claimMap": {
+        "id":         "sub",
+        "name":       "name",
+        "login":      "name",
+        "avatar_url": "picture",
+        "email":      "email"
+      },
+      "idClaim": "id",
+      "verificationClaims": {
+        "email": "_always_verified"
+      }
+    },
+    "linkedin": {
+      "claimMap": {
+        "sub":         "sub",
+        "name":        "name",
+        "given_name":  "given_name",
+        "family_name": "family_name",
+        "picture":     "picture",
+        "email":       "email",
+        "locale":      "locale"
+      },
+      "idClaim": "sub",
+      "verificationClaims": {
+        "email": "email_verified"
+      }
+    }
+  }
+}

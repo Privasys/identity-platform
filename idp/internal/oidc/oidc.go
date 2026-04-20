@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
@@ -347,14 +348,10 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		if strings.Contains(scope, "openid") {
 			requestedAttributes = append(requestedAttributes, "sub")
 		}
-		if strings.Contains(scope, "email") {
-			requestedAttributes = append(requestedAttributes, "email")
-		}
-		if strings.Contains(scope, "profile") {
-			requestedAttributes = append(requestedAttributes, "name")
-		}
-		if strings.Contains(scope, "phone") {
-			requestedAttributes = append(requestedAttributes, "phone_number")
+		for _, attr := range attributes.All {
+			if strings.Contains(scope, attr.Scope) {
+				requestedAttributes = append(requestedAttributes, attr.Key)
+			}
 		}
 		if len(requestedAttributes) > 0 {
 			qrPayload["requestedAttributes"] = requestedAttributes
@@ -873,9 +870,9 @@ func HandleUserInfo(issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 		// transient attributes (email, name, etc.) that the wallet relayed
 		// during authentication. Return them so relying parties and the
 		// management-service can discover them via standard OIDC userinfo.
-		for _, key := range []string{"email", "name", "preferred_username", "nickname", "picture", "phone_number"} {
-			if v, ok := claims[key].(string); ok && v != "" {
-				resp[key] = v
+		for _, attr := range attributes.All {
+			if v, ok := claims[attr.Key].(string); ok && v != "" {
+				resp[attr.Key] = v
 			}
 		}
 
@@ -901,37 +898,21 @@ func verifyPKCE(challenge, verifier string) bool {
 	return computed == challenge
 }
 
-// filterAttributesByScope returns only the attributes allowed by the OIDC scope.
-// Attribute names follow OIDC Standard Claims (RFC 7519 §5.1):
-//   - "email" scope → "email"
-//   - "profile" scope → "name", "given_name", "family_name", "nickname", "picture", "locale"
-//   - "phone" scope → "phone_number"
-//
-// Unknown attributes pass through only if their key matches a scope token
-// (future extensibility).
+// filterAttributesByScope returns only the attributes allowed by the OIDC scope,
+// using the shared canonical attribute definitions.
 func filterAttributesByScope(attrs map[string]string, scope string) map[string]string {
 	if len(attrs) == 0 {
 		return nil
 	}
 	out := make(map[string]string)
-	hasEmail := strings.Contains(scope, "email")
-	hasProfile := strings.Contains(scope, "profile")
-	hasPhone := strings.Contains(scope, "phone")
 	for k, v := range attrs {
-		switch k {
-		case "email":
-			if hasEmail || hasProfile {
+		if attr, ok := attributes.ByKey[k]; ok {
+			// Known canonical attribute — check if its scope is requested.
+			// Special case: email is also allowed under profile scope.
+			if strings.Contains(scope, attr.Scope) || (k == "email" && strings.Contains(scope, "profile")) {
 				out[k] = v
 			}
-		case "name", "family_name", "given_name", "nickname", "picture", "locale":
-			if hasProfile {
-				out[k] = v
-			}
-		case "phone_number":
-			if hasPhone {
-				out[k] = v
-			}
-		default:
+		} else {
 			// Extensible: allow attribute if its key appears as a scope token.
 			if strings.Contains(scope, k) {
 				out[k] = v

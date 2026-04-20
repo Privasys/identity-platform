@@ -4,7 +4,11 @@
   "attributes": [
     { "key": "email",        "label": "Email",        "scope": "email",   "profileField": "email",       "verifiable": true },
     { "key": "name",         "label": "Display Name", "scope": "profile", "profileField": "displayName", "verifiable": false },
+    { "key": "given_name",   "label": "First Name",   "scope": "profile", "profileField": null,          "verifiable": false },
+    { "key": "family_name",  "label": "Last Name",    "scope": "profile", "profileField": null,          "verifiable": false },
+    { "key": "nickname",     "label": "Nickname",      "scope": "profile", "profileField": null,          "verifiable": false },
     { "key": "picture",      "label": "Avatar",        "scope": "profile", "profileField": "avatarUri",   "verifiable": false },
+    { "key": "locale",       "label": "Language",      "scope": "profile", "profileField": "locale",      "verifiable": false },
     { "key": "phone_number", "label": "Phone Number",  "scope": "phone",  "profileField": null,          "verifiable": true }
   ],
   "providers": {
@@ -12,8 +16,11 @@
       "claimMap": {
         "sub":         "sub",
         "name":        "name",
+        "given_name":  "given_name",
+        "family_name": "family_name",
         "picture":     "picture",
-        "email":       "email"
+        "email":       "email",
+        "locale":      "locale"
       },
       "idClaim": "sub",
       "verificationClaims": {
@@ -26,10 +33,16 @@
         "sub":               "sub",
         "name":              "name",
         "displayName":       "name",
+        "given_name":        "given_name",
+        "givenName":         "given_name",
+        "family_name":       "family_name",
+        "surname":           "family_name",
         "picture":           "picture",
         "email":             "email",
         "mail":              "email",
-        "userPrincipalName": "email"
+        "userPrincipalName": "email",
+        "locale":            "locale",
+        "preferredLanguage": "locale"
       },
       "idClaim": "sub",
       "verificationClaims": {
@@ -53,8 +66,11 @@
       "claimMap": {
         "sub":         "sub",
         "name":        "name",
+        "given_name":  "given_name",
+        "family_name": "family_name",
         "picture":     "picture",
-        "email":       "email"
+        "email":       "email",
+        "locale":      "locale"
       },
       "idClaim": "sub",
       "verificationClaims": {

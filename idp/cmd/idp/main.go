@@ -176,8 +176,14 @@ func main() {
 		Sender:       cfg.MailSender,
 	}
 	recoveryHandler := recovery.NewHandler(db, recoveryMailer, issuer)
-	mux.HandleFunc("POST /recovery/codes", recoveryHandler.HandleGenerateRecoveryCodes)
-	mux.HandleFunc("GET /recovery/codes", recoveryHandler.HandleCheckRecoveryCodes)
+	recoveryHandler.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
+	// Recovery phrase (BIP39) endpoints — preferred names.
+	mux.HandleFunc("POST /recovery/phrase/regenerate", recoveryHandler.HandleRegeneratePhrase)
+	mux.HandleFunc("GET /recovery/phrase/status", recoveryHandler.HandlePhraseStatus)
+	mux.HandleFunc("DELETE /recovery/phrase", recoveryHandler.HandleDeleteRecoveryCodes)
+	// Legacy code endpoint aliases (back-compat for older wallet builds).
+	mux.HandleFunc("POST /recovery/codes", recoveryHandler.HandleRegeneratePhrase)
+	mux.HandleFunc("GET /recovery/codes", recoveryHandler.HandlePhraseStatus)
 	mux.HandleFunc("DELETE /recovery/codes", recoveryHandler.HandleDeleteRecoveryCodes)
 	mux.HandleFunc("POST /recovery/begin", recoveryHandler.HandleBeginRecovery)
 	mux.HandleFunc("GET /recovery/status", recoveryHandler.HandleRecoveryStatus)

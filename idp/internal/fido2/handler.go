@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/Privasys/idp/internal/oidc"
+	"github.com/Privasys/idp/internal/recovery"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/protocol/webauthncose"
@@ -38,9 +39,74 @@ type Config struct {
 
 // Handler manages FIDO2 registration and authentication.
 type Handler struct {
-	webAuthn   *webauthn.WebAuthn
-	db         *store.DB
-	challenges *challengeStore
+	webAuthn       *webauthn.WebAuthn
+	db             *store.DB
+	challenges     *challengeStore
+	walletSessions *walletSessionStore
+}
+
+// walletSessionStore is a tiny in-memory map of sessionToken → user_id with TTL.
+// Issued by /fido2/*/complete and consumed by recovery management endpoints to
+// avoid the wallet needing a full OIDC bearer token.
+type walletSessionStore struct {
+	mu       sync.Mutex
+	sessions map[string]walletSessionEntry
+}
+
+type walletSessionEntry struct {
+	userID    string
+	expiresAt time.Time
+}
+
+const walletSessionTTL = 30 * time.Minute
+
+func newWalletSessionStore() *walletSessionStore {
+	s := &walletSessionStore{sessions: make(map[string]walletSessionEntry)}
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+			s.cleanup()
+		}
+	}()
+	return s
+}
+
+func (s *walletSessionStore) issue(userID string) string {
+	token := generateToken()
+	s.mu.Lock()
+	s.sessions[token] = walletSessionEntry{userID: userID, expiresAt: time.Now().Add(walletSessionTTL)}
+	s.mu.Unlock()
+	return token
+}
+
+// Resolve returns the user_id for a sessionToken, sliding the TTL on success.
+func (s *walletSessionStore) Resolve(token string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.sessions[token]
+	if !ok || time.Now().After(e.expiresAt) {
+		delete(s.sessions, token)
+		return "", false
+	}
+	e.expiresAt = time.Now().Add(walletSessionTTL)
+	s.sessions[token] = e
+	return e.userID, true
+}
+
+func (s *walletSessionStore) cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for k, v := range s.sessions {
+		if now.After(v.expiresAt) {
+			delete(s.sessions, k)
+		}
+	}
+}
+
+// WalletSessionResolver returns a closure usable by the recovery package.
+func (h *Handler) WalletSessionResolver() func(string) (string, bool) {
+	return h.walletSessions.Resolve
 }
 
 // NewHandler creates a FIDO2 handler with the given configuration.
@@ -63,9 +129,10 @@ func NewHandler(cfg Config) (*Handler, error) {
 	}
 
 	return &Handler{
-		webAuthn:   w,
-		db:         cfg.DB,
-		challenges: newChallengeStore(),
+		webAuthn:       w,
+		db:             cfg.DB,
+		challenges:     newChallengeStore(),
+		walletSessions: newWalletSessionStore(),
 	}, nil
 }
 
@@ -309,7 +376,23 @@ func (h *Handler) CompleteRegistration(
 		log.Printf("fido2: registered credential %s for user %s (aaguid: %s)",
 			credID[:16]+"...", userID, aaguid)
 
-		sessionToken := generateToken()
+		// Issue a wallet session token for management ops (recovery phrase, etc).
+		sessionToken := h.walletSessions.issue(userID)
+
+		// On first registration, auto-generate a BIP39 recovery phrase if the
+		// user has none. Returned ONCE; user must save it.
+		var recoveryPhrase string
+		if existing, _ := h.db.HasRecoveryCodes(userID); existing == 0 {
+			if phrase, err := recovery.GenerateRecoveryPhrase(); err == nil {
+				if err := h.db.StoreRecoveryCodes(userID, []string{recovery.HashPhrase(phrase)}); err == nil {
+					recoveryPhrase = phrase
+				} else {
+					log.Printf("fido2/register/complete: store recovery phrase: %v", err)
+				}
+			} else {
+				log.Printf("fido2/register/complete: generate recovery phrase: %v", err)
+			}
+		}
 
 		// Mark OIDC session complete (first-time users register, not authenticate).
 		if entry.sessionID != "" {
@@ -329,10 +412,15 @@ func (h *Handler) CompleteRegistration(
 			}
 		}
 
-		writeJSON(w, map[string]interface{}{
+		resp := map[string]interface{}{
 			"status":       "ok",
 			"sessionToken": sessionToken,
-		})
+			"userId":       userID,
+		}
+		if recoveryPhrase != "" {
+			resp["recoveryPhrase"] = recoveryPhrase
+		}
+		writeJSON(w, resp)
 	}
 }
 
@@ -518,7 +606,7 @@ func (h *Handler) CompleteAuthentication(
 
 		log.Printf("fido2: authenticated user %s (credential %s...)", userID, credID[:16])
 
-		sessionToken := generateToken()
+		sessionToken := h.walletSessions.issue(userID)
 
 		// Generate OIDC auth code and mark session complete.
 		if entry.sessionID != "" {
@@ -541,6 +629,7 @@ func (h *Handler) CompleteAuthentication(
 		writeJSON(w, map[string]interface{}{
 			"status":       "ok",
 			"sessionToken": sessionToken,
+			"userId":       userID,
 		})
 	}
 }

@@ -14,11 +14,13 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/big"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/tyler-smith/go-bip39"
 )
 
 // Mailer sends verification emails via Microsoft Graph API.
@@ -156,40 +158,26 @@ func (m *Mailer) send(to, subject, body string) error {
 
 // --- Code generation utilities ---
 
-// GenerateRecoveryCodes returns 12 random 16-character base32 codes.
-func GenerateRecoveryCodes() ([]string, error) {
-	const (
-		count   = 12
-		length  = 16
-		charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567" // base32 alphabet
-	)
-
-	codes := make([]string, count)
-	for i := 0; i < count; i++ {
-		buf := make([]byte, length)
-		for j := 0; j < length; j++ {
-			n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-			if err != nil {
-				return nil, err
-			}
-			buf[j] = charset[n.Int64()]
-		}
-		// Format as XXXX-XXXX-XXXX-XXXX for readability.
-		codes[i] = string(buf[:4]) + "-" + string(buf[4:8]) + "-" + string(buf[8:12]) + "-" + string(buf[12:16])
+// GenerateRecoveryPhrase returns a single BIP39 24-word mnemonic (256 bits of
+// entropy + 8-bit checksum). High-entropy phrases make rate limiting and
+// device attestation unnecessary on /recovery/begin.
+func GenerateRecoveryPhrase() (string, error) {
+	entropy, err := bip39.NewEntropy(256)
+	if err != nil {
+		return "", err
 	}
-	return codes, nil
+	return bip39.NewMnemonic(entropy)
 }
 
-// HashCode returns the SHA-256 hex digest of a code (stripped of dashes).
-func HashCode(code string) string {
-	// Remove dashes for hashing.
-	clean := make([]byte, 0, len(code))
-	for _, b := range []byte(code) {
-		if b != '-' {
-			clean = append(clean, b)
-		}
-	}
-	h := sha256.Sum256(clean)
+// NormalizePhrase lowercases and collapses whitespace for stable hashing.
+func NormalizePhrase(phrase string) string {
+	fields := strings.Fields(strings.ToLower(phrase))
+	return strings.Join(fields, " ")
+}
+
+// HashPhrase returns the SHA-256 hex digest of the normalized phrase.
+func HashPhrase(phrase string) string {
+	h := sha256.Sum256([]byte(NormalizePhrase(phrase)))
 	return hex.EncodeToString(h[:])
 }
 

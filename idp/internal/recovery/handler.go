@@ -5,27 +5,27 @@ package recovery
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log"
-	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
 )
 
+// WalletSessionResolver resolves a short-lived wallet sessionToken to a user_id.
+// Implemented by the fido2 package; injected to avoid an import cycle.
+type WalletSessionResolver func(token string) (string, bool)
+
 // Handler serves all recovery-related HTTP endpoints.
 type Handler struct {
-	db     *store.DB
-	mailer *Mailer
-	issuer *tokens.Issuer
+	db            *store.DB
+	mailer        *Mailer
+	issuer        *tokens.Issuer
+	walletSession WalletSessionResolver
 }
 
 // NewHandler creates a recovery handler.
@@ -33,46 +33,50 @@ func NewHandler(db *store.DB, mailer *Mailer, issuer *tokens.Issuer) *Handler {
 	return &Handler{db: db, mailer: mailer, issuer: issuer}
 }
 
-// --- Recovery code endpoints ---
+// SetWalletSessionResolver wires the fido2 wallet-session lookup into recovery auth.
+func (h *Handler) SetWalletSessionResolver(r WalletSessionResolver) {
+	h.walletSession = r
+}
 
-// HandleGenerateRecoveryCodes creates new recovery codes for an authenticated user.
-// POST /recovery/codes  (requires Bearer token)
-func (h *Handler) HandleGenerateRecoveryCodes(w http.ResponseWriter, r *http.Request) {
+// --- Recovery phrase endpoints ---
+
+// HandleRegeneratePhrase creates a new BIP39 recovery phrase, replacing any existing one.
+// POST /recovery/phrase/regenerate  (requires wallet sessionToken or JWT bearer)
+func (h *Handler) HandleRegeneratePhrase(w http.ResponseWriter, r *http.Request) {
 	userID := h.authenticateBearer(w, r)
 	if userID == "" {
 		return
 	}
 
-	codes, err := GenerateRecoveryCodes()
+	phrase, err := GenerateRecoveryPhrase()
 	if err != nil {
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
 
-	hashes := make([]string, len(codes))
-	for i, code := range codes {
-		hashes[i] = HashCode(code)
-	}
-
-	if err := h.db.StoreRecoveryCodes(userID, hashes); err != nil {
-		log.Printf("[recovery] store codes error: %v", err)
+	if err := h.db.StoreRecoveryCodes(userID, []string{HashPhrase(phrase)}); err != nil {
+		log.Printf("[recovery] store phrase error: %v", err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"codes":   codes,
-		"message": "Save these codes securely. They will not be shown again.",
+		"phrase":  phrase,
+		"message": "Save this 24-word phrase securely. It will not be shown again.",
 	})
 }
 
-// HandleCheckRecoveryCodes returns whether the user has active recovery codes.
-// GET /recovery/codes  (requires Bearer token)
-func (h *Handler) HandleCheckRecoveryCodes(w http.ResponseWriter, r *http.Request) {
-	userID := h.authenticateBearer(w, r)
+// HandlePhraseStatus returns whether the user has a recovery phrase set up.
+// GET /recovery/phrase/status?user_id=...  (public — only exposes a boolean)
+func (h *Handler) HandlePhraseStatus(w http.ResponseWriter, r *http.Request) {
+	userID := r.URL.Query().Get("user_id")
 	if userID == "" {
-		return
+		// Fall back to bearer auth for backward compatibility.
+		userID = h.authenticateBearer(w, r)
+		if userID == "" {
+			return
+		}
 	}
 
 	count, err := h.db.HasRecoveryCodes(userID)
@@ -83,6 +87,8 @@ func (h *Handler) HandleCheckRecoveryCodes(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
+		"has_phrase": count > 0,
+		// Legacy field for old wallet builds — count is always 0 or 1 now.
 		"has_codes":       count > 0,
 		"remaining_codes": count,
 	})
@@ -118,97 +124,33 @@ func (h *Handler) HandleDeleteRecoveryCodes(w http.ResponseWriter, r *http.Reque
 
 // --- Recovery flow endpoints ---
 
-// HandleBeginRecovery starts the recovery process using a recovery code.
-// Requires device attestation (TEE-signed) and is rate-limited to 5 attempts per device per day.
-// POST /recovery/begin  { "recovery_code": "...", "device_public_key": "base64", "device_signature": "base64", "timestamp": "RFC3339" }
+// HandleBeginRecovery starts the recovery process using a BIP39 recovery phrase.
+// No device attestation or rate limiting — protection comes from 256-bit phrase entropy.
+// POST /recovery/begin  { "recovery_phrase": "word1 word2 ..." }
+// (Legacy field "recovery_code" still accepted for backward compatibility.)
 func (h *Handler) HandleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		RecoveryCode    string `json:"recovery_code"`
-		DevicePublicKey string `json:"device_public_key"` // base64 uncompressed P-256 (65 bytes: 0x04 || X || Y)
-		DeviceSignature string `json:"device_signature"`  // base64 ASN.1/DER ECDSA signature
-		Timestamp       string `json:"timestamp"`         // RFC 3339
+		RecoveryPhrase string `json:"recovery_phrase"`
+		RecoveryCode   string `json:"recovery_code"` // legacy alias
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
 		return
 	}
-	if req.RecoveryCode == "" {
-		http.Error(w, `{"error":"recovery_code is required"}`, http.StatusBadRequest)
+	phrase := req.RecoveryPhrase
+	if phrase == "" {
+		phrase = req.RecoveryCode
+	}
+	if phrase == "" {
+		http.Error(w, `{"error":"recovery_phrase is required"}`, http.StatusBadRequest)
 		return
 	}
 
-	// --- Device attestation verification (TEE-signed rate limiting) ---
-	if req.DevicePublicKey == "" || req.DeviceSignature == "" || req.Timestamp == "" {
-		http.Error(w, `{"error":"device attestation required (device_public_key, device_signature, timestamp)"}`, http.StatusBadRequest)
-		return
-	}
-
-	// Parse and validate timestamp freshness (±5 minutes).
-	ts, err := time.Parse(time.RFC3339, req.Timestamp)
-	if err != nil {
-		http.Error(w, `{"error":"invalid timestamp format (RFC 3339 required)"}`, http.StatusBadRequest)
-		return
-	}
-	if time.Since(ts).Abs() > 5*time.Minute {
-		http.Error(w, `{"error":"timestamp too far from server time"}`, http.StatusBadRequest)
-		return
-	}
-
-	// Decode uncompressed P-256 public key (65 bytes: 0x04 prefix + 32-byte X + 32-byte Y).
-	pubKeyBytes, err := base64.StdEncoding.DecodeString(req.DevicePublicKey)
-	if err != nil || len(pubKeyBytes) != 65 || pubKeyBytes[0] != 0x04 {
-		http.Error(w, `{"error":"invalid device_public_key (expected base64 uncompressed P-256, 65 bytes)"}`, http.StatusBadRequest)
-		return
-	}
-	x := new(big.Int).SetBytes(pubKeyBytes[1:33])
-	y := new(big.Int).SetBytes(pubKeyBytes[33:65])
-	pubKey := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
-	if !pubKey.Curve.IsOnCurve(x, y) {
-		http.Error(w, `{"error":"device_public_key not on P-256 curve"}`, http.StatusBadRequest)
-		return
-	}
-
-	// Verify ECDSA signature over SHA-256(recovery_code || timestamp).
-	// Accept both raw r||s (64 bytes, IEEE P1363 / Web Crypto) and ASN.1/DER formats.
-	sigBytes, err := base64.StdEncoding.DecodeString(req.DeviceSignature)
-	if err != nil {
-		http.Error(w, `{"error":"invalid device_signature"}`, http.StatusBadRequest)
-		return
-	}
-	digest := sha256.Sum256([]byte(req.RecoveryCode + req.Timestamp))
-	var sigValid bool
-	if len(sigBytes) == 64 {
-		// Raw r||s format (IEEE P1363, as produced by Web Crypto API).
-		sr := new(big.Int).SetBytes(sigBytes[:32])
-		ss := new(big.Int).SetBytes(sigBytes[32:64])
-		sigValid = ecdsa.Verify(pubKey, digest[:], sr, ss)
-	} else {
-		// ASN.1/DER format.
-		sigValid = ecdsa.VerifyASN1(pubKey, digest[:], sigBytes)
-	}
-	if !sigValid {
-		http.Error(w, `{"error":"device signature verification failed"}`, http.StatusBadRequest)
-		return
-	}
-
-	// Rate limit: max 5 recovery attempts per device per day.
-	keyHash := sha256.Sum256(pubKeyBytes)
-	deviceKeyHash := hex.EncodeToString(keyHash[:])
-	count, err := h.db.CheckRecoveryRateLimit(deviceKeyHash)
-	if err != nil {
-		log.Printf("[recovery] rate limit check error: %v", err)
-	}
-	if count >= 5 {
-		http.Error(w, `{"error":"too many recovery attempts from this device today (max 5)"}`, http.StatusTooManyRequests)
-		return
-	}
-	h.db.RecordRecoveryAttempt(deviceKeyHash)
-
-	// --- Find user by recovery code ---
-	codeHash := HashCode(req.RecoveryCode)
+	// --- Find user by recovery phrase ---
+	codeHash := HashPhrase(phrase)
 	userID, err := h.db.FindUserByRecoveryCode(codeHash)
 	if err != nil {
-		http.Error(w, `{"error":"invalid recovery code"}`, http.StatusBadRequest)
+		http.Error(w, `{"error":"invalid recovery phrase"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -232,7 +174,7 @@ func (h *Handler) HandleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Mark code as verified on the request.
+	// Mark phrase as verified on the request.
 	h.db.UpdateRecoveryCodeVerified(requestID)
 
 	// If guardians required, notify them.
@@ -704,14 +646,28 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 // --- Helpers ---
 
 // authenticateBearer extracts and validates the Bearer token, returning the user ID.
+// Accepts two forms:
+//   - "Bearer <jwt>"           — OIDC access token (verified via tokens.Issuer)
+//   - "Bearer wallet:<token>"  — short-lived wallet session token issued by /fido2/*/complete
 func (h *Handler) authenticateBearer(w http.ResponseWriter, r *http.Request) string {
 	auth := r.Header.Get("Authorization")
-	if len(auth) < 8 || auth[:7] != "Bearer " {
+	if len(auth) < 8 || !strings.HasPrefix(auth, "Bearer ") {
 		http.Error(w, `{"error":"authorization required"}`, http.StatusUnauthorized)
 		return ""
 	}
 	token := auth[7:]
 
+	// Wallet session token path.
+	if strings.HasPrefix(token, "wallet:") && h.walletSession != nil {
+		walletToken := strings.TrimPrefix(token, "wallet:")
+		if userID, ok := h.walletSession(walletToken); ok {
+			return userID
+		}
+		http.Error(w, `{"error":"invalid or expired wallet session"}`, http.StatusUnauthorized)
+		return ""
+	}
+
+	// OIDC JWT path.
 	claims, err := h.issuer.VerifyAccessToken(token)
 	if err != nil {
 		http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)

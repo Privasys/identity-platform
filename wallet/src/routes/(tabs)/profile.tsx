@@ -84,6 +84,13 @@ export default function ProfileScreen() {
                             <Text style={styles.createProfileButtonText}>Set Up Profile</Text>
                         )}
                     </Pressable>
+                    <Pressable
+                        style={styles.recoverButton}
+                        onPress={() => router.push('/recover-account' as never)}
+                    >
+                        <Ionicons name="key-outline" size={16} color="#00BCF2" />
+                        <Text style={styles.recoverButtonText}>Recover Existing Account</Text>
+                    </Pressable>
                 </RNView>
             </RNView>
         );
@@ -228,7 +235,25 @@ export default function ProfileScreen() {
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>Recovery Settings</Text>
                             <Text style={styles.sharingDetail}>
-                                Email, backup codes, guardians & devices
+                                Backup codes, guardians & devices
+                            </Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                    </RNView>
+                </Pressable>
+
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/recover-account' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="key-outline" size={20} color="#F59E0B" />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>Recover Account</Text>
+                            <Text style={styles.sharingDetail}>
+                                Lost access? Start recovery here
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -364,6 +389,18 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '600' as const
+    },
+    recoverButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        marginTop: 4,
+    },
+    recoverButtonText: {
+        color: '#00BCF2',
+        fontSize: 14,
+        fontWeight: '500',
     },
 
     profileCard: {

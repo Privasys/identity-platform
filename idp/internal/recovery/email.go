@@ -1,8 +1,8 @@
 // Copyright (c) Privasys. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.0.
 
-// Package recovery implements account recovery: email verification, recovery
-// codes, guardian-based social recovery, and multi-device enrollment.
+// Package recovery implements account recovery: recovery codes,
+// guardian-based social recovery, and multi-device enrollment.
 package recovery
 
 import (
@@ -38,52 +38,32 @@ func (m *Mailer) Enabled() bool {
 	return m.TenantID != "" && m.ClientID != "" && m.ClientSecret != ""
 }
 
-// SendVerificationCode sends a 6-digit OTP to the given email address.
-func (m *Mailer) SendVerificationCode(email, code string) error {
+// SendGuardianInvite sends an invitation email with a deep link to become a guardian.
+// userName is the inviting user's self-reported display name (from the wallet).
+func (m *Mailer) SendGuardianInvite(guardianEmail, userName, inviteToken string) error {
 	if !m.Enabled() {
-		log.Printf("[email] Graph API not configured — would send code %s to %s", code, email)
+		log.Printf("[email] Graph API not configured — would send guardian invite to %s (token: %s)", guardianEmail, inviteToken)
 		return nil
 	}
 
-	subject := "Privasys — Email Verification Code"
-	body := fmt.Sprintf(
-		"Your Privasys email verification code is:\n\n    %s\n\n"+
-			"This code expires in 10 minutes. If you did not request this, ignore this email.\n",
-		code,
-	)
+	deepLink := fmt.Sprintf("https://privasys.id/guardian?token=%s", inviteToken)
 
-	return m.send(email, subject, body)
-}
-
-// SendGuardianInvite sends a notification to a guardian about being invited.
-func (m *Mailer) SendGuardianInvite(guardianEmail, userName string) error {
-	if !m.Enabled() {
-		log.Printf("[email] Graph API not configured — would send guardian invite to %s", guardianEmail)
-		return nil
+	// Use a fallback if the wallet didn't provide a name.
+	if userName == "" {
+		userName = "A Privasys user"
 	}
 
 	subject := "Privasys — Recovery Guardian Invitation"
 	body := fmt.Sprintf(
 		"%s has invited you as a recovery guardian on Privasys.\n\n"+
-			"Open the Privasys Wallet app to accept or decline this invitation.\n",
-		userName,
-	)
-
-	return m.send(guardianEmail, subject, body)
-}
-
-// SendRecoveryAlert notifies guardians that a recovery is in progress.
-func (m *Mailer) SendRecoveryAlert(guardianEmail, userName string) error {
-	if !m.Enabled() {
-		log.Printf("[email] Graph API not configured — would send recovery alert to %s", guardianEmail)
-		return nil
-	}
-
-	subject := "Privasys — Account Recovery Request"
-	body := fmt.Sprintf(
-		"%s is attempting to recover their Privasys account.\n\n"+
-			"Open the Privasys Wallet app to approve or decline this recovery request.\n",
-		userName,
+			"As a recovery guardian, you help protect their account by approving "+
+			"recovery requests if they ever lose access to their device.\n\n"+
+			"To accept this invitation, tap the link below:\n\n"+
+			"    %s\n\n"+
+			"If you already have the Privasys Wallet app installed, the link will "+
+			"open directly in the app. Otherwise, you'll be directed to download it.\n\n"+
+			"This invitation expires in 7 days.\n",
+		userName, deepLink,
 	)
 
 	return m.send(guardianEmail, subject, body)
@@ -175,15 +155,6 @@ func (m *Mailer) send(to, subject, body string) error {
 }
 
 // --- Code generation utilities ---
-
-// GenerateOTP returns a cryptographically random 6-digit numeric code.
-func GenerateOTP() (string, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%06d", n.Int64()), nil
-}
 
 // GenerateRecoveryCodes returns 12 random 16-character base32 codes.
 func GenerateRecoveryCodes() ([]string, error) {

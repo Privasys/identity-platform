@@ -159,8 +159,8 @@ func main() {
 	// Client registration (admin endpoint).
 	mux.HandleFunc("POST /clients", clients.HandleRegister(clientReg, cfg.AdminToken))
 
-	// Admin: role management.
-	mux.HandleFunc("GET /admin/users", admin.HandleListUsers(db, cfg.AdminToken))
+	// Admin: metrics and role management.
+	mux.HandleFunc("GET /admin/metrics", admin.HandleGetMetrics(db, cfg.AdminToken))
 	mux.HandleFunc("POST /admin/roles", admin.HandleGrantRole(db, cfg.AdminToken))
 	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
 	mux.HandleFunc("GET /admin/roles", admin.HandleListRoles(db, cfg.AdminToken))
@@ -168,7 +168,7 @@ func main() {
 	// Admin: service account management.
 	mux.HandleFunc("POST /admin/service-accounts", admin.HandleCreateServiceAccount(db, cfg.AdminToken))
 
-	// Account recovery & email verification.
+	// Account recovery & guardian management.
 	recoveryMailer := &recovery.Mailer{
 		TenantID:     cfg.AzureTenantID,
 		ClientID:     cfg.AzureClientID,
@@ -176,20 +176,23 @@ func main() {
 		Sender:       cfg.MailSender,
 	}
 	recoveryHandler := recovery.NewHandler(db, recoveryMailer, issuer)
-	mux.HandleFunc("POST /recovery/email/send", recoveryHandler.HandleSendEmailCode)
-	mux.HandleFunc("POST /recovery/email/verify", recoveryHandler.HandleVerifyEmailCode)
 	mux.HandleFunc("POST /recovery/codes", recoveryHandler.HandleGenerateRecoveryCodes)
 	mux.HandleFunc("GET /recovery/codes", recoveryHandler.HandleCheckRecoveryCodes)
+	mux.HandleFunc("DELETE /recovery/codes", recoveryHandler.HandleDeleteRecoveryCodes)
 	mux.HandleFunc("POST /recovery/begin", recoveryHandler.HandleBeginRecovery)
 	mux.HandleFunc("GET /recovery/status", recoveryHandler.HandleRecoveryStatus)
 	mux.HandleFunc("POST /recovery/complete", recoveryHandler.HandleCompleteRecovery)
 	mux.HandleFunc("GET /guardians", recoveryHandler.HandleListGuardians)
-	mux.HandleFunc("POST /guardians", recoveryHandler.HandleInviteGuardian)
+	mux.HandleFunc("POST /guardians/invite", recoveryHandler.HandleInviteGuardianByEmail)
+	mux.HandleFunc("POST /guardians/add", recoveryHandler.HandleAddGuardianByQR)
+	mux.HandleFunc("POST /guardians/accept-invite", recoveryHandler.HandleAcceptGuardianInviteByToken)
 	mux.HandleFunc("DELETE /guardians", recoveryHandler.HandleRemoveGuardian)
 	mux.HandleFunc("POST /guardians/respond", recoveryHandler.HandleRespondToGuardianInvite)
 	mux.HandleFunc("POST /guardians/approve", recoveryHandler.HandleApproveRecovery)
 	mux.HandleFunc("GET /guardians/invites", recoveryHandler.HandleListPendingGuardianInvites)
 	mux.HandleFunc("GET /guardians/recovery-requests", recoveryHandler.HandleListRecoveryRequests)
+	mux.HandleFunc("GET /guardians/qr", recoveryHandler.HandleGetGuardianQR)
+	mux.HandleFunc("POST /push-token", recoveryHandler.HandleRegisterPushToken)
 	mux.HandleFunc("GET /devices", recoveryHandler.HandleListDevices)
 	mux.HandleFunc("DELETE /devices", recoveryHandler.HandleRevokeDevice)
 
@@ -208,14 +211,15 @@ func main() {
 	// Bootstrap admin user if configured.
 	admin.MaybeBootstrapAdmin(db, cfg.BootstrapAdmin)
 
-	// Periodic cleanup of expired refresh tokens and recovery records.
+	// Periodic cleanup of expired refresh tokens, recovery records, and invitations.
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 		for range ticker.C {
 			db.CleanupExpiredRefreshTokens()
-			db.CleanupExpiredVerifications()
 			db.CleanupExpiredRecoveryRequests()
+			db.CleanupExpiredGuardianInvites()
+			db.CleanupExpiredRateLimits()
 		}
 	}()
 

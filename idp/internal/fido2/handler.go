@@ -195,11 +195,10 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 
 	// Ensure user exists in DB.
 	_, err := h.db.Exec(`
-		INSERT INTO users (user_id, display_name, email) VALUES (?, ?, ?)
+		INSERT INTO users (user_id) VALUES (?)
 		ON CONFLICT(user_id) DO UPDATE SET
-			display_name = CASE WHEN excluded.display_name != '' THEN excluded.display_name ELSE users.display_name END,
 			updated_at = CURRENT_TIMESTAMP
-	`, userID, req.UserName, "")
+	`, userID)
 	if err != nil {
 		log.Printf("fido2/register/begin: user upsert failed: %v", err)
 		errorJSON(w, http.StatusInternalServerError, "database error")

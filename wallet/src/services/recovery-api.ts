@@ -5,11 +5,11 @@
  * Recovery API client — calls the IdP recovery endpoints.
  *
  * Endpoints:
- * - Email verification (send + verify OTP)
- * - Recovery codes (generate, check)
- * - Guardians (list, invite, remove, respond, approve)
+ * - Recovery codes (generate, check, delete)
+ * - Guardians (list, invite by email, add by QR, accept invite, remove, respond, approve)
  * - Devices (list, revoke)
  * - Recovery flow (begin, status, complete)
+ * - Guardian QR (get own QR data)
  */
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
@@ -32,22 +32,6 @@ async function idpFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
 function authHeaders(accessToken: string): HeadersInit {
     return { Authorization: `Bearer ${accessToken}` };
-}
-
-// ── Email verification ──────────────────────────────────────────────────
-
-export async function sendVerificationEmail(email: string): Promise<{ verification_id: string }> {
-    return idpFetch('/recovery/email/send', {
-        method: 'POST',
-        body: JSON.stringify({ email }),
-    });
-}
-
-export async function verifyEmailCode(email: string, code: string): Promise<{ verification_id: string; verified: string }> {
-    return idpFetch('/recovery/email/verify', {
-        method: 'POST',
-        body: JSON.stringify({ email, code }),
-    });
 }
 
 // ── Recovery codes ──────────────────────────────────────────────────────
@@ -76,11 +60,18 @@ export async function checkRecoveryCodes(accessToken: string): Promise<RecoveryC
     });
 }
 
+export async function deleteRecoveryCodes(accessToken: string): Promise<{ status: string }> {
+    return idpFetch('/recovery/codes', {
+        method: 'DELETE',
+        headers: authHeaders(accessToken),
+    });
+}
+
 // ── Guardians ───────────────────────────────────────────────────────────
 
 export interface GuardianInfo {
     guardian_id: string;
-    guardian_email: string;
+    display_name: string;
     status: string;
 }
 
@@ -96,11 +87,34 @@ export async function listGuardians(accessToken: string): Promise<GuardiansResul
     });
 }
 
-export async function inviteGuardian(accessToken: string, guardianEmail: string, threshold: number): Promise<{ status: string }> {
-    return idpFetch('/guardians', {
+export interface InviteGuardianResult {
+    status: string;
+    invite_token: string;
+    expires_at: string;
+    message: string;
+}
+
+export async function inviteGuardianByEmail(accessToken: string, guardianEmail: string, threshold: number, userName: string): Promise<InviteGuardianResult> {
+    return idpFetch('/guardians/invite', {
         method: 'POST',
         headers: authHeaders(accessToken),
-        body: JSON.stringify({ guardian_email: guardianEmail, threshold }),
+        body: JSON.stringify({ guardian_email: guardianEmail, threshold, user_name: userName }),
+    });
+}
+
+export async function addGuardianByQR(accessToken: string, guardianId: string, threshold: number): Promise<{ status: string; message: string }> {
+    return idpFetch('/guardians/add', {
+        method: 'POST',
+        headers: authHeaders(accessToken),
+        body: JSON.stringify({ guardian_id: guardianId, threshold }),
+    });
+}
+
+export async function acceptGuardianInviteByToken(accessToken: string, inviteToken: string): Promise<{ status: string; user_id: string }> {
+    return idpFetch('/guardians/accept-invite', {
+        method: 'POST',
+        headers: authHeaders(accessToken),
+        body: JSON.stringify({ invite_token: inviteToken }),
     });
 }
 
@@ -113,7 +127,7 @@ export async function removeGuardian(accessToken: string, guardianId: string): P
 
 export interface GuardianInvite {
     user_id: string;
-    user_email: string;
+    display_name: string;
 }
 
 export async function listGuardianInvites(accessToken: string): Promise<{ invites: GuardianInvite[] }> {
@@ -134,7 +148,7 @@ export async function respondToGuardianInvite(accessToken: string, userId: strin
 export interface RecoveryRequestInfo {
     request_id: string;
     user_id: string;
-    user_email: string;
+    display_name: string;
 }
 
 export async function listRecoveryRequests(accessToken: string): Promise<{ requests: RecoveryRequestInfo[] }> {
@@ -149,6 +163,18 @@ export async function approveRecovery(accessToken: string, requestId: string, ap
         method: 'POST',
         headers: authHeaders(accessToken),
         body: JSON.stringify({ request_id: requestId, approved }),
+    });
+}
+
+export interface GuardianQRData {
+    user_id: string;
+    display_name: string;
+}
+
+export async function getGuardianQR(accessToken: string): Promise<GuardianQRData> {
+    return idpFetch('/guardians/qr', {
+        method: 'GET',
+        headers: authHeaders(accessToken),
     });
 }
 
@@ -187,10 +213,20 @@ export interface RecoveryBeginResult {
     expires_at: string;
 }
 
-export async function beginRecovery(email: string, verificationId: string, recoveryCode: string): Promise<RecoveryBeginResult> {
+export async function beginRecovery(
+    recoveryCode: string,
+    devicePublicKey: string,  // base64 uncompressed P-256 (65 bytes: 0x04 || X || Y)
+    deviceSignature: string,  // base64 ASN.1/DER ECDSA signature over SHA-256(recovery_code || timestamp)
+    timestamp: string,        // RFC 3339
+): Promise<RecoveryBeginResult> {
     return idpFetch('/recovery/begin', {
         method: 'POST',
-        body: JSON.stringify({ email, verification_id: verificationId, recovery_code: recoveryCode }),
+        body: JSON.stringify({
+            recovery_code: recoveryCode,
+            device_public_key: devicePublicKey,
+            device_signature: deviceSignature,
+            timestamp,
+        }),
     });
 }
 

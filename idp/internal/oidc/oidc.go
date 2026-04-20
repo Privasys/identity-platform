@@ -563,24 +563,11 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	// Resolve profile attributes. Prefer transient data from the auth code
-	// (social IdP or wallet relay). Fall back to the DB only for legacy
-	// passkey users who have profile data stored from prior Auth.js sessions.
+	// Resolve profile attributes from transient auth code data
+	// (wallet relay or social IdP). No profile data is stored server-side.
 	attrs := ac.Attributes
 	if attrs == nil {
 		attrs = make(map[string]string)
-	}
-	avatarURL := ""
-	if attrs["email"] == "" && attrs["name"] == "" {
-		if user, err := getUserProfile(db, ac.UserID); err == nil {
-			if user.Email != "" {
-				attrs["email"] = user.Email
-			}
-			if user.DisplayName != "" {
-				attrs["name"] = user.DisplayName
-			}
-			avatarURL = user.AvatarURL
-		}
 	}
 
 	// Filter attributes to only those allowed by the requested scope.
@@ -594,7 +581,7 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 		Subject:          ac.UserID,
 		Email:            filteredAttrs["email"],
 		Name:             filteredAttrs["name"],
-		Picture:          avatarURL,
+		Picture:          "",
 		AttestationLevel: "verified",
 		Audience:         ac.ClientID,
 		Nonce:            ac.Nonce,
@@ -685,23 +672,8 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	// Look up user profile (best-effort for refresh — transient data expired).
-	var email, name, avatarURL string
-	if user, err := getUserProfile(db, userID); err == nil {
-		email = user.Email
-		name = user.DisplayName
-		avatarURL = user.AvatarURL
-	}
-
-	// Build attributes from DB profile and filter by scope.
-	refreshAttrs := make(map[string]string)
-	if email != "" {
-		refreshAttrs["email"] = email
-	}
-	if name != "" {
-		refreshAttrs["name"] = name
-	}
-	filteredRefreshAttrs := filterAttributesByScope(refreshAttrs, scope)
+	// No user profile is stored server-side — refresh tokens only carry roles.
+	filteredRefreshAttrs := filterAttributesByScope(nil, scope)
 
 	// Get current roles.
 	roles, _ := db.GetRoles(userID)
@@ -719,7 +691,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 		Subject:          userID,
 		Email:            filteredRefreshAttrs["email"],
 		Name:             filteredRefreshAttrs["name"],
-		Picture:          avatarURL,
+		Picture:          "",
 		AttestationLevel: "verified",
 		Audience:         clientID,
 		AuthTime:         time.Now(),
@@ -885,24 +857,15 @@ func HandleUserInfo(issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 			return
 		}
 
-		user, err := getUserProfile(db, sub)
-		if err != nil {
+		// Verify the user exists (no profile data stored — just user_id).
+		var exists int
+		if err := db.QueryRow("SELECT 1 FROM users WHERE user_id = ?", sub).Scan(&exists); err != nil {
 			errorResponse(w, http.StatusNotFound, "invalid_token", "User not found")
 			return
 		}
 
 		resp := map[string]interface{}{
 			"sub": sub,
-		}
-		if user.DisplayName != "" {
-			resp["name"] = user.DisplayName
-		}
-		if user.Email != "" {
-			resp["email"] = user.Email
-			resp["email_verified"] = true
-		}
-		if user.AvatarURL != "" {
-			resp["picture"] = user.AvatarURL
 		}
 
 		// Include roles.
@@ -917,25 +880,6 @@ func HandleUserInfo(issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 }
 
 // --- Helpers ---
-
-type userProfile struct {
-	UserID      string
-	DisplayName string
-	Email       string
-	AvatarURL   string
-}
-
-func getUserProfile(db *store.DB, userID string) (*userProfile, error) {
-	u := &userProfile{UserID: userID}
-	err := db.QueryRow(
-		"SELECT display_name, email, avatar_url FROM users WHERE user_id = ?",
-		userID,
-	).Scan(&u.DisplayName, &u.Email, &u.AvatarURL)
-	if err != nil {
-		return nil, err
-	}
-	return u, nil
-}
 
 func verifyPKCE(challenge, verifier string) bool {
 	if challenge == "" || verifier == "" {

@@ -18,21 +18,21 @@ import (
 	"github.com/Privasys/idp/internal/store"
 )
 
-// HandleListUsers handles GET /admin/users — list all users with roles.
-func HandleListUsers(db *store.DB, adminToken string) http.HandlerFunc {
+// HandleGetMetrics handles GET /admin/metrics — aggregate usage statistics (no PII).
+func HandleGetMetrics(db *store.DB, adminToken string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !checkAdmin(w, r, adminToken) {
 			return
 		}
 
-		users, err := db.ListUsers()
+		metrics, err := db.GetMetrics()
 		if err != nil {
-			log.Printf("admin/users: list failed: %v", err)
-			writeError(w, http.StatusInternalServerError, "failed to list users")
+			log.Printf("admin/metrics: failed: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to get metrics")
 			return
 		}
 
-		writeJSON(w, http.StatusOK, users)
+		writeJSON(w, http.StatusOK, metrics)
 	}
 }
 

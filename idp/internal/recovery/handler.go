@@ -4,8 +4,16 @@
 package recovery
 
 import (
+	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"log"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -23,86 +31,6 @@ type Handler struct {
 // NewHandler creates a recovery handler.
 func NewHandler(db *store.DB, mailer *Mailer, issuer *tokens.Issuer) *Handler {
 	return &Handler{db: db, mailer: mailer, issuer: issuer}
-}
-
-// --- Email verification endpoints ---
-
-// HandleSendEmailCode sends a 6-digit OTP to the provided email.
-// POST /recovery/email/send  { "email": "user@example.com" }
-func (h *Handler) HandleSendEmailCode(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email string `json:"email"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
-		http.Error(w, `{"error":"email is required"}`, http.StatusBadRequest)
-		return
-	}
-
-	// Rate limit: max 3 per email per hour.
-	count, err := h.db.EmailVerificationRateCheck(req.Email)
-	if err != nil {
-		log.Printf("[recovery] rate check error: %v", err)
-	}
-	if count >= 3 {
-		http.Error(w, `{"error":"too many verification attempts, try again later"}`, http.StatusTooManyRequests)
-		return
-	}
-
-	code, err := GenerateOTP()
-	if err != nil {
-		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-		return
-	}
-
-	id := GenerateID()
-	codeHash := HashCode(code)
-	expiresAt := time.Now().Add(10 * time.Minute)
-
-	if err := h.db.StoreEmailVerification(id, req.Email, codeHash, expiresAt); err != nil {
-		log.Printf("[recovery] store verification error: %v", err)
-		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-		return
-	}
-
-	// Send email (async — don't block the response on Graph API).
-	go func() {
-		if err := h.mailer.SendVerificationCode(req.Email, code); err != nil {
-			log.Printf("[recovery] failed to send verification email to %s: %v", req.Email, err)
-		}
-	}()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"verification_id": id,
-		"message":         "verification code sent",
-	})
-}
-
-// HandleVerifyEmailCode verifies the OTP and returns a verification token.
-// POST /recovery/email/verify  { "email": "user@example.com", "code": "123456" }
-func (h *Handler) HandleVerifyEmailCode(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email string `json:"email"`
-		Code  string `json:"code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" || req.Code == "" {
-		http.Error(w, `{"error":"email and code are required"}`, http.StatusBadRequest)
-		return
-	}
-
-	codeHash := HashCode(req.Code)
-	verificationID, err := h.db.VerifyEmailCode(req.Email, codeHash)
-	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"verification_id": verificationID,
-		"email":           req.Email,
-		"verified":        "true",
-	})
 }
 
 // --- Recovery code endpoints ---
@@ -160,48 +88,131 @@ func (h *Handler) HandleCheckRecoveryCodes(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// HandleDeleteRecoveryCodes deactivates recovery codes (requires ≥1 accepted guardian).
+// DELETE /recovery/codes  (requires Bearer token)
+func (h *Handler) HandleDeleteRecoveryCodes(w http.ResponseWriter, r *http.Request) {
+	userID := h.authenticateBearer(w, r)
+	if userID == "" {
+		return
+	}
+
+	// Must have at least one accepted guardian to deactivate codes.
+	accepted, _, err := h.db.GetAcceptedGuardianCount(userID)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	if accepted < 1 {
+		http.Error(w, `{"error":"you must have at least one accepted guardian before deactivating recovery codes"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.db.DeleteRecoveryCodes(userID); err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"deleted"}`))
+}
+
 // --- Recovery flow endpoints ---
 
-// HandleBeginRecovery starts the recovery process.
-// POST /recovery/begin  { "email": "user@example.com", "verification_id": "...", "recovery_code": "XXXX-XXXX-XXXX-XXXX" }
+// HandleBeginRecovery starts the recovery process using a recovery code.
+// Requires device attestation (TEE-signed) and is rate-limited to 5 attempts per device per day.
+// POST /recovery/begin  { "recovery_code": "...", "device_public_key": "base64", "device_signature": "base64", "timestamp": "RFC3339" }
 func (h *Handler) HandleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Email          string `json:"email"`
-		VerificationID string `json:"verification_id"`
-		RecoveryCode   string `json:"recovery_code"`
+		RecoveryCode    string `json:"recovery_code"`
+		DevicePublicKey string `json:"device_public_key"` // base64 uncompressed P-256 (65 bytes: 0x04 || X || Y)
+		DeviceSignature string `json:"device_signature"`  // base64 ASN.1/DER ECDSA signature
+		Timestamp       string `json:"timestamp"`         // RFC 3339
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
 		return
 	}
-	if req.Email == "" || req.VerificationID == "" || req.RecoveryCode == "" {
-		http.Error(w, `{"error":"email, verification_id, and recovery_code are required"}`, http.StatusBadRequest)
+	if req.RecoveryCode == "" {
+		http.Error(w, `{"error":"recovery_code is required"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Step 1: Verify email verification token is valid.
-	verifiedEmail, ok := h.db.IsEmailVerified(req.VerificationID)
-	if !ok || verifiedEmail != req.Email {
-		http.Error(w, `{"error":"email verification is invalid or expired"}`, http.StatusBadRequest)
+	// --- Device attestation verification (TEE-signed rate limiting) ---
+	if req.DevicePublicKey == "" || req.DeviceSignature == "" || req.Timestamp == "" {
+		http.Error(w, `{"error":"device attestation required (device_public_key, device_signature, timestamp)"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Step 2: Find user by email.
-	userID, err := h.db.FindUserByEmail(req.Email)
+	// Parse and validate timestamp freshness (±5 minutes).
+	ts, err := time.Parse(time.RFC3339, req.Timestamp)
 	if err != nil {
-		http.Error(w, `{"error":"no account found with this email"}`, http.StatusNotFound)
+		http.Error(w, `{"error":"invalid timestamp format (RFC 3339 required)"}`, http.StatusBadRequest)
+		return
+	}
+	if time.Since(ts).Abs() > 5*time.Minute {
+		http.Error(w, `{"error":"timestamp too far from server time"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Step 3: Verify recovery code.
+	// Decode uncompressed P-256 public key (65 bytes: 0x04 prefix + 32-byte X + 32-byte Y).
+	pubKeyBytes, err := base64.StdEncoding.DecodeString(req.DevicePublicKey)
+	if err != nil || len(pubKeyBytes) != 65 || pubKeyBytes[0] != 0x04 {
+		http.Error(w, `{"error":"invalid device_public_key (expected base64 uncompressed P-256, 65 bytes)"}`, http.StatusBadRequest)
+		return
+	}
+	x := new(big.Int).SetBytes(pubKeyBytes[1:33])
+	y := new(big.Int).SetBytes(pubKeyBytes[33:65])
+	pubKey := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
+	if !pubKey.Curve.IsOnCurve(x, y) {
+		http.Error(w, `{"error":"device_public_key not on P-256 curve"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Verify ECDSA signature over SHA-256(recovery_code || timestamp).
+	// Accept both raw r||s (64 bytes, IEEE P1363 / Web Crypto) and ASN.1/DER formats.
+	sigBytes, err := base64.StdEncoding.DecodeString(req.DeviceSignature)
+	if err != nil {
+		http.Error(w, `{"error":"invalid device_signature"}`, http.StatusBadRequest)
+		return
+	}
+	digest := sha256.Sum256([]byte(req.RecoveryCode + req.Timestamp))
+	var sigValid bool
+	if len(sigBytes) == 64 {
+		// Raw r||s format (IEEE P1363, as produced by Web Crypto API).
+		sr := new(big.Int).SetBytes(sigBytes[:32])
+		ss := new(big.Int).SetBytes(sigBytes[32:64])
+		sigValid = ecdsa.Verify(pubKey, digest[:], sr, ss)
+	} else {
+		// ASN.1/DER format.
+		sigValid = ecdsa.VerifyASN1(pubKey, digest[:], sigBytes)
+	}
+	if !sigValid {
+		http.Error(w, `{"error":"device signature verification failed"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Rate limit: max 5 recovery attempts per device per day.
+	keyHash := sha256.Sum256(pubKeyBytes)
+	deviceKeyHash := hex.EncodeToString(keyHash[:])
+	count, err := h.db.CheckRecoveryRateLimit(deviceKeyHash)
+	if err != nil {
+		log.Printf("[recovery] rate limit check error: %v", err)
+	}
+	if count >= 5 {
+		http.Error(w, `{"error":"too many recovery attempts from this device today (max 5)"}`, http.StatusTooManyRequests)
+		return
+	}
+	h.db.RecordRecoveryAttempt(deviceKeyHash)
+
+	// --- Find user by recovery code ---
 	codeHash := HashCode(req.RecoveryCode)
-	valid, err := h.db.VerifyRecoveryCode(userID, codeHash)
-	if err != nil || !valid {
+	userID, err := h.db.FindUserByRecoveryCode(codeHash)
+	if err != nil {
 		http.Error(w, `{"error":"invalid recovery code"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Step 4: Check if guardians are required.
+	// Check if guardians are required.
 	acceptedGuardians, threshold, err := h.db.GetAcceptedGuardianCount(userID)
 	if err != nil {
 		log.Printf("[recovery] guardian check error: %v", err)
@@ -212,7 +223,7 @@ func (h *Handler) HandleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 		guardiansRequired = threshold
 	}
 
-	// Step 5: Create recovery request.
+	// Create recovery request.
 	requestID := GenerateID()
 	expiresAt := time.Now().Add(1 * time.Hour)
 	if err := h.db.CreateRecoveryRequest(requestID, userID, guardiansRequired, expiresAt); err != nil {
@@ -221,8 +232,8 @@ func (h *Handler) HandleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Mark email + code as verified on the request.
-	h.db.UpdateRecoveryRequest(requestID, true, true)
+	// Mark code as verified on the request.
+	h.db.UpdateRecoveryCodeVerified(requestID)
 
 	// If guardians required, notify them.
 	if guardiansRequired > 0 {
@@ -297,8 +308,8 @@ func (h *Handler) HandleCompleteRecovery(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check all factors are satisfied.
-	if !rr.EmailVerified || !rr.CodeVerified {
-		http.Error(w, `{"error":"email and recovery code must be verified"}`, http.StatusBadRequest)
+	if !rr.CodeVerified {
+		http.Error(w, `{"error":"recovery code must be verified"}`, http.StatusBadRequest)
 		return
 	}
 	if rr.GuardiansRequired > 0 && rr.GuardiansApproved < rr.GuardiansRequired {
@@ -344,9 +355,9 @@ func (h *Handler) HandleListGuardians(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleInviteGuardian invites a guardian by email.
-// POST /guardians  { "guardian_email": "friend@example.com", "threshold": 2 }
-func (h *Handler) HandleInviteGuardian(w http.ResponseWriter, r *http.Request) {
+// HandleInviteGuardianByEmail sends an email invitation with a deep link.
+// POST /guardians/invite  { "guardian_email": "friend@example.com", "threshold": 2, "user_name": "Alice" }
+func (h *Handler) HandleInviteGuardianByEmail(w http.ResponseWriter, r *http.Request) {
 	userID := h.authenticateBearer(w, r)
 	if userID == "" {
 		return
@@ -355,6 +366,7 @@ func (h *Handler) HandleInviteGuardian(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		GuardianEmail string `json:"guardian_email"`
 		Threshold     int    `json:"threshold"`
+		UserName      string `json:"user_name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.GuardianEmail == "" {
 		http.Error(w, `{"error":"guardian_email is required"}`, http.StatusBadRequest)
@@ -364,49 +376,128 @@ func (h *Handler) HandleInviteGuardian(w http.ResponseWriter, r *http.Request) {
 		req.Threshold = 1
 	}
 
-	// Find guardian by email — must be an existing Privasys ID user.
-	guardianID, err := h.db.FindUserByEmail(req.GuardianEmail)
+	// Rate limit: max 10 invitations per user per day.
+	count, err := h.db.GuardianInviteRateCheck(userID)
 	if err != nil {
-		http.Error(w, `{"error":"guardian must be an existing Privasys ID user with a verified email"}`, http.StatusNotFound)
+		log.Printf("[recovery] invite rate check error: %v", err)
+	}
+	if count >= 10 {
+		http.Error(w, `{"error":"too many invitations today, try again tomorrow"}`, http.StatusTooManyRequests)
 		return
 	}
 
+	// Create invitation with token.
+	inviteToken := GenerateID()
+	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
+
+	if err := h.db.CreateGuardianInvite(inviteToken, userID, expiresAt); err != nil {
+		log.Printf("[recovery] create invite error: %v", err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Send email with deep link.
+	go func() {
+		if err := h.mailer.SendGuardianInvite(req.GuardianEmail, req.UserName, inviteToken); err != nil {
+			log.Printf("[recovery] failed to send guardian invite email: %v", err)
+		}
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"status":       "invited",
+		"invite_token": inviteToken,
+		"expires_at":   expiresAt.UTC().Format(time.RFC3339),
+		"message":      "guardian invitation email sent",
+	})
+}
+
+// HandleAddGuardianByQR adds a guardian directly by user_id (from QR code scan).
+// POST /guardians/add  { "guardian_id": "...", "threshold": 2 }
+func (h *Handler) HandleAddGuardianByQR(w http.ResponseWriter, r *http.Request) {
+	userID := h.authenticateBearer(w, r)
+	if userID == "" {
+		return
+	}
+
+	var req struct {
+		GuardianID string `json:"guardian_id"`
+		Threshold  int    `json:"threshold"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.GuardianID == "" {
+		http.Error(w, `{"error":"guardian_id is required"}`, http.StatusBadRequest)
+		return
+	}
+	if req.Threshold < 1 {
+		req.Threshold = 1
+	}
+
 	// Cannot be your own guardian.
-	if guardianID == userID {
+	if req.GuardianID == userID {
 		http.Error(w, `{"error":"you cannot be your own guardian"}`, http.StatusBadRequest)
 		return
 	}
 
-	if err := h.db.AddGuardian(userID, guardianID, req.GuardianEmail, req.Threshold); err != nil {
+	if err := h.db.AddGuardian(userID, req.GuardianID, req.Threshold); err != nil {
 		log.Printf("[recovery] add guardian error: %v", err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Notify guardian via email and push.
-	go func() {
-		// Get user's display name for the notification.
-		users, _ := h.db.ListUsers()
-		userName := "A Privasys user"
-		for _, u := range users {
-			if u.UserID == userID {
-				userName = u.DisplayName
-				if userName == "" {
-					userName = u.Email
-				}
-				break
-			}
-		}
-		if err := h.mailer.SendGuardianInvite(req.GuardianEmail, userName); err != nil {
-			log.Printf("[recovery] failed to send guardian invite email: %v", err)
-		}
-		// TODO: also send push notification via broker.
-	}()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "pending",
+		"message": "guardian added, awaiting confirmation",
+	})
+}
+
+// HandleAcceptGuardianInviteByToken accepts an email-based invitation using the invite token.
+// POST /guardians/accept-invite  { "invite_token": "..." }  (requires Bearer token — guardian's token)
+func (h *Handler) HandleAcceptGuardianInviteByToken(w http.ResponseWriter, r *http.Request) {
+	guardianID := h.authenticateBearer(w, r)
+	if guardianID == "" {
+		return
+	}
+
+	var req struct {
+		InviteToken string `json:"invite_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InviteToken == "" {
+		http.Error(w, `{"error":"invite_token is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Look up the invitation.
+	inv, err := h.db.GetGuardianInvite(req.InviteToken)
+	if err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Cannot be your own guardian.
+	if inv.UserID == guardianID {
+		http.Error(w, `{"error":"you cannot be your own guardian"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Accept the invitation.
+	if err := h.db.AcceptGuardianInvite(req.InviteToken, guardianID); err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Also create the guardian relationship.
+	threshold := 1 // Default; user can adjust threshold later.
+	if err := h.db.AddGuardian(inv.UserID, guardianID, threshold); err != nil {
+		log.Printf("[recovery] add guardian from invite error: %v", err)
+	}
+	// Auto-accept since the guardian explicitly accepted via invite link.
+	h.db.RespondToGuardianInvite(inv.UserID, guardianID, true)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"status":  "invited",
-		"message": "guardian invitation sent",
+		"status":  "accepted",
+		"user_id": inv.UserID,
 	})
 }
 
@@ -433,7 +524,7 @@ func (h *Handler) HandleRemoveGuardian(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"removed"}`))
 }
 
-// HandleRespondToGuardianInvite lets a guardian accept or decline.
+// HandleRespondToGuardianInvite lets a guardian accept or decline a direct (QR-based) invitation.
 // POST /guardians/respond  { "user_id": "...", "accept": true }  (requires Bearer token — guardian's token)
 func (h *Handler) HandleRespondToGuardianInvite(w http.ResponseWriter, r *http.Request) {
 	guardianID := h.authenticateBearer(w, r)
@@ -527,6 +618,20 @@ func (h *Handler) HandleListRecoveryRequests(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(map[string]any{"requests": requests})
 }
 
+// HandleGetGuardianQR returns the user's QR code data for guardian identification.
+// GET /guardians/qr  (requires Bearer token)
+func (h *Handler) HandleGetGuardianQR(w http.ResponseWriter, r *http.Request) {
+	userID := h.authenticateBearer(w, r)
+	if userID == "" {
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"user_id": userID,
+	})
+}
+
 // --- Device management endpoints ---
 
 // HandleListDevices returns credentials/devices for the authenticated user.
@@ -570,6 +675,32 @@ func (h *Handler) HandleRevokeDevice(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"revoked"}`))
 }
 
+// HandleRegisterPushToken stores the wallet's Expo push token for this user.
+// POST /push-token  { "push_token": "ExponentPushToken[...]" }
+func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request) {
+	userID := h.authenticateBearer(w, r)
+	if userID == "" {
+		return
+	}
+
+	var req struct {
+		PushToken string `json:"push_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PushToken == "" {
+		http.Error(w, `{"error":"push_token is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.db.UpsertPushToken(userID, req.PushToken); err != nil {
+		log.Printf("[push-token] upsert failed for %s: %v", userID, err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"ok"}`))
+}
+
 // --- Helpers ---
 
 // authenticateBearer extracts and validates the Bearer token, returning the user ID.
@@ -595,7 +726,7 @@ func (h *Handler) authenticateBearer(w http.ResponseWriter, r *http.Request) str
 	return sub
 }
 
-// notifyGuardians sends email + push to all accepted guardians for a user.
+// notifyGuardians sends push notifications to all accepted guardians for a user.
 func (h *Handler) notifyGuardians(userID string) {
 	guardians, _, err := h.db.ListGuardians(userID)
 	if err != nil {
@@ -603,25 +734,53 @@ func (h *Handler) notifyGuardians(userID string) {
 		return
 	}
 
-	// Get user name for notification.
-	users, _ := h.db.ListUsers()
-	userName := "A Privasys user"
-	for _, u := range users {
-		if u.UserID == userID {
-			userName = u.DisplayName
-			if userName == "" {
-				userName = u.Email
-			}
-			break
-		}
-	}
-
 	for _, g := range guardians {
-		if g.Status == "accepted" {
-			if err := h.mailer.SendRecoveryAlert(g.GuardianEmail, userName); err != nil {
-				log.Printf("[recovery] failed to send recovery alert to %s: %v", g.GuardianEmail, err)
-			}
-			// TODO: also send push notification via broker.
+		if g.Status != "accepted" {
+			continue
 		}
+		pushToken := h.db.GetPushToken(g.GuardianID)
+		if pushToken == "" {
+			log.Printf("[recovery] guardian %s has no push token — skipping notification", g.GuardianID)
+			continue
+		}
+		go h.sendGuardianPush(g.GuardianID, pushToken, userID)
 	}
+}
+
+// sendGuardianPush sends a push notification to a guardian via Expo push service.
+func (h *Handler) sendGuardianPush(guardianID, pushToken, recoveringUserID string) {
+	payload, _ := json.Marshal([]map[string]interface{}{
+		{
+			"to":    pushToken,
+			"sound": "default",
+			"title": "Recovery request",
+			"body":  "Someone you protect needs your help to recover their account.",
+			"data": map[string]string{
+				"type":    "recovery-request",
+				"user_id": recoveringUserID,
+			},
+		},
+	})
+
+	req, err := http.NewRequest("POST", "https://exp.host/--/api/v2/push/send", bytes.NewReader(payload))
+	if err != nil {
+		log.Printf("[recovery] push to guardian %s failed: %v", guardianID, err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("[recovery] push to guardian %s failed: %v", guardianID, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		log.Printf("[recovery] push to guardian %s returned %d: %s", guardianID, resp.StatusCode, body)
+		return
+	}
+	log.Printf("[recovery] push notification sent to guardian %s", guardianID)
 }

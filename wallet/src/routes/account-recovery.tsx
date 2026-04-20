@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Account Recovery management screen — configure recovery options.
+ * Account Recovery settings screen — configure recovery options.
  *
  * Sections:
- * - Email Verification: verify your email for recovery
- * - Recovery Codes: generate and manage backup codes
- * - Trusted Guardians: invite/manage k-of-n guardian contacts
- * - Devices: view registered devices (FIDO2 credentials on IdP)
+ * - Recovery Codes: generate, manage, or deactivate backup codes
+ * - Trusted Guardians: invite by email (deep link) or QR code scan
+ * - Devices: view registered FIDO2 credentials
  * - Guardian Duties: invites/requests from others
  */
 
@@ -29,12 +28,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import {
-    sendVerificationEmail,
-    verifyEmailCode,
     generateRecoveryCodes,
     checkRecoveryCodes,
+    deleteRecoveryCodes,
     listGuardians,
-    inviteGuardian,
+    inviteGuardianByEmail,
+    addGuardianByQR,
     removeGuardian,
     listGuardianInvites,
     respondToGuardianInvite,
@@ -49,6 +48,8 @@ import {
 } from '@/services/recovery-api';
 import { useProfileStore } from '@/stores/profile';
 
+type InviteMethod = 'email' | 'qr';
+
 export default function AccountRecoveryScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -61,14 +62,6 @@ export default function AccountRecoveryScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Email verification
-    const [emailInput, setEmailInput] = useState(profile?.email || '');
-    const [verificationId, setVerificationId] = useState('');
-    const [otpInput, setOtpInput] = useState('');
-    const [emailVerified, setEmailVerified] = useState(false);
-    const [sendingOtp, setSendingOtp] = useState(false);
-    const [verifyingOtp, setVerifyingOtp] = useState(false);
-
     // Recovery codes
     const [codesStatus, setCodesStatus] = useState<{ has_codes: boolean; remaining_codes: number } | null>(null);
     const [newCodes, setNewCodes] = useState<string[] | null>(null);
@@ -80,6 +73,7 @@ export default function AccountRecoveryScreen() {
     const [guardianEmail, setGuardianEmail] = useState('');
     const [thresholdInput, setThresholdInput] = useState('1');
     const [showInviteForm, setShowInviteForm] = useState(false);
+    const [inviteMethod, setInviteMethod] = useState<InviteMethod>('email');
     const [inviting, setInviting] = useState(false);
 
     // Devices
@@ -88,6 +82,8 @@ export default function AccountRecoveryScreen() {
     // Guardian duties (invites from others + recovery requests)
     const [pendingInvites, setPendingInvites] = useState<GuardianInvite[]>([]);
     const [recoveryRequests, setRecoveryRequests] = useState<RecoveryRequestInfo[]>([]);
+
+    const acceptedGuardianCount = guardians.filter((g) => g.status === 'accepted').length;
 
     const loadData = useCallback(async () => {
         if (!accessToken) {
@@ -125,37 +121,6 @@ export default function AccountRecoveryScreen() {
         setRefreshing(false);
     }, [loadData]);
 
-    // ── Email verification handlers ──
-
-    const handleSendOtp = async () => {
-        if (!emailInput.trim()) return;
-        setSendingOtp(true);
-        try {
-            const res = await sendVerificationEmail(emailInput.trim());
-            setVerificationId(res.verification_id);
-            Alert.alert('Code Sent', `A verification code has been sent to ${emailInput.trim()}.`);
-        } catch (e: any) {
-            Alert.alert('Error', e.message);
-        } finally {
-            setSendingOtp(false);
-        }
-    };
-
-    const handleVerifyOtp = async () => {
-        if (!otpInput.trim() || !emailInput.trim()) return;
-        setVerifyingOtp(true);
-        try {
-            await verifyEmailCode(emailInput.trim(), otpInput.trim());
-            setEmailVerified(true);
-            setOtpInput('');
-            Alert.alert('Verified', 'Your email has been verified successfully.');
-        } catch (e: any) {
-            Alert.alert('Error', e.message);
-        } finally {
-            setVerifyingOtp(false);
-        }
-    };
-
     // ── Recovery codes handlers ──
 
     const handleGenerateCodes = async () => {
@@ -185,17 +150,43 @@ export default function AccountRecoveryScreen() {
         );
     };
 
+    const handleDeactivateCodes = () => {
+        Alert.alert(
+            'Deactivate Recovery Codes',
+            'WARNING: Without recovery codes, your guardians could collude to take over your account. ' +
+            'Recovery codes are your only protection against guardian collusion. ' +
+            'Only deactivate if you fully trust all your guardians.\n\n' +
+            'Are you sure you want to delete your recovery codes?',
+            [
+                { text: 'Keep Codes', style: 'cancel' },
+                {
+                    text: 'I Understand, Deactivate',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteRecoveryCodes(accessToken);
+                            setCodesStatus({ has_codes: false, remaining_codes: 0 });
+                            Alert.alert('Deactivated', 'Recovery codes have been deleted. You can regenerate them at any time.');
+                        } catch (e: any) {
+                            Alert.alert('Error', e.message);
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
     // ── Guardian handlers ──
 
-    const handleInviteGuardian = async () => {
+    const handleInviteGuardianByEmail = async () => {
         if (!guardianEmail.trim()) return;
         const threshold = Math.max(1, parseInt(thresholdInput, 10) || 1);
         setInviting(true);
         try {
-            await inviteGuardian(accessToken, guardianEmail.trim(), threshold);
+            const res = await inviteGuardianByEmail(accessToken, guardianEmail.trim(), threshold, profile?.displayName ?? '');
             setGuardianEmail('');
             setShowInviteForm(false);
-            Alert.alert('Invited', 'Guardian invitation sent.');
+            Alert.alert('Invited', `Guardian invitation email sent. Expires ${new Date(res.expires_at).toLocaleDateString()}.`);
             await loadData();
         } catch (e: any) {
             Alert.alert('Error', e.message);
@@ -204,8 +195,13 @@ export default function AccountRecoveryScreen() {
         }
     };
 
+    const handleAddGuardianByQR = async () => {
+        // TODO: open camera, scan QR code, extract guardian_id from JSON.
+        Alert.alert('Scan QR Code', 'Camera QR scanner will be available in a future update.');
+    };
+
     const handleRemoveGuardian = (g: GuardianInfo) => {
-        Alert.alert('Remove Guardian', `Remove ${g.guardian_email} as a guardian?`, [
+        Alert.alert('Remove Guardian', `Remove ${g.display_name || g.guardian_id} as a guardian?`, [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Remove',
@@ -237,7 +233,7 @@ export default function AccountRecoveryScreen() {
     const handleApproveRecovery = (req: RecoveryRequestInfo, approved: boolean) => {
         Alert.alert(
             approved ? 'Approve Recovery' : 'Deny Recovery',
-            `${approved ? 'Approve' : 'Deny'} the recovery request from ${req.user_email || req.user_id}?`,
+            `${approved ? 'Approve' : 'Deny'} the recovery request from ${req.display_name || req.user_id}?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -286,7 +282,7 @@ export default function AccountRecoveryScreen() {
                 <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </Pressable>
-                <Text style={styles.headerTitle}>Account Recovery</Text>
+                <Text style={styles.headerTitle}>Recovery Settings</Text>
                 <RNView style={{ width: 32 }} />
             </RNView>
 
@@ -304,77 +300,6 @@ export default function AccountRecoveryScreen() {
                         </Text>
                     </RNView>
                 )}
-
-                {/* ── Email Verification ── */}
-                <Text style={styles.sectionTitle}>EMAIL VERIFICATION</Text>
-                <Text style={styles.sectionDescription}>
-                    Verify your email address to enable account recovery. A 6-digit code will be sent to your email.
-                </Text>
-
-                <RNView style={styles.card}>
-                    {emailVerified ? (
-                        <RNView style={styles.verifiedRow}>
-                            <Ionicons name="checkmark-circle" size={24} color="#34E89E" />
-                            <RNView style={{ flex: 1 }}>
-                                <Text style={styles.verifiedLabel}>Email Verified</Text>
-                                <Text style={styles.verifiedEmail}>{emailInput}</Text>
-                            </RNView>
-                        </RNView>
-                    ) : verificationId ? (
-                        <>
-                            <Text style={styles.fieldLabel}>Enter the 6-digit code sent to {emailInput}</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={otpInput}
-                                onChangeText={setOtpInput}
-                                placeholder="123456"
-                                placeholderTextColor="#94A3B8"
-                                keyboardType="number-pad"
-                                maxLength={6}
-                                autoFocus
-                            />
-                            <Pressable
-                                style={[styles.primaryButton, verifyingOtp && { opacity: 0.6 }]}
-                                onPress={handleVerifyOtp}
-                                disabled={verifyingOtp || otpInput.length < 6}
-                            >
-                                {verifyingOtp ? (
-                                    <ActivityIndicator color="#FFFFFF" size="small" />
-                                ) : (
-                                    <Text style={styles.primaryButtonText}>Verify Code</Text>
-                                )}
-                            </Pressable>
-                            <Pressable style={styles.secondaryButton} onPress={() => setVerificationId('')}>
-                                <Text style={styles.secondaryButtonText}>Resend Code</Text>
-                            </Pressable>
-                        </>
-                    ) : (
-                        <>
-                            <Text style={styles.fieldLabel}>Email address</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={emailInput}
-                                onChangeText={setEmailInput}
-                                placeholder="you@example.com"
-                                placeholderTextColor="#94A3B8"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
-                            <Pressable
-                                style={[styles.primaryButton, (sendingOtp || !emailInput.trim()) && { opacity: 0.6 }]}
-                                onPress={handleSendOtp}
-                                disabled={sendingOtp || !emailInput.trim() || notConfigured}
-                            >
-                                {sendingOtp ? (
-                                    <ActivityIndicator color="#FFFFFF" size="small" />
-                                ) : (
-                                    <Text style={styles.primaryButtonText}>Send Verification Code</Text>
-                                )}
-                            </Pressable>
-                        </>
-                    )}
-                </RNView>
 
                 {/* ── Recovery Codes ── */}
                 <Text style={styles.sectionTitle}>RECOVERY CODES</Text>
@@ -435,13 +360,21 @@ export default function AccountRecoveryScreen() {
                                 </Text>
                             )}
                         </Pressable>
+                        {codesStatus?.has_codes && acceptedGuardianCount >= 1 && (
+                            <Pressable
+                                style={styles.secondaryButton}
+                                onPress={handleDeactivateCodes}
+                            >
+                                <Text style={[styles.secondaryButtonText, { color: '#DC2626', fontSize: 13 }]}>Deactivate Codes (not recommended)</Text>
+                            </Pressable>
+                        )}
                     </RNView>
                 )}
 
                 {/* ── Trusted Guardians ── */}
                 <Text style={styles.sectionTitle}>TRUSTED GUARDIANS</Text>
                 <Text style={styles.sectionDescription}>
-                    Nominate trusted contacts who can approve your account recovery. They must be Privasys ID users.
+                    Nominate trusted contacts who can approve your account recovery. Invite them by email or scan their QR code.
                 </Text>
 
                 {guardians.length > 0 && (
@@ -453,7 +386,7 @@ export default function AccountRecoveryScreen() {
                             <RNView key={g.guardian_id} style={styles.guardianRow}>
                                 <Ionicons name="person-outline" size={18} color="#64748B" />
                                 <RNView style={{ flex: 1 }}>
-                                    <Text style={styles.guardianEmail}>{g.guardian_email}</Text>
+                                    <Text style={styles.guardianName}>{g.display_name || g.guardian_id.substring(0, 8) + '…'}</Text>
                                     <Text style={[styles.guardianStatus, g.status === 'accepted' && { color: '#34E89E' }]}>
                                         {g.status}
                                     </Text>
@@ -468,43 +401,86 @@ export default function AccountRecoveryScreen() {
 
                 {showInviteForm ? (
                     <RNView style={styles.card}>
-                        <Text style={styles.fieldLabel}>Guardian's email</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={guardianEmail}
-                            onChangeText={setGuardianEmail}
-                            placeholder="guardian@example.com"
-                            placeholderTextColor="#94A3B8"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoFocus
-                        />
-                        <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Approval threshold (k)</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={thresholdInput}
-                            onChangeText={setThresholdInput}
-                            placeholder="1"
-                            placeholderTextColor="#94A3B8"
-                            keyboardType="number-pad"
-                            maxLength={2}
-                        />
-                        <RNView style={styles.formActions}>
-                            <Pressable onPress={() => setShowInviteForm(false)}>
-                                <Text style={styles.cancelText}>Cancel</Text>
+                        {/* Invite method selector */}
+                        <RNView style={styles.methodSelector}>
+                            <Pressable
+                                style={[styles.methodOption, inviteMethod === 'email' && styles.methodOptionActive]}
+                                onPress={() => setInviteMethod('email')}
+                            >
+                                <Ionicons name="mail-outline" size={16} color={inviteMethod === 'email' ? '#00BCF2' : '#94A3B8'} />
+                                <Text style={[styles.methodText, inviteMethod === 'email' && styles.methodTextActive]}>Email</Text>
                             </Pressable>
                             <Pressable
-                                style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }, (inviting || !guardianEmail.trim()) && { opacity: 0.6 }]}
-                                onPress={handleInviteGuardian}
-                                disabled={inviting || !guardianEmail.trim()}
+                                style={[styles.methodOption, inviteMethod === 'qr' && styles.methodOptionActive]}
+                                onPress={() => setInviteMethod('qr')}
                             >
-                                {inviting ? (
-                                    <ActivityIndicator color="#FFFFFF" size="small" />
-                                ) : (
-                                    <Text style={styles.primaryButtonText}>Send Invite</Text>
-                                )}
+                                <Ionicons name="qr-code-outline" size={16} color={inviteMethod === 'qr' ? '#00BCF2' : '#94A3B8'} />
+                                <Text style={[styles.methodText, inviteMethod === 'qr' && styles.methodTextActive]}>Scan QR</Text>
                             </Pressable>
                         </RNView>
+
+                        {inviteMethod === 'email' ? (
+                            <>
+                                <Text style={styles.fieldLabel}>Guardian's email</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={guardianEmail}
+                                    onChangeText={setGuardianEmail}
+                                    placeholder="guardian@example.com"
+                                    placeholderTextColor="#94A3B8"
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    autoFocus
+                                />
+                                <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Approval threshold (k)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={thresholdInput}
+                                    onChangeText={setThresholdInput}
+                                    placeholder="1"
+                                    placeholderTextColor="#94A3B8"
+                                    keyboardType="number-pad"
+                                    maxLength={2}
+                                />
+                                <Text style={styles.helperText}>
+                                    An invitation email with a link will be sent. They don't need the app yet.
+                                </Text>
+                                <RNView style={styles.formActions}>
+                                    <Pressable onPress={() => setShowInviteForm(false)}>
+                                        <Text style={styles.cancelText}>Cancel</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }, (inviting || !guardianEmail.trim()) && { opacity: 0.6 }]}
+                                        onPress={handleInviteGuardianByEmail}
+                                        disabled={inviting || !guardianEmail.trim()}
+                                    >
+                                        {inviting ? (
+                                            <ActivityIndicator color="#FFFFFF" size="small" />
+                                        ) : (
+                                            <Text style={styles.primaryButtonText}>Send Invite</Text>
+                                        )}
+                                    </Pressable>
+                                </RNView>
+                            </>
+                        ) : (
+                            <>
+                                <Text style={styles.helperText}>
+                                    Ask your guardian to open their Privasys Wallet and show their Guardian QR code, then scan it with your camera.
+                                </Text>
+                                <RNView style={styles.formActions}>
+                                    <Pressable onPress={() => setShowInviteForm(false)}>
+                                        <Text style={styles.cancelText}>Cancel</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
+                                        onPress={handleAddGuardianByQR}
+                                    >
+                                        <Ionicons name="camera-outline" size={18} color="#FFFFFF" />
+                                        <Text style={[styles.primaryButtonText, { marginLeft: 6 }]}>Open Scanner</Text>
+                                    </Pressable>
+                                </RNView>
+                            </>
+                        )}
                     </RNView>
                 ) : (
                     <Pressable
@@ -513,7 +489,7 @@ export default function AccountRecoveryScreen() {
                         disabled={notConfigured}
                     >
                         <Ionicons name="person-add-outline" size={18} color="#00BCF2" />
-                        <Text style={styles.outlineButtonText}>Invite Guardian</Text>
+                        <Text style={styles.outlineButtonText}>Add Guardian</Text>
                     </Pressable>
                 )}
 
@@ -561,7 +537,7 @@ export default function AccountRecoveryScreen() {
                             <RNView key={inv.user_id} style={styles.card}>
                                 <Text style={styles.dutyTitle}>Guardian Invitation</Text>
                                 <Text style={styles.dutyDescription}>
-                                    {inv.user_email || inv.user_id} wants you as a recovery guardian.
+                                    {inv.display_name || inv.user_id} wants you as a recovery guardian.
                                 </Text>
                                 <RNView style={styles.formActions}>
                                     <Pressable
@@ -584,7 +560,7 @@ export default function AccountRecoveryScreen() {
                             <RNView key={req.request_id} style={styles.card}>
                                 <Text style={styles.dutyTitle}>Recovery Request</Text>
                                 <Text style={styles.dutyDescription}>
-                                    {req.user_email || req.user_id} is trying to recover their account. Do you approve?
+                                    {req.display_name || req.user_id} is trying to recover their account. Do you approve?
                                 </Text>
                                 <RNView style={styles.formActions}>
                                     <Pressable
@@ -676,6 +652,12 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
+    helperText: {
+        fontSize: 13,
+        color: '#94A3B8',
+        lineHeight: 18,
+        marginBottom: 12,
+    },
     input: {
         backgroundColor: '#F1F5F9',
         borderRadius: 10,
@@ -691,6 +673,8 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         paddingVertical: 12,
         alignItems: 'center' as const,
+        flexDirection: 'row',
+        justifyContent: 'center',
     },
     primaryButtonText: {
         color: '#FFFFFF',
@@ -736,20 +720,34 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
 
-    // Email verified
-    verifiedRow: {
+    // Method selector (email / QR)
+    methodSelector: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 16,
+    },
+    methodOption: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        justifyContent: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 8,
+        paddingVertical: 10,
     },
-    verifiedLabel: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#0F172A',
+    methodOptionActive: {
+        borderColor: '#00BCF2',
+        backgroundColor: '#F0FAFF',
     },
-    verifiedEmail: {
-        fontSize: 13,
-        color: '#64748B',
+    methodText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#94A3B8',
+    },
+    methodTextActive: {
+        color: '#00BCF2',
     },
 
     // Status row (codes, etc.)
@@ -795,7 +793,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 0.5,
         borderBottomColor: '#F1F5F9',
     },
-    guardianEmail: {
+    guardianName: {
         fontSize: 14,
         color: '#0F172A',
         fontWeight: '500',

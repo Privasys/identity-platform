@@ -100,9 +100,9 @@ func HandleToken(secret string, issuer *tokens.Issuer, db *store.DB) http.Handle
 // ensureE2EUser creates the e2e test user if it doesn't exist.
 func ensureE2EUser(db *store.DB) error {
 	_, err := db.Exec(
-		`INSERT INTO users (user_id, display_name, email) VALUES (?, ?, ?)
+		`INSERT INTO users (user_id) VALUES (?)
 		 ON CONFLICT(user_id) DO NOTHING`,
-		e2eUserID, e2eDisplayName, e2eEmail,
+		e2eUserID,
 	)
 	return err
 }

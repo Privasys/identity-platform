@@ -53,12 +53,16 @@ func migrate(db *sql.DB) error {
 
 		-- FIDO2 users.
 		CREATE TABLE IF NOT EXISTS users (
-			user_id      TEXT PRIMARY KEY,  -- opaque ID (UUID)
-			display_name TEXT NOT NULL DEFAULT '',
-			email        TEXT NOT NULL DEFAULT '',
-			avatar_url   TEXT NOT NULL DEFAULT '',
-			created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+			user_id    TEXT PRIMARY KEY,  -- opaque ID (UUID)
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
+		-- Push tokens for wallet notifications (Expo push tokens).
+		CREATE TABLE IF NOT EXISTS push_tokens (
+			user_id    TEXT PRIMARY KEY REFERENCES users(user_id),
+			push_token TEXT NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
 		-- FIDO2 credentials (one user can have multiple).
@@ -114,18 +118,7 @@ func migrate(db *sql.DB) error {
 			created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
-		-- Email verification OTPs (short-lived).
-		CREATE TABLE IF NOT EXISTS email_verifications (
-			id          TEXT PRIMARY KEY,
-			email       TEXT NOT NULL,
-			code_hash   TEXT NOT NULL,          -- SHA-256 of 6-digit code
-			expires_at  DATETIME NOT NULL,
-			attempts    INTEGER NOT NULL DEFAULT 0,
-			verified    BOOLEAN NOT NULL DEFAULT FALSE,
-			created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-		);
-
-		-- Recovery codes (generated at FIDO2 registration, one-time use).
+		-- Recovery codes (generated on demand, one-time use).
 		CREATE TABLE IF NOT EXISTS recovery_codes (
 			user_id     TEXT NOT NULL REFERENCES users(user_id),
 			code_hash   TEXT NOT NULL,          -- SHA-256 of 16-char code
@@ -138,7 +131,6 @@ func migrate(db *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS guardians (
 			user_id        TEXT NOT NULL REFERENCES users(user_id),
 			guardian_id    TEXT NOT NULL REFERENCES users(user_id),
-			guardian_email TEXT NOT NULL,
 			status         TEXT NOT NULL DEFAULT 'pending',
 			threshold      INTEGER NOT NULL DEFAULT 1,
 			invited_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -146,11 +138,30 @@ func migrate(db *sql.DB) error {
 			PRIMARY KEY (user_id, guardian_id)
 		);
 
+		-- Guardian invitations (email-based flow with deep link).
+		-- No PII stored; email is used transiently for sending only.
+		CREATE TABLE IF NOT EXISTS guardian_invites (
+			invite_token    TEXT PRIMARY KEY,
+			user_id         TEXT NOT NULL REFERENCES users(user_id),
+			guardian_id     TEXT,
+			status          TEXT NOT NULL DEFAULT 'pending',
+			created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+			expires_at      DATETIME NOT NULL
+		);
+
+		-- Rate limiting for recovery attempts (keyed by device public key hash).
+		CREATE TABLE IF NOT EXISTS recovery_rate_limits (
+			device_key_hash TEXT NOT NULL,
+			attempted_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_rate_limits_device
+			ON recovery_rate_limits(device_key_hash, attempted_at);
+
 		-- Active recovery requests.
 		CREATE TABLE IF NOT EXISTS recovery_requests (
 			request_id          TEXT PRIMARY KEY,
 			user_id             TEXT NOT NULL REFERENCES users(user_id),
-			email_verified      BOOLEAN NOT NULL DEFAULT FALSE,
 			code_verified       BOOLEAN NOT NULL DEFAULT FALSE,
 			guardians_required  INTEGER NOT NULL DEFAULT 0,
 			guardians_approved  INTEGER NOT NULL DEFAULT 0,
@@ -203,8 +214,8 @@ func migrate(db *sql.DB) error {
 	// Migration: backfill users rows for existing service accounts so that
 	// FK constraints (roles, etc.) work uniformly for all principal types.
 	_, err = db.Exec(`
-		INSERT INTO users (user_id, display_name)
-		SELECT account_id, display_name FROM service_accounts
+		INSERT INTO users (user_id)
+		SELECT account_id FROM service_accounts
 		WHERE account_id NOT IN (SELECT user_id FROM users)
 	`)
 	if err != nil {
@@ -216,48 +227,63 @@ func migrate(db *sql.DB) error {
 
 // --- User operations ---
 
-// UserInfo holds user details returned by ListUsers.
-type UserInfo struct {
-	UserID      string   `json:"user_id"`
-	DisplayName string   `json:"display_name"`
-	Email       string   `json:"email"`
-	CreatedAt   string   `json:"created_at"`
-	Roles       []string `json:"roles"`
+// UpsertPushToken stores or updates the Expo push token for a user.
+func (db *DB) UpsertPushToken(userID, pushToken string) error {
+	_, err := db.Exec(`
+		INSERT INTO push_tokens (user_id, push_token, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(user_id) DO UPDATE SET push_token = excluded.push_token, updated_at = CURRENT_TIMESTAMP
+	`, userID, pushToken)
+	return err
 }
 
-// ListUsers returns all users with their roles.
-func (db *DB) ListUsers() ([]UserInfo, error) {
+// GetPushToken returns the stored push token for a user, or "" if none.
+func (db *DB) GetPushToken(userID string) string {
+	var token string
+	db.QueryRow("SELECT push_token FROM push_tokens WHERE user_id = ?", userID).Scan(&token)
+	return token
+}
+
+// Metrics holds aggregate usage statistics (no PII).
+type Metrics struct {
+	TotalUsers          int            `json:"total_users"`
+	TotalCredentials    int            `json:"total_credentials"`
+	TotalGuardians      int            `json:"total_guardians"`
+	ActiveRecoveries    int            `json:"active_recoveries"`
+	RegistrationsToday  int            `json:"registrations_today"`
+	NewCredentialsToday int            `json:"new_credentials_today"`
+	DailyRegistrations  map[string]int `json:"daily_registrations"` // last 30 days
+}
+
+// GetMetrics returns aggregate statistics without exposing any user data.
+func (db *DB) GetMetrics() (*Metrics, error) {
+	m := &Metrics{DailyRegistrations: make(map[string]int)}
+
+	db.QueryRow("SELECT COUNT(*) FROM users").Scan(&m.TotalUsers)
+	db.QueryRow("SELECT COUNT(*) FROM credentials").Scan(&m.TotalCredentials)
+	db.QueryRow("SELECT COUNT(*) FROM guardians WHERE status = 'accepted'").Scan(&m.TotalGuardians)
+	db.QueryRow("SELECT COUNT(*) FROM recovery_requests WHERE status = 'pending' AND expires_at > ?", time.Now()).Scan(&m.ActiveRecoveries)
+	db.QueryRow("SELECT COUNT(*) FROM users WHERE created_at >= date('now', 'start of day')").Scan(&m.RegistrationsToday)
+	db.QueryRow("SELECT COUNT(*) FROM credentials WHERE created_at >= date('now', 'start of day')").Scan(&m.NewCredentialsToday)
+
+	// Daily registration counts for the last 30 days.
 	rows, err := db.Query(`
-		SELECT u.user_id, u.display_name, u.email, u.created_at
-		FROM users u ORDER BY u.created_at DESC
+		SELECT date(created_at) AS day, COUNT(*) AS cnt
+		FROM users
+		WHERE created_at >= date('now', '-30 days')
+		GROUP BY day ORDER BY day
 	`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []UserInfo
-	for rows.Next() {
-		var u UserInfo
-		if err := rows.Scan(&u.UserID, &u.DisplayName, &u.Email, &u.CreatedAt); err != nil {
-			continue
-		}
-		u.Roles = []string{}
-		users = append(users, u)
-	}
-
-	// Fetch roles for all users.
-	for i := range users {
-		roles, err := db.GetRoles(users[i].UserID)
-		if err == nil && roles != nil {
-			users[i].Roles = roles
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var day string
+			var cnt int
+			if rows.Scan(&day, &cnt) == nil {
+				m.DailyRegistrations[day] = cnt
+			}
 		}
 	}
 
-	if users == nil {
-		users = []UserInfo{}
-	}
-	return users, nil
+	return m, nil
 }
 
 // --- Credential operations ---
@@ -409,9 +435,9 @@ func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID s
 
 	// Ensure a users row exists so FKs (roles, etc.) work for service accounts.
 	_, err = tx.Exec(
-		`INSERT INTO users (user_id, display_name) VALUES (?, ?)
-		 ON CONFLICT(user_id) DO UPDATE SET display_name = excluded.display_name`,
-		accountID, displayName,
+		`INSERT INTO users (user_id) VALUES (?)
+		 ON CONFLICT(user_id) DO NOTHING`,
+		accountID,
 	)
 	if err != nil {
 		return err
@@ -427,89 +453,6 @@ func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID s
 	}
 
 	return tx.Commit()
-}
-
-// --- Email verification operations ---
-
-// StoreEmailVerification stores a hashed OTP for email verification.
-func (db *DB) StoreEmailVerification(id, email, codeHash string, expiresAt time.Time) error {
-	_, err := db.Exec(
-		`INSERT INTO email_verifications (id, email, code_hash, expires_at) VALUES (?, ?, ?, ?)`,
-		id, email, codeHash, expiresAt,
-	)
-	return err
-}
-
-// EmailVerificationRateCheck returns the number of OTPs sent to this email in the last hour.
-func (db *DB) EmailVerificationRateCheck(email string) (int, error) {
-	var count int
-	err := db.QueryRow(
-		`SELECT COUNT(*) FROM email_verifications WHERE email = ? AND created_at > ?`,
-		email, time.Now().Add(-1*time.Hour),
-	).Scan(&count)
-	return count, err
-}
-
-// VerifyEmailCode checks the OTP, increments attempts, and marks verified if correct.
-// Returns the verification ID if successful.
-func (db *DB) VerifyEmailCode(email, codeHash string) (string, error) {
-	var id string
-	var storedHash string
-	var expiresAt time.Time
-	var attempts int
-	var verified bool
-
-	err := db.QueryRow(
-		`SELECT id, code_hash, expires_at, attempts, verified
-		 FROM email_verifications
-		 WHERE email = ? AND verified = FALSE
-		 ORDER BY created_at DESC LIMIT 1`,
-		email,
-	).Scan(&id, &storedHash, &expiresAt, &attempts, &verified)
-	if err != nil {
-		return "", fmt.Errorf("no pending verification for this email")
-	}
-	if time.Now().After(expiresAt) {
-		return "", fmt.Errorf("verification code expired")
-	}
-	if attempts >= 5 {
-		return "", fmt.Errorf("too many verification attempts")
-	}
-
-	// Increment attempts.
-	db.Exec("UPDATE email_verifications SET attempts = attempts + 1 WHERE id = ?", id)
-
-	if storedHash != codeHash {
-		return "", fmt.Errorf("invalid verification code")
-	}
-
-	// Mark verified.
-	db.Exec("UPDATE email_verifications SET verified = TRUE WHERE id = ?", id)
-	return id, nil
-}
-
-// IsEmailVerified checks if a verification ID is verified and not expired.
-func (db *DB) IsEmailVerified(verificationID string) (string, bool) {
-	var email string
-	var verified bool
-	var expiresAt time.Time
-	err := db.QueryRow(
-		"SELECT email, verified, expires_at FROM email_verifications WHERE id = ?",
-		verificationID,
-	).Scan(&email, &verified, &expiresAt)
-	if err != nil || !verified {
-		return "", false
-	}
-	// Extend validity window: verification good for 30 min after verified.
-	if time.Now().After(expiresAt.Add(30 * time.Minute)) {
-		return "", false
-	}
-	return email, true
-}
-
-// CleanupExpiredVerifications removes old email verification records.
-func (db *DB) CleanupExpiredVerifications() {
-	db.Exec("DELETE FROM email_verifications WHERE expires_at < ?", time.Now().Add(-1*time.Hour))
 }
 
 // --- Recovery code operations ---
@@ -541,6 +484,12 @@ func (db *DB) StoreRecoveryCodes(userID string, codeHashes []string) error {
 	return tx.Commit()
 }
 
+// DeleteRecoveryCodes removes all recovery codes for a user.
+func (db *DB) DeleteRecoveryCodes(userID string) error {
+	_, err := db.Exec("DELETE FROM recovery_codes WHERE user_id = ?", userID)
+	return err
+}
+
 // VerifyRecoveryCode checks if an unused recovery code matches for the user.
 // Returns true and consumes the code if valid.
 func (db *DB) VerifyRecoveryCode(userID, codeHash string) (bool, error) {
@@ -555,6 +504,23 @@ func (db *DB) VerifyRecoveryCode(userID, codeHash string) (bool, error) {
 	return n == 1, nil
 }
 
+// FindUserByRecoveryCode checks a code hash against all users' unused codes.
+// Returns user_id and consumes the code if found.
+func (db *DB) FindUserByRecoveryCode(codeHash string) (string, error) {
+	var userID string
+	err := db.QueryRow(
+		"SELECT user_id FROM recovery_codes WHERE code_hash = ? AND used_at IS NULL LIMIT 1",
+		codeHash,
+	).Scan(&userID)
+	if err != nil {
+		return "", fmt.Errorf("invalid recovery code")
+	}
+	// Consume the code.
+	db.Exec("UPDATE recovery_codes SET used_at = ? WHERE user_id = ? AND code_hash = ?",
+		time.Now(), userID, codeHash)
+	return userID, nil
+}
+
 // HasRecoveryCodes checks if a user has any unused recovery codes.
 func (db *DB) HasRecoveryCodes(userID string) (int, error) {
 	var count int
@@ -567,13 +533,13 @@ func (db *DB) HasRecoveryCodes(userID string) (int, error) {
 
 // --- Guardian operations ---
 
-// AddGuardian creates a pending guardian invitation.
-func (db *DB) AddGuardian(userID, guardianID, guardianEmail string, threshold int) error {
+// AddGuardian creates a pending guardian relationship (e.g. via QR code scan).
+func (db *DB) AddGuardian(userID, guardianID string, threshold int) error {
 	_, err := db.Exec(
-		`INSERT INTO guardians (user_id, guardian_id, guardian_email, status, threshold)
-		 VALUES (?, ?, ?, 'pending', ?)
+		`INSERT INTO guardians (user_id, guardian_id, status, threshold)
+		 VALUES (?, ?, 'pending', ?)
 		 ON CONFLICT(user_id, guardian_id) DO UPDATE SET status = 'pending', threshold = excluded.threshold`,
-		userID, guardianID, guardianEmail, threshold,
+		userID, guardianID, threshold,
 	)
 	return err
 }
@@ -607,18 +573,17 @@ func (db *DB) RemoveGuardian(userID, guardianID string) error {
 
 // GuardianInfo holds guardian details.
 type GuardianInfo struct {
-	GuardianID    string `json:"guardian_id"`
-	GuardianEmail string `json:"guardian_email"`
-	Status        string `json:"status"`
-	InvitedAt     string `json:"invited_at"`
-	AcceptedAt    string `json:"accepted_at,omitempty"`
+	GuardianID string `json:"guardian_id"`
+	Status     string `json:"status"`
+	InvitedAt  string `json:"invited_at"`
+	AcceptedAt string `json:"accepted_at,omitempty"`
 }
 
 // ListGuardians returns all guardians for a user.
 func (db *DB) ListGuardians(userID string) ([]GuardianInfo, int, error) {
 	rows, err := db.Query(
-		`SELECT guardian_id, guardian_email, status, invited_at, COALESCE(accepted_at, '')
-		 FROM guardians WHERE user_id = ?`,
+		`SELECT g.guardian_id, g.status, g.invited_at, COALESCE(g.accepted_at, '')
+		 FROM guardians g WHERE g.user_id = ?`,
 		userID,
 	)
 	if err != nil {
@@ -629,7 +594,7 @@ func (db *DB) ListGuardians(userID string) ([]GuardianInfo, int, error) {
 	var guardians []GuardianInfo
 	for rows.Next() {
 		var g GuardianInfo
-		if err := rows.Scan(&g.GuardianID, &g.GuardianEmail, &g.Status, &g.InvitedAt, &g.AcceptedAt); err != nil {
+		if err := rows.Scan(&g.GuardianID, &g.Status, &g.InvitedAt, &g.AcceptedAt); err != nil {
 			continue
 		}
 		guardians = append(guardians, g)
@@ -648,8 +613,8 @@ func (db *DB) ListGuardians(userID string) ([]GuardianInfo, int, error) {
 // ListPendingGuardianInvites returns guardian invitations addressed to this user (as guardian).
 func (db *DB) ListPendingGuardianInvites(guardianID string) ([]map[string]string, error) {
 	rows, err := db.Query(
-		`SELECT g.user_id, u.display_name, u.email, g.invited_at
-		 FROM guardians g JOIN users u ON g.user_id = u.user_id
+		`SELECT g.user_id, g.invited_at
+		 FROM guardians g
 		 WHERE g.guardian_id = ? AND g.status = 'pending'`,
 		guardianID,
 	)
@@ -660,14 +625,12 @@ func (db *DB) ListPendingGuardianInvites(guardianID string) ([]map[string]string
 
 	var invites []map[string]string
 	for rows.Next() {
-		var userID, name, email, invitedAt string
-		if err := rows.Scan(&userID, &name, &email, &invitedAt); err != nil {
+		var userID, invitedAt string
+		if err := rows.Scan(&userID, &invitedAt); err != nil {
 			continue
 		}
 		invites = append(invites, map[string]string{
 			"user_id":    userID,
-			"name":       name,
-			"email":      email,
 			"invited_at": invitedAt,
 		})
 	}
@@ -688,17 +651,78 @@ func (db *DB) GetAcceptedGuardianCount(userID string) (int, int, error) {
 	return count, threshold, err
 }
 
-// FindUserByEmail returns user_id for a user with a verified email attribute.
-func (db *DB) FindUserByEmail(email string) (string, error) {
-	var userID string
+// --- Guardian invite operations (email-based flow) ---
+
+// CreateGuardianInvite stores a new guardian invitation (no PII stored).
+func (db *DB) CreateGuardianInvite(inviteToken, userID string, expiresAt time.Time) error {
+	_, err := db.Exec(
+		`INSERT INTO guardian_invites (invite_token, user_id, expires_at)
+		 VALUES (?, ?, ?)`,
+		inviteToken, userID, expiresAt,
+	)
+	return err
+}
+
+// GetGuardianInvite retrieves an invitation by token.
+type GuardianInvite struct {
+	InviteToken string
+	UserID      string
+	GuardianID  string
+	Status      string
+	ExpiresAt   time.Time
+}
+
+func (db *DB) GetGuardianInvite(inviteToken string) (*GuardianInvite, error) {
+	var inv GuardianInvite
+	var guardianID sql.NullString
 	err := db.QueryRow(
-		"SELECT user_id FROM users WHERE email = ? LIMIT 1",
-		email,
-	).Scan(&userID)
+		`SELECT invite_token, user_id, guardian_id, status, expires_at
+		 FROM guardian_invites WHERE invite_token = ?`,
+		inviteToken,
+	).Scan(&inv.InviteToken, &inv.UserID, &guardianID, &inv.Status, &inv.ExpiresAt)
 	if err != nil {
-		return "", fmt.Errorf("no user found with email %q", email)
+		return nil, fmt.Errorf("invitation not found")
 	}
-	return userID, nil
+	if guardianID.Valid {
+		inv.GuardianID = guardianID.String
+	}
+	if time.Now().After(inv.ExpiresAt) {
+		db.Exec("UPDATE guardian_invites SET status = 'expired' WHERE invite_token = ?", inviteToken)
+		return nil, fmt.Errorf("invitation expired")
+	}
+	return &inv, nil
+}
+
+// AcceptGuardianInvite marks an invitation as accepted and sets the guardian_id.
+func (db *DB) AcceptGuardianInvite(inviteToken, guardianID string) error {
+	res, err := db.Exec(
+		`UPDATE guardian_invites SET status = 'accepted', guardian_id = ?
+		 WHERE invite_token = ? AND status = 'pending'`,
+		guardianID, inviteToken,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("invitation not found or already resolved")
+	}
+	return nil
+}
+
+// GuardianInviteRateCheck returns the number of invitations sent by this user today.
+func (db *DB) GuardianInviteRateCheck(userID string) (int, error) {
+	var count int
+	err := db.QueryRow(
+		`SELECT COUNT(*) FROM guardian_invites WHERE user_id = ? AND created_at > ?`,
+		userID, time.Now().Add(-24*time.Hour),
+	).Scan(&count)
+	return count, err
+}
+
+// CleanupExpiredGuardianInvites removes expired guardian invitations.
+func (db *DB) CleanupExpiredGuardianInvites() {
+	db.Exec("UPDATE guardian_invites SET status = 'expired' WHERE expires_at < ? AND status = 'pending'", time.Now())
 }
 
 // --- Recovery request operations ---
@@ -717,7 +741,6 @@ func (db *DB) CreateRecoveryRequest(requestID, userID string, guardiansRequired 
 type RecoveryRequest struct {
 	RequestID         string
 	UserID            string
-	EmailVerified     bool
 	CodeVerified      bool
 	GuardiansRequired int
 	GuardiansApproved int
@@ -728,11 +751,11 @@ type RecoveryRequest struct {
 func (db *DB) GetRecoveryRequest(requestID string) (*RecoveryRequest, error) {
 	var r RecoveryRequest
 	err := db.QueryRow(
-		`SELECT request_id, user_id, email_verified, code_verified,
+		`SELECT request_id, user_id, code_verified,
 		        guardians_required, guardians_approved, status, expires_at
 		 FROM recovery_requests WHERE request_id = ?`,
 		requestID,
-	).Scan(&r.RequestID, &r.UserID, &r.EmailVerified, &r.CodeVerified,
+	).Scan(&r.RequestID, &r.UserID, &r.CodeVerified,
 		&r.GuardiansRequired, &r.GuardiansApproved, &r.Status, &r.ExpiresAt)
 	if err != nil {
 		return nil, err
@@ -744,11 +767,11 @@ func (db *DB) GetRecoveryRequest(requestID string) (*RecoveryRequest, error) {
 	return &r, nil
 }
 
-// UpdateRecoveryRequest updates fields on a recovery request.
-func (db *DB) UpdateRecoveryRequest(requestID string, emailVerified, codeVerified bool) error {
+// UpdateRecoveryCodeVerified marks the recovery code as verified on a request.
+func (db *DB) UpdateRecoveryCodeVerified(requestID string) error {
 	_, err := db.Exec(
-		`UPDATE recovery_requests SET email_verified = ?, code_verified = ? WHERE request_id = ?`,
-		emailVerified, codeVerified, requestID,
+		`UPDATE recovery_requests SET code_verified = TRUE WHERE request_id = ?`,
+		requestID,
 	)
 	return err
 }
@@ -830,9 +853,8 @@ func (db *DB) CleanupExpiredRecoveryRequests() {
 // ListActiveRecoveryRequests returns pending recovery requests for a user's guardians.
 func (db *DB) ListActiveRecoveryRequests(guardianID string) ([]map[string]string, error) {
 	rows, err := db.Query(
-		`SELECT rr.request_id, rr.user_id, u.display_name, u.email, rr.created_at
+		`SELECT rr.request_id, rr.user_id, rr.created_at
 		 FROM recovery_requests rr
-		 JOIN users u ON rr.user_id = u.user_id
 		 JOIN guardians g ON g.user_id = rr.user_id AND g.guardian_id = ?
 		 WHERE rr.status = 'pending' AND rr.expires_at > ? AND g.status = 'accepted'
 		 AND rr.request_id NOT IN (SELECT request_id FROM recovery_approvals WHERE guardian_id = ?)`,
@@ -845,15 +867,13 @@ func (db *DB) ListActiveRecoveryRequests(guardianID string) ([]map[string]string
 
 	var requests []map[string]string
 	for rows.Next() {
-		var requestID, userID, name, email, createdAt string
-		if err := rows.Scan(&requestID, &userID, &name, &email, &createdAt); err != nil {
+		var requestID, userID, createdAt string
+		if err := rows.Scan(&requestID, &userID, &createdAt); err != nil {
 			continue
 		}
 		requests = append(requests, map[string]string{
 			"request_id": requestID,
 			"user_id":    userID,
-			"name":       name,
-			"email":      email,
 			"created_at": createdAt,
 		})
 	}
@@ -861,4 +881,30 @@ func (db *DB) ListActiveRecoveryRequests(guardianID string) ([]map[string]string
 		requests = []map[string]string{}
 	}
 	return requests, nil
+}
+
+// --- Recovery rate limiting ---
+
+// CheckRecoveryRateLimit returns the number of recovery attempts from this device today.
+func (db *DB) CheckRecoveryRateLimit(deviceKeyHash string) (int, error) {
+	var count int
+	err := db.QueryRow(
+		`SELECT COUNT(*) FROM recovery_rate_limits WHERE device_key_hash = ? AND attempted_at > ?`,
+		deviceKeyHash, time.Now().Add(-24*time.Hour),
+	).Scan(&count)
+	return count, err
+}
+
+// RecordRecoveryAttempt records a recovery attempt for rate limiting.
+func (db *DB) RecordRecoveryAttempt(deviceKeyHash string) error {
+	_, err := db.Exec(
+		`INSERT INTO recovery_rate_limits (device_key_hash) VALUES (?)`,
+		deviceKeyHash,
+	)
+	return err
+}
+
+// CleanupExpiredRateLimits removes old rate limit entries.
+func (db *DB) CleanupExpiredRateLimits() {
+	db.Exec("DELETE FROM recovery_rate_limits WHERE attempted_at < ?", time.Now().Add(-24*time.Hour))
 }

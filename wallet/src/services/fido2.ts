@@ -170,13 +170,22 @@ export async function register(
     origin: string,
     keyAlias: string,
     browserSessionId: string,
-    displayName?: string
+    displayName?: string,
+    userHandleOverride?: string
 ): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string; userId?: string; recoveryPhrase?: string }> {
-    // 1. Begin registration — get challenge and options from server
-    //    Generate a random user handle (32 random bytes, base64url-encoded)
-    const userHandleBytes = new Uint8Array(32);
-    crypto.getRandomValues(userHandleBytes);
-    const userHandle = base64urlEncode(userHandleBytes);
+    // 1. Begin registration — get challenge and options from server.
+    //    If the caller provides a userHandle (e.g. the canonical privasys.id
+    //    user_id derived from the pairwise seed) use it so all of the user's
+    //    devices map to the same server-side `user_id`. Otherwise generate a
+    //    fresh random 32-byte handle.
+    let userHandle: string;
+    if (userHandleOverride) {
+        userHandle = userHandleOverride;
+    } else {
+        const userHandleBytes = new Uint8Array(32);
+        crypto.getRandomValues(userHandleBytes);
+        userHandle = base64urlEncode(userHandleBytes);
+    }
 
     const beginResp = await fido2Fetch<CredentialCreationOptions>(
         origin,

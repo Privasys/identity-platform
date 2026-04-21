@@ -46,7 +46,7 @@ import {
     type RecoveryRequestInfo,
     type DeviceInfo,
 } from '@/services/recovery-api';
-import { ensurePrivasysSession, getPrivasysAccount } from '@/services/privasys-account';
+import { ensurePrivasysSession, getPrivasysAccount } from '@/services/privasys-id';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 

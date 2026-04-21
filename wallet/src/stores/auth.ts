@@ -33,6 +33,8 @@ export interface AuthState {
     isUnlocked: boolean;
     /** Epoch ms when the current unlock expires. */
     unlockExpiresAt: number;
+    /** The wallet's own privasys.id meta-account (for recovery management). */
+    privasysId: PrivasysIdAccount | null;
 
     // Actions
     setOnboarded: () => void;
@@ -41,7 +43,23 @@ export interface AuthState {
     getCredentialForRp: (rpId: string) => Credential | undefined;
     setUnlocked: (durationMs: number) => void;
     checkUnlocked: () => boolean;
+    setPrivasysId: (account: PrivasysIdAccount | null) => void;
+    setPrivasysSession: (sessionToken: string, ttlMs: number) => void;
     hydrate: () => Promise<void>;
+}
+
+/** The wallet's own account at privasys.id (used for recovery management). */
+export interface PrivasysIdAccount {
+    /** Stable user id at privasys.id. */
+    userId: string;
+    /** Last sessionToken issued by FIDO2 register/authenticate. */
+    sessionToken: string;
+    /** Epoch ms when the sessionToken expires (~30 min). */
+    sessionExpiresAt: number;
+    /** Credential id used for re-authentication. */
+    credentialId: string;
+    /** Hardware key alias for re-authentication. */
+    keyAlias: string;
 }
 
 const STORE_KEY = 'v1-auth-store';
@@ -51,6 +69,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     credentials: [],
     isUnlocked: false,
     unlockExpiresAt: 0,
+    privasysId: null,
 
     setOnboarded: () => {
         set({ isOnboarded: true });
@@ -88,6 +107,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return true;
     },
 
+    setPrivasysId: (account) => {
+        set({ privasysId: account });
+        persist(get());
+    },
+
+    setPrivasysSession: (sessionToken, ttlMs) => {
+        const cur = get().privasysId;
+        if (!cur) return;
+        const updated = { ...cur, sessionToken, sessionExpiresAt: Date.now() + ttlMs };
+        set({ privasysId: updated });
+        persist(get());
+    },
+
     hydrate: async () => {
         const raw = await SecureStore.getItemAsync(STORE_KEY);
         if (!raw) return;
@@ -95,7 +127,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const data = JSON.parse(raw);
             set({
                 isOnboarded: data.isOnboarded ?? false,
-                credentials: data.credentials ?? []
+                credentials: data.credentials ?? [],
+                privasysId: data.privasysId ?? null,
             });
         } catch {
             // Corrupted data — start fresh
@@ -106,7 +139,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 function persist(state: AuthState) {
     const data = {
         isOnboarded: state.isOnboarded,
-        credentials: state.credentials
+        credentials: state.credentials,
+        privasysId: state.privasysId,
     };
     SecureStore.setItemAsync(STORE_KEY, JSON.stringify(data)).catch(console.error);
 }

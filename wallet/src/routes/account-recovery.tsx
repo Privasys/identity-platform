@@ -28,9 +28,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import {
-    generateRecoveryCodes,
-    checkRecoveryCodes,
-    deleteRecoveryCodes,
+    getRecoveryPhraseStatus,
+    regenerateRecoveryPhrase,
+    deleteRecoveryPhrase,
     listGuardians,
     inviteGuardianByEmail,
     addGuardianByQR,
@@ -46,6 +46,8 @@ import {
     type RecoveryRequestInfo,
     type DeviceInfo,
 } from '@/services/recovery-api';
+import { ensurePrivasysSession, getPrivasysAccount } from '@/services/privasys-account';
+import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 
 type InviteMethod = 'email' | 'qr';
@@ -54,18 +56,23 @@ export default function AccountRecoveryScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const profile = useProfileStore((s) => s.profile);
+    const privasysId = useAuthStore((s) => s.privasysId);
 
-    // Access token — for now we pass empty string (will be wired when SDK auth is ready).
-    // TODO: get a real access token from the IdP for the wallet user.
-    const accessToken = '';
+    // Wallet session token for management calls. The legacy `accessToken`
+    // string is now `wallet:<sessionToken>` so that the same `Bearer ...`
+    // header works for both new and legacy endpoints.
+    const accessToken = privasysId?.sessionToken ? `wallet:${privasysId.sessionToken}` : '';
+    const walletSessionToken = privasysId?.sessionToken ?? '';
+    const userId = privasysId?.userId ?? '';
 
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [signingIn, setSigningIn] = useState(false);
 
-    // Recovery codes
-    const [codesStatus, setCodesStatus] = useState<{ has_codes: boolean; remaining_codes: number } | null>(null);
-    const [newCodes, setNewCodes] = useState<string[] | null>(null);
-    const [generatingCodes, setGeneratingCodes] = useState(false);
+    // Recovery phrase
+    const [phraseStatus, setPhraseStatus] = useState<{ has_phrase: boolean } | null>(null);
+    const [newPhrase, setNewPhrase] = useState<string | null>(null);
+    const [generatingPhrase, setGeneratingPhrase] = useState(false);
 
     // Guardians
     const [guardians, setGuardians] = useState<GuardianInfo[]>([]);
@@ -79,26 +86,29 @@ export default function AccountRecoveryScreen() {
     // Devices
     const [devices, setDevices] = useState<DeviceInfo[]>([]);
 
-    // Guardian duties (invites from others + recovery requests)
+    // Guardian duties
     const [pendingInvites, setPendingInvites] = useState<GuardianInvite[]>([]);
     const [recoveryRequests, setRecoveryRequests] = useState<RecoveryRequestInfo[]>([]);
 
     const acceptedGuardianCount = guardians.filter((g) => g.status === 'accepted').length;
 
     const loadData = useCallback(async () => {
-        if (!accessToken) {
-            setLoading(false);
-            return;
-        }
         try {
-            const [codesRes, guardiansRes, devicesRes, invitesRes, requestsRes] = await Promise.all([
-                checkRecoveryCodes(accessToken).catch(() => null),
+            // Phrase status is public — fetch by user_id if known
+            if (userId) {
+                const ps = await getRecoveryPhraseStatus(userId).catch(() => null);
+                if (ps) setPhraseStatus({ has_phrase: ps.has_phrase });
+            }
+            if (!accessToken) {
+                setLoading(false);
+                return;
+            }
+            const [guardiansRes, devicesRes, invitesRes, requestsRes] = await Promise.all([
                 listGuardians(accessToken).catch(() => null),
                 listDevices(accessToken).catch(() => null),
                 listGuardianInvites(accessToken).catch(() => null),
                 listRecoveryRequests(accessToken).catch(() => null),
             ]);
-            if (codesRes) setCodesStatus(codesRes);
             if (guardiansRes) {
                 setGuardians(guardiansRes.guardians || []);
                 setGuardianThreshold(guardiansRes.threshold);
@@ -111,7 +121,7 @@ export default function AccountRecoveryScreen() {
         } finally {
             setLoading(false);
         }
-    }, [accessToken]);
+    }, [accessToken, userId]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
@@ -121,28 +131,49 @@ export default function AccountRecoveryScreen() {
         setRefreshing(false);
     }, [loadData]);
 
-    // ── Recovery codes handlers ──
+    // ── Privasys ID sign-in ──
 
-    const handleGenerateCodes = async () => {
+    const handleSignIn = async () => {
+        setSigningIn(true);
+        try {
+            const result = await ensurePrivasysSession(profile?.displayName);
+            // First registration returns the recovery phrase exactly once
+            if (result.recoveryPhrase) {
+                setNewPhrase(result.recoveryPhrase);
+                setPhraseStatus({ has_phrase: true });
+            }
+            await loadData();
+        } catch (e: any) {
+            Alert.alert('Sign-in failed', e.message || String(e));
+        } finally {
+            setSigningIn(false);
+        }
+    };
+
+    // ── Recovery phrase handlers ──
+
+    const handleGeneratePhrase = async () => {
         Alert.alert(
-            'Generate Recovery Codes',
-            codesStatus?.has_codes
-                ? 'This will replace your existing recovery codes. The old codes will no longer work.'
-                : 'Generate 12 one-time recovery codes. Save them securely.',
+            'Generate Recovery Phrase',
+            phraseStatus?.has_phrase
+                ? 'This will replace your existing 24-word recovery phrase. The old phrase will no longer work.'
+                : 'Generate a new 24-word recovery phrase. Write it down and store it in a safe place — it will only be shown once.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Generate',
                     onPress: async () => {
-                        setGeneratingCodes(true);
+                        setGeneratingPhrase(true);
                         try {
-                            const res = await generateRecoveryCodes(accessToken);
-                            setNewCodes(res.codes);
-                            setCodesStatus({ has_codes: true, remaining_codes: res.codes.length });
+                            // Refresh session if needed
+                            const sess = await ensurePrivasysSession(profile?.displayName);
+                            const res = await regenerateRecoveryPhrase(sess.sessionToken);
+                            setNewPhrase(res.phrase);
+                            setPhraseStatus({ has_phrase: true });
                         } catch (e: any) {
                             Alert.alert('Error', e.message);
                         } finally {
-                            setGeneratingCodes(false);
+                            setGeneratingPhrase(false);
                         }
                     },
                 },
@@ -150,23 +181,23 @@ export default function AccountRecoveryScreen() {
         );
     };
 
-    const handleDeactivateCodes = () => {
+    const handleDeactivatePhrase = () => {
         Alert.alert(
-            'Deactivate Recovery Codes',
-            'WARNING: Without recovery codes, your guardians could collude to take over your account. ' +
-            'Recovery codes are your only protection against guardian collusion. ' +
+            'Deactivate Recovery Phrase',
+            'WARNING: Without a recovery phrase, your guardians could collude to take over your account. ' +
             'Only deactivate if you fully trust all your guardians.\n\n' +
-            'Are you sure you want to delete your recovery codes?',
+            'Are you sure you want to delete your recovery phrase?',
             [
-                { text: 'Keep Codes', style: 'cancel' },
+                { text: 'Keep Phrase', style: 'cancel' },
                 {
                     text: 'I Understand, Deactivate',
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteRecoveryCodes(accessToken);
-                            setCodesStatus({ has_codes: false, remaining_codes: 0 });
-                            Alert.alert('Deactivated', 'Recovery codes have been deleted. You can regenerate them at any time.');
+                            const sess = await ensurePrivasysSession(profile?.displayName);
+                            await deleteRecoveryPhrase(sess.sessionToken);
+                            setPhraseStatus({ has_phrase: false });
+                            Alert.alert('Deactivated', 'Recovery phrase deleted. You can regenerate one at any time.');
                         } catch (e: any) {
                             Alert.alert('Error', e.message);
                         }
@@ -293,79 +324,90 @@ export default function AccountRecoveryScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00BCF2" />}
             >
                 {notConfigured && (
-                    <RNView style={styles.infoCard}>
-                        <Ionicons name="information-circle-outline" size={20} color="#F59E0B" />
-                        <Text style={styles.infoText}>
-                            Recovery management requires an authenticated session with Privasys ID. This will be enabled in a future update.
+                    <RNView style={styles.card}>
+                        <Text style={styles.fieldLabel}>Sign in to Privasys ID</Text>
+                        <Text style={styles.helperText}>
+                            Recovery management requires a wallet session. Sign in once with your biometrics
+                            to manage your recovery phrase, guardians and registered devices.
                         </Text>
+                        <Pressable
+                            style={[styles.primaryButton, signingIn && { opacity: 0.6 }]}
+                            onPress={handleSignIn}
+                            disabled={signingIn}
+                        >
+                            {signingIn ? (
+                                <ActivityIndicator color="#FFFFFF" size="small" />
+                            ) : (
+                                <Text style={styles.primaryButtonText}>Sign in with biometrics</Text>
+                            )}
+                        </Pressable>
                     </RNView>
                 )}
 
-                {/* ── Recovery Codes ── */}
-                <Text style={styles.sectionTitle}>RECOVERY CODES</Text>
+                {/* ── Recovery Phrase ── */}
+                <Text style={styles.sectionTitle}>RECOVERY PHRASE</Text>
                 <Text style={styles.sectionDescription}>
-                    One-time backup codes to regain access if you lose your device. Store them in a safe place.
+                    A 24-word phrase to regain access if you lose your device. Write it down on paper
+                    and store it somewhere safe — it will only be shown once.
                 </Text>
 
-                {newCodes ? (
+                {newPhrase ? (
                     <RNView style={styles.card}>
                         <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
-                            Save these codes — they won't be shown again
+                            Save these 24 words in order — they won't be shown again
                         </Text>
                         <RNView style={styles.codesGrid}>
-                            {newCodes.map((code, i) => (
+                            {newPhrase.split(/\s+/).map((word, i) => (
                                 <RNView key={i} style={styles.codeItem}>
-                                    <Text style={styles.codeText}>{code}</Text>
+                                    <Text style={styles.codeText}>{i + 1}. {word}</Text>
                                 </RNView>
                             ))}
                         </RNView>
                         <Pressable
                             style={styles.secondaryButton}
-                            onPress={() => setNewCodes(null)}
+                            onPress={() => setNewPhrase(null)}
                         >
-                            <Text style={styles.secondaryButtonText}>I've saved these codes</Text>
+                            <Text style={styles.secondaryButtonText}>I've saved my phrase</Text>
                         </Pressable>
                     </RNView>
                 ) : (
                     <RNView style={styles.card}>
-                        {codesStatus ? (
+                        {phraseStatus ? (
                             <RNView style={styles.statusRow}>
                                 <Ionicons
-                                    name={codesStatus.has_codes ? 'checkmark-circle' : 'alert-circle-outline'}
+                                    name={phraseStatus.has_phrase ? 'checkmark-circle' : 'alert-circle-outline'}
                                     size={20}
-                                    color={codesStatus.has_codes ? '#34E89E' : '#F59E0B'}
+                                    color={phraseStatus.has_phrase ? '#34E89E' : '#F59E0B'}
                                 />
                                 <Text style={styles.statusText}>
-                                    {codesStatus.has_codes
-                                        ? `${codesStatus.remaining_codes} recovery code${codesStatus.remaining_codes !== 1 ? 's' : ''} remaining`
-                                        : 'No recovery codes configured'}
+                                    {phraseStatus.has_phrase ? 'Recovery phrase configured' : 'No recovery phrase configured'}
                                 </Text>
                             </RNView>
                         ) : (
                             <RNView style={styles.statusRow}>
                                 <Ionicons name="alert-circle-outline" size={20} color="#94A3B8" />
-                                <Text style={styles.statusText}>Recovery codes not set up</Text>
+                                <Text style={styles.statusText}>Recovery phrase not set up</Text>
                             </RNView>
                         )}
                         <Pressable
-                            style={[styles.primaryButton, (generatingCodes || notConfigured) && { opacity: 0.6 }]}
-                            onPress={handleGenerateCodes}
-                            disabled={generatingCodes || notConfigured}
+                            style={[styles.primaryButton, (generatingPhrase || notConfigured) && { opacity: 0.6 }]}
+                            onPress={handleGeneratePhrase}
+                            disabled={generatingPhrase || notConfigured}
                         >
-                            {generatingCodes ? (
+                            {generatingPhrase ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                                 <Text style={styles.primaryButtonText}>
-                                    {codesStatus?.has_codes ? 'Regenerate Codes' : 'Generate Recovery Codes'}
+                                    {phraseStatus?.has_phrase ? 'Regenerate Phrase' : 'Generate Recovery Phrase'}
                                 </Text>
                             )}
                         </Pressable>
-                        {codesStatus?.has_codes && acceptedGuardianCount >= 1 && (
+                        {phraseStatus?.has_phrase && acceptedGuardianCount >= 1 && (
                             <Pressable
                                 style={styles.secondaryButton}
-                                onPress={handleDeactivateCodes}
+                                onPress={handleDeactivatePhrase}
                             >
-                                <Text style={[styles.secondaryButtonText, { color: '#DC2626', fontSize: 13 }]}>Deactivate Codes (not recommended)</Text>
+                                <Text style={[styles.secondaryButtonText, { color: '#DC2626', fontSize: 13 }]}>Deactivate Phrase (not recommended)</Text>
                             </Pressable>
                         )}
                     </RNView>

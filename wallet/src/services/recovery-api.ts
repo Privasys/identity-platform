@@ -4,12 +4,13 @@
 /**
  * Recovery API client — calls the IdP recovery endpoints.
  *
- * Endpoints:
- * - Recovery codes (generate, check, delete)
- * - Guardians (list, invite by email, add by QR, accept invite, remove, respond, approve)
- * - Devices (list, revoke)
- * - Recovery flow (begin, status, complete)
- * - Guardian QR (get own QR data)
+ * Two flavours of auth:
+ * - Wallet session token (`Bearer wallet:<token>`) — issued by FIDO2
+ *   register/authenticate against privasys.id; used for management
+ *   operations (regenerate phrase, manage guardians, manage devices).
+ * - No auth — for the public phrase-status endpoint and the recovery
+ *   begin/status/complete flow (entropy of the 24-word BIP39 phrase
+ *   is sufficient on its own).
  */
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
@@ -30,40 +31,54 @@ async function idpFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     return res.json();
 }
 
+function walletHeaders(walletSessionToken: string): HeadersInit {
+    return { Authorization: `Bearer wallet:${walletSessionToken}` };
+}
+
+// Legacy bearer (JWT access token) — still used by guardian/device endpoints
+// that have not been migrated to wallet-session auth yet.
 function authHeaders(accessToken: string): HeadersInit {
     return { Authorization: `Bearer ${accessToken}` };
 }
 
-// ── Recovery codes ──────────────────────────────────────────────────────
+// ── Recovery phrase (BIP39 24-word) ─────────────────────────────────────
 
-export interface RecoveryCodesResult {
-    codes: string[];
-    message: string;
+export interface RecoveryPhraseResult {
+    /** Space-separated 24-word BIP39 phrase. Returned ONCE. */
+    phrase: string;
+    message?: string;
 }
 
-export async function generateRecoveryCodes(accessToken: string): Promise<RecoveryCodesResult> {
-    return idpFetch('/recovery/codes', {
-        method: 'POST',
-        headers: authHeaders(accessToken),
-    });
+export interface RecoveryPhraseStatus {
+    has_phrase: boolean;
+    /** Back-compat fields from legacy /recovery/codes API. */
+    has_codes?: boolean;
+    remaining_codes?: number;
 }
 
-export interface RecoveryCodesStatus {
-    has_codes: boolean;
-    remaining_codes: number;
-}
-
-export async function checkRecoveryCodes(accessToken: string): Promise<RecoveryCodesStatus> {
-    return idpFetch('/recovery/codes', {
+/**
+ * Public — anyone can check whether a user has a recovery phrase set up.
+ * (Returns just a boolean; no sensitive data.)
+ */
+export async function getRecoveryPhraseStatus(userId: string): Promise<RecoveryPhraseStatus> {
+    return idpFetch(`/recovery/phrase/status?user_id=${encodeURIComponent(userId)}`, {
         method: 'GET',
-        headers: authHeaders(accessToken),
     });
 }
 
-export async function deleteRecoveryCodes(accessToken: string): Promise<{ status: string }> {
-    return idpFetch('/recovery/codes', {
+/** Authenticated — generate a new 24-word phrase (replaces any existing one). */
+export async function regenerateRecoveryPhrase(walletSessionToken: string): Promise<RecoveryPhraseResult> {
+    return idpFetch('/recovery/phrase/regenerate', {
+        method: 'POST',
+        headers: walletHeaders(walletSessionToken),
+    });
+}
+
+/** Authenticated — delete the existing recovery phrase. */
+export async function deleteRecoveryPhrase(walletSessionToken: string): Promise<{ status: string }> {
+    return idpFetch('/recovery/phrase', {
         method: 'DELETE',
-        headers: authHeaders(accessToken),
+        headers: walletHeaders(walletSessionToken),
     });
 }
 
@@ -213,20 +228,14 @@ export interface RecoveryBeginResult {
     expires_at: string;
 }
 
-export async function beginRecovery(
-    recoveryCode: string,
-    devicePublicKey: string,  // base64 uncompressed P-256 (65 bytes: 0x04 || X || Y)
-    deviceSignature: string,  // base64 ASN.1/DER ECDSA signature over SHA-256(recovery_code || timestamp)
-    timestamp: string,        // RFC 3339
-): Promise<RecoveryBeginResult> {
+/**
+ * Begin a recovery request using a 24-word BIP39 phrase.
+ * Phrase is the only credential needed — no device attestation, no rate limit.
+ */
+export async function beginRecovery(recoveryPhrase: string): Promise<RecoveryBeginResult> {
     return idpFetch('/recovery/begin', {
         method: 'POST',
-        body: JSON.stringify({
-            recovery_code: recoveryCode,
-            device_public_key: devicePublicKey,
-            device_signature: deviceSignature,
-            timestamp,
-        }),
+        body: JSON.stringify({ recovery_phrase: recoveryPhrase }),
     });
 }
 

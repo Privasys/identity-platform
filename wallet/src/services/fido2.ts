@@ -45,6 +45,9 @@ interface CredentialAssertionOptions {
 interface CompleteResponse {
     status: string;
     sessionToken?: string;
+    userId?: string;
+    /** BIP39 24-word recovery phrase. Returned ONCE on first registration. */
+    recoveryPhrase?: string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -168,7 +171,7 @@ export async function register(
     keyAlias: string,
     browserSessionId: string,
     displayName?: string
-): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string }> {
+): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string; userId?: string; recoveryPhrase?: string }> {
     // 1. Begin registration — get challenge and options from server
     //    Generate a random user handle (32 random bytes, base64url-encoded)
     const userHandleBytes = new Uint8Array(32);
@@ -261,6 +264,8 @@ export async function register(
         userHandle: options.user.id,
         userName: options.user.name,
         serverRpId: options.rp.id,
+        userId: completeResp.userId,
+        recoveryPhrase: completeResp.recoveryPhrase,
     };
 }
 
@@ -280,7 +285,7 @@ export async function authenticate(
     credentialId: string,
     browserSessionId: string,
     rpId?: string
-): Promise<{ sessionToken: string }> {
+): Promise<{ sessionToken: string; userId?: string }> {
     // 1. Begin authentication
     const beginResp = await fido2Fetch<CredentialAssertionOptions>(
         origin,
@@ -332,7 +337,7 @@ export async function authenticate(
         }
     );
 
-    return { sessionToken: completeResp.sessionToken || '' };
+    return { sessionToken: completeResp.sessionToken || '', userId: completeResp.userId };
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────

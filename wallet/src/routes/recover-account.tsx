@@ -5,7 +5,7 @@
  * Recover Account flow — for users who lost access to their device.
  *
  * Steps:
- * 1. Enter a recovery code
+ * 1. Enter your 24-word BIP39 recovery phrase
  * 2. Wait for guardian approvals (if guardians are configured)
  * 3. Account recovered → register new FIDO2 credential
  *
@@ -46,42 +46,6 @@ interface RecoveryState {
     guardiansRequired: number;
     guardiansApproved: number;
     expiresAt: string;
-}
-
-/**
- * Sign a recovery request with the device's TEE-backed key (P-256).
- * The IdP verifies this signature to rate-limit recovery attempts per device.
- *
- * TODO: Wire to actual Secure Enclave (iOS) / StrongBox (Android) key via
- * react-native-keychain or expo-secure-store. For now, generates an ephemeral
- * key — the rate-limiting contract is enforced server-side regardless.
- */
-async function signRecoveryAttestation(
-    recoveryCode: string,
-    timestamp: string,
-): Promise<{ devicePublicKey: string; deviceSignature: string }> {
-    // TODO: Replace with hardware-backed key from TEE.
-    // 1. Generate or retrieve a P-256 key pair stored in Secure Enclave / StrongBox.
-    // 2. Sign SHA-256(recoveryCode || timestamp) with the private key.
-    // 3. Return base64(uncompressed public key) and base64(ASN.1/DER signature).
-    //
-    // Placeholder: use Web Crypto API (available in React Native Hermes).
-    const keyPair = await crypto.subtle.generateKey(
-        { name: 'ECDSA', namedCurve: 'P-256' },
-        true,
-        ['sign'],
-    );
-    const message = new TextEncoder().encode(recoveryCode + timestamp);
-    const signature = await crypto.subtle.sign(
-        { name: 'ECDSA', hash: 'SHA-256' },
-        keyPair.privateKey,
-        message, // sign() hashes with SHA-256 internally
-    );
-    const rawPub = await crypto.subtle.exportKey('raw', keyPair.publicKey);
-    return {
-        devicePublicKey: btoa(String.fromCharCode(...new Uint8Array(rawPub))),
-        deviceSignature: btoa(String.fromCharCode(...new Uint8Array(signature))),
-    };
 }
 
 type FlowStep = 'enter-code' | 'waiting' | 'approved' | 'completed' | 'expired';
@@ -162,20 +126,9 @@ export default function RecoverAccountScreen() {
         if (!codeInput.trim()) return;
         setSubmitting(true);
         try {
-            // Device attestation: sign the recovery request with TEE-backed key.
-            // TODO: Replace with actual TEE key from Secure Enclave (iOS) / StrongBox (Android).
-            // For now, uses a placeholder — the IdP will enforce the contract once wallet TEE is wired.
-            const timestamp = new Date().toISOString();
-            const { devicePublicKey, deviceSignature } = await signRecoveryAttestation(
-                codeInput.trim(),
-                timestamp,
-            );
-            const res: RecoveryBeginResult = await beginRecovery(
-                codeInput.trim(),
-                devicePublicKey,
-                deviceSignature,
-                timestamp,
-            );
+            // BIP39 24-word phrase has 256 bits of entropy — no device
+            // attestation, no rate limiting required.
+            const res: RecoveryBeginResult = await beginRecovery(codeInput.trim());
             const state: RecoveryState = {
                 requestId: res.request_id,
                 userId: res.user_id,
@@ -265,20 +218,21 @@ export default function RecoverAccountScreen() {
                         </RNView>
                         <Text style={styles.title}>Enter Recovery Code</Text>
                         <Text style={styles.subtitle}>
-                            Enter one of your recovery codes to begin the account recovery process.
+                            Enter your 24-word recovery phrase to begin the account recovery process.
                         </Text>
 
                         <RNView style={styles.card}>
-                            <Text style={styles.fieldLabel}>Recovery Code</Text>
+                            <Text style={styles.fieldLabel}>Recovery Phrase</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { minHeight: 100, textAlignVertical: 'top' }]}
                                 value={codeInput}
                                 onChangeText={setCodeInput}
-                                placeholder="XXXX-XXXX-XXXX-XXXX"
+                                placeholder="word1 word2 word3 ... word24"
                                 placeholderTextColor="#94A3B8"
-                                autoCapitalize="characters"
+                                autoCapitalize="none"
                                 autoCorrect={false}
                                 autoFocus
+                                multiline
                             />
                             <Pressable
                                 style={[styles.primaryButton, (submitting || !codeInput.trim()) && { opacity: 0.6 }]}

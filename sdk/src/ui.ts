@@ -1184,7 +1184,12 @@ export class AuthUI {
         this.state = 'push-waiting';
         this.render();
 
-        client.notifyAndWait(this.cfg.pushToken!).then(
+        // Pass the OIDC session_id through to the broker so the wallet uses
+        // it as `?session_id=` on /fido2/authenticate/begin. That is what the
+        // IdP FIDO2 handler stores against the challenge entry — without it,
+        // the handler can't link the assertion back to the OIDC session and
+        // /session/complete falls through with no real user_id.
+        client.notifyAndWait(this.cfg.pushToken!, this.cfg.sessionId).then(
             (result) => {
                 this.sessionToken = result.sessionToken;
                 this.attestation = result.attestation;

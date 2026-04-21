@@ -472,10 +472,24 @@ func HandleSessionComplete(codes *CodeStore, sessions *SessionStore) http.Handle
 			return
 		}
 
-		userID := req.UserID
-		if userID == "" {
-			userID = "wallet:" + req.SessionID
+		// SECURITY: do not mint a synthetic "wallet:<sessionID>" subject when
+		// the caller didn't supply a real user_id. The previous behaviour
+		// allowed the wallet/relay path to silently produce JWTs with a
+		// brand-new sub that had no roles and no profile attributes — users
+		// would re-authenticate after a session drop and lose their admin
+		// role and email/name (see .operations/bugs-and-fixes.md #25).
+		// The OIDC session MUST be marked authenticated by the FIDO2 handler
+		// (which knows the real user_id) before frame-host calls this
+		// endpoint. If we get here with an unauthenticated session and no
+		// user_id, the wallet/FIDO2→OIDC linking is broken and we should
+		// surface that as a hard auth failure rather than corrupt the token.
+		if req.UserID == "" {
+			log.Printf("session/complete: refusing to complete session %s without user_id (FIDO2/OIDC linking missing)", req.SessionID)
+			errorResponse(w, http.StatusBadRequest, "invalid_request",
+				"session not authenticated and no user_id supplied")
+			return
 		}
+		userID := req.UserID
 
 		authCode := codes.Create(&AuthCode{
 			ClientID:            session.ClientID,

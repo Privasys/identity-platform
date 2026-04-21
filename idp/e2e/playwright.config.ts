@@ -13,8 +13,13 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "authorize-page",
+      name: "authorize",
       testMatch: "authorize.spec.ts",
+      use: { browserName: "chromium" },
+    },
+    {
+      name: "recovery",
+      testMatch: "recovery.spec.ts",
       use: { browserName: "chromium" },
     },
   ],

@@ -16,6 +16,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write   # required for google-github-actions/auth WIF
 
 jobs:
   publish:
@@ -43,9 +44,63 @@ jobs:
           test -f dist/index.js
           test -f dist/index.d.ts
           test -f dist/privasys-auth.iife.js
+          test -f dist/privasys-auth-frame.iife.js
 
       - name: Publish to GHCR npm
         working-directory: sdk
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---- Deploy hosted frame bundle to privasys.id (idp-fr-par-1) ----
+      # The frame bundle at https://privasys.id/auth/privasys-auth-frame.iife.js
+      # is loaded by every adopter site's iframe. It MUST be re-deployed on every
+      # SDK release so that fixes (e.g. broker session_id passthrough — bug #25)
+      # actually ship to users without requiring an IdP container rebuild.
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Upload frame bundle to idp-fr-par-1
+        run: |
+          gcloud compute scp \
+            sdk/dist/privasys-auth-frame.iife.js \
+            sdk/dist/privasys-auth-frame.iife.js.map \
+            idp-fr-par-1:/tmp/ \
+            --project privasys-production \
+            --zone europe-west9-a \
+            --tunnel-through-iap \
+            --scp-flag="-O"
+
+      - name: Install frame bundle into /var/www/auth
+        run: |
+          gcloud compute ssh idp-fr-par-1 \
+            --project privasys-production \
+            --zone europe-west9-a \
+            --tunnel-through-iap \
+            --command "
+              set -e
+              TS=\$(date +%s)
+              if [ -f /var/www/auth/privasys-auth-frame.iife.js ]; then
+                sudo cp /var/www/auth/privasys-auth-frame.iife.js /var/www/auth/privasys-auth-frame.iife.js.bak.\$TS
+              fi
+              sudo cp /tmp/privasys-auth-frame.iife.js     /var/www/auth/privasys-auth-frame.iife.js
+              sudo cp /tmp/privasys-auth-frame.iife.js.map /var/www/auth/privasys-auth-frame.iife.js.map
+              sudo chown root:root /var/www/auth/privasys-auth-frame.iife.js /var/www/auth/privasys-auth-frame.iife.js.map
+              sudo chmod 644       /var/www/auth/privasys-auth-frame.iife.js /var/www/auth/privasys-auth-frame.iife.js.map
+              # Keep only the 5 most recent backups
+              sudo bash -c 'ls -1t /var/www/auth/privasys-auth-frame.iife.js.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f'
+              rm -f /tmp/privasys-auth-frame.iife.js /tmp/privasys-auth-frame.iife.js.map
+            "
+
+      - name: Smoke test frame bundle
+        run: |
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "https://privasys.id/auth/privasys-auth-frame.iife.js")
+          echo "frame bundle: HTTP $STATUS"
+          test "$STATUS" = "200"

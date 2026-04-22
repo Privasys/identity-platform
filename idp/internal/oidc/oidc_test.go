@@ -139,3 +139,60 @@ func TestPKCE(t *testing.T) {
 		t.Error("expected PKCE verification to fail with wrong verifier")
 	}
 }
+
+
+// Verifies the strict role taxonomy: a token minted for audience X must
+// only carry roles prefixed with "X:".  Regression coverage for the
+// handleJWTBearerGrant / handleAuthorizationCodeGrant / refresh-token
+// paths.
+func TestFilterRolesByAudience(t *testing.T) {
+roles := []string{
+"platform:admin",             // legacy bare-prefix, must be dropped
+"privasys-platform:admin",
+"privasys-platform:manager",
+"management-service:manager", // different audience, must be dropped
+"admin",                      // bare, must be dropped
+}
+
+tests := []struct {
+aud  string
+want []string
+}{
+{"privasys-platform", []string{"privasys-platform:admin", "privasys-platform:manager"}},
+{"management-service", []string{"management-service:manager"}},
+{"platform", []string{"platform:admin"}},
+{"nonexistent", nil},
+{"", roles}, // empty audience acts as a passthrough (no filtering)
+}
+
+for _, tt := range tests {
+t.Run(tt.aud, func(t *testing.T) {
+got := filterRolesByAudience(append([]string(nil), roles...), tt.aud)
+if len(got) != len(tt.want) {
+t.Fatalf("aud=%q: got %v, want %v", tt.aud, got, tt.want)
+}
+for i := range got {
+if got[i] != tt.want[i] {
+t.Errorf("aud=%q: got[%d]=%q, want %q", tt.aud, i, got[i], tt.want[i])
+}
+}
+})
+}
+}
+
+func TestAudienceFromScope(t *testing.T) {
+tests := []struct {
+scope, fallback, want string
+}{
+{"openid profile", "privasys-platform", "privasys-platform"},
+{"openid audience:management-service", "privasys-platform", "management-service"},
+{"audience:privasys-platform openid", "x", "privasys-platform"},
+{"audience:", "fallback", "fallback"}, // empty value falls back
+{"", "privasys-platform", "privasys-platform"},
+}
+for _, tt := range tests {
+if got := audienceFromScope(tt.scope, tt.fallback); got != tt.want {
+t.Errorf("scope=%q: got %q, want %q", tt.scope, got, tt.want)
+}
+}
+}

@@ -615,8 +615,13 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 		filteredAttrs = restricted
 	}
 
-	// Get user roles.
-	roles, _ := db.GetRoles(ac.UserID)
+	// Get user roles, filtered to the requested audience namespace.
+	// The access token audience is the resource-server trust domain
+	// (privasys-platform by default). Only roles in that namespace are
+	// emitted — enforces the strict role taxonomy.
+	allRoles, _ := db.GetRoles(ac.UserID)
+	audience := audienceFromScope(ac.Scope, "privasys-platform")
+	roles := filterRolesByAudience(allRoles, audience)
 
 	// Issue ID token.
 	idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{
@@ -636,9 +641,10 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Issue access token (with roles and profile).
-	// Access token aud = "privasys-platform" (the resource server trust domain).
+	// Access token aud is the resource-server trust domain, selected from
+	// the scope (audience:<X>, defaulting to privasys-platform).
 	// ID token aud = client_id (per OIDC spec: ID tokens are for the client).
-	accessToken, err := issuer.IssueAccessToken(ac.UserID, "privasys-platform", roles, filteredAttrs)
+	accessToken, err := issuer.IssueAccessToken(ac.UserID, audience, roles, filteredAttrs)
 	if err != nil {
 		log.Printf("token: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -717,11 +723,14 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	// No user profile is stored server-side — refresh tokens only carry roles.
 	filteredRefreshAttrs := filterAttributesByScope(nil, scope)
 
-	// Get current roles.
-	roles, _ := db.GetRoles(userID)
+	// Get current roles, filtered to the audience namespace carried by the
+	// original scope.
+	allRoles, _ := db.GetRoles(userID)
+	audience := audienceFromScope(scope, "privasys-platform")
+	roles := filterRolesByAudience(allRoles, audience)
 
 	// Issue new access token (with current roles and available profile).
-	accessToken, err := issuer.IssueAccessToken(userID, "privasys-platform", roles, filteredRefreshAttrs)
+	accessToken, err := issuer.IssueAccessToken(userID, audience, roles, filteredRefreshAttrs)
 	if err != nil {
 		log.Printf("refresh: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -818,18 +827,14 @@ func handleJWTBearerGrant(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	// Get service account roles.
-	roles, _ := db.GetRoles(accountID)
-
 	// Determine audience from scope (e.g. "audience:management-service").
 	// Default to "privasys-platform" if no explicit audience scope is provided.
-	audience := "privasys-platform"
-	for _, s := range strings.Fields(scope) {
-		if strings.HasPrefix(s, "audience:") {
-			audience = strings.TrimPrefix(s, "audience:")
-			break
-		}
-	}
+	audience := audienceFromScope(scope, "privasys-platform")
+
+	// Get service account roles, filtered to the audience namespace so
+	// tokens minted for one trust domain never leak grants for another.
+	allRoles, _ := db.GetRoles(accountID)
+	roles := filterRolesByAudience(allRoles, audience)
 
 	// Issue access token (service accounts have no profile attributes).
 	accessToken, err := issuer.IssueAccessToken(accountID, audience, roles, nil)
@@ -941,6 +946,41 @@ func verifyPKCE(challenge, verifier string) bool {
 	h := sha256.Sum256([]byte(verifier))
 	computed := base64.RawURLEncoding.EncodeToString(h[:])
 	return computed == challenge
+}
+
+// audienceFromScope extracts the explicit `audience:<X>` token from an OIDC
+// scope string, falling back to the supplied default when no audience scope
+// is present. The returned audience is also used as the role-namespace prefix
+// by filterRolesByAudience — this is the mechanism enforcing the strict role
+// taxonomy (e.g. `privasys-platform:admin` only surfaces to consumers of the
+// `privasys-platform` audience).
+func audienceFromScope(scope, fallback string) string {
+	for _, s := range strings.Fields(scope) {
+		if strings.HasPrefix(s, "audience:") {
+			if aud := strings.TrimPrefix(s, "audience:"); aud != "" {
+				return aud
+			}
+		}
+	}
+	return fallback
+}
+
+// filterRolesByAudience returns only roles whose name is prefixed with
+// `<audience>:`. This is how audience-scoped tokens are prevented from
+// leaking role grants that belong to a different trust domain. Bare roles
+// (no `:` prefix) and roles from other namespaces are dropped.
+func filterRolesByAudience(roles []string, audience string) []string {
+	if audience == "" || len(roles) == 0 {
+		return roles
+	}
+	prefix := audience + ":"
+	out := roles[:0:0]
+	for _, r := range roles {
+		if strings.HasPrefix(r, prefix) {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // filterAttributesByScope returns only the attributes allowed by the OIDC scope,

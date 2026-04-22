@@ -446,7 +446,22 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     const needsProfile = requestedAttributes?.some(
                         (a: string) => a === 'email' || a === 'name',
                     );
-                    if (needsProfile && socialProviders.length > 0) {
+                    if (needsProfile) {
+                        // Passkey alone cannot supply verified email/name —
+                        // we MUST route the user through an external IdP
+                        // before issuing the auth code. If the IdP is not
+                        // configured with any social provider, fail loudly
+                        // instead of silently completing with a profile-less
+                        // user (regression observed in v0.2.1 where dropping
+                        // provider env vars caused new passkey users to be
+                        // created with no email/name and no way to recover).
+                        if (socialProviders.length === 0) {
+                            throw new Error(
+                                'Profile verification required (email/name) ' +
+                                'but the IdP has no external identity ' +
+                                'providers configured. Contact support.',
+                            );
+                        }
                         // Show an inline profile-verification UI and open a
                         // social popup so the user's verified email/name gets
                         // attached to the auth code before token exchange.

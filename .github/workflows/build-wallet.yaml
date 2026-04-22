@@ -246,7 +246,7 @@ jobs:
           EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_IOS: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID_IOS }}
           EXPO_PUBLIC_OAUTH_MICROSOFT_CLIENT_ID: ${{ secrets.OAUTH_MICROSOFT_CLIENT_ID }}
         run: |
-          PROFILE="${{ inputs.profile || 'preview' }}"
+          PROFILE="${{ inputs.profile || 'production' }}"
           eas build \
             --platform ios \
             --profile "$PROFILE" \
@@ -257,7 +257,7 @@ jobs:
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: wallet-ios-${{ inputs.profile || 'preview' }}
+          name: wallet-ios-${{ inputs.profile || 'production' }}
           path: wallet/build/wallet-ios.ipa
           retention-days: 30
 
@@ -313,7 +313,7 @@ jobs:
           EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_ANDROID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID_ANDROID }}
           EXPO_PUBLIC_OAUTH_MICROSOFT_CLIENT_ID: ${{ secrets.OAUTH_MICROSOFT_CLIENT_ID }}
         run: |
-          PROFILE="${{ inputs.profile || 'preview' }}"
+          PROFILE="${{ inputs.profile || 'production' }}"
           eas build \
             --platform android \
             --profile "$PROFILE" \
@@ -324,7 +324,7 @@ jobs:
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: wallet-android-${{ inputs.profile || 'preview' }}
+          name: wallet-android-${{ inputs.profile || 'production' }}
           path: wallet/build/wallet-android.aab
           retention-days: 30
 
@@ -347,7 +347,7 @@ jobs:
       - name: Download IPA
         uses: actions/download-artifact@v4
         with:
-          name: wallet-ios-${{ inputs.profile || 'preview' }}
+          name: wallet-ios-${{ inputs.profile || 'production' }}
           path: wallet/build/
 
       - name: Install dependencies
@@ -374,12 +374,16 @@ jobs:
             --non-interactive
 
   # ─── Submit to Google Play ────────────────────────────────────────
+  # Runs on:
+  #   - tag push (wallet-v*) — always treated as a production release
+  #   - manual dispatch with profile=production and android in scope
   submit-google-play:
     if: >
-      github.event_name == 'workflow_dispatch' &&
-      !inputs.use_eas_cloud &&
-      (inputs.platform == 'android' || inputs.platform == 'all') &&
-      inputs.profile == 'production'
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/wallet-v')) ||
+      (github.event_name == 'workflow_dispatch' &&
+       !inputs.use_eas_cloud &&
+       (inputs.platform == 'android' || inputs.platform == 'all') &&
+       inputs.profile == 'production')
     needs: [build-local-android]
     runs-on: ubuntu-latest
     steps:
@@ -392,7 +396,7 @@ jobs:
       - name: Download AAB
         uses: actions/download-artifact@v4
         with:
-          name: wallet-android-production
+          name: wallet-android-${{ inputs.profile || 'production' }}
           path: wallet/build/
 
       - name: Install dependencies

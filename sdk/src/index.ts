@@ -20,3 +20,9 @@ export { generateQRPayload, generateBatchQRPayload, generateSessionId } from './
 export { SessionManager } from './session';
 export { AuthFrame } from './frame-client';
 export type { AuthFrameConfig } from './frame-client';
+export { PrivasysSession } from './enclave-session';
+export type {
+    SessionInitOptions,
+    WalletAttestationResult,
+    SealedResponse,
+} from './enclave-session';

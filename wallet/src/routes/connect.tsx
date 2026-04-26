@@ -147,6 +147,13 @@ interface QRPayload {
     appName?: string;
     privacyPolicyUrl?: string;
     clientIP?: string;
+    /** When set to 'session-relay', the wallet must call /__privasys/session-bootstrap
+     *  with `sdkPub` before the FIDO2 ceremony so the IdP can bind the issued
+     *  JWT to a sealed-CBOR transport session. */
+    mode?: 'session-relay' | 'standard';
+    /** SDK ephemeral P-256 SEC1 uncompressed public key, base64url. Required
+     *  when mode==='session-relay'. */
+    sdkPub?: string;
 }
 
 export default function ConnectScreen() {
@@ -412,7 +419,10 @@ export default function ConnectScreen() {
                 keyAlias,
                 credentialId,
                 payload.sessionId,
-                serverRpId
+                serverRpId,
+                payload.mode === 'session-relay' && payload.sdkPub
+                    ? { sdkPub: payload.sdkPub }
+                    : undefined,
             );
 
             // Check for missing attributes before relaying

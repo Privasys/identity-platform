@@ -293,8 +293,29 @@ export async function authenticate(
     keyAlias: string,
     credentialId: string,
     browserSessionId: string,
-    rpId?: string
-): Promise<{ sessionToken: string; userId?: string }> {
+    rpId?: string,
+    sessionRelay?: { sdkPub: string }
+): Promise<{ sessionToken: string; userId?: string; sessionRelay?: SessionRelayBinding }> {
+    // 0. Optional: bootstrap a browser→enclave session over the same
+    //    RA-TLS connection. Wallet posts the SDK's ephemeral P-256
+    //    public key (SEC1 uncompressed, base64url) and gets back the
+    //    server's pub + session id; both are forwarded to the IdP as
+    //    query params so the issued JWT can carry the binding.
+    let relay: SessionRelayBinding | undefined;
+    if (sessionRelay?.sdkPub) {
+        const bs = await fido2Fetch<{ session_id: string; enc_pub: string; expires_at: number }>(
+            origin,
+            '/__privasys/session-bootstrap',
+            { sdk_pub: sessionRelay.sdkPub },
+        );
+        relay = {
+            sessionId: bs.session_id,
+            encPub: bs.enc_pub,
+            sdkPub: sessionRelay.sdkPub,
+            expiresAt: bs.expires_at,
+        };
+    }
+
     // 1. Begin authentication
     const beginResp = await fido2Fetch<CredentialAssertionOptions>(
         origin,
@@ -331,9 +352,16 @@ export async function authenticate(
     const sigResult = await NativeKeys.sign(keyAlias, signedDataB64);
 
     // 5. Complete authentication — send standard WebAuthn assertion response
+    let completePath = `/fido2/authenticate/complete?challenge=${encodeURIComponent(options.challenge)}`;
+    if (relay) {
+        completePath +=
+            `&session_id=${encodeURIComponent(relay.sessionId)}` +
+            `&enc_pub=${encodeURIComponent(relay.encPub)}` +
+            `&sdk_pub=${encodeURIComponent(relay.sdkPub)}`;
+    }
     const completeResp = await fido2Fetch<CompleteResponse>(
         origin,
-        `/fido2/authenticate/complete?challenge=${encodeURIComponent(options.challenge)}`,
+        completePath,
         {
             id: credentialId,
             rawId: credentialId,
@@ -346,7 +374,18 @@ export async function authenticate(
         }
     );
 
-    return { sessionToken: completeResp.sessionToken || '', userId: completeResp.userId };
+    return { sessionToken: completeResp.sessionToken || '', userId: completeResp.userId, sessionRelay: relay };
+}
+
+/** Result of a session-relay bootstrap, returned from authenticate() when
+ *  the caller requested `mode:"session-relay"`. */
+export interface SessionRelayBinding {
+    sessionId: string;
+    /** Server P-256 SEC1 uncompressed pubkey, base64url. */
+    encPub: string;
+    /** Echo of the SDK pubkey supplied by the caller, base64url. */
+    sdkPub: string;
+    expiresAt: number;
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────

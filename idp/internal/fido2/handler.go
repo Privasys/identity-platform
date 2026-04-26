@@ -684,7 +684,7 @@ func (h *Handler) loadCredentials(userID string) ([]webauthn.Credential, error) 
 // session_id is present (the canonical signal that this is not a
 // session-relay flow).
 //
-// TODO(phase-C): also recompute and enforce the binding challenge
+// TODO: also recompute and enforce the binding challenge
 // (SHA256("privasys-session-relay/v1" || nonce || sdk_pub || quote_hash
 // || enc_pub || session_id)) against clientDataJSON.challenge before
 // returning a populated map.

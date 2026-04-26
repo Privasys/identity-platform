@@ -102,7 +102,7 @@ Push to `main` or use the manual workflow dispatch:
 
 ### Note on Rust native modules
 
-The RA-TLS Rust library needs to be cross-compiled for iOS/Android. The GitHub Actions workflow handles this automatically by checking out the `Privasys/ra-tls-clients` repo and running the build scripts. You'll need to add a `RATLS_REPO_TOKEN` secret — a GitHub PAT with Contents read access on `Privasys/ra-tls-clients`.
+The RA-TLS Rust library needs to be cross-compiled for iOS/Android. The GitHub Actions workflow handles this automatically by checking out the public `Privasys/ra-tls-clients` repo and running the build scripts. No extra secret is required — the default `GITHUB_TOKEN` is sufficient for public-repo checkouts.
 
 ## 5. Submit to TestFlight
 
@@ -145,7 +145,6 @@ bunx eas build --platform ios --profile preview --auto-submit
 | Secret | Description |
 |--------|-------------|
 | `EXPO_TOKEN` | Expo access token for EAS CLI |
-| `RATLS_REPO_TOKEN` | GitHub PAT with read access to `Privasys/ra-tls-clients` (for Rust RA-TLS cross-compile) |
 
 ## 8. Verification Checklist
 

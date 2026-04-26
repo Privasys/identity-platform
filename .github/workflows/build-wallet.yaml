@@ -77,7 +77,6 @@ jobs:
         with:
           repository: Privasys/ra-tls-clients
           path: ra-tls-clients
-          token: ${{ secrets.RATLS_REPO_TOKEN }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -119,7 +118,6 @@ jobs:
         with:
           repository: Privasys/ra-tls-clients
           path: ra-tls-clients
-          token: ${{ secrets.RATLS_REPO_TOKEN }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

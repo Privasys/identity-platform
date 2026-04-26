@@ -12,6 +12,8 @@ package fido2
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -28,6 +30,47 @@ import (
 	"github.com/go-webauthn/webauthn/protocol/webauthncose"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
+
+// sessionRelayBindingDomain is the version-tagged domain separator that
+// prefixes the SHA-256 input used as the WebAuthn challenge in the
+// session-relay flow. See `buildSessionRelayClaims` for the matching
+// recompute on /complete.
+const sessionRelayBindingDomain = "privasys-session-relay/v1"
+
+// computeSessionRelayBinding hashes the canonical input defined by §3.3 of
+// the session-relay design. All inputs are accepted as base64url strings
+// (sdk_pub, enc_pub, nonce) or hex strings (quote_hash, session_id) and
+// decoded to their raw bytes before concatenation.
+func computeSessionRelayBinding(nonceB64, sdkPubB64, quoteHashHex, encPubB64, sessionIDHex string) ([]byte, error) {
+	nonce, err := decodeRawURLB64(nonceB64)
+	if err != nil {
+		return nil, fmt.Errorf("nonce: %w", err)
+	}
+	sdkPub, err := decodeRawURLB64(sdkPubB64)
+	if err != nil {
+		return nil, fmt.Errorf("sdk_pub: %w", err)
+	}
+	quoteHash, err := hex.DecodeString(quoteHashHex)
+	if err != nil {
+		return nil, fmt.Errorf("quote_hash: %w", err)
+	}
+	encPub, err := decodeRawURLB64(encPubB64)
+	if err != nil {
+		return nil, fmt.Errorf("enc_pub: %w", err)
+	}
+	sessionID, err := hex.DecodeString(sessionIDHex)
+	if err != nil {
+		return nil, fmt.Errorf("session_id: %w", err)
+	}
+	h := sha256.New()
+	h.Write([]byte(sessionRelayBindingDomain))
+	h.Write(nonce)
+	h.Write(sdkPub)
+	h.Write(quoteHash)
+	h.Write(encPub)
+	h.Write(sessionID)
+	return h.Sum(nil), nil
+}
 
 // Config for the FIDO2 handler.
 type Config struct {
@@ -246,6 +289,19 @@ func generateToken() string {
 func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.URL.Query().Get("session_id")
 
+	// Optional binding-challenge override for the session-relay flow.
+	// See BeginAuthentication for the rationale.
+	bindingChallengeStr := r.URL.Query().Get("binding_challenge")
+	var bindingChallengeBytes []byte
+	if bindingChallengeStr != "" {
+		var err error
+		bindingChallengeBytes, err = decodeRawURLB64(bindingChallengeStr)
+		if err != nil || len(bindingChallengeBytes) != 32 {
+			errorJSON(w, http.StatusBadRequest, "invalid binding_challenge")
+			return
+		}
+	}
+
 	var req struct {
 		UserName   string `json:"userName"`
 		UserHandle string `json:"userHandle"`
@@ -291,6 +347,11 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if bindingChallengeBytes != nil {
+		options.Response.Challenge = protocol.URLEncodedBase64(bindingChallengeBytes)
+		sessionData.Challenge = bindingChallengeStr
+	}
+
 	challengeKey := sessionData.Challenge
 	h.challenges.put(challengeKey, &challengeEntry{
 		sessionData: sessionData,
@@ -330,6 +391,13 @@ func (h *Handler) CompleteRegistration(
 		entry, ok := h.challenges.pop(challenge)
 		if !ok {
 			errorJSON(w, http.StatusBadRequest, "challenge expired or not found")
+			return
+		}
+
+		// Enforce session-relay binding before any side effect.
+		if err := enforceSessionRelayBinding(r, challenge); err != nil {
+			log.Printf("fido2/register/complete: %v", err)
+			errorJSON(w, http.StatusBadRequest, "session-relay binding invalid")
 			return
 		}
 
@@ -442,6 +510,24 @@ func (h *Handler) CompleteRegistration(
 func (h *Handler) BeginAuthentication(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.URL.Query().Get("session_id")
 
+	// Optional: when the client is using the session-relay flow it
+	// pre-computes the WebAuthn challenge as a SHA-256 binding over
+	// (nonce, sdk_pub, quote_hash, enc_pub, session_id) and supplies it
+	// here as a base64url string. We override the random challenge that
+	// go-webauthn would generate so the assertion is provably bound to
+	// the relay parameters. The same value is recomputed and re-checked
+	// on /complete.
+	bindingChallengeStr := r.URL.Query().Get("binding_challenge")
+	var bindingChallengeBytes []byte
+	if bindingChallengeStr != "" {
+		var err error
+		bindingChallengeBytes, err = decodeRawURLB64(bindingChallengeStr)
+		if err != nil || len(bindingChallengeBytes) != 32 {
+			errorJSON(w, http.StatusBadRequest, "invalid binding_challenge")
+			return
+		}
+	}
+
 	var req struct {
 		CredentialID string `json:"credentialId"`
 	}
@@ -459,6 +545,11 @@ func (h *Handler) BeginAuthentication(w http.ResponseWriter, r *http.Request) {
 			log.Printf("fido2/authenticate/begin (discoverable): %v", err)
 			errorJSON(w, http.StatusInternalServerError, "authentication failed")
 			return
+		}
+
+		if bindingChallengeBytes != nil {
+			options.Response.Challenge = protocol.URLEncodedBase64(bindingChallengeBytes)
+			sessionData.Challenge = bindingChallengeStr
 		}
 
 		challengeKey := sessionData.Challenge
@@ -504,6 +595,11 @@ func (h *Handler) BeginAuthentication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if bindingChallengeBytes != nil {
+		options.Response.Challenge = protocol.URLEncodedBase64(bindingChallengeBytes)
+		sessionData.Challenge = bindingChallengeStr
+	}
+
 	challengeKey := sessionData.Challenge
 	h.challenges.put(challengeKey, &challengeEntry{
 		sessionData: sessionData,
@@ -543,6 +639,13 @@ func (h *Handler) CompleteAuthentication(
 		entry, ok := h.challenges.pop(challenge)
 		if !ok {
 			errorJSON(w, http.StatusBadRequest, "challenge expired or not found")
+			return
+		}
+
+		// Enforce session-relay binding before any side effect.
+		if err := enforceSessionRelayBinding(r, challenge); err != nil {
+			log.Printf("fido2/authenticate/complete: %v", err)
+			errorJSON(w, http.StatusBadRequest, "session-relay binding invalid")
 			return
 		}
 
@@ -684,10 +787,10 @@ func (h *Handler) loadCredentials(userID string) ([]webauthn.Credential, error) 
 // session_id is present (the canonical signal that this is not a
 // session-relay flow).
 //
-// TODO: also recompute and enforce the binding challenge
-// (SHA256("privasys-session-relay/v1" || nonce || sdk_pub || quote_hash
-// || enc_pub || session_id)) against clientDataJSON.challenge before
-// returning a populated map.
+// Callers MUST have already validated the binding challenge (see
+// enforceSessionRelayBinding) before invoking this — the claims
+// returned here carry `att_verified: true` which downstream relying
+// parties trust as proof that the wallet attested the listed quote.
 func buildSessionRelayClaims(r *http.Request) map[string]interface{} {
 	q := r.URL.Query()
 	sid := q.Get("session_id")
@@ -710,4 +813,50 @@ func buildSessionRelayClaims(r *http.Request) map[string]interface{} {
 		relay["att_oids"] = oids
 	}
 	return relay
+}
+
+// decodeRawURLB64 accepts both padded and unpadded URL-safe base64 input.
+func decodeRawURLB64(s string) ([]byte, error) {
+	// strip trailing '=' padding then use RawURLEncoding (which rejects padding)
+	for len(s) > 0 && s[len(s)-1] == '=' {
+		s = s[:len(s)-1]
+	}
+	return base64.RawURLEncoding.DecodeString(s)
+}
+
+// enforceSessionRelayBinding validates the session-relay flow on
+// /fido2/.../complete: when `session_id` is present in the query, all
+// the other binding inputs (`nonce`, `sdk_pub`, `enc_pub`,
+// `quote_hash`) MUST also be present, the recomputed binding hash MUST
+// match `expectedChallenge` (the challenge popped from the store, which
+// is the one the WebAuthn assertion signed). If any check fails, an
+// error is returned and the caller MUST reject the request.
+//
+// When `session_id` is absent (legacy non-relay flow) this is a no-op
+// and returns nil.
+func enforceSessionRelayBinding(r *http.Request, expectedChallenge string) error {
+	q := r.URL.Query()
+	sid := q.Get("session_id")
+	if sid == "" {
+		return nil
+	}
+	nonce := q.Get("nonce")
+	sdkPub := q.Get("sdk_pub")
+	encPub := q.Get("enc_pub")
+	quoteHash := q.Get("quote_hash")
+	if nonce == "" || sdkPub == "" || encPub == "" || quoteHash == "" {
+		return fmt.Errorf("session-relay flow missing binding inputs")
+	}
+	expected, err := computeSessionRelayBinding(nonce, sdkPub, quoteHash, encPub, sid)
+	if err != nil {
+		return fmt.Errorf("recompute binding: %w", err)
+	}
+	got, err := decodeRawURLB64(expectedChallenge)
+	if err != nil {
+		return fmt.Errorf("decode challenge: %w", err)
+	}
+	if subtle.ConstantTimeCompare(expected, got) != 1 {
+		return fmt.Errorf("session-relay binding mismatch")
+	}
+	return nil
 }

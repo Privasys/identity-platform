@@ -32,6 +32,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
@@ -52,7 +53,33 @@ import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaT
 
 function appName(rpId: string): string {
     const dot = rpId.indexOf('.');
-    return dot > 0 ? rpId.substring(0, dot) : rpId;
+    return dot > 0 ? rpId.substring(0, dot) : rpId;}
+
+/**
+ * Derive a stable hex digest over the verified attestation. This is the
+ * `quote_hash` claim the wallet binds into the WebAuthn challenge — the
+ * IdP echoes it through into the issued JWT so a relying party can
+ * cryptographically check it picked the enclave the wallet attested.
+ *
+ * Mirror of any downstream verifier that recomputes the same digest
+ * from its own AttestationResult.
+ */
+function deriveQuoteHash(att: AttestationResult): string {
+    const fields: string[] = [
+        att.tee_type ?? '',
+        att.mrenclave ?? '',
+        att.mrsigner ?? '',
+        att.mrtd ?? '',
+        att.code_hash ?? '',
+        att.config_merkle_root ?? '',
+        att.attestation_servers_hash ?? '',
+    ];
+    const bytes = sha256(new TextEncoder().encode(fields.join(':')));
+    let hex = '';
+    for (let i = 0; i < bytes.length; i++) {
+        hex += bytes[i]!.toString(16).padStart(2, '0');
+    }
+    return hex;
 }
 
 function friendlyBrowser(ua?: string): string | null {
@@ -154,6 +181,9 @@ interface QRPayload {
     /** SDK ephemeral P-256 SEC1 uncompressed public key, base64url. Required
      *  when mode==='session-relay'. */
     sdkPub?: string;
+    /** Per-session replay nonce (base64url). When omitted we fall back to
+     *  `sessionId` for the session-relay challenge binding. */
+    nonce?: string;
 }
 
 export default function ConnectScreen() {
@@ -414,15 +444,33 @@ export default function ConnectScreen() {
         setStep('authenticating');
         console.log(`[CONNECT] doAuthenticate — origin=${payload.origin}, credentialId=${credentialId.substring(0, 16)}...`);
         try {
+            // Build session-relay binding inputs only when the QR opted in.
+            // The IdP recomputes SHA-256(domain || nonce || sdk_pub ||
+            // quote_hash || enc_pub || session_id) and rejects on
+            // mismatch, so the issued JWT proves the wallet attested
+            // exactly the listed quote.
+            let sessionRelayArg: { sdkPub: string; quoteHash: string; nonce: string } | undefined;
+            if (payload.mode === 'session-relay' && payload.sdkPub) {
+                if (!attestation) {
+                    throw new Error('session-relay mode requires verified attestation');
+                }
+                sessionRelayArg = {
+                    sdkPub: payload.sdkPub,
+                    quoteHash: deriveQuoteHash(attestation),
+                    // The QR-supplied nonce is the canonical replay window for
+                    // this session. Fall back to the broker session id when
+                    // the QR is still on v1 (no `nonce` field).
+                    nonce: payload.nonce ?? payload.sessionId,
+                };
+            }
+
             const result = await fido2.authenticate(
                 payload.origin,
                 keyAlias,
                 credentialId,
                 payload.sessionId,
                 serverRpId,
-                payload.mode === 'session-relay' && payload.sdkPub
-                    ? { sdkPub: payload.sdkPub }
-                    : undefined,
+                sessionRelayArg,
             );
 
             // Check for missing attributes before relaying

@@ -294,14 +294,17 @@ export async function authenticate(
     credentialId: string,
     browserSessionId: string,
     rpId?: string,
-    sessionRelay?: { sdkPub: string }
+    sessionRelay?: { sdkPub: string; quoteHash: string; nonce: string }
 ): Promise<{ sessionToken: string; userId?: string; sessionRelay?: SessionRelayBinding }> {
     // 0. Optional: bootstrap a browser→enclave session over the same
     //    RA-TLS connection. Wallet posts the SDK's ephemeral P-256
     //    public key (SEC1 uncompressed, base64url) and gets back the
-    //    server's pub + session id; both are forwarded to the IdP as
-    //    query params so the issued JWT can carry the binding.
+    //    server's pub + session id. We then derive a binding challenge
+    //    over (nonce, sdk_pub, quote_hash, enc_pub, session_id) — the
+    //    IdP recomputes and rejects on mismatch, so the issued JWT is
+    //    cryptographic proof that the wallet attested those values.
     let relay: SessionRelayBinding | undefined;
+    let bindingChallengeB64: string | undefined;
     if (sessionRelay?.sdkPub) {
         const bs = await fido2Fetch<{ session_id: string; enc_pub: string; expires_at: number }>(
             origin,
@@ -314,17 +317,34 @@ export async function authenticate(
             sdkPub: sessionRelay.sdkPub,
             expiresAt: bs.expires_at,
         };
+        const binding = computeSessionRelayBinding(
+            sessionRelay.nonce,
+            sessionRelay.sdkPub,
+            sessionRelay.quoteHash,
+            relay.encPub,
+            relay.sessionId,
+        );
+        bindingChallengeB64 = base64urlEncode(binding);
     }
 
-    // 1. Begin authentication
+    // 1. Begin authentication. When in the session-relay flow we hand the
+    //    pre-computed binding to the IdP so it returns it as the
+    //    WebAuthn challenge to sign.
+    let beginPath = `/fido2/authenticate/begin?session_id=${encodeURIComponent(browserSessionId)}`;
+    if (bindingChallengeB64) {
+        beginPath += `&binding_challenge=${encodeURIComponent(bindingChallengeB64)}`;
+    }
     const beginResp = await fido2Fetch<CredentialAssertionOptions>(
         origin,
-        `/fido2/authenticate/begin?session_id=${encodeURIComponent(browserSessionId)}`,
+        beginPath,
         {
             credentialId,
         }
     );
     const options = beginResp.publicKey;
+    if (bindingChallengeB64 && options.challenge !== bindingChallengeB64) {
+        throw new Error('FIDO2 server returned a challenge that does not match the requested binding');
+    }
 
     // 2. Build clientDataJSON
     const clientData = JSON.stringify({
@@ -353,11 +373,13 @@ export async function authenticate(
 
     // 5. Complete authentication — send standard WebAuthn assertion response
     let completePath = `/fido2/authenticate/complete?challenge=${encodeURIComponent(options.challenge)}`;
-    if (relay) {
+    if (relay && sessionRelay) {
         completePath +=
             `&session_id=${encodeURIComponent(relay.sessionId)}` +
             `&enc_pub=${encodeURIComponent(relay.encPub)}` +
-            `&sdk_pub=${encodeURIComponent(relay.sdkPub)}`;
+            `&sdk_pub=${encodeURIComponent(relay.sdkPub)}` +
+            `&nonce=${encodeURIComponent(sessionRelay.nonce)}` +
+            `&quote_hash=${encodeURIComponent(sessionRelay.quoteHash)}`;
     }
     const completeResp = await fido2Fetch<CompleteResponse>(
         origin,
@@ -400,6 +422,40 @@ function concat(arrays: Uint8Array[]): Uint8Array {
         offset += a.length;
     }
     return result;
+}
+
+/**
+ * Compute the session-relay WebAuthn challenge binding per §3.3 of the
+ * design. Mirrors the IdP's `computeSessionRelayBinding` in
+ * `internal/fido2/handler.go`.
+ *
+ * Inputs are accepted as the same encodings the IdP query params carry:
+ * - nonce, sdkPub, encPub: base64url (no padding required)
+ * - quoteHash, sessionIdHex: hex
+ */
+function computeSessionRelayBinding(
+    nonceB64: string,
+    sdkPubB64: string,
+    quoteHashHex: string,
+    encPubB64: string,
+    sessionIdHex: string,
+): Uint8Array {
+    const nonce = base64urlDecode(nonceB64);
+    const sdkPub = base64urlDecode(sdkPubB64);
+    const quoteHash = hexDecode(quoteHashHex);
+    const encPub = base64urlDecode(encPubB64);
+    const sessionId = hexDecode(sessionIdHex);
+    const domain = new TextEncoder().encode('privasys-session-relay/v1');
+    return sha256(concat([domain, nonce, sdkPub, quoteHash, encPub, sessionId]));
+}
+
+function hexDecode(hex: string): Uint8Array {
+    if (hex.length % 2 !== 0) throw new Error('hex string has odd length');
+    const out = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < out.length; i++) {
+        out[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+    }
+    return out;
 }
 
 /** Build a COSE_Key for P-256 (ES256). */

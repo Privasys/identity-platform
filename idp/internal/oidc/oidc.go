@@ -76,6 +76,12 @@ type AuthCode struct {
 	// carried in-memory through the auth code, embedded in the JWT, then GC'd.
 	// Never persisted to any database. Keyed by OIDC claim name (e.g. "email", "name").
 	Attributes map[string]string
+
+	// SessionRelay carries per-request browser→enclave session metadata
+	// captured by the wallet during a `mode:"session-relay"` flow. Forwarded
+	// verbatim into the issued ID token under the `session` and `att_*`
+	// top-level claims by the token endpoint, then GC'd. Optional.
+	SessionRelay map[string]interface{}
 }
 
 // CodeStore manages short-lived authorization codes.
@@ -633,6 +639,7 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 		Audience:         ac.ClientID,
 		Nonce:            ac.Nonce,
 		AuthTime:         ac.AuthTime,
+		SessionRelay:     ac.SessionRelay,
 	})
 	if err != nil {
 		log.Printf("token: ID token issuance failed: %v", err)

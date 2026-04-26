@@ -103,6 +103,13 @@ type IDTokenClaims struct {
 	Audience         string
 	Nonce            string
 	AuthTime         time.Time
+
+	// SessionRelay, if set, is emitted into the JWT as a top-level
+	// `session` claim plus optional `att_verified` / `att_quote_hash` /
+	// `att_oids` claims when those keys are present. Carries the
+	// browser→enclave session metadata captured by the wallet during a
+	// `mode:"session-relay"` flow.
+	SessionRelay map[string]interface{}
 }
 
 // IssueIDToken creates a signed OIDC ID token.
@@ -129,6 +136,23 @@ func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 	}
 	if claims.Nonce != "" {
 		c["nonce"] = claims.Nonce
+	}
+	// Browser→enclave session relay metadata (optional). Pulls a
+	// well-known subset of keys to the top level for downstream
+	// consumers; the full session object is also embedded as `session`.
+	if sr := claims.SessionRelay; len(sr) > 0 {
+		if v, ok := sr["att_verified"]; ok {
+			c["att_verified"] = v
+		}
+		if v, ok := sr["att_quote_hash"]; ok {
+			c["att_quote_hash"] = v
+		}
+		if v, ok := sr["att_oids"]; ok {
+			c["att_oids"] = v
+		}
+		if v, ok := sr["session"]; ok {
+			c["session"] = v
+		}
 	}
 	return iss.sign(c)
 }

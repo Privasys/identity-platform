@@ -398,6 +398,7 @@ func (h *Handler) CompleteRegistration(
 		if entry.sessionID != "" {
 			session, ok := sessionStore.Get(entry.sessionID)
 			if ok {
+				relay := buildSessionRelayClaims(r)
 				authCode := codeStore.Create(&oidc.AuthCode{
 					ClientID:            session.ClientID,
 					RedirectURI:         session.RedirectURI,
@@ -407,6 +408,7 @@ func (h *Handler) CompleteRegistration(
 					CodeChallenge:       session.CodeChallenge,
 					CodeChallengeMethod: session.CodeChallengeMethod,
 					AuthTime:            time.Now(),
+					SessionRelay:        relay,
 				})
 				sessionStore.Complete(entry.sessionID, userID, authCode)
 			}
@@ -612,6 +614,7 @@ func (h *Handler) CompleteAuthentication(
 		if entry.sessionID != "" {
 			session, ok := sessionStore.Get(entry.sessionID)
 			if ok {
+				relay := buildSessionRelayClaims(r)
 				authCode := codeStore.Create(&oidc.AuthCode{
 					ClientID:            session.ClientID,
 					RedirectURI:         session.RedirectURI,
@@ -621,6 +624,7 @@ func (h *Handler) CompleteAuthentication(
 					CodeChallenge:       session.CodeChallenge,
 					CodeChallengeMethod: session.CodeChallengeMethod,
 					AuthTime:            time.Now(),
+					SessionRelay:        relay,
 				})
 				sessionStore.Complete(entry.sessionID, userID, authCode)
 			}
@@ -672,4 +676,38 @@ func (h *Handler) loadCredentials(userID string) ([]webauthn.Credential, error) 
 	}
 
 	return creds, nil
+}
+
+// buildSessionRelayClaims extracts the optional browser→enclave session
+// relay metadata from the request's URL query parameters and returns a
+// claim map ready to embed into the AuthCode. Returns nil when no
+// session_id is present (the canonical signal that this is not a
+// session-relay flow).
+//
+// TODO(phase-C): also recompute and enforce the binding challenge
+// (SHA256("privasys-session-relay/v1" || nonce || sdk_pub || quote_hash
+// || enc_pub || session_id)) against clientDataJSON.challenge before
+// returning a populated map.
+func buildSessionRelayClaims(r *http.Request) map[string]interface{} {
+	q := r.URL.Query()
+	sid := q.Get("session_id")
+	if sid == "" {
+		return nil
+	}
+	relay := map[string]interface{}{
+		"att_verified": true,
+		"session": map[string]interface{}{
+			"id":           sid,
+			"enc_pub":      q.Get("enc_pub"),
+			"sdk_pub_bind": q.Get("sdk_pub"),
+			"quote_hash":   q.Get("quote_hash"),
+		},
+	}
+	if qh := q.Get("quote_hash"); qh != "" {
+		relay["att_quote_hash"] = qh
+	}
+	if oids := q.Get("att_oids"); oids != "" {
+		relay["att_oids"] = oids
+	}
+	return relay
 }

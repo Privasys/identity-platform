@@ -10,18 +10,49 @@ async function getNotifications() {
     if (!_notificationsSetup && Platform.OS !== 'web') {
         _notificationsSetup = true;
         Notifications.setNotificationHandler({
-            handleNotification: async () => {
+            handleNotification: async (notification) => {
+                // Auth-request notifications received while the app is in
+                // the foreground are surfaced directly via the connect
+                // screen (see addNotificationReceivedListener below). We
+                // suppress the banner / list entry / sound to avoid a
+                // double prompt — the user is already looking at the app.
+                const data = notification?.request?.content?.data as
+                    | Record<string, unknown>
+                    | undefined;
+                const isAuthRequest = data?.type === 'auth-request';
                 return {
-                    shouldShowAlert: true,
-                    shouldPlaySound: true,
-                    shouldSetBadge: true,
-                    shouldShowBanner: true,
-                    shouldShowList: true,
+                    shouldShowAlert: !isAuthRequest,
+                    shouldPlaySound: !isAuthRequest,
+                    shouldSetBadge: !isAuthRequest,
+                    shouldShowBanner: !isAuthRequest,
+                    shouldShowList: !isAuthRequest,
                 };
             },
         });
     }
     return Notifications;
+}
+
+/** Build the connect-screen JSON payload from an auth-request notification's data. */
+function authRequestPayload(data: Record<string, unknown>): string | null {
+    if (data?.type !== 'auth-request' || !data.origin || !data.sessionId || !data.rpId) {
+        return null;
+    }
+    return JSON.stringify({
+        origin: data.origin,
+        sessionId: data.sessionId,
+        rpId: data.rpId,
+        brokerUrl: data.brokerUrl,
+        userAgent: data.userAgent,
+        appName: data.appName,
+        clientIP: data.clientIP,
+        // session-relay (Phase E): only present when the requesting SDK
+        // opted into the sealed-session bootstrap.
+        mode: data.mode,
+        sdkPub: data.sdkPub,
+        nonce: data.nonce,
+        expectedAppSni: data.expectedAppSni,
+    });
 }
 
 let ambientPushToken: string | null = null;
@@ -69,26 +100,32 @@ export function useExpoPushToken() {
         async function setupListeners() {
             const Notifications = await getNotifications();
 
-            // Foreground notification handler - no special handling needed,
-            // all notifications use the default display behavior.
+            // Foreground notification handler — when an auth-request
+            // arrives while the app is open we route straight to the
+            // connect screen, instead of forcing the user to dismiss a
+            // banner first. The notification handler above is what
+            // suppresses the banner for this case.
             notificationListener.current = Notifications.addNotificationReceivedListener(
-                () => {},
+                (n) => {
+                    const data = n.request.content.data as Record<string, unknown> | undefined;
+                    if (!data) return;
+                    const payload = authRequestPayload(data);
+                    if (payload) {
+                        router.push({ pathname: '/connect', params: { payload, source: 'push' } });
+                    }
+                },
             );
 
-            // Tap-to-open handler - fires when the user taps a notification.
+            // Tap-to-open handler — fires when the user taps a notification
+            // delivered while the app was in the background.
             responseListener.current = Notifications.addNotificationResponseReceivedListener(
                 (response) => {
-                    const data = response.notification.request.content.data;
-                    if (data?.type === 'auth-request' && data.origin && data.sessionId && data.rpId) {
-                        const payload = JSON.stringify({
-                            origin: data.origin,
-                            sessionId: data.sessionId,
-                            rpId: data.rpId,
-                            brokerUrl: data.brokerUrl,
-                            userAgent: data.userAgent,
-                            appName: data.appName,
-                            clientIP: data.clientIP,
-                        });
+                    const data = response.notification.request.content.data as
+                        | Record<string, unknown>
+                        | undefined;
+                    if (!data) return;
+                    const payload = authRequestPayload(data);
+                    if (payload) {
                         router.push({ pathname: '/connect', params: { payload, source: 'push' } });
                     }
                 }

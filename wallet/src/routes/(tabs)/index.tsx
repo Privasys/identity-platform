@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { StyleSheet, ScrollView, Pressable, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
+import { useSessionsStore, type RelaySession } from '@/stores/sessions';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 /** Extract app name from rpId (e.g., "wasm-app-example" from "wasm-app-example.apps-test.privasys.org"). */
@@ -12,10 +14,33 @@ function appName(rpId: string): string {
     return dot > 0 ? rpId.substring(0, dot) : rpId;
 }
 
+function formatRemaining(secondsLeft: number): string {
+    if (secondsLeft <= 0) return 'expired';
+    if (secondsLeft < 60) return `${secondsLeft}s left`;
+    const m = Math.floor(secondsLeft / 60);
+    if (m < 60) return `${m}m left`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m left`;
+}
+
 export default function HomeScreen() {
     const { apps } = useTrustedAppsStore();
+    const sessions = useSessionsStore((s) => s.sessions);
+    const pruneExpired = useSessionsStore((s) => s.pruneExpired);
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+
+    // Tick every second so the "remaining" label and pruning stay live.
+    useEffect(() => {
+        const id = setInterval(() => {
+            setNow(Math.floor(Date.now() / 1000));
+            pruneExpired();
+        }, 1000);
+        return () => clearInterval(id);
+    }, [pruneExpired]);
+
+    const liveSessions: RelaySession[] = sessions.filter((s) => s.expiresAt > now);
 
     return (
         <RNView style={styles.screen}>
@@ -40,7 +65,7 @@ export default function HomeScreen() {
 
             {/* Content */}
             <RNView style={styles.content}>
-                {apps.length === 0 ? (
+                {apps.length === 0 && liveSessions.length === 0 ? (
                     <RNView style={styles.emptyState}>
                         <RNView style={styles.emptyIconContainer}>
                             <Ionicons name="qr-code-outline" size={48} color="#00BCF2" />
@@ -56,43 +81,95 @@ export default function HomeScreen() {
                         contentContainerStyle={styles.listContent}
                         showsVerticalScrollIndicator={false}
                     >
-                        <Text style={styles.sectionTitle}>CONNECTED SERVICES</Text>
-                        {apps.map((app) => (
-                            <Pressable
-                                key={app.rpId}
-                                style={styles.serviceCard}
-                                onPress={() =>
-                                    router.push({
-                                        pathname: '/service-detail',
-                                        params: { rpId: app.rpId }
-                                    })
-                                }
-                            >
-                                <RNView
+                        {liveSessions.length > 0 && (
+                            <>
+                                <Text style={styles.sectionTitle}>SESSIONS</Text>
+                                {liveSessions.map((s) => (
+                                    <RNView key={s.sessionId} style={styles.sessionCard}>
+                                        <RNView style={styles.sessionDot} />
+                                        <RNView style={styles.serviceInfo}>
+                                            <Text style={styles.serviceName}>
+                                                {s.appName ?? appName(s.rpId)}
+                                            </Text>
+                                            <Text style={styles.serviceMeta}>
+                                                Relaying · {formatRemaining(s.expiresAt - now)}
+                                            </Text>
+                                        </RNView>
+                                    </RNView>
+                                ))}
+                            </>
+                        )}
+
+                        {apps.length > 0 && (
+                            <>
+                                <Text
                                     style={[
-                                        styles.serviceIcon,
-                                        { backgroundColor: app.teeType === 'sgx' ? '#34E89E' : app.teeType === 'tdx' ? '#00BCF2' : '#8B5CF6' }
+                                        styles.sectionTitle,
+                                        liveSessions.length > 0 && { marginTop: 24 }
                                     ]}
                                 >
-                                    <Ionicons
-                                        name={app.teeType === 'sgx' ? 'lock-closed' : app.teeType === 'tdx' ? 'shield-checkmark' : 'key'}
-                                        size={18}
-                                        color="#FFFFFF"
-                                    />
-                                </RNView>
-                                <RNView style={styles.serviceInfo}>
-                                    <Text style={styles.serviceName}>{appName(app.rpId)}</Text>
-                                    <Text style={styles.serviceMeta}>
-                                        {app.teeType === 'none' ? 'Passkey' : app.teeType.toUpperCase()} · Connected{' '}
-                                        {new Date(app.lastVerified * 1000).toLocaleDateString()}
-                                    </Text>
-                                </RNView>
-                                <Ionicons name="chevron-forward" size={18} color="#C0C0C0" />
-                            </Pressable>
-                        ))}
+                                    CONNECTED SERVICES
+                                </Text>
+                                {apps.map((app) => (
+                                    <Pressable
+                                        key={app.rpId}
+                                        style={styles.serviceCard}
+                                        onPress={() =>
+                                            router.push({
+                                                pathname: '/service-detail',
+                                                params: { rpId: app.rpId }
+                                            })
+                                        }
+                                    >
+                                        <RNView
+                                            style={[
+                                                styles.serviceIcon,
+                                                {
+                                                    backgroundColor:
+                                                        app.teeType === 'sgx'
+                                                            ? '#34E89E'
+                                                            : app.teeType === 'tdx'
+                                                                ? '#00BCF2'
+                                                                : '#8B5CF6'
+                                                }
+                                            ]}
+                                        >
+                                            <Ionicons
+                                                name={
+                                                    app.teeType === 'sgx'
+                                                        ? 'lock-closed'
+                                                        : app.teeType === 'tdx'
+                                                            ? 'shield-checkmark'
+                                                            : 'key'
+                                                }
+                                                size={18}
+                                                color="#FFFFFF"
+                                            />
+                                        </RNView>
+                                        <RNView style={styles.serviceInfo}>
+                                            <Text style={styles.serviceName}>{appName(app.rpId)}</Text>
+                                            <Text style={styles.serviceMeta}>
+                                                {app.teeType === 'none' ? 'Passkey' : app.teeType.toUpperCase()} · Connected{' '}
+                                                {new Date(app.lastVerified * 1000).toLocaleDateString()}
+                                            </Text>
+                                        </RNView>
+                                        <Ionicons name="chevron-forward" size={18} color="#C0C0C0" />
+                                    </Pressable>
+                                ))}
+                            </>
+                        )}
                     </ScrollView>
                 )}
             </RNView>
+
+            {/* Floating scan button — replaces the standalone Scan tab. */}
+            <Pressable
+                style={styles.scanFab}
+                onPress={() => router.push('/scan')}
+                accessibilityLabel="Scan QR code"
+            >
+                <Ionicons name="qr-code-outline" size={26} color="#FFFFFF" />
+            </Pressable>
         </RNView>
     );
 }
@@ -161,7 +238,7 @@ const styles = StyleSheet.create({
         lineHeight: 22
     },
     list: { flex: 1 },
-    listContent: { padding: 20, paddingTop: 24 },
+    listContent: { padding: 20, paddingTop: 24, paddingBottom: 96 },
     sectionTitle: {
         fontSize: 12,
         fontWeight: '700',
@@ -182,6 +259,28 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 2
     },
+    sessionCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(52, 232, 158, 0.5)',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2
+    },
+    sessionDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#34E89E',
+        marginRight: 14
+    },
     serviceIcon: {
         width: 40,
         height: 40,
@@ -200,5 +299,21 @@ const styles = StyleSheet.create({
     serviceMeta: {
         fontSize: 12,
         color: '#64748B'
+    },
+    scanFab: {
+        position: 'absolute',
+        right: 24,
+        bottom: 24,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#00BCF2',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#00BCF2',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        elevation: 8
     }
 });

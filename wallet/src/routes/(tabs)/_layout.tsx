@@ -32,29 +32,20 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="scan"
-                options={{
-                    title: 'Scan',
-                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-                        <Ionicons name="qr-code-outline" size={size} color={color} />
-                    )
-                }}
-            />
-            <Tabs.Screen
-                name="about"
-                options={{
-                    title: 'About',
-                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-                        <Ionicons name="information-circle" size={size} color={color} />
-                    )
-                }}
-            />
-            <Tabs.Screen
                 name="profile"
                 options={{
                     title: 'Profile',
                     tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                         <Ionicons name="person-circle" size={size} color={color} />
+                    )
+                }}
+            />
+            <Tabs.Screen
+                name="settings"
+                options={{
+                    title: 'Settings',
+                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+                        <Ionicons name="settings" size={size} color={color} />
                     )
                 }}
             />

@@ -2,42 +2,36 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Settings screen — manage wallet configuration.
+ * Settings tab — wallet configuration plus the About/version section that
+ * used to live in its own tab.
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
-import { Stack, useRouter } from 'expo-router';
-import { StyleSheet, Pressable, Alert, ScrollView } from 'react-native';
+import Constants from 'expo-constants';
+import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text, View } from '@/components/Themed';
+import AboutPrivasysWallet from '@/components/AboutPrivasysWallet';
+import { Text, View, Image } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 export default function SettingsScreen() {
-    const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { credentials, removeCredential } = useAuthStore();
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
-    const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
+    const { remove: removeTrustedApp } = useTrustedAppsStore();
     const pushToken = useExpoPushToken();
 
     return (
-        <>
-            <Stack.Screen
-                options={{
-                    headerShown: true,
-                    title: 'Settings',
-                    headerLeft: () => (
-                        <Pressable onPress={() => router.back()} hitSlop={8}>
-                            <Ionicons name="chevron-back" size={24} color="#007AFF" />
-                        </Pressable>
-                    ),
-                    headerShadowVisible: false,
-                    headerStyle: { backgroundColor: '#F8FAFB' }
-                }}
-            />
+        <RNView style={styles.screen}>
+            <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
+                <Text style={styles.headerTitle}>Settings</Text>
+            </RNView>
+
             <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
                 {/* Grace Period */}
                 <Text style={styles.sectionTitle}>Biometric Grace Period</Text>
@@ -127,14 +121,60 @@ export default function SettingsScreen() {
                         </Pressable>
                     </>
                 ) : null}
+
+                {/* About */}
+                <Text style={styles.sectionTitle}>About</Text>
+                <View style={styles.aboutCard}>
+                    <View style={styles.aboutHeader}>
+                        <Image
+                            style={styles.aboutLogo}
+                            source={require('@/assets/images/privasys-logo.svg')}
+                            contentFit="contain"
+                        />
+                        <Text style={styles.aboutTitle}>Privasys Wallet</Text>
+                    </View>
+                    <View style={styles.aboutSeparator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
+                    <AboutPrivasysWallet />
+                </View>
+
+                <View style={styles.buildInfoCard}>
+                    <BuildInfoRow label="Version" value={Constants.expoConfig?.extra?.CODE_VERSION} />
+                    <BuildInfoRow label="Build Number" value={Constants.expoConfig?.extra?.BUILD_NUMBER} />
+                    <BuildInfoRow label="Build ID" value={Constants.expoConfig?.extra?.BUILD_ID?.slice(0, 7)} />
+                    <BuildInfoRow label="Build Type" value={Constants.expoConfig?.extra?.STAGE} />
+                    <BuildInfoRow label="Commit ID" value={Constants.expoConfig?.extra?.COMMIT_HASH?.slice(0, 7)} />
+                </View>
             </ScrollView>
-        </>
+        </RNView>
+    );
+}
+
+function BuildInfoRow({ label, value }: { label: string; value?: string }) {
+    return (
+        <View style={styles.buildInfoRow}>
+            <Text style={styles.buildInfoLabel}>{label}</Text>
+            <Text style={styles.buildInfoValue}>{value ?? '-'}</Text>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    scroll: { flex: 1, backgroundColor: '#F8FAFB' },
-    content: { padding: 20, paddingTop: 8, paddingBottom: 40 },
+    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+    header: {
+        backgroundColor: '#34E89E',
+        paddingHorizontal: 24,
+        paddingBottom: 24,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28
+    },
+    headerTitle: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        letterSpacing: -0.5
+    },
+    scroll: { flex: 1 },
+    content: { padding: 20, paddingTop: 16, paddingBottom: 40 },
     sectionTitle: {
         fontSize: 17,
         fontWeight: '600',
@@ -210,5 +250,35 @@ const styles = StyleSheet.create({
         fontFamily: 'SpaceMono',
         color: '#64748B',
         lineHeight: 18
-    }
+    },
+
+    aboutCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12
+    },
+    aboutHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: 'transparent'
+    },
+    aboutLogo: { width: 36, height: 36, backgroundColor: 'transparent' },
+    aboutTitle: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
+    aboutSeparator: { height: 1, marginVertical: 12 },
+
+    buildInfoCard: {
+        backgroundColor: '#F1F5F9',
+        borderRadius: 12,
+        padding: 16,
+        gap: 10
+    },
+    buildInfoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        backgroundColor: 'transparent'
+    },
+    buildInfoLabel: { fontSize: 14, color: '#64748B' },
+    buildInfoValue: { fontSize: 14, fontWeight: '600', color: '#0F172A' }
 });

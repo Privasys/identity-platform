@@ -46,6 +46,7 @@ import { attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
+import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
@@ -200,6 +201,7 @@ export default function ConnectScreen() {
     const { addCredential, removeCredential, getCredentialForRp, checkUnlocked, setUnlocked } = useAuthStore();
     const { getApp, isAttestationMatch, addOrUpdate: addTrustedApp } = useTrustedAppsStore();
     const { gracePeriodSec } = useSettingsStore();
+    const addRelaySession = useSessionsStore((s) => s.add);
     const profile = useProfileStore((s) => s.profile);
 
     // State
@@ -496,6 +498,20 @@ export default function ConnectScreen() {
                 pushToken,
                 attributes
             );
+
+            // Phase E: when the SDK opted into the sealed session-relay
+            // bootstrap, surface the live session on the Home screen
+            // until the enclave-side binding expires.
+            if (result.sessionRelay) {
+                addRelaySession({
+                    sessionId: result.sessionRelay.sessionId,
+                    rpId: payload.rpId,
+                    origin: payload.origin,
+                    appName: payload.appName,
+                    expiresAt: result.sessionRelay.expiresAt,
+                    startedAt: Math.floor(Date.now() / 1000),
+                });
+            }
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);

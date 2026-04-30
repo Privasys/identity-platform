@@ -212,6 +212,14 @@ export default function ConnectScreen() {
     const [step, setStep] = useState<FlowStep>('verifying');
     const [error, setError] = useState<string | null>(null);
     const [attestation, setAttestation] = useState<AttestationResult | null>(null);
+    // Mirror of `attestation` updated synchronously alongside setAttestation
+    // so callbacks invoked in the same tick (e.g. doAuthenticate fired right
+    // after setAttestation in startFlow) can read the freshly-verified value
+    // without waiting for React to commit. session-relay binds quote_hash
+    // into the FIDO2 challenge, so reading a stale (null) closure value
+    // tripped "session-relay mode requires verified attestation" even on
+    // the happy trusted-app path.
+    const attestationRef = useRef<AttestationResult | null>(null);
     const [qr, setQr] = useState<QRPayload | null>(null);
     const [isTrusted, setIsTrusted] = useState(false);
     const [attestationChanged, setAttestationChanged] = useState(false);
@@ -310,6 +318,7 @@ export default function ConnectScreen() {
                 }
 
                 setAttestation(result);
+                attestationRef.current = result;
 
                 // Check if this is a trusted app with matching attestation
                 const trustedApp = getApp(payload.rpId);
@@ -460,13 +469,18 @@ export default function ConnectScreen() {
                 if (!payload.appHost) {
                     throw new Error('session-relay mode requires appHost');
                 }
-                if (!attestation) {
+                // Read from the ref, not state — doAuthenticate is invoked
+                // in the same tick as setAttestation in startFlow's
+                // trusted-app branch, so the closure-captured `attestation`
+                // is still null at this point.
+                const att = attestationRef.current ?? attestation;
+                if (!att) {
                     throw new Error('session-relay mode requires verified attestation');
                 }
                 sessionRelayArg = {
                     sdkPub: payload.sdkPub,
                     appHost: payload.appHost,
-                    quoteHash: deriveQuoteHash(attestation),
+                    quoteHash: deriveQuoteHash(att),
                     // The QR-supplied nonce is the canonical replay window for
                     // this session. Fall back to the broker session id when
                     // the QR is still on v1 (no `nonce` field).

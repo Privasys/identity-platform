@@ -1,6 +1,6 @@
 {
     "name": "@privasys/auth",
-    "version": "0.1.2",
+    "version": "0.2.0",
     "description": "Browser SDK for Privasys Wallet authentication — QR code, push notification, and session management.",
     "license": "AGPL-3.0-only",
     "type": "module",

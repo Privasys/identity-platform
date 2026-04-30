@@ -42,6 +42,25 @@ export interface AuthResult {
     pushToken?: string;
     /** Profile attributes from the wallet or social IdP (keyed by OIDC claim name). */
     attributes?: Record<string, string>;
+    /**
+     * Session-relay binding returned by the wallet when the QR opted into
+     * `mode: 'session-relay'`. The SDK uses these to derive the AES-GCM key
+     * shared with the enclave and instantiate a `PrivasysSession`.
+     */
+    sessionRelay?: SessionRelayBinding;
+}
+
+/**
+ * Wallet-attested session-relay binding. Returned to the SDK over the
+ * broker so the SDK can complete its half of the ECDH handshake.
+ */
+export interface SessionRelayBinding {
+    /** Opaque session id (>=16 bytes), base64url. */
+    sessionId: string;
+    /** Enclave's ephemeral P-256 public key (SEC1 uncompressed, base64url). */
+    encPub: string;
+    /** Enclave-side session expiry (epoch ms). */
+    expiresAt: number;
 }
 
 /** An active session with an enclave. */

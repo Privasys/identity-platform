@@ -1,7 +1,7 @@
 // Copyright (c) Privasys. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.0.
 
-import type { AuthResult, AuthState, AttestationInfo } from './types';
+import type { AuthResult, AuthState, AttestationInfo, SessionRelayBinding } from './types';
 import type { WebAuthnState } from './webauthn';
 import { PrivasysAuth } from './client';
 import { WebAuthnClient } from './webauthn';
@@ -50,6 +50,13 @@ export interface AuthUIConfig {
     /** When true, the device is already trusted (device hint exists). The trust
      *  prompt is suppressed and `trustDevice` is set automatically. */
     deviceTrusted?: boolean;
+    /**
+     * Session-relay opt-in. When set, the QR carries `mode: 'session-relay'`
+     * plus the SDK ephemeral pubkey and `appHost`, and the wallet returns
+     * the enclave-issued `sessionId` + `encPub` over the broker so the SDK
+     * can derive the AES-GCM key and instantiate `PrivasysSession`.
+     */
+    sessionRelay?: { sdkPub: string; appHost: string; nonce?: string };
 }
 
 /** Resolved result returned by `signIn()`. */
@@ -68,6 +75,8 @@ export interface SignInResult {
     attributes?: Record<string, string>;
     /** Whether the user chose to trust this device for future push-based sign-in. */
     trustDevice?: boolean;
+    /** Session-relay binding from the wallet (set only in session-relay mode). */
+    sessionRelay?: SessionRelayBinding;
 }
 
 // ---------------------------------------------------------------------------
@@ -724,6 +733,7 @@ export class AuthUI {
     private attestation: AttestationInfo | undefined;
     private pushToken: string | undefined;
     private attributes: Record<string, string> | undefined;
+    private sessionRelay: SessionRelayBinding | undefined;
     private method: 'wallet' | 'passkey' = 'wallet';
 
     constructor(config: AuthUIConfig) {
@@ -756,6 +766,7 @@ export class AuthUI {
             this.sessionId = '';
             this.attestation = undefined;
             this.attributes = undefined;
+            this.sessionRelay = undefined;
             this.mount();
 
             // If returning user (push token available), skip idle and send push immediately
@@ -997,7 +1008,7 @@ export class AuthUI {
 
     private renderQR(): HTMLElement {
         const client = this.getRelayClient();
-        const { payload } = client.createQR(this.sessionId);
+        const { payload } = client.createQR(this.sessionId, this.cfg.sessionRelay);
 
         return el('div', null,
             el('div', { className: 'qr-section' },
@@ -1196,6 +1207,7 @@ export class AuthUI {
                 this.sessionId = result.sessionId;
                 this.pushToken = result.pushToken;
                 this.attributes = result.attributes;
+                this.sessionRelay = result.sessionRelay;
                 this.complete();
             },
             (err) => {
@@ -1209,7 +1221,7 @@ export class AuthUI {
     private startWallet(): void {
         this.method = 'wallet';
         const client = this.getRelayClient();
-        const { sessionId } = client.createQR(this.cfg.sessionId);
+        const { sessionId } = client.createQR(this.cfg.sessionId, this.cfg.sessionRelay);
         this.sessionId = sessionId;
         this.state = 'qr-scanning';
         this.render();
@@ -1221,6 +1233,7 @@ export class AuthUI {
                 this.sessionId = result.sessionId;
                 this.pushToken = result.pushToken;
                 this.attributes = result.attributes;
+                this.sessionRelay = result.sessionRelay;
                 this.complete();
             },
             (err) => {
@@ -1305,6 +1318,7 @@ export class AuthUI {
             pushToken: this.pushToken,
             attributes: this.attributes,
             trustDevice: trust,
+            sessionRelay: this.sessionRelay,
         };
         this.close();
         this.resolve?.(result);

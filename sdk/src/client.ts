@@ -1,7 +1,7 @@
 // Copyright (c) Privasys. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.0.
 
-import type { AuthConfig, AuthEvents, AuthResult, AuthState, AttestationInfo, BatchAppConfig, BatchAuthResult } from './types';
+import type { AuthConfig, AuthEvents, AuthResult, AuthState, AttestationInfo, BatchAppConfig, BatchAuthResult, SessionRelayBinding } from './types';
 import { generateQRPayload, generateBatchQRPayload } from './qr';
 import { SessionManager } from './session';
 
@@ -42,8 +42,16 @@ export class PrivasysAuth {
     /**
      * Generate a QR payload for the wallet to scan.
      * Returns the sessionId and the JSON payload string to encode in the QR.
+     *
+     * Pass `sessionRelay` to opt into the sealed-CBOR transport flow: the
+     * QR carries `mode: 'session-relay'` plus the SDK pubkey and app host
+     * so the wallet bootstraps a sealed session against the enclave during
+     * the FIDO2 ceremony.
      */
-    createQR(sessionId?: string): { sessionId: string; payload: string } {
+    createQR(
+        sessionId?: string,
+        sessionRelay?: { sdkPub: string; appHost: string; nonce?: string },
+    ): { sessionId: string; payload: string } {
         return generateQRPayload({
             rpId: this.config.rpId,
             brokerUrl: this.config.brokerUrl,
@@ -51,6 +59,14 @@ export class PrivasysAuth {
             requestedAttributes: this.config.requestedAttributes,
             appName: this.config.appName,
             privacyPolicyUrl: this.config.privacyPolicyUrl,
+            ...(sessionRelay
+                ? {
+                    mode: 'session-relay' as const,
+                    sdkPub: sessionRelay.sdkPub,
+                    appHost: sessionRelay.appHost,
+                    nonce: sessionRelay.nonce,
+                }
+                : {}),
         });
     }
 
@@ -208,6 +224,7 @@ export class PrivasysAuth {
                     attestation: msg.attestation as AttestationInfo | undefined,
                     pushToken: (msg.pushToken as string | undefined) || undefined,
                     attributes: (msg.attributes as Record<string, string> | undefined) || undefined,
+                    sessionRelay: (msg.sessionRelay as SessionRelayBinding | undefined) || undefined,
                 };
 
                 // Store session locally

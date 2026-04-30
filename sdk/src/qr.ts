@@ -24,6 +24,33 @@ export interface QRPayload {
     requestedAttributes?: string[];
     appName?: string;
     privacyPolicyUrl?: string;
+    /**
+     * When set to 'session-relay', the wallet must call
+     * `<appHost>/__privasys/session-bootstrap` with `sdkPub` before the
+     * FIDO2 ceremony so the IdP can bind the issued JWT to a sealed-CBOR
+     * transport session. The wallet returns `sessionId`/`encPub`/
+     * `expiresAt` to the SDK via the broker so it can derive the AES-GCM
+     * key.
+     */
+    mode?: 'session-relay' | 'standard';
+    /**
+     * SDK ephemeral P-256 SEC1 uncompressed public key, base64url. Required
+     * when mode==='session-relay'.
+     */
+    sdkPub?: string;
+    /**
+     * Hostname (no scheme) of the enclave app to bootstrap the sealed
+     * session against, e.g. `gemma4-test.apps-test.privasys.org`. The QR's
+     * `origin` is the IdP host (privasys.id / privasys-test.id) used for
+     * the FIDO2 ceremony; `appHost` is the separate enclave that owns the
+     * sealed-transport endpoint. Required when mode==='session-relay'.
+     */
+    appHost?: string;
+    /**
+     * Per-session replay nonce (base64url). When omitted the wallet falls
+     * back to `sessionId` for the session-relay challenge binding.
+     */
+    nonce?: string;
 }
 
 /**
@@ -57,6 +84,10 @@ export function generateQRPayload(opts: {
     requestedAttributes?: string[];
     appName?: string;
     privacyPolicyUrl?: string;
+    mode?: 'session-relay' | 'standard';
+    sdkPub?: string;
+    appHost?: string;
+    nonce?: string;
 }): { sessionId: string; payload: string } {
     const sessionId = opts.sessionId ?? generateSessionId();
     const qr: QRPayload = {
@@ -70,6 +101,15 @@ export function generateQRPayload(opts: {
     }
     if (opts.appName) qr.appName = opts.appName;
     if (opts.privacyPolicyUrl) qr.privacyPolicyUrl = opts.privacyPolicyUrl;
+    if (opts.mode === 'session-relay') {
+        if (!opts.sdkPub || !opts.appHost) {
+            throw new Error('generateQRPayload: session-relay mode requires sdkPub and appHost');
+        }
+        qr.mode = 'session-relay';
+        qr.sdkPub = opts.sdkPub;
+        qr.appHost = opts.appHost;
+        if (opts.nonce) qr.nonce = opts.nonce;
+    }
     return { sessionId, payload: wrapAsUniversalLink(JSON.stringify(qr)) };
 }
 

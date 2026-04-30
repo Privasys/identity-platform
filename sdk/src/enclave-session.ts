@@ -109,7 +109,31 @@ export class PrivasysSession {
 
         const att = await opts.attestWithWallet({ sdkPub: sdkPubB64, host: opts.host });
 
-        const encPubRaw = base64UrlDecode(att.encPub);
+        return PrivasysSession.fromHandshake({
+            host: opts.host,
+            sessionId: att.sessionId,
+            sdkPrivateKey: sdkKeyPair.privateKey,
+            encPub: att.encPub,
+            fetchImpl,
+        });
+    }
+
+    /**
+     * Construct a session from a completed handshake. Use this when the SDK
+     * has performed the ECDH out-of-band (e.g. the iframe generated the SDK
+     * keypair, the wallet attested the enclave, and `encPub` + `sessionId`
+     * came back over the broker).
+     */
+    static async fromHandshake(opts: {
+        host: string;
+        sessionId: string;
+        sdkPrivateKey: CryptoKey;
+        encPub: string;
+        fetchImpl?: typeof fetch;
+    }): Promise<PrivasysSession> {
+        const fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
+
+        const encPubRaw = base64UrlDecode(opts.encPub);
         if (encPubRaw.byteLength !== 65 || encPubRaw[0] !== 0x04) {
             throw new Error('PrivasysSession: enclave public key not SEC1 uncompressed');
         }
@@ -123,11 +147,11 @@ export class PrivasysSession {
 
         const sharedBits = await crypto.subtle.deriveBits(
             { name: 'ECDH', public: encPubKey },
-            sdkKeyPair.privateKey,
+            opts.sdkPrivateKey,
             256,
         );
 
-        const sessionIdBytes = base64UrlDecode(att.sessionId);
+        const sessionIdBytes = base64UrlDecode(opts.sessionId);
         const ikm = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveBits', 'deriveKey']);
         const aeadBits = await crypto.subtle.deriveBits(
             { name: 'HKDF', hash: 'SHA-256', salt: sessionIdBytes as BufferSource, info: HKDF_INFO as BufferSource },
@@ -145,7 +169,7 @@ export class PrivasysSession {
             await crypto.subtle.deriveBits(
                 { name: 'HKDF', hash: 'SHA-256', salt: sessionIdBytes as BufferSource, info: DIR_C2S as BufferSource },
                 ikm,
-                32, // 4 bytes
+                32,
             ),
         );
         const s2cPrefix = new Uint8Array(
@@ -156,7 +180,7 @@ export class PrivasysSession {
             ),
         );
 
-        return new PrivasysSession(opts.host, att.sessionId, { aead, c2sPrefix, s2cPrefix }, fetchImpl);
+        return new PrivasysSession(opts.host, opts.sessionId, { aead, c2sPrefix, s2cPrefix }, fetchImpl);
     }
 
     /**

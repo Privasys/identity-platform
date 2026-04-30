@@ -19,10 +19,52 @@ import { AuthUI } from './ui';
 import type { AuthUIConfig, SignInResult } from './ui';
 import { SessionManager } from './session';
 import type { AuthSession } from './types';
+import { PrivasysSession } from './enclave-session';
 
 const sessions = new SessionManager();
 
 let activeUI: AuthUI | null = null;
+
+// ── Sealed session-relay state (iframe-scoped) ───────────────────────────
+//
+// When the parent opts into session-relay we generate the SDK ephemeral
+// P-256 keypair *here* (the private key never leaves the iframe origin).
+// After the wallet attests the enclave and returns {session_id, enc_pub}
+// over the broker, we derive K, instantiate a PrivasysSession, and expose
+// a `privasys:session:request` postMessage RPC so the parent can issue
+// sealed requests without ever seeing K or the plaintext envelope.
+
+interface PendingHandshake {
+    appHost: string;
+    sdkKeyPair: CryptoKeyPair;
+    sdkPubB64: string;
+}
+
+interface ActiveSession {
+    appHost: string;
+    sessionId: string;
+    expiresAt: number;
+    session: PrivasysSession;
+}
+
+let pendingHandshake: PendingHandshake | null = null;
+let activeSession: ActiveSession | null = null;
+
+async function generateSdkKeyPair(): Promise<{ keyPair: CryptoKeyPair; sdkPubB64: string }> {
+    const keyPair = (await crypto.subtle.generateKey(
+        { name: 'ECDH', namedCurve: 'P-256' },
+        false, // non-extractable: private key stays in this origin's WebCrypto store
+        ['deriveBits'],
+    )) as CryptoKeyPair;
+    const raw = new Uint8Array(await crypto.subtle.exportKey('raw', keyPair.publicKey));
+    if (raw.byteLength !== 65 || raw[0] !== 0x04) {
+        throw new Error('frame-host: unexpected SEC1 encoding for SDK pubkey');
+    }
+    let s = '';
+    for (let i = 0; i < raw.byteLength; i++) s += String.fromCharCode(raw[i]);
+    const sdkPubB64 = btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return { keyPair, sdkPubB64 };
+}
 
 // ── Session renewal (OIDC refresh_token) ────────────────────────────────
 
@@ -315,13 +357,34 @@ window.addEventListener('message', async (e: MessageEvent) => {
     if (!data || typeof data.type !== 'string') return;
 
     if (data.type === 'privasys:init') {
-        const config: AuthUIConfig & { clientId?: string; scope?: string | string[] } = data.config;
+        const config: AuthUIConfig & {
+            clientId?: string;
+            scope?: string | string[];
+            sessionRelay?: { appHost: string };
+        } = data.config;
         const parentOrigin = e.origin;
 
-        // Tear down any previous UI
+        // Tear down any previous UI / session-relay handshake.
         if (activeUI) {
             activeUI.destroy();
             activeUI = null;
+        }
+        pendingHandshake = null;
+
+        // If the parent opted into session-relay, generate the SDK keypair
+        // up-front and hand the public half to the AuthUI so the QR / push
+        // request asks the wallet to bootstrap a sealed session against the
+        // enclave during the FIDO2 ceremony. The private key never leaves
+        // this iframe.
+        let sessionRelayUI: AuthUIConfig['sessionRelay'] | undefined;
+        if (config.sessionRelay?.appHost) {
+            const { keyPair, sdkPubB64 } = await generateSdkKeyPair();
+            pendingHandshake = {
+                appHost: config.sessionRelay.appHost,
+                sdkKeyPair: keyPair,
+                sdkPubB64,
+            };
+            sessionRelayUI = { sdkPub: sdkPubB64, appHost: config.sessionRelay.appHost };
         }
 
         // IdP base URL (same origin as this iframe).
@@ -426,6 +489,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     socialProviders,
                     onSocialAuth,
                     requestedAttributes,
+                    sessionRelay: sessionRelayUI,
                 });
 
                 const uiResult: SignInResult = await activeUI.signIn();
@@ -503,6 +567,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 }
                 scheduleRenewal(session, parentOrigin);
 
+                // Install the sealed session so the parent's `frame.session()`
+                // RPC works once the auth result lands.
+                if (uiResult.sessionRelay) {
+                    await installSessionRelay(uiResult.sessionRelay, parentOrigin);
+                }
+
                 // 7. Send result to parent with the access_token.
                 window.parent.postMessage(
                     {
@@ -530,7 +600,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // Non-OIDC mode (original flow): opaque session token from enclave.
         const pushToken = sessions.findPushToken();
         const deviceTrusted = !!sessions.getDeviceHint();
-        activeUI = new AuthUI({ ...config, pushToken, deviceTrusted });
+        activeUI = new AuthUI({ ...config, pushToken, deviceTrusted, sessionRelay: sessionRelayUI });
 
         try {
             const result: SignInResult = await activeUI.signIn();
@@ -554,6 +624,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     sessions.saveDeviceHint(session.pushToken, session.brokerUrl);
                 }
                 scheduleRenewal(session, parentOrigin);
+            }
+
+            if (result.sessionRelay) {
+                await installSessionRelay(result.sessionRelay, parentOrigin);
             }
 
             window.parent.postMessage(
@@ -608,7 +682,86 @@ window.addEventListener('message', async (e: MessageEvent) => {
             e.origin,
         );
     }
+
+    // Sealed session-relay RPC. The parent serialises the request as
+    // {method, path, body?} and we relay it through PrivasysSession.request
+    // (CBOR-sealed AES-256-GCM over fetch). Only the iframe holds K, so the
+    // parent can never inspect or replay sealed traffic.
+    if (data.type === 'privasys:session:request') {
+        const id = data.id;
+        const reply = (payload: Record<string, unknown>) =>
+            window.parent.postMessage({ type: 'privasys:session:response', id, ...payload }, e.origin);
+        if (!activeSession) {
+            reply({ error: 'no active session' });
+            return;
+        }
+        if (activeSession.expiresAt && activeSession.expiresAt <= Date.now()) {
+            reply({ error: 'session expired' });
+            return;
+        }
+        try {
+            const method = String(data.method || 'GET').toUpperCase();
+            const path = String(data.path || '/');
+            const body = data.body as unknown;
+            const init = (data.init as RequestInit | undefined) ?? undefined;
+            const resp = await activeSession.session.request(method, path, body, init);
+            const headers: Record<string, string> = {};
+            resp.headers.forEach((v, k) => { headers[k] = v; });
+            reply({
+                status: resp.status,
+                headers,
+                body: resp.body,
+                sealed: resp.sealed,
+            });
+        } catch (err) {
+            reply({ error: err instanceof Error ? err.message : String(err) });
+        }
+    }
 });
+
+async function installSessionRelay(
+    binding: { sessionId: string; encPub: string; expiresAt?: number },
+    parentOrigin: string,
+): Promise<void> {
+    if (!pendingHandshake) {
+        console.warn('[frame-host] sessionRelay returned without pending handshake — ignoring');
+        return;
+    }
+    const { sdkKeyPair, appHost } = pendingHandshake;
+    pendingHandshake = null;
+    try {
+        const session = await PrivasysSession.fromHandshake({
+            host: appHost,
+            sessionId: binding.sessionId,
+            sdkPrivateKey: sdkKeyPair.privateKey,
+            encPub: binding.encPub,
+        });
+        activeSession = {
+            appHost,
+            sessionId: binding.sessionId,
+            expiresAt: binding.expiresAt ?? 0,
+            session,
+        };
+        window.parent.postMessage(
+            {
+                type: 'privasys:session:ready',
+                sessionId: binding.sessionId,
+                appHost,
+                expiresAt: binding.expiresAt ?? 0,
+            },
+            parentOrigin,
+        );
+    } catch (err) {
+        console.error('[frame-host] failed to derive sealed session:', err);
+        window.parent.postMessage(
+            {
+                type: 'privasys:session:error',
+                error: err instanceof Error ? err.message : String(err),
+            },
+            parentOrigin,
+        );
+    }
+}
 
 // Signal to parent that the iframe is ready to receive messages
 window.parent.postMessage({ type: 'privasys:ready' }, '*');

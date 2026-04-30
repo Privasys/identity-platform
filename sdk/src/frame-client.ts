@@ -83,6 +83,15 @@ export interface AuthFrameConfig {
      * The container should have explicit dimensions.
      */
     container?: HTMLElement;
+    /**
+     * Sealed session-relay opt-in. When set, the auth iframe negotiates an
+     * end-to-end ECDH session with the enclave at `appHost` during the
+     * wallet ceremony. After `signIn()` resolves, call {@link AuthFrame.session}
+     * to obtain a proxy that issues sealed CBOR-AES-GCM requests; the iframe
+     * stays mounted (hidden) so the SDK private key stays inside
+     * `authOrigin` and never reaches the adopter's origin.
+     */
+    sessionRelay?: { appHost: string };
 }
 
 export interface SignInResult {
@@ -93,6 +102,33 @@ export interface SignInResult {
     pushToken?: string;
     /** JWT access_token from the IdP (present when clientId was set in config). */
     accessToken?: string;
+    /** Wallet-attested sealed-transport binding (set when sessionRelay was configured). */
+    sessionRelay?: { sessionId: string; encPub: string; expiresAt?: number };
+}
+
+/**
+ * Sealed-transport request response. `body` is the deserialised CBOR
+ * payload returned by the enclave (typically a `Uint8Array` plaintext
+ * carrying JSON), `headers` mirrors the HTTP response headers, and
+ * `sealed` is true when the response actually came back encrypted (false
+ * means the enclave returned a non-sealed status, e.g. 4xx error).
+ */
+export interface SealedResponse {
+    status: number;
+    headers: Record<string, string>;
+    body: Uint8Array;
+    sealed: boolean;
+}
+
+/**
+ * Proxy for issuing sealed requests against the enclave. Returned by
+ * {@link AuthFrame.session}.
+ */
+export interface SealedSession {
+    sessionId: string;
+    appHost: string;
+    expiresAt: number;
+    request(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedResponse>;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +143,14 @@ export class AuthFrame {
     private sessionHandler: ((e: MessageEvent) => void) | null = null;
     private _onSessionExpired?: (rpId: string) => void;
     private _onSessionRenewed?: (rpId: string, accessToken?: string) => void;
+    // Sealed session-relay state.
+    private sealedIframe: HTMLIFrameElement | null = null;
+    private sealedHandler: ((e: MessageEvent) => void) | null = null;
+    private sealedSession: SealedSession | null = null;
+    private sealedReadyResolvers: Array<(s: SealedSession) => void> = [];
+    private sealedReadyRejecters: Array<(e: Error) => void> = [];
+    private sealedReqSeq = 0;
+    private sealedReqs = new Map<number, { resolve: (r: SealedResponse) => void; reject: (e: Error) => void }>();
 
     constructor(config: AuthFrameConfig) {
         const { authOrigin, container, ...rest } = config;
@@ -157,6 +201,27 @@ export class AuthFrame {
             // Append to the correct parent
             (this.container || document.body).appendChild(iframe);
 
+            const wantsSealed = !!this.config.sessionRelay?.appHost;
+
+            // When session-relay is on we keep the iframe mounted (hidden)
+            // after auth completes so subsequent `session().request()` calls
+            // can route through the iframe-resident PrivasysSession. Without
+            // session-relay we tear everything down on result.
+            const finishSignIn = (result: SignInResult) => {
+                if (wantsSealed) {
+                    // Hide the iframe but leave it in the DOM with the message
+                    // handler still attached.
+                    iframe.style.cssText =
+                        'position:fixed;width:0;height:0;border:none;opacity:0;pointer-events:none;';
+                    this.sealedIframe = iframe;
+                    this.sealedHandler = handler;
+                    resolve(result);
+                } else {
+                    cleanup();
+                    resolve(result);
+                }
+            };
+
             const cleanup = () => {
                 window.removeEventListener('message', handler);
                 iframe.remove();
@@ -176,8 +241,7 @@ export class AuthFrame {
                         break;
 
                     case 'privasys:result':
-                        cleanup();
-                        resolve(data.result as SignInResult);
+                        finishSignIn(data.result as SignInResult);
                         break;
 
                     case 'privasys:cancel':
@@ -189,11 +253,93 @@ export class AuthFrame {
                         cleanup();
                         reject(new Error(data.error || 'Authentication failed'));
                         break;
+
+                    case 'privasys:session:ready': {
+                        const s = this.installSealedProxy({
+                            sessionId: data.sessionId,
+                            appHost: data.appHost,
+                            expiresAt: data.expiresAt ?? 0,
+                        });
+                        const resolvers = this.sealedReadyResolvers;
+                        this.sealedReadyResolvers = [];
+                        this.sealedReadyRejecters = [];
+                        for (const r of resolvers) r(s);
+                        break;
+                    }
+
+                    case 'privasys:session:error': {
+                        const err = new Error(data.error || 'sealed session failed');
+                        const rejecters = this.sealedReadyRejecters;
+                        this.sealedReadyResolvers = [];
+                        this.sealedReadyRejecters = [];
+                        for (const r of rejecters) r(err);
+                        break;
+                    }
+
+                    case 'privasys:session:response': {
+                        const id = data.id as number;
+                        const pending = this.sealedReqs.get(id);
+                        if (!pending) return;
+                        this.sealedReqs.delete(id);
+                        if (data.error) {
+                            pending.reject(new Error(String(data.error)));
+                        } else {
+                            pending.resolve({
+                                status: data.status as number,
+                                headers: (data.headers as Record<string, string>) || {},
+                                body: data.body as Uint8Array,
+                                sealed: !!data.sealed,
+                            });
+                        }
+                        break;
+                    }
                 }
             };
 
             window.addEventListener('message', handler);
         });
+    }
+
+    /**
+     * Returns the sealed session installed by the most recent successful
+     * `signIn()` (when `sessionRelay` was configured). Resolves once the
+     * iframe-side ECDH handshake completes — usually right after `signIn()`
+     * resolves, but slightly later if the wallet returned the binding only
+     * just before this call.
+     */
+    session(): Promise<SealedSession> {
+        if (this.sealedSession) return Promise.resolve(this.sealedSession);
+        if (!this.config.sessionRelay?.appHost) {
+            return Promise.reject(new Error('AuthFrame: session() requires sessionRelay config'));
+        }
+        return new Promise<SealedSession>((resolve, reject) => {
+            this.sealedReadyResolvers.push(resolve);
+            this.sealedReadyRejecters.push(reject);
+        });
+    }
+
+    private installSealedProxy(meta: { sessionId: string; appHost: string; expiresAt: number }): SealedSession {
+        const sealed: SealedSession = {
+            sessionId: meta.sessionId,
+            appHost: meta.appHost,
+            expiresAt: meta.expiresAt,
+            request: (method, path, body, init) => {
+                if (!this.sealedIframe?.contentWindow) {
+                    return Promise.reject(new Error('AuthFrame: sealed iframe is gone'));
+                }
+                const id = ++this.sealedReqSeq;
+                const target = this.sealedIframe.contentWindow;
+                return new Promise<SealedResponse>((resolve, reject) => {
+                    this.sealedReqs.set(id, { resolve, reject });
+                    target.postMessage(
+                        { type: 'privasys:session:request', id, method, path, body, init },
+                        this.authOrigin,
+                    );
+                });
+            },
+        };
+        this.sealedSession = sealed;
+        return sealed;
     }
 
     /**
@@ -324,10 +470,29 @@ export class AuthFrame {
     /** Tear down any active iframes. */
     destroy(): void {
         this.destroySessionIframe();
+        this.destroySealedIframe();
         const existing = document.querySelector(
             `iframe[src^="${this.authOrigin}/auth/"]`,
         );
         if (existing) existing.remove();
+    }
+
+    private destroySealedIframe(): void {
+        if (this.sealedHandler) {
+            window.removeEventListener('message', this.sealedHandler);
+            this.sealedHandler = null;
+        }
+        if (this.sealedIframe) {
+            this.sealedIframe.remove();
+            this.sealedIframe = null;
+        }
+        const err = new Error('AuthFrame destroyed');
+        for (const [, p] of this.sealedReqs) p.reject(err);
+        this.sealedReqs.clear();
+        for (const r of this.sealedReadyRejecters) r(err);
+        this.sealedReadyResolvers = [];
+        this.sealedReadyRejecters = [];
+        this.sealedSession = null;
     }
 
     private destroySessionIframe(): void {

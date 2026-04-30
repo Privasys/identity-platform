@@ -171,8 +171,43 @@ export async function register(
     keyAlias: string,
     browserSessionId: string,
     displayName?: string,
-    userHandleOverride?: string
-): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string; userId?: string; recoveryPhrase?: string }> {
+    userHandleOverride?: string,
+    sessionRelay?: { sdkPub: string; appHost: string; quoteHash: string; nonce: string }
+): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string; userId?: string; recoveryPhrase?: string; sessionRelay?: SessionRelayBinding }> {
+    // Mirror of authenticate(): if the QR opted into session-relay we
+    // must bootstrap a sealed session against the enclave app first so
+    // the IdP can bind the issued JWT to the same (sdk_pub, enc_pub,
+    // session_id, quote_hash, nonce) tuple. Without this, first-time
+    // users (who go through registration, not authentication) end up
+    // with a vanilla passkey and no Home-tab relay session — and the
+    // chat UI has no sealed-transport handle to call the enclave with.
+    let relay: SessionRelayBinding | undefined;
+    let bindingChallengeB64: string | undefined;
+    if (sessionRelay?.sdkPub) {
+        if (!sessionRelay.appHost) {
+            throw new Error('session-relay flow requires appHost');
+        }
+        const bs = await fido2Fetch<{ session_id: string; enc_pub: string; expires_at: number }>(
+            sessionRelay.appHost,
+            '/__privasys/session-bootstrap',
+            { sdk_pub: sessionRelay.sdkPub },
+        );
+        relay = {
+            sessionId: bs.session_id,
+            encPub: bs.enc_pub,
+            sdkPub: sessionRelay.sdkPub,
+            expiresAt: bs.expires_at,
+        };
+        const binding = computeSessionRelayBinding(
+            sessionRelay.nonce,
+            sessionRelay.sdkPub,
+            sessionRelay.quoteHash,
+            relay.encPub,
+            relay.sessionId,
+        );
+        bindingChallengeB64 = base64urlEncode(binding);
+    }
+
     // 1. Begin registration — get challenge and options from server.
     //    If the caller provides a userHandle (e.g. the canonical privasys.id
     //    user_id derived from the pairwise seed) use it so all of the user's
@@ -187,15 +222,22 @@ export async function register(
         userHandle = base64urlEncode(userHandleBytes);
     }
 
+    let beginPath = `/fido2/register/begin?session_id=${encodeURIComponent(browserSessionId)}`;
+    if (bindingChallengeB64) {
+        beginPath += `&binding_challenge=${encodeURIComponent(bindingChallengeB64)}`;
+    }
     const beginResp = await fido2Fetch<CredentialCreationOptions>(
         origin,
-        `/fido2/register/begin?session_id=${encodeURIComponent(browserSessionId)}`,
+        beginPath,
         {
             userName: displayName || keyAlias,
             userHandle,
         }
     );
     const options = beginResp.publicKey;
+    if (bindingChallengeB64 && options.challenge !== bindingChallengeB64) {
+        throw new Error('FIDO2 server returned a challenge that does not match the requested binding');
+    }
 
     // 2. Generate or retrieve hardware key
     const keyInfo = await NativeKeys.generateKey(keyAlias, true);
@@ -253,9 +295,18 @@ export async function register(
 
     // 7. Complete registration — send standard WebAuthn credential response
     const credentialIdB64 = base64urlEncode(credentialIdBytes);
+    let completePath = `/fido2/register/complete?challenge=${encodeURIComponent(options.challenge)}`;
+    if (relay && sessionRelay) {
+        completePath +=
+            `&session_id=${encodeURIComponent(relay.sessionId)}` +
+            `&enc_pub=${encodeURIComponent(relay.encPub)}` +
+            `&sdk_pub=${encodeURIComponent(relay.sdkPub)}` +
+            `&nonce=${encodeURIComponent(sessionRelay.nonce)}` +
+            `&quote_hash=${encodeURIComponent(sessionRelay.quoteHash)}`;
+    }
     const completeResp = await fido2Fetch<CompleteResponse>(
         origin,
-        `/fido2/register/complete?challenge=${encodeURIComponent(options.challenge)}`,
+        completePath,
         {
             id: credentialIdB64,
             rawId: credentialIdB64,
@@ -275,6 +326,7 @@ export async function register(
         serverRpId: options.rp.id,
         userId: completeResp.userId,
         recoveryPhrase: completeResp.recoveryPhrase,
+        sessionRelay: relay,
     };
 }
 

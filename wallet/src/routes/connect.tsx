@@ -406,13 +406,51 @@ export default function ConnectScreen() {
         }
     }, [qr, attestation, attestationChanged]);
 
+    /** Build the wallet-side session-relay argument from the QR payload
+     *  and the verified attestation, or return undefined when the QR did
+     *  not opt in. Shared by doRegister and doAuthenticate so first-time
+     *  users get the same sealed-transport binding as returning users. */
+    const buildSessionRelayArg = (
+        payload: QRPayload,
+    ): { sdkPub: string; appHost: string; quoteHash: string; nonce: string } | undefined => {
+        if (payload.mode !== 'session-relay' || !payload.sdkPub) return undefined;
+        if (!payload.appHost) {
+            throw new Error('session-relay mode requires appHost');
+        }
+        const att = attestationRef.current ?? attestation;
+        if (!att) {
+            throw new Error('session-relay mode requires verified attestation');
+        }
+        return {
+            sdkPub: payload.sdkPub,
+            appHost: payload.appHost,
+            quoteHash: deriveQuoteHash(att),
+            // The QR-supplied nonce is the canonical replay window for
+            // this session. Fall back to the broker session id when
+            // the QR is still on v1 (no `nonce` field).
+            nonce: payload.nonce ?? payload.sessionId,
+        };
+    };
+
     const doRegister = async (payload: QRPayload) => {
         setStep('authenticating');
         console.log(`[CONNECT] doRegister — origin=${payload.origin}, rpId=${payload.rpId}`);
         try {
             const keyAlias = `fido2-${payload.rpId}`;
             const currentProfile = useProfileStore.getState().profile;
-            const result = await fido2.register(payload.origin, keyAlias, payload.sessionId, currentProfile?.displayName);
+            // Build session-relay binding (mirror of doAuthenticate). Without
+            // this, first-time users get a vanilla passkey and no sealed
+            // session, so the chat UI cannot reach the enclave and the
+            // Home tab never shows a SESSIONS row.
+            const sessionRelayArg = buildSessionRelayArg(payload);
+            const result = await fido2.register(
+                payload.origin,
+                keyAlias,
+                payload.sessionId,
+                currentProfile?.displayName,
+                undefined,
+                sessionRelayArg,
+            );
 
             // Check for missing attributes before relaying
             const missing = getMissingAttributes(payload, currentProfile);
@@ -446,11 +484,25 @@ export default function ConnectScreen() {
                 payload.sessionId,
                 result.sessionToken,
                 pushToken,
-                attributes
+                attributes,
+                result.sessionRelay,
             );
 
             // Relay succeeded — now persist locally.
             persistCredentialAndTrust(payload, result.credentialId, keyAlias, result.userHandle, result.userName, result.serverRpId);
+
+            // Surface the live sealed session on the Home screen so the
+            // user sees the relay countdown next to the connected service.
+            if (result.sessionRelay) {
+                addRelaySession({
+                    sessionId: result.sessionRelay.sessionId,
+                    rpId: payload.rpId,
+                    origin: payload.origin,
+                    appName: payload.appName,
+                    expiresAt: result.sessionRelay.expiresAt,
+                    startedAt: Math.floor(Date.now() / 1000),
+                });
+            }
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
@@ -478,29 +530,7 @@ export default function ConnectScreen() {
             // quote_hash || enc_pub || session_id) and rejects on
             // mismatch, so the issued JWT proves the wallet attested
             // exactly the listed quote.
-            let sessionRelayArg: { sdkPub: string; appHost: string; quoteHash: string; nonce: string } | undefined;
-            if (payload.mode === 'session-relay' && payload.sdkPub) {
-                if (!payload.appHost) {
-                    throw new Error('session-relay mode requires appHost');
-                }
-                // Read from the ref, not state — doAuthenticate is invoked
-                // in the same tick as setAttestation in startFlow's
-                // trusted-app branch, so the closure-captured `attestation`
-                // is still null at this point.
-                const att = attestationRef.current ?? attestation;
-                if (!att) {
-                    throw new Error('session-relay mode requires verified attestation');
-                }
-                sessionRelayArg = {
-                    sdkPub: payload.sdkPub,
-                    appHost: payload.appHost,
-                    quoteHash: deriveQuoteHash(att),
-                    // The QR-supplied nonce is the canonical replay window for
-                    // this session. Fall back to the broker session id when
-                    // the QR is still on v1 (no `nonce` field).
-                    nonce: payload.nonce ?? payload.sessionId,
-                };
-            }
+            const sessionRelayArg = buildSessionRelayArg(payload);
 
             const result = await fido2.authenticate(
                 payload.origin,

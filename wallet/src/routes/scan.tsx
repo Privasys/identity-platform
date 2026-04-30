@@ -132,13 +132,32 @@ export default function TabScanScreen() {
             // 1. Try raw JSON payload (backward-compatible)
             if (routePayload(result.data)) return;
 
-            // 2. Try universal link URL: https://privasys.id/scp?p=<base64url>
+            // 2. Try universal link URL.
+            //    Short form: https://privasys.id/scp?v=1&s=<sid>&h=<pin>&r=<host>
+            //                — descriptor is fetched from the relay.
+            //    Long form:  https://privasys.id/scp?p=<base64url(JSON)>
+            //                — full descriptor in the URL (legacy).
             try {
                 const url = new URL(result.data);
-                const b64 = url.searchParams.get('p');
-                if (b64 && url.pathname.startsWith('/scp')) {
-                    const json = decodeB64Url(b64);
-                    if (json && routePayload(json)) return;
+                if (url.pathname.startsWith('/scp')) {
+                    const v = url.searchParams.get('v');
+                    const s = url.searchParams.get('s');
+                    const h = url.searchParams.get('h');
+                    if (v && s && h) {
+                        // Hand off to the /scp route, which handles fetch +
+                        // hash verification and then redirects to /connect.
+                        navigating.current = true;
+                        const params: Record<string, string> = { v, s, h };
+                        const r = url.searchParams.get('r');
+                        if (r) params.r = r;
+                        router.push({ pathname: '/scp', params });
+                        return;
+                    }
+                    const b64 = url.searchParams.get('p');
+                    if (b64) {
+                        const json = decodeB64Url(b64);
+                        if (json && routePayload(json)) return;
+                    }
                 }
 
                 // Legacy URL format: /_/ prefix

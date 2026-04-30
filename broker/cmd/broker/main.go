@@ -33,12 +33,21 @@ func main() {
 	hub := relay.NewHub()
 	go hub.Run()
 
+	// In-memory store for short-form QR descriptors. The SDK PUTs the
+	// descriptor here keyed by sessionId; the wallet GETs it after
+	// scanning the short QR and verifies SHA-256(body)[:16] against the
+	// pin in the QR. TTL'd, single-write, multi-read.
+	descStore := relay.NewDescriptorStore()
+
 	mux := http.NewServeMux()
 
 	// WebSocket relay endpoint
 	mux.HandleFunc("/relay", func(w http.ResponseWriter, r *http.Request) {
 		relay.HandleWebSocket(hub, w, r)
 	})
+
+	// Connect descriptor store (short-QR side channel)
+	mux.HandleFunc("/connect/", descStore.HandleConnect)
 
 	// Push notification trigger
 	notifyHandler := func(w http.ResponseWriter, r *http.Request) {

@@ -42,6 +42,10 @@ env:
   RUST_TOOLCHAIN: stable
   NODE_VERSION: '24'
   BUN_VERSION: '1.3.11'
+  # Pre-built Rust RA-TLS FFI libraries are downloaded from this release of
+  # https://github.com/Privasys/ra-tls-clients instead of being recompiled
+  # on every wallet build. Bump when ra-tls-clients ships a new version.
+  RATLS_VERSION: v0.4.0
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────
@@ -65,95 +69,10 @@ jobs:
           bunx tsc --noEmit
 
   # ─── Build Rust RA-TLS native libraries ───────────────────────────
-  build-rust-ios:
-    if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' &&
-       (inputs.platform == 'ios' || inputs.platform == 'all'))
-    runs-on: macos-14  # Apple Silicon runner (M1), macOS Sonoma, Xcode 15+
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: Privasys/ra-tls-clients
-          path: ra-tls-clients
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim
-
-      - name: Cache Rust build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ra-tls-clients/rust/mobile/target
-          key: rust-ios-${{ hashFiles('ra-tls-clients/rust/Cargo.lock') }}
-          restore-keys: rust-ios-
-
-      - name: Build iOS static libraries
-        working-directory: ra-tls-clients/rust/mobile
-        run: |
-          chmod +x scripts/build-ios.sh
-          ./scripts/build-ios.sh release
-
-      - name: Upload iOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ratls-ios
-          path: ra-tls-clients/rust/mobile/target/aarch64-apple-ios/release/libratls_mobile.a
-          retention-days: 7
-
-  build-rust-android:
-    if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' &&
-       (inputs.platform == 'android' || inputs.platform == 'all'))
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: Privasys/ra-tls-clients
-          path: ra-tls-clients
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,x86_64-linux-android
-
-      - name: Set up Android NDK
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r27c
-        id: ndk
-
-      - name: Cache Rust build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ra-tls-clients/rust/mobile/target
-          key: rust-android-${{ hashFiles('ra-tls-clients/rust/Cargo.lock') }}
-          restore-keys: rust-android-
-
-      - name: Build Android shared libraries
-        working-directory: ra-tls-clients/rust/mobile
-        env:
-          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
-        run: |
-          chmod +x scripts/build-android.sh
-          ./scripts/build-android.sh release
-
-      - name: Upload Android artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ratls-android
-          path: ra-tls-clients/rust/mobile/target/android/jniLibs/
-          retention-days: 7
+  # Removed: pre-built artefacts are now consumed directly from
+  # https://github.com/Privasys/ra-tls-clients releases (env.RATLS_VERSION).
+  # See the "Download Rust ... artefacts" step inside build-local-ios /
+  # build-local-android below.
 
   # ─── Build app via EAS Cloud ──────────────────────────────────────
   # NOTE: EAS Cloud builds clone from git, so pre-built Rust binaries
@@ -202,7 +121,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
        !inputs.use_eas_cloud &&
        (inputs.platform == 'ios' || inputs.platform == 'all'))
-    needs: [check, build-rust-ios]
+    needs: [check]
     runs-on: macos-26  # Xcode 26 — ships iOS 26 SDK
     steps:
       - uses: actions/checkout@v4
@@ -211,16 +130,25 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Download Rust iOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: ratls-ios
-          path: wallet/modules/native-ratls/ios/lib/
-
-      - name: Verify Rust artifacts
+      - name: Download Rust iOS artefacts from ra-tls-clients release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ls -la wallet/modules/native-ratls/ios/lib/
-          # Force-track and commit so EAS tarball includes them
+          set -euo pipefail
+          mkdir -p wallet/modules/native-ratls/ios/lib
+          cd wallet/modules/native-ratls/ios/lib
+          gh release download "$RATLS_VERSION" \
+            --repo Privasys/ra-tls-clients \
+            --pattern 'ratls-mobile-ios.tar.gz' \
+            --output ratls-mobile-ios.tar.gz
+          tar -xzf ratls-mobile-ios.tar.gz
+          rm ratls-mobile-ios.tar.gz
+          ls -la
+          test -f libratls_mobile.a
+
+      - name: Stage artefacts for EAS tarball
+        run: |
+          # Force-track and commit so the EAS source tarball includes them
           # (gitignored files are excluded from the EAS archive)
           git add -f wallet/modules/native-ratls/ios/lib/
           git -c user.name='CI' -c user.email='ci@privasys.org' commit -m 'ci: add Rust iOS artifacts [skip ci]'
@@ -265,7 +193,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
        !inputs.use_eas_cloud &&
        (inputs.platform == 'android' || inputs.platform == 'all'))
-    needs: [check, build-rust-android]
+    needs: [check]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -279,18 +207,27 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Download Rust Android artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: ratls-android
-          path: wallet/modules/native-ratls/android/src/main/jniLibs/
-
-      - name: Verify Rust artifacts
+      - name: Download Rust Android artefacts from ra-tls-clients release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          mkdir -p wallet/modules/native-ratls/android/src/main/jniLibs
+          cd wallet/modules/native-ratls/android/src/main/jniLibs
+          gh release download "$RATLS_VERSION" \
+            --repo Privasys/ra-tls-clients \
+            --pattern 'ratls-mobile-android.tar.gz' \
+            --output ratls-mobile-android.tar.gz
+          tar -xzf ratls-mobile-android.tar.gz
+          rm ratls-mobile-android.tar.gz
           echo "=== jniLibs contents ==="
-          find wallet/modules/native-ratls/android/src/main/jniLibs/ -type f
-          ls -la wallet/modules/native-ratls/android/src/main/jniLibs/arm64-v8a/
-          # Force-track and commit so EAS tarball includes them
+          find . -type f
+          test -f arm64-v8a/libratls_mobile.so
+          test -f x86_64/libratls_mobile.so
+
+      - name: Stage artefacts for EAS tarball
+        run: |
+          # Force-track and commit so the EAS source tarball includes them
           # (gitignored files are excluded from the EAS archive)
           git add -f wallet/modules/native-ratls/android/src/main/jniLibs/
           git -c user.name='CI' -c user.email='ci@privasys.org' commit -m 'ci: add Rust Android artifacts [skip ci]'

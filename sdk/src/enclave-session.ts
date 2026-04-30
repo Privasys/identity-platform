@@ -36,6 +36,7 @@
  */
 
 const SEALED_CONTENT_TYPE = 'application/privasys-sealed+cbor';
+const SEALED_STREAM_CONTENT_TYPE = 'application/privasys-sealed-stream+cbor';
 const SESSION_AUTH_SCHEME = 'PrivasysSession';
 const HKDF_INFO = new TextEncoder().encode('privasys-session/v1');
 const DIR_C2S = new TextEncoder().encode('privasys-dir/c2s');
@@ -219,7 +220,18 @@ export class PrivasysSession {
         const respBody = new Uint8Array(await resp.arrayBuffer());
         // Allow plaintext error responses (e.g. 502 from the gateway with no
         // session-relay context). The caller can branch on status + sealed.
-        if (!resp.headers.get('content-type')?.startsWith(SEALED_CONTENT_TYPE)) {
+        const respCT = resp.headers.get('content-type') ?? '';
+        if (respCT.startsWith(SEALED_STREAM_CONTENT_TYPE)) {
+            // Drain the stream into a single Uint8Array so request() retains
+            // its single-shot semantics. For SSE callers, use stream() below.
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of decodeFrameStream(respBody, this.keys.aead, this.keys.s2cPrefix, ad)) {
+                chunks.push(chunk);
+            }
+            const inner = parseInnerStatus(resp.headers, resp.status);
+            return { status: inner, sealed: true, body: concat(chunks), headers: resp.headers };
+        }
+        if (!respCT.startsWith(SEALED_CONTENT_TYPE)) {
             return { status: resp.status, sealed: false, body: respBody, headers: resp.headers };
         }
 
@@ -247,6 +259,101 @@ export class PrivasysSession {
         }
         return JSON.parse(new TextDecoder().decode(r.body)) as T;
     }
+
+    /**
+     * Sends a sealed request and returns a stream of decrypted plaintext
+     * chunks. Use for SSE / chunked endpoints; for one-shot calls use
+     * {@link request}. The returned object carries the inner HTTP status
+     * (decoded from `X-Privasys-Inner-Status`) and a ReadableStream of the
+     * decrypted body bytes.
+     */
+    async stream(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedStreamResponse> {
+        const upperMethod = method.toUpperCase();
+        const ad = encodeAD(upperMethod, path, this.sessionId);
+
+        const plaintext = serializePlaintext(body);
+        const ctr = this.c2sCtr++;
+        const nonce = makeNonce(this.keys.c2sPrefix, ctr);
+        const ct = new Uint8Array(
+            await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: ad as BufferSource },
+                this.keys.aead,
+                plaintext as BufferSource,
+            ),
+        );
+        const reqBody = encodeSealed({ v: 1, ctr, ct });
+
+        const headers = new Headers(init?.headers);
+        headers.set('Content-Type', SEALED_CONTENT_TYPE);
+        headers.set('Authorization', `${SESSION_AUTH_SCHEME} ${this.sessionId}`);
+
+        const url = `https://${this.host}${path}`;
+        const resp = await this.fetchImpl(url, {
+            ...init,
+            method: upperMethod,
+            headers,
+            body: reqBody as BodyInit,
+        });
+
+        const respCT = resp.headers.get('content-type') ?? '';
+        if (!respCT.startsWith(SEALED_STREAM_CONTENT_TYPE)) {
+            // Fall back: drain as single envelope (or raw passthrough) and
+            // expose it as a one-chunk stream.
+            const buf = new Uint8Array(await resp.arrayBuffer());
+            let chunks: Uint8Array[] = [buf];
+            let sealed = false;
+            let status = resp.status;
+            if (respCT.startsWith(SEALED_CONTENT_TYPE)) {
+                const env = decodeSealed(buf);
+                const respNonce = makeNonce(this.keys.s2cPrefix, env.ctr);
+                const pt = new Uint8Array(
+                    await crypto.subtle.decrypt(
+                        { name: 'AES-GCM', iv: respNonce as BufferSource, additionalData: ad as BufferSource },
+                        this.keys.aead,
+                        env.ct as BufferSource,
+                    ),
+                );
+                chunks = [pt];
+                sealed = true;
+                status = parseInnerStatus(resp.headers, resp.status);
+            }
+            const single = new ReadableStream<Uint8Array>({
+                start(controller) {
+                    for (const c of chunks) controller.enqueue(c);
+                    controller.close();
+                },
+            });
+            return { status, sealed, headers: resp.headers, body: single };
+        }
+
+        const aead = this.keys.aead;
+        const s2cPrefix = this.keys.s2cPrefix;
+        const reader = resp.body!.getReader();
+        const status = parseInnerStatus(resp.headers, resp.status);
+        const stream = new ReadableStream<Uint8Array>({
+            async pull(controller) {
+                try {
+                    for await (const chunk of decodeFrameReader(reader, aead, s2cPrefix, ad)) {
+                        controller.enqueue(chunk);
+                    }
+                    controller.close();
+                } catch (e) {
+                    controller.error(e);
+                }
+            },
+            cancel(reason) {
+                reader.cancel(reason).catch(() => undefined);
+            },
+        });
+        return { status, sealed: true, headers: resp.headers, body: stream };
+    }
+}
+
+export interface SealedStreamResponse {
+    status: number;
+    sealed: boolean;
+    headers: Headers;
+    body: ReadableStream<Uint8Array>;
 }
 
 export interface SealedResponse {
@@ -410,7 +517,7 @@ function readArgument(buf: Uint8Array, off: number): [bigint, number] {
     throw new Error(`CBOR: indefinite-length not supported (ai=${ai})`);
 }
 
-function concat(parts: Uint8Array[]): Uint8Array {
+function concat(parts: Uint8Array<ArrayBufferLike>[]): Uint8Array {
     let total = 0;
     for (const p of parts) total += p.byteLength;
     const out = new Uint8Array(total);
@@ -420,6 +527,87 @@ function concat(parts: Uint8Array[]): Uint8Array {
         o += p.byteLength;
     }
     return out;
+}
+
+function parseInnerStatus(headers: Headers, fallback: number): number {
+    const v = headers.get('x-privasys-inner-status');
+    if (!v) return fallback;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/**
+ * Decode a complete sealed-stream byte buffer into a series of decrypted
+ * plaintext chunks. Used by request() when the response is a stream that
+ * has already been fully buffered.
+ */
+async function* decodeFrameStream(
+    buf: Uint8Array,
+    aead: CryptoKey,
+    s2cPrefix: Uint8Array,
+    ad: Uint8Array,
+): AsyncGenerator<Uint8Array> {
+    let off = 0;
+    while (off + 4 <= buf.byteLength) {
+        const len = new DataView(buf.buffer, buf.byteOffset + off, 4).getUint32(0, false);
+        off += 4;
+        if (len === 0) return;
+        if (off + len > buf.byteLength) throw new Error('sealed-stream: truncated frame');
+        const env = decodeSealed(buf.subarray(off, off + len));
+        off += len;
+        const nonce = makeNonce(s2cPrefix, env.ctr);
+        const pt = new Uint8Array(
+            await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: ad as BufferSource },
+                aead,
+                env.ct as BufferSource,
+            ),
+        );
+        yield pt;
+    }
+}
+
+/**
+ * Decode an in-flight sealed-stream from a ReadableStream<Uint8Array> reader.
+ * Yields each decrypted plaintext chunk as soon as a full frame is available.
+ */
+async function* decodeFrameReader(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    aead: CryptoKey,
+    s2cPrefix: Uint8Array,
+    ad: Uint8Array,
+): AsyncGenerator<Uint8Array> {
+    let buf: Uint8Array<ArrayBufferLike> = new Uint8Array(0);
+    for (;;) {
+        // Need 4 bytes for length.
+        while (buf.byteLength < 4) {
+            const { value, done } = await reader.read();
+            if (done) {
+                if (buf.byteLength === 0) return;
+                throw new Error('sealed-stream: truncated length header');
+            }
+            buf = concat([buf, value]);
+        }
+        const len = new DataView(buf.buffer, buf.byteOffset, 4).getUint32(0, false);
+        if (len === 0) return;
+        // Need len bytes for envelope.
+        while (buf.byteLength < 4 + len) {
+            const { value, done } = await reader.read();
+            if (done) throw new Error('sealed-stream: truncated frame');
+            buf = concat([buf, value]);
+        }
+        const env = decodeSealed(buf.subarray(4, 4 + len));
+        buf = buf.slice(4 + len);
+        const nonce = makeNonce(s2cPrefix, env.ctr);
+        const pt = new Uint8Array(
+            await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: ad as BufferSource },
+                aead,
+                env.ct as BufferSource,
+            ),
+        );
+        yield pt;
+    }
 }
 
 function base64UrlEncode(b: Uint8Array): string {

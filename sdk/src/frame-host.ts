@@ -717,6 +717,54 @@ window.addEventListener('message', async (e: MessageEvent) => {
             reply({ error: err instanceof Error ? err.message : String(err) });
         }
     }
+
+    // Sealed streaming RPC. The parent posts a single
+    // `privasys:session:stream-request`; the iframe replies with one
+    // `privasys:session:stream-start` (carrying status + headers) followed
+    // by zero or more `privasys:session:stream-chunk` messages and finally
+    // `privasys:session:stream-end` (or `privasys:session:stream-error`).
+    if (data.type === 'privasys:session:stream-request') {
+        const id = data.id;
+        const post = (type: string, payload: Record<string, unknown> = {}) =>
+            window.parent.postMessage({ type, id, ...payload }, e.origin);
+        if (!activeSession) {
+            post('privasys:session:stream-error', { error: 'no active session' });
+            return;
+        }
+        if (activeSession.expiresAt && activeSession.expiresAt <= Date.now()) {
+            post('privasys:session:stream-error', { error: 'session expired' });
+            return;
+        }
+        try {
+            const method = String(data.method || 'POST').toUpperCase();
+            const path = String(data.path || '/');
+            const body = data.body as unknown;
+            const init = (data.init as RequestInit | undefined) ?? undefined;
+            const resp = await activeSession.session.stream(method, path, body, init);
+            const headers: Record<string, string> = {};
+            resp.headers.forEach((v, k) => { headers[k] = v; });
+            post('privasys:session:stream-start', { status: resp.status, headers, sealed: resp.sealed });
+            const reader = resp.body.getReader();
+            try {
+                for (;;) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value && value.byteLength > 0) {
+                        post('privasys:session:stream-chunk', { chunk: value });
+                    }
+                }
+                post('privasys:session:stream-end');
+            } catch (err) {
+                post('privasys:session:stream-error', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        } catch (err) {
+            post('privasys:session:stream-error', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
 });
 
 async function installSessionRelay(

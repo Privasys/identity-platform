@@ -121,6 +121,17 @@ export interface SealedResponse {
 }
 
 /**
+ * Streaming variant of {@link SealedResponse}. Yields decrypted plaintext
+ * chunks (already past the gateway's terminate path) as they arrive.
+ */
+export interface SealedStreamResponse {
+    status: number;
+    sealed: boolean;
+    headers: Record<string, string>;
+    body: ReadableStream<Uint8Array>;
+}
+
+/**
  * Proxy for issuing sealed requests against the enclave. Returned by
  * {@link AuthFrame.session}.
  */
@@ -129,6 +140,12 @@ export interface SealedSession {
     appHost: string;
     expiresAt: number;
     request(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedResponse>;
+    /**
+     * Streaming variant of {@link request}. Use for SSE / chunked responses
+     * (e.g. OpenAI-style chat completions). The returned `body` yields
+     * decrypted plaintext bytes; SSE event parsing is left to the caller.
+     */
+    stream(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedStreamResponse>;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +168,11 @@ export class AuthFrame {
     private sealedReadyRejecters: Array<(e: Error) => void> = [];
     private sealedReqSeq = 0;
     private sealedReqs = new Map<number, { resolve: (r: SealedResponse) => void; reject: (e: Error) => void }>();
+    private sealedStreams = new Map<number, {
+        controller?: ReadableStreamDefaultController<Uint8Array>;
+        resolve?: (r: SealedStreamResponse) => void;
+        reject?: (e: Error) => void;
+    }>();
 
     constructor(config: AuthFrameConfig) {
         const { authOrigin, container, ...rest } = config;
@@ -293,6 +315,65 @@ export class AuthFrame {
                         }
                         break;
                     }
+
+                    case 'privasys:session:stream-start': {
+                        const id = data.id as number;
+                        const slot = this.sealedStreams.get(id);
+                        if (!slot || !slot.resolve) return;
+                        const stream = new ReadableStream<Uint8Array>({
+                            start: (controller) => { slot.controller = controller; },
+                            cancel: () => {
+                                this.sealedStreams.delete(id);
+                                this.sealedIframe?.contentWindow?.postMessage(
+                                    { type: 'privasys:session:stream-cancel', id },
+                                    this.authOrigin,
+                                );
+                            },
+                        });
+                        slot.resolve({
+                            status: data.status as number,
+                            sealed: !!data.sealed,
+                            headers: (data.headers as Record<string, string>) || {},
+                            body: stream,
+                        });
+                        slot.resolve = undefined;
+                        slot.reject = undefined;
+                        break;
+                    }
+
+                    case 'privasys:session:stream-chunk': {
+                        const id = data.id as number;
+                        const slot = this.sealedStreams.get(id);
+                        if (!slot?.controller) return;
+                        const chunk = data.chunk as Uint8Array;
+                        if (chunk && chunk.byteLength > 0) {
+                            slot.controller.enqueue(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk));
+                        }
+                        break;
+                    }
+
+                    case 'privasys:session:stream-end': {
+                        const id = data.id as number;
+                        const slot = this.sealedStreams.get(id);
+                        if (!slot) return;
+                        slot.controller?.close();
+                        this.sealedStreams.delete(id);
+                        break;
+                    }
+
+                    case 'privasys:session:stream-error': {
+                        const id = data.id as number;
+                        const slot = this.sealedStreams.get(id);
+                        if (!slot) return;
+                        const err = new Error(String(data.error || 'sealed stream failed'));
+                        if (slot.reject) {
+                            slot.reject(err);
+                        } else {
+                            slot.controller?.error(err);
+                        }
+                        this.sealedStreams.delete(id);
+                        break;
+                    }
                 }
             };
 
@@ -333,6 +414,20 @@ export class AuthFrame {
                     this.sealedReqs.set(id, { resolve, reject });
                     target.postMessage(
                         { type: 'privasys:session:request', id, method, path, body, init },
+                        this.authOrigin,
+                    );
+                });
+            },
+            stream: (method, path, body, init) => {
+                if (!this.sealedIframe?.contentWindow) {
+                    return Promise.reject(new Error('AuthFrame: sealed iframe is gone'));
+                }
+                const id = ++this.sealedReqSeq;
+                const target = this.sealedIframe.contentWindow;
+                return new Promise<SealedStreamResponse>((resolve, reject) => {
+                    this.sealedStreams.set(id, { resolve, reject });
+                    target.postMessage(
+                        { type: 'privasys:session:stream-request', id, method, path, body, init },
                         this.authOrigin,
                     );
                 });

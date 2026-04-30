@@ -19,7 +19,7 @@ export type { WebAuthnConfig, WebAuthnState, WebAuthnEvents } from './webauthn';
 export { generateQRPayload, generateBatchQRPayload, generateSessionId } from './qr';
 export { SessionManager } from './session';
 export { AuthFrame } from './frame-client';
-export type { AuthFrameConfig, SealedResponse, SealedSession } from './frame-client';
+export type { AuthFrameConfig, SealedResponse, SealedSession, SealedStreamResponse } from './frame-client';
 export { PrivasysSession } from './enclave-session';
 export type {
     SessionInitOptions,

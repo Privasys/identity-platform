@@ -17,6 +17,7 @@ import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
+import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { checkDeviceSecurity } from '@/services/security';
@@ -91,7 +92,8 @@ export default function RootLayout() {
             useProfileStore.getState().hydrate(),
             useConsentStore.getState().hydrate(),
             useTrustedAppsStore.getState().hydrate(),
-            useSettingsStore.getState().hydrate()
+            useSettingsStore.getState().hydrate(),
+            useSessionsStore.getState().hydrate()
         ]).then(() => setStoresReady(true));
 
         // Run security checks in the background

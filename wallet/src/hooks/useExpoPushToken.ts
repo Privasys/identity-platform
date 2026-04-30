@@ -100,6 +100,27 @@ export function useExpoPushToken() {
         async function setupListeners() {
             const Notifications = await getNotifications();
 
+            // Cold-start: if the app was launched by tapping a notification,
+            // the response is queued and addNotificationResponseReceivedListener
+            // may register too late to receive it. Read it explicitly.
+            try {
+                const initial = await Notifications.getLastNotificationResponseAsync();
+                if (initial) {
+                    const data = initial.notification.request.content.data as
+                        | Record<string, unknown>
+                        | undefined;
+                    const payload = data ? authRequestPayload(data) : null;
+                    if (payload) {
+                        // Defer one tick so the router is mounted before pushing.
+                        setTimeout(() => {
+                            router.push({ pathname: '/connect', params: { payload, source: 'push' } });
+                        }, 0);
+                    }
+                }
+            } catch (e) {
+                console.warn('[notifications] getLastNotificationResponseAsync failed', e);
+            }
+
             // Foreground notification handler — when an auth-request
             // arrives while the app is open we route straight to the
             // connect screen, instead of forcing the user to dismiss a

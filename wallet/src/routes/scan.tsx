@@ -1,13 +1,16 @@
 ﻿import { useFocusEffect } from '@react-navigation/native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, CameraType, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View } from '@/components/Themed';
 
 export default function TabScanScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [facing] = useState<CameraType>('back');
     const [serviceUrl, setServiceUrl] = useState<string>();
     const [permission, requestPermission] = useCameraPermissions();
@@ -159,12 +162,33 @@ export default function TabScanScreen() {
                 onBarcodeScanned={handleBarcode}
                 barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
             />
+            <Pressable
+                style={[styles.closeButton, { top: insets.top + 12 }]}
+                onPress={() => {
+                    if (router.canGoBack()) router.back();
+                    else router.replace('/(tabs)');
+                }}
+                accessibilityLabel="Close scanner"
+                hitSlop={12}
+            >
+                <Ionicons name="close" size={26} color="#FFFFFF" />
+            </Pressable>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    closeButton: {
+        position: 'absolute',
+        left: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
     infoText: {
         fontSize: 17,
         lineHeight: 24,

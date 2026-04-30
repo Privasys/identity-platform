@@ -352,12 +352,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
     screen: { flex: 1, backgroundColor: '#F8FAFB' },
     header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingBottom: 16,
-        backgroundColor: '#0F172A'
+        backgroundColor: '#34E89E',
+        paddingHorizontal: 24,
+        paddingBottom: 24,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28
     },
     headerTitle: {
         fontSize: 28,

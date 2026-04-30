@@ -125,15 +125,6 @@ export default function SettingsScreen() {
                 {/* About */}
                 <Text style={styles.sectionTitle}>About</Text>
                 <View style={styles.aboutCard}>
-                    <View style={styles.aboutHeader}>
-                        <Image
-                            style={styles.aboutLogo}
-                            source={require('@/assets/images/privasys-logo.svg')}
-                            contentFit="contain"
-                        />
-                        <Text style={styles.aboutTitle}>Privasys Wallet</Text>
-                    </View>
-                    <View style={styles.aboutSeparator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
                     <AboutPrivasysWallet />
                 </View>
 

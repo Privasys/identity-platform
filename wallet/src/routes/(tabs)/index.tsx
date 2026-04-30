@@ -46,15 +46,6 @@ export default function HomeScreen() {
         <RNView style={styles.screen}>
             {/* Gradient header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
-                <RNView style={styles.headerRow}>
-                    <RNView />
-                    <Pressable
-                        onPress={() => router.push('/settings')}
-                        style={styles.settingsButton}
-                    >
-                        <Ionicons name="settings-outline" size={22} color="rgba(255,255,255,0.9)" />
-                    </Pressable>
-                </RNView>
                 <Text style={styles.headerTitle}>Privasys Wallet</Text>
                 <Text style={styles.headerSubtitle}>
                     {apps.length === 0
@@ -182,20 +173,6 @@ const styles = StyleSheet.create({
         paddingBottom: 32,
         borderBottomLeftRadius: 28,
         borderBottomRightRadius: 28
-    },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 20
-    },
-    settingsButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center'
     },
     headerTitle: {
         fontSize: 28,

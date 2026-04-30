@@ -294,7 +294,7 @@ export async function authenticate(
     credentialId: string,
     browserSessionId: string,
     rpId?: string,
-    sessionRelay?: { sdkPub: string; quoteHash: string; nonce: string }
+    sessionRelay?: { sdkPub: string; appHost: string; quoteHash: string; nonce: string }
 ): Promise<{ sessionToken: string; userId?: string; sessionRelay?: SessionRelayBinding }> {
     // 0. Optional: bootstrap a browser→enclave session over the same
     //    RA-TLS connection. Wallet posts the SDK's ephemeral P-256
@@ -303,11 +303,19 @@ export async function authenticate(
     //    over (nonce, sdk_pub, quote_hash, enc_pub, session_id) — the
     //    IdP recomputes and rejects on mismatch, so the issued JWT is
     //    cryptographic proof that the wallet attested those values.
+    //
+    //    The bootstrap call MUST go to the enclave app (`appHost`), NOT
+    //    the IdP `origin`: only the enclave runs the sealed-CBOR
+    //    middleware. The IdP `origin` is the privasys.id host that
+    //    serves the FIDO2 ceremony.
     let relay: SessionRelayBinding | undefined;
     let bindingChallengeB64: string | undefined;
     if (sessionRelay?.sdkPub) {
+        if (!sessionRelay.appHost) {
+            throw new Error('session-relay flow requires appHost');
+        }
         const bs = await fido2Fetch<{ session_id: string; enc_pub: string; expires_at: number }>(
-            origin,
+            sessionRelay.appHost,
             '/__privasys/session-bootstrap',
             { sdk_pub: sessionRelay.sdkPub },
         );

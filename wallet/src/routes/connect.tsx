@@ -182,6 +182,10 @@ interface QRPayload {
     /** SDK ephemeral P-256 SEC1 uncompressed public key, base64url. Required
      *  when mode==='session-relay'. */
     sdkPub?: string;
+    /** Hostname (no scheme) of the enclave app that hosts
+     *  `/__privasys/session-bootstrap`. Different from `origin`/`rpId`,
+     *  which point at the IdP. Required when mode==='session-relay'. */
+    appHost?: string;
     /** Per-session replay nonce (base64url). When omitted we fall back to
      *  `sessionId` for the session-relay challenge binding. */
     nonce?: string;
@@ -451,13 +455,17 @@ export default function ConnectScreen() {
             // quote_hash || enc_pub || session_id) and rejects on
             // mismatch, so the issued JWT proves the wallet attested
             // exactly the listed quote.
-            let sessionRelayArg: { sdkPub: string; quoteHash: string; nonce: string } | undefined;
+            let sessionRelayArg: { sdkPub: string; appHost: string; quoteHash: string; nonce: string } | undefined;
             if (payload.mode === 'session-relay' && payload.sdkPub) {
+                if (!payload.appHost) {
+                    throw new Error('session-relay mode requires appHost');
+                }
                 if (!attestation) {
                     throw new Error('session-relay mode requires verified attestation');
                 }
                 sessionRelayArg = {
                     sdkPub: payload.sdkPub,
+                    appHost: payload.appHost,
                     quoteHash: deriveQuoteHash(attestation),
                     // The QR-supplied nonce is the canonical replay window for
                     // this session. Fall back to the broker session id when
@@ -496,7 +504,8 @@ export default function ConnectScreen() {
                 payload.sessionId,
                 result.sessionToken,
                 pushToken,
-                attributes
+                attributes,
+                result.sessionRelay,
             );
 
             // Phase E: when the SDK opted into the sealed session-relay

@@ -27,13 +27,18 @@ export interface BrokerConnection {
  * @param sessionToken  The opaque session token from the enclave's FIDO2 endpoint.
  * @param pushToken  Expo push token for future auth requests.
  * @param attributes  Optional profile attributes resolved from the wallet's local store.
+ * @param sessionRelay  Optional sealed-transport binding {sessionId, encPub, expiresAt}
+ *                      from `/__privasys/session-bootstrap`. When set, the SDK
+ *                      iframe completes the ECDH handshake and instantiates a
+ *                      `PrivasysSession` for sealed CBOR-AES-GCM requests.
  */
 export function relaySessionToken(
     brokerUrl: string,
     sessionId: string,
     sessionToken: string,
     pushToken: string | null,
-    attributes?: Record<string, string>
+    attributes?: Record<string, string>,
+    sessionRelay?: { sessionId: string; encPub: string; expiresAt?: number },
 ): Promise<void> {
     return new Promise((resolve, reject) => {
         let settled = false;
@@ -58,6 +63,9 @@ export function relaySessionToken(
             };
             if (attributes) {
                 msg.attributes = attributes;
+            }
+            if (sessionRelay) {
+                msg.sessionRelay = sessionRelay;
             }
             ws.send(JSON.stringify(msg));
             settled = true;

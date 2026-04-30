@@ -277,14 +277,24 @@ export default function ConnectScreen() {
     const startFlow = useCallback(
         async (payload: QRPayload) => {
             setStep('verifying');
-            console.log(`[CONNECT] startFlow — verifying attestation for ${payload.origin}`);
+            // In session-relay mode the meaningful enclave is the AI app host
+            // (where the sealed-CBOR transport terminates and where the
+            // bound JWT will be presented). The IdP at `payload.origin`
+            // brokers the FIDO2 ceremony but never sees the sealed bytes,
+            // so attesting it would not constrain the relying party.
+            const attestationTarget =
+                payload.mode === 'session-relay' && payload.appHost
+                    ? payload.appHost
+                    : payload.origin;
+            console.log(`[CONNECT] startFlow — verifying attestation for ${attestationTarget}` +
+                (attestationTarget !== payload.origin ? ` (session-relay; origin=${payload.origin})` : ''));
             try {
                 let result: AttestationResult;
                 try {
                     // Obtain an AS token via App Attest, then verify through the attestation server
                     const asToken = await getAttestationServerToken();
                     console.log('[CONNECT] obtained AS token, calling verify()');
-                    result = await verifyAttestation(payload.origin, {
+                    result = await verifyAttestation(attestationTarget, {
                         tee: 'sgx',
                         attestation_server: 'https://as.privasys.org',
                         attestation_server_token: asToken,
@@ -292,7 +302,7 @@ export default function ConnectScreen() {
                 } catch (verifyErr: any) {
                     // Fallback to inspect-only (e.g. simulator, App Attest unavailable)
                     console.warn(`[CONNECT] verify() unavailable, falling back to inspect: ${verifyErr.message}`);
-                    result = await inspectAttestation(payload.origin);
+                    result = await inspectAttestation(attestationTarget);
                 }
                 console.log(`[CONNECT] attestation OK — mrenclave=${result.mrenclave?.substring(0, 16)}...`);
 
@@ -320,11 +330,15 @@ export default function ConnectScreen() {
                 setAttestation(result);
                 attestationRef.current = result;
 
-                // Check if this is a trusted app with matching attestation
-                const trustedApp = getApp(payload.rpId);
+                // The trusted-apps store is keyed by the entity whose
+                // measurements we just verified — that's `attestationTarget`,
+                // not necessarily `payload.rpId`. (FIDO2 credentials remain
+                // keyed by rpId; only the enclave-trust record moves.)
+                const trustKey = attestationTarget;
+                const trustedApp = getApp(trustKey);
                 if (
                     trustedApp &&
-                    isAttestationMatch(payload.rpId, {
+                    isAttestationMatch(trustKey, {
                         mrenclave: result.mrenclave,
                         mrtd: result.mrtd,
                         codeHash: result.code_hash,
@@ -572,10 +586,18 @@ export default function ConnectScreen() {
             serverRpId,
         });
 
+        // Store the trust record under the entity that was actually attested
+        // (appHost in session-relay mode, otherwise origin) so that the
+        // measurements we persist correspond to the host they describe.
+        const trustKey =
+            payload.mode === 'session-relay' && payload.appHost
+                ? payload.appHost
+                : payload.origin;
+
         if (attestation) {
             addTrustedApp({
-                rpId: payload.rpId,
-                origin: payload.origin,
+                rpId: trustKey,
+                origin: trustKey,
                 mrenclave: attestation.mrenclave,
                 mrtd: attestation.mrtd,
                 codeHash: attestation.code_hash,
@@ -586,8 +608,8 @@ export default function ConnectScreen() {
             });
         } else {
             addTrustedApp({
-                rpId: payload.rpId,
-                origin: payload.origin,
+                rpId: trustKey,
+                origin: trustKey,
                 teeType: 'none',
                 lastVerified: Math.floor(Date.now() / 1000),
                 credentialId,

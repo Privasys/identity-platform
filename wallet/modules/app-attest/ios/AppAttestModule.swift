@@ -84,6 +84,18 @@ public class AppAttestModule: Module {
             let assertion = try await service.generateAssertion(keyId, clientDataHash: hashData)
             return assertion.base64EncodedString()
         }
+
+        // Clear cached keyId + attested flag from the Keychain. Used to
+        // recover from a stale keyId in the Keychain whose underlying
+        // Secure Enclave key no longer exists (e.g. after a reinstall —
+        // App Attest keys are bound to the app instance and do not
+        // survive uninstall, but our Keychain entry does). Apple
+        // rejects attestKey/generateAssertion calls against an unknown
+        // keyId with `DCError.invalidInput` (numeric code 2).
+        AsyncFunction("reset") { () -> Void in
+            Self.deleteKeychainEntry(account: keychainKeyIdAccount)
+            Self.deleteKeychainEntry(account: keychainAttestedAccount)
+        }
     }
 
     // MARK: - Keychain helpers
@@ -130,6 +142,15 @@ public class AppAttestModule: Module {
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess, let data = result as? Data else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+
+    private static func deleteKeychainEntry(account: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 }
 

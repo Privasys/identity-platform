@@ -24,8 +24,34 @@ const BROKER_BASE = 'https://relay.privasys.org';
  *   3. Generate an assertion (or attestation on first run) using the challenge.
  *   4. POST to /app-token with the attestation/assertion.
  *   5. Return the JWT.
+ *
+ * Recovery: if Apple rejects with `DCError.invalidInput` (numeric code 2)
+ * or `DCError.invalidKey` (3), the cached keyId in the Keychain is stale
+ * (the underlying Secure Enclave key is gone — typically after an app
+ * reinstall, since the Keychain entry survives but App Attest keys do
+ * not). We wipe state and retry the full flow exactly once.
  */
 export async function getAttestationServerToken(): Promise<string> {
+    try {
+        return await runAttestationFlow();
+    } catch (err: any) {
+        if (isStaleKeyError(err)) {
+            await AppAttest.reset();
+            return await runAttestationFlow();
+        }
+        throw err;
+    }
+}
+
+function isStaleKeyError(err: any): boolean {
+    const msg: string = err?.message ?? String(err ?? '');
+    // iOS surfaces `com.apple.devicecheck.error error N` for DCError. We
+    // care about invalidInput (2) and invalidKey (3) — both indicate the
+    // keyId we passed is no longer recognised by Apple's servers.
+    return /devicecheck\.error error [23]\b/.test(msg);
+}
+
+async function runAttestationFlow(): Promise<string> {
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
     // 1. Ensure key is ready

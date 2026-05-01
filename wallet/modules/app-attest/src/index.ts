@@ -46,3 +46,14 @@ export async function attestKey(challenge: string): Promise<string> {
 export async function generateAssertion(clientDataHash: string): Promise<string> {
     return NativeModule!.generateAssertion(clientDataHash);
 }
+
+/**
+ * Wipe the cached keyId and attested flag. Use to recover from a stale
+ * keyId in the Keychain whose underlying Secure Enclave key is gone
+ * (Apple rejects with `DCError.invalidInput` / `error 2`).
+ */
+export async function reset(): Promise<void> {
+    if (NativeModule && typeof NativeModule.reset === 'function') {
+        await NativeModule.reset();
+    }
+}

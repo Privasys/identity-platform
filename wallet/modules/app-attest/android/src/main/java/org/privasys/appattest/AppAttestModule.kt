@@ -53,6 +53,10 @@ class AppAttestModule : Module() {
                 requestIntegrityToken(context, clientDataHashBase64)
             }
         }
+
+        // No-op on Android — Play Integrity has no persistent key state.
+        AsyncFunction("reset") {
+        }
     }
 
     private suspend fun requestIntegrityToken(context: Context, nonce: String): String {

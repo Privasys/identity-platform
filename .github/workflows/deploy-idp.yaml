@@ -100,6 +100,8 @@ jobs:
               #      (covers the very first deploy via this workflow, when
               #      the file doesn't exist yet but the container has been
               #      running for a while with the token set out-of-band).
+              #   3. /etc/privasys/idp.env (legacy systemd deployment that
+              #      ran the idp as a native binary instead of docker).
               # Whatever we resolve, we (re)write the file so step 1 wins
               # next time, even if the container is gone.
               ADMIN_TOKEN_FILE=/var/lib/docker/volumes/idp-data/_data/admin-token.txt
@@ -114,8 +116,18 @@ jobs:
                   '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
                   | sed -n 's/^VAULT_TOKEN=//p' | head -n1 || true)
               fi
+              if [ -z \"\$ADMIN_TOKEN\" ] && sudo test -r /etc/privasys/idp.env; then
+                ADMIN_TOKEN=\$(sudo sed -n 's/^IDP_ADMIN_TOKEN=//p' /etc/privasys/idp.env | head -n1 | tr -d '\"' || true)
+              fi
               if [ -z \"\$ADMIN_TOKEN\" ]; then
-                echo '::error::Could not recover IDP_ADMIN_TOKEN: not on disk and not in running container env. Set it manually on the host then re-run.'
+                echo '::group::Debug: docker state on host'
+                sudo docker ps -a || true
+                echo '---'
+                sudo ls -la /var/lib/docker/volumes/idp-data/_data/ 2>/dev/null || true
+                echo '---'
+                sudo ls -la /etc/privasys/ 2>/dev/null || true
+                echo '::endgroup::'
+                echo '::error::Could not recover IDP_ADMIN_TOKEN: not on disk, not in running container env, not in /etc/privasys/idp.env. See debug listing above.'
                 exit 1
               fi
               echo \"\$ADMIN_TOKEN\" | sudo tee \"\$ADMIN_TOKEN_FILE\" >/dev/null
@@ -124,14 +136,23 @@ jobs:
               # Preserve the full IDP_* env set from the currently-running
               # container so we don't accidentally drop OAuth client secrets,
               # extra RP origins, mail-sender config, etc. on each deploy.
-              # If there's no running container yet (very first deploy) the
-              # env file is just empty and the explicit -e flags below win.
+              # If there's no running container yet (very first deploy via
+              # this workflow), fall back to /etc/privasys/idp.env from the
+              # legacy systemd-binary deployment.
               ENV_FILE=\$(mktemp)
-              sudo docker inspect idp --format \
-                '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-                | grep -E '^(IDP_|VAULT_TOKEN=|GOOGLE_|GITHUB_|MICROSOFT_|LINKEDIN_|AZURE_)' \
-                > \"\$ENV_FILE\" || true
-              echo \"Preserving \$(wc -l < \"\$ENV_FILE\") env vars from previous container.\"
+              if sudo docker inspect idp >/dev/null 2>&1; then
+                sudo docker inspect idp --format \
+                  '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+                  | grep -E '^(IDP_|VAULT_TOKEN=|GOOGLE_|GITHUB_|MICROSOFT_|LINKEDIN_|AZURE_)' \
+                  > \"\$ENV_FILE\" || true
+              elif sudo test -r /etc/privasys/idp.env; then
+                # idp.env may have shell-style quoting; strip surrounding
+                # double quotes from values so docker --env-file accepts them.
+                sudo sed -E 's/^([A-Z_]+)=\"(.*)\"$/\\1=\\2/' /etc/privasys/idp.env \
+                  | grep -E '^(IDP_|VAULT_TOKEN=|GOOGLE_|GITHUB_|MICROSOFT_|LINKEDIN_|AZURE_)' \
+                  > \"\$ENV_FILE\" || true
+              fi
+              echo \"Preserving \$(wc -l < \"\$ENV_FILE\") env vars from previous deployment.\"
 
               echo 'Stopping previous container (if any)...'
               sudo docker stop idp 2>/dev/null || true

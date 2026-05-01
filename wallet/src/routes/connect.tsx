@@ -41,7 +41,7 @@ import { buildErrorReport, REPORT_DESTINATION } from '@/utils/logs';
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
-import { verifyAttestation } from '@/services/attestation';
+import { verifyAttestation, inspectAttestation } from '@/services/attestation';
 import { relaySessionToken } from '@/services/broker';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import * as fido2 from '@/services/fido2';
@@ -169,6 +169,44 @@ type FlowStep =
     | 'done'
     | 'error';
 
+/**
+ * Why we trust the current attestation.
+ *
+ * - `fresh-as-verified`: just round-tripped to as.privasys.org with an
+ *   App Attest-bound token. Highest assurance; required on first connect
+ *   to a new enclave and periodically after that.
+ * - `cached-trusted`: the cert measurements match a previously-verified
+ *   record in the trusted-apps store and the cache is still within TTL.
+ *   We did not re-contact the attestation server.
+ * - `non-enclave`: the cert carried no TEE measurements (e.g. github.com
+ *   behind a Let's Encrypt cert). The wallet supports FIDO2 sign-in to
+ *   non-enclave RPs; attestation simply does not apply.
+ */
+type AttestationVerificationLevel =
+    | 'fresh-as-verified'
+    | 'cached-trusted'
+    | 'non-enclave';
+
+// Re-verification cadence for already-trusted enclaves.
+//
+// OPEN QUESTION (TBD): how often to re-verify a known-good enclave with
+// the attestation server. Trade-off: each AS round-trip burns one App
+// Attest assertion (Apple rate-limits these per device/day) and adds
+// latency to the user-visible critical path; on the other hand, fresher
+// AS verification narrows the window in which a compromised enclave
+// could ride on a stale local trust record. Today's policy:
+//
+//   - First connect to an enclave  →  always full verify
+//   - Subsequent connects          →  full verify if last AS check was
+//                                     more than REVERIFY_TTL_MS ago, OR
+//                                     with probability REVERIFY_RANDOM_P
+//                                     (so we sample even within TTL).
+//
+// Pick a final cadence once we have telemetry on how often these land in
+// the foreground sign-in path.
+const REVERIFY_TTL_MS = 24 * 60 * 60 * 1000;
+const REVERIFY_RANDOM_P = 0.1;
+
 interface QRPayload {
     origin: string;
     sessionId: string;
@@ -228,6 +266,11 @@ export default function ConnectScreen() {
     const [qr, setQr] = useState<QRPayload | null>(null);
     const [isTrusted, setIsTrusted] = useState(false);
     const [attestationChanged, setAttestationChanged] = useState(false);
+    // How the current attestation was established. Drives the badge in
+    // AttestationView so the user can tell apart a fresh attestation-server
+    // round-trip from a cache hit (and so we never silently accept either
+    // when the target turned out to be a non-enclave service).
+    const [verificationLevel, setVerificationLevel] = useState<AttestationVerificationLevel | null>(null);
     const hasStarted = useRef(false);
 
     // Attribute acquisition state — holds FIDO2 result while user provides missing profile data
@@ -294,51 +337,37 @@ export default function ConnectScreen() {
             console.log(`[CONNECT] startFlow — verifying attestation for ${attestationTarget}` +
                 (attestationTarget !== payload.origin ? ` (session-relay; origin=${payload.origin})` : ''));
             try {
-                let result: AttestationResult;
+                // Step 1 — inspect the cert. inspect() does NOT contact the
+                // attestation server: it does the TLS handshake and parses any
+                // RA-TLS extensions out of whatever cert the target presented.
+                // This is how we tell apart an enclave service (mrenclave/mrtd
+                // populated) from a standard FIDO2 RP behind a public cert
+                // (github.com, google.com — both legitimate targets for the
+                // wallet).
+                let inspectResult: AttestationResult;
                 try {
-                    // Obtain an AS token via App Attest, then verify through the attestation server.
-                    // Full attestation verification is MANDATORY for every enclave service the
-                    // wallet talks to — not only the session-relay flow. inspect() does a
-                    // structural-only parse of the cert and never asks as.privasys.org to
-                    // verify the quote signature, so an attacker with control of the network
-                    // (or a misconfigured gateway falling back to a public LE cert) could
-                    // present garbage measurements that inspect() would happily surface.
-                    // We always go through verify(), and we always fail closed when it can't run.
-                    const asToken = await getAttestationServerToken();
-                    console.log('[CONNECT] obtained AS token, calling verify()');
-                    result = await verifyAttestation(attestationTarget, {
-                        tee: 'sgx',
-                        attestation_server: 'https://as.privasys.org',
-                        attestation_server_token: asToken,
-                    });
-                } catch (verifyErr: any) {
-                    // Hard-fail for every flow. Common causes: App Attest unavailable
-                    // (TestFlight DeviceCheck error 2 — usually a missing entitlement on
-                    // the App ID/provisioning profile), simulator, AS unreachable, or the
-                    // target served a non-attested cert. None of these are safe to bypass.
-                    console.error(
-                        `[CONNECT] verify() failed for ${attestationTarget} — ` +
-                        `refusing to proceed without verified attestation: ${verifyErr.message}`
-                    );
+                    inspectResult = await inspectAttestation(attestationTarget);
+                } catch (inspectErr: any) {
+                    console.error(`[CONNECT] inspect() failed for ${attestationTarget}: ${inspectErr.message}`);
                     throw new Error(
-                        `Attestation verification unavailable for ${attestationTarget}: ${verifyErr.message}. ` +
-                        `Sign-in requires App Attest + as.privasys.org.`
+                        `Could not connect to ${attestationTarget}: ${inspectErr.message}`
                     );
                 }
-                const measurement = result.mrenclave ?? result.mrtd ?? '(none)';
-                const measurementLabel = result.mrenclave ? 'mrenclave' : (result.mrtd ? 'mrtd' : 'measurement');
-                console.log(`[CONNECT] attestation OK — tee=${result.tee_type ?? 'unknown'} ${measurementLabel}=${measurement.substring(0, 16)}...`);
 
-                // verify() succeeded but the target presented a non-attested certificate
-                // (no mrenclave AND no mrtd). For session-relay this is fatal — we have
-                // nothing to bind the FIDO2 challenge to. Most common root cause is the
-                // gateway terminating with its public Let's Encrypt cert because the
-                // RA-TLS client did not advertise the `privasys-ratls/1` ALPN.
-                if (payload.mode === 'session-relay' && !result.mrenclave && !result.mrtd) {
+                const hasMeasurements = !!(inspectResult.mrenclave || inspectResult.mrtd);
+
+                // Session-relay strictly requires verified enclave measurements:
+                // the FIDO2 challenge is bound to quote_hash so the relying party
+                // can prove the sealed-CBOR transport reached the attested
+                // appHost. A non-attested cert (typically the gateway falling
+                // back to its public LE wildcard because the wallet's RA-TLS
+                // client did not advertise the `privasys-ratls/1` ALPN) leaves
+                // us with nothing to bind — fail fast with a clear message.
+                if (payload.mode === 'session-relay' && !hasMeasurements) {
                     console.error(
                         `[CONNECT] session-relay attestation missing — ` +
                         `target=${attestationTarget} served a non-attested cert ` +
-                        `(subject=${(result as any).cert_subject ?? 'unknown'}). ` +
+                        `(subject=${(inspectResult as any).cert_subject ?? 'unknown'}). ` +
                         `Most likely cause: the wallet's RA-TLS client did not advertise ` +
                         `the privasys-ratls/1 ALPN, so the gateway terminated the handshake ` +
                         `with its public Let's Encrypt cert.`
@@ -349,10 +378,12 @@ export default function ConnectScreen() {
                     );
                 }
 
-                // Non-enclave backend (legacy / non-session-relay flow): no enclave
-                // measurements → skip attestation approval.
-                if (!result.mrenclave && !result.mrtd) {
-                    console.log('[CONNECT] no enclave measurements — skipping attestation approval');
+                // Step 2a — non-enclave path. Standard FIDO2 RP, no attestation
+                // applies. This is a supported flow, not a fallback: the wallet
+                // is meant to act as a passkey for sites like github.com too.
+                if (!hasMeasurements) {
+                    console.log(`[CONNECT] target ${attestationTarget} is non-enclave (no TEE measurements) — proceeding without attestation`);
+                    setVerificationLevel('non-enclave');
                     const credential = getCredentialForRp(payload.rpId);
                     if (credential) {
                         setIsTrusted(true);
@@ -361,8 +392,6 @@ export default function ConnectScreen() {
                             setStep('confirm');
                             return;
                         }
-                        // QR-initiated or within grace period: go straight to FIDO2.
-                        // NativeKeys.sign() handles biometric — no app-level prompt needed.
                         await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
                         return;
                     }
@@ -371,24 +400,88 @@ export default function ConnectScreen() {
                     return;
                 }
 
-                setAttestation(result);
-                attestationRef.current = result;
-
-                // The trusted-apps store is keyed by the entity whose
-                // measurements we just verified — that's `attestationTarget`,
-                // not necessarily `payload.rpId`. (FIDO2 credentials remain
-                // keyed by rpId; only the enclave-trust record moves.)
+                // Step 2b — enclave path. Decide between cached trust and a
+                // fresh attestation-server round-trip based on REVERIFY_TTL_MS
+                // and REVERIFY_RANDOM_P.
                 const trustKey = attestationTarget;
                 const trustedApp = getApp(trustKey);
-                if (
-                    trustedApp &&
+                const cachedMatch =
+                    !!trustedApp &&
                     isAttestationMatch(trustKey, {
-                        mrenclave: result.mrenclave,
-                        mrtd: result.mrtd,
-                        codeHash: result.code_hash,
-                        configRoot: result.config_merkle_root
-                    })
-                ) {
+                        mrenclave: inspectResult.mrenclave,
+                        mrtd: inspectResult.mrtd,
+                        codeHash: inspectResult.code_hash,
+                        configRoot: inspectResult.config_merkle_root,
+                    });
+                const cacheAgeMs = trustedApp ? Date.now() - trustedApp.lastVerified * 1000 : Infinity;
+                const sampledForReverify = Math.random() < REVERIFY_RANDOM_P;
+                const reverifyDue =
+                    !cachedMatch ||
+                    cacheAgeMs > REVERIFY_TTL_MS ||
+                    sampledForReverify;
+
+                let result: AttestationResult;
+                let level: AttestationVerificationLevel;
+                if (reverifyDue) {
+                    // Full verification through the attestation server. This is
+                    // mandatory on first connect to a given enclave and on
+                    // periodic refresh; if it fails we hard-fail the flow.
+                    try {
+                        const asToken = await getAttestationServerToken();
+                        const reason = !trustedApp
+                            ? 'first connect'
+                            : !cachedMatch
+                                ? 'cert measurements changed'
+                                : cacheAgeMs > REVERIFY_TTL_MS
+                                    ? `cache age ${Math.round(cacheAgeMs / 60000)}m exceeds TTL`
+                                    : 'random sample';
+                        console.log(`[CONNECT] AS verify (${reason})`);
+                        result = await verifyAttestation(attestationTarget, {
+                            tee: 'sgx',
+                            attestation_server: 'https://as.privasys.org',
+                            attestation_server_token: asToken,
+                        });
+                    } catch (verifyErr: any) {
+                        console.error(
+                            `[CONNECT] verify() failed for ${attestationTarget} — ` +
+                            `refusing to proceed without verified attestation: ${verifyErr.message}`
+                        );
+                        throw new Error(
+                            `Attestation verification unavailable for ${attestationTarget}: ${verifyErr.message}. ` +
+                            `Sign-in to an enclave service requires App Attest + as.privasys.org.`
+                        );
+                    }
+                    level = 'fresh-as-verified';
+                } else {
+                    console.log(
+                        `[CONNECT] cached attestation trusted (last AS verify ${Math.round(cacheAgeMs / 60000)}m ago, ` +
+                        `within ${REVERIFY_TTL_MS / 60000}m TTL)`
+                    );
+                    result = inspectResult;
+                    level = 'cached-trusted';
+                }
+
+                const measurement = result.mrenclave ?? result.mrtd ?? '(none)';
+                const measurementLabel = result.mrenclave ? 'mrenclave' : 'mrtd';
+                console.log(`[CONNECT] attestation OK [${level}] — tee=${result.tee_type ?? 'unknown'} ${measurementLabel}=${measurement.substring(0, 16)}...`);
+
+                setAttestation(result);
+                attestationRef.current = result;
+                setVerificationLevel(level);
+
+                // After a fresh AS verify, refresh the trusted-apps record's
+                // lastVerified timestamp even if we'll skip straight to FIDO2
+                // below. Without this, REVERIFY_TTL_MS would force a fresh AS
+                // round-trip on every connect after the TTL elapses, regardless
+                // of whether the user has been actively using the app.
+                if (level === 'fresh-as-verified' && cachedMatch && trustedApp) {
+                    addTrustedApp({
+                        ...trustedApp,
+                        lastVerified: Math.floor(Date.now() / 1000),
+                    });
+                }
+
+                if (cachedMatch) {
                     setIsTrusted(true);
                     const credential = getCredentialForRp(payload.rpId);
                     if (credential) {
@@ -412,7 +505,10 @@ export default function ConnectScreen() {
                     return;
                 }
 
-                // New app — show full attestation details
+                // New app — show full attestation details so the user can
+                // approve. The "fresh-as-verified" badge surfaced in
+                // AttestationView is the user-visible signal that the
+                // attestation server confirmed the quote.
                 setStep('attestation');
             } catch (e: any) {
                 console.error(`[CONNECT] attestation FAILED:`, e.message, e);
@@ -420,7 +516,7 @@ export default function ConnectScreen() {
                 setStep('error');
             }
         },
-        [getApp, isAttestationMatch, getCredentialForRp, checkUnlocked, gracePeriodSec]
+        [getApp, isAttestationMatch, addTrustedApp, getCredentialForRp, checkUnlocked, gracePeriodSec]
     );
 
     const handleConfirm = useCallback(async () => {
@@ -786,6 +882,7 @@ export default function ConnectScreen() {
                         attestation={attestation}
                         rpId={qr.rpId}
                         isChanged={false}
+                        verificationLevel={verificationLevel}
                         onApprove={handleApprove}
                         onReject={handleReject}
                     />
@@ -796,6 +893,7 @@ export default function ConnectScreen() {
                         attestation={attestation}
                         rpId={qr.rpId}
                         isChanged={true}
+                        verificationLevel={verificationLevel}
                         onApprove={handleApprove}
                         onReject={handleReject}
                     />
@@ -1029,12 +1127,14 @@ function AttestationView({
     attestation,
     rpId,
     isChanged,
+    verificationLevel,
     onApprove,
     onReject
 }: {
     attestation: AttestationResult;
     rpId: string;
     isChanged: boolean;
+    verificationLevel: AttestationVerificationLevel | null;
     onApprove: () => void;
     onReject: () => void;
 }) {
@@ -1085,6 +1185,25 @@ function AttestationView({
                         <Text style={styles.teeBadgeText}>{attestation.tee_type?.toUpperCase()}</Text>
                     </View>
                 </View>
+
+                {/* Verification-level badge — surfaces whether we just contacted
+                    the attestation server or trusted a recent local cache. */}
+                {verificationLevel === 'fresh-as-verified' && (
+                    <View style={[styles.verifyBadge, styles.verifyBadgeFresh]}>
+                        <Text style={styles.verifyBadgeIcon}>✓</Text>
+                        <Text style={styles.verifyBadgeText}>
+                            Verified just now by as.privasys.org
+                        </Text>
+                    </View>
+                )}
+                {verificationLevel === 'cached-trusted' && (
+                    <View style={[styles.verifyBadge, styles.verifyBadgeCached]}>
+                        <Text style={styles.verifyBadgeIcon}>↻</Text>
+                        <Text style={styles.verifyBadgeText}>
+                            Trusted from a recent verification on this device
+                        </Text>
+                    </View>
+                )}
 
                 {/* Collapsible details toggle */}
                 <Pressable
@@ -1796,6 +1915,19 @@ const styles = StyleSheet.create({
         borderRadius: 6
     },
     teeBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+    verifyBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        marginBottom: 12,
+        gap: 8,
+    },
+    verifyBadgeFresh: { backgroundColor: '#E8FFF0', borderWidth: 1, borderColor: '#34D399' },
+    verifyBadgeCached: { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1' },
+    verifyBadgeIcon: { fontSize: 14, fontWeight: '700', color: '#0F766E' },
+    verifyBadgeText: { fontSize: 13, fontWeight: '500', color: '#0F172A', flex: 1 },
     sectionHeader: {
         fontSize: 13,
         fontWeight: '600',

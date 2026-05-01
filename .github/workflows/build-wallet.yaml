@@ -82,14 +82,25 @@ jobs:
   # NOTE: EAS Cloud builds clone from git, so pre-built Rust binaries
   # must be committed to the repo for this path to work. Use local
   # builds (below) when Rust artifacts are provided by prior CI steps.
+  # ─── Build iOS via EAS Cloud ──────────────────────────────────────
+  # Runs on push-to-wallet-v* tags (so the iOS production pipeline
+  # always self-heals Apple Developer Portal capabilities + provisioning
+  # profiles when entitlements change — local builds re-use whatever
+  # profile EAS has cached, which goes stale the moment we touch the
+  # entitlements plist) and on workflow_dispatch when the user
+  # explicitly opts into cloud builds.
   build-eas-cloud:
     if: >
-      github.event_name == 'workflow_dispatch' && inputs.use_eas_cloud
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/wallet-v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.use_eas_cloud)
     needs: [check]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: ${{ inputs.platform == 'all' && fromJSON('["ios", "android"]') || fromJSON(format('["{0}"]', inputs.platform)) }}
+        # On push-to-wallet-v* tag we only build iOS via cloud (Android
+        # still goes through the local job below). On workflow_dispatch
+        # we honour the user's platform choice.
+        platform: ${{ github.event_name == 'push' && fromJSON('["ios"]') || (inputs.platform == 'all' && fromJSON('["ios","android"]') || fromJSON(format('["{0}"]', inputs.platform))) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -109,22 +120,33 @@ jobs:
 
       - name: Build with EAS Cloud
         working-directory: wallet
+        env:
+          # Push events build the production profile; workflow_dispatch
+          # honours the user's choice.
+          PROFILE: ${{ github.event_name == 'push' && 'production' || inputs.profile }}
+          # Wait for the cloud build to finish on push events so the
+          # downstream submit-testflight job can rely on `--latest`
+          # being a successful build. Manual dispatches with --no-wait
+          # still get fire-and-forget semantics.
+          WAIT_FLAG: ${{ github.event_name == 'push' && '--wait' || '--no-wait' }}
         run: |
           eas build \
             --platform ${{ matrix.platform }} \
-            --profile "${{ inputs.profile }}" \
+            --profile "$PROFILE" \
             --non-interactive \
-            --no-wait
+            $WAIT_FLAG
 
   # ─── Build app locally on GitHub Actions runner ───────────────────
-  # Uses pre-built Rust artifacts from prior jobs. This is the default
-  # path for push-to-main and for manual dispatch without EAS Cloud.
+  # Uses pre-built Rust artifacts from prior jobs. iOS local builds
+  # are reserved for manual workflow_dispatch with use_eas_cloud=false
+  # (e.g. quick iteration without burning EAS Cloud minutes); push-tag
+  # iOS builds always go through EAS Cloud above so credentials stay
+  # in sync with the entitlements plist.
   build-local-ios:
     if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' &&
-       !inputs.use_eas_cloud &&
-       (inputs.platform == 'ios' || inputs.platform == 'all'))
+      github.event_name == 'workflow_dispatch' &&
+      !inputs.use_eas_cloud &&
+      (inputs.platform == 'ios' || inputs.platform == 'all')
     needs: [check]
     runs-on: macos-26  # Xcode 26 — ships iOS 26 SDK
     steps:
@@ -268,13 +290,31 @@ jobs:
           retention-days: 30
 
   # ─── Submit to TestFlight ─────────────────────────────────────────
+  # Two paths:
+  #   - push-to-wallet-v* tag: build-eas-cloud just produced a build on
+  #     EAS Cloud; we submit it via `eas submit --latest` (no IPA to
+  #     download — EAS Cloud holds the artifact server-side).
+  #   - workflow_dispatch with use_eas_cloud=false: build-local-ios
+  #     just produced an IPA artifact; we submit that file directly.
   submit-testflight:
+    needs: [build-eas-cloud, build-local-ios]
+    # Run when the matching producer succeeded. On push events
+    # build-local-ios is skipped (and that's fine); on
+    # workflow_dispatch with use_eas_cloud=false build-eas-cloud is
+    # skipped. We tolerate either by checking results explicitly and
+    # also gating on the original event filter.
     if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' &&
-       !inputs.use_eas_cloud &&
-       (inputs.platform == 'ios' || inputs.platform == 'all'))
-    needs: [build-local-ios]
+      always() &&
+      (
+        (github.event_name == 'push' &&
+         startsWith(github.ref, 'refs/tags/wallet-v') &&
+         needs.build-eas-cloud.result == 'success')
+        ||
+        (github.event_name == 'workflow_dispatch' &&
+         !inputs.use_eas_cloud &&
+         (inputs.platform == 'ios' || inputs.platform == 'all') &&
+         needs.build-local-ios.result == 'success')
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -283,7 +323,8 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Download IPA
+      - name: Download IPA (workflow_dispatch local build only)
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/download-artifact@v4
         with:
           name: wallet-ios-${{ inputs.profile || 'production' }}
@@ -304,7 +345,17 @@ jobs:
           mkdir -p keys
           echo "${{ secrets.ASC_API_KEY_P8_BASE64 }}" | base64 -d > keys/AuthKey_9H3WFH5GZY.p8
 
-      - name: Submit to TestFlight
+      - name: Submit to TestFlight (push tag → latest EAS Cloud build)
+        if: github.event_name == 'push'
+        working-directory: wallet
+        run: |
+          eas submit \
+            --platform ios \
+            --latest \
+            --non-interactive
+
+      - name: Submit to TestFlight (workflow_dispatch → local IPA)
+        if: github.event_name == 'workflow_dispatch'
         working-directory: wallet
         run: |
           eas submit \

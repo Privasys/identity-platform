@@ -9,9 +9,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,7 +19,7 @@ import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
-import { buildLogExport, getLogs } from '@/utils/logs';
+import { getLogs } from '@/utils/logs';
 
 export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
@@ -30,27 +28,6 @@ export default function SettingsScreen() {
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
     const { remove: removeTrustedApp } = useTrustedAppsStore();
     const pushToken = useExpoPushToken();
-
-    const onExportLogs = async () => {
-        try {
-            const filename = `privasys-wallet-logs-${Date.now()}.txt`;
-            const path = `${FileSystem.cacheDirectory}${filename}`;
-            await FileSystem.writeAsStringAsync(path, buildLogExport(), {
-                encoding: FileSystem.EncodingType.UTF8,
-            });
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(path, {
-                    mimeType: 'text/plain',
-                    dialogTitle: 'Export Wallet Logs',
-                    UTI: 'public.plain-text',
-                });
-            } else {
-                Alert.alert('Saved', `Logs written to ${path}`);
-            }
-        } catch (e: any) {
-            Alert.alert('Export failed', e?.message ?? String(e));
-        }
-    };
 
     return (
         <RNView style={styles.screen}>
@@ -171,11 +148,6 @@ export default function SettingsScreen() {
                 <Pressable style={styles.logsButton} onPress={() => router.push('/logs')}>
                     <Ionicons name="document-text-outline" size={18} color="#0F172A" />
                     <Text style={styles.logsButtonText}>View Logs</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                </Pressable>
-                <Pressable style={styles.logsButton} onPress={onExportLogs}>
-                    <Ionicons name="share-outline" size={18} color="#0F172A" />
-                    <Text style={styles.logsButtonText}>Export Logs to File</Text>
                     <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                 </Pressable>
             </ScrollView>

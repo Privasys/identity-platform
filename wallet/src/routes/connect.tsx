@@ -851,14 +851,15 @@ export default function ConnectScreen() {
                         <Text style={styles.errorIcon}>✕</Text>
                         <Text style={styles.title}>Connection Failed</Text>
                         {error && <Text style={styles.errorText}>{error}</Text>}
-                        <Pressable
-                            style={styles.secondaryButton}
-                            onPress={() => setReportOpen(true)}
-                        >
-                            <Text style={styles.secondaryButtonText}>Report Error</Text>
-                        </Pressable>
                         <Pressable style={styles.secondaryButton} onPress={handleReject}>
                             <Text style={styles.secondaryButtonText}>Go back</Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.reportLink}
+                            onPress={() => setReportOpen(true)}
+                            hitSlop={8}
+                        >
+                            <Text style={styles.reportLinkText}>Report Error</Text>
                         </Pressable>
                     </View>
                 )}
@@ -1833,6 +1834,13 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     secondaryButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+    reportLink: {
+        marginTop: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        alignItems: 'center'
+    },
+    reportLinkText: { color: '#007AFF', fontSize: 15, fontWeight: '500' },
     cancelButton: {
         marginTop: 24,
         paddingVertical: 12,

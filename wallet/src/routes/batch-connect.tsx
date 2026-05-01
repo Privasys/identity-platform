@@ -18,7 +18,8 @@ import { StyleSheet, Pressable, ActivityIndicator, ScrollView, FlatList } from '
 
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
-import { inspectAttestation } from '@/services/attestation';
+import { getAttestationServerToken } from '@/services/app-attest';
+import { inspectAttestation, verifyAttestation } from '@/services/attestation';
 import { relaySessionToken } from '@/services/broker';
 import * as fido2 from '@/services/fido2';
 import { useAuthStore } from '@/stores/auth';
@@ -105,9 +106,59 @@ export default function BatchConnectScreen() {
         }));
         setApps(entries);
 
-        // Verify attestation for all apps in parallel
+        // Per-app attestation policy (mirrors connect.tsx):
+        //   - inspect() the cert first to detect enclave vs non-enclave (e.g.
+        //     a non-enclave RP like github.com is a legitimate batch entry).
+        //   - For enclave entries, full verify() against as.privasys.org on
+        //     first connect or when the local trusted-apps cache is stale /
+        //     a random sample says so.
+        //   - For cached-and-fresh enclave entries, trust the local cache
+        //     (see REVERIFY_TTL_MS / REVERIFY_RANDOM_P in connect.tsx — kept
+        //     in sync with the values there).
+        //   - Hard-fail any enclave entry whose AS verification fails.
+        // App Attest token is fetched once on demand and reused across all
+        // entries that actually need a fresh AS round-trip.
+        const REVERIFY_TTL_MS = 24 * 60 * 60 * 1000;
+        const REVERIFY_RANDOM_P = 0.1;
+        let asToken: string | null = null;
+        const getAsTokenLazy = async () => {
+            if (asToken) return asToken;
+            asToken = await getAttestationServerToken();
+            return asToken;
+        };
+
         const results = await Promise.allSettled(
-            payload.apps.map((app) => inspectAttestation(app.rpId)),
+            payload.apps.map(async (app) => {
+                const inspectResult = await inspectAttestation(app.rpId);
+                const hasMeasurements = !!(inspectResult.mrenclave || inspectResult.mrtd);
+                if (!hasMeasurements) {
+                    // Non-enclave RP — no attestation to perform.
+                    return inspectResult;
+                }
+                const trustedApp = getApp(app.rpId);
+                const cachedMatch =
+                    !!trustedApp &&
+                    isAttestationMatch(app.rpId, {
+                        mrenclave: inspectResult.mrenclave,
+                        mrtd: inspectResult.mrtd,
+                        codeHash: inspectResult.code_hash,
+                        configRoot: inspectResult.config_merkle_root,
+                    });
+                const cacheAgeMs = trustedApp ? Date.now() - trustedApp.lastVerified * 1000 : Infinity;
+                const reverifyDue =
+                    !cachedMatch ||
+                    cacheAgeMs > REVERIFY_TTL_MS ||
+                    Math.random() < REVERIFY_RANDOM_P;
+                if (!reverifyDue) {
+                    return inspectResult;
+                }
+                const token = await getAsTokenLazy();
+                return verifyAttestation(app.rpId, {
+                    tee: 'sgx',
+                    attestation_server: 'https://as.privasys.org',
+                    attestation_server_token: token,
+                });
+            }),
         );
 
         const updated = entries.map((entry, i) => {

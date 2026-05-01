@@ -93,8 +93,8 @@ public class AppAttestModule: Module {
         // rejects attestKey/generateAssertion calls against an unknown
         // keyId with `DCError.invalidInput` (numeric code 2).
         AsyncFunction("reset") { () -> Void in
-            Self.deleteKeychainEntry(account: keychainKeyIdAccount)
-            Self.deleteKeychainEntry(account: keychainAttestedAccount)
+            Self.deleteKeychainEntry(account: Self.keychainKeyIdAccount)
+            Self.deleteKeychainEntry(account: Self.keychainAttestedAccount)
         }
     }
 

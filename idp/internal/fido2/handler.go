@@ -39,9 +39,11 @@ const sessionRelayBindingDomain = "privasys-session-relay/v1"
 
 // computeSessionRelayBinding hashes the canonical input defined by §3.3 of
 // the session-relay design. All inputs are accepted as base64url strings
-// (sdk_pub, enc_pub, nonce) or hex strings (quote_hash, session_id) and
-// decoded to their raw bytes before concatenation.
-func computeSessionRelayBinding(nonceB64, sdkPubB64, quoteHashHex, encPubB64, sessionIDHex string) ([]byte, error) {
+// (sdk_pub, enc_pub, nonce, session_id) or hex strings (quote_hash) and
+// decoded to their raw bytes before concatenation. session_id is base64url
+// because that is the encoding the enclave manager's session-bootstrap
+// endpoint emits on the wire.
+func computeSessionRelayBinding(nonceB64, sdkPubB64, quoteHashHex, encPubB64, sessionIDB64 string) ([]byte, error) {
 	nonce, err := decodeRawURLB64(nonceB64)
 	if err != nil {
 		return nil, fmt.Errorf("nonce: %w", err)
@@ -58,7 +60,7 @@ func computeSessionRelayBinding(nonceB64, sdkPubB64, quoteHashHex, encPubB64, se
 	if err != nil {
 		return nil, fmt.Errorf("enc_pub: %w", err)
 	}
-	sessionID, err := hex.DecodeString(sessionIDHex)
+	sessionID, err := decodeRawURLB64(sessionIDB64)
 	if err != nil {
 		return nil, fmt.Errorf("session_id: %w", err)
 	}

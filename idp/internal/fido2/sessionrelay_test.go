@@ -27,7 +27,7 @@ func TestSessionRelayBinding_KAT(t *testing.T) {
 		sdkPubB64   string
 		quoteHex    string // hex
 		encPubB64   string
-		sessHex     string
+		sessB64     string // base64url, no padding (matches enclave manager wire format)
 		wantBindB64 string // base64url, no padding (what the wallet would set as challenge)
 	}{
 		{
@@ -40,13 +40,13 @@ func TestSessionRelayBinding_KAT(t *testing.T) {
 			sdkPubB64:   base64.RawURLEncoding.EncodeToString(append([]byte{0x04}, zero(64)...)),
 			quoteHex:    hex.EncodeToString(zero(32)),
 			encPubB64:   base64.RawURLEncoding.EncodeToString(append([]byte{0x04}, zero(64)...)),
-			sessHex:     hex.EncodeToString(zero(16)),
+			sessB64:     base64.RawURLEncoding.EncodeToString(zero(16)),
 			wantBindB64: "OziFEdCpT4RDFtjziC_vA4r1wvdNQ-DGQ8U7xL8vbic",
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := computeSessionRelayBinding(tc.nonceB64, tc.sdkPubB64, tc.quoteHex, tc.encPubB64, tc.sessHex)
+			got, err := computeSessionRelayBinding(tc.nonceB64, tc.sdkPubB64, tc.quoteHex, tc.encPubB64, tc.sessB64)
 			if err != nil {
 				t.Fatalf("computeSessionRelayBinding: %v", err)
 			}

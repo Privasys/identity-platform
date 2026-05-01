@@ -1,0 +1,140 @@
+# Copyright (c) Privasys. All rights reserved.
+# Licensed under the GNU Affero General Public License v3.0.
+#
+# Deploys the IdP container to the production VM idp-fr-par-1
+# (privasys-production / europe-west9-a). Triggers automatically when
+# `Build & Push IdP` succeeds for an `idp-v*` tag, or manually via
+# workflow_dispatch.
+#
+# Required GitHub repo secrets (already used by publish-sdk.yaml):
+#   - WIF_PROVIDER          Workload Identity Federation provider resource name
+#   - WIF_SERVICE_ACCOUNT   Service account email (github-deploy@privasys-production…)
+#
+# Service account must have on `privasys-production`:
+#   - roles/iap.tunnelResourceAccessor   (for --tunnel-through-iap)
+#   - roles/compute.osLogin              (for SSH)
+#   - roles/compute.instances.use        (on idp-fr-par-1)
+# These are already granted (publish-sdk.yaml uses the same SA to scp
+# into /var/www/auth on the same VM).
+
+name: Deploy IdP
+
+on:
+  workflow_run:
+    workflows: ["Build & Push IdP"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'IdP image version to deploy (e.g. 0.2.4 or "latest")'
+        required: true
+        default: 'latest'
+
+permissions:
+  contents: read
+  id-token: write   # google-github-actions/auth WIF
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # On workflow_run, only deploy if the upstream Build & Push IdP succeeded.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # On workflow_run, check out the same commit/tag the build ran on
+          # so the deploy step sees the matching docker-compose contract.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve version to deploy
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Build & Push IdP only runs on idp-v* tags; recover from head_branch.
+            TAG="${{ github.event.workflow_run.head_branch }}"
+            VERSION="${TAG#idp-v}"
+            if [ -z "$VERSION" ] || [ "$VERSION" = "$TAG" ]; then
+              echo "::error::Unable to derive IdP version from upstream tag '$TAG'"
+              exit 1
+            fi
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Deploying IdP version: $VERSION"
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Pull image and restart container on idp-fr-par-1
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gcloud compute ssh idp-fr-par-1 \
+            --project privasys-production \
+            --zone europe-west9-a \
+            --tunnel-through-iap \
+            --command "
+              set -e
+              IMAGE='ghcr.io/privasys/idp:${VERSION}'
+              echo \"Pulling \$IMAGE...\"
+              echo '${GHCR_TOKEN}' | sudo docker login ghcr.io -u '${GHCR_USER}' --password-stdin
+              sudo docker pull \"\$IMAGE\"
+
+              # Read admin token from the persistent volume so secrets don't have
+              # to round-trip through the workflow. The IdP writes this on first
+              # boot and we re-use it across container replacements.
+              ADMIN_TOKEN=\$(sudo cat /var/lib/docker/volumes/idp-data/_data/admin-token.txt 2>/dev/null || true)
+              if [ -z \"\$ADMIN_TOKEN\" ]; then
+                echo '::error::admin-token.txt missing from idp-data volume'
+                exit 1
+              fi
+
+              echo 'Stopping previous container (if any)...'
+              sudo docker stop idp 2>/dev/null || true
+              sudo docker rm   idp 2>/dev/null || true
+
+              echo 'Starting new container...'
+              sudo docker run -d \
+                --name idp \
+                --restart unless-stopped \
+                -p 127.0.0.1:8091:8091 \
+                -e IDP_PORT=8091 \
+                -e IDP_ISSUER_URL=https://privasys.id \
+                -e IDP_RP_ID=privasys.id \
+                -e IDP_RP_ORIGINS=https://privasys.id \
+                -e IDP_SIGNING_KEY_FILE=/data/signing-key.pem \
+                -e IDP_DB_PATH=/data/idp.db \
+                -e IDP_BROKER_URL=https://relay.privasys.org \
+                -e IDP_ADMIN_TOKEN=\"\$ADMIN_TOKEN\" \
+                -v idp-data:/data \
+                \"\$IMAGE\"
+
+              # Drop the local docker login credentials.
+              sudo docker logout ghcr.io >/dev/null 2>&1 || true
+            "
+
+      - name: Smoke test /healthz
+        run: |
+          set -e
+          # Give the container a few seconds to bind :8091 and for Caddy to
+          # forward /healthz.
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            STATUS=$(curl -sS -o /dev/null -w "%{http_code}" https://privasys.id/healthz || true)
+            echo "attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::/healthz did not return 200 after restart"
+          exit 1

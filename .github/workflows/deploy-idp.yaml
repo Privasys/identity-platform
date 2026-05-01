@@ -26,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'IdP image version to deploy (e.g. 0.2.4 or "latest")'
+        description: 'IdP image version to deploy (e.g. v0.2.4 or "latest")'
         required: true
         default: 'latest'
 
@@ -52,9 +52,11 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ inputs.version }}"
           else
-            # Build & Push IdP only runs on idp-v* tags; recover from head_branch.
+            # Build & Push IdP only runs on idp-v* tags. The build workflow
+            # publishes images as ghcr.io/privasys/idp:<TAG without "idp-">
+            # so the image tag is e.g. "v0.2.4" (NOT "0.2.4"). Match that.
             TAG="${{ github.event.workflow_run.head_branch }}"
-            VERSION="${TAG#idp-v}"
+            VERSION="${TAG#idp-}"
             if [ -z "$VERSION" ] || [ "$VERSION" = "$TAG" ]; then
               echo "::error::Unable to derive IdP version from upstream tag '$TAG'"
               exit 1

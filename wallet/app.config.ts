@@ -230,6 +230,7 @@ export default (context: ConfigContext): ExpoConfig => {
             ['expo-notifications', { icon: './assets/notification-icon.png', color: '#B21D36' }],
             './modules/passkey-provider/app.plugin',
             './modules/notification-service/app.plugin',
+            './modules/app-attest/app.plugin',
             './plugins/swift-concurrency-fix',
             './plugins/disable-lint-vital'
         ].filter((p) => p !== 'noop') as ExpoConfig['plugins'],

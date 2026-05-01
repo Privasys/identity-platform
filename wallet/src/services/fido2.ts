@@ -490,21 +490,23 @@ function concat(arrays: Uint8Array[]): Uint8Array {
  * `internal/fido2/handler.go`.
  *
  * Inputs are accepted as the same encodings the IdP query params carry:
- * - nonce, sdkPub, encPub: base64url (no padding required)
- * - quoteHash, sessionIdHex: hex
+ * - nonce, sdkPub, encPub, sessionId: base64url (no padding required;
+ *   sessionId is base64url because that is what the enclave manager's
+ *   session-bootstrap endpoint emits on the wire)
+ * - quoteHash: hex
  */
 function computeSessionRelayBinding(
     nonceB64: string,
     sdkPubB64: string,
     quoteHashHex: string,
     encPubB64: string,
-    sessionIdHex: string,
+    sessionIdB64: string,
 ): Uint8Array {
     const nonce = base64urlDecode(nonceB64);
     const sdkPub = base64urlDecode(sdkPubB64);
     const quoteHash = hexDecode(quoteHashHex);
     const encPub = base64urlDecode(encPubB64);
-    const sessionId = hexDecode(sessionIdHex);
+    const sessionId = base64urlDecode(sessionIdB64);
     const domain = new TextEncoder().encode('privasys-session-relay/v1');
     return sha256(concat([domain, nonce, sdkPub, quoteHash, encPub, sessionId]));
 }

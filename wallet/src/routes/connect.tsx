@@ -305,11 +305,32 @@ export default function ConnectScreen() {
                         attestation_server_token: asToken,
                     });
                 } catch (verifyErr: any) {
-                    // Fallback to inspect-only (e.g. simulator, App Attest unavailable)
+                    // For session-relay, full attestation verification is
+                    // load-bearing: the FIDO2 challenge is bound to
+                    // quote_hash so the relying party can prove the sealed
+                    // transport reached the attested appHost. If verify()
+                    // can't run (e.g. App Attest unavailable on TestFlight,
+                    // simulator, or the device temporarily can't reach
+                    // Apple's attestation servers), inspect()'s
+                    // structural-only parse is NOT a safe substitute — it
+                    // produces an `mrtd` without ever checking the quote
+                    // signature against as.privasys.org. Fail closed.
+                    if (payload.mode === 'session-relay') {
+                        console.error(
+                            `[CONNECT] verify() failed in session-relay flow — ` +
+                            `refusing to fall back to unverified inspect(): ${verifyErr.message}`
+                        );
+                        throw new Error(
+                            `Attestation verification unavailable: ${verifyErr.message}. ` +
+                            `Session-relay sign-in requires App Attest + as.privasys.org.`
+                        );
+                    }
                     console.warn(`[CONNECT] verify() unavailable, falling back to inspect: ${verifyErr.message}`);
                     result = await inspectAttestation(attestationTarget);
                 }
-                console.log(`[CONNECT] attestation OK — mrenclave=${result.mrenclave?.substring(0, 16)}...`);
+                const measurement = result.mrenclave ?? result.mrtd ?? '(none)';
+                const measurementLabel = result.mrenclave ? 'mrenclave' : (result.mrtd ? 'mrtd' : 'measurement');
+                console.log(`[CONNECT] attestation OK — tee=${result.tee_type ?? 'unknown'} ${measurementLabel}=${measurement.substring(0, 16)}...`);
 
                 // Session-relay strictly requires verified enclave measurements:
                 // the FIDO2 challenge is bound to quote_hash so the relying party

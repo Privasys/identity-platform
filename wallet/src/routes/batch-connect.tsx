@@ -18,7 +18,8 @@ import { StyleSheet, Pressable, ActivityIndicator, ScrollView, FlatList } from '
 
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
-import { inspectAttestation } from '@/services/attestation';
+import { getAttestationServerToken } from '@/services/app-attest';
+import { verifyAttestation } from '@/services/attestation';
 import { relaySessionToken } from '@/services/broker';
 import * as fido2 from '@/services/fido2';
 import { useAuthStore } from '@/stores/auth';
@@ -105,9 +106,33 @@ export default function BatchConnectScreen() {
         }));
         setApps(entries);
 
-        // Verify attestation for all apps in parallel
+        // Full attestation verification is MANDATORY for every enclave service.
+        // Each app's RA-TLS cert is verified end-to-end against as.privasys.org
+        // (App Attest token → attestation server → quote signature). We never
+        // fall back to inspect()'s structural-only parse; if verify() can't run
+        // for an entry, that entry is marked failed and the user sees it in the
+        // review screen. App Attest token is fetched once and reused across all
+        // entries to avoid burning a fresh assertion per app.
+        let asToken: string;
+        try {
+            asToken = await getAttestationServerToken();
+        } catch (err: any) {
+            setError(
+                `Attestation verification unavailable: ${err.message}. ` +
+                `Sign-in requires App Attest + as.privasys.org.`
+            );
+            setStep('error');
+            return;
+        }
+
         const results = await Promise.allSettled(
-            payload.apps.map((app) => inspectAttestation(app.rpId)),
+            payload.apps.map((app) =>
+                verifyAttestation(app.rpId, {
+                    tee: 'sgx',
+                    attestation_server: 'https://as.privasys.org',
+                    attestation_server_token: asToken,
+                })
+            ),
         );
 
         const updated = entries.map((entry, i) => {

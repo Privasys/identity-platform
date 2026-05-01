@@ -41,7 +41,7 @@ import { buildErrorReport, REPORT_DESTINATION } from '@/utils/logs';
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
-import { inspectAttestation, verifyAttestation } from '@/services/attestation';
+import { verifyAttestation } from '@/services/attestation';
 import { relaySessionToken } from '@/services/broker';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import * as fido2 from '@/services/fido2';
@@ -296,7 +296,14 @@ export default function ConnectScreen() {
             try {
                 let result: AttestationResult;
                 try {
-                    // Obtain an AS token via App Attest, then verify through the attestation server
+                    // Obtain an AS token via App Attest, then verify through the attestation server.
+                    // Full attestation verification is MANDATORY for every enclave service the
+                    // wallet talks to — not only the session-relay flow. inspect() does a
+                    // structural-only parse of the cert and never asks as.privasys.org to
+                    // verify the quote signature, so an attacker with control of the network
+                    // (or a misconfigured gateway falling back to a public LE cert) could
+                    // present garbage measurements that inspect() would happily surface.
+                    // We always go through verify(), and we always fail closed when it can't run.
                     const asToken = await getAttestationServerToken();
                     console.log('[CONNECT] obtained AS token, calling verify()');
                     result = await verifyAttestation(attestationTarget, {
@@ -305,43 +312,28 @@ export default function ConnectScreen() {
                         attestation_server_token: asToken,
                     });
                 } catch (verifyErr: any) {
-                    // For session-relay, full attestation verification is
-                    // load-bearing: the FIDO2 challenge is bound to
-                    // quote_hash so the relying party can prove the sealed
-                    // transport reached the attested appHost. If verify()
-                    // can't run (e.g. App Attest unavailable on TestFlight,
-                    // simulator, or the device temporarily can't reach
-                    // Apple's attestation servers), inspect()'s
-                    // structural-only parse is NOT a safe substitute — it
-                    // produces an `mrtd` without ever checking the quote
-                    // signature against as.privasys.org. Fail closed.
-                    if (payload.mode === 'session-relay') {
-                        console.error(
-                            `[CONNECT] verify() failed in session-relay flow — ` +
-                            `refusing to fall back to unverified inspect(): ${verifyErr.message}`
-                        );
-                        throw new Error(
-                            `Attestation verification unavailable: ${verifyErr.message}. ` +
-                            `Session-relay sign-in requires App Attest + as.privasys.org.`
-                        );
-                    }
-                    console.warn(`[CONNECT] verify() unavailable, falling back to inspect: ${verifyErr.message}`);
-                    result = await inspectAttestation(attestationTarget);
+                    // Hard-fail for every flow. Common causes: App Attest unavailable
+                    // (TestFlight DeviceCheck error 2 — usually a missing entitlement on
+                    // the App ID/provisioning profile), simulator, AS unreachable, or the
+                    // target served a non-attested cert. None of these are safe to bypass.
+                    console.error(
+                        `[CONNECT] verify() failed for ${attestationTarget} — ` +
+                        `refusing to proceed without verified attestation: ${verifyErr.message}`
+                    );
+                    throw new Error(
+                        `Attestation verification unavailable for ${attestationTarget}: ${verifyErr.message}. ` +
+                        `Sign-in requires App Attest + as.privasys.org.`
+                    );
                 }
                 const measurement = result.mrenclave ?? result.mrtd ?? '(none)';
                 const measurementLabel = result.mrenclave ? 'mrenclave' : (result.mrtd ? 'mrtd' : 'measurement');
                 console.log(`[CONNECT] attestation OK — tee=${result.tee_type ?? 'unknown'} ${measurementLabel}=${measurement.substring(0, 16)}...`);
 
-                // Session-relay strictly requires verified enclave measurements:
-                // the FIDO2 challenge is bound to quote_hash so the relying party
-                // can prove the sealed-CBOR transport reached the attested
-                // appHost. If the appHost served a non-RA-TLS cert (e.g. the
-                // gateway's public LE wildcard, which happens when the wallet's
-                // RA-TLS client did not advertise the `privasys-ratls/1` ALPN),
-                // we have nothing to bind — fail fast with a clear message
-                // instead of silently degrading and tripping the obscure
-                // "session-relay mode requires verified attestation" later
-                // inside buildSessionRelayArg.
+                // verify() succeeded but the target presented a non-attested certificate
+                // (no mrenclave AND no mrtd). For session-relay this is fatal — we have
+                // nothing to bind the FIDO2 challenge to. Most common root cause is the
+                // gateway terminating with its public Let's Encrypt cert because the
+                // RA-TLS client did not advertise the `privasys-ratls/1` ALPN.
                 if (payload.mode === 'session-relay' && !result.mrenclave && !result.mrtd) {
                     console.error(
                         `[CONNECT] session-relay attestation missing — ` +

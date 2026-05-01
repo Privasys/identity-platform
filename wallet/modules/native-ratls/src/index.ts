@@ -38,7 +38,16 @@ export async function inspect(
         console.error(`[RA-TLS] inspect error from native: ${result.error}`);
         throw new Error(result.error);
     }
-    console.log(`[RA-TLS] inspect OK — mrenclave=${result.mrenclave?.substring(0, 16)}...`);
+    // Log whichever measurement is appropriate for the TEE family. TDX
+    // exposes MRTD; SGX exposes MRENCLAVE. inspect() does not verify the
+    // quote, so other quote-derived fields (code_hash, config_merkle_root,
+    // quote_verification_status, …) are intentionally null here.
+    const measurement =
+        result.mrtd ?? result.mrenclave ?? null;
+    console.log(
+        `[RA-TLS] inspect OK — tee=${result.tee_type ?? 'unknown'} ` +
+        `measurement=${measurement ? measurement.substring(0, 16) + '…' : 'none'}`
+    );
     return result;
 }
 

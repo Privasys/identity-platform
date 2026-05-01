@@ -92,14 +92,46 @@ jobs:
               echo '${GHCR_TOKEN}' | sudo docker login ghcr.io -u '${GHCR_USER}' --password-stdin
               sudo docker pull \"\$IMAGE\"
 
-              # Read admin token from the persistent volume so secrets don't have
-              # to round-trip through the workflow. The IdP writes this on first
-              # boot and we re-use it across container replacements.
-              ADMIN_TOKEN=\$(sudo cat /var/lib/docker/volumes/idp-data/_data/admin-token.txt 2>/dev/null || true)
+              # IDP_ADMIN_TOKEN must be preserved across deploys (changing it
+              # would break management-service-binary and any other admin
+               # client). Resolution order:
+              #   1. Persisted file written by a previous successful deploy.
+              #   2. Live env var of the currently-running 'idp' container
+              #      (covers the very first deploy via this workflow, when
+              #      the file doesn't exist yet but the container has been
+              #      running for a while with the token set out-of-band).
+              # Whatever we resolve, we (re)write the file so step 1 wins
+              # next time, even if the container is gone.
+              ADMIN_TOKEN_FILE=/var/lib/docker/volumes/idp-data/_data/admin-token.txt
+              ADMIN_TOKEN=\$(sudo cat \"\$ADMIN_TOKEN_FILE\" 2>/dev/null || true)
               if [ -z \"\$ADMIN_TOKEN\" ]; then
-                echo '::error::admin-token.txt missing from idp-data volume'
+                ADMIN_TOKEN=\$(sudo docker inspect idp --format \
+                  '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+                  | sed -n 's/^IDP_ADMIN_TOKEN=//p' | head -n1 || true)
+              fi
+              if [ -z \"\$ADMIN_TOKEN\" ]; then
+                ADMIN_TOKEN=\$(sudo docker inspect idp --format \
+                  '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+                  | sed -n 's/^VAULT_TOKEN=//p' | head -n1 || true)
+              fi
+              if [ -z \"\$ADMIN_TOKEN\" ]; then
+                echo '::error::Could not recover IDP_ADMIN_TOKEN: not on disk and not in running container env. Set it manually on the host then re-run.'
                 exit 1
               fi
+              echo \"\$ADMIN_TOKEN\" | sudo tee \"\$ADMIN_TOKEN_FILE\" >/dev/null
+              sudo chmod 600 \"\$ADMIN_TOKEN_FILE\"
+
+              # Preserve the full IDP_* env set from the currently-running
+              # container so we don't accidentally drop OAuth client secrets,
+              # extra RP origins, mail-sender config, etc. on each deploy.
+              # If there's no running container yet (very first deploy) the
+              # env file is just empty and the explicit -e flags below win.
+              ENV_FILE=\$(mktemp)
+              sudo docker inspect idp --format \
+                '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+                | grep -E '^(IDP_|VAULT_TOKEN=|GOOGLE_|GITHUB_|MICROSOFT_|LINKEDIN_|AZURE_)' \
+                > \"\$ENV_FILE\" || true
+              echo \"Preserving \$(wc -l < \"\$ENV_FILE\") env vars from previous container.\"
 
               echo 'Stopping previous container (if any)...'
               sudo docker stop idp 2>/dev/null || true
@@ -110,16 +142,13 @@ jobs:
                 --name idp \
                 --restart unless-stopped \
                 -p 127.0.0.1:8091:8091 \
+                --env-file \"\$ENV_FILE\" \
                 -e IDP_PORT=8091 \
-                -e IDP_ISSUER_URL=https://privasys.id \
-                -e IDP_RP_ID=privasys.id \
-                -e IDP_RP_ORIGINS=https://privasys.id \
-                -e IDP_SIGNING_KEY_FILE=/data/signing-key.pem \
-                -e IDP_DB_PATH=/data/idp.db \
-                -e IDP_BROKER_URL=https://relay.privasys.org \
                 -e IDP_ADMIN_TOKEN=\"\$ADMIN_TOKEN\" \
                 -v idp-data:/data \
                 \"\$IMAGE\"
+
+              rm -f \"\$ENV_FILE\"
 
               # Drop the local docker login credentials.
               sudo docker logout ghcr.io >/dev/null 2>&1 || true

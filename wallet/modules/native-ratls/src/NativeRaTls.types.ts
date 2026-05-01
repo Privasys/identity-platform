@@ -22,7 +22,7 @@ export interface AttestationResult {
 }
 
 export interface VerificationPolicy {
-    tee: 'sgx' | 'tdx';
+    tee: 'sgx' | 'tdx' | 'sev-snp' | 'nvidia-gpu';
     mrenclave?: string;
     mrsigner?: string;
     mrtd?: string;

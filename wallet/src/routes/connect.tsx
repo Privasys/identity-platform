@@ -436,8 +436,12 @@ export default function ConnectScreen() {
                                     ? `cache age ${Math.round(cacheAgeMs / 60000)}m exceeds TTL`
                                     : 'random sample';
                         console.log(`[CONNECT] AS verify (${reason})`);
+                        // Use whichever TEE family inspect() identified —
+                        // hard-coding 'sgx' here meant TDX containers (and
+                        // future SEV-SNP / NVIDIA-GPU enclaves) failed
+                        // verification with "expected SGX quote, found …".
                         result = await verifyAttestation(attestationTarget, {
-                            tee: 'sgx',
+                            tee: inspectResult.tee_type ?? 'sgx',
                             attestation_server: 'https://as.privasys.org',
                             attestation_server_token: asToken,
                         });

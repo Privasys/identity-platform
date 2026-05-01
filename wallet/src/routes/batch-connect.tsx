@@ -154,7 +154,7 @@ export default function BatchConnectScreen() {
                 }
                 const token = await getAsTokenLazy();
                 return verifyAttestation(app.rpId, {
-                    tee: 'sgx',
+                    tee: inspectResult.tee_type ?? 'sgx',
                     attestation_server: 'https://as.privasys.org',
                     attestation_server_token: token,
                 });

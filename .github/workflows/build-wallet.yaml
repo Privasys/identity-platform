@@ -118,6 +118,18 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Write App Store Connect API Key (so EAS can sync Apple capabilities)
+        # Without this, EAS prints "Skipping Provisioning Profile validation
+        # on Apple Servers because we aren't authenticated" and re-uses the
+        # cached provisioning profile, which is fatal whenever entitlements
+        # change (e.g. App Attest in 1.2.18). We use the same secret that
+        # `eas submit` already consumes — it has both build and submit scopes.
+        if: matrix.platform == 'ios'
+        run: |
+          mkdir -p wallet/keys
+          echo "${{ secrets.ASC_API_KEY_P8_BASE64 }}" | base64 -d \
+            > wallet/keys/AuthKey_9H3WFH5GZY.p8
+
       - name: Build with EAS Cloud
         working-directory: wallet
         env:
@@ -129,6 +141,12 @@ jobs:
           # being a successful build. Manual dispatches with --no-wait
           # still get fire-and-forget semantics.
           WAIT_FLAG: ${{ github.event_name == 'push' && '--wait' || '--no-wait' }}
+          # App Store Connect API credentials — let EAS auth with Apple
+          # to sync Bundle ID capabilities + mint fresh provisioning
+          # profiles when entitlements change.
+          EXPO_ASC_API_KEY_PATH: ${{ github.workspace }}/wallet/keys/AuthKey_9H3WFH5GZY.p8
+          EXPO_ASC_KEY_ID: 9H3WFH5GZY
+          EXPO_ASC_ISSUER_ID: 187e7a6e-cbee-4599-8043-eb862a5bf2f9
         run: |
           eas build \
             --platform ${{ matrix.platform }} \

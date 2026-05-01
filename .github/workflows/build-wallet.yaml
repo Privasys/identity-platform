@@ -45,7 +45,10 @@ env:
   # Pre-built Rust RA-TLS FFI libraries are downloaded from this release of
   # https://github.com/Privasys/ra-tls-clients instead of being recompiled
   # on every wallet build. Bump when ra-tls-clients ships a new version.
-  RATLS_VERSION: v0.4.0
+  # v0.4.1 adds the `privasys-ratls/1` ALPN to Rust + Go clients — required
+  # for the gateway splice path; without it the gateway terminates with
+  # its public LE cert and the wallet sees no attestation.
+  RATLS_VERSION: v0.4.1
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

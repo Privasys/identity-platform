@@ -311,7 +311,33 @@ export default function ConnectScreen() {
                 }
                 console.log(`[CONNECT] attestation OK — mrenclave=${result.mrenclave?.substring(0, 16)}...`);
 
-                // Non-enclave backend: no enclave measurements → skip attestation approval.
+                // Session-relay strictly requires verified enclave measurements:
+                // the FIDO2 challenge is bound to quote_hash so the relying party
+                // can prove the sealed-CBOR transport reached the attested
+                // appHost. If the appHost served a non-RA-TLS cert (e.g. the
+                // gateway's public LE wildcard, which happens when the wallet's
+                // RA-TLS client did not advertise the `privasys-ratls/1` ALPN),
+                // we have nothing to bind — fail fast with a clear message
+                // instead of silently degrading and tripping the obscure
+                // "session-relay mode requires verified attestation" later
+                // inside buildSessionRelayArg.
+                if (payload.mode === 'session-relay' && !result.mrenclave && !result.mrtd) {
+                    console.error(
+                        `[CONNECT] session-relay attestation missing — ` +
+                        `target=${attestationTarget} served a non-attested cert ` +
+                        `(subject=${(result as any).cert_subject ?? 'unknown'}). ` +
+                        `Most likely cause: the wallet's RA-TLS client did not advertise ` +
+                        `the privasys-ratls/1 ALPN, so the gateway terminated the handshake ` +
+                        `with its public Let's Encrypt cert.`
+                    );
+                    throw new Error(
+                        `${attestationTarget} did not present an attested certificate. ` +
+                        `Session-relay sign-in cannot proceed without enclave measurements.`
+                    );
+                }
+
+                // Non-enclave backend (legacy / non-session-relay flow): no enclave
+                // measurements → skip attestation approval.
                 if (!result.mrenclave && !result.mrtd) {
                     console.log('[CONNECT] no enclave measurements — skipping attestation approval');
                     const credential = getCredentialForRp(payload.rpId);

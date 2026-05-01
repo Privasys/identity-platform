@@ -39,9 +39,10 @@ export async function inspect(
         throw new Error(result.error);
     }
     // Log whichever measurement is appropriate for the TEE family. TDX
-    // exposes MRTD; SGX exposes MRENCLAVE. inspect() does not verify the
-    // quote, so other quote-derived fields (code_hash, config_merkle_root,
-    // quote_verification_status, …) are intentionally null here.
+    // exposes MRTD; SGX exposes MRENCLAVE. inspect() does parse the
+    // attestation OIDs out of the cert (mrtd, mrenclave, workload_*,
+    // platform fields), but does NOT verify the quote signature \u2014 that
+    // requires a verify() call to the attestation server.
     const measurement =
         result.mrtd ?? result.mrenclave ?? null;
     console.log(

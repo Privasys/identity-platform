@@ -49,7 +49,7 @@ env:
   # in v0.4.3 because both clients speak HTTP/1.1 only (Rust uses ureq,
   # Go writes HTTP/1.1 manually) and Caddy preferred h2 → connection
   # closed mid-request on /__privasys/session-bootstrap (wallet 1.2.16).
-  RATLS_VERSION: v0.4.6
+  RATLS_VERSION: v0.4.7
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

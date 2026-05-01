@@ -25,6 +25,7 @@ import * as fido2 from '@/services/fido2';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
+import { effectiveCodeHash, effectiveConfigMerkleRoot } from '@/services/attestation-fields';
 
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
 
@@ -141,8 +142,8 @@ export default function BatchConnectScreen() {
                     isAttestationMatch(app.rpId, {
                         mrenclave: inspectResult.mrenclave,
                         mrtd: inspectResult.mrtd,
-                        codeHash: inspectResult.code_hash,
-                        configRoot: inspectResult.config_merkle_root,
+                        codeHash: effectiveCodeHash(inspectResult),
+                        configRoot: effectiveConfigMerkleRoot(inspectResult),
                     });
                 const cacheAgeMs = trustedApp ? Date.now() - trustedApp.lastVerified * 1000 : Infinity;
                 const reverifyDue =
@@ -173,8 +174,8 @@ export default function BatchConnectScreen() {
                 ? isAttestationMatch(entry.rpId, {
                       mrenclave: attestation.mrenclave,
                       mrtd: attestation.mrtd,
-                      codeHash: attestation.code_hash,
-                      configRoot: attestation.config_merkle_root,
+                      codeHash: effectiveCodeHash(attestation),
+                      configRoot: effectiveConfigMerkleRoot(attestation),
                   })
                 : false;
 
@@ -285,8 +286,8 @@ export default function BatchConnectScreen() {
                             origin: app.rpId,
                             mrenclave: app.attestation.mrenclave,
                             mrtd: app.attestation.mrtd,
-                            codeHash: app.attestation.code_hash,
-                            configRoot: app.attestation.config_merkle_root,
+                            codeHash: effectiveCodeHash(app.attestation),
+                            configRoot: effectiveConfigMerkleRoot(app.attestation),
                             teeType: app.attestation.tee_type || 'sgx',
                             lastVerified: Math.floor(Date.now() / 1000),
                             credentialId: pendingCredential.credentialId,

@@ -21,6 +21,12 @@ import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { checkDeviceSecurity } from '@/services/security';
+import { installLogCapture } from '@/utils/logs';
+
+// Capture console output into an in-memory ring buffer as early as
+// possible so the Settings → Logs screen and the Connect → Report Error
+// flow can surface the lines that led up to a problem.
+installLogCapture();
 // import * as Sentry from '@sentry/react-native';
 
 // Sentry.init({

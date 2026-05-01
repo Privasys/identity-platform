@@ -15,12 +15,14 @@
  *                      first so the user can reject unexpected requests.
  */
 
+import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     StyleSheet,
     Pressable,
     ActivityIndicator,
+    Modal,
     ScrollView,
     View as RNView,
     TextInput,
@@ -33,6 +35,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { sha256 } from '@noble/hashes/sha2.js';
+
+import { buildErrorReport, REPORT_DESTINATION } from '@/utils/logs';
 
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
@@ -211,6 +215,7 @@ export default function ConnectScreen() {
     // State
     const [step, setStep] = useState<FlowStep>('verifying');
     const [error, setError] = useState<string | null>(null);
+    const [reportOpen, setReportOpen] = useState(false);
     const [attestation, setAttestation] = useState<AttestationResult | null>(null);
     // Mirror of `attestation` updated synchronously alongside setAttestation
     // so callbacks invoked in the same tick (e.g. doAuthenticate fired right
@@ -820,15 +825,163 @@ export default function ConnectScreen() {
                         <Text style={styles.errorIcon}>✕</Text>
                         <Text style={styles.title}>Connection Failed</Text>
                         {error && <Text style={styles.errorText}>{error}</Text>}
+                        <Pressable
+                            style={styles.secondaryButton}
+                            onPress={() => setReportOpen(true)}
+                        >
+                            <Text style={styles.secondaryButtonText}>Report Error</Text>
+                        </Pressable>
                         <Pressable style={styles.secondaryButton} onPress={handleReject}>
                             <Text style={styles.secondaryButtonText}>Go back</Text>
                         </Pressable>
                     </View>
                 )}
+
+                <ReportErrorModal
+                    visible={reportOpen}
+                    errorMessage={error}
+                    onClose={() => setReportOpen(false)}
+                />
             </View>
         </>
     );
 }
+
+// ── Report Error preview modal ──────────────────────────────────────────
+
+/**
+ * Shows the user exactly what will be sent and to whom before they hand
+ * the report off. We do not auto-submit anything yet — the destination
+ * (errors.privasys.org) will become a real ingestion endpoint once the
+ * companion API is ready. For now the user copies the text and pastes
+ * it into the conversation, email, or issue tracker themselves.
+ */
+function ReportErrorModal({
+    visible,
+    errorMessage,
+    onClose,
+}: {
+    visible: boolean;
+    errorMessage: string | null;
+    onClose: () => void;
+}) {
+    const insets = useSafeAreaInsets();
+    const report = visible ? buildErrorReport(errorMessage) : '';
+
+    const onCopy = async () => {
+        await Clipboard.setStringAsync(report);
+        Alert.alert(
+            'Copied',
+            `Report copied to the clipboard. Paste it into your message to ${REPORT_DESTINATION} or share it with support.`,
+            [{ text: 'OK', onPress: onClose }],
+        );
+    };
+
+    return (
+        <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent={false}>
+            <RNView style={[reportStyles.screen, { paddingTop: insets.top + 12 }]}>
+                <RNView style={reportStyles.header}>
+                    <Pressable onPress={onClose} hitSlop={10}>
+                        <Ionicons name="close" size={24} color="#0F172A" />
+                    </Pressable>
+                    <Text style={reportStyles.headerTitle}>Report Error</Text>
+                    <RNView style={{ width: 24 }} />
+                </RNView>
+
+                <RNView style={reportStyles.destinationCard}>
+                    <Text style={reportStyles.destinationLabel}>Will be sent to</Text>
+                    <Text style={reportStyles.destinationValue}>{REPORT_DESTINATION}</Text>
+                    <Text style={reportStyles.destinationNote}>
+                        Automatic submission is not wired up yet — for now, copy the report below
+                        and share it with the Privasys team.
+                    </Text>
+                </RNView>
+
+                <Text style={reportStyles.previewLabel}>Report contents</Text>
+                <ScrollView style={reportStyles.previewScroll} contentContainerStyle={{ padding: 12 }}>
+                    <Text style={reportStyles.previewText} selectable>
+                        {report}
+                    </Text>
+                </ScrollView>
+
+                <RNView style={[reportStyles.actions, { paddingBottom: insets.bottom + 16 }]}>
+                    <Pressable style={reportStyles.cancelButton} onPress={onClose}>
+                        <Text style={reportStyles.cancelButtonText}>Cancel</Text>
+                    </Pressable>
+                    <Pressable style={reportStyles.copyButton} onPress={onCopy}>
+                        <Ionicons name="copy-outline" size={16} color="#FFFFFF" />
+                        <Text style={reportStyles.copyButtonText}>Copy Report</Text>
+                    </Pressable>
+                </RNView>
+            </RNView>
+        </Modal>
+    );
+}
+
+const reportStyles = StyleSheet.create({
+    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+    },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
+    destinationCard: {
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 20,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+    },
+    destinationLabel: { fontSize: 12, color: '#64748B', marginBottom: 4 },
+    destinationValue: { fontSize: 16, fontWeight: '600', color: '#0F172A', marginBottom: 8 },
+    destinationNote: { fontSize: 12, color: '#64748B', lineHeight: 18 },
+    previewLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#64748B',
+        paddingHorizontal: 20,
+        marginBottom: 6,
+    },
+    previewScroll: {
+        flex: 1,
+        marginHorizontal: 20,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    previewText: { fontSize: 11, fontFamily: 'SpaceMono', color: '#0F172A', lineHeight: 16 },
+    actions: {
+        flexDirection: 'row',
+        gap: 12,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+    },
+    cancelButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        alignItems: 'center',
+    },
+    cancelButtonText: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
+    copyButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: '#007AFF',
+    },
+    copyButtonText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+});
 
 // ── Attestation detail view ─────────────────────────────────────────────
 

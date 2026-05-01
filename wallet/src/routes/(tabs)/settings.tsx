@@ -9,6 +9,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
+import * as FileSystem from 'expo-file-system/legacy';
+import { useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,13 +21,36 @@ import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
+import { buildLogExport, getLogs } from '@/utils/logs';
 
 export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
+    const router = useRouter();
     const { credentials, removeCredential } = useAuthStore();
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
     const { remove: removeTrustedApp } = useTrustedAppsStore();
     const pushToken = useExpoPushToken();
+
+    const onExportLogs = async () => {
+        try {
+            const filename = `privasys-wallet-logs-${Date.now()}.txt`;
+            const path = `${FileSystem.cacheDirectory}${filename}`;
+            await FileSystem.writeAsStringAsync(path, buildLogExport(), {
+                encoding: FileSystem.EncodingType.UTF8,
+            });
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(path, {
+                    mimeType: 'text/plain',
+                    dialogTitle: 'Export Wallet Logs',
+                    UTI: 'public.plain-text',
+                });
+            } else {
+                Alert.alert('Saved', `Logs written to ${path}`);
+            }
+        } catch (e: any) {
+            Alert.alert('Export failed', e?.message ?? String(e));
+        }
+    };
 
     return (
         <RNView style={styles.screen}>
@@ -135,6 +161,23 @@ export default function SettingsScreen() {
                     <BuildInfoRow label="Build Type" value={Constants.expoConfig?.extra?.STAGE} />
                     <BuildInfoRow label="Commit ID" value={Constants.expoConfig?.extra?.COMMIT_HASH?.slice(0, 7)} />
                 </View>
+
+                {/* Logs */}
+                <Text style={styles.sectionTitle}>Logs</Text>
+                <Text style={styles.sectionDescription}>
+                    The wallet captures the most recent console output in memory so you can share
+                    it when reporting issues. Currently {getLogs().length} entries.
+                </Text>
+                <Pressable style={styles.logsButton} onPress={() => router.push('/logs')}>
+                    <Ionicons name="document-text-outline" size={18} color="#0F172A" />
+                    <Text style={styles.logsButtonText}>View Logs</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </Pressable>
+                <Pressable style={styles.logsButton} onPress={onExportLogs}>
+                    <Ionicons name="share-outline" size={18} color="#0F172A" />
+                    <Text style={styles.logsButtonText}>Export Logs to File</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </Pressable>
             </ScrollView>
         </RNView>
     );
@@ -271,5 +314,17 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent'
     },
     buildInfoLabel: { fontSize: 14, color: '#64748B' },
-    buildInfoValue: { fontSize: 14, fontWeight: '600', color: '#0F172A' }
+    buildInfoValue: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
+
+    logsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        marginBottom: 8,
+    },
+    logsButtonText: { flex: 1, fontSize: 15, fontWeight: '500', color: '#0F172A' },
 });

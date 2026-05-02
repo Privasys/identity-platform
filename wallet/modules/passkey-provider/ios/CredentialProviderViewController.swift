@@ -261,10 +261,7 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
 
         var lines: [String] = [rpId]
         if let tee = att["tee_type"] as? String { lines.append("TEE: \(tee)") }
-        // Prefer the per-workload OID (.65230.3.2) when present; fall back
-        // to the platform/VM-wide combined workloads hash (.65230.2.5).
-        let codeHash = (att["workload_code_hash"] as? String) ?? (att["combined_workloads_hash"] as? String)
-        if let hash = codeHash { lines.append("Code: \(hash.prefix(16))…") }
+        if let hash = att["workload_code_hash"] as? String { lines.append("Code: \(hash.prefix(16))…") }
         detailLabel.text = lines.joined(separator: "\n")
 
         approveButton.isHidden = false

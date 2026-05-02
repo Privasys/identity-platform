@@ -224,12 +224,7 @@ class PasskeyActivity : Activity() {
                         statusText.text = "Server Verified ✓"
 
                         val teeType = json?.optString("tee_type", "") ?: ""
-                        // Prefer the per-workload OID (.65230.3.2) when present;
-                        // fall back to the platform/VM-wide combined workloads
-                        // hash (.65230.2.5).
-                        val workloadCode = json?.optString("workload_code_hash", "") ?: ""
-                        val combined = json?.optString("combined_workloads_hash", "") ?: ""
-                        val codeHash = if (workloadCode.isNotEmpty()) workloadCode else combined
+                        val codeHash = json?.optString("workload_code_hash", "") ?: ""
                         val detail = buildString {
                             append(rpId)
                             if (teeType.isNotEmpty()) append("\nTEE: $teeType")

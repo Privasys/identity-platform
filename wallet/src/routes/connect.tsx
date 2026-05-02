@@ -53,7 +53,6 @@ import { useProfileStore } from '@/stores/profile';
 import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
-import { effectiveCodeHash, effectiveConfigMerkleRoot, effectiveDekOrigin } from '@/services/attestation-fields';
 
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
 
@@ -76,8 +75,8 @@ function deriveQuoteHash(att: AttestationResult): string {
         att.mrenclave ?? '',
         att.mrsigner ?? '',
         att.mrtd ?? '',
-        effectiveCodeHash(att) ?? '',
-        effectiveConfigMerkleRoot(att) ?? '',
+        att.workload_code_hash ?? '',
+        att.workload_config_merkle_root ?? '',
         att.attestation_servers_hash ?? '',
     ];
     const bytes = sha256(new TextEncoder().encode(fields.join(':')));
@@ -411,8 +410,8 @@ export default function ConnectScreen() {
                     isAttestationMatch(trustKey, {
                         mrenclave: inspectResult.mrenclave,
                         mrtd: inspectResult.mrtd,
-                        codeHash: effectiveCodeHash(inspectResult),
-                        configRoot: effectiveConfigMerkleRoot(inspectResult),
+                        codeHash: inspectResult.workload_code_hash,
+                        configRoot: inspectResult.workload_config_merkle_root,
                     });
                 const cacheAgeMs = trustedApp ? Date.now() - trustedApp.lastVerified * 1000 : Infinity;
                 const sampledForReverify = Math.random() < REVERIFY_RANDOM_P;
@@ -775,8 +774,8 @@ export default function ConnectScreen() {
                 origin: trustKey,
                 mrenclave: attestation.mrenclave,
                 mrtd: attestation.mrtd,
-                codeHash: effectiveCodeHash(attestation),
-                configRoot: effectiveConfigMerkleRoot(attestation),
+                codeHash: attestation.workload_code_hash,
+                configRoot: attestation.workload_config_merkle_root,
                 teeType: attestation.tee_type || 'sgx',
                 lastVerified: Math.floor(Date.now() / 1000),
                 credentialId,
@@ -1226,7 +1225,7 @@ function AttestationView({
                         {/* Verification Details */}
                         {(attestation.quote_verification_status ||
                             attestation.attestation_servers_hash ||
-                            effectiveDekOrigin(attestation)) && (
+                            attestation.workload_key_source) && (
                             <>
                                 <Text style={styles.sectionHeader}>Verification</Text>
                                 <View style={styles.attestationCard}>
@@ -1242,8 +1241,8 @@ function AttestationView({
                                             value={truncateHex(attestation.attestation_servers_hash)}
                                         />
                                     )}
-                                    {effectiveDekOrigin(attestation) && (
-                                        <AttestationRow label="DEK Origin" value={effectiveDekOrigin(attestation)!} />
+                                    {attestation.workload_key_source && (
+                                        <AttestationRow label="Key Source" value={attestation.workload_key_source} />
                                     )}
                                 </View>
                             </>
@@ -1267,16 +1266,16 @@ function AttestationView({
                             {attestation.mrtd && (
                                 <AttestationRow label="MRTD" value={truncateHex(attestation.mrtd)} />
                             )}
-                            {effectiveCodeHash(attestation) && (
+                            {attestation.workload_code_hash && (
                                 <AttestationRow
                                     label="Code Hash"
-                                    value={truncateHex(effectiveCodeHash(attestation)!)}
+                                    value={truncateHex(attestation.workload_code_hash)}
                                 />
                             )}
-                            {effectiveConfigMerkleRoot(attestation) && (
+                            {attestation.workload_config_merkle_root && (
                                 <AttestationRow
                                     label="Config Root"
-                                    value={truncateHex(effectiveConfigMerkleRoot(attestation)!)}
+                                    value={truncateHex(attestation.workload_config_merkle_root)}
                                 />
                             )}
                         </View>
@@ -1488,7 +1487,7 @@ function AttributeAcquisitionView({
             persistent: false,
             teeType: attestation?.tee_type ?? 'none',
             enclaveMeasurement: attestation?.mrenclave ?? attestation?.mrtd ?? '',
-            codeHash: attestation ? (effectiveCodeHash(attestation) ?? '') : '',
+            codeHash: attestation?.workload_code_hash ?? '',
             consentedAt: Math.floor(Date.now() / 1000),
             expiresAt: 0,
         });

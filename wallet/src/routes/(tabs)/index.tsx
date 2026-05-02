@@ -14,8 +14,9 @@ function appName(rpId: string): string {
     return dot > 0 ? rpId.substring(0, dot) : rpId;
 }
 
-function formatRemaining(secondsLeft: number): string {
-    if (secondsLeft <= 0) return 'expired';
+function formatRemaining(msLeft: number): string {
+    if (msLeft <= 0) return 'expired';
+    const secondsLeft = Math.floor(msLeft / 1000);
     if (secondsLeft < 60) return `${secondsLeft}s left`;
     const m = Math.floor(secondsLeft / 60);
     if (m < 60) return `${m}m left`;
@@ -29,12 +30,12 @@ export default function HomeScreen() {
     const pruneExpired = useSessionsStore((s) => s.pruneExpired);
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+    const [now, setNow] = useState(() => Date.now());
 
     // Tick every second so the "remaining" label and pruning stay live.
     useEffect(() => {
         const id = setInterval(() => {
-            setNow(Math.floor(Date.now() / 1000));
+            setNow(Date.now());
             pruneExpired();
         }, 1000);
         return () => clearInterval(id);

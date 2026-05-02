@@ -644,7 +644,7 @@ export default function ConnectScreen() {
                     origin: payload.origin,
                     appName: payload.appName,
                     expiresAt: result.sessionRelay.expiresAt,
-                    startedAt: Math.floor(Date.now() / 1000),
+                    startedAt: Date.now(),
                 });
             }
 
@@ -720,7 +720,7 @@ export default function ConnectScreen() {
                     origin: payload.origin,
                     appName: payload.appName,
                     expiresAt: result.sessionRelay.expiresAt,
-                    startedAt: Math.floor(Date.now() / 1000),
+                    startedAt: Date.now(),
                 });
             }
 

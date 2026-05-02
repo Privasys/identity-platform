@@ -27,9 +27,9 @@ export interface RelaySession {
     origin: string;
     /** Optional human-readable app name. */
     appName?: string;
-    /** Epoch seconds when the enclave will discard the binding. */
+    /** Epoch milliseconds when the enclave will discard the binding. */
     expiresAt: number;
-    /** Epoch seconds when the wallet registered the session. */
+    /** Epoch milliseconds when the wallet registered the session. */
     startedAt: number;
 }
 
@@ -60,7 +60,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     },
 
     pruneExpired: () => {
-        const now = Math.floor(Date.now() / 1000);
+        const now = Date.now();
         const live = get().sessions.filter((s) => s.expiresAt > now);
         if (live.length !== get().sessions.length) {
             set({ sessions: live });
@@ -73,7 +73,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         if (!raw) return;
         try {
             const data = JSON.parse(raw);
-            const now = Math.floor(Date.now() / 1000);
+            const now = Date.now();
             const sessions: RelaySession[] = Array.isArray(data?.sessions)
                 ? data.sessions.filter((s: RelaySession) => s && s.expiresAt > now)
                 : [];

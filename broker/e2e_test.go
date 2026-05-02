@@ -73,7 +73,7 @@ func TestE2E_AppAttest_To_AttestationServer(t *testing.T) {
 	issuer, err := tokens.NewIssuer(tokens.Config{
 		PrivateKeyPEM: string(privKeyPEM),
 		IssuerURL:     brokerURL,
-		Audience:      "363481202289541124",
+		Audience:      "privasys-platform",
 		Role:          "attestation-server:client",
 	})
 	if err != nil {
@@ -354,7 +354,7 @@ func TestE2E_AppAttest_To_AttestationServer(t *testing.T) {
 		}
 
 		// 5c. Validate audience — must match what AS expects.
-		expectedAudience := "363481202289541124"
+		expectedAudience := "privasys-platform"
 		aud, _ := claims["aud"].(string)
 		if aud != expectedAudience {
 			t.Fatalf("aud mismatch: got %q, want %q", aud, expectedAudience)

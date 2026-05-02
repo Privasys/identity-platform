@@ -42,7 +42,8 @@ func Load() *Config {
 
 	asAudience := os.Getenv("AS_AUDIENCE")
 	if asAudience == "" {
-		asAudience = "attestation-server"
+		// Standardised on privasys.id IdP audience for the platform.
+		asAudience = "privasys-platform"
 	}
 
 	asRole := os.Getenv("AS_ROLE")

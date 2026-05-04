@@ -205,12 +205,63 @@ export class AuthFrame {
             const iframe = document.createElement('iframe');
             iframe.src = this.authOrigin + '/auth/';
 
-            if (this.container) {
-                // Embedded mode: fill the container element
+            const wantsSealed = !!this.config.sessionRelay?.appHost;
+
+            // Sealed mode requires the auth iframe to outlive the sign-in
+            // ceremony (subsequent `session().request()` / `.stream()` calls
+            // route through its contentWindow). If the caller passes a
+            // `container`, React will eventually unmount that container and
+            // the iframe along with it — at which point `contentWindow`
+            // becomes null and every sealed call throws "AuthFrame: sealed
+            // iframe is gone". We can't move the iframe across parents
+            // later (browsers reload an iframe whose parent changes, which
+            // would destroy the in-memory ECDH session keys), so for sealed
+            // mode we always attach to <body> from the start. To preserve
+            // the inline visual, we absolute-position the iframe over the
+            // container's bounding rect and follow it on resize/scroll
+            // until sign-in completes; once auth resolves we shrink the
+            // iframe to 0×0 (invisible) but leave it parented to <body>.
+            const overlayContainer = wantsSealed ? this.container : null;
+            const reflowOverlay = (): void => {
+                if (!overlayContainer) return;
+                const r = overlayContainer.getBoundingClientRect();
+                iframe.style.cssText =
+                    `position:fixed;left:${r.left}px;top:${r.top}px;` +
+                    `width:${r.width}px;height:${r.height}px;` +
+                    'z-index:999998;border:none;background:#fff;';
+            };
+            let overlayHandlers: (() => void) | null = null;
+            const stopOverlay = (): void => {
+                if (overlayHandlers) {
+                    overlayHandlers();
+                    overlayHandlers = null;
+                }
+            };
+
+            if (overlayContainer) {
+                // Sealed + container: absolute overlay on <body>.
+                reflowOverlay();
+                iframe.allow =
+                    'publickey-credentials-get *; publickey-credentials-create *';
+                document.body.appendChild(iframe);
+                window.addEventListener('resize', reflowOverlay);
+                window.addEventListener('scroll', reflowOverlay, true);
+                const ro = typeof ResizeObserver !== 'undefined'
+                    ? new ResizeObserver(reflowOverlay)
+                    : null;
+                ro?.observe(overlayContainer);
+                overlayHandlers = () => {
+                    window.removeEventListener('resize', reflowOverlay);
+                    window.removeEventListener('scroll', reflowOverlay, true);
+                    ro?.disconnect();
+                };
+            } else if (this.container) {
+                // Embedded mode (non-sealed): fill the container element
                 iframe.style.cssText =
                     'width:100%;height:100%;border:none;display:block;';
                 iframe.allow =
                     'publickey-credentials-get *; publickey-credentials-create *';
+                this.container.appendChild(iframe);
             } else {
                 // Modal mode (default): full-screen overlay
                 iframe.style.cssText =
@@ -218,12 +269,8 @@ export class AuthFrame {
                     'z-index:999999;border:none;background:#fff;';
                 iframe.allow =
                     'publickey-credentials-get *; publickey-credentials-create *';
+                document.body.appendChild(iframe);
             }
-
-            // Append to the correct parent
-            (this.container || document.body).appendChild(iframe);
-
-            const wantsSealed = !!this.config.sessionRelay?.appHost;
 
             // When session-relay is on we keep the iframe mounted (hidden)
             // after auth completes so subsequent `session().request()` calls
@@ -231,8 +278,9 @@ export class AuthFrame {
             // session-relay we tear everything down on result.
             const finishSignIn = (result: SignInResult) => {
                 if (wantsSealed) {
-                    // Hide the iframe but leave it in the DOM with the message
-                    // handler still attached.
+                    stopOverlay();
+                    // Hide the iframe but leave it parented to <body> with
+                    // the message handler still attached.
                     iframe.style.cssText =
                         'position:fixed;width:0;height:0;border:none;opacity:0;pointer-events:none;';
                     this.sealedIframe = iframe;
@@ -245,6 +293,7 @@ export class AuthFrame {
             };
 
             const cleanup = () => {
+                stopOverlay();
                 window.removeEventListener('message', handler);
                 iframe.remove();
             };

@@ -152,6 +152,30 @@ export interface SealedSession {
 // AuthFrame
 // ---------------------------------------------------------------------------
 
+/**
+ * Reduce a `RequestInit` to the subset that survives `postMessage`'s
+ * structured clone. AbortSignal and Headers instances both throw
+ * `DataCloneError`, so we drop the signal entirely (the caller-side
+ * forwards aborts via an explicit `stream-cancel` message) and flatten
+ * Headers to a plain record.
+ */
+function sanitizeInit(init?: RequestInit): { headers?: Record<string, string> } | undefined {
+    if (!init) return undefined;
+    const out: { headers?: Record<string, string> } = {};
+    if (init.headers) {
+        const h: Record<string, string> = {};
+        if (init.headers instanceof Headers) {
+            init.headers.forEach((v, k) => { h[k] = v; });
+        } else if (Array.isArray(init.headers)) {
+            for (const [k, v] of init.headers) h[k] = v;
+        } else {
+            Object.assign(h, init.headers as Record<string, string>);
+        }
+        out.headers = h;
+    }
+    return out;
+}
+
 export class AuthFrame {
     private readonly authOrigin: string;
     private readonly config: Omit<AuthFrameConfig, 'authOrigin' | 'container'>;
@@ -459,10 +483,14 @@ export class AuthFrame {
                 }
                 const id = ++this.sealedReqSeq;
                 const target = this.sealedIframe.contentWindow;
+                // `init` may carry an AbortSignal (and a Headers instance).
+                // Neither survives `postMessage`'s structured clone, so we
+                // serialise to a plain { headers } object before sending.
+                const safeInit = sanitizeInit(init);
                 return new Promise<SealedResponse>((resolve, reject) => {
                     this.sealedReqs.set(id, { resolve, reject });
                     target.postMessage(
-                        { type: 'privasys:session:request', id, method, path, body, init },
+                        { type: 'privasys:session:request', id, method, path, body, init: safeInit },
                         this.authOrigin,
                     );
                 });
@@ -473,10 +501,40 @@ export class AuthFrame {
                 }
                 const id = ++this.sealedReqSeq;
                 const target = this.sealedIframe.contentWindow;
+                const safeInit = sanitizeInit(init);
+                const signal = init?.signal;
                 return new Promise<SealedStreamResponse>((resolve, reject) => {
                     this.sealedStreams.set(id, { resolve, reject });
+                    // If the caller passed an AbortSignal, forward an
+                    // explicit cancel message to the iframe when it fires
+                    // (the signal itself can't cross postMessage). We
+                    // also reject the pending start promise if abort
+                    // happens before stream-start arrives.
+                    if (signal) {
+                        const onAbort = () => {
+                            try {
+                                target.postMessage(
+                                    { type: 'privasys:session:stream-cancel', id },
+                                    this.authOrigin,
+                                );
+                            } catch { /* iframe may be gone */ }
+                            const slot = this.sealedStreams.get(id);
+                            if (slot?.reject) {
+                                slot.reject(new DOMException('Aborted', 'AbortError'));
+                                this.sealedStreams.delete(id);
+                            } else if (slot?.controller) {
+                                try { slot.controller.error(new DOMException('Aborted', 'AbortError')); } catch { /* */ }
+                                this.sealedStreams.delete(id);
+                            }
+                        };
+                        if (signal.aborted) {
+                            queueMicrotask(onAbort);
+                        } else {
+                            signal.addEventListener('abort', onAbort, { once: true });
+                        }
+                    }
                     target.postMessage(
-                        { type: 'privasys:session:stream-request', id, method, path, body, init },
+                        { type: 'privasys:session:stream-request', id, method, path, body, init: safeInit },
                         this.authOrigin,
                     );
                 });

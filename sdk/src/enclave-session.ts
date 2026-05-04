@@ -330,18 +330,36 @@ export class PrivasysSession {
         const s2cPrefix = this.keys.s2cPrefix;
         const reader = resp.body!.getReader();
         const status = parseInnerStatus(resp.headers, resp.status);
+        // Per-frame flush: each `pull()` advances the decoder by exactly
+        // one sealed frame (or closes the stream). The previous
+        // implementation drained the entire async iterator inside a
+        // single pull, so the consumer only saw frames after the inner
+        // loop finished or backpressure kicked in. For SSE / token
+        // streaming this materialised as bursty UI updates: many
+        // tokens piling up between paints. Yielding one frame per pull
+        // hands every decoded chunk straight to the caller as soon as
+        // the network produces it, which is what the chat-relay
+        // postMessage bridge needs to forward `stream-chunk` per token.
+        const iter = decodeFrameReader(reader, aead, s2cPrefix, ad);
         const stream = new ReadableStream<Uint8Array>({
             async pull(controller) {
                 try {
-                    for await (const chunk of decodeFrameReader(reader, aead, s2cPrefix, ad)) {
-                        controller.enqueue(chunk);
+                    const { value, done } = await iter.next();
+                    if (done) {
+                        controller.close();
+                        return;
                     }
-                    controller.close();
+                    controller.enqueue(value);
                 } catch (e) {
                     controller.error(e);
                 }
             },
             cancel(reason) {
+                // Best-effort cleanup of the underlying reader and the
+                // generator's internal state. Errors here are not
+                // observable by the caller (the stream is being torn
+                // down) so we swallow them.
+                iter.return?.(undefined).catch(() => undefined);
                 reader.cancel(reason).catch(() => undefined);
             },
         });

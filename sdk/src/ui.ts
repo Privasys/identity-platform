@@ -735,6 +735,7 @@ export class AuthUI {
     private attributes: Record<string, string> | undefined;
     private sessionRelay: SessionRelayBinding | undefined;
     private method: 'wallet' | 'passkey' = 'wallet';
+    private qrPayload = '';
 
     constructor(config: AuthUIConfig) {
         this.cfg = {
@@ -767,6 +768,7 @@ export class AuthUI {
             this.attestation = undefined;
             this.attributes = undefined;
             this.sessionRelay = undefined;
+            this.qrPayload = '';
             this.mount();
 
             // If returning user (push token available), skip idle and send push immediately
@@ -1007,8 +1009,11 @@ export class AuthUI {
     }
 
     private renderQR(): HTMLElement {
-        const client = this.getRelayClient();
-        const { payload } = client.createQR(this.sessionId, this.cfg.sessionRelay);
+        // The QR payload is generated once in startWallet() and cached on
+        // `this.qrPayload`. Re-running `createQR()` here would re-PUT the
+        // descriptor to the relay on every render and trigger a chain of
+        // 409 conflicts (one PUT per state transition).
+        const payload = this.qrPayload;
 
         return el('div', null,
             el('div', { className: 'qr-section' },
@@ -1221,8 +1226,9 @@ export class AuthUI {
     private startWallet(): void {
         this.method = 'wallet';
         const client = this.getRelayClient();
-        const { sessionId } = client.createQR(this.cfg.sessionId, this.cfg.sessionRelay);
+        const { sessionId, payload } = client.createQR(this.cfg.sessionId, this.cfg.sessionRelay);
         this.sessionId = sessionId;
+        this.qrPayload = payload;
         this.state = 'qr-scanning';
         this.render();
 

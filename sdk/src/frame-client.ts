@@ -324,6 +324,14 @@ export class AuthFrame {
 
             const handler = (e: MessageEvent) => {
                 if (e.origin !== this.authOrigin) return;
+                // Multiple privasys.id iframes can coexist (this signIn
+                // iframe, getSession()'s SSO check iframe, and others).
+                // Without filtering by source, a `privasys:ready` from
+                // the SSO iframe would re-trigger `privasys:init` here
+                // → restart the OIDC ceremony in our hidden sealed
+                // iframe → second push notification → second Face ID
+                // prompt on the wallet after `Trust this device`.
+                if (e.source !== iframe.contentWindow) return;
                 const data = e.data;
                 if (!data || typeof data.type !== 'string') return;
 
@@ -565,6 +573,7 @@ export class AuthFrame {
 
             const handler = (e: MessageEvent) => {
                 if (e.origin !== this.authOrigin) return;
+                if (e.source !== iframe.contentWindow) return;
                 const data = e.data;
                 if (!data || typeof data.type !== 'string') return;
 
@@ -612,8 +621,10 @@ export class AuthFrame {
         return new Promise((resolve) => {
             // If we have a persistent iframe, use it directly
             if (this.sessionIframe?.contentWindow) {
+                const sessionWin = this.sessionIframe.contentWindow;
                 const handler = (e: MessageEvent) => {
                     if (e.origin !== this.authOrigin) return;
+                    if (e.source !== sessionWin) return;
                     if (e.data?.type === 'privasys:session-cleared') {
                         window.removeEventListener('message', handler);
                         this.destroySessionIframe();
@@ -650,6 +661,7 @@ export class AuthFrame {
 
             const handler = (e: MessageEvent) => {
                 if (e.origin !== this.authOrigin) return;
+                if (e.source !== iframe.contentWindow) return;
                 const data = e.data;
                 if (!data || typeof data.type !== 'string') return;
 

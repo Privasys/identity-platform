@@ -554,6 +554,21 @@ export default function ConnectScreen() {
      *  and the verified attestation, or return undefined when the QR did
      *  not opt in. Shared by doRegister and doAuthenticate so first-time
      *  users get the same sealed-transport binding as returning users. */
+    /** Defensive: ensure the value we hand to the sessions store is an
+     *  epoch-ms in the future. The enclave currently returns ms, but if
+     *  it ever returns 0/undefined or seconds the Home tab would show
+     *  the session as already expired and silently drop it. Fall back
+     *  to a 5-minute window so the user still sees the session card. */
+    const sanitizeRelayExpiresAt = (raw: unknown): number => {
+        const fallbackMs = Date.now() + 5 * 60 * 1000;
+        if (typeof raw !== 'number' || !Number.isFinite(raw)) return fallbackMs;
+        // < 1e12 means the value can't be a sane epoch-ms after Sep 2001
+        // — almost certainly seconds. Treat it as such.
+        const asMs = raw < 1e12 ? raw * 1000 : raw;
+        if (asMs <= Date.now() + 1000) return fallbackMs;
+        return asMs;
+    };
+
     const buildSessionRelayArg = (
         payload: QRPayload,
     ): { sdkPub: string; appHost: string; quoteHash: string; nonce: string } | undefined => {
@@ -638,14 +653,20 @@ export default function ConnectScreen() {
             // Surface the live sealed session on the Home screen so the
             // user sees the relay countdown next to the connected service.
             if (result.sessionRelay) {
+                const safeExpiresAt = sanitizeRelayExpiresAt(result.sessionRelay.expiresAt);
+                console.log(
+                    `[CONNECT] registering relay session on Home: sessionId=${result.sessionRelay.sessionId.substring(0, 8)}... rawExpiresAt=${result.sessionRelay.expiresAt} safeExpiresAt=${safeExpiresAt} (in ${Math.round((safeExpiresAt - Date.now()) / 1000)}s)`
+                );
                 addRelaySession({
                     sessionId: result.sessionRelay.sessionId,
                     rpId: payload.rpId,
                     origin: payload.origin,
                     appName: payload.appName,
-                    expiresAt: result.sessionRelay.expiresAt,
+                    expiresAt: safeExpiresAt,
                     startedAt: Date.now(),
                 });
+            } else {
+                console.warn('[CONNECT] registration result has no sessionRelay binding — Home tab will not show this session');
             }
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
@@ -714,14 +735,20 @@ export default function ConnectScreen() {
             // bootstrap, surface the live session on the Home screen
             // until the enclave-side binding expires.
             if (result.sessionRelay) {
+                const safeExpiresAt = sanitizeRelayExpiresAt(result.sessionRelay.expiresAt);
+                console.log(
+                    `[CONNECT] registering relay session on Home: sessionId=${result.sessionRelay.sessionId.substring(0, 8)}... rawExpiresAt=${result.sessionRelay.expiresAt} safeExpiresAt=${safeExpiresAt} (in ${Math.round((safeExpiresAt - Date.now()) / 1000)}s)`
+                );
                 addRelaySession({
                     sessionId: result.sessionRelay.sessionId,
                     rpId: payload.rpId,
                     origin: payload.origin,
                     appName: payload.appName,
-                    expiresAt: result.sessionRelay.expiresAt,
+                    expiresAt: safeExpiresAt,
                     startedAt: Date.now(),
                 });
+            } else {
+                console.warn('[CONNECT] authentication result has no sessionRelay binding — Home tab will not show this session');
             }
 
             // Start biometric grace period (skips push confirmation for subsequent auths).

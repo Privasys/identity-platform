@@ -108,7 +108,7 @@ func (reg *Registry) Register(name string, redirectURIs []string, secret string,
 	}, nil
 }
 
-// RegisterWithID creates a client with a specific client_id (for pre-known clients like Zitadel).
+// RegisterWithID creates a client with a specific client_id (for pre-known clients).
 func (reg *Registry) RegisterWithID(clientID, name string, redirectURIs []string, secret string, requiredAttributes []string) (*Client, error) {
 	var secretHash string
 	if secret != "" {

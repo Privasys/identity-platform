@@ -172,7 +172,7 @@ func HandleCreateServiceAccount(db *store.DB, adminToken string) http.HandlerFun
 		}
 		pubPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER}))
 
-		// Encode private key as PEM (PKCS#1 for Zitadel-compatible format).
+		// Encode private key as PEM (PKCS#1 RSA private key format).
 		privPEM := string(pem.EncodeToMemory(&pem.Block{
 			Type:  "RSA PRIVATE KEY",
 			Bytes: x509.MarshalPKCS1PrivateKey(privKey),

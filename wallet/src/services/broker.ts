@@ -22,7 +22,7 @@ export interface BrokerConnection {
 /**
  * Connect to the auth broker and relay a session token to the browser.
  *
- * @param brokerUrl  WebSocket URL for the relay (e.g. wss://auth.privasys.org/relay).
+ * @param brokerUrl  WebSocket URL for the relay (e.g. wss://relay.privasys.org).
  * @param sessionId  Session ID shared with the browser (from QR or push).
  * @param sessionToken  The opaque session token from the enclave's FIDO2 endpoint.
  * @param pushToken  Expo push token for future auth requests.

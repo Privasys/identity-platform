@@ -8,7 +8,7 @@
  * system browser. The wallet links provider accounts for:
  * 1. Profile seeding (name, email, avatar)
  * 2. Account recovery (re-register FIDO2 after device loss)
- * 3. Platform API auth via Zitadel
+ * 3. Platform API auth via Privasys ID
  *
  * The linked identity is NOT used for enclave authentication — that's always FIDO2.
  */

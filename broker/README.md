@@ -76,14 +76,12 @@ Wallet                    Broker                    Attestation Server
 {
   "iss": "https://relay.privasys.org",
   "sub": "wallet",
-  "aud": "363481202289541124",
+  "aud": "attestation-server",
   "platform": "ios",
   "device_id": "...",
   "iat": 1712000000,
   "exp": 1712003600,
-  "roles": {
-    "attestation-server:client": {}
-  }
+  "roles": ["attestation-server:client"]
 }
 ```
 

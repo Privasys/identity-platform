@@ -61,9 +61,6 @@ build/
 *.aab
 *.tar.gz
 
-# -- Deployment docs with secrets ---------------------------------
-idp/docs/zitadel-federation.md
-
 # -- Temporary dev artifacts --------------------------------------
 idp/Dockerfile.*
 idp/fix-*.sh

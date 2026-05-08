@@ -5,8 +5,8 @@
 //
 // This is the bridge between Privasys ID and the developer platform.
 // Users authenticate via hardware-bound FIDO2 keys in the app, and
-// the IdP issues standard OIDC tokens that Zitadel (and any other OIDC
-// client) can consume.
+// the IdP issues standard OIDC tokens that downstream platform
+// services (and any other OIDC client) can consume.
 //
 // Endpoints:
 //

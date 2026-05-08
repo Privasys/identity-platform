@@ -38,7 +38,7 @@ func HandleGetMetrics(db *store.DB, adminToken string) http.HandlerFunc {
 
 // HandleGrantRole handles POST /admin/roles — assign a role to a user.
 //
-//	Request: {"user_id": "...", "role": "platform:admin"}
+//	Request: {"user_id": "...", "role": "privasys-platform:admin"}
 //	Response: {"status": "ok"}
 func HandleGrantRole(db *store.DB, adminToken string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -229,17 +229,27 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// BootstrapAdmin is the env var name for auto-granting platform:admin to a user on startup.
+// BootstrapAdmin is the env var name for auto-granting the platform admin
+// role to a user on startup.
 const BootstrapAdmin = "IDP_BOOTSTRAP_ADMIN"
 
-// MaybeBootstrapAdmin grants platform:admin to the user specified by IDP_BOOTSTRAP_ADMIN env var.
+// MaybeBootstrapAdmin grants `privasys-platform:admin` to the user specified by
+// IDP_BOOTSTRAP_ADMIN. The role is intentionally namespaced under the
+// `privasys-platform` audience so that filterRolesByAudience surfaces it on
+// tokens minted for that audience (e.g. management-service consumers). A
+// previously-granted bare `platform:admin` is revoked to keep the legacy
+// role from lingering in the DB.
 func MaybeBootstrapAdmin(db *store.DB, sub string) {
 	if sub == "" {
 		return
 	}
-	if err := db.GrantRole(sub, "platform:admin", "bootstrap"); err != nil {
-		log.Printf("bootstrap: failed to grant admin to %s: %v", sub, err)
+	if err := db.GrantRole(sub, "privasys-platform:admin", "bootstrap"); err != nil {
+		log.Printf("bootstrap: failed to grant privasys-platform:admin to %s: %v", sub, err)
 		return
 	}
-	log.Printf("bootstrap: granted platform:admin to %s", sub)
+	// Best-effort cleanup of the legacy bare role granted by older builds.
+	if err := db.RevokeRole(sub, "platform:admin"); err != nil {
+		log.Printf("bootstrap: failed to revoke legacy platform:admin from %s: %v", sub, err)
+	}
+	log.Printf("bootstrap: granted privasys-platform:admin to %s", sub)
 }

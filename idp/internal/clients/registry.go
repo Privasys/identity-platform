@@ -18,12 +18,12 @@ import (
 
 // Client represents a registered OIDC client.
 type Client struct {
-	ClientID            string   `json:"client_id"`
-	ClientName          string   `json:"client_name"`
-	ClientSecret        string   `json:"client_secret,omitempty"` // only returned on registration
-	RedirectURIs        []string `json:"redirect_uris"`
-	Confidential        bool     `json:"confidential"`                    // true if client has a secret
-	RequiredAttributes  []string `json:"required_attributes,omitempty"`   // per-app attribute whitelist; empty = all scope-derived
+	ClientID           string   `json:"client_id"`
+	ClientName         string   `json:"client_name"`
+	ClientSecret       string   `json:"client_secret,omitempty"` // only returned on registration
+	RedirectURIs       []string `json:"redirect_uris"`
+	Confidential       bool     `json:"confidential"`                  // true if client has a secret
+	RequiredAttributes []string `json:"required_attributes,omitempty"` // per-app attribute whitelist; empty = all scope-derived
 }
 
 // ValidRedirectURI checks if the given URI is in the client's registered redirect URIs.

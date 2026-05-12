@@ -54,6 +54,7 @@ export class PrivasysAuth {
     ): { sessionId: string; payload: string } {
         return generateQRPayload({
             rpId: this.config.rpId,
+            idpOrigin: this.config.idpOrigin,
             brokerUrl: this.config.brokerUrl,
             sessionId,
             requestedAttributes: this.config.requestedAttributes,
@@ -147,7 +148,7 @@ export class PrivasysAuth {
                 sessionId: sid,
                 rpId: this.config.rpId,
                 appName: this.config.appName,
-                origin: this.config.rpId,
+                origin: this.config.idpOrigin ?? 'privasys.id',
                 brokerUrl: this.config.brokerUrl,
             }),
         });

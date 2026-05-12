@@ -51,7 +51,7 @@ function buildRows(apps: TrustedApp[], sessions: RelaySession[], now: number): S
         sessionByRpId.delete(app.rpId);
         return {
             rpId: app.rpId,
-            name: appName(app.rpId),
+            name: app.appName ?? appName(app.rpId),
             app,
             session,
             lastActiveMs: session ? session.startedAt : app.lastVerified * 1000

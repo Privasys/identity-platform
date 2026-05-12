@@ -8,6 +8,13 @@ import { create } from 'zustand';
 export interface TrustedApp {
     rpId: string;
     origin: string;
+    /**
+     * Most-recent human-readable app name surfaced through this rpId.
+     * Federated sign-ins (multiple websites sharing a single rpId such
+     * as `privasys.id`) overwrite this on every successful ceremony so
+     * the Home tab labels match the app the user just signed into.
+     */
+    appName?: string;
     /** Expected MRENCLAVE (SGX) or empty (TDX). */
     mrenclave?: string;
     /** Expected MRTD (TDX) or empty (SGX). */

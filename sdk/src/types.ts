@@ -5,6 +5,13 @@
 export interface AuthConfig {
     /** The relying party ID (e.g., "myapp.apps.privasys.org"). */
     rpId: string;
+    /**
+     * Hostname (no scheme) of the IdP that runs the FIDO2 ceremony for
+     * this app. Defaults to `"privasys.id"`. Set this only if you are
+     * running a self-hosted IdP. The wallet uses this as the `origin`
+     * in `clientDataJSON` and as the host it POSTs `/fido2/*` against.
+     */
+    idpOrigin?: string;
     /** WebSocket URL for the auth broker relay. */
     brokerUrl: string;
     /** Whether to require attestation verification on the wallet. */

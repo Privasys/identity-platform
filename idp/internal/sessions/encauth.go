@@ -317,12 +317,13 @@ const defaultEncAuthTTL = 90 * 24 * time.Hour
 // its sid up-front. Two-call flow:
 //
 //  1. Wallet POSTs `{client_id}` → server returns `{sid}`.
+//
 //  2. Wallet builds and signs the canonical CBOR payload (with the
 //     returned sid embedded), POSTs `{client_id, payload, hw_sig}` →
 //     server verifies, co-signs, stores, returns `{sid, envelope}`.
 //
-//	POST /sessions/encauth
-//	Authorization: Bearer wallet:<token> | Bearer <jwt>
+//     POST /sessions/encauth
+//     Authorization: Bearer wallet:<token> | Bearer <jwt>
 func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, _, err := s.authBearer(r, issuer)

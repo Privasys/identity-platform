@@ -143,6 +143,8 @@ export interface GenerateQRResult {
  */
 export function generateQRPayload(opts: {
     rpId: string;
+    /** IdP hostname running /fido2/*. Defaults to `'privasys.id'`. */
+    idpOrigin?: string;
     brokerUrl: string;
     sessionId?: string;
     requestedAttributes?: string[];
@@ -156,9 +158,15 @@ export function generateQRPayload(opts: {
     relayBase?: string;
 }): GenerateQRResult {
     const sessionId = opts.sessionId ?? generateSessionId();
+    // `origin` is the FIDO2 server (the IdP), NOT the relying-party ID.
+    // Apps may set `rpId` to their own hostname while the wallet still
+    // talks to `privasys.id` for the WebAuthn ceremony. Default to the
+    // hosted IdP so existing app configs (which only set `rpId`) keep
+    // working without changes.
+    const idpOrigin = opts.idpOrigin ?? DEEPLINK_HOST;
     const desc: QRDescriptor = {
         v: DESCRIPTOR_VERSION,
-        origin: opts.rpId,
+        origin: idpOrigin,
         sessionId,
         rpId: opts.rpId,
         brokerUrl: opts.brokerUrl,

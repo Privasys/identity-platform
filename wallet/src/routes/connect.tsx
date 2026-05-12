@@ -731,6 +731,21 @@ export default function ConnectScreen() {
                 result.sessionRelay,
             );
 
+            // Refresh the trusted-app row so the Home tab reflects the
+            // most-recent sign-in. Federated rpIds (e.g. `privasys.id`
+            // shared by chat / explorer / etc.) reuse a single row, so
+            // we also overwrite `appName` with the friendliest label
+            // currently in flight — without this the row stays frozen
+            // on whatever the very first sign-in surfaced.
+            const existingTrust = getApp(payload.rpId);
+            if (existingTrust) {
+                addTrustedApp({
+                    ...existingTrust,
+                    appName: payload.appName ?? existingTrust.appName,
+                    lastVerified: Math.floor(Date.now() / 1000),
+                });
+            }
+
             // Phase E: when the SDK opted into the sealed session-relay
             // bootstrap, surface the live session on the Home screen
             // until the enclave-side binding expires.
@@ -747,8 +762,6 @@ export default function ConnectScreen() {
                     expiresAt: safeExpiresAt,
                     startedAt: Date.now(),
                 });
-            } else {
-                console.warn('[CONNECT] authentication result has no sessionRelay binding — Home tab will not show this session');
             }
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
@@ -799,6 +812,7 @@ export default function ConnectScreen() {
             addTrustedApp({
                 rpId: trustKey,
                 origin: trustKey,
+                appName: payload.appName,
                 mrenclave: attestation.mrenclave,
                 mrtd: attestation.mrtd,
                 codeHash: attestation.workload_code_hash,
@@ -811,6 +825,7 @@ export default function ConnectScreen() {
             addTrustedApp({
                 rpId: trustKey,
                 origin: trustKey,
+                appName: payload.appName,
                 teeType: 'none',
                 lastVerified: Math.floor(Date.now() / 1000),
                 credentialId,

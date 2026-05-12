@@ -43,14 +43,14 @@ var ErrRevoked = errors.New("session revoked")
 
 // Session is a row in the unified sessions table.
 type Session struct {
-	SID         string
-	UserID      string
-	ClientID    string
-	DeviceID    string
-	CreatedAt   time.Time
-	LastSeenAt  time.Time
-	ExpiresAt   time.Time
-	RevokedAt   *time.Time
+	SID        string
+	UserID     string
+	ClientID   string
+	DeviceID   string
+	CreatedAt  time.Time
+	LastSeenAt time.Time
+	ExpiresAt  time.Time
+	RevokedAt  *time.Time
 }
 
 // Store wraps the IdP DB with session-table operations.
@@ -77,13 +77,40 @@ func New(db *store.DB) (*Store, error) {
 			created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			expires_at   DATETIME NOT NULL,
-			revoked_at   DATETIME
+			revoked_at   DATETIME,
+			encauth_blob BLOB
 		);
 		CREATE INDEX IF NOT EXISTS idx_sessions_user
 			ON sessions(user_id, revoked_at);
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("create sessions table: %w", err)
+	}
+	// Migration: add encauth_blob to existing tables. SQLite has no
+	// IF NOT EXISTS for ALTER TABLE; check via PRAGMA first.
+	rows, err := db.Query(`PRAGMA table_info(sessions)`)
+	if err != nil {
+		return nil, fmt.Errorf("inspect sessions: %w", err)
+	}
+	defer rows.Close()
+	hasEncAuth := false
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull int
+		var dflt *string
+		var pk int
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return nil, err
+		}
+		if name == "encauth_blob" {
+			hasEncAuth = true
+		}
+	}
+	if !hasEncAuth {
+		if _, err := db.Exec(`ALTER TABLE sessions ADD COLUMN encauth_blob BLOB`); err != nil {
+			return nil, fmt.Errorf("add encauth_blob: %w", err)
+		}
 	}
 	return &Store{db: db}, nil
 }

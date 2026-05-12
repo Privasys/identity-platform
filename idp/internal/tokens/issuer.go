@@ -255,6 +255,35 @@ func (iss *Issuer) sign(claims map[string]interface{}) (string, error) {
 	return token.SignedString(iss.privateKey)
 }
 
+// SignRaw produces an ES256 (ECDSA-P-256-SHA-256) signature over the
+// given message bytes using the issuer's signing key, returning the
+// raw 64-byte R||S concatenation (NOT DER). Used to co-sign EncAuth
+// vouchers so enclaves can verify them with the same JWKS they
+// already trust for JWT verification.
+func (iss *Issuer) SignRaw(msg []byte) ([]byte, error) {
+	digest := sha256.Sum256(msg)
+	r, s, err := ecdsa.Sign(rand.Reader, iss.privateKey, digest[:])
+	if err != nil {
+		return nil, fmt.Errorf("sign: %w", err)
+	}
+	curveByteLen := (iss.privateKey.Curve.Params().BitSize + 7) / 8
+	out := make([]byte, 2*curveByteLen)
+	rb := r.Bytes()
+	sb := s.Bytes()
+	copy(out[curveByteLen-len(rb):curveByteLen], rb)
+	copy(out[2*curveByteLen-len(sb):], sb)
+	return out, nil
+}
+
+// PublicKey returns the issuer's signing public key. Callers can use
+// this to verify SignRaw outputs locally (e.g. in tests).
+func (iss *Issuer) PublicKey() *ecdsa.PublicKey {
+	return &iss.privateKey.PublicKey
+}
+
+// KeyID returns the JWKS key id matching SignRaw outputs.
+func (iss *Issuer) KeyID() string { return iss.keyID }
+
 // HandleJWKS serves the public key in JWK Set format.
 func (iss *Issuer) HandleJWKS(w http.ResponseWriter, r *http.Request) {
 	pub := iss.privateKey.PublicKey

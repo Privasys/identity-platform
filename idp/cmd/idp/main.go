@@ -106,6 +106,8 @@ func main() {
 	// Unified session management (revoke, list).
 	mux.HandleFunc("GET /sessions/me", sessionsStore.HandleListMine(issuer))
 	mux.HandleFunc("POST /sessions/{sid}/revoke", sessionsStore.HandleRevoke(issuer))
+	mux.HandleFunc("PUT /sessions/{sid}/encauth", sessionsStore.HandlePutEncAuth(issuer))
+	mux.HandleFunc("GET /sessions/{sid}/encauth", sessionsStore.HandleGetEncAuth(issuer))
 
 	// UserInfo endpoint.
 	mux.HandleFunc("GET /userinfo", oidc.HandleUserInfo(issuer, db))

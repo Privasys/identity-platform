@@ -739,12 +739,20 @@ export default function ConnectScreen() {
             );
 
             // Refresh the trusted-app row so the Home tab reflects the
-            // most-recent sign-in. Federated rpIds (e.g. `privasys.id`
-            // shared by chat / explorer / etc.) reuse a single row, so
+            // most-recent sign-in. Look the row up under the same key
+            // we attested in `startFlow` (appHost in session-relay
+            // mode, otherwise rpId) — `payload.rpId` alone would miss
+            // the row in session-relay flows where rpId is the IdP
+            // (`privasys.id`) and the trust row lives under the AI
+            // enclave appHost. Federated rpIds reuse a single row, so
             // we also overwrite `appName` with the friendliest label
             // currently in flight — without this the row stays frozen
             // on whatever the very first sign-in surfaced.
-            const existingTrust = getApp(payload.rpId);
+            const trustKey =
+                payload.mode === 'session-relay' && payload.appHost
+                    ? payload.appHost
+                    : payload.rpId;
+            const existingTrust = getApp(trustKey);
             if (existingTrust) {
                 addTrustedApp({
                     ...existingTrust,
@@ -807,13 +815,18 @@ export default function ConnectScreen() {
             serverRpId,
         });
 
-        // Store the trust record under the entity that was actually attested
-        // (appHost in session-relay mode, otherwise origin) so that the
-        // measurements we persist correspond to the host they describe.
+        // Store the trust record under the entity that was actually
+        // attested in `startFlow` — appHost in session-relay mode,
+        // otherwise rpId. `payload.origin` is the FIDO2 ceremony host
+        // (the IdP at privasys.id) and is shared across every adopter,
+        // so keying the trust row on it would conflate every relying
+        // party into a single row that always shows the IdP's
+        // measurements (i.e. none — privasys.id is not an enclave) and
+        // overwrite the per-RP enclave data we just verified.
         const trustKey =
             payload.mode === 'session-relay' && payload.appHost
                 ? payload.appHost
-                : payload.origin;
+                : payload.rpId;
 
         if (attestation) {
             addTrustedApp({

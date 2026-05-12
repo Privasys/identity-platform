@@ -20,6 +20,7 @@ import (
 
 	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/clients"
+	"github.com/Privasys/idp/internal/sessions"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
 )
@@ -521,7 +522,11 @@ func HandleSessionComplete(codes *CodeStore, sessions *SessionStore) http.Handle
 
 // HandleToken handles the OIDC token exchange (authorization code → tokens,
 // refresh_token → tokens, jwt-bearer → tokens).
-func HandleToken(reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
+//
+// `sess` is optional; when nil the unified session model is bypassed
+// and tokens are minted without a `sid` claim (legacy behaviour). All
+// production wiring should pass a non-nil store.
+func HandleToken(reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer, db *store.DB, sess *sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			errorResponse(w, http.StatusBadRequest, "invalid_request", "Cannot parse form")
@@ -532,9 +537,9 @@ func HandleToken(reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer,
 
 		switch grantType {
 		case "authorization_code":
-			handleAuthorizationCodeGrant(w, r, reg, codes, issuer, db)
+			handleAuthorizationCodeGrant(w, r, reg, codes, issuer, db, sess)
 		case "refresh_token":
-			handleRefreshTokenGrant(w, r, reg, issuer, db)
+			handleRefreshTokenGrant(w, r, reg, issuer, db, sess)
 		case "urn:ietf:params:oauth:grant-type:jwt-bearer":
 			handleJWTBearerGrant(w, r, issuer, db)
 		default:
@@ -547,7 +552,7 @@ func HandleToken(reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer,
 const refreshTokenTTL = 30 * 24 * time.Hour // 30 days
 
 func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
-	reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer, db *store.DB) {
+	reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer, db *store.DB, sess *sessions.Store) {
 
 	code := r.FormValue("code")
 	redirectURI := r.FormValue("redirect_uri")
@@ -630,6 +635,19 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 	roles := filterRolesByAudience(allRoles, audience)
 
 	// Issue ID token.
+	// Mint a session row (when the unified session store is wired up)
+	// and embed its sid in the issued tokens. The wallet uses sid as
+	// the revocation handle (see internal/sessions).
+	var sid string
+	if sess != nil {
+		row, err := sess.Create("", ac.UserID, ac.ClientID, "", refreshTokenTTL)
+		if err != nil {
+			log.Printf("token: session row creation failed: %v", err)
+		} else {
+			sid = row.SID
+		}
+	}
+
 	idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{
 		Subject:          ac.UserID,
 		Email:            filteredAttrs["email"],
@@ -639,6 +657,7 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 		Audience:         ac.ClientID,
 		Nonce:            ac.Nonce,
 		AuthTime:         ac.AuthTime,
+		SID:              sid,
 		SessionRelay:     ac.SessionRelay,
 	})
 	if err != nil {
@@ -651,7 +670,7 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 	// Access token aud is the resource-server trust domain, selected from
 	// the scope (audience:<X>, defaulting to privasys-platform).
 	// ID token aud = client_id (per OIDC spec: ID tokens are for the client).
-	accessToken, err := issuer.IssueAccessToken(ac.UserID, audience, roles, filteredAttrs)
+	accessToken, err := issuer.IssueAccessTokenWithSID(ac.UserID, audience, sid, roles, filteredAttrs)
 	if err != nil {
 		log.Printf("token: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -668,7 +687,7 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 
 	// Issue refresh token if offline_access was requested.
 	if strings.Contains(ac.Scope, "offline_access") {
-		refreshToken, err := issueRefreshToken(db, ac.UserID, ac.ClientID, ac.Scope)
+		refreshToken, err := issueRefreshToken(db, ac.UserID, ac.ClientID, ac.Scope, sid)
 		if err != nil {
 			log.Printf("token: refresh token issuance failed: %v", err)
 		} else {
@@ -683,7 +702,7 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 }
 
 func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
-	reg *clients.Registry, issuer *tokens.Issuer, db *store.DB) {
+	reg *clients.Registry, issuer *tokens.Issuer, db *store.DB, sess *sessions.Store) {
 
 	refreshToken := r.FormValue("refresh_token")
 	clientID := r.FormValue("client_id")
@@ -715,7 +734,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 
 	// Consume the refresh token (rotation: old token is invalidated).
 	tokenHash := hashRefreshToken(refreshToken)
-	userID, storedClientID, scope, err := db.ConsumeRefreshToken(tokenHash)
+	userID, storedClientID, scope, sid, err := db.ConsumeRefreshTokenWithSID(tokenHash)
 	if err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid_grant", "Invalid or expired refresh token")
 		return
@@ -725,6 +744,16 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	if storedClientID != clientID {
 		errorResponse(w, http.StatusBadRequest, "invalid_grant", "client_id mismatch")
 		return
+	}
+
+	// Reject refreshes for revoked sessions. Legacy tokens (sid == "")
+	// pre-date the unified session model and are accepted unconditionally.
+	if sess != nil && sid != "" {
+		if !sess.IsActive(sid) {
+			errorResponse(w, http.StatusBadRequest, "invalid_grant", "Session revoked")
+			return
+		}
+		_ = sess.Touch(sid, refreshTokenTTL)
 	}
 
 	// No user profile is stored server-side — refresh tokens only carry roles.
@@ -737,7 +766,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	roles := filterRolesByAudience(allRoles, audience)
 
 	// Issue new access token (with current roles and available profile).
-	accessToken, err := issuer.IssueAccessToken(userID, audience, roles, filteredRefreshAttrs)
+	accessToken, err := issuer.IssueAccessTokenWithSID(userID, audience, sid, roles, filteredRefreshAttrs)
 	if err != nil {
 		log.Printf("refresh: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -753,6 +782,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 		AttestationLevel: "verified",
 		Audience:         clientID,
 		AuthTime:         time.Now(),
+		SID:              sid,
 	})
 	if err != nil {
 		log.Printf("refresh: ID token issuance failed: %v", err)
@@ -761,7 +791,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Issue new refresh token (rotation).
-	newRefreshToken, err := issueRefreshToken(db, userID, clientID, scope)
+	newRefreshToken, err := issueRefreshToken(db, userID, clientID, scope, sid)
 	if err != nil {
 		log.Printf("refresh: new refresh token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -865,13 +895,13 @@ func handleJWTBearerGrant(w http.ResponseWriter, r *http.Request,
 }
 
 // issueRefreshToken generates a random refresh token, stores its hash, and returns the plaintext.
-func issueRefreshToken(db *store.DB, userID, clientID, scope string) (string, error) {
+func issueRefreshToken(db *store.DB, userID, clientID, scope, sid string) (string, error) {
 	b := make([]byte, 32)
 	rand.Read(b)
 	token := base64.RawURLEncoding.EncodeToString(b)
 	tokenHash := hashRefreshToken(token)
 
-	err := db.StoreRefreshToken(tokenHash, userID, clientID, scope, time.Now().Add(refreshTokenTTL))
+	err := db.StoreRefreshTokenWithSID(tokenHash, userID, clientID, scope, sid, time.Now().Add(refreshTokenTTL))
 	if err != nil {
 		return "", err
 	}

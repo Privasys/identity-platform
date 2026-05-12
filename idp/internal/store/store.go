@@ -249,6 +249,35 @@ func migrate(db *sql.DB) error {
 		return err
 	}
 
+	// Migration: add sid column to refresh_tokens so the unified session
+	// model can rotate refresh tokens while preserving the user-facing
+	// session id (see internal/sessions). Existing rows get NULL/'' and
+	// are treated as legacy (no associated session row).
+	var hasSID bool
+	rtRows, err := db.Query("PRAGMA table_info(refresh_tokens)")
+	if err != nil {
+		return err
+	}
+	defer rtRows.Close()
+	for rtRows.Next() {
+		var cid int
+		var colName, ctype string
+		var notnull int
+		var dfltValue *string
+		var pk int
+		if err := rtRows.Scan(&cid, &colName, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if colName == "sid" {
+			hasSID = true
+		}
+	}
+	if !hasSID {
+		if _, err := db.Exec("ALTER TABLE refresh_tokens ADD COLUMN sid TEXT NOT NULL DEFAULT ''"); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -407,9 +436,17 @@ func (db *DB) RevokeRole(userID, role string) error {
 
 // StoreRefreshToken stores a hashed refresh token.
 func (db *DB) StoreRefreshToken(tokenHash, userID, clientID, scope string, expiresAt time.Time) error {
+	return db.StoreRefreshTokenWithSID(tokenHash, userID, clientID, scope, "", expiresAt)
+}
+
+// StoreRefreshTokenWithSID is StoreRefreshToken plus an associated
+// session id. Used by the unified session model so refresh-token
+// rotation can carry the sid forward and revocation invalidates all
+// future rotations.
+func (db *DB) StoreRefreshTokenWithSID(tokenHash, userID, clientID, scope, sid string, expiresAt time.Time) error {
 	_, err := db.Exec(
-		"INSERT INTO refresh_tokens (token_hash, user_id, client_id, scope, expires_at) VALUES (?, ?, ?, ?, ?)",
-		tokenHash, userID, clientID, scope, expiresAt,
+		"INSERT INTO refresh_tokens (token_hash, user_id, client_id, scope, sid, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+		tokenHash, userID, clientID, scope, sid, expiresAt,
 	)
 	return err
 }
@@ -417,21 +454,28 @@ func (db *DB) StoreRefreshToken(tokenHash, userID, clientID, scope string, expir
 // ConsumeRefreshToken retrieves and deletes a refresh token (single-use rotation).
 // Returns userID, clientID, scope.
 func (db *DB) ConsumeRefreshToken(tokenHash string) (string, string, string, error) {
-	var userID, clientID, scope string
+	userID, clientID, scope, _, err := db.ConsumeRefreshTokenWithSID(tokenHash)
+	return userID, clientID, scope, err
+}
+
+// ConsumeRefreshTokenWithSID is ConsumeRefreshToken plus the sid that
+// was associated at storage time (empty string for legacy rows).
+func (db *DB) ConsumeRefreshTokenWithSID(tokenHash string) (string, string, string, string, error) {
+	var userID, clientID, scope, sid string
 	var expiresAt time.Time
 	err := db.QueryRow(
-		"SELECT user_id, client_id, scope, expires_at FROM refresh_tokens WHERE token_hash = ?",
+		"SELECT user_id, client_id, scope, COALESCE(sid, ''), expires_at FROM refresh_tokens WHERE token_hash = ?",
 		tokenHash,
-	).Scan(&userID, &clientID, &scope, &expiresAt)
+	).Scan(&userID, &clientID, &scope, &sid, &expiresAt)
 	if err != nil {
-		return "", "", "", fmt.Errorf("refresh token not found: %w", err)
+		return "", "", "", "", fmt.Errorf("refresh token not found: %w", err)
 	}
 	// Delete consumed token (rotation: caller issues a new one).
 	db.Exec("DELETE FROM refresh_tokens WHERE token_hash = ?", tokenHash)
 	if time.Now().After(expiresAt) {
-		return "", "", "", fmt.Errorf("refresh token expired")
+		return "", "", "", "", fmt.Errorf("refresh token expired")
 	}
-	return userID, clientID, scope, nil
+	return userID, clientID, scope, sid, nil
 }
 
 // CleanupExpiredRefreshTokens removes expired refresh tokens.

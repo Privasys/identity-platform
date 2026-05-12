@@ -104,6 +104,12 @@ type IDTokenClaims struct {
 	Nonce            string
 	AuthTime         time.Time
 
+	// SID is the unified per-(user, app, device) session id (see
+	// `internal/sessions`). When non-empty it is emitted as a top-level
+	// `sid` claim on every issued ID/access token. The wallet, the
+	// gateway, and resource servers use it as the revocation handle.
+	SID string
+
 	// SessionRelay, if set, is emitted into the JWT as a top-level
 	// `session` claim plus optional `att_verified` / `att_quote_hash` /
 	// `att_oids` claims when those keys are present. Carries the
@@ -137,6 +143,9 @@ func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 	if claims.Nonce != "" {
 		c["nonce"] = claims.Nonce
 	}
+	if claims.SID != "" {
+		c["sid"] = claims.SID
+	}
 	// Browser→enclave session relay metadata (optional). Pulls a
 	// well-known subset of keys to the top level for downstream
 	// consumers; the full session object is also embedded as `session`.
@@ -159,6 +168,13 @@ func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 
 // IssueAccessToken creates a signed access token (JWT) with optional role and profile claims.
 func (iss *Issuer) IssueAccessToken(subject, audience string, roles []string, attributes map[string]string) (string, error) {
+	return iss.IssueAccessTokenWithSID(subject, audience, "", roles, attributes)
+}
+
+// IssueAccessTokenWithSID is IssueAccessToken plus a top-level `sid`
+// claim binding the token to a row in `internal/sessions`. Resource
+// servers use this to enforce wallet-driven revocation.
+func (iss *Issuer) IssueAccessTokenWithSID(subject, audience, sid string, roles []string, attributes map[string]string) (string, error) {
 	now := time.Now()
 	c := jwt.MapClaims{
 		"iss": iss.issuerURL,
@@ -167,6 +183,9 @@ func (iss *Issuer) IssueAccessToken(subject, audience string, roles []string, at
 		"iat": now.Unix(),
 		"exp": now.Add(15 * time.Minute).Unix(),
 		"typ": "at+jwt",
+	}
+	if sid != "" {
+		c["sid"] = sid
 	}
 	if len(roles) > 0 {
 		c["roles"] = roles

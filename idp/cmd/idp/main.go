@@ -38,6 +38,7 @@ import (
 	"github.com/Privasys/idp/internal/fido2"
 	"github.com/Privasys/idp/internal/oidc"
 	"github.com/Privasys/idp/internal/recovery"
+	"github.com/Privasys/idp/internal/sessions"
 	"github.com/Privasys/idp/internal/social"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
@@ -80,6 +81,13 @@ func main() {
 	// Session store (maps browser session → authenticated user).
 	sessionStore := oidc.NewSessionStore()
 
+	// Unified sessions table (per-(user, app, device) row backing every
+	// issued JWT — the wallet uses sid as the revocation handle).
+	sessionsStore, err := sessions.New(db)
+	if err != nil {
+		log.Fatalf("failed to open sessions store: %v", err)
+	}
+
 	mux := http.NewServeMux()
 
 	// OIDC discovery (OpenID Connect + RFC 8414).
@@ -92,7 +100,11 @@ func main() {
 	mux.HandleFunc("GET /authorize", oidc.HandleAuthorize(clientReg, sessionStore, cfg.IssuerURL))
 
 	// Token endpoint.
-	mux.HandleFunc("POST /token", oidc.HandleToken(clientReg, codeStore, issuer, db))
+	mux.HandleFunc("POST /token", oidc.HandleToken(clientReg, codeStore, issuer, db, sessionsStore))
+
+	// Unified session management (revoke, list).
+	mux.HandleFunc("GET /sessions/me", sessionsStore.HandleListMine(issuer))
+	mux.HandleFunc("POST /sessions/{sid}/revoke", sessionsStore.HandleRevoke(issuer))
 
 	// UserInfo endpoint.
 	mux.HandleFunc("GET /userinfo", oidc.HandleUserInfo(issuer, db))
@@ -219,6 +231,7 @@ func main() {
 			db.CleanupExpiredRecoveryRequests()
 			db.CleanupExpiredGuardianInvites()
 			db.CleanupExpiredRateLimits()
+			sessionsStore.CleanupExpired()
 		}
 	}()
 

@@ -41,6 +41,7 @@ const SESSION_AUTH_SCHEME = 'PrivasysSession';
 const HKDF_INFO = new TextEncoder().encode('privasys-session/v1');
 const DIR_C2S = new TextEncoder().encode('privasys-dir/c2s');
 const DIR_S2C = new TextEncoder().encode('privasys-dir/s2c');
+const INIT_PATH = '/__privasys/session-bootstrap';
 
 /** Provider-shaped object the wallet returns after attestation. */
 export interface WalletAttestationResult {
@@ -70,6 +71,30 @@ export interface SessionInitOptions {
     host: string;
     /** Override the global fetch (useful for tests / SSR). */
     fetchImpl?: typeof fetch;
+    /**
+     * Optional EncAuth fetcher. When set, the session can silently
+     * rebind to the enclave on AEAD-401 errors without bouncing back
+     * through the wallet (Phase D / silent-rebind).
+     *
+     * The callback should fetch a fresh wallet-signed voucher from the
+     * IdP at `GET /sessions/{sid}/encauth` and return the parsed JSON
+     * envelope. Return null/undefined to skip rebind for this attempt;
+     * the caller will then receive the original 401 response.
+     */
+    getEncAuth?: () => Promise<EncAuthEnvelope | null | undefined>;
+}
+
+/**
+ * EncAuthEnvelope is the wallet-signed silent-rebind voucher returned
+ * by `GET /sessions/{sid}/encauth`. The SDK forwards it verbatim to
+ * the enclave's `/__privasys/session-bootstrap` endpoint; verification
+ * happens entirely inside the enclave.
+ */
+export interface EncAuthEnvelope {
+    v: 1;
+    payload: string;  // base64url(canonical CBOR)
+    hw_sig: string;   // base64url(64 B R||S)
+    idp_sig: string;  // base64url(64 B R||S)
 }
 
 interface DerivedKeys {
@@ -80,11 +105,12 @@ interface DerivedKeys {
 
 export class PrivasysSession {
     readonly host: string;
-    readonly sessionId: string;
-    private readonly keys: DerivedKeys;
+    sessionId: string;
+    private keys: DerivedKeys;
     private readonly fetchImpl: typeof fetch;
     private c2sCtr = 0n;
     private s2cCtr = 0n;
+    private getEncAuth?: () => Promise<EncAuthEnvelope | null | undefined>;
 
     private constructor(host: string, sessionId: string, keys: DerivedKeys, fetchImpl: typeof fetch) {
         this.host = host;
@@ -110,13 +136,15 @@ export class PrivasysSession {
 
         const att = await opts.attestWithWallet({ sdkPub: sdkPubB64, host: opts.host });
 
-        return PrivasysSession.fromHandshake({
+        const session = await PrivasysSession.fromHandshake({
             host: opts.host,
             sessionId: att.sessionId,
             sdkPrivateKey: sdkKeyPair.privateKey,
             encPub: att.encPub,
             fetchImpl,
         });
+        if (opts.getEncAuth) session.getEncAuth = opts.getEncAuth;
+        return session;
     }
 
     /**
@@ -190,6 +218,29 @@ export class PrivasysSession {
      * already a Uint8Array / string.
      */
     async request(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedResponse> {
+        const r = await this.requestOnce(method, path, body, init);
+        // Silent-rebind: when the enclave rejected our session (expired
+        // or evicted) and the caller wired a getEncAuth fetcher, ask
+        // the IdP for a fresh voucher and re-bootstrap without going
+        // through the wallet. The enclave's plaintext error responses
+        // come back unsealed with status 401, which is also what the
+        // outer gateway returns when there's no session at all.
+        if (
+            r.status === 401 &&
+            !r.sealed &&
+            this.getEncAuth &&
+            // Avoid infinite loops: skip rebind on the rebind path itself.
+            path !== INIT_PATH
+        ) {
+            const rebound = await this.tryRebind();
+            if (rebound) {
+                return this.requestOnce(method, path, body, init);
+            }
+        }
+        return r;
+    }
+
+    private async requestOnce(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedResponse> {
         const upperMethod = method.toUpperCase();
         const ad = encodeAD(upperMethod, path, this.sessionId);
 
@@ -249,6 +300,69 @@ export class PrivasysSession {
             this.s2cCtr = sealed.ctr + 1n;
         }
         return { status: resp.status, sealed: true, body: pt, headers: resp.headers };
+    }
+
+    /**
+     * Silent rebind: replace this session's keys + sessionId in place
+     * by re-bootstrapping against the enclave with a wallet-issued
+     * EncAuth voucher. Returns true on success.
+     *
+     * Failures are swallowed (returns false) so the original 401
+     * propagates unchanged to the caller, who can then trigger a
+     * fresh wallet ceremony.
+     */
+    private async tryRebind(): Promise<boolean> {
+        if (!this.getEncAuth) return false;
+        let env: EncAuthEnvelope | null | undefined;
+        try {
+            env = await this.getEncAuth();
+        } catch {
+            return false;
+        }
+        if (!env) return false;
+
+        try {
+            const sdkKeyPair = (await crypto.subtle.generateKey(
+                { name: 'ECDH', namedCurve: 'P-256' },
+                false,
+                ['deriveBits'],
+            )) as CryptoKeyPair;
+            const sdkPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', sdkKeyPair.publicKey));
+            const sdkPubB64 = base64UrlEncode(sdkPubRaw);
+
+            const url = `https://${this.host}${INIT_PATH}`;
+            const resp = await this.fetchImpl(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sdk_pub: sdkPubB64, encauth: env }),
+            });
+            if (!resp.ok) return false;
+            // If the enclave couldn't accept the voucher it sets a
+            // diagnostic header. Treat that as a soft failure even if
+            // the response otherwise looks fine, so callers fall back
+            // to a wallet ceremony.
+            if (resp.headers.get('X-Privasys-EncAuth-Reject')) return false;
+
+            const data = (await resp.json()) as { session_id: string; enc_pub: string };
+            if (!data.session_id || !data.enc_pub) return false;
+
+            const reborn = await PrivasysSession.fromHandshake({
+                host: this.host,
+                sessionId: data.session_id,
+                sdkPrivateKey: sdkKeyPair.privateKey,
+                encPub: data.enc_pub,
+                fetchImpl: this.fetchImpl,
+            });
+            // Adopt the new keys + sessionId in place. Counters are
+            // reset because the AAD now embeds the new sessionId.
+            this.sessionId = reborn.sessionId;
+            this.keys = reborn.keys;
+            this.c2sCtr = 0n;
+            this.s2cCtr = 0n;
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     /** Convenience for JSON responses. */

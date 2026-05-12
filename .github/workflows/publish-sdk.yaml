@@ -80,6 +80,12 @@ jobs:
       - name: Setup gcloud CLI
         uses: google-github-actions/setup-gcloud@v3
 
+      # NOTE: SSH into idp-fr-par-1 via IAP requires google-guest-agent to
+      # be running on the VM (it provisions per-CI-run keys from project SSH
+      # metadata into the runner user's authorized_keys). The agent is
+      # enabled by default on GCE images; if it is ever disabled, every CI
+      # SSH attempt fails with "Permission denied (publickey)" no matter
+      # which username is used. See run 25766840278 for the original break.
       - name: Upload frame bundle to idp-fr-par-1
         run: |
           gcloud compute scp \

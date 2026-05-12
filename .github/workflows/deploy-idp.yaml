@@ -81,6 +81,9 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # SSH-via-IAP requires google-guest-agent to be running on the VM
+          # (it propagates the ephemeral CI key from project metadata to
+          # /home/runner/.ssh/authorized_keys). See publish-sdk.yaml.
           gcloud compute ssh idp-fr-par-1 \
             --project privasys-production \
             --zone europe-west9-a \

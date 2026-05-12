@@ -4,8 +4,7 @@
 // Package sessions implements the unified per-(user, app, device) session
 // row backing every JWT issued by the IdP. Each session has a stable
 // `sid` that is embedded in id/access/refresh tokens and that the user
-// can revoke from the wallet. See `.operations/identity-platform/
-// session-plan.md` §2.
+// can revoke from the wallet.
 //
 // The store is intentionally tiny and append-mostly: rows are created on
 // first sign-in (or on first refresh-token rotation for legacy sessions
@@ -148,6 +147,32 @@ func (s *Store) Create(sid, userID, clientID, deviceID string, ttl time.Duration
 		SID: sid, UserID: userID, ClientID: clientID, DeviceID: deviceID,
 		CreatedAt: now, LastSeenAt: now, ExpiresAt: expiresAt,
 	}, nil
+}
+
+// FindOrCreateForApp returns the most-recently-active non-revoked
+// session for (userID, clientID, deviceID), creating a fresh row when
+// none exists. Used by the wallet-driven EncAuth upload flow so the
+// wallet does not need to know its sid ahead of time: it knows the
+// user (from its session token) and the app (from the FIDO2 RP it
+// just signed against).
+func (s *Store) FindOrCreateForApp(userID, clientID, deviceID string, ttl time.Duration) (*Session, error) {
+	row := s.db.QueryRow(
+		`SELECT sid FROM sessions
+		  WHERE user_id = ? AND client_id = ? AND device_id = ?
+		    AND revoked_at IS NULL AND expires_at > ?
+		  ORDER BY last_seen_at DESC LIMIT 1`,
+		userID, clientID, deviceID, time.Now().UTC(),
+	)
+	var sid string
+	switch err := row.Scan(&sid); err {
+	case nil:
+		_ = s.Touch(sid, ttl)
+		return s.Get(sid)
+	case sql.ErrNoRows:
+		return s.Create("", userID, clientID, deviceID, ttl)
+	default:
+		return nil, err
+	}
 }
 
 // Touch updates last_seen_at and (optionally) extends expires_at to

@@ -108,6 +108,7 @@ func main() {
 	mux.HandleFunc("POST /sessions/{sid}/revoke", sessionsStore.HandleRevoke(issuer))
 	mux.HandleFunc("PUT /sessions/{sid}/encauth", sessionsStore.HandlePutEncAuth(issuer))
 	mux.HandleFunc("GET /sessions/{sid}/encauth", sessionsStore.HandleGetEncAuth(issuer))
+	mux.HandleFunc("POST /sessions/encauth", sessionsStore.HandlePostEncAuth(issuer))
 
 	// UserInfo endpoint.
 	mux.HandleFunc("GET /userinfo", oidc.HandleUserInfo(issuer, db))

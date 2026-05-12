@@ -20,8 +20,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
-// EncAuth is the wallet-signed silent-rebind voucher described in
-// `.operations/identity-platform/session-relay/crypto-contract.md` §8.
+// EncAuth is the wallet-signed silent-rebind voucher.
 //
 // Field tags use integer CBOR keys to keep the wire size minimal. The
 // canonical encoding rules (definite length, sorted integer keys,
@@ -294,5 +293,90 @@ func (s *Store) HandleGetEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, env)
+	}
+}
+
+// PutEncAuthForSession is like PutEncAuth but pins to a server-chosen
+// sid: the wallet does not need to know its sid ahead of time.
+func (s *Store) PutEncAuthForSession(sid string, payloadBytes, hwSig []byte, issuer *tokens.Issuer) (*Envelope, error) {
+	p, err := DecodeEncAuthPayload(payloadBytes)
+	if err != nil {
+		return nil, err
+	}
+	if p.SID != sid {
+		return nil, errors.New("payload sid does not match session row")
+	}
+	return s.PutEncAuth(p.Sub, payloadBytes, hwSig, issuer)
+}
+
+// defaultEncAuthTTL is the lifetime of an EncAuth-anchored session
+// row. 90 days, refreshed on every successful silent rebind via Touch.
+const defaultEncAuthTTL = 90 * 24 * time.Hour
+
+// HandlePostEncAuth lets the wallet upload an EncAuth without knowing
+// its sid up-front. Two-call flow:
+//
+//  1. Wallet POSTs `{client_id}` → server returns `{sid}`.
+//  2. Wallet builds and signs the canonical CBOR payload (with the
+//     returned sid embedded), POSTs `{client_id, payload, hw_sig}` →
+//     server verifies, co-signs, stores, returns `{sid, envelope}`.
+//
+//	POST /sessions/encauth
+//	Authorization: Bearer wallet:<token> | Bearer <jwt>
+func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, _, err := s.authBearer(r, issuer)
+		if err != nil {
+			httpUnauth(w, err.Error())
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, 8*1024))
+		if err != nil {
+			httpErr(w, http.StatusBadRequest, "read body: "+err.Error())
+			return
+		}
+		var req struct {
+			ClientID string `json:"client_id"`
+			DeviceID string `json:"device_id"`
+			Payload  string `json:"payload"`
+			HwSig    string `json:"hw_sig"`
+		}
+		if err := json.Unmarshal(body, &req); err != nil {
+			httpErr(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		if req.ClientID == "" {
+			httpErr(w, http.StatusBadRequest, "client_id required")
+			return
+		}
+		sess, err := s.FindOrCreateForApp(userID, req.ClientID, req.DeviceID, defaultEncAuthTTL)
+		if err != nil {
+			httpErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		out := map[string]any{"sid": sess.SID}
+		if req.Payload != "" && req.HwSig != "" {
+			payload, perr := base64.RawURLEncoding.DecodeString(req.Payload)
+			if perr != nil {
+				httpErr(w, http.StatusBadRequest, "invalid payload b64")
+				return
+			}
+			hwSig, herr := base64.RawURLEncoding.DecodeString(req.HwSig)
+			if herr != nil {
+				httpErr(w, http.StatusBadRequest, "invalid hw_sig b64")
+				return
+			}
+			env, perr := s.PutEncAuthForSession(sess.SID, payload, hwSig, issuer)
+			if perr != nil {
+				if errors.Is(perr, ErrRevoked) {
+					httpErr(w, http.StatusGone, perr.Error())
+					return
+				}
+				httpErr(w, http.StatusBadRequest, perr.Error())
+				return
+			}
+			out["envelope"] = env
+		}
+		writeJSON(w, http.StatusOK, out)
 	}
 }

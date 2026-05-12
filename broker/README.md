@@ -100,10 +100,6 @@ go test -v -count=1 ./...
 
 The e2e test (`e2e_test.go`) simulates the full mobile app → broker → attestation server flow with 10 subtests covering challenge retrieval, token exchange, OIDC discovery, JWKS validation, JWT signature verification, and error cases.
 
-## Deployment
-
-See [../../.operations/build-and-deploy.md](../../.operations/build-and-deploy.md) for deployment instructions.
-
 ## License
 
 [GNU Affero General Public License v3.0](../LICENSE)

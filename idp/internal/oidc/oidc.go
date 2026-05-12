@@ -484,7 +484,7 @@ func HandleSessionComplete(codes *CodeStore, sessions *SessionStore) http.Handle
 		// allowed the wallet/relay path to silently produce JWTs with a
 		// brand-new sub that had no roles and no profile attributes — users
 		// would re-authenticate after a session drop and lose their admin
-		// role and email/name (see .operations/bugs-and-fixes.md #25).
+		// role and email/name.
 		// The OIDC session MUST be marked authenticated by the FIDO2 handler
 		// (which knows the real user_id) before frame-host calls this
 		// endpoint. If we get here with an unauthenticated session and no

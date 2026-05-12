@@ -30,8 +30,7 @@ function formatRemaining(msLeft: number): string {
 /**
  * One row in the unified Active Sessions list. Rows are keyed by
  * rpId. A row may originate from a trusted app, a live relay session,
- * or both (sealed transport on a known app). See
- * `.operations/identity-platform/session-plan.md` §2.
+ * or both (sealed transport on a known app).
  */
 interface SessionRow {
     rpId: string;

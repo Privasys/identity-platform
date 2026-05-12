@@ -4,8 +4,7 @@
 /**
  * EncAuth voucher builder + uploader.
  *
- * Implements the wallet half of the silent-rebind voucher described
- * in `.operations/identity-platform/session-relay/crypto-contract.md` §8.
+ * Implements the wallet half of the silent-rebind voucher.
  *
  * Flow:
  *   1. Wallet collects attestation OIDs + enclave public key + leaf
@@ -271,16 +270,63 @@ export async function uploadEncAuth(
 }
 
 /**
- * One-shot helper: build payload, sign with hardware key, upload.
+ * One-shot helper: ask the IdP for (or reuse) a sid for this app,
+ * build + sign an EncAuth payload anchored to that sid, then upload.
  *
  * Intended to be called from the FIDO2 sign-in / connect flow once
  * the wallet has a verified RA-TLS handshake against the enclave.
+ *
+ * `clientId` is the OIDC client_id of the relying party (passed in
+ * the QR / sign-in payload). `sub` is the user's pairwise sub for
+ * this app. The remaining fields come from the verified attestation.
  */
 export async function signAndUploadEncAuth(args: {
     walletSessionToken: string;
     keyId: string;
-    payload: EncAuthPayload;
-}): Promise<EncAuthEnvelope> {
-    const { payload, hwSig } = await signEncAuth(args.keyId, args.payload);
-    return uploadEncAuth(args.walletSessionToken, args.payload.sid, payload, hwSig);
+    clientId: string;
+    deviceId?: string;
+    payload: Omit<EncAuthPayload, 'sid'>;
+}): Promise<{ sid: string; envelope: EncAuthEnvelope }> {
+    // Step 1: allocate (or reuse) a sid for (user, client_id, device).
+    const allocUrl = `${IDP_BASE_URL}/sessions/encauth`;
+    const allocResp = await fetch(allocUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer wallet:${args.walletSessionToken}`,
+        },
+        body: JSON.stringify({ client_id: args.clientId, device_id: args.deviceId ?? '' }),
+    });
+    if (!allocResp.ok) {
+        const detail = await allocResp.text().catch(() => '');
+        throw new Error(`allocate encauth sid: ${allocResp.status} ${detail}`);
+    }
+    const allocBody = (await allocResp.json()) as { sid: string };
+    const sid = allocBody.sid;
+    if (!sid) throw new Error('allocate encauth sid: server returned no sid');
+
+    // Step 2: sign with the allocated sid embedded.
+    const fullPayload: EncAuthPayload = { ...args.payload, sid };
+    const { payload: cborBytes, hwSig } = await signEncAuth(args.keyId, fullPayload);
+
+    // Step 3: upload payload + hw_sig in the same POST shape.
+    const putResp = await fetch(allocUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer wallet:${args.walletSessionToken}`,
+        },
+        body: JSON.stringify({
+            client_id: args.clientId,
+            device_id: args.deviceId ?? '',
+            payload: b64uEncode(cborBytes),
+            hw_sig: b64uEncode(hwSig),
+        }),
+    });
+    if (!putResp.ok) {
+        const detail = await putResp.text().catch(() => '');
+        throw new Error(`upload encauth: ${putResp.status} ${detail}`);
+    }
+    const putBody = (await putResp.json()) as { sid: string; envelope: EncAuthEnvelope };
+    return { sid: putBody.sid, envelope: putBody.envelope };
 }

@@ -681,6 +681,52 @@ export class AuthFrame {
         });
     }
 
+    /**
+     * Mint a per-audience access token (challenge mode) without rotating
+     * the user's primary session. Used to call services that demand a
+     * specific `aud` claim — most notably `aud=attestation-server` for
+     * the GCP-side verify-quote endpoint.
+     *
+     * Implementation: relays a `privasys:get-token-for-audience` postMessage
+     * to the auth iframe, which performs an OIDC `refresh_token` grant
+     * with an explicit `scope=audience:<aud> ...`. The IdP rotates the
+     * refresh token (the iframe persists the new one) but the returned
+     * access token is audience-bound and never replaces the session token
+     * the parent already holds.
+     *
+     * Requires an active session — call {@link AuthFrame.getSession} first.
+     */
+    getTokenForAudience(audience: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            if (!this.sessionIframe?.contentWindow) {
+                reject(new Error('no active session iframe; call getSession() first'));
+                return;
+            }
+            const id = `aud-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const target = this.sessionIframe.contentWindow;
+            const handler = (e: MessageEvent) => {
+                if (e.origin !== this.authOrigin) return;
+                if (e.source !== target) return;
+                const data = e.data;
+                if (!data || data.type !== 'privasys:token-for-audience:response' || data.id !== id) return;
+                window.removeEventListener('message', handler);
+                clearTimeout(timer);
+                if (typeof data.error === 'string') reject(new Error(data.error));
+                else if (typeof data.accessToken === 'string') resolve(data.accessToken);
+                else reject(new Error('malformed response from auth frame'));
+            };
+            const timer = setTimeout(() => {
+                window.removeEventListener('message', handler);
+                reject(new Error('timeout minting audience token'));
+            }, 15_000);
+            window.addEventListener('message', handler);
+            target.postMessage(
+                { type: 'privasys:get-token-for-audience', id, rpId: this.rpId, audience },
+                this.authOrigin,
+            );
+        });
+    }
+
     /** Tear down any active iframes. */
     destroy(): void {
         this.destroySessionIframe();

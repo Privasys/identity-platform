@@ -759,10 +759,46 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	// No user profile is stored server-side — refresh tokens only carry roles.
 	filteredRefreshAttrs := filterAttributesByScope(nil, scope)
 
+	// RFC 6749 §6: clients MAY request a narrower scope on refresh. We
+	// support this so the chat UI can mint a per-call token bound to a
+	// different audience (e.g. `attestation-server`) without rotating
+	// the user's primary session.
+	//
+	// Rules:
+	//   - The optional `scope` form param replaces the access-token scope
+	//     for THIS response only. The new refresh token stores the
+	//     ORIGINAL scope, so the next refresh starts from the same
+	//     baseline.
+	//   - Every non-`audience:*` token in the requested scope MUST be
+	//     present in the originally granted scope (subset rule). We do
+	//     not enforce this for `audience:*` because role filtering by
+	//     audience namespace already prevents cross-audience role leakage:
+	//     a user without an `<aud>:*` role gets an empty roles claim.
+	//   - The audience is derived from the requested scope when present,
+	//     otherwise from the stored scope.
+	effectiveScope := scope
+	if requested := strings.TrimSpace(r.FormValue("scope")); requested != "" {
+		stored := map[string]bool{}
+		for _, s := range strings.Fields(scope) {
+			stored[s] = true
+		}
+		for _, s := range strings.Fields(requested) {
+			if strings.HasPrefix(s, "audience:") {
+				continue
+			}
+			if !stored[s] {
+				errorResponse(w, http.StatusBadRequest, "invalid_scope",
+					"requested scope "+s+" not present in granted scope")
+				return
+			}
+		}
+		effectiveScope = requested
+	}
+
 	// Get current roles, filtered to the audience namespace carried by the
-	// original scope.
+	// effective scope (= requested scope if any, else stored).
 	allRoles, _ := db.GetRoles(userID)
-	audience := audienceFromScope(scope, "privasys-platform")
+	audience := audienceFromScope(effectiveScope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
 
 	// Issue new access token (with current roles and available profile).
@@ -804,7 +840,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 		"expires_in":    900,
 		"id_token":      idToken,
 		"refresh_token": newRefreshToken,
-		"scope":         scope,
+		"scope":         effectiveScope,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

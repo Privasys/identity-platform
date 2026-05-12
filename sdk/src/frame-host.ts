@@ -683,6 +683,57 @@ window.addEventListener('message', async (e: MessageEvent) => {
         );
     }
 
+    // Mint a per-audience access token without rotating the user's primary
+    // session. Used by chat to call as.privasys.org/verify-quote with an
+    // `aud=attestation-server` JWT. Implementation: refresh_token grant
+    // with an explicit `scope` form param (RFC 6749 §6 + audience extension).
+    // The new refresh token returned by the IdP keeps the original scope,
+    // so subsequent renewals continue to mint platform-audience tokens.
+    if (data.type === 'privasys:get-token-for-audience') {
+        const id = data.id;
+        const reply = (payload: Record<string, unknown>) =>
+            window.parent.postMessage(
+                { type: 'privasys:token-for-audience:response', id, ...payload },
+                e.origin,
+            );
+        const session = sessions.get(data.rpId);
+        if (!session?.refreshToken || !session?.clientId) {
+            reply({ error: 'no refresh token in session' });
+            return;
+        }
+        const audience = String(data.audience || '').trim();
+        if (!audience) {
+            reply({ error: 'audience required' });
+            return;
+        }
+        try {
+            const idpBase = globalThis.location.origin;
+            const resp = await fetch(`${idpBase}/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    grant_type: 'refresh_token',
+                    refresh_token: session.refreshToken,
+                    client_id: session.clientId,
+                    scope: `audience:${audience} openid email profile offline_access`,
+                }),
+            });
+            if (!resp.ok) {
+                const body = await resp.json().catch(() => ({ error: resp.statusText }));
+                reply({ error: body.error_description || body.error || `mint failed: ${resp.status}` });
+                return;
+            }
+            const tok = await resp.json();
+            // The IdP rotated the refresh token. Persist the new one so the
+            // next user-scope refresh uses a valid handle, but DO NOT touch
+            // the access token — that one is audience-bound.
+            sessions.store({ ...session, refreshToken: tok.refresh_token });
+            reply({ accessToken: tok.access_token, expiresIn: tok.expires_in });
+        } catch (err) {
+            reply({ error: (err as Error).message });
+        }
+    }
+
     // Sealed session-relay RPC. The parent serialises the request as
     // {method, path, body?} and we relay it through PrivasysSession.request
     // (CBOR-sealed AES-256-GCM over fetch). Only the iframe holds K, so the

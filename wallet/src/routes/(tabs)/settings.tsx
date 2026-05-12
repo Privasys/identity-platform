@@ -150,6 +150,18 @@ export default function SettingsScreen() {
                     <Text style={styles.logsButtonText}>View Logs</Text>
                     <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                 </Pressable>
+
+                {/* Server-side sessions (revoke). */}
+                <Text style={styles.sectionTitle}>Server Sessions</Text>
+                <Text style={styles.sectionDescription}>
+                    Manage the JWTs the privasys.id IdP has issued for your account. Revoke
+                    here to stop tokens working immediately, e.g. after losing a browser.
+                </Text>
+                <Pressable style={styles.logsButton} onPress={() => router.push('/server-sessions')}>
+                    <Ionicons name="server-outline" size={18} color="#0F172A" />
+                    <Text style={styles.logsButtonText}>Manage Server Sessions</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </Pressable>
             </ScrollView>
         </RNView>
     );

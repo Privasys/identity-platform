@@ -21,11 +21,18 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
 )
+
+// WalletSessionResolver resolves a short-lived wallet session token
+// (issued by `/fido2/*/complete`) to a user_id. The wallet uses these
+// tokens as its primary auth credential, so the session-management
+// endpoints accept them in addition to OIDC access tokens.
+type WalletSessionResolver func(token string) (string, bool)
 
 // ErrNotFound is returned by lookups that match no row.
 var ErrNotFound = errors.New("session not found")
@@ -48,7 +55,15 @@ type Session struct {
 
 // Store wraps the IdP DB with session-table operations.
 type Store struct {
-	db *store.DB
+	db            *store.DB
+	walletSession WalletSessionResolver
+}
+
+// SetWalletSessionResolver wires the FIDO2 wallet-session lookup into
+// the auth path of /sessions/me and /sessions/{sid}/revoke. Optional
+// — when nil only OIDC access tokens are accepted.
+func (s *Store) SetWalletSessionResolver(r WalletSessionResolver) {
+	s.walletSession = r
 }
 
 // New constructs a Store and ensures the sessions table exists.
@@ -251,7 +266,7 @@ func (s *Store) CleanupExpired() {
 //	Authorization: Bearer <access_token>
 func (s *Store) HandleListMine(issuer *tokens.Issuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, _, err := authBearer(r, issuer)
+		userID, _, err := s.authBearer(r, issuer)
 		if err != nil {
 			httpUnauth(w, err.Error())
 			return
@@ -284,7 +299,7 @@ func (s *Store) HandleListMine(issuer *tokens.Issuer) http.HandlerFunc {
 //	Authorization: Bearer <access_token>
 func (s *Store) HandleRevoke(issuer *tokens.Issuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, _, err := authBearer(r, issuer)
+		userID, _, err := s.authBearer(r, issuer)
 		if err != nil {
 			httpUnauth(w, err.Error())
 			return
@@ -316,14 +331,26 @@ func (s *Store) HandleRevoke(issuer *tokens.Issuer) http.HandlerFunc {
 	}
 }
 
-// authBearer extracts and verifies a Bearer access token, returning
-// (sub, sid).
-func authBearer(r *http.Request, issuer *tokens.Issuer) (string, string, error) {
+// authBearer extracts and verifies a Bearer token, returning
+// (sub, sid). Accepts two forms:
+//   - "Bearer wallet:<token>" — short-lived wallet session token
+//     issued by `/fido2/*/complete`. sid is returned empty.
+//   - "Bearer <jwt>"          — OIDC access token. sid is the `sid`
+//     claim, possibly empty for legacy tokens.
+func (s *Store) authBearer(r *http.Request, issuer *tokens.Issuer) (string, string, error) {
 	auth := r.Header.Get("Authorization")
-	if len(auth) < 8 || auth[:7] != "Bearer " {
+	if len(auth) < 8 || !strings.HasPrefix(auth, "Bearer ") {
 		return "", "", errors.New("bearer token required")
 	}
-	claims, err := issuer.VerifyAccessToken(auth[7:])
+	token := auth[7:]
+	if strings.HasPrefix(token, "wallet:") && s.walletSession != nil {
+		walletToken := strings.TrimPrefix(token, "wallet:")
+		if userID, ok := s.walletSession(walletToken); ok {
+			return userID, "", nil
+		}
+		return "", "", errors.New("invalid or expired wallet session")
+	}
+	claims, err := issuer.VerifyAccessToken(token)
 	if err != nil {
 		return "", "", err
 	}

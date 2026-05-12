@@ -87,6 +87,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to open sessions store: %v", err)
 	}
+	sessionsStore.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 
 	mux := http.NewServeMux()
 

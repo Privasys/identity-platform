@@ -325,17 +325,24 @@ export default function ConnectScreen() {
     const startFlow = useCallback(
         async (payload: QRPayload) => {
             setStep('verifying');
-            // In session-relay mode the meaningful enclave is the AI app host
-            // (where the sealed-CBOR transport terminates and where the
-            // bound JWT will be presented). The IdP at `payload.origin`
-            // brokers the FIDO2 ceremony but never sees the sealed bytes,
-            // so attesting it would not constrain the relying party.
+            // The relying-party app the user is actually signing into is
+            // `payload.rpId` (e.g. `lightpanda.apps-test.privasys.org`).
+            // `payload.origin` is the FIDO2 ceremony host (the IdP at
+            // `privasys.id`) — attesting it would just measure the IdP,
+            // not the enclave that holds the user's data, so it is
+            // explicitly NOT what we want here.
+            //
+            // In session-relay mode the AI app host is set on `appHost`;
+            // we keep that as the attestation target because the sealed
+            // CBOR transport terminates there even when `rpId` points at
+            // a generic IdP scope. Without an `appHost` we fall back to
+            // `rpId`.
             const attestationTarget =
                 payload.mode === 'session-relay' && payload.appHost
                     ? payload.appHost
-                    : payload.origin;
+                    : payload.rpId;
             console.log(`[CONNECT] startFlow — verifying attestation for ${attestationTarget}` +
-                (attestationTarget !== payload.origin ? ` (session-relay; origin=${payload.origin})` : ''));
+                (attestationTarget !== payload.origin ? ` (fido2 origin=${payload.origin})` : ''));
             try {
                 // Step 1 — inspect the cert. inspect() does NOT contact the
                 // attestation server: it does the TLS handshake and parses any

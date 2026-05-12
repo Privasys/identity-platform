@@ -130,8 +130,19 @@ export class PrivasysAuth {
     /**
      * For returning users: send a push notification via the broker
      * to the wallet, then wait for them to approve.
+     *
+     * `sessionRelay` MUST be forwarded so the push-driven flow
+     * triggers the same sealed-CBOR bootstrap as a freshly-scanned
+     * QR. Dropping it on the push path silently degrades returning
+     * users to a vanilla passkey against `rpId` (the IdP), which has
+     * no enclave measurements — the wallet then stores a `teeType:
+     * 'none'` trust row that masquerades as the real enclave.
      */
-    async notifyAndWait(pushToken: string, sessionId?: string): Promise<AuthResult> {
+    async notifyAndWait(
+        pushToken: string,
+        sessionId?: string,
+        sessionRelay?: { sdkPub: string; appHost: string; nonce?: string },
+    ): Promise<AuthResult> {
         const sid = sessionId ?? this.createQR().sessionId;
 
         // POST to broker /notify endpoint
@@ -150,6 +161,14 @@ export class PrivasysAuth {
                 appName: this.config.appName,
                 origin: this.config.idpOrigin ?? 'privasys.id',
                 brokerUrl: this.config.brokerUrl,
+                ...(sessionRelay
+                    ? {
+                        mode: 'session-relay' as const,
+                        sdkPub: sessionRelay.sdkPub,
+                        appHost: sessionRelay.appHost,
+                        nonce: sessionRelay.nonce,
+                    }
+                    : {}),
             }),
         });
 

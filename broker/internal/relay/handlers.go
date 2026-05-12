@@ -79,6 +79,17 @@ type notifyRequest struct {
 	Origin    string `json:"origin"`
 	BrokerURL string `json:"brokerUrl"`
 	Type      string `json:"type,omitempty"` // "auth-request"
+
+	// Session-relay fields. Only set when the SDK opted into the
+	// sealed-CBOR bootstrap. They MUST be forwarded to the wallet
+	// in the push payload, otherwise the wallet falls back to a
+	// vanilla passkey against `rpId` (typically the IdP, which has
+	// no enclave measurements) and stores a bogus `teeType:'none'`
+	// trust row.
+	Mode    string `json:"mode,omitempty"`    // "session-relay"
+	SdkPub  string `json:"sdkPub,omitempty"`  // SEC1 P-256 base64url
+	AppHost string `json:"appHost,omitempty"` // attestation target host
+	Nonce   string `json:"nonce,omitempty"`   // replay window nonce
 }
 
 // HandleNotify sends a push notification to the wallet via Expo push service.
@@ -122,18 +133,34 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 	}
 
 	// Build Expo push message
+	pushData := map[string]string{
+		"type":      "auth-request",
+		"sessionId": req.SessionID,
+		"rpId":      req.RpID,
+		"appName":   req.AppName,
+		"origin":    req.Origin,
+		"brokerUrl": req.BrokerURL,
+		"userAgent": r.Header.Get("User-Agent"),
+		"clientIP":  clientIP,
+	}
+	// Forward session-relay fields verbatim when present so the wallet
+	// can attest the appHost and bootstrap the sealed-CBOR session
+	// instead of falling back to a vanilla passkey against the IdP.
+	if req.Mode != "" {
+		pushData["mode"] = req.Mode
+	}
+	if req.SdkPub != "" {
+		pushData["sdkPub"] = req.SdkPub
+	}
+	if req.AppHost != "" {
+		pushData["appHost"] = req.AppHost
+	}
+	if req.Nonce != "" {
+		pushData["nonce"] = req.Nonce
+	}
 	pushMsg := map[string]interface{}{
-		"to": req.PushToken,
-		"data": map[string]string{
-			"type":      "auth-request",
-			"sessionId": req.SessionID,
-			"rpId":      req.RpID,
-			"appName":   req.AppName,
-			"origin":    req.Origin,
-			"brokerUrl": req.BrokerURL,
-			"userAgent": r.Header.Get("User-Agent"),
-			"clientIP":  clientIP,
-		},
+		"to":   req.PushToken,
+		"data": pushData,
 	}
 
 	displayName := req.AppName

@@ -46,10 +46,15 @@ function authRequestPayload(data: Record<string, unknown>): string | null {
         userAgent: data.userAgent,
         appName: data.appName,
         clientIP: data.clientIP,
-        // session-relay (Phase E): only present when the requesting SDK
-        // opted into the sealed-session bootstrap.
+        // Session-relay fields. Only present when the requesting SDK
+        // opted into the sealed-session bootstrap. `appHost` is the
+        // attestation target — omitting it makes the wallet fall back
+        // to attesting `rpId` (typically the IdP at `privasys.id`,
+        // which has no enclave measurements), producing a bogus
+        // `Passkey (no enclave)` trust row.
         mode: data.mode,
         sdkPub: data.sdkPub,
+        appHost: data.appHost,
         nonce: data.nonce,
         expectedAppSni: data.expectedAppSni,
     });

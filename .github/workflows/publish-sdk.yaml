@@ -48,7 +48,21 @@ jobs:
 
       - name: Publish to GHCR npm
         working-directory: sdk
-        run: npm publish
+        # Tolerate re-runs: if the version is already on the registry, npm
+        # exits 1 with "cannot publish over the previously published versions".
+        # We treat that as success so the post-publish frame-bundle deploy can
+        # still execute (the deploy is the part that actually matters for
+        # adopter sites).
+        run: |
+          set +e
+          out=$(npm publish 2>&1)
+          rc=$?
+          echo "$out"
+          if [ $rc -ne 0 ] && echo "$out" | grep -q "cannot publish over the previously published versions"; then
+            echo "::notice::Version already published; continuing to deploy hosted bundle."
+            exit 0
+          fi
+          exit $rc
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

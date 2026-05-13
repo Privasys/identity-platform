@@ -771,7 +771,14 @@ export default function ConnectScreen() {
                 );
                 addRelaySession({
                     sessionId: result.sessionRelay.sessionId,
-                    rpId: payload.rpId,
+                    // Key the relay session by the same identity as the
+                    // trusted-app row (appHost in session-relay mode,
+                    // otherwise rpId). Without this, the Home tab
+                    // shows two separate cards for the same app — a
+                    // sealed "Relaying…" tile keyed by the IdP rpId
+                    // and a duplicate trusted-app tile keyed by the
+                    // enclave appHost.
+                    rpId: trustKey,
                     origin: payload.origin,
                     appName: payload.appName,
                     expiresAt: safeExpiresAt,

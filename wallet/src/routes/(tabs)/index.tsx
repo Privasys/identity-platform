@@ -17,16 +17,6 @@ function appName(rpId: string): string {
     return dot > 0 ? rpId.substring(0, dot) : rpId;
 }
 
-function formatRemaining(msLeft: number): string {
-    if (msLeft <= 0) return 'expired';
-    const secondsLeft = Math.floor(msLeft / 1000);
-    if (secondsLeft < 60) return `${secondsLeft}s left`;
-    const m = Math.floor(secondsLeft / 60);
-    if (m < 60) return `${m}m left`;
-    const h = Math.floor(m / 60);
-    return `${h}h ${m % 60}m left`;
-}
-
 /**
  * One row in the unified Active Sessions list. Rows are keyed by
  * rpId. A row may originate from a trusted app, a live relay session,
@@ -219,11 +209,9 @@ export default function HomeScreen() {
                                                 )}
                                             </RNView>
                                             <Text style={styles.serviceMeta}>
-                                                {sealed && row.session
-                                                    ? `Relaying · ${formatRemaining(row.session.expiresAt - now)}`
-                                                    : row.app
-                                                        ? `${teeType === 'none' ? 'Passkey' : teeType.toUpperCase()} · Connected ${new Date(row.app.lastVerified * 1000).toLocaleDateString()}`
-                                                        : 'Active session'}
+                                                {row.app
+                                                    ? `${teeType === 'none' ? 'Passkey' : teeType.toUpperCase()} · Connected ${new Date(row.app.lastVerified * 1000).toLocaleDateString()}`
+                                                    : 'Active session'}
                                             </Text>
                                         </RNView>
                                         {onPress && (

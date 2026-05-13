@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { useAuthStore } from '@/stores/auth';
+import { useSessionsStore } from '@/stores/sessions';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 function appName(rpId: string): string {
@@ -23,9 +24,14 @@ export default function ServiceDetailScreen() {
 
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
     const { removeCredential, credentials } = useAuthStore();
+    const sessions = useSessionsStore((s) => s.sessions);
 
     const app = apps.find((a) => a.rpId === rpId);
     const credential = credentials.find((c) => c.rpId === rpId);
+    // Live sealed-relay session for this app, if any. Sessions are
+    // keyed by the same `appHost` (= `trustKey`) the trusted-app row
+    // uses, so a direct rpId match is correct.
+    const session = sessions.find((s) => s.rpId === rpId && s.expiresAt > Date.now());
     const [removing, setRemoving] = useState(false);
 
     const handleRemove = () => {
@@ -114,6 +120,29 @@ export default function ServiceDetailScreen() {
                             />
                         )}
                     </RNView>
+
+                    {/* Sealed session (only when this app currently has a
+                        live session-relay binding the wallet anchored on
+                        behalf of a browser). Surfaced here so users can
+                        tell at a glance that the row's "Sealed" badge
+                        on Home corresponds to a real K binding. */}
+                    {session && (
+                        <RNView style={styles.card}>
+                            <RNView style={styles.cardTitleRow}>
+                                <Text style={styles.cardTitle}>Sealed Session</Text>
+                                <RNView style={styles.sealedBadge}>
+                                    <RNView style={styles.sealedDot} />
+                                    <Text style={styles.sealedText}>Active</Text>
+                                </RNView>
+                            </RNView>
+                            <DetailRow label="Transport" value="AES-256-GCM (sealed CBOR)" />
+                            <DetailRow label="Session ID" value={session.sessionId} mono />
+                            <DetailRow
+                                label="Started"
+                                value={new Date(session.startedAt).toLocaleString()}
+                            />
+                        </RNView>
+                    )}
 
                     {/* Remove */}
                     <Pressable
@@ -208,6 +237,32 @@ const styles = StyleSheet.create({
         color: '#64748B',
         letterSpacing: 0.5,
         marginBottom: 12
+    },
+    cardTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12
+    },
+    sealedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(52, 232, 158, 0.12)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10
+    },
+    sealedDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#34E89E'
+    },
+    sealedText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#0F8A4A'
     },
     detailRow: {
         flexDirection: 'row',

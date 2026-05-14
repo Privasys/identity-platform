@@ -727,14 +727,22 @@ export class AuthFrame {
         });
     }
 
-    /** Tear down any active iframes. */
+    /**
+     * Tear down any active iframes owned by THIS instance only.
+     *
+     * Important: only iframes that this `AuthFrame` created (the
+     * `signIn()` overlay, the `getSession()` renewal iframe, and the
+     * sealed session iframe) are removed. We deliberately do NOT do a
+     * document-wide `querySelector('iframe[src^=…/auth/]')` cleanup —
+     * that would tear down the persistent renewal iframe owned by
+     * another `AuthFrame` instance (typically the app-wide
+     * `PrivasysAuthProvider`), silently breaking its OIDC refresh
+     * timer and surfacing as a delayed "Session expired" the next
+     * time the JWT actually times out.
+     */
     destroy(): void {
         this.destroySessionIframe();
         this.destroySealedIframe();
-        const existing = document.querySelector(
-            `iframe[src^="${this.authOrigin}/auth/"]`,
-        );
-        if (existing) existing.remove();
     }
 
     private destroySealedIframe(): void {

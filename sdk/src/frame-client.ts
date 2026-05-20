@@ -182,6 +182,12 @@ export class AuthFrame {
     private readonly container: HTMLElement | null;
     private sessionIframe: HTMLIFrameElement | null = null;
     private sessionHandler: ((e: MessageEvent) => void) | null = null;
+    // Cached session payload from the last successful getSession() call.
+    // Reused while sessionIframe is still attached so concurrent callers
+    // (e.g. multiple attestation rows minting per-audience tokens) don't
+    // tear down each other's iframe via destroySessionIframe().
+    private cachedSession: { token: string; rpId: string; authenticatedAt: number } | null = null;
+    private sessionInFlight: Promise<{ token: string; rpId: string; authenticatedAt: number } | null> | null = null;
     private _onSessionExpired?: (rpId: string) => void;
     private _onSessionRenewed?: (rpId: string, accessToken?: string) => void;
     // Sealed session-relay state.
@@ -558,6 +564,26 @@ export class AuthFrame {
      * The iframe is kept alive so the frame-host can run renewal timers.
      */
     getSession(): Promise<{ token: string; rpId: string; authenticatedAt: number } | null> {
+        // Idempotent: if a session iframe is already attached AND we
+        // have the cached payload from when it was set up, hand it
+        // back directly. Tearing it down and recreating it would
+        // break any concurrent caller about to postMessage through
+        // the same iframe (e.g. getTokenForAudience), which is the
+        // root cause of the "no active session iframe; call
+        // getSession() first" race seen when multiple attestation
+        // rows mint audience tokens in parallel.
+        if (this.sessionIframe?.contentWindow && this.cachedSession) {
+            return Promise.resolve(this.cachedSession);
+        }
+        // Coalesce concurrent in-flight calls.
+        if (this.sessionInFlight) return this.sessionInFlight;
+        const p = this.doGetSession();
+        this.sessionInFlight = p;
+        p.finally(() => { if (this.sessionInFlight === p) this.sessionInFlight = null; });
+        return p;
+    }
+
+    private doGetSession(): Promise<{ token: string; rpId: string; authenticatedAt: number } | null> {
         return new Promise((resolve) => {
             // Clean up any prior session iframe for this instance
             this.destroySessionIframe();
@@ -590,12 +616,14 @@ export class AuthFrame {
                         // timers (OIDC refresh_token or legacy push-based).
                         this.sessionIframe = iframe;
                         this.sessionHandler = handler;
+                        this.cachedSession = data.session;
                     } else {
                         // No session — clean up
                         window.removeEventListener('message', handler);
                         iframe.remove();
                         this.sessionIframe = null;
                         this.sessionHandler = null;
+                        this.cachedSession = null;
                     }
 
                     resolve(data.session || null);
@@ -772,5 +800,6 @@ export class AuthFrame {
             this.sessionIframe.remove();
             this.sessionIframe = null;
         }
+        this.cachedSession = null;
     }
 }

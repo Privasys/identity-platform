@@ -60,6 +60,10 @@ export interface QRDescriptor {
     appHost?: string;
     /** Per-session replay nonce (base64url). Falls back to sessionId. */
     nonce?: string;
+    /** OIDC client_id of the relying party. The wallet uses it to anchor
+     *  the EncAuth silent-rebind voucher on the same IdP session row
+     *  (`sid`) the issued JWT will carry. */
+    clientId?: string;
 }
 
 /** Backwards-compatible alias — pre-v1 callers spoke of "QRPayload". */
@@ -154,6 +158,7 @@ export function generateQRPayload(opts: {
     sdkPub?: string;
     appHost?: string;
     nonce?: string;
+    clientId?: string;
     /** Override for the relay base URL (defaults to `brokerUrl`'s host). */
     relayBase?: string;
 }): GenerateQRResult {
@@ -176,6 +181,7 @@ export function generateQRPayload(opts: {
     }
     if (opts.appName) desc.appName = opts.appName;
     if (opts.privacyPolicyUrl) desc.privacyPolicyUrl = opts.privacyPolicyUrl;
+    if (opts.clientId) desc.clientId = opts.clientId;
     if (opts.mode === 'session-relay') {
         if (!opts.sdkPub || !opts.appHost) {
             throw new Error('generateQRPayload: session-relay mode requires sdkPub and appHost');

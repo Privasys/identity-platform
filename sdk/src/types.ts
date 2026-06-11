@@ -24,6 +24,10 @@ export interface AuthConfig {
     appName?: string;
     /** URL to the app's privacy policy. Shown to the user when sharing attributes. */
     privacyPolicyUrl?: string;
+    /** OIDC client_id of the relying party. Forwarded to the wallet (QR
+     *  descriptor / push payload) so it can anchor the EncAuth voucher on
+     *  the same IdP session row (`sid`) the issued JWT will carry. */
+    clientId?: string;
 }
 
 /** Attestation information returned from the wallet. */
@@ -66,7 +70,9 @@ export interface SessionRelayBinding {
     sessionId: string;
     /** Enclave's ephemeral P-256 public key (SEC1 uncompressed, base64url). */
     encPub: string;
-    /** Enclave-side session expiry (epoch ms). */
+    /** Enclave-side session expiry, epoch **seconds** (crypto-contract §3).
+     *  Legacy Go enclaves sent epoch ms; consumers normalise via the
+     *  `< 1e12 → seconds` heuristic until those are gone. */
     expiresAt: number;
 }
 

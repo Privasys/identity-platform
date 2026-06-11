@@ -148,6 +148,45 @@ export class PrivasysSession {
     }
 
     /**
+     * Resume (re-create) a sealed session purely from an EncAuth voucher —
+     * no wallet ceremony, no push. This is the page-reload / cold-start
+     * path: `K` is never persisted, so a new ephemeral keypair is
+     * generated and the enclave re-derives a fresh session against its
+     * long-lived identity key after verifying the voucher.
+     *
+     * Returns a discriminated result so callers can distinguish "user
+     * never had a voucher" from "the enclave refused it" (measurement or
+     * identity changed → a wallet ceremony is required).
+     */
+    static async resume(opts: {
+        host: string;
+        getEncAuth: () => Promise<EncAuthEnvelope | null | undefined>;
+        fetchImpl?: typeof fetch;
+    }): Promise<{ session: PrivasysSession } | { error: 'no-voucher' | 'rejected' | 'unavailable' }> {
+        const fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
+        let env: EncAuthEnvelope | null | undefined;
+        try {
+            env = await opts.getEncAuth();
+        } catch {
+            return { error: 'unavailable' };
+        }
+        if (!env) return { error: 'no-voucher' };
+
+        const handshake = await bootstrapWithEncAuth(opts.host, env, fetchImpl);
+        if (!handshake.ok) return { error: handshake.error };
+
+        const session = await PrivasysSession.fromHandshake({
+            host: opts.host,
+            sessionId: handshake.sessionId,
+            sdkPrivateKey: handshake.sdkPrivateKey,
+            encPub: handshake.encPub,
+            fetchImpl,
+            getEncAuth: opts.getEncAuth,
+        });
+        return { session };
+    }
+
+    /**
      * Construct a session from a completed handshake. Use this when the SDK
      * has performed the ECDH out-of-band (e.g. the iframe generated the SDK
      * keypair, the wallet attested the enclave, and `encPub` + `sessionId`
@@ -159,6 +198,8 @@ export class PrivasysSession {
         sdkPrivateKey: CryptoKey;
         encPub: string;
         fetchImpl?: typeof fetch;
+        /** Optional EncAuth fetcher enabling silent rebind (see {@link SessionInitOptions.getEncAuth}). */
+        getEncAuth?: () => Promise<EncAuthEnvelope | null | undefined>;
     }): Promise<PrivasysSession> {
         const fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
 
@@ -209,7 +250,9 @@ export class PrivasysSession {
             ),
         );
 
-        return new PrivasysSession(opts.host, opts.sessionId, { aead, c2sPrefix, s2cPrefix }, fetchImpl);
+        const session = new PrivasysSession(opts.host, opts.sessionId, { aead, c2sPrefix, s2cPrefix }, fetchImpl);
+        if (opts.getEncAuth) session.getEncAuth = opts.getEncAuth;
+        return session;
     }
 
     /**
@@ -321,36 +364,15 @@ export class PrivasysSession {
         }
         if (!env) return false;
 
+        const handshake = await bootstrapWithEncAuth(this.host, env, this.fetchImpl);
+        if (!handshake.ok) return false;
+
         try {
-            const sdkKeyPair = (await crypto.subtle.generateKey(
-                { name: 'ECDH', namedCurve: 'P-256' },
-                false,
-                ['deriveBits'],
-            )) as CryptoKeyPair;
-            const sdkPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', sdkKeyPair.publicKey));
-            const sdkPubB64 = base64UrlEncode(sdkPubRaw);
-
-            const url = `https://${this.host}${INIT_PATH}`;
-            const resp = await this.fetchImpl(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sdk_pub: sdkPubB64, encauth: env }),
-            });
-            if (!resp.ok) return false;
-            // If the enclave couldn't accept the voucher it sets a
-            // diagnostic header. Treat that as a soft failure even if
-            // the response otherwise looks fine, so callers fall back
-            // to a wallet ceremony.
-            if (resp.headers.get('X-Privasys-EncAuth-Reject')) return false;
-
-            const data = (await resp.json()) as { session_id: string; enc_pub: string };
-            if (!data.session_id || !data.enc_pub) return false;
-
             const reborn = await PrivasysSession.fromHandshake({
                 host: this.host,
-                sessionId: data.session_id,
-                sdkPrivateKey: sdkKeyPair.privateKey,
-                encPub: data.enc_pub,
+                sessionId: handshake.sessionId,
+                sdkPrivateKey: handshake.sdkPrivateKey,
+                encPub: handshake.encPub,
                 fetchImpl: this.fetchImpl,
             });
             // Adopt the new keys + sessionId in place. Counters are
@@ -499,6 +521,127 @@ export interface SealedResponse {
 // -----------------------------------------------------------------------------
 // helpers
 // -----------------------------------------------------------------------------
+
+/**
+ * Run an EncAuth-vouched bootstrap against the enclave: generate a fresh
+ * ephemeral SDK keypair, POST it with the voucher, and return the
+ * handshake inputs. Shared by silent rebind (`tryRebind`) and cold
+ * resume (`PrivasysSession.resume`).
+ *
+ * `rejected` means the enclave actively refused the voucher
+ * (`X-Privasys-EncAuth-Reject` or a non-OK status) — the measurement or
+ * enclave identity changed and a wallet ceremony is required.
+ * `unavailable` is a transport/parse failure worth retrying.
+ */
+async function bootstrapWithEncAuth(
+    host: string,
+    env: EncAuthEnvelope,
+    fetchImpl: typeof fetch,
+): Promise<
+    | { ok: true; sessionId: string; encPub: string; sdkPrivateKey: CryptoKey }
+    | { ok: false; error: 'rejected' | 'unavailable' }
+> {
+    try {
+        const sdkKeyPair = (await crypto.subtle.generateKey(
+            { name: 'ECDH', namedCurve: 'P-256' },
+            false,
+            ['deriveBits'],
+        )) as CryptoKeyPair;
+        const sdkPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', sdkKeyPair.publicKey));
+        const sdkPubB64 = base64UrlEncode(sdkPubRaw);
+
+        const url = `https://${host}${INIT_PATH}`;
+        const resp = await fetchImpl(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sdk_pub: sdkPubB64, encauth: env }),
+        });
+        if (!resp.ok) return { ok: false, error: 'rejected' };
+        // If the enclave couldn't accept the voucher it sets a diagnostic
+        // header and falls through to the legacy random-id path. Treat
+        // that as a refusal even if the response otherwise looks fine, so
+        // callers fall back to a wallet ceremony.
+        if (resp.headers.get('X-Privasys-EncAuth-Reject')) return { ok: false, error: 'rejected' };
+
+        const data = (await resp.json()) as { session_id: string; enc_pub: string };
+        if (!data.session_id || !data.enc_pub) return { ok: false, error: 'rejected' };
+
+        // SECURITY: pin the response enc_pub to the wallet-attested
+        // enc_pub carried (and signed) inside the voucher. The bootstrap
+        // endpoint is exempt from sealed transport, so this response
+        // crosses the gateway-terminated leg in the clear. Without this
+        // check a malicious intermediary could substitute its own
+        // enc_pub, the SDK would derive K against it, and the "sealed"
+        // session would be readable by that intermediary — defeating the
+        // whole point of session relay. In the honest path the enclave
+        // only accepts the voucher when its own identity equals the
+        // bound enc_pub, so the genuine response always matches.
+        let boundEncPub: Uint8Array;
+        try {
+            boundEncPub = extractVoucherEncPub(env.payload);
+        } catch {
+            return { ok: false, error: 'rejected' };
+        }
+        let respEncPub: Uint8Array;
+        try {
+            respEncPub = base64UrlDecode(data.enc_pub);
+        } catch {
+            return { ok: false, error: 'rejected' };
+        }
+        if (!bytesEqual(respEncPub, boundEncPub)) {
+            return { ok: false, error: 'rejected' };
+        }
+
+        return { ok: true, sessionId: data.session_id, encPub: data.enc_pub, sdkPrivateKey: sdkKeyPair.privateKey };
+    } catch {
+        return { ok: false, error: 'unavailable' };
+    }
+}
+
+/**
+ * Extract the wallet-attested `enc_pub` (SEC1 uncompressed, 65 bytes)
+ * from an EncAuth voucher payload (base64url canonical CBOR, integer
+ * keys 1..10 ascending — crypto-contract §8.1; enc_pub is key 6). Strict
+ * walk: rejects anything that is not the expected map shape. Used to
+ * pin the enclave identity the silent-rebind / resume session is keyed
+ * against. Throws on any malformation.
+ */
+function extractVoucherEncPub(payloadB64: string): Uint8Array {
+    const buf = base64UrlDecode(payloadB64);
+    let off = 0;
+    if (buf[off] !== 0xaa) throw new Error('encauth payload: expected map(10)');
+    off += 1;
+    let encPub: Uint8Array | null = null;
+    for (let i = 0; i < 10; i++) {
+        const [key, kOff] = readUint(buf, off);
+        off = kOff;
+        const major = buf[off] >> 5;
+        if (major === 0) {
+            const [, o] = readUint(buf, off);
+            off = o;
+        } else if (major === 2) {
+            const [b, o] = readByteString(buf, off);
+            off = o;
+            if (key === 6n) encPub = b;
+        } else if (major === 3) {
+            const [, o] = readTextString(buf, off);
+            off = o;
+        } else {
+            throw new Error('encauth payload: unexpected major type');
+        }
+    }
+    if (!encPub || encPub.byteLength !== 65 || encPub[0] !== 0x04) {
+        throw new Error('encauth payload: missing or malformed enc_pub');
+    }
+    return encPub;
+}
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+    if (a.byteLength !== b.byteLength) return false;
+    let diff = 0;
+    for (let i = 0; i < a.byteLength; i++) diff |= a[i] ^ b[i];
+    return diff === 0;
+}
 
 function serializePlaintext(body: unknown): Uint8Array {
     if (body == null) return new Uint8Array(0);

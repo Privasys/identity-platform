@@ -33,6 +33,10 @@ export interface AuthUIConfig {
      *  FIDO2 requests use this ID so the IdP can link them back to the
      *  OIDC authorize session. */
     sessionId?: string;
+    /** OIDC client_id (OIDC mode). Forwarded to the wallet via the QR
+     *  descriptor / push payload so the EncAuth voucher lands on the same
+     *  IdP session row (`sid`) as the issued JWT. */
+    clientId?: string;
     /** Attribute keys the relying party needs from the wallet (e.g. ["email", "name"]). */
     requestedAttributes?: string[];
     /** Direct FIDO2 endpoint base URL (OIDC mode). When set, the WebAuthn
@@ -1358,6 +1362,7 @@ export class AuthUI {
                 requestedAttributes: this.cfg.requestedAttributes,
                 appName: this.cfg.appName,
                 privacyPolicyUrl: this.cfg.privacyPolicyUrl,
+                clientId: this.cfg.clientId,
             }, {
                 onStateChange: (s: AuthState) => {
                     const map: Record<string, UIState> = {

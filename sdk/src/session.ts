@@ -3,7 +3,11 @@
 
 import type { AuthSession } from './types';
 
-const STORAGE_KEY = 'privasys_sessions';
+/** localStorage key for the session list. Exported so the frame-host
+ *  can watch cross-document `storage` events for renewals performed in
+ *  sibling iframes/tabs. */
+export const SESSIONS_STORAGE_KEY = 'privasys_sessions';
+const STORAGE_KEY = SESSIONS_STORAGE_KEY;
 const HINTS_KEY = 'privasys_device_hints';
 const PASSKEY_HINT_KEY = 'privasys_passkey';
 

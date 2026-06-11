@@ -635,14 +635,22 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 	roles := filterRolesByAudience(allRoles, audience)
 
 	// Issue ID token.
-	// Mint a session row (when the unified session store is wired up)
-	// and embed its sid in the issued tokens. The wallet uses sid as
-	// the revocation handle (see internal/sessions).
+	// Reuse (or mint) the unified session row for (user, client, device)
+	// and embed its sid in the issued tokens. The wallet uses sid as the
+	// revocation handle (see internal/sessions).
+	//
+	// This MUST be FindOrCreateForApp — not an unconditional Create — so
+	// the sid in the JWT matches the row the wallet's EncAuth voucher is
+	// stored on (`POST /sessions/encauth` resolves the same (user,
+	// client, device) tuple). With a per-sign-in sid the SDK's
+	// `GET /sessions/{sid}/encauth` would always 404 and silent rebind
+	// would never engage. Browser flows carry no stable device id, so
+	// device_id is "" on both paths.
 	var sid string
 	if sess != nil {
-		row, err := sess.Create("", ac.UserID, ac.ClientID, "", refreshTokenTTL)
+		row, err := sess.FindOrCreateForApp(ac.UserID, ac.ClientID, "", refreshTokenTTL)
 		if err != nil {
-			log.Printf("token: session row creation failed: %v", err)
+			log.Printf("token: session row lookup/creation failed: %v", err)
 		} else {
 			sid = row.SID
 		}

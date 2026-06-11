@@ -60,6 +60,7 @@ export class PrivasysAuth {
             requestedAttributes: this.config.requestedAttributes,
             appName: this.config.appName,
             privacyPolicyUrl: this.config.privacyPolicyUrl,
+            clientId: this.config.clientId,
             ...(sessionRelay
                 ? {
                     mode: 'session-relay' as const,
@@ -161,6 +162,7 @@ export class PrivasysAuth {
                 appName: this.config.appName,
                 origin: this.config.idpOrigin ?? 'privasys.id',
                 brokerUrl: this.config.brokerUrl,
+                ...(this.config.clientId ? { clientId: this.config.clientId } : {}),
                 ...(sessionRelay
                     ? {
                         mode: 'session-relay' as const,

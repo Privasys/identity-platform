@@ -385,82 +385,8 @@ export class AuthFrame {
                         break;
                     }
 
-                    case 'privasys:session:response': {
-                        const id = data.id as number;
-                        const pending = this.sealedReqs.get(id);
-                        if (!pending) return;
-                        this.sealedReqs.delete(id);
-                        if (data.error) {
-                            pending.reject(new Error(String(data.error)));
-                        } else {
-                            pending.resolve({
-                                status: data.status as number,
-                                headers: (data.headers as Record<string, string>) || {},
-                                body: data.body as Uint8Array,
-                                sealed: !!data.sealed,
-                            });
-                        }
-                        break;
-                    }
-
-                    case 'privasys:session:stream-start': {
-                        const id = data.id as number;
-                        const slot = this.sealedStreams.get(id);
-                        if (!slot || !slot.resolve) return;
-                        const stream = new ReadableStream<Uint8Array>({
-                            start: (controller) => { slot.controller = controller; },
-                            cancel: () => {
-                                this.sealedStreams.delete(id);
-                                this.sealedIframe?.contentWindow?.postMessage(
-                                    { type: 'privasys:session:stream-cancel', id },
-                                    this.authOrigin,
-                                );
-                            },
-                        });
-                        slot.resolve({
-                            status: data.status as number,
-                            sealed: !!data.sealed,
-                            headers: (data.headers as Record<string, string>) || {},
-                            body: stream,
-                        });
-                        slot.resolve = undefined;
-                        slot.reject = undefined;
-                        break;
-                    }
-
-                    case 'privasys:session:stream-chunk': {
-                        const id = data.id as number;
-                        const slot = this.sealedStreams.get(id);
-                        if (!slot?.controller) return;
-                        const chunk = data.chunk as Uint8Array;
-                        if (chunk && chunk.byteLength > 0) {
-                            slot.controller.enqueue(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk));
-                        }
-                        break;
-                    }
-
-                    case 'privasys:session:stream-end': {
-                        const id = data.id as number;
-                        const slot = this.sealedStreams.get(id);
-                        if (!slot) return;
-                        slot.controller?.close();
-                        this.sealedStreams.delete(id);
-                        break;
-                    }
-
-                    case 'privasys:session:stream-error': {
-                        const id = data.id as number;
-                        const slot = this.sealedStreams.get(id);
-                        if (!slot) return;
-                        const err = new Error(String(data.error || 'sealed stream failed'));
-                        if (slot.reject) {
-                            slot.reject(err);
-                        } else {
-                            slot.controller?.error(err);
-                        }
-                        this.sealedStreams.delete(id);
-                        break;
-                    }
+                    default:
+                        this.handleSealedRpcMessage(data);
                 }
             };
 
@@ -483,6 +409,178 @@ export class AuthFrame {
         return new Promise<SealedSession>((resolve, reject) => {
             this.sealedReadyResolvers.push(resolve);
             this.sealedReadyRejecters.push(reject);
+        });
+    }
+
+    /**
+     * Handle sealed-transport RPC responses relayed from the auth iframe.
+     * Shared by the sign-in message handler (sealed mode) and the
+     * resume-session handler. Returns true when the message was consumed.
+     */
+    private handleSealedRpcMessage(data: { type?: unknown; [k: string]: unknown }): boolean {
+        switch (data.type) {
+            case 'privasys:session:response': {
+                const id = data.id as number;
+                const pending = this.sealedReqs.get(id);
+                if (!pending) return true;
+                this.sealedReqs.delete(id);
+                if (data.error) {
+                    pending.reject(new Error(String(data.error)));
+                } else {
+                    pending.resolve({
+                        status: data.status as number,
+                        headers: (data.headers as Record<string, string>) || {},
+                        body: data.body as Uint8Array,
+                        sealed: !!data.sealed,
+                    });
+                }
+                return true;
+            }
+
+            case 'privasys:session:stream-start': {
+                const id = data.id as number;
+                const slot = this.sealedStreams.get(id);
+                if (!slot || !slot.resolve) return true;
+                const stream = new ReadableStream<Uint8Array>({
+                    start: (controller) => { slot.controller = controller; },
+                    cancel: () => {
+                        this.sealedStreams.delete(id);
+                        this.sealedIframe?.contentWindow?.postMessage(
+                            { type: 'privasys:session:stream-cancel', id },
+                            this.authOrigin,
+                        );
+                    },
+                });
+                slot.resolve({
+                    status: data.status as number,
+                    sealed: !!data.sealed,
+                    headers: (data.headers as Record<string, string>) || {},
+                    body: stream,
+                });
+                slot.resolve = undefined;
+                slot.reject = undefined;
+                return true;
+            }
+
+            case 'privasys:session:stream-chunk': {
+                const id = data.id as number;
+                const slot = this.sealedStreams.get(id);
+                if (!slot?.controller) return true;
+                const chunk = data.chunk as Uint8Array;
+                if (chunk && chunk.byteLength > 0) {
+                    slot.controller.enqueue(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk));
+                }
+                return true;
+            }
+
+            case 'privasys:session:stream-end': {
+                const id = data.id as number;
+                const slot = this.sealedStreams.get(id);
+                if (!slot) return true;
+                slot.controller?.close();
+                this.sealedStreams.delete(id);
+                return true;
+            }
+
+            case 'privasys:session:stream-error': {
+                const id = data.id as number;
+                const slot = this.sealedStreams.get(id);
+                if (!slot) return true;
+                const err = new Error(String(data.error || 'sealed stream failed'));
+                if (slot.reject) {
+                    slot.reject(err);
+                } else {
+                    slot.controller?.error(err);
+                }
+                this.sealedStreams.delete(id);
+                return true;
+            }
+
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Re-establish the sealed session after a page reload, with no wallet
+     * ceremony and no push notification. Mounts a hidden auth iframe and
+     * asks the frame-host to bootstrap against the enclave using the
+     * EncAuth voucher stored at the IdP (Phase D silent rebind, cold-start
+     * variant).
+     *
+     * Rejects with `no-voucher` (the user never completed a sealed sign-in
+     * for this app), `rejected` (the enclave identity or measurement
+     * changed — a full wallet ceremony is required), or `unavailable`
+     * (transient transport failure, worth retrying).
+     */
+    resumeSession(): Promise<SealedSession> {
+        if (this.sealedSession) return Promise.resolve(this.sealedSession);
+        if (!this.config.sessionRelay?.appHost) {
+            return Promise.reject(new Error('AuthFrame: resumeSession() requires sessionRelay config'));
+        }
+        const appHost = this.config.sessionRelay.appHost;
+
+        // A sealed iframe without an installed session is a leftover from
+        // a failed handshake — rebuild from scratch.
+        if (this.sealedIframe) this.destroySealedIframe();
+
+        return new Promise<SealedSession>((resolve, reject) => {
+            const iframe = document.createElement('iframe');
+            iframe.src = this.authOrigin + '/auth/';
+            iframe.style.cssText =
+                'position:fixed;width:0;height:0;border:none;opacity:0;pointer-events:none;';
+            const id = ++this.sealedReqSeq;
+            let settled = false;
+
+            const fail = (err: Error) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                window.removeEventListener('message', handler);
+                iframe.remove();
+                reject(err);
+            };
+            const timer = setTimeout(() => fail(new Error('unavailable')), 15_000);
+
+            const handler = (e: MessageEvent) => {
+                if (e.origin !== this.authOrigin) return;
+                if (e.source !== iframe.contentWindow) return;
+                const data = e.data;
+                if (!data || typeof data.type !== 'string') return;
+                // After adoption this same handler keeps serving the sealed
+                // RPC traffic for the lifetime of the iframe.
+                if (this.handleSealedRpcMessage(data)) return;
+
+                if (data.type === 'privasys:ready') {
+                    iframe.contentWindow!.postMessage(
+                        { type: 'privasys:session:resume', id, appHost, rpId: this.rpId },
+                        this.authOrigin,
+                    );
+                    return;
+                }
+
+                if (data.type === 'privasys:session:resume:response' && data.id === id) {
+                    if (settled) return;
+                    if (data.error) {
+                        fail(new Error(String(data.error)));
+                        return;
+                    }
+                    settled = true;
+                    clearTimeout(timer);
+                    // Adopt this iframe as the sealed transport carrier;
+                    // the handler stays attached for RPC responses.
+                    this.sealedIframe = iframe;
+                    this.sealedHandler = handler;
+                    resolve(this.installSealedProxy({
+                        sessionId: String(data.sessionId),
+                        appHost,
+                        expiresAt: Number(data.expiresAt) || 0,
+                    }));
+                }
+            };
+
+            window.addEventListener('message', handler);
+            document.body.appendChild(iframe);
         });
     }
 

@@ -44,6 +44,7 @@ import { getAttestationServerToken } from '@/services/app-attest';
 import { verifyAttestation, inspectAttestation } from '@/services/attestation';
 import { relaySessionToken } from '@/services/broker';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
+import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
 import { attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
@@ -231,6 +232,10 @@ interface QRPayload {
     /** Per-session replay nonce (base64url). When omitted we fall back to
      *  `sessionId` for the session-relay challenge binding. */
     nonce?: string;
+    /** OIDC client_id of the relying party. Required for EncAuth voucher
+     *  issuance: the voucher must land on the same IdP session row (sid)
+     *  the issued JWT will carry, and that row is keyed by client_id. */
+    clientId?: string;
 }
 
 export default function ConnectScreen() {
@@ -598,6 +603,43 @@ export default function ConnectScreen() {
         };
     };
 
+    /** Fire-and-forget EncAuth voucher issuance after a successful
+     *  session-relay sign-in (Phase C wiring). The voucher lets the
+     *  browser silently re-bootstrap its sealed session (idle TTL,
+     *  reload) without waking this wallet. Failures only mean the
+     *  browser falls back to a full wallet ceremony on the next rebind,
+     *  so they are logged and swallowed — never block the sign-in. */
+    const maybeIssueEncAuth = (
+        payload: QRPayload,
+        keyAlias: string,
+        result: { sessionToken: string; userId?: string; sessionRelay?: fido2.SessionRelayBinding },
+        relayArg: { quoteHash: string } | undefined,
+    ) => {
+        if (!result.sessionRelay || !relayArg) return;
+        if (!payload.clientId) {
+            console.log('[CONNECT] payload has no clientId — skipping EncAuth voucher (silent rebind disabled)');
+            return;
+        }
+        if (!result.userId || !result.sessionToken) {
+            console.log('[CONNECT] missing userId/sessionToken — skipping EncAuth voucher');
+            return;
+        }
+        const att = attestationRef.current ?? attestation;
+        if (!att) return;
+        void issueEncAuthForSignIn({
+            walletSessionToken: result.sessionToken,
+            keyId: keyAlias,
+            clientId: payload.clientId,
+            sub: result.userId,
+            encPubB64: result.sessionRelay.encPub,
+            quoteHashHex: relayArg.quoteHash,
+            attestation: att,
+        }).then(
+            ({ sid }) => console.log(`[CONNECT] EncAuth voucher uploaded (sid=${sid.substring(0, 8)}…)`),
+            (err) => console.warn('[CONNECT] EncAuth voucher upload failed (silent rebind disabled):', err),
+        );
+    };
+
     const doRegister = async (payload: QRPayload) => {
         setStep('authenticating');
         console.log(`[CONNECT] doRegister — origin=${payload.origin}, rpId=${payload.rpId}`);
@@ -675,6 +717,11 @@ export default function ConnectScreen() {
             } else {
                 console.warn('[CONNECT] registration result has no sessionRelay binding — Home tab will not show this session');
             }
+
+            // Upload the silent-rebind voucher while the keystore's
+            // biometric grace (where supported) still covers the extra
+            // hardware signature.
+            maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg);
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
@@ -785,6 +832,11 @@ export default function ConnectScreen() {
                     startedAt: Date.now(),
                 });
             }
+
+            // Upload the silent-rebind voucher while the keystore's
+            // biometric grace (where supported) still covers the extra
+            // hardware signature.
+            maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg);
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);

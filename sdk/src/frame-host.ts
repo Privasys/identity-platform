@@ -17,9 +17,9 @@
 
 import { AuthUI } from './ui';
 import type { AuthUIConfig, SignInResult } from './ui';
-import { SessionManager } from './session';
+import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
 import type { AuthSession } from './types';
-import { PrivasysSession } from './enclave-session';
+import { PrivasysSession, type EncAuthEnvelope } from './enclave-session';
 
 const sessions = new SessionManager();
 
@@ -36,6 +36,9 @@ let activeUI: AuthUI | null = null;
 
 interface PendingHandshake {
     appHost: string;
+    /** rpId of the OIDC session this sealed handshake belongs to; used to
+     *  look up the bearer token for EncAuth voucher fetches. */
+    rpId: string;
     sdkKeyPair: CryptoKeyPair;
     sdkPubB64: string;
 }
@@ -49,6 +52,40 @@ interface ActiveSession {
 
 let pendingHandshake: PendingHandshake | null = null;
 let activeSession: ActiveSession | null = null;
+
+/** Read a string claim out of a JWT without verification (the IdP signed it). */
+function jwtClaim(token: string, claim: string): string | null {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const v = payload[claim];
+        return typeof v === 'string' && v ? v : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Build the EncAuth voucher fetcher for silent rebind / cold resume.
+ * Reads the freshest bearer token for `rpId` from this origin's session
+ * store at call time (renewal may have rotated it since install) and
+ * fetches the wallet-signed envelope from the IdP. Returns null when
+ * there is no session, no `sid` claim, or no stored voucher — the
+ * caller then falls back to a wallet ceremony.
+ */
+function makeGetEncAuth(rpId: string): () => Promise<EncAuthEnvelope | null> {
+    return async () => {
+        const session = sessions.get(rpId);
+        if (!session?.token) return null;
+        const sid = jwtClaim(session.token, 'sid');
+        if (!sid) return null;
+        const resp = await fetch(
+            `${globalThis.location.origin}/sessions/${encodeURIComponent(sid)}/encauth`,
+            { headers: { Authorization: `Bearer ${session.token}` } },
+        );
+        if (!resp.ok) return null;
+        return (await resp.json()) as EncAuthEnvelope;
+    };
+}
 
 async function generateSdkKeyPair(): Promise<{ keyPair: CryptoKeyPair; sdkPubB64: string }> {
     const keyPair = (await crypto.subtle.generateKey(
@@ -67,10 +104,38 @@ async function generateSdkKeyPair(): Promise<{ keyPair: CryptoKeyPair; sdkPubB64
 }
 
 // ── Session renewal (OIDC refresh_token) ────────────────────────────────
+//
+// Renewal coordination is client-side and cross-document. Several
+// privasys.id iframes can be alive at once for the same session chain:
+// the persistent renewal iframe, a sealed sign-in iframe kept mounted
+// for session-relay, and one of each per additional tab. The IdP
+// rotates refresh tokens with strict single-use semantics (the old
+// token is deleted before the new one is issued), so exactly one
+// document may run a refresh grant for a given (clientId, rpId) chain
+// at a time. Every refresh-grant consumer in this file — the scheduled
+// renewal, the inline check-session renewal, and audience-token
+// minting — is serialised through the Web Locks API, which is
+// origin-scoped across documents and tabs.
+//
+// Renewal is scheduled from the access token's `exp` claim (not a flat
+// delay), retries transient failures with backoff, and never removes
+// the session unless the refresh-token chain is provably dead.
 
-const RENEWAL_MS = 13 * 60 * 1000; // Renew at 13 min (before 15-min TTL)
+/** Renew when the token has less than this long to live. */
+const RENEW_MARGIN_MS = 90_000;
+/** Random spread so N documents don't fire at the same instant. */
+const RENEW_JITTER_MS = 15_000;
+/** Backoff schedule for transient renewal failures (network, IdP 5xx). */
+const RENEW_RETRY_MS = [5_000, 30_000, 120_000];
+/** Backstop cadence; no-ops unless the token is inside the margin. */
+const RENEW_HEARTBEAT_MS = 60_000;
 
 const renewalTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const renewalRetryCount = new Map<string, number>();
+/** rpIds this document renews, with the parent origin to notify. */
+const renewalParents = new Map<string, string>();
+/** Last access token seen per rpId; dedupes storage-event notifications. */
+const lastSeenTokens = new Map<string, string>();
 
 function cancelRenewal(rpId: string): void {
     const timer = renewalTimers.get(rpId);
@@ -78,6 +143,43 @@ function cancelRenewal(rpId: string): void {
         clearTimeout(timer);
         renewalTimers.delete(rpId);
     }
+    renewalRetryCount.delete(rpId);
+    renewalParents.delete(rpId);
+}
+
+/**
+ * Serialise a refresh-token-grant user across all privasys.id documents
+ * (iframes and tabs). Falls back to running unlocked when the Web Locks
+ * API is unavailable — best effort, matching pre-lock behaviour.
+ */
+async function withRefreshLock<T>(rpId: string, clientId: string, fn: () => Promise<T>): Promise<T> {
+    const locks = (navigator as Navigator & { locks?: LockManager }).locks;
+    if (locks?.request) {
+        return locks.request(`privasys-refresh:${clientId}:${rpId}`, fn) as Promise<T>;
+    }
+    return fn();
+}
+
+/** Epoch-ms `exp` of a JWT, or null when unreadable. */
+function tokenExpMs(token: string): number | null {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Check whether an access token's exp claim is within a safety margin. */
+function isTokenExpired(token: string, marginMs = 30_000): boolean {
+    const exp = tokenExpMs(token);
+    if (exp === null) return false;
+    return exp - marginMs < Date.now();
+}
+
+/** True when the token should be renewed now (inside the renewal margin). */
+function needsRenewal(token: string): boolean {
+    return isTokenExpired(token, RENEW_MARGIN_MS);
 }
 
 function scheduleRenewal(session: AuthSession, parentOrigin: string): void {
@@ -85,87 +187,210 @@ function scheduleRenewal(session: AuthSession, parentOrigin: string): void {
 
     if (!session.refreshToken || !session.clientId) return;
 
-    const timer = setTimeout(async () => {
+    renewalParents.set(session.rpId, parentOrigin);
+    lastSeenTokens.set(session.rpId, session.token);
+
+    // Schedule from the token's actual exp; a flat delay drifts apart
+    // from the token lifetime whenever the iframe is (re)created after
+    // sign-in. Unknown exp falls back to the historical 13 minutes.
+    const exp = tokenExpMs(session.token);
+    const base = exp === null ? 13 * 60 * 1000 : exp - Date.now() - RENEW_MARGIN_MS;
+    const jitter = Math.floor(Math.random() * RENEW_JITTER_MS);
+    const delay = Math.max(1_000, base + jitter);
+
+    const timer = setTimeout(() => {
         renewalTimers.delete(session.rpId);
+        void renewIfNeeded(session.rpId, parentOrigin);
+    }, delay);
 
-        const current = sessions.get(session.rpId);
-        if (!current?.refreshToken || !current?.clientId) return;
+    renewalTimers.set(session.rpId, timer);
+}
 
-        try {
-            await renewSession(current, parentOrigin);
-            const updated = sessions.get(session.rpId);
-            if (updated) scheduleRenewal(updated, parentOrigin);
-        } catch (err) {
-            console.warn('[frame-host] renewal failed, expiring session:', err);
-            sessions.remove(session.rpId);
+function scheduleRenewalRetry(rpId: string, parentOrigin: string): void {
+    const attempt = renewalRetryCount.get(rpId) ?? 0;
+    renewalRetryCount.set(rpId, attempt + 1);
+    const delay = RENEW_RETRY_MS[Math.min(attempt, RENEW_RETRY_MS.length - 1)];
+    const prev = renewalTimers.get(rpId);
+    if (prev) clearTimeout(prev);
+    const timer = setTimeout(() => {
+        renewalTimers.delete(rpId);
+        void renewIfNeeded(rpId, parentOrigin);
+    }, delay);
+    renewalTimers.set(rpId, timer);
+}
+
+/**
+ * Renew the session for `rpId` if (and only if) its token is inside the
+ * renewal margin, under the cross-document refresh lock. Re-reads the
+ * session from localStorage after acquiring the lock so a renewal that
+ * another document just completed turns this call into a no-op instead
+ * of a double-spend of the rotated refresh token.
+ *
+ * Returns the freshest session (renewed or not), or undefined when the
+ * chain is dead and the session has been removed.
+ */
+async function renewIfNeeded(
+    rpId: string,
+    parentOrigin: string,
+    notify = true,
+): Promise<AuthSession | undefined> {
+    const current = sessions.get(rpId);
+    if (!current?.refreshToken || !current?.clientId) return current;
+    if (!needsRenewal(current.token)) {
+        // Not due yet (timer fired early relative to a token another
+        // document already rotated) — just re-arm from the fresh exp.
+        if (!renewalTimers.has(rpId)) scheduleRenewal(current, parentOrigin);
+        return current;
+    }
+
+    return withRefreshLock(rpId, current.clientId, async () => {
+        // Re-read under the lock: another document may have renewed
+        // while we waited.
+        const fresh = sessions.get(rpId);
+        if (!fresh?.refreshToken || !fresh?.clientId) return fresh;
+        if (!needsRenewal(fresh.token)) {
+            renewalRetryCount.delete(rpId);
+            scheduleRenewal(fresh, parentOrigin);
+            return fresh;
+        }
+        return renewSessionLocked(fresh, parentOrigin, notify);
+    });
+}
+
+/**
+ * Run one refresh_token grant. Must be called with the refresh lock
+ * held. Failure handling is deliberately non-destructive:
+ *  - invalid_grant with a newer token in storage → adopt it (a
+ *    non-locking client rotated underneath us during rollout);
+ *  - invalid_grant with no newer token → the chain is dead (revoked
+ *    sid, expired refresh token) → remove + session-expired;
+ *  - anything else (network, 5xx) → keep the session, retry with
+ *    backoff.
+ */
+async function renewSessionLocked(
+    session: AuthSession,
+    parentOrigin: string,
+    notify: boolean,
+): Promise<AuthSession | undefined> {
+    const idpBase = globalThis.location.origin;
+    const usedRefreshToken = session.refreshToken!;
+
+    let resp: Response;
+    try {
+        resp = await fetch(`${idpBase}/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: usedRefreshToken,
+                client_id: session.clientId!,
+            }),
+        });
+    } catch (err) {
+        console.warn('[frame-host] renewal fetch failed, will retry:', err);
+        scheduleRenewalRetry(session.rpId, parentOrigin);
+        return session;
+    }
+
+    if (resp.ok) {
+        const tokens = await resp.json();
+        const updated: AuthSession = {
+            ...session,
+            token: tokens.access_token,
+            refreshToken: tokens.refresh_token,
+            authenticatedAt: Date.now(),
+        };
+        sessions.store(updated);
+        renewalRetryCount.delete(session.rpId);
+        scheduleRenewal(updated, parentOrigin);
+
+        // Notify parent — skipped during check-session inline renewal to
+        // avoid a double-message race (session-renewed before session
+        // response).
+        if (notify) {
+            window.parent.postMessage(
+                {
+                    type: 'privasys:session-renewed',
+                    rpId: session.rpId,
+                    accessToken: tokens.access_token,
+                },
+                parentOrigin,
+            );
+        }
+        return updated;
+    }
+
+    const body = await resp.json().catch(() => ({ error: resp.statusText }));
+    const errCode = typeof body.error === 'string' ? body.error : '';
+
+    if (resp.status === 400 && errCode === 'invalid_grant') {
+        // The token we used is gone server-side. If storage now holds a
+        // different refresh token, another (non-locking) party rotated
+        // it — adopt theirs rather than killing the session.
+        const stored = sessions.get(session.rpId);
+        if (stored?.refreshToken && stored.refreshToken !== usedRefreshToken) {
+            renewalRetryCount.delete(session.rpId);
+            scheduleRenewal(stored, parentOrigin);
+            return stored;
+        }
+        console.warn('[frame-host] refresh-token chain dead, expiring session:', body);
+        cancelRenewal(session.rpId);
+        sessions.remove(session.rpId);
+        // During check-session inline renewal (notify=false) the caller
+        // reports the dead session as `session: null` itself; posting
+        // session-expired too would race the parent's response handler.
+        if (notify) {
             window.parent.postMessage(
                 { type: 'privasys:session-expired', rpId: session.rpId },
                 parentOrigin,
             );
         }
-    }, RENEWAL_MS);
-
-    renewalTimers.set(session.rpId, timer);
-}
-
-/**
- * Renew a session by calling the IdP's OIDC refresh_token grant.
- * No push notification or wallet involvement — just a single HTTP call.
- */
-async function renewSession(session: AuthSession, parentOrigin: string, notify = true): Promise<void> {
-    const idpBase = globalThis.location.origin;
-
-    const resp = await fetch(`${idpBase}/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: session.refreshToken!,
-            client_id: session.clientId!,
-        }),
-    });
-
-    if (!resp.ok) {
-        const body = await resp.json().catch(() => ({ error: resp.statusText }));
-        throw new Error(body.error_description || body.error || `Refresh failed: ${resp.status}`);
+        return undefined;
     }
 
-    const tokens = await resp.json();
+    // 5xx / unexpected 4xx: transient until proven otherwise.
+    console.warn(`[frame-host] renewal failed (${resp.status}), will retry:`, body);
+    scheduleRenewalRetry(session.rpId, parentOrigin);
+    return session;
+}
 
-    // Update session with new tokens (refresh token is rotated).
-    sessions.store({
-        ...session,
-        token: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        authenticatedAt: Date.now(),
-    });
-
-    // Notify parent — skipped during check-session inline renewal to avoid
-    // a double-message race (session-renewed before session response).
-    if (notify) {
+// Cross-document propagation: when another iframe/tab renews a session
+// we track, re-arm our timer from the fresh exp and forward the new
+// access token to our parent so its in-memory copy doesn't go stale.
+// (`storage` fires in every same-origin document except the writer.)
+window.addEventListener('storage', (ev) => {
+    if (ev.key !== SESSIONS_STORAGE_KEY) return;
+    for (const [rpId, parentOrigin] of renewalParents) {
+        const current = sessions.get(rpId);
+        if (!current?.refreshToken || !current?.clientId) continue;
+        if (lastSeenTokens.get(rpId) === current.token) continue;
+        lastSeenTokens.set(rpId, current.token);
+        scheduleRenewal(current, parentOrigin);
         window.parent.postMessage(
             {
                 type: 'privasys:session-renewed',
-                rpId: session.rpId,
-                accessToken: tokens.access_token,
+                rpId,
+                accessToken: current.token,
             },
             parentOrigin,
         );
     }
-}
+});
+
+// Backstop heartbeat: one-shot timers can fire arbitrarily late in
+// throttled/suspended documents. This interval (clamped to ≥1/min by
+// the browser anyway) renews any tracked session that slipped inside
+// the margin; the lock + in-lock re-read make overlapping heartbeats
+// across documents harmless no-ops.
+setInterval(() => {
+    for (const [rpId, parentOrigin] of renewalParents) {
+        const current = sessions.get(rpId);
+        if (!current?.refreshToken || !current?.clientId) continue;
+        if (needsRenewal(current.token)) void renewIfNeeded(rpId, parentOrigin);
+    }
+}, RENEW_HEARTBEAT_MS);
 
 // ── OIDC PKCE helpers ───────────────────────────────────────────────────
-
-/** Check whether an access token's exp claim is within a safety margin. */
-function isTokenExpired(token: string, marginMs = 30_000): boolean {
-    try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (typeof payload.exp !== 'number') return false;
-        return payload.exp * 1000 - marginMs < Date.now();
-    } catch {
-        return false;
-    }
-}
 
 async function generatePKCE(): Promise<{ codeVerifier: string; codeChallenge: string }> {
     const buf = new Uint8Array(32);
@@ -381,6 +606,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             const { keyPair, sdkPubB64 } = await generateSdkKeyPair();
             pendingHandshake = {
                 appHost: config.sessionRelay.appHost,
+                rpId: config.rpId || config.appName,
                 sdkKeyPair: keyPair,
                 sdkPubB64,
             };
@@ -618,12 +844,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
             };
             sessions.store(session);
 
-            // Schedule automatic renewal before TTL expires
+            // Legacy opaque-token sessions have no refresh token; there is
+            // no silent-renewal path for them (the old scheduleRenewal call
+            // here was a no-op). Only persist the device hint.
             if (session.pushToken && session.brokerUrl) {
                 if (result.trustDevice || deviceTrusted) {
                     sessions.saveDeviceHint(session.pushToken, session.brokerUrl);
                 }
-                scheduleRenewal(session, parentOrigin);
             }
 
             if (result.sessionRelay) {
@@ -649,17 +876,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
     if (data.type === 'privasys:check-session') {
         let session = sessions.get(data.rpId);
 
-        // If the access token is expired but we have a refresh token,
-        // renew immediately before returning so the parent gets a fresh token.
-        if (session?.token && session?.refreshToken && session?.clientId && isTokenExpired(session.token)) {
-            try {
-                await renewSession(session, e.origin, false);
-                session = sessions.get(data.rpId);
-            } catch {
-                // Renewal failed — clear and return null so parent triggers sign-in.
-                sessions.remove(data.rpId);
-                session = undefined;
-            }
+        // If the access token is inside the renewal margin and we have a
+        // refresh token, renew inline (under the cross-document lock)
+        // before returning so the parent gets a fresh token. A dead
+        // chain comes back as undefined → parent triggers sign-in.
+        if (session?.token && session?.refreshToken && session?.clientId && needsRenewal(session.token)) {
+            session = await renewIfNeeded(data.rpId, e.origin, false);
         }
 
         // Ensure renewal is running for active sessions
@@ -707,27 +929,36 @@ window.addEventListener('message', async (e: MessageEvent) => {
             return;
         }
         try {
-            const idpBase = globalThis.location.origin;
-            const resp = await fetch(`${idpBase}/token`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    grant_type: 'refresh_token',
-                    refresh_token: session.refreshToken,
-                    client_id: session.clientId,
-                    scope: `audience:${audience} openid email profile offline_access`,
-                }),
+            // Audience minting consumes (and rotates) the same single-use
+            // refresh token as silent renewal, so it runs under the same
+            // cross-document lock, re-reading the freshest token inside.
+            const tok = await withRefreshLock(data.rpId, session.clientId, async () => {
+                const fresh = sessions.get(data.rpId);
+                if (!fresh?.refreshToken || !fresh?.clientId) {
+                    throw new Error('no refresh token in session');
+                }
+                const idpBase = globalThis.location.origin;
+                const resp = await fetch(`${idpBase}/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        grant_type: 'refresh_token',
+                        refresh_token: fresh.refreshToken,
+                        client_id: fresh.clientId,
+                        scope: `audience:${audience} openid email profile offline_access`,
+                    }),
+                });
+                if (!resp.ok) {
+                    const body = await resp.json().catch(() => ({ error: resp.statusText }));
+                    throw new Error(body.error_description || body.error || `mint failed: ${resp.status}`);
+                }
+                const minted = await resp.json();
+                // The IdP rotated the refresh token. Persist the new one so
+                // the next user-scope refresh uses a valid handle, but DO
+                // NOT touch the access token — that one is audience-bound.
+                sessions.store({ ...fresh, refreshToken: minted.refresh_token });
+                return minted;
             });
-            if (!resp.ok) {
-                const body = await resp.json().catch(() => ({ error: resp.statusText }));
-                reply({ error: body.error_description || body.error || `mint failed: ${resp.status}` });
-                return;
-            }
-            const tok = await resp.json();
-            // The IdP rotated the refresh token. Persist the new one so the
-            // next user-scope refresh uses a valid handle, but DO NOT touch
-            // the access token — that one is audience-bound.
-            sessions.store({ ...session, refreshToken: tok.refresh_token });
             reply({ accessToken: tok.access_token, expiresIn: tok.expires_in });
         } catch (err) {
             reply({ error: (err as Error).message });
@@ -746,10 +977,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
             reply({ error: 'no active session' });
             return;
         }
-        if (activeSession.expiresAt && activeSession.expiresAt <= Date.now()) {
-            reply({ error: 'session expired' });
-            return;
-        }
+        // No pre-emptive expiry gate here: with the sliding enclave TTL an
+        // active session never wall-clock-expires, and a forgotten one
+        // comes back as an unsealed 401 that PrivasysSession.request()
+        // resolves via EncAuth silent rebind.
         try {
             const method = String(data.method || 'GET').toUpperCase();
             const path = String(data.path || '/');
@@ -769,6 +1000,46 @@ window.addEventListener('message', async (e: MessageEvent) => {
         }
     }
 
+    // Cold resume: re-establish a sealed session purely from the stored
+    // EncAuth voucher — no wallet ceremony, no push. Used by the parent
+    // after a page reload, when the OIDC session restored via SSO but
+    // the iframe-resident sealed session (deliberately never persisted)
+    // is gone. Idempotent: an already-active session for the same
+    // appHost is returned as-is.
+    if (data.type === 'privasys:session:resume') {
+        const id = data.id;
+        const reply = (payload: Record<string, unknown>) =>
+            window.parent.postMessage({ type: 'privasys:session:resume:response', id, ...payload }, e.origin);
+        const appHost = String(data.appHost || '');
+        const rpId = String(data.rpId || '');
+        if (!appHost || !rpId) {
+            reply({ error: 'appHost and rpId required' });
+            return;
+        }
+        if (activeSession && activeSession.appHost === appHost) {
+            reply({ sessionId: activeSession.sessionId, appHost, expiresAt: activeSession.expiresAt });
+            return;
+        }
+        const getEncAuth = makeGetEncAuth(rpId);
+        const result = await PrivasysSession.resume({ host: appHost, getEncAuth });
+        if ('error' in result) {
+            // 'no-voucher'    → user never completed a sealed sign-in here
+            // 'rejected'      → enclave identity/measurement changed; a
+            //                   wallet ceremony is required
+            // 'unavailable'   → transport failure, worth retrying
+            reply({ error: result.error });
+            return;
+        }
+        activeSession = {
+            appHost,
+            sessionId: result.session.sessionId,
+            expiresAt: 0,
+            session: result.session,
+        };
+        reply({ sessionId: result.session.sessionId, appHost, expiresAt: 0 });
+        return;
+    }
+
     // Sealed streaming RPC. The parent posts a single
     // `privasys:session:stream-request`; the iframe replies with one
     // `privasys:session:stream-start` (carrying status + headers) followed
@@ -780,10 +1051,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
             window.parent.postMessage({ type, id, ...payload }, e.origin);
         if (!activeSession) {
             post('privasys:session:stream-error', { error: 'no active session' });
-            return;
-        }
-        if (activeSession.expiresAt && activeSession.expiresAt <= Date.now()) {
-            post('privasys:session:stream-error', { error: 'session expired' });
             return;
         }
         try {
@@ -818,6 +1085,17 @@ window.addEventListener('message', async (e: MessageEvent) => {
     }
 });
 
+/**
+ * Normalise an enclave-supplied expiry to epoch ms. The wire contract
+ * uses epoch seconds (crypto-contract §3); older Go enclaves sent epoch
+ * ms. Values below 1e12 cannot be a sane epoch-ms after Sep 2001, so
+ * they are treated as seconds.
+ */
+function normalizeEpochMs(v: number | undefined): number {
+    if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return 0;
+    return v < 1e12 ? v * 1000 : v;
+}
+
 async function installSessionRelay(
     binding: { sessionId: string; encPub: string; expiresAt?: number },
     parentOrigin: string,
@@ -826,19 +1104,25 @@ async function installSessionRelay(
         console.warn('[frame-host] sessionRelay returned without pending handshake — ignoring');
         return;
     }
-    const { sdkKeyPair, appHost } = pendingHandshake;
+    const { sdkKeyPair, appHost, rpId } = pendingHandshake;
     pendingHandshake = null;
+    const expiresAtMs = normalizeEpochMs(binding.expiresAt);
     try {
         const session = await PrivasysSession.fromHandshake({
             host: appHost,
             sessionId: binding.sessionId,
             sdkPrivateKey: sdkKeyPair.privateKey,
             encPub: binding.encPub,
+            // Silent rebind: when the enclave forgets this session (idle
+            // TTL, restart with the same identity) the next request's
+            // unsealed 401 triggers a voucher-based re-bootstrap with no
+            // wallet involvement.
+            getEncAuth: makeGetEncAuth(rpId),
         });
         activeSession = {
             appHost,
             sessionId: binding.sessionId,
-            expiresAt: binding.expiresAt ?? 0,
+            expiresAt: expiresAtMs,
             session,
         };
         window.parent.postMessage(
@@ -846,7 +1130,7 @@ async function installSessionRelay(
                 type: 'privasys:session:ready',
                 sessionId: binding.sessionId,
                 appHost,
-                expiresAt: binding.expiresAt ?? 0,
+                expiresAt: expiresAtMs,
             },
             parentOrigin,
         );

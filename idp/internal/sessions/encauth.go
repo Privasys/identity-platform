@@ -33,7 +33,7 @@ type EncAuth struct {
 	AppID     []byte `cbor:"4,keyasint"`  // SHA-256 of canonical workload OIDs
 	EncMeas   []byte `cbor:"5,keyasint"`  // SHA-256 of canonical platform OIDs
 	EncPub    []byte `cbor:"6,keyasint"`  // P-256 SEC1 uncompressed (65 B)
-	QuoteHash []byte `cbor:"7,keyasint"`  // SHA-256 of leaf RA-TLS cert
+	QuoteHash []byte `cbor:"7,keyasint"`  // wallet attestation digest (crypto-contract §4.1)
 	NotBefore uint64 `cbor:"8,keyasint"`  // unix seconds
 	NotAfter  uint64 `cbor:"9,keyasint"`  // unix seconds
 	HwPub     []byte `cbor:"10,keyasint"` // P-256 SEC1 uncompressed (65 B)

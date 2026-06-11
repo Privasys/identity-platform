@@ -162,7 +162,11 @@ export default function HomeScreen() {
                             </Text>
                         ) : (
                             filtered.map((row) => {
-                                const sealed = !!row.session;
+                                // Sealed transport is deliberately NOT
+                                // surfaced: it is an internal transport
+                                // guarantee, not a session property the
+                                // user should reason about (plan WS5 —
+                                // "no visible sealed/normal split").
                                 const teeType = row.app?.teeType ?? 'none';
                                 const iconBg =
                                     teeType === 'sgx'
@@ -186,10 +190,7 @@ export default function HomeScreen() {
                                 return (
                                     <Pressable
                                         key={row.rpId}
-                                        style={[
-                                            styles.serviceCard,
-                                            sealed && styles.serviceCardSealed
-                                        ]}
+                                        style={styles.serviceCard}
                                         onPress={onPress}
                                         disabled={!onPress}
                                     >
@@ -201,17 +202,11 @@ export default function HomeScreen() {
                                         <RNView style={styles.serviceInfo}>
                                             <RNView style={styles.serviceNameRow}>
                                                 <Text style={styles.serviceName}>{row.name}</Text>
-                                                {sealed && (
-                                                    <RNView style={styles.sealedBadge}>
-                                                        <RNView style={styles.sealedDot} />
-                                                        <Text style={styles.sealedText}>Sealed</Text>
-                                                    </RNView>
-                                                )}
                                             </RNView>
                                             <Text style={styles.serviceMeta}>
                                                 {row.app
                                                     ? `${teeType === 'none' ? 'Passkey' : teeType.toUpperCase()} · Connected ${new Date(row.app.lastVerified * 1000).toLocaleDateString()}`
-                                                    : 'Active session'}
+                                                    : 'Connected'}
                                             </Text>
                                         </RNView>
                                         {onPress && (
@@ -312,10 +307,6 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 2
     },
-    serviceCardSealed: {
-        borderWidth: 1,
-        borderColor: 'rgba(52, 232, 158, 0.5)'
-    },
     searchBox: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -342,27 +333,6 @@ const styles = StyleSheet.create({
         color: '#64748B',
         textAlign: 'center',
         paddingVertical: 24
-    },
-    sealedBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(52, 232, 158, 0.12)',
-        borderRadius: 10,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        marginLeft: 8
-    },
-    sealedDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#34E89E',
-        marginRight: 4
-    },
-    sealedText: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#0E7C4A'
     },
     serviceIcon: {
         width: 40,

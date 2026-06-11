@@ -21,7 +21,11 @@
  * exactly (P-256 + SHA-256, fixed 64-byte R||S).
  */
 
+import { sha256 } from '@noble/hashes/sha2.js';
+
 import * as NativeKeys from '../../modules/native-keys/src/index';
+
+import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
 
 const IDP_BASE_URL = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
@@ -195,6 +199,17 @@ function b64uEncode(bytes: Uint8Array): string {
     return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+function hexToBytes(hex: string): Uint8Array {
+    if (hex.length % 2 !== 0) throw new Error('hexToBytes: odd length');
+    const out = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < out.length; i++) {
+        const byte = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        if (Number.isNaN(byte)) throw new Error('hexToBytes: invalid hex');
+        out[i] = byte;
+    }
+    return out;
+}
+
 function b64uDecode(s: string): Uint8Array {
     const pad = s.length % 4 === 0 ? 0 : 4 - (s.length % 4);
     const std = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(pad);
@@ -280,6 +295,106 @@ export async function uploadEncAuth(
  * the QR / sign-in payload). `sub` is the user's pairwise sub for
  * this app. The remaining fields come from the verified attestation.
  */
+// ---- measurement hashing --------------------------------------------
+
+/**
+ * Deterministic serialisation of an OID-value subset: sorted
+ * `key=value` lines joined by `\n`, hashed with SHA-256. The enclave
+ * does not re-derive these hashes (its acceptance pins `enc_pub` +
+ * `quote_hash`, which transitively cover the measurement); they exist
+ * so the wallet can detect when an (app, enclave) measurement it
+ * previously approved has changed and a fresh voucher is required.
+ * Stability across wallet versions matters; renaming a key silently
+ * invalidates all outstanding vouchers' measurement identities.
+ */
+function hashOidSubset(fields: Record<string, string | undefined>): Uint8Array {
+    const lines = Object.keys(fields)
+        .filter((k) => fields[k] !== undefined && fields[k] !== '')
+        .sort()
+        .map((k) => `${k}=${fields[k]}`);
+    return sha256(new TextEncoder().encode(lines.join('\n')));
+}
+
+/** SHA-256 over the platform half (TEE + 1.x/2.x OIDs) of a verified attestation. */
+export function encMeasHash(att: AttestationResult): Uint8Array {
+    return hashOidSubset({
+        tee_type: att.tee_type,
+        mrenclave: att.mrenclave,
+        mrsigner: att.mrsigner,
+        mrtd: att.mrtd,
+        config_merkle_root: att.config_merkle_root,
+        combined_workloads_hash: att.combined_workloads_hash,
+        dek_origin: att.dek_origin,
+        attestation_servers_hash: att.attestation_servers_hash,
+    });
+}
+
+/** SHA-256 over the workload half (3.x OIDs) of a verified attestation. */
+export function appIdHash(att: AttestationResult): Uint8Array {
+    return hashOidSubset({
+        workload_config_merkle_root: att.workload_config_merkle_root,
+        workload_code_hash: att.workload_code_hash,
+        workload_image_ref: att.workload_image_ref,
+        workload_key_source: att.workload_key_source,
+    });
+}
+
+/** Default voucher lifetime (crypto-contract §8.3: ≤ 90 days). */
+const ENCAUTH_TTL_SECONDS = 90 * 24 * 3600;
+
+/**
+ * Issue and upload the silent-rebind voucher right after a successful
+ * session-relay sign-in. Call this IMMEDIATELY after the FIDO2
+ * ceremony so the hardware key's biometric grace window (where the
+ * platform supports one) covers the extra signature.
+ *
+ * Failures are the caller's to swallow: a missing voucher only means
+ * the browser falls back to a wallet ceremony on the next rebind, so
+ * this must never fail the sign-in itself.
+ */
+export async function issueEncAuthForSignIn(args: {
+    /** Opaque wallet session token from the FIDO2 complete response. */
+    walletSessionToken: string;
+    /** Hardware key alias used for the FIDO2 ceremony (signs the voucher). */
+    keyId: string;
+    /** OIDC client_id of the relying party (from the QR / push payload). */
+    clientId: string;
+    /** Pairwise user id for this app (completeResp.userId). */
+    sub: string;
+    /** Enclave identity pubkey from the bootstrap response, base64url SEC1. */
+    encPubB64: string;
+    /** The wallet attestation digest over the verified attestation
+     *  (hex, 32 bytes — `deriveQuoteHash` in connect.tsx; canonical
+     *  field list in crypto-contract §4.1). The enclave's optional
+     *  voucher check (`SetExpectedQuoteDigest`) compares against this
+     *  same digest — never a certificate hash. */
+    quoteHashHex: string;
+    /** The verified attestation backing this sign-in. */
+    attestation: AttestationResult;
+    /** Optional stable device identifier (defaults to ''). */
+    deviceId?: string;
+}): Promise<{ sid: string }> {
+    const hwKey = await NativeKeys.getPublicKey(args.keyId);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const { sid } = await signAndUploadEncAuth({
+        walletSessionToken: args.walletSessionToken,
+        keyId: args.keyId,
+        clientId: args.clientId,
+        deviceId: args.deviceId,
+        payload: {
+            sub: args.sub,
+            appId: appIdHash(args.attestation),
+            encMeas: encMeasHash(args.attestation),
+            encPub: b64uDecode(args.encPubB64),
+            quoteHash: hexToBytes(args.quoteHashHex),
+            notBefore: nowSec - 60, // tolerate modest clock skew
+            notAfter: nowSec + ENCAUTH_TTL_SECONDS,
+            hwPub: b64uDecode(hwKey.publicKey),
+        },
+    });
+    return { sid };
+}
+
 export async function signAndUploadEncAuth(args: {
     walletSessionToken: string;
     keyId: string;

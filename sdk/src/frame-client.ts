@@ -726,6 +726,20 @@ export class AuthFrame {
 
                     resolve(data.session || null);
                 } else if (data.type === 'privasys:session-renewed') {
+                    // Keep the cached session in step with the background
+                    // renewal so a subsequent getSession() returns the
+                    // FRESH access token. Without this, getSession() keeps
+                    // handing back the token captured at first mount;
+                    // consumers that re-read on `onSessionRenewed` then
+                    // present an already-expired token, 401, and surface a
+                    // false "session expired" that a reload silently fixes.
+                    if (this.cachedSession && typeof data.accessToken === 'string' && data.accessToken) {
+                        this.cachedSession = {
+                            ...this.cachedSession,
+                            token: data.accessToken,
+                            authenticatedAt: Date.now(),
+                        };
+                    }
                     this._onSessionRenewed?.(data.rpId, data.accessToken);
                 } else if (data.type === 'privasys:session-expired') {
                     this._onSessionExpired?.(data.rpId);

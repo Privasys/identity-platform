@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<!-- Copyright (c) Privasys. All rights reserved. Licensed under AGPL-3.0. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Authorize a device · Privasys ID</title>
+<style>
+  :root { --bg:#1d1d1f; --card:#27272a; --fg:#f5f5f7; --muted:#a1a1a6;
+          --line:#3a3a3d; --g1:#34E89E; --g2:#00BCF2; --warn:#EAB308; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:var(--bg); color:var(--fg); padding:24px;
+         font-family:"Inter","InterVariable",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+  .card { width:100%; max-width:420px; background:var(--card); border:1px solid var(--line);
+          border-radius:18px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+  .logo { font-weight:700; font-size:14px; letter-spacing:.04em; text-transform:uppercase;
+          background:linear-gradient(90deg,var(--g1),var(--g2)); -webkit-background-clip:text;
+          background-clip:text; color:transparent; margin-bottom:18px; }
+  h1 { font-size:20px; margin:0 0 6px; }
+  .app { font-size:16px; font-weight:600; margin:2px 0; }
+  .muted { color:var(--muted); font-size:14px; }
+  .scopes { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0; }
+  .chip { font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:3px 10px; }
+  .warn { margin:14px 0; padding:12px 14px; border-radius:10px; font-size:13px;
+          background:rgba(234,179,8,.12); border:1px solid rgba(234,179,8,.4); color:var(--warn); }
+  .code { font-variant-numeric:tabular-nums; letter-spacing:.12em; font-weight:700; font-size:22px;
+          text-align:center; margin:6px 0 16px; }
+  .btn { display:block; width:100%; text-align:center; text-decoration:none; cursor:pointer;
+         border:none; border-radius:12px; padding:13px 16px; font-size:15px; font-weight:600;
+         font-family:inherit; margin-top:10px; }
+  .btn-primary { color:#06231a; background:linear-gradient(90deg,var(--g1),var(--g2)); }
+  .btn-secondary { color:var(--fg); background:transparent; border:1px solid var(--line); }
+  .btn-deny { color:#fca5a5; background:transparent; border:1px solid transparent; }
+  input { width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line);
+          background:#1f1f22; color:var(--fg); font-size:18px; letter-spacing:.12em; text-align:center;
+          text-transform:uppercase; font-family:inherit; }
+  .status { text-align:center; margin-top:14px; font-size:14px; min-height:20px; }
+  .ok { color:var(--g1); } .err { color:#fca5a5; }
+  .hidden { display:none; }
+  .spin { display:inline-block; width:14px; height:14px; border:2px solid var(--muted);
+          border-top-color:transparent; border-radius:50%; animation:s .8s linear infinite; vertical-align:-2px; }
+  @keyframes s { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Privasys ID</div>
+
+  <!-- Step 1: enter code (shown only when no user_code in URL) -->
+  <div id="enter">
+    <h1>Authorize a device</h1>
+    <p class="muted">Enter the code shown in your terminal or app.</p>
+    <div style="height:10px"></div>
+    <input id="codeInput" placeholder="XXXX-XXXX" autocomplete="one-time-code" inputmode="text" maxlength="9">
+    <button class="btn btn-primary" id="codeContinue">Continue</button>
+    <div class="status err" id="enterErr"></div>
+  </div>
+
+  <!-- Step 2: consent -->
+  <div id="consent" class="hidden">
+    <h1>Authorize sign-in</h1>
+    <div class="app" id="clientName">Privasys CLI</div>
+    <div class="muted">wants to sign in to your Privasys account</div>
+    <div class="code" id="codeEcho"></div>
+    <div class="warn hidden" id="agentWarn"></div>
+    <div class="scopes" id="scopes"></div>
+    <a class="btn btn-primary" id="walletBtn" target="_blank" rel="noopener">Open Privasys Wallet</a>
+    <button class="btn btn-secondary" id="passkeyBtn">Use a passkey or sign in another way</button>
+    <button class="btn btn-deny" id="denyBtn">Not me — deny</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- Step 3: result -->
+  <div id="result" class="hidden">
+    <h1 id="resultTitle"></h1>
+    <p class="muted" id="resultMsg"></p>
+  </div>
+</div>
+
+<script src="https://privasys.id/auth/privasys-auth-client.iife.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  var userCode = (params.get("user_code") || "").trim();
+  var pollTimer = null;
+
+  function show(step) {
+    ["enter", "consent", "result"].forEach(function (s) {
+      $(s).classList.toggle("hidden", s !== step);
+    });
+  }
+
+  function norm(c) { return (c || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
+
+  function finish(ok, title, msg) {
+    if (pollTimer) clearInterval(pollTimer);
+    $("resultTitle").textContent = title;
+    $("resultTitle").className = ok ? "ok" : "err";
+    $("resultMsg").textContent = msg;
+    show("result");
+  }
+
+  async function lookup() {
+    var r = await fetch("/device/lookup?user_code=" + encodeURIComponent(userCode));
+    if (!r.ok) throw new Error("This code is invalid or has expired.");
+    return r.json();
+  }
+
+  function renderConsent(d) {
+    $("clientName").textContent = d.client_name || "An application";
+    $("codeEcho").textContent = userCode.length === 8 ? userCode.slice(0, 4) + "-" + userCode.slice(4) : userCode;
+    if (d.requested_by) {
+      $("agentWarn").textContent = "Requested by “" + d.requested_by +
+        "”. Approving lets it act as you until you revoke it in your wallet.";
+      $("agentWarn").classList.remove("hidden");
+    }
+    var scopeBox = $("scopes");
+    scopeBox.innerHTML = "";
+    (d.scope || "").split(/\s+/).filter(Boolean).forEach(function (s) {
+      if (s.indexOf("audience:") === 0) return;
+      var el = document.createElement("span");
+      el.className = "chip";
+      el.textContent = s;
+      scopeBox.appendChild(el);
+    });
+    if (d.qr_payload) $("walletBtn").href = d.qr_payload;
+    show("consent");
+    startPolling();
+  }
+
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async function () {
+      try {
+        var d = await lookup();
+        if (d.status === "approved") finish(true, "Approved ✓", "You can return to your terminal. This page can be closed.");
+        else if (d.status === "denied") finish(false, "Request denied", "The sign-in request was rejected.");
+      } catch (e) { finish(false, "Expired", e.message); }
+    }, 2500);
+  }
+
+  $("denyBtn").addEventListener("click", async function () {
+    try {
+      await fetch("/device/deny", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_code: userCode })
+      });
+      finish(false, "Request denied", "You rejected this sign-in request.");
+    } catch (e) { $("status").textContent = e.message; }
+  });
+
+  // No-wallet path: authenticate via the SDK (passkey / social / wallet
+  // modal), then approve the device with the resulting IdP access token.
+  $("passkeyBtn").addEventListener("click", async function () {
+    $("status").innerHTML = '<span class="spin"></span> Opening sign-in…';
+    try {
+      if (!window.Privasys || !Privasys.AuthFrame) throw new Error("Sign-in unavailable. Try the wallet.");
+      var auth = new Privasys.AuthFrame({
+        apiBase: "https://api.developer.privasys.org",
+        appName: "Privasys CLI",
+        clientId: "privasys-cli"
+      });
+      var res = await auth.signIn();
+      if (!res || !res.accessToken) throw new Error("Sign-in did not return a token.");
+      var r = await fetch("/device/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + res.accessToken },
+        body: JSON.stringify({ user_code: userCode })
+      });
+      if (!r.ok) throw new Error("Approval failed.");
+      finish(true, "Approved ✓", "You can return to your terminal. This page can be closed.");
+    } catch (e) {
+      $("status").className = "status err";
+      $("status").textContent = e.message || "Sign-in failed.";
+    }
+  });
+
+  $("codeContinue").addEventListener("click", function () {
+    userCode = norm($("codeInput").value);
+    if (userCode.length !== 8) { $("enterErr").textContent = "Enter the 8-character code."; return; }
+    begin();
+  });
+
+  async function begin() {
+    try {
+      var d = await lookup();
+      if (d.status === "approved") return finish(true, "Already approved ✓", "You can return to your terminal.");
+      if (d.status === "denied") return finish(false, "Request denied", "This request was rejected.");
+      renderConsent(d);
+    } catch (e) {
+      if (params.get("user_code")) { show("enter"); $("enterErr").textContent = e.message; }
+      else { $("enterErr").textContent = e.message; }
+    }
+  }
+
+  userCode = norm(userCode);
+  if (userCode.length === 8) begin();
+  else show("enter");
+})();
+</script>
+</body>
+</html>

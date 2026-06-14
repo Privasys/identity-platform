@@ -116,6 +116,13 @@ func main() {
 	// Device authorization endpoint (RFC 8628) — CLI / agent auth backbone.
 	mux.HandleFunc("POST /device_authorization", oidc.HandleDeviceAuthorization(clientReg, sessionStore, deviceStore, cfg.IssuerURL))
 
+	// Verification page (privasys.id/device) + its JSON endpoints: consent
+	// lookup, approve (Bearer user token from the page's SDK login) and deny.
+	mux.HandleFunc("GET /device", oidc.HandleDevicePage())
+	mux.HandleFunc("GET /device/lookup", oidc.HandleDeviceLookup(deviceStore, sessionStore))
+	mux.HandleFunc("POST /device/approve", oidc.HandleDeviceApprove(issuer, deviceStore, sessionStore, codeStore))
+	mux.HandleFunc("POST /device/deny", oidc.HandleDeviceDeny(deviceStore))
+
 	// Token endpoint.
 	mux.HandleFunc("POST /token", oidc.HandleToken(clientReg, codeStore, deviceStore, sessionStore, issuer, db, sessionsStore))
 

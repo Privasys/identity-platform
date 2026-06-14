@@ -31,7 +31,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/clients"
+	"github.com/Privasys/idp/internal/tokens"
 )
 
 const (
@@ -64,6 +66,7 @@ type DeviceAuth struct {
 	// UNVERIFIED "requested by" label and never conflated with ClientName.
 	RequestedBy string
 	Scope       string
+	QRPayload   string // wallet universal link, echoed to the verification page
 	CreatedAt   time.Time
 	ExpiresAt   time.Time
 	Interval    int
@@ -247,21 +250,6 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 			ExpiresAt:           now.Add(deviceCodeTTL),
 		})
 
-		deviceCode := generateDeviceCode()
-		userCode := generateUserCode()
-		devices.Create(&DeviceAuth{
-			DeviceCode:  deviceCode,
-			UserCode:    userCode,
-			SessionID:   sessionID,
-			ClientID:    clientID,
-			ClientName:  client.ClientName,
-			RequestedBy: agentName,
-			Scope:       scope,
-			CreatedAt:   now,
-			ExpiresAt:   now.Add(deviceCodeTTL),
-			Interval:    defaultDeviceInterval,
-		})
-
 		// Wallet QR payload — same shape as /authorize so the existing wallet
 		// relay completes the session unchanged. appName carries the
 		// authoritative client name (consent §11.2); requestedBy carries the
@@ -283,6 +271,22 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 		qrJSON, _ := json.Marshal(qrPayload)
 		universalLink := "https://privasys.id/scp?p=" + base64.RawURLEncoding.EncodeToString(qrJSON)
 
+		deviceCode := generateDeviceCode()
+		userCode := generateUserCode()
+		devices.Create(&DeviceAuth{
+			DeviceCode:  deviceCode,
+			UserCode:    userCode,
+			SessionID:   sessionID,
+			ClientID:    clientID,
+			ClientName:  client.ClientName,
+			RequestedBy: agentName,
+			Scope:       scope,
+			QRPayload:   universalLink,
+			CreatedAt:   now,
+			ExpiresAt:   now.Add(deviceCodeTTL),
+			Interval:    defaultDeviceInterval,
+		})
+
 		userCodeDisplay := formatUserCode(userCode)
 		resp := map[string]interface{}{
 			"device_code":               deviceCode,
@@ -300,6 +304,131 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
 		json.NewEncoder(w).Encode(resp)
+	}
+}
+
+// HandleDeviceLookup implements GET /device/lookup?user_code=XXXX for the
+// verification page: it returns the consent details (authoritative client
+// name, the unverified requested-by label, scope, wallet link) and the
+// current approval status. Public (the user_code is the capability).
+func HandleDeviceLookup(devices *DeviceStore, sessions *SessionStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		da, ok := devices.GetByUserCode(r.URL.Query().Get("user_code"))
+		if !ok {
+			errorResponse(w, http.StatusNotFound, "invalid_request", "Unknown or expired code")
+			return
+		}
+		status := "pending"
+		if da.mu.Lock(); da.denied {
+			status = "denied"
+		}
+		da.mu.Unlock()
+		if status == "pending" {
+			if s, sok := sessions.Get(da.SessionID); sok && s.Authenticated {
+				status = "approved"
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"client_name":  da.ClientName,
+			"requested_by": da.RequestedBy,
+			"scope":        da.Scope,
+			"qr_payload":   da.QRPayload,
+			"status":       status,
+		})
+	}
+}
+
+// HandleDeviceDeny implements POST /device/deny {user_code}. Lets the
+// verification page reject a request so the polling client gets access_denied.
+func HandleDeviceDeny(devices *DeviceStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			UserCode string `json:"user_code"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req.UserCode == "" {
+			req.UserCode = r.FormValue("user_code")
+		}
+		if !devices.Deny(req.UserCode) {
+			errorResponse(w, http.StatusNotFound, "invalid_request", "Unknown or expired code")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "denied"})
+	}
+}
+
+// HandleDeviceApprove implements POST /device/approve {user_code} with a
+// Bearer access token. The verification page authenticates the user with the
+// @privasys/auth SDK (wallet, passkey, or social — Modes B and C), then calls
+// this to approve the pending device by completing its AuthSession with the
+// authenticated user. This is the non-wallet-relay approval path; the
+// wallet-QR path completes the session directly via the FIDO2 relay.
+func HandleDeviceApprove(issuer *tokens.Issuer, devices *DeviceStore, sessions *SessionStore, codes *CodeStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if len(auth) < 8 || auth[:7] != "Bearer " {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			errorResponse(w, http.StatusUnauthorized, "invalid_token", "Bearer token required")
+			return
+		}
+		claims, err := issuer.VerifyAccessToken(auth[7:])
+		if err != nil {
+			errorResponse(w, http.StatusUnauthorized, "invalid_token", err.Error())
+			return
+		}
+		sub, _ := claims["sub"].(string)
+		if sub == "" {
+			errorResponse(w, http.StatusUnauthorized, "invalid_token", "Missing sub claim")
+			return
+		}
+
+		var req struct {
+			UserCode string `json:"user_code"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.UserCode == "" {
+			errorResponse(w, http.StatusBadRequest, "invalid_request", "user_code required")
+			return
+		}
+
+		da, ok := devices.GetByUserCode(req.UserCode)
+		if !ok {
+			errorResponse(w, http.StatusNotFound, "invalid_request", "Unknown or expired code")
+			return
+		}
+		session, ok := sessions.Get(da.SessionID)
+		if !ok {
+			errorResponse(w, http.StatusNotFound, "invalid_request", "Authorization expired")
+			return
+		}
+
+		// Idempotent: if already approved, succeed without minting a new code.
+		if !session.Authenticated {
+			// Carry whatever profile attributes the page's login put in the
+			// access token, so the device's token is consistent with a wallet
+			// approval.
+			attrs := map[string]string{}
+			for _, a := range attributes.All {
+				if v, ok := claims[a.Key].(string); ok && v != "" {
+					attrs[a.Key] = v
+				}
+			}
+			authCode := codes.Create(&AuthCode{
+				ClientID:            session.ClientID,
+				UserID:              sub,
+				Scope:               session.Scope,
+				CodeChallenge:       session.CodeChallenge,
+				CodeChallengeMethod: session.CodeChallengeMethod,
+				AuthTime:            time.Now(),
+				Attributes:          attrs,
+			})
+			sessions.Complete(da.SessionID, sub, authCode)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "approved"})
 	}
 }
 

@@ -4,7 +4,9 @@
 package oidc
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -277,6 +279,129 @@ func TestDeviceCodeSlowDown(t *testing.T) {
 	if c, b := poll(); c != http.StatusBadRequest || b["error"] != "slow_down" {
 		t.Fatalf("second immediate poll: expected slow_down, got %d %v", c, b)
 	}
+}
+
+func TestDeviceVerificationPageApprove(t *testing.T) {
+	reg, db, iss := newDeviceTestEnv(t)
+	codes := NewCodeStore()
+	sessions := NewSessionStore()
+	devices := NewDeviceStore()
+	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id")
+	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, nil)
+	lookupHandler := HandleDeviceLookup(devices, sessions)
+	approveHandler := HandleDeviceApprove(iss, devices, sessions, codes)
+
+	// Begin.
+	_, body := postForm(t, devHandler, "/device_authorization", url.Values{
+		"client_id":      {"privasys-cli"},
+		"scope":          {"openid email profile offline_access"},
+		"code_challenge": {testPKCEChallenge},
+		"agent_name":     {"Claude Code"},
+	})
+	deviceCode := body["device_code"].(string)
+	userCode := body["user_code"].(string)
+	da, _ := devices.GetByDeviceCode(deviceCode)
+	da.Interval = 0
+
+	// Lookup shows consent details, status pending.
+	rec := httptest.NewRecorder()
+	lookupHandler.ServeHTTP(rec, httptest.NewRequest("GET", "/device/lookup?user_code="+url.QueryEscape(userCode), nil))
+	var lk map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&lk)
+	if lk["client_name"] != "Privasys CLI" || lk["requested_by"] != "Claude Code" || lk["status"] != "pending" {
+		t.Fatalf("lookup: %v", lk)
+	}
+
+	// The user authenticates on the page (here: mint a token directly) and approves.
+	if _, err := db.Exec("INSERT OR IGNORE INTO users (user_id) VALUES (?)", "user-page"); err != nil {
+		t.Fatal(err)
+	}
+	userTok, err := iss.IssueAccessToken("user-page", "privasys-platform", nil, map[string]string{"email": "u@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	areq := httptest.NewRequest("POST", "/device/approve", strings.NewReader(`{"user_code":"`+userCode+`"}`))
+	areq.Header.Set("Authorization", "Bearer "+userTok)
+	arec := httptest.NewRecorder()
+	approveHandler.ServeHTTP(arec, areq)
+	if arec.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", arec.Code, arec.Body.String())
+	}
+
+	// Lookup now approved.
+	rec = httptest.NewRecorder()
+	lookupHandler.ServeHTTP(rec, httptest.NewRequest("GET", "/device/lookup?user_code="+url.QueryEscape(userCode), nil))
+	lk = map[string]interface{}{}
+	json.NewDecoder(rec.Body).Decode(&lk)
+	if lk["status"] != "approved" {
+		t.Fatalf("expected approved, got %v", lk["status"])
+	}
+
+	// Device poll yields tokens, and the email attribute carried through.
+	c, b := postForm(t, tokenHandler, "/token", url.Values{
+		"grant_type":    {"urn:ietf:params:oauth:grant-type:device_code"},
+		"device_code":   {deviceCode},
+		"client_id":     {"privasys-cli"},
+		"code_verifier": {testPKCEVerifier},
+	})
+	if c != http.StatusOK {
+		t.Fatalf("poll: %d %v", c, b)
+	}
+	at, _ := b["access_token"].(string)
+	claims, _ := Claims(at)
+	if claims["sub"] != "user-page" {
+		t.Errorf("token sub = %v", claims["sub"])
+	}
+}
+
+func TestDeviceVerificationPageDeny(t *testing.T) {
+	reg, db, iss := newDeviceTestEnv(t)
+	codes := NewCodeStore()
+	sessions := NewSessionStore()
+	devices := NewDeviceStore()
+	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id")
+	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, nil)
+	denyHandler := HandleDeviceDeny(devices)
+
+	_, body := postForm(t, devHandler, "/device_authorization", url.Values{
+		"client_id":      {"privasys-cli"},
+		"scope":          {"openid"},
+		"code_challenge": {testPKCEChallenge},
+	})
+	deviceCode := body["device_code"].(string)
+	userCode := body["user_code"].(string)
+	da, _ := devices.GetByDeviceCode(deviceCode)
+	da.Interval = 0
+
+	drec := httptest.NewRecorder()
+	denyHandler.ServeHTTP(drec, httptest.NewRequest("POST", "/device/deny", strings.NewReader(`{"user_code":"`+userCode+`"}`)))
+	if drec.Code != http.StatusOK {
+		t.Fatalf("deny: %d %s", drec.Code, drec.Body.String())
+	}
+
+	c, b := postForm(t, tokenHandler, "/token", url.Values{
+		"grant_type":    {"urn:ietf:params:oauth:grant-type:device_code"},
+		"device_code":   {deviceCode},
+		"client_id":     {"privasys-cli"},
+		"code_verifier": {testPKCEVerifier},
+	})
+	if c != http.StatusBadRequest || b["error"] != "access_denied" {
+		t.Fatalf("expected access_denied, got %d %v", c, b)
+	}
+}
+
+// Claims decodes a JWT payload without verifying (test helper mirror).
+func Claims(token string) (map[string]interface{}, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("not a jwt")
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]interface{}
+	return m, json.Unmarshal(raw, &m)
 }
 
 func TestUserCodeFormatAndNormalize(t *testing.T) {

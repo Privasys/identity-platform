@@ -147,6 +147,10 @@ func HandleCreateServiceAccount(db *store.DB, adminToken string) http.HandlerFun
 
 		var req struct {
 			DisplayName string `json:"display_name"`
+			// AccessTokenTTLSeconds, when > 0, gives this account long-lived
+			// access tokens (for infrastructure SAs like the vault that hold
+			// one bearer instead of refreshing). Absent/0 = default 15 min.
+			AccessTokenTTLSeconds int `json:"access_token_ttl_seconds"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid request body")
@@ -188,7 +192,7 @@ func HandleCreateServiceAccount(db *store.DB, adminToken string) http.HandlerFun
 		keyID := hex.EncodeToString(kidBytes)
 
 		// Store in DB.
-		if err := db.CreateServiceAccount(accountID, req.DisplayName, pubPEM, keyID); err != nil {
+		if err := db.CreateServiceAccount(accountID, req.DisplayName, pubPEM, keyID, req.AccessTokenTTLSeconds); err != nil {
 			log.Printf("admin/service-accounts: create failed: %v", err)
 			writeError(w, http.StatusInternalServerError, "failed to create service account")
 			return

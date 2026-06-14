@@ -917,8 +917,16 @@ func handleJWTBearerGrant(w http.ResponseWriter, r *http.Request,
 	allRoles, _ := db.GetRoles(accountID)
 	roles := filterRolesByAudience(allRoles, audience)
 
+	// Infrastructure service accounts (e.g. the vault constellation) may
+	// carry a long access-token TTL so they hold one bearer instead of
+	// refreshing every few minutes; 0/absent keeps the standard 15 minutes.
+	ttlSeconds := 900
+	if sec, terr := db.ServiceAccountTokenTTL(accountID); terr == nil && sec > 0 {
+		ttlSeconds = sec
+	}
+
 	// Issue access token (service accounts have no profile attributes).
-	accessToken, err := issuer.IssueAccessToken(accountID, audience, roles, nil)
+	accessToken, err := issuer.IssueAccessTokenWithTTL(accountID, audience, "", roles, nil, time.Duration(ttlSeconds)*time.Second)
 	if err != nil {
 		log.Printf("jwt-bearer: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -928,7 +936,7 @@ func handleJWTBearerGrant(w http.ResponseWriter, r *http.Request,
 	resp := map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
-		"expires_in":   900,
+		"expires_in":   ttlSeconds,
 		"scope":        scope,
 	}
 

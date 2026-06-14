@@ -175,13 +175,20 @@ func (iss *Issuer) IssueAccessToken(subject, audience string, roles []string, at
 // claim binding the token to a row in `internal/sessions`. Resource
 // servers use this to enforce wallet-driven revocation.
 func (iss *Issuer) IssueAccessTokenWithSID(subject, audience, sid string, roles []string, attributes map[string]string) (string, error) {
+	return iss.IssueAccessTokenWithTTL(subject, audience, sid, roles, attributes, 15*time.Minute)
+}
+
+// IssueAccessTokenWithTTL is IssueAccessTokenWithSID with an explicit
+// lifetime, used for long-lived infrastructure service-account tokens
+// (e.g. the vault constellation's attestation-server bearer).
+func (iss *Issuer) IssueAccessTokenWithTTL(subject, audience, sid string, roles []string, attributes map[string]string, ttl time.Duration) (string, error) {
 	now := time.Now()
 	c := jwt.MapClaims{
 		"iss": iss.issuerURL,
 		"sub": subject,
 		"aud": audience,
 		"iat": now.Unix(),
-		"exp": now.Add(15 * time.Minute).Unix(),
+		"exp": now.Add(ttl).Unix(),
 		"typ": "at+jwt",
 	}
 	if sid != "" {

@@ -218,6 +218,11 @@ interface QRPayload {
     appName?: string;
     privacyPolicyUrl?: string;
     clientIP?: string;
+    /** Optional, UNVERIFIED label naming an agent that brokered this request
+     *  (CLI/agent device flow). When present the approval grants that agent a
+     *  token that acts as the user, so we surface it prominently as a
+     *  delegation warning. Never treat it as a verified identity. */
+    requestedBy?: string;
     /** When set to 'session-relay', the wallet must call /__privasys/session-bootstrap
      *  with `sdkPub` before the FIDO2 ceremony so the IdP can bind the issued
      *  JWT to a sealed-CBOR transport session. */
@@ -989,6 +994,13 @@ export default function ConnectScreen() {
                                 <Text style={styles.confirmHint}>
                                     {[friendlyBrowser(qr.userAgent), qr.clientIP].filter(Boolean).join(' · ')}
                                 </Text>
+                            )}
+                            {qr.requestedBy && (
+                                <View style={styles.confirmAgentBanner}>
+                                    <Text style={styles.confirmAgentText}>
+                                        Requested by “{qr.requestedBy}”. Approving lets it act as you until you revoke it in Settings.
+                                    </Text>
+                                </View>
                             )}
                         </View>
                         <View style={styles.confirmActions}>
@@ -2160,6 +2172,22 @@ const styles = StyleSheet.create({
         color: '#94A3B8',
         textAlign: 'center',
         paddingHorizontal: 20
+    },
+    confirmAgentBanner: {
+        marginTop: 16,
+        marginHorizontal: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 10,
+        backgroundColor: 'rgba(234, 179, 8, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(234, 179, 8, 0.4)'
+    },
+    confirmAgentText: {
+        fontSize: 13,
+        fontFamily: 'Inter',
+        color: '#EAB308',
+        textAlign: 'center'
     },
     confirmActions: {
         flexDirection: 'row',

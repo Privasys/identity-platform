@@ -115,7 +115,6 @@ func migrate(db *sql.DB) error {
 			display_name TEXT NOT NULL DEFAULT '',
 			public_key   TEXT NOT NULL,          -- PEM-encoded RSA or EC public key
 			key_id       TEXT NOT NULL DEFAULT '',
-			access_token_ttl_seconds INTEGER NOT NULL DEFAULT 0, -- 0 = default 15m; >0 = long-lived infra SA (e.g. vault)
 			created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
@@ -275,34 +274,6 @@ func migrate(db *sql.DB) error {
 	}
 	if !hasSID {
 		if _, err := db.Exec("ALTER TABLE refresh_tokens ADD COLUMN sid TEXT NOT NULL DEFAULT ''"); err != nil {
-			return err
-		}
-	}
-
-	// service_accounts.access_token_ttl_seconds — long-lived tokens for
-	// infrastructure accounts (e.g. the vault constellation) that hold one
-	// bearer instead of refreshing every few minutes.
-	saRows, err := db.Query("PRAGMA table_info(service_accounts)")
-	if err != nil {
-		return err
-	}
-	defer saRows.Close()
-	hasTokenTTL := false
-	for saRows.Next() {
-		var cid int
-		var colName, ctype string
-		var notnull int
-		var dfltValue *string
-		var pk int
-		if err := saRows.Scan(&cid, &colName, &ctype, &notnull, &dfltValue, &pk); err != nil {
-			return err
-		}
-		if colName == "access_token_ttl_seconds" {
-			hasTokenTTL = true
-		}
-	}
-	if !hasTokenTTL {
-		if _, err := db.Exec("ALTER TABLE service_accounts ADD COLUMN access_token_ttl_seconds INTEGER NOT NULL DEFAULT 0"); err != nil {
 			return err
 		}
 	}
@@ -523,23 +494,10 @@ func (db *DB) GetServiceAccount(accountID string) (publicKeyPEM, keyID string, e
 	return
 }
 
-// ServiceAccountTokenTTL returns the access-token TTL in seconds for a
-// service account. 0 means use the default (15 min). Infrastructure
-// accounts (e.g. the vault constellation) are provisioned with a long TTL
-// so they can hold a single bearer instead of refreshing constantly.
-func (db *DB) ServiceAccountTokenTTL(accountID string) (int, error) {
-	var ttl int
-	err := db.QueryRow(
-		"SELECT access_token_ttl_seconds FROM service_accounts WHERE account_id = ?",
-		accountID,
-	).Scan(&ttl)
-	return ttl, err
-}
-
 // CreateServiceAccount stores a new service account.
 // It also inserts a row into the users table so that foreign-key constraints
 // (e.g. roles.user_id → users.user_id) are satisfied for service accounts.
-func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID string, tokenTTLSeconds int) error {
+func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -557,9 +515,9 @@ func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID s
 	}
 
 	_, err = tx.Exec(
-		`INSERT INTO service_accounts (account_id, display_name, public_key, key_id, access_token_ttl_seconds) VALUES (?, ?, ?, ?, ?)
-		 ON CONFLICT(account_id) DO UPDATE SET display_name = excluded.display_name, public_key = excluded.public_key, key_id = excluded.key_id, access_token_ttl_seconds = excluded.access_token_ttl_seconds`,
-		accountID, displayName, publicKeyPEM, keyID, tokenTTLSeconds,
+		`INSERT INTO service_accounts (account_id, display_name, public_key, key_id) VALUES (?, ?, ?, ?)
+		 ON CONFLICT(account_id) DO UPDATE SET display_name = excluded.display_name, public_key = excluded.public_key, key_id = excluded.key_id`,
+		accountID, displayName, publicKeyPEM, keyID,
 	)
 	if err != nil {
 		return err

@@ -25,6 +25,17 @@ import (
 	"github.com/Privasys/idp/internal/tokens"
 )
 
+const (
+	// longLivedAudience is the token audience that is issued long-lived.
+	// Tokens for it authorise nothing but attestation-server quote
+	// verification (POST /verify), so a long lifetime is low-risk — the
+	// vault constellation holds one as a static bearer instead of
+	// refreshing every 15 minutes. Powerful audiences stay short-lived.
+	longLivedAudience = "attestation-server"
+	// longLivedTokenTTLSeconds is ~5 years.
+	longLivedTokenTTLSeconds = 5 * 365 * 24 * 3600
+)
+
 // HandleDiscovery returns the OIDC discovery document.
 func HandleDiscovery(issuerURL string) http.HandlerFunc {
 	doc := map[string]interface{}{
@@ -917,12 +928,15 @@ func handleJWTBearerGrant(w http.ResponseWriter, r *http.Request,
 	allRoles, _ := db.GetRoles(accountID)
 	roles := filterRolesByAudience(allRoles, audience)
 
-	// Infrastructure service accounts (e.g. the vault constellation) may
-	// carry a long access-token TTL so they hold one bearer instead of
-	// refreshing every few minutes; 0/absent keeps the standard 15 minutes.
+	// Tokens for the attestation-server audience authorise nothing but
+	// quote verification (POST /verify), so they may be long-lived — the
+	// vault constellation holds one as a static AS bearer instead of
+	// refreshing every 15 minutes. Gating on audience (not the service
+	// account) means the same SA still gets short-lived tokens for every
+	// powerful audience; only this harmless one is long.
 	ttlSeconds := 900
-	if sec, terr := db.ServiceAccountTokenTTL(accountID); terr == nil && sec > 0 {
-		ttlSeconds = sec
+	if audience == longLivedAudience {
+		ttlSeconds = longLivedTokenTTLSeconds
 	}
 
 	// Issue access token (service accounts have no profile attributes).

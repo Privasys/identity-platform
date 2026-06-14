@@ -40,7 +40,7 @@ jobs:
     # On workflow_run, only deploy if the upstream Build & Push IdP succeeded.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # On workflow_run, check out the same commit/tag the build ran on
           # so the deploy step sees the matching docker-compose contract.

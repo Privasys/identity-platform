@@ -42,11 +42,12 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		"issuer":                                issuerURL,
 		"authorization_endpoint":                issuerURL + "/authorize",
 		"token_endpoint":                        issuerURL + "/token",
+		"device_authorization_endpoint":         issuerURL + "/device_authorization",
 		"userinfo_endpoint":                     issuerURL + "/userinfo",
 		"jwks_uri":                              issuerURL + "/jwks",
 		"registration_endpoint":                 issuerURL + "/clients",
 		"response_types_supported":              []string{"code"},
-		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"},
+		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer", "urn:ietf:params:oauth:grant-type:device_code"},
 		"subject_types_supported":               []string{"pairwise"},
 		"id_token_signing_alg_values_supported": []string{"ES256"},
 		"scopes_supported":                      []string{"openid", "profile", "email", "phone", "offline_access"},
@@ -363,32 +364,7 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		// Tell the wallet which attributes the relying party needs,
 		// derived from the requested OIDC scope, then filtered by the
 		// client's required_attributes whitelist (if set).
-		var requestedAttributes []string
-		if strings.Contains(scope, "openid") {
-			requestedAttributes = append(requestedAttributes, "sub")
-		}
-		for _, attr := range attributes.All {
-			if strings.Contains(scope, attr.Scope) {
-				requestedAttributes = append(requestedAttributes, attr.Key)
-			}
-		}
-
-		// If the client declares specific required attributes, intersect.
-		if len(client.RequiredAttributes) > 0 {
-			allowed := make(map[string]bool, len(client.RequiredAttributes))
-			for _, a := range client.RequiredAttributes {
-				allowed[a] = true
-			}
-			// Always keep "sub" if present (required by OpenID Connect).
-			allowed["sub"] = true
-			filtered := requestedAttributes[:0]
-			for _, a := range requestedAttributes {
-				if allowed[a] {
-					filtered = append(filtered, a)
-				}
-			}
-			requestedAttributes = filtered
-		}
+		requestedAttributes := requestedAttributesForScope(scope, client)
 
 		if len(requestedAttributes) > 0 {
 			qrPayload["requestedAttributes"] = requestedAttributes
@@ -537,7 +513,7 @@ func HandleSessionComplete(codes *CodeStore, sessions *SessionStore) http.Handle
 // `sess` is optional; when nil the unified session model is bypassed
 // and tokens are minted without a `sid` claim (legacy behaviour). All
 // production wiring should pass a non-nil store.
-func HandleToken(reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer, db *store.DB, sess *sessions.Store) http.HandlerFunc {
+func HandleToken(reg *clients.Registry, codes *CodeStore, devices *DeviceStore, authSessions *SessionStore, issuer *tokens.Issuer, db *store.DB, sess *sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			errorResponse(w, http.StatusBadRequest, "invalid_request", "Cannot parse form")
@@ -553,11 +529,104 @@ func HandleToken(reg *clients.Registry, codes *CodeStore, issuer *tokens.Issuer,
 			handleRefreshTokenGrant(w, r, reg, issuer, db, sess)
 		case "urn:ietf:params:oauth:grant-type:jwt-bearer":
 			handleJWTBearerGrant(w, r, issuer, db)
+		case "urn:ietf:params:oauth:grant-type:device_code":
+			handleDeviceCodeGrant(w, r, reg, codes, devices, authSessions, issuer, db, sess)
 		default:
 			errorResponse(w, http.StatusBadRequest, "unsupported_grant_type",
-				"Supported: authorization_code, refresh_token, urn:ietf:params:oauth:grant-type:jwt-bearer")
+				"Supported: authorization_code, refresh_token, urn:ietf:params:oauth:grant-type:jwt-bearer, urn:ietf:params:oauth:grant-type:device_code")
 		}
 	}
+}
+
+// handleDeviceCodeGrant implements the RFC 8628 token poll. The client polls
+// with its device_code (+ PKCE code_verifier) until the user approves on the
+// wallet (or verification page). Until then it returns authorization_pending;
+// it returns slow_down when polled too fast, access_denied if the user
+// rejected, and expired_token once the device_code lapses.
+func handleDeviceCodeGrant(w http.ResponseWriter, r *http.Request,
+	reg *clients.Registry, codes *CodeStore, devices *DeviceStore, authSessions *SessionStore,
+	issuer *tokens.Issuer, db *store.DB, sess *sessions.Store) {
+
+	deviceCode := r.FormValue("device_code")
+	codeVerifier := r.FormValue("code_verifier")
+	clientID := r.FormValue("client_id")
+	clientSecret := r.FormValue("client_secret")
+	if clientID == "" {
+		if id, secret, ok := r.BasicAuth(); ok {
+			clientID = id
+			clientSecret = secret
+		}
+	}
+
+	if deviceCode == "" {
+		errorResponse(w, http.StatusBadRequest, "invalid_request", "device_code required")
+		return
+	}
+
+	// Validate the client (public clients have no secret).
+	ok, err := reg.VerifySecret(clientID, clientSecret)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid_client", "Unknown client")
+		return
+	}
+	if !ok {
+		errorResponse(w, http.StatusUnauthorized, "invalid_client", "Invalid client credentials")
+		return
+	}
+
+	// expired_token once the device_code lapses (or was already consumed).
+	da, found := devices.GetByDeviceCode(deviceCode)
+	if !found {
+		errorResponse(w, http.StatusBadRequest, "expired_token", "device_code expired or unknown")
+		return
+	}
+	if da.ClientID != clientID {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "client_id mismatch")
+		return
+	}
+
+	// Rate-limit polling per RFC 8628 §3.5.
+	if da.touchPoll() {
+		errorResponse(w, http.StatusBadRequest, "slow_down", "Polling too frequently")
+		return
+	}
+
+	da.mu.Lock()
+	denied := da.denied
+	da.mu.Unlock()
+	if denied {
+		devices.Delete(deviceCode)
+		errorResponse(w, http.StatusBadRequest, "access_denied", "User denied the request")
+		return
+	}
+
+	// Approval is signalled by the wallet (or verification page) completing
+	// the linked AuthSession via the shared FIDO2/relay path.
+	session, sok := authSessions.Get(da.SessionID)
+	if !sok || !session.Authenticated {
+		errorResponse(w, http.StatusBadRequest, "authorization_pending", "Waiting for user approval")
+		return
+	}
+
+	// Consume the authorization code the FIDO2 handler created on completion.
+	ac, cok := codes.Consume(session.AuthCode)
+	if !cok {
+		errorResponse(w, http.StatusBadRequest, "expired_token", "Authorization expired before token retrieval")
+		return
+	}
+	if ac.ClientID != clientID {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "client_id mismatch")
+		return
+	}
+	if !verifyPKCE(ac.CodeChallenge, codeVerifier) {
+		errorResponse(w, http.StatusBadRequest, "invalid_grant", "PKCE verification failed")
+		return
+	}
+
+	// Single-use: drop the device authorization now that it is redeemed.
+	devices.Delete(deviceCode)
+
+	issueTokensForCode(w, ac, reg, issuer, db, sess)
 }
 
 const refreshTokenTTL = 30 * 24 * time.Hour // 30 days
@@ -614,6 +683,17 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request,
 		errorResponse(w, http.StatusBadRequest, "invalid_grant", "PKCE verification failed")
 		return
 	}
+
+	issueTokensForCode(w, ac, reg, issuer, db, sess)
+}
+
+// issueTokensForCode mints the ID/access/refresh tokens for a consumed,
+// client-validated, PKCE-verified authorization code. Shared by the
+// authorization_code and device_code grants so both produce identical tokens
+// (roles, sid, audience, attribute handling). The caller must have already
+// consumed `ac` from the code store and verified the client and PKCE.
+func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
+	reg *clients.Registry, issuer *tokens.Issuer, db *store.DB, sess *sessions.Store) {
 
 	// Resolve profile attributes from transient auth code data
 	// (wallet relay or social IdP). No profile data is stored server-side.
@@ -1084,6 +1164,40 @@ func filterRolesByAudience(roles []string, audience string) []string {
 		}
 	}
 	return out
+}
+
+// requestedAttributesForScope derives the attribute keys a relying party needs
+// from the requested OIDC scope, then intersects with the client's
+// required_attributes whitelist (when set). "sub" is always included for an
+// openid request. Shared by /authorize and /device_authorization so the wallet
+// sees one consistent list regardless of entry point.
+func requestedAttributesForScope(scope string, client *clients.Client) []string {
+	var requested []string
+	if strings.Contains(scope, "openid") {
+		requested = append(requested, "sub")
+	}
+	for _, attr := range attributes.All {
+		if strings.Contains(scope, attr.Scope) {
+			requested = append(requested, attr.Key)
+		}
+	}
+
+	if client != nil && len(client.RequiredAttributes) > 0 {
+		allowed := make(map[string]bool, len(client.RequiredAttributes))
+		for _, a := range client.RequiredAttributes {
+			allowed[a] = true
+		}
+		// Always keep "sub" (required by OpenID Connect).
+		allowed["sub"] = true
+		filtered := requested[:0]
+		for _, a := range requested {
+			if allowed[a] {
+				filtered = append(filtered, a)
+			}
+		}
+		requested = filtered
+	}
+	return requested
 }
 
 // filterAttributesByScope returns only the attributes allowed by the OIDC scope,

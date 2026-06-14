@@ -13,7 +13,8 @@
 //	GET  /.well-known/openid-configuration  — OIDC discovery
 //	GET  /jwks                               — JSON Web Key Set
 //	GET  /authorize                          — Authorization request (shows QR / triggers push)
-//	POST /token                              — Token exchange (code → id_token + access_token)
+//	POST /device_authorization               — Device Authorization Grant (RFC 8628; CLI / agent auth)
+//	POST /token                              — Token exchange (code / device_code / refresh / jwt-bearer)
 //	GET  /userinfo                           — User profile (consented claims)
 //	POST /fido2/register/begin               — Start FIDO2 registration
 //	POST /fido2/register/complete            — Complete FIDO2 registration
@@ -64,6 +65,15 @@ func main() {
 	// Client registry.
 	clientReg := clients.NewRegistry(db)
 
+	// Ensure the Privasys CLI public client exists (PKCE, no secret). The
+	// device-authorization flow (RFC 8628) is keyed on this client; it has no
+	// usable redirect (the device flow delivers codes by polling), so the
+	// registered URI is only the verification landing page.
+	if _, err := clientReg.RegisterWithID("privasys-cli", "Privasys CLI",
+		[]string{cfg.IssuerURL + "/device"}, "", nil); err != nil {
+		log.Printf("warning: failed to ensure privasys-cli client: %v", err)
+	}
+
 	// FIDO2 handler.
 	fido2Handler, err := fido2.NewHandler(fido2.Config{
 		RPID:          cfg.RPID,
@@ -80,6 +90,9 @@ func main() {
 
 	// Session store (maps browser session → authenticated user).
 	sessionStore := oidc.NewSessionStore()
+
+	// Device authorization store (RFC 8628) — backs the CLI and agent flows.
+	deviceStore := oidc.NewDeviceStore()
 
 	// Unified sessions table (per-(user, app, device) row backing every
 	// issued JWT — the wallet uses sid as the revocation handle).
@@ -100,8 +113,11 @@ func main() {
 	// Authorization endpoint.
 	mux.HandleFunc("GET /authorize", oidc.HandleAuthorize(clientReg, sessionStore, cfg.IssuerURL))
 
+	// Device authorization endpoint (RFC 8628) — CLI / agent auth backbone.
+	mux.HandleFunc("POST /device_authorization", oidc.HandleDeviceAuthorization(clientReg, sessionStore, deviceStore, cfg.IssuerURL))
+
 	// Token endpoint.
-	mux.HandleFunc("POST /token", oidc.HandleToken(clientReg, codeStore, issuer, db, sessionsStore))
+	mux.HandleFunc("POST /token", oidc.HandleToken(clientReg, codeStore, deviceStore, sessionStore, issuer, db, sessionsStore))
 
 	// Unified session management (revoke, list).
 	mux.HandleFunc("GET /sessions/me", sessionsStore.HandleListMine(issuer))

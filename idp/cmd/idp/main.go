@@ -201,6 +201,9 @@ func main() {
 	mux.HandleFunc("GET /auth/social", socialHandler.HandleRedirect)
 	mux.HandleFunc("GET /auth/social/callback", socialHandler.HandleCallback)
 	mux.HandleFunc("GET /auth/social/providers", socialHandler.HandleProviders)
+	// Wallet profile-linking (reuses the same providers/secrets; no OIDC session).
+	mux.HandleFunc("GET /wallet/link", socialHandler.HandleWalletLink)
+	mux.HandleFunc("GET /wallet/link/result", socialHandler.HandleWalletLinkResult)
 
 	// Client registration (admin endpoint).
 	mux.HandleFunc("POST /clients", clients.HandleRegister(clientReg, cfg.AdminToken))

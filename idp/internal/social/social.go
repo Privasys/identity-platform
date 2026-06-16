@@ -86,10 +86,19 @@ func (p *Providers) List() []string {
 // --- State store (CSRF protection for OAuth2 callbacks) ---
 
 type stateEntry struct {
-	sessionID string // OIDC session_id to complete
+	sessionID string // OIDC session_id to complete (web-SDK mode)
 	provider  string // Which social provider
 	verifier  string // PKCE code_verifier for the upstream token exchange
 	expiresAt time.Time
+
+	// Wallet-link mode (sessionID is empty). The wallet links a provider to
+	// seed its local profile; there is no OIDC session. After the upstream
+	// exchange the callback stashes the normalised attributes under a one-time
+	// result code and 302-redirects to the wallet's custom-scheme redirectURI.
+	walletMode  bool
+	redirectURI string // wallet custom-scheme callback (allowlisted)
+	nonce       string // wallet-supplied, echoed back for correlation
+	challenge   string // wallet PKCE S256 challenge, verified at /wallet/link/result
 }
 
 type stateStore struct {
@@ -124,6 +133,25 @@ func (ss *stateStore) create(sessionID, provider, verifier string) string {
 	return state
 }
 
+func (ss *stateStore) createWallet(provider, verifier, redirectURI, nonce, challenge string) string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	state := hex.EncodeToString(b)
+
+	ss.mu.Lock()
+	ss.states[state] = &stateEntry{
+		provider:    provider,
+		verifier:    verifier,
+		expiresAt:   time.Now().Add(10 * time.Minute),
+		walletMode:  true,
+		redirectURI: redirectURI,
+		nonce:       nonce,
+		challenge:   challenge,
+	}
+	ss.mu.Unlock()
+	return state
+}
+
 func (ss *stateStore) consume(state string) (*stateEntry, bool) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
@@ -147,12 +175,78 @@ func (ss *stateStore) cleanup() {
 	}
 }
 
+// --- Wallet-link result store (one-time codes) ---
+
+// linkResult holds the normalised attributes from a wallet-link flow, keyed by
+// a one-time code. It is retrieved exactly once at /wallet/link/result, after
+// the caller proves possession of the PKCE verifier bound at /wallet/link.
+type linkResult struct {
+	provider  string
+	userID    string
+	attrs     map[string]string
+	verified  map[string]bool
+	challenge string // wallet PKCE S256 challenge; verifier checked at retrieval
+	expiresAt time.Time
+}
+
+type resultStore struct {
+	mu      sync.Mutex
+	results map[string]*linkResult
+}
+
+func newResultStore() *resultStore {
+	rs := &resultStore{results: make(map[string]*linkResult)}
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+			rs.cleanup()
+		}
+	}()
+	return rs
+}
+
+func (rs *resultStore) create(res *linkResult) string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	code := hex.EncodeToString(b)
+	res.expiresAt = time.Now().Add(5 * time.Minute)
+
+	rs.mu.Lock()
+	rs.results[code] = res
+	rs.mu.Unlock()
+	return code
+}
+
+func (rs *resultStore) consume(code string) (*linkResult, bool) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	res, ok := rs.results[code]
+	if !ok || time.Now().After(res.expiresAt) {
+		delete(rs.results, code)
+		return nil, false
+	}
+	delete(rs.results, code)
+	return res, true
+}
+
+func (rs *resultStore) cleanup() {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	now := time.Now()
+	for k, v := range rs.results {
+		if now.After(v.expiresAt) {
+			delete(rs.results, k)
+		}
+	}
+}
+
 // --- Handlers ---
 
 // Handler manages social authentication flows.
 type Handler struct {
 	providers  *Providers
 	states     *stateStore
+	results    *resultStore
 	codes      *oidc.CodeStore
 	sessions   *oidc.SessionStore
 	issuerURL  string
@@ -164,6 +258,7 @@ func NewHandler(providers *Providers, codes *oidc.CodeStore, sessions *oidc.Sess
 	return &Handler{
 		providers:  providers,
 		states:     newStateStore(),
+		results:    newResultStore(),
 		codes:      codes,
 		sessions:   sessions,
 		issuerURL:  issuerURL,
@@ -286,6 +381,30 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		attrs["email"] = h.fetchGitHubPrimaryEmail(accessToken)
 	}
 
+	// Wallet-link mode: no OIDC session. Stash the normalised attributes (plus
+	// per-attribute verification status) under a one-time result code and
+	// 302-redirect back to the wallet's custom-scheme URI. The wallet redeems
+	// the code at /wallet/link/result with its PKCE verifier.
+	if entry.walletMode {
+		res := &linkResult{
+			provider:  entry.provider,
+			userID:    userID,
+			attrs:     attrs,
+			verified:  providerVerified(entry.provider, raw),
+			challenge: entry.challenge,
+		}
+		resultCode := h.results.create(res)
+		sep := "?"
+		if strings.Contains(entry.redirectURI, "?") {
+			sep = "&"
+		}
+		redir := fmt.Sprintf("%s%scode=%s&nonce=%s", entry.redirectURI, sep,
+			url.QueryEscape(resultCode), url.QueryEscape(entry.nonce))
+		log.Printf("social/%s: wallet link complete (%d attrs), redirecting", entry.provider, len(attrs))
+		http.Redirect(w, r, redir, http.StatusFound)
+		return
+	}
+
 	// Complete the OIDC session.
 	session, ok := h.sessions.Get(entry.sessionID)
 	if !ok {
@@ -335,6 +454,167 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"providers": names,
 	})
+}
+
+// --- Wallet-link handlers ---
+
+// allowedWalletSchemes is the set of custom URL schemes the wallet may use as
+// its link callback (one per build stage, see auth.md "Custom URL Schemes").
+// Restricting the redirect prevents an open redirect / token-leak to a
+// malicious app.
+var allowedWalletSchemes = []string{
+	"privasys-wallet://",
+	"privasys-wallet-dev://",
+	"privasys-wallet-preview://",
+}
+
+func allowedWalletRedirect(uri string) bool {
+	for _, s := range allowedWalletSchemes {
+		if strings.HasPrefix(uri, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// HandleWalletLink initiates a wallet profile-link flow (no OIDC session). The
+// wallet opens this in the system browser; the IdP performs the upstream OAuth
+// with its held secret and redirects the result back to the wallet.
+// GET /wallet/link?provider=github&redirect_uri=privasys-wallet://link/callback
+//
+//	&nonce=xxx&code_challenge=yyy&code_challenge_method=S256
+func (h *Handler) HandleWalletLink(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	providerName := q.Get("provider")
+	redirectURI := q.Get("redirect_uri")
+	nonce := q.Get("nonce")
+	challenge := q.Get("code_challenge")
+	challengeMethod := q.Get("code_challenge_method")
+
+	if providerName == "" || redirectURI == "" || nonce == "" {
+		http.Error(w, "provider, redirect_uri and nonce required", http.StatusBadRequest)
+		return
+	}
+	if !allowedWalletRedirect(redirectURI) {
+		http.Error(w, "redirect_uri scheme not allowed", http.StatusBadRequest)
+		return
+	}
+	// PKCE is mandatory on the wallet leg too: it binds redemption of the
+	// one-time result code to the wallet instance that started the flow, so a
+	// hijacked deep link cannot redeem it.
+	if challenge == "" {
+		http.Error(w, "code_challenge is required (PKCE)", http.StatusBadRequest)
+		return
+	}
+	if challengeMethod != "" && challengeMethod != "S256" {
+		http.Error(w, "only S256 code_challenge_method is supported", http.StatusBadRequest)
+		return
+	}
+
+	prov, ok := h.providers.Get(providerName)
+	if !ok {
+		http.Error(w, "unknown provider", http.StatusBadRequest)
+		return
+	}
+	if !prov.PKCE {
+		http.Error(w, "provider does not support PKCE", http.StatusBadRequest)
+		return
+	}
+
+	// Upstream PKCE verifier/challenge, bound to the CSRF state.
+	verifier, upstreamChallenge := generatePKCE()
+	state := h.states.createWallet(providerName, verifier, redirectURI, nonce, challenge)
+
+	authURL, _ := url.Parse(prov.AuthURL)
+	uq := authURL.Query()
+	uq.Set("client_id", prov.ClientID)
+	uq.Set("redirect_uri", h.issuerURL+"/auth/social/callback")
+	uq.Set("response_type", "code")
+	uq.Set("scope", strings.Join(prov.Scopes, " "))
+	uq.Set("state", state)
+	uq.Set("code_challenge", upstreamChallenge)
+	uq.Set("code_challenge_method", "S256")
+	authURL.RawQuery = uq.Encode()
+
+	http.Redirect(w, r, authURL.String(), http.StatusFound)
+}
+
+// walletLinkAttr is one normalised attribute returned to the wallet.
+type walletLinkAttr struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	Verified bool   `json:"verified"`
+}
+
+// HandleWalletLinkResult redeems a one-time result code for the normalised
+// attributes from a wallet-link flow. The caller must present the PKCE verifier
+// matching the challenge bound at /wallet/link.
+// GET /wallet/link/result?code=xxx&code_verifier=yyy
+func (h *Handler) HandleWalletLinkResult(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	verifier := r.URL.Query().Get("code_verifier")
+	if code == "" || verifier == "" {
+		http.Error(w, `{"error":"code and code_verifier required"}`, http.StatusBadRequest)
+		return
+	}
+
+	res, ok := h.results.consume(code)
+	if !ok {
+		http.Error(w, `{"error":"invalid or expired code"}`, http.StatusBadRequest)
+		return
+	}
+	if !verifyChallenge(res.challenge, verifier) {
+		http.Error(w, `{"error":"PKCE verification failed"}`, http.StatusBadRequest)
+		return
+	}
+
+	attrs := make([]walletLinkAttr, 0, len(res.attrs))
+	for k, v := range res.attrs {
+		if v == "" {
+			continue
+		}
+		attrs = append(attrs, walletLinkAttr{Key: k, Value: v, Verified: res.verified[k]})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"provider":   res.provider,
+		"sub":        res.userID,
+		"attributes": attrs,
+	})
+}
+
+// providerVerified returns, per canonical attribute key, whether the provider's
+// raw response marks it verified — mirrors the wallet's isProviderVerified using
+// the shared referential's verificationClaims.
+func providerVerified(provider string, raw map[string]interface{}) map[string]bool {
+	out := map[string]bool{}
+	prov, ok := attributes.Providers[provider]
+	if !ok {
+		return out
+	}
+	for canonicalKey, claimKey := range prov.VerificationClaims {
+		if claimKey == "_always_verified" {
+			out[canonicalKey] = true
+			continue
+		}
+		switch v := raw[claimKey].(type) {
+		case bool:
+			out[canonicalKey] = v
+		case string:
+			out[canonicalKey] = v == "true"
+		}
+	}
+	return out
+}
+
+// verifyChallenge checks a PKCE S256 challenge against its verifier.
+func verifyChallenge(challenge, verifier string) bool {
+	if challenge == "" || verifier == "" {
+		return false
+	}
+	sum := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(sum[:]) == challenge
 }
 
 // --- OAuth2 helpers ---

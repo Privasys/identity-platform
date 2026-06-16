@@ -15,7 +15,8 @@ import { StyleSheet, Pressable, ActivityIndicator, View as RNView, TextInput, Sc
 
 import { Text, Image } from '@/components/Themed';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
-import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
+import { linkProviderViaIdP } from '@/services/identity';
+import { getDeviceLocale } from '@/services/device-locale';
 import { recoverAccount } from '@/services/recovery';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore, type LinkedProvider, type ProfileAttribute } from '@/stores/profile';
@@ -164,7 +165,7 @@ export default function OnboardingScreen() {
                 displayName: displayName || 'Privasys User',
                 email,
                 avatarUri,
-                locale: '',
+                locale: getDeviceLocale(),
                 did,
                 canonicalDid,
                 pairwiseSeed,

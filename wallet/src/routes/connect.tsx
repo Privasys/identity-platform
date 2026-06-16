@@ -49,6 +49,7 @@ import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
+import { getDeviceLocale } from '@/services/device-locale';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -129,7 +130,14 @@ async function resolveRequestedAttributes(
             continue;
         }
         const value = getProfileValue(profile, attr);
-        if (value) attrs[attr] = value;
+        if (value) {
+            attrs[attr] = value;
+        } else if (attr === 'locale') {
+            // locale is device-sourceable — fall back to the OS preference so we
+            // never have to ask the user for it.
+            const deviceLocale = getDeviceLocale();
+            if (deviceLocale) attrs[attr] = deviceLocale;
+        }
     }
 
     return Object.keys(attrs).length > 0 ? attrs : undefined;
@@ -160,9 +168,11 @@ function getMissingAttributes(
     for (const attr of requested) {
         if (attr === 'sub') continue;
         if (!CANONICAL_KEYS.has(attr)) continue;
-        if (!profile || !getProfileValue(profile, attr)) {
-            missing.push(attr);
-        }
+        if (profile && getProfileValue(profile, attr)) continue;
+        // Device-sourceable attributes are never "missing" if the OS can supply
+        // them (locale comes from expo-localization), so we don't ask the user.
+        if (attr === 'locale' && getDeviceLocale()) continue;
+        missing.push(attr);
     }
     return missing;
 }
@@ -1559,7 +1569,7 @@ function AttributeAcquisitionView({
                     displayName: '',
                     email: '',
                     avatarUri: '',
-                    locale: '',
+                    locale: getDeviceLocale(),
                     did,
                     canonicalDid,
                     pairwiseSeed,

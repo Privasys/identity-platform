@@ -39,7 +39,7 @@ func TestNormalizeLocale(t *testing.T) {
 		"en_US": "en-US", // underscore + casing handled
 		"EN-gb": "en-GB", // casing
 		"fr":    "fr",
-		"fr-CA": "fr",      // region not curated -> base language
+		"en-NZ": "en",      // region not curated -> base language
 		"":      "",        // empty passthrough
 		"xx-YY": "xx-YY",   // unknown -> cleaned input
 	}

@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { exportAttributesForAudit } from '@/services/attributes';
+import { getDeviceLocale } from '@/services/device-locale';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
@@ -50,7 +51,7 @@ export default function ProfileScreen() {
                 displayName: 'Privasys User',
                 email: '',
                 avatarUri: '',
-                locale: '',
+                locale: getDeviceLocale(),
                 did,
                 canonicalDid,
                 pairwiseSeed,

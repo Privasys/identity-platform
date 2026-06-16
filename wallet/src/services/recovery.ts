@@ -21,6 +21,7 @@ import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
+import { getDeviceLocale } from '@/services/device-locale';
 import { useProfileStore } from '@/stores/profile';
 
 export interface RecoveryResult {
@@ -79,7 +80,7 @@ export async function recoverAccount(
         displayName,
         email,
         avatarUri,
-        locale: '',
+        locale: getDeviceLocale(),
         did,
         canonicalDid,
         pairwiseSeed,

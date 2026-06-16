@@ -49,7 +49,7 @@ export interface ProfileAttribute {
 
     // ── Provenance ──────────────────────────────────────────────────────
     /** How this attribute was sourced. */
-    source: 'provider' | 'manual' | 'document';
+    source: 'provider' | 'manual' | 'document' | 'device';
     /** Provider ID if source is 'provider' (e.g. 'google', 'microsoft'). */
     sourceProvider?: string;
     /** Epoch seconds when this attribute was first acquired. */

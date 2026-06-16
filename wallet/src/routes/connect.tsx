@@ -48,6 +48,7 @@ import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
+import { LOCALES, localeLabel } from '@/constants/locales';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -1519,6 +1520,7 @@ function AttributeAcquisitionView({
     const [mode, setMode] = useState<'choose' | 'manual'>('choose');
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
     const [manualValues, setManualValues] = useState<Record<string, string>>({});
+    const [localePickerOpen, setLocalePickerOpen] = useState(false);
     const profileCreated = useRef(false);
 
     // Auto-create a bare profile if one doesn't exist yet
@@ -1734,6 +1736,24 @@ function AttributeAcquisitionView({
                             {missingAttributes.map((attr) => {
                                 if (!stillMissing.includes(attr)) return null;
                                 const label = attributeLabel(attr);
+                                // locale must be a standard BCP-47 tag — offer a
+                                // constrained picker instead of free text.
+                                if (attr === 'locale') {
+                                    const selected = manualValues.locale;
+                                    return (
+                                        <RNView key={attr} style={acqStyles.inputContainer}>
+                                            <Text style={acqStyles.inputLabel}>{label}</Text>
+                                            <Pressable
+                                                style={acqStyles.input}
+                                                onPress={() => setLocalePickerOpen(true)}
+                                            >
+                                                <Text style={selected ? acqStyles.pickerValue : acqStyles.pickerPlaceholder}>
+                                                    {selected ? localeLabel(selected) : 'Select a language'}
+                                                </Text>
+                                            </Pressable>
+                                        </RNView>
+                                    );
+                                }
                                 return (
                                     <RNView key={attr} style={acqStyles.inputContainer}>
                                         <Text style={acqStyles.inputLabel}>{label}</Text>
@@ -1769,6 +1789,37 @@ function AttributeAcquisitionView({
                     )}
                 </ScrollView>
 
+                {/* Locale picker modal (BCP-47 tags) */}
+                <Modal
+                    visible={localePickerOpen}
+                    animationType="slide"
+                    transparent
+                    onRequestClose={() => setLocalePickerOpen(false)}
+                >
+                    <Pressable style={acqStyles.pickerBackdrop} onPress={() => setLocalePickerOpen(false)}>
+                        <RNView style={acqStyles.pickerSheet}>
+                            <Text style={acqStyles.pickerTitle}>Select a language</Text>
+                            <ScrollView>
+                                {LOCALES.map((opt) => (
+                                    <Pressable
+                                        key={opt.tag}
+                                        style={acqStyles.pickerRow}
+                                        onPress={() => {
+                                            setManualValues((prev) => ({ ...prev, locale: opt.tag }));
+                                            setLocalePickerOpen(false);
+                                        }}
+                                    >
+                                        <Text style={acqStyles.pickerRowText}>{opt.label}</Text>
+                                        {manualValues.locale === opt.tag && (
+                                            <Ionicons name="checkmark" size={20} color="#007AFF" />
+                                        )}
+                                    </Pressable>
+                                ))}
+                            </ScrollView>
+                        </RNView>
+                    </Pressable>
+                </Modal>
+
                 {/* Bottom action buttons */}
                 <RNView style={[acqStyles.bottomActions, { paddingBottom: Math.max(insets.bottom, 20) }]}>
                     <RNView style={styles.buttonRow}>
@@ -1791,6 +1842,13 @@ function AttributeAcquisitionView({
 
 const acqStyles = StyleSheet.create({
     container: { padding: 20, paddingTop: 80 },
+    pickerValue: { fontSize: 16, color: '#0F172A' },
+    pickerPlaceholder: { fontSize: 16, color: '#94A3B8' },
+    pickerBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+    pickerSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 16, paddingBottom: 32, maxHeight: '70%' },
+    pickerTitle: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginBottom: 12, color: '#0F172A' },
+    pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 24, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F0' },
+    pickerRowText: { fontSize: 16, color: '#0F172A' },
     iconContainer: {
         width: 72,
         height: 72,

@@ -48,7 +48,7 @@ import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
-import { LOCALES, localeLabel } from '@/constants/locales';
+import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -1535,7 +1535,16 @@ function AttributeAcquisitionView({
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
     const [manualValues, setManualValues] = useState<Record<string, string>>({});
     const [localePickerOpen, setLocalePickerOpen] = useState(false);
+    const [localeOptions, setLocaleOptions] = useState<ValueOption[]>([]);
     const profileCreated = useRef(false);
+
+    // Lazily fetch the locale value set (from the IdP referential) when manual
+    // entry needs it, so the wallet doesn't bundle its own copy.
+    useEffect(() => {
+        if (mode === 'manual' && localeOptions.length === 0) {
+            getAttributeValues('locale').then(setLocaleOptions).catch(() => {});
+        }
+    }, [mode, localeOptions.length]);
 
     // Auto-create a bare profile if one doesn't exist yet
     useEffect(() => {
@@ -1769,7 +1778,9 @@ function AttributeAcquisitionView({
                                                 onPress={() => setLocalePickerOpen(true)}
                                             >
                                                 <Text style={selected ? acqStyles.pickerValue : acqStyles.pickerPlaceholder}>
-                                                    {selected ? localeLabel(selected) : 'Select a language'}
+                                                    {selected
+                                                        ? (localeOptions.find((o) => o.value === selected)?.label ?? selected)
+                                                        : 'Select a language'}
                                                 </Text>
                                             </Pressable>
                                         </RNView>
@@ -1821,17 +1832,17 @@ function AttributeAcquisitionView({
                         <RNView style={acqStyles.pickerSheet}>
                             <Text style={acqStyles.pickerTitle}>Select a language</Text>
                             <ScrollView>
-                                {LOCALES.map((opt) => (
+                                {localeOptions.map((opt) => (
                                     <Pressable
-                                        key={opt.tag}
+                                        key={opt.value}
                                         style={acqStyles.pickerRow}
                                         onPress={() => {
-                                            setManualValues((prev) => ({ ...prev, locale: opt.tag }));
+                                            setManualValues((prev) => ({ ...prev, locale: opt.value }));
                                             setLocalePickerOpen(false);
                                         }}
                                     >
                                         <Text style={acqStyles.pickerRowText}>{opt.label}</Text>
-                                        {manualValues.locale === opt.tag && (
+                                        {manualValues.locale === opt.value && (
                                             <Ionicons name="checkmark" size={20} color="#007AFF" />
                                         )}
                                     </Pressable>

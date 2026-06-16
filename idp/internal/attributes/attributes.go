@@ -8,16 +8,25 @@
 package attributes
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 )
 
 //go:generate cp ../../../shared/canonical-attributes.json canonical-attributes.json
+//go:generate cp -r ../../../shared/referential referential
 
 //go:embed canonical-attributes.json
 var rawJSON []byte
+
+// referentialFS holds the enumerated value sets (locale.json, ...) referenced by
+// attribute valuesUrl. Served verbatim by the IdP at /referential/<name>.json so
+// the wallet/SDK fetch the single source instead of bundling their own copy.
+//
+//go:embed referential
+var referentialFS embed.FS
 
 // Attribute describes a single canonical user attribute.
 type Attribute struct {
@@ -26,6 +35,15 @@ type Attribute struct {
 	Scope        string  `json:"scope"`
 	ProfileField *string `json:"profileField"` // nil when not mapped to a top-level profile field
 	Verifiable   bool    `json:"verifiable"`
+	// ValuesURL, when set, points to the enumerated value set that constrains
+	// this attribute (e.g. "/referential/locale.json"). Relative to the issuer.
+	ValuesURL string `json:"valuesUrl,omitempty"`
+}
+
+// ValueOption is one entry in an enumerated attribute's value set.
+type ValueOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
 }
 
 // ProviderDef describes how a single external identity provider maps its
@@ -60,6 +78,10 @@ var (
 
 	// Providers maps provider name → claim mapping definitions.
 	Providers map[string]ProviderDef
+
+	// localeByLower maps a lowercased BCP-47 tag → its canonical form, built
+	// from referential/locale.json. Used by NormalizeLocale.
+	localeByLower map[string]string
 )
 
 func init() {
@@ -83,6 +105,57 @@ func init() {
 	}
 
 	Providers = doc.Providers
+
+	localeByLower = map[string]string{}
+	for _, v := range ValueSet("locale") {
+		localeByLower[strings.ToLower(v.Value)] = v.Value
+	}
+}
+
+// ReferentialFile returns the raw bytes of an enumerated value set served at
+// /referential/<name>.json (e.g. name="locale"). The IdP serves these verbatim
+// so the wallet/SDK fetch the single source instead of bundling their own copy.
+func ReferentialFile(name string) ([]byte, bool) {
+	b, err := referentialFS.ReadFile("referential/" + name + ".json")
+	if err != nil {
+		return nil, false
+	}
+	return b, true
+}
+
+// ValueSet parses and returns the enumerated values for an attribute (e.g.
+// "locale"). Returns nil if there is no such value set.
+func ValueSet(name string) []ValueOption {
+	b, ok := ReferentialFile(name)
+	if !ok {
+		return nil
+	}
+	var doc struct {
+		Values []ValueOption `json:"values"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		log.Printf("attributes: failed to parse referential/%s.json: %v", name, err)
+		return nil
+	}
+	return doc.Values
+}
+
+// NormalizeLocale maps a raw locale string to a canonical BCP-47 tag from the
+// locale value set (handles `_` separators and casing, e.g. en_US -> en-US;
+// falls back to the base language tag, else returns the cleaned input).
+func NormalizeLocale(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	cleaned := strings.ReplaceAll(strings.TrimSpace(raw), "_", "-")
+	if canon, ok := localeByLower[strings.ToLower(cleaned)]; ok {
+		return canon
+	}
+	base := strings.SplitN(strings.ToLower(cleaned), "-", 2)[0]
+	if canon, ok := localeByLower[base]; ok {
+		return canon
+	}
+	return cleaned
 }
 
 // NormalizeClaims converts raw provider claims to canonical attribute key/value
@@ -128,6 +201,11 @@ func NormalizeClaims(provider string, raw map[string]interface{}) (attrs map[str
 				attrs[canonicalKey] = s
 			}
 		}
+	}
+
+	// Normalise enumerated values to their canonical form.
+	if loc := attrs["locale"]; loc != "" {
+		attrs["locale"] = NormalizeLocale(loc)
 	}
 
 	return

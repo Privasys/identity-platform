@@ -28,7 +28,6 @@ import { File, Paths } from 'expo-file-system';
 import * as WebBrowser from 'expo-web-browser';
 
 import { attributeLabel } from '@/services/attributes';
-import { normalizeLocale } from '@/constants/locales';
 import type { LinkedProvider, ProfileAttribute, VerificationRecord } from '@/stores/profile';
 
 // Ensure web browser sessions are cleaned up on redirect
@@ -208,9 +207,8 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
         } else if (a.key === 'email') {
             userInfo.email = a.value;
         } else if (a.key === 'locale') {
-            // Normalise provider locales (e.g. en_US, EN-gb) to a canonical BCP-47 tag.
-            value = normalizeLocale(a.value);
-            userInfo.locale = value;
+            // Already normalised to a canonical BCP-47 tag by the IdP.
+            userInfo.locale = a.value;
         }
 
         const verifications: VerificationRecord[] = a.verified

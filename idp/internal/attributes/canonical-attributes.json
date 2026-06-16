@@ -8,7 +8,7 @@
     { "key": "family_name",  "label": "Last Name",    "scope": "profile", "profileField": null,          "verifiable": false },
     { "key": "nickname",     "label": "Nickname",      "scope": "profile", "profileField": null,          "verifiable": false },
     { "key": "picture",      "label": "Avatar",        "scope": "profile", "profileField": "avatarUri",   "verifiable": false },
-    { "key": "locale",       "label": "Language",      "scope": "profile", "profileField": "locale",      "verifiable": false },
+    { "key": "locale",       "label": "Language",      "scope": "profile", "profileField": "locale",      "verifiable": false, "valuesUrl": "/referential/locale.json" },
     { "key": "phone_number", "label": "Phone Number",  "scope": "phone",  "profileField": null,          "verifiable": true }
   ],
   "providers": {

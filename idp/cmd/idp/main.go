@@ -30,10 +30,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Privasys/idp/internal/admin"
+	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/config"
 	"github.com/Privasys/idp/internal/fido2"
@@ -204,6 +206,21 @@ func main() {
 	// Wallet profile-linking (reuses the same providers/secrets; no OIDC session).
 	mux.HandleFunc("GET /wallet/link", socialHandler.HandleWalletLink)
 	mux.HandleFunc("GET /wallet/link/result", socialHandler.HandleWalletLinkResult)
+
+	// Referential value sets (e.g. /referential/locale.json) — the single source
+	// for enumerated attribute values, fetched by the wallet/SDK so they don't
+	// bundle their own copy. Referenced from canonical-attributes.json valuesUrl.
+	mux.HandleFunc("GET /referential/{file}", func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimSuffix(r.PathValue("file"), ".json")
+		body, ok := attributes.ReferentialFile(name)
+		if !ok {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Write(body)
+	})
 
 	// Client registration (admin endpoint).
 	mux.HandleFunc("POST /clients", clients.HandleRegister(clientReg, cfg.AdminToken))

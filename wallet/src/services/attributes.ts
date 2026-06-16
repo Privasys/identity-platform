@@ -43,6 +43,12 @@ export interface AttributeDefinition {
      * a verification record — unverified values from providers are rejected.
      */
     verifiable: boolean;
+    /**
+     * For enumerated attributes, the URL of the value set that constrains this
+     * attribute (e.g. "/referential/locale.json", relative to the IdP). Fetched
+     * on demand so the wallet doesn't bundle its own copy. See value-sets.ts.
+     */
+    valuesUrl?: string;
 }
 
 // Map JSON profileField strings to the typed union.
@@ -63,6 +69,7 @@ export const CANONICAL_ATTRIBUTES: AttributeDefinition[] = canonicalDoc.attribut
     scope: a.scope as AttributeDefinition['scope'],
     profileField: a.profileField ? PROFILE_FIELD_MAP[a.profileField] : undefined,
     verifiable: a.verifiable,
+    valuesUrl: (a as { valuesUrl?: string }).valuesUrl,
 }));
 
 /** Lookup table keyed by canonical attribute key. */

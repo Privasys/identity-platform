@@ -141,6 +141,14 @@ async function resolveRequestedAttributes(
  * doesn't have values for. 'sub' is excluded since it's always derivable.
  * Only canonical attributes are accepted — unknown keys are ignored.
  */
+// The identity attributes the wallet treats as required for sign-in. Anything
+// else a relying party requests is best-effort (optional): it is seeded if a
+// provider supplies it, but a missing optional attribute never blocks the
+// ceremony. This stops a provider that cannot supply one attribute (e.g. Google
+// has no `nickname` claim) from deadlocking the flow. Per-attribute `essential`
+// signalling threaded from the IdP is the cleaner long-term mechanism (Phase 2).
+const REQUIRED_ATTRIBUTE_KEYS = new Set(['email', 'name']);
+
 function getMissingAttributes(
     payload: QRPayload,
     profile: import('@/stores/profile').UserProfile | null,
@@ -157,6 +165,11 @@ function getMissingAttributes(
         }
     }
     return missing;
+}
+
+/** Subset of missing attributes that block sign-in (the rest are optional). */
+function getRequiredMissing(missing: string[]): string[] {
+    return missing.filter((k) => REQUIRED_ATTRIBUTE_KEYS.has(k));
 }
 
 type FlowStep =
@@ -926,13 +939,14 @@ export default function ConnectScreen() {
         const pending = pendingRelay.current;
         if (!pending) return;
 
-        // Re-check: are attributes still missing?
+        // Re-check: are any *required* attributes still missing? Optional ones
+        // (anything outside REQUIRED_ATTRIBUTE_KEYS) never block.
         const updatedProfile = useProfileStore.getState().profile;
-        const stillMissing = getMissingAttributes(pending.payload, updatedProfile);
-        if (stillMissing.length > 0) {
+        const requiredMissing = getRequiredMissing(getMissingAttributes(pending.payload, updatedProfile));
+        if (requiredMissing.length > 0) {
             Alert.alert(
                 'Missing information',
-                `Please provide: ${stillMissing.map((k) => attributeLabel(k)).join(', ')}`,
+                `Please provide: ${requiredMissing.map((k) => attributeLabel(k)).join(', ')}`,
             );
             return;
         }
@@ -1553,6 +1567,8 @@ function AttributeAcquisitionView({
     const stillMissing = missingAttributes.filter(
         (attr) => !profile || !getProfileValue(profile, attr),
     );
+    // Only required attributes (email, name) block Continue; the rest are optional.
+    const requiredMissing = getRequiredMissing(stillMissing);
 
     const handleLinkProvider = async (providerKey: string) => {
         setLinkingProvider(providerKey);
@@ -1593,7 +1609,11 @@ function AttributeAcquisitionView({
     };
 
     const displayAppName = appNameProp || appName(rpId);
-    const manualAllFilled = missingAttributes.every((attr) => manualValues[attr]?.trim());
+    // Save is enabled once the required fields are filled; optional fields
+    // (anything outside REQUIRED_ATTRIBUTE_KEYS) may be left blank.
+    const manualRequiredFilled = missingAttributes
+        .filter((attr) => REQUIRED_ATTRIBUTE_KEYS.has(attr))
+        .every((attr) => manualValues[attr]?.trim());
 
     const handleContinue = () => {
         // Log consent in consent history
@@ -1660,6 +1680,7 @@ function AttributeAcquisitionView({
                     <RNView style={acqStyles.attributeList}>
                         {missingAttributes.map((attr) => {
                             const isFilled = !stillMissing.includes(attr);
+                            const isOptional = !REQUIRED_ATTRIBUTE_KEYS.has(attr);
                             return (
                                 <RNView key={attr} style={acqStyles.attributeRow}>
                                     <Ionicons
@@ -1668,7 +1689,7 @@ function AttributeAcquisitionView({
                                         color={isFilled ? '#34C759' : '#94A3B8'}
                                     />
                                     <Text style={[acqStyles.attributeLabel, isFilled && acqStyles.attributeFilled]}>
-                                        {attributeLabel(attr)}
+                                        {attributeLabel(attr)}{isOptional ? ' (optional)' : ''}
                                     </Text>
                                     {isFilled && profile && (
                                         <Text style={acqStyles.attributeValue} numberOfLines={1}>
@@ -1680,8 +1701,8 @@ function AttributeAcquisitionView({
                         })}
                     </RNView>
 
-                    {stillMissing.length === 0 ? (
-                        /* All attributes acquired — show continue */
+                    {requiredMissing.length === 0 ? (
+                        /* Required attributes present — optional ones don't block */
                         <RNView style={acqStyles.readySection}>
                             <Ionicons name="checkmark-circle" size={32} color="#34C759" />
                             <Text style={acqStyles.readyText}>All set! Tap continue to finish signing in.</Text>
@@ -1772,9 +1793,9 @@ function AttributeAcquisitionView({
                             })}
 
                             <Pressable
-                                style={[acqStyles.saveButton, !manualAllFilled && acqStyles.saveButtonDisabled]}
+                                style={[acqStyles.saveButton, !manualRequiredFilled && acqStyles.saveButtonDisabled]}
                                 onPress={handleManualSave}
-                                disabled={!manualAllFilled}
+                                disabled={!manualRequiredFilled}
                             >
                                 <Text style={acqStyles.saveButtonText}>Save</Text>
                             </Pressable>
@@ -1827,9 +1848,9 @@ function AttributeAcquisitionView({
                             <Text style={styles.rejectButtonText}>Cancel</Text>
                         </Pressable>
                         <Pressable
-                            style={[styles.approveButton, stillMissing.length > 0 && acqStyles.continueDisabled]}
+                            style={[styles.approveButton, requiredMissing.length > 0 && acqStyles.continueDisabled]}
                             onPress={handleContinue}
-                            disabled={stillMissing.length > 0}
+                            disabled={requiredMissing.length > 0}
                         >
                             <Text style={styles.approveButtonText}>Continue</Text>
                         </Pressable>

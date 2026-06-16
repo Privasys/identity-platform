@@ -38,6 +38,10 @@ type Attribute struct {
 	// ValuesURL, when set, points to the enumerated value set that constrains
 	// this attribute (e.g. "/referential/locale.json"). Relative to the issuer.
 	ValuesURL string `json:"valuesUrl,omitempty"`
+	// DeviceSourced marks an attribute the client OS can supply directly (e.g.
+	// locale from the device language). Such attributes are auto-filled by the
+	// wallet and need not be prompted for.
+	DeviceSourced bool `json:"deviceSourced,omitempty"`
 }
 
 // ValueOption is one entry in an enumerated attribute's value set.

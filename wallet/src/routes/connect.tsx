@@ -47,9 +47,9 @@ import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid }
 import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
-import { attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
+import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
-import { getDeviceLocale } from '@/services/device-locale';
+import { getDeviceAttribute } from '@/services/device-attributes';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -132,11 +132,11 @@ async function resolveRequestedAttributes(
         const value = getProfileValue(profile, attr);
         if (value) {
             attrs[attr] = value;
-        } else if (attr === 'locale') {
-            // locale is device-sourceable — fall back to the OS preference so we
-            // never have to ask the user for it.
-            const deviceLocale = getDeviceLocale();
-            if (deviceLocale) attrs[attr] = deviceLocale;
+        } else if (ATTRIBUTE_MAP[attr]?.deviceSourced) {
+            // Device-sourceable (e.g. locale) — read from the OS so we never have
+            // to ask the user for it.
+            const deviceValue = getDeviceAttribute(attr);
+            if (deviceValue) attrs[attr] = deviceValue;
         }
     }
 
@@ -170,8 +170,8 @@ function getMissingAttributes(
         if (!CANONICAL_KEYS.has(attr)) continue;
         if (profile && getProfileValue(profile, attr)) continue;
         // Device-sourceable attributes are never "missing" if the OS can supply
-        // them (locale comes from expo-localization), so we don't ask the user.
-        if (attr === 'locale' && getDeviceLocale()) continue;
+        // them (e.g. locale from expo-localization), so we don't ask the user.
+        if (ATTRIBUTE_MAP[attr]?.deviceSourced && getDeviceAttribute(attr)) continue;
         missing.push(attr);
     }
     return missing;
@@ -1569,7 +1569,7 @@ function AttributeAcquisitionView({
                     displayName: '',
                     email: '',
                     avatarUri: '',
-                    locale: getDeviceLocale(),
+                    locale: getDeviceAttribute('locale'),
                     did,
                     canonicalDid,
                     pairwiseSeed,

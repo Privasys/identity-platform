@@ -49,6 +49,12 @@ export interface AttributeDefinition {
      * on demand so the wallet doesn't bundle its own copy. See value-sets.ts.
      */
     valuesUrl?: string;
+    /**
+     * Whether the client OS can supply this attribute directly (e.g. locale from
+     * the device language). Device-sourced attributes are auto-filled and never
+     * prompted for. The wallet maps the key to its reader in device-attributes.ts.
+     */
+    deviceSourced?: boolean;
 }
 
 // Map JSON profileField strings to the typed union.
@@ -70,6 +76,7 @@ export const CANONICAL_ATTRIBUTES: AttributeDefinition[] = canonicalDoc.attribut
     profileField: a.profileField ? PROFILE_FIELD_MAP[a.profileField] : undefined,
     verifiable: a.verifiable,
     valuesUrl: (a as { valuesUrl?: string }).valuesUrl,
+    deviceSourced: (a as { deviceSourced?: boolean }).deviceSourced,
 }));
 
 /** Lookup table keyed by canonical attribute key. */

@@ -69,8 +69,12 @@ func main() {
 	// device-authorization flow (RFC 8628) is keyed on this client; it has no
 	// usable redirect (the device flow delivers codes by polling), so the
 	// registered URI is only the verification landing page.
+	// The CLI only needs enough identity to own apps and show who is signed in
+	// (email + name); it does not need given_name/family_name/nickname/locale.
+	// The required-attributes whitelist narrows what the wallet is asked for,
+	// regardless of the scope the CLI requests.
 	if _, err := clientReg.RegisterWithID("privasys-cli", "Privasys CLI",
-		[]string{cfg.IssuerURL + "/device"}, "", nil); err != nil {
+		[]string{cfg.IssuerURL + "/device"}, "", []string{"email", "name"}); err != nil {
 		log.Printf("warning: failed to ensure privasys-cli client: %v", err)
 	}
 
@@ -160,6 +164,7 @@ func main() {
 		ClientID:     cfg.GitHubClientID,
 		ClientSecret: cfg.GitHubClientSecret,
 		Scopes:       []string{"read:user", "user:email"},
+		PKCE:         true,
 	})
 	socialProviders.Register(&social.Provider{
 		Name: "google", DisplayName: "Google",
@@ -169,6 +174,7 @@ func main() {
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,
 		Scopes:       []string{"openid", "email", "profile"},
+		PKCE:         true,
 	})
 	socialProviders.Register(&social.Provider{
 		Name: "microsoft", DisplayName: "Microsoft",
@@ -178,6 +184,7 @@ func main() {
 		ClientID:     cfg.MicrosoftClientID,
 		ClientSecret: cfg.MicrosoftClientSecret,
 		Scopes:       []string{"openid", "email", "profile"},
+		PKCE:         true,
 	})
 	socialProviders.Register(&social.Provider{
 		Name: "linkedin", DisplayName: "LinkedIn",
@@ -187,6 +194,7 @@ func main() {
 		ClientID:     cfg.LinkedInClientID,
 		ClientSecret: cfg.LinkedInClientSecret,
 		Scopes:       []string{"openid", "profile", "email"},
+		PKCE:         true,
 	})
 
 	socialHandler := social.NewHandler(socialProviders, codeStore, sessionStore, cfg.IssuerURL)

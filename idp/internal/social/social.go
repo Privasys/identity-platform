@@ -9,6 +9,8 @@ package social
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -34,6 +36,10 @@ type Provider struct {
 	ClientID     string
 	ClientSecret string
 	Scopes       []string
+	// PKCE indicates the provider's authorization server supports PKCE (S256).
+	// We require it on every upstream authorization-code leg; a provider with
+	// PKCE=false is refused rather than downgraded to a no-PKCE exchange.
+	PKCE bool
 }
 
 // Providers maps provider names to their configuration.
@@ -82,6 +88,7 @@ func (p *Providers) List() []string {
 type stateEntry struct {
 	sessionID string // OIDC session_id to complete
 	provider  string // Which social provider
+	verifier  string // PKCE code_verifier for the upstream token exchange
 	expiresAt time.Time
 }
 
@@ -101,7 +108,7 @@ func newStateStore() *stateStore {
 	return ss
 }
 
-func (ss *stateStore) create(sessionID, provider string) string {
+func (ss *stateStore) create(sessionID, provider, verifier string) string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	state := hex.EncodeToString(b)
@@ -110,6 +117,7 @@ func (ss *stateStore) create(sessionID, provider string) string {
 	ss.states[state] = &stateEntry{
 		sessionID: sessionID,
 		provider:  provider,
+		verifier:  verifier,
 		expiresAt: time.Now().Add(10 * time.Minute),
 	}
 	ss.mu.Unlock()
@@ -180,14 +188,23 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// PKCE is mandatory on every upstream authorization-code leg. Refuse a
+	// provider that does not support it rather than downgrading.
+	if !prov.PKCE {
+		http.Error(w, "provider does not support PKCE", http.StatusBadRequest)
+		return
+	}
+
 	// Verify session exists.
 	if _, ok := h.sessions.Get(sessionID); !ok {
 		http.Error(w, "session not found or expired", http.StatusBadRequest)
 		return
 	}
 
-	// Create CSRF state.
-	state := h.states.create(sessionID, providerName)
+	// Generate the PKCE verifier/challenge for this flow and bind the verifier
+	// to the CSRF state so the callback can complete the token exchange.
+	verifier, challenge := generatePKCE()
+	state := h.states.create(sessionID, providerName, verifier)
 
 	// Build authorization URL.
 	authURL, _ := url.Parse(prov.AuthURL)
@@ -197,6 +214,8 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 	q.Set("response_type", "code")
 	q.Set("scope", strings.Join(prov.Scopes, " "))
 	q.Set("state", state)
+	q.Set("code_challenge", challenge)
+	q.Set("code_challenge_method", "S256")
 	authURL.RawQuery = q.Encode()
 
 	http.Redirect(w, r, authURL.String(), http.StatusFound)
@@ -232,8 +251,8 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Exchange code for access token.
-	token, err := h.exchangeCode(prov, code)
+	// Exchange code for access token (PKCE: send the verifier bound to state).
+	token, err := h.exchangeCode(prov, code, entry.verifier)
 	if err != nil {
 		log.Printf("social/%s: token exchange failed: %v", entry.provider, err)
 		h.callbackError(w, "Authentication failed — could not exchange code")
@@ -320,18 +339,31 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 
 // --- OAuth2 helpers ---
 
+// generatePKCE returns a fresh PKCE code_verifier and its S256 code_challenge
+// (RFC 7636). The verifier is 43 base64url chars (32 random bytes); the
+// challenge is base64url(SHA-256(verifier)), unpadded.
+func generatePKCE() (verifier, challenge string) {
+	b := make([]byte, 32)
+	rand.Read(b)
+	verifier = base64.RawURLEncoding.EncodeToString(b)
+	sum := sha256.Sum256([]byte(verifier))
+	challenge = base64.RawURLEncoding.EncodeToString(sum[:])
+	return
+}
+
 type tokenResponse struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
 }
 
-func (h *Handler) exchangeCode(prov *Provider, code string) (string, error) {
+func (h *Handler) exchangeCode(prov *Provider, code, verifier string) (string, error) {
 	data := url.Values{
 		"client_id":     {prov.ClientID},
 		"client_secret": {prov.ClientSecret},
 		"code":          {code},
 		"redirect_uri":  {h.issuerURL + "/auth/social/callback"},
 		"grant_type":    {"authorization_code"},
+		"code_verifier": {verifier},
 	}
 
 	req, _ := http.NewRequest("POST", prov.TokenURL, strings.NewReader(data.Encode()))

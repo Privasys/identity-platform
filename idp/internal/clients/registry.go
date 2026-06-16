@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/store"
 )
 
@@ -72,8 +73,27 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 	}, nil
 }
 
+// validateRequiredAttributes rejects any attribute key that is not in the
+// canonical referential (shared/canonical-attributes.json). An empty/nil list
+// is allowed and means "all scope-derived attributes". This guarantees a client
+// can only ever request attributes that exist in the golden referential —
+// requesting anything outside it is refused at registration, not silently
+// dropped at /authorize.
+func validateRequiredAttributes(requiredAttributes []string) error {
+	for _, a := range requiredAttributes {
+		if !attributes.Keys[a] {
+			return fmt.Errorf("unknown required attribute %q: not in the canonical referential", a)
+		}
+	}
+	return nil
+}
+
 // Register creates a new OIDC client.
 func (reg *Registry) Register(name string, redirectURIs []string, secret string, requiredAttributes []string) (*Client, error) {
+	if err := validateRequiredAttributes(requiredAttributes); err != nil {
+		return nil, err
+	}
+
 	b := make([]byte, 16)
 	rand.Read(b)
 	clientID := hex.EncodeToString(b)
@@ -110,6 +130,10 @@ func (reg *Registry) Register(name string, redirectURIs []string, secret string,
 
 // RegisterWithID creates a client with a specific client_id (for pre-known clients).
 func (reg *Registry) RegisterWithID(clientID, name string, redirectURIs []string, secret string, requiredAttributes []string) (*Client, error) {
+	if err := validateRequiredAttributes(requiredAttributes); err != nil {
+		return nil, err
+	}
+
 	var secretHash string
 	if secret != "" {
 		h, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)

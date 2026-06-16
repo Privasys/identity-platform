@@ -15,7 +15,7 @@ import { StyleSheet, Pressable, ActivityIndicator, View as RNView, TextInput, Sc
 
 import { Text, Image } from '@/components/Themed';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
-import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
+import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { recoverAccount } from '@/services/recovery';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore, type LinkedProvider, type ProfileAttribute } from '@/stores/profile';
@@ -102,17 +102,7 @@ export default function OnboardingScreen() {
         setLinkingProvider(providerKey);
         setError(null);
         try {
-            const providerTemplate = PROVIDERS[providerKey];
-            if (!providerTemplate) throw new Error(`Unknown provider: ${providerKey}`);
-
-            // Client IDs should be configured per environment
-            const clientId = getClientId(providerKey);
-            if (!clientId) {
-                throw new Error(`No client ID configured for ${providerTemplate.displayName}.`);
-            }
-
-            const config: ProviderConfig = { ...providerTemplate, clientId };
-            const result = await linkIdentityProvider(config);
+            const result = await linkProviderViaIdP(providerKey);
 
             // Update linked providers
             setLinkedProviders((prev) => {
@@ -200,11 +190,7 @@ export default function OnboardingScreen() {
         setError(null);
         setLoading(true);
         try {
-            const clientId = getClientId(providerKey);
-            if (!clientId) {
-                throw new Error(`No client ID configured for ${providerKey}.`);
-            }
-            await recoverAccount(providerKey, clientId);
+            await recoverAccount(providerKey);
             setStep('done');
         } catch (e: any) {
             if (e.message !== 'Authentication cancelled') {

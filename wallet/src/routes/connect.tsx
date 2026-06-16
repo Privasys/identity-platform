@@ -46,7 +46,7 @@ import { relaySessionToken } from '@/services/broker';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
-import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
+import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
@@ -1555,20 +1555,7 @@ function AttributeAcquisitionView({
     const handleLinkProvider = async (providerKey: string) => {
         setLinkingProvider(providerKey);
         try {
-            const providerTemplate = PROVIDERS[providerKey];
-            if (!providerTemplate) throw new Error(`Unknown provider: ${providerKey}`);
-
-            const clientId = getClientId(providerKey);
-            if (!clientId) {
-                Alert.alert(
-                    'Not configured',
-                    `OAuth client ID for ${providerTemplate.displayName} is not configured yet.`,
-                );
-                return;
-            }
-
-            const config: ProviderConfig = { ...providerTemplate, clientId };
-            const result = await linkIdentityProvider(config);
+            const result = await linkProviderViaIdP(providerKey);
 
             // Update profile with normalised provider data
             const store = useProfileStore.getState();
@@ -1579,7 +1566,7 @@ function AttributeAcquisitionView({
                 const existing = profile ? getProfileValue(profile, attr.key) : undefined;
                 if (!existing) {
                     setProfileValue(store, attr.key, attr.value, 'provider', {
-                        sourceProvider: config.provider,
+                        sourceProvider: attr.sourceProvider ?? providerKey,
                         verified: attr.verified,
                         verifications: attr.verifications,
                     });

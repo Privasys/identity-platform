@@ -20,7 +20,7 @@
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
-import { linkIdentityProvider, type ProviderConfig, PROVIDERS } from '@/services/identity';
+import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { useProfileStore } from '@/stores/profile';
 
 export interface RecoveryResult {
@@ -45,8 +45,7 @@ export interface RecoveryResult {
  * 5. Create profile
  */
 export async function recoverAccount(
-    providerKey: string,
-    clientId: string
+    providerKey: string
 ): Promise<RecoveryResult> {
     const providerTemplate = PROVIDERS[providerKey];
     if (!providerTemplate) {
@@ -59,9 +58,8 @@ export async function recoverAccount(
         console.warn('Recovery: key is not hardware-backed');
     }
 
-    // Step 2: Link provider to verify identity
-    const config: ProviderConfig = { ...providerTemplate, clientId };
-    const linkResult = await linkIdentityProvider(config);
+    // Step 2: Link provider (via the IdP) to verify identity
+    const linkResult = await linkProviderViaIdP(providerKey);
 
     // Step 3: Generate DID from new key
     const did = await generateDid();

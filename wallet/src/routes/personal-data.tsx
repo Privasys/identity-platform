@@ -30,7 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES } from '@/services/attributes';
-import { getClientId, linkIdentityProvider, PROVIDERS, type ProviderConfig } from '@/services/identity';
+import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
 const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -58,20 +58,7 @@ export default function PersonalDataScreen() {
     const handleImportFromProvider = async (providerKey: string) => {
         setLinkingProvider(providerKey);
         try {
-            const providerTemplate = PROVIDERS[providerKey];
-            if (!providerTemplate) throw new Error(`Unknown provider: ${providerKey}`);
-
-            const clientId = getClientId(providerKey);
-            if (!clientId) {
-                Alert.alert(
-                    'Not configured',
-                    `OAuth client ID for ${providerTemplate.displayName} is not configured yet.`,
-                );
-                return;
-            }
-
-            const config: ProviderConfig = { ...providerTemplate, clientId };
-            const result = await linkIdentityProvider(config);
+            const result = await linkProviderViaIdP(providerKey);
 
             linkProvider(result.provider);
 

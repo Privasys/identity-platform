@@ -1,0 +1,82 @@
+# Privasys IdP — Caddy site config for privasys.id
+#
+# Live at /etc/caddy/Caddyfile on the production VM idp-fr-par-1
+# (privasys-production, europe-west9-a). This file is the source of truth;
+# keep it in sync with the host (the host config was hand-maintained and had
+# drifted from the repo — supersedes the stale idp-nginx.conf in this dir).
+#
+# Routing model: the marketing/static site + the auth iframe are served from
+# /var/www; specific OIDC/FIDO2/session AND the wallet-link + referential API
+# paths are reverse-proxied to the Go IdP backend on localhost:8091.
+#
+# Secrets are NOT here. The IdP's OAuth client IDs/secrets and admin token live
+# in /etc/privasys/idp.env on the host (off-repo) and are loaded into the IdP
+# container by deploy-idp.yaml.
+#
+# When adding a new IdP API path, add it to the @idp matcher below AND apply the
+# same change to the live host (caddy validate + systemctl reload caddy).
+
+privasys.id {
+    handle_path /.well-known/apple-app-site-association {
+        root * /var/www/.well-known
+        header Content-Type application/json
+        rewrite * /apple-app-site-association
+        file_server
+    }
+    handle_path /.well-known/assetlinks.json {
+        root * /var/www/.well-known
+        header Content-Type application/json
+        rewrite * /assetlinks.json
+        file_server
+    }
+
+    # API routes under /auth/ go to the Go backend (before the static handler)
+    @authApi path /auth/social /auth/social/*
+    handle @authApi {
+        reverse_proxy localhost:8091
+    }
+
+    # Auth iframe files (allow cross-origin embedding)
+    handle /auth/* {
+        header X-Frame-Options ""
+        header Content-Security-Policy "frame-ancestors *"
+        header Access-Control-Allow-Origin "*"
+        root * /var/www
+        file_server
+    }
+    handle /auth/ {
+        header X-Frame-Options ""
+        header Content-Security-Policy "frame-ancestors *"
+        header Access-Control-Allow-Origin "*"
+        root * /var/www
+        try_files /auth/index.html
+        file_server
+    }
+
+    # OIDC / FIDO2 / session endpoints + wallet-link + referential -> IdP backend
+    @idp path /.well-known/openid-configuration /jwks /authorize /token /userinfo /fido2/* /session/* /clients /admin/* /healthz /e2e/* /recovery/* /guardians/* /devices /push-token /device_authorization /device /device/* /wallet/* /referential/*
+    handle @idp {
+        reverse_proxy localhost:8091
+    }
+
+    # Plausible analytics proxy (first-party to evade ad blockers)
+    handle /pa/script.js {
+        uri replace /pa/script.js /js/script.js
+        reverse_proxy https://plausible.privasys.org {
+            header_up Host plausible.privasys.org
+        }
+    }
+    handle /pa/event {
+        uri replace /pa/event /api/event
+        reverse_proxy https://plausible.privasys.org {
+            header_up Host plausible.privasys.org
+        }
+    }
+
+    # Static landing page
+    handle {
+        root * /var/www
+        try_files {path} {path}/index.html /index.html
+        file_server
+    }
+}

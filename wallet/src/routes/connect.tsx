@@ -48,6 +48,7 @@ import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, getProfileAssurance, getProfileValue, setProfileValue } from '@/services/attributes';
+import { verifyIdentity as runKycVerification } from '@/services/kyc';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
 import { useAuthStore } from '@/stores/auth';
@@ -1585,6 +1586,7 @@ function AttributeAcquisitionView({
 
     const [mode, setMode] = useState<'choose' | 'manual'>('choose');
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
+    const [verifyingId, setVerifyingId] = useState(false);
     const [manualValues, setManualValues] = useState<Record<string, string>>({});
     const [localePickerOpen, setLocalePickerOpen] = useState(false);
     const [localeOptions, setLocaleOptions] = useState<ValueOption[]>([]);
@@ -1636,6 +1638,40 @@ function AttributeAcquisitionView({
     // Essential attributes (per the IdP's attributeRequirements, or the
     // email+name fallback) block Continue; the rest are optional.
     const requiredMissing = getRequiredMissing(stillMissing, attributeRequirements);
+    // A gov-assurance claim can only be satisfied by an enclave identity
+    // verification — surface a "Verify with your ID" path when one is missing.
+    const hasGovMissing = stillMissing.some(
+        (attr) => assuranceFor(attr, attributeRequirements) === 'gov',
+    );
+
+    const handleVerifyIdentity = async () => {
+        setVerifyingId(true);
+        try {
+            // The NFC + biometric capture module (Phase 2 §3.3) will supply the
+            // document fields. Until it ships, a dev build uses a stub so the
+            // enclave round-trip (attestation → /verify-identity → auto-fill) is
+            // exercisable end to end. Never ship stub identity data in production.
+            if (!__DEV__) {
+                Alert.alert(
+                    'ID verification coming soon',
+                    'Scanning your ID document over NFC is not available in this build yet.',
+                );
+                return;
+            }
+            const devStub = {
+                given_name: 'Ada',
+                family_name: 'Lovelace',
+                birthdate: '1990-05-17',
+                nationality: 'GBR',
+            };
+            const result = await runKycVerification(devStub);
+            console.log('[CONNECT] identity verified — filled:', result.filled.join(', '));
+        } catch (e: any) {
+            Alert.alert('Verification failed', e.message);
+        } finally {
+            setVerifyingId(false);
+        }
+    };
 
     const handleLinkProvider = async (providerKey: string) => {
         setLinkingProvider(providerKey);
@@ -1781,6 +1817,34 @@ function AttributeAcquisitionView({
                     ) : mode === 'choose' ? (
                         /* Provider linking options */
                         <>
+                            {hasGovMissing && (
+                                <>
+                                    <Pressable
+                                        style={acqStyles.providerButton}
+                                        onPress={handleVerifyIdentity}
+                                        disabled={verifyingId || linkingProvider !== null}
+                                    >
+                                        <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
+                                        {verifyingId ? (
+                                            <ActivityIndicator size="small" color="#FFFFFF" />
+                                        ) : (
+                                            <Text style={acqStyles.providerButtonText}>Verify with your ID</Text>
+                                        )}
+                                    </Pressable>
+                                    <RNView style={acqStyles.privacyNotice}>
+                                        <Ionicons name="lock-closed-outline" size={16} color="#F59E0B" />
+                                        <Text style={acqStyles.privacyNoticeText}>
+                                            A government-verified attribute is required. Your ID is checked in a
+                                            secure enclave; the value stays on your device.
+                                        </Text>
+                                    </RNView>
+                                    <RNView style={acqStyles.divider}>
+                                        <RNView style={acqStyles.dividerLine} />
+                                        <Text style={acqStyles.dividerText}>or</Text>
+                                        <RNView style={acqStyles.dividerLine} />
+                                    </RNView>
+                                </>
+                            )}
                             <Text style={acqStyles.sectionTitle}>Import from an account</Text>
                             {Object.entries(PROVIDERS).map(([key, config]) => {
                                 const isLinking = linkingProvider === key;

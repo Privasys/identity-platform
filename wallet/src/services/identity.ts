@@ -215,7 +215,8 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
             ? [{
                   verifier: providerKey,
                   verifierDisplayName: displayName,
-                  method: 'oidc_claim',
+                  method: 'oidc_claim' as const,
+                  assurance: 'provider' as const,
                   verifiedAt: now,
                   evidence: `${providerKey}:${a.key}_verified=true`,
               }]

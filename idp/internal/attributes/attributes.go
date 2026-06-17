@@ -42,6 +42,10 @@ type Attribute struct {
 	// locale from the device language). Such attributes are auto-filled by the
 	// wallet and need not be prompted for.
 	DeviceSourced bool `json:"deviceSourced,omitempty"`
+	// IdentityVerifiable marks an attribute that can reach 'gov' assurance via
+	// the identity-verifier enclave (passport/ID + biometric). Carried under the
+	// request-gated 'identity' scope (see kyc-enclave-design.md §3).
+	IdentityVerifiable bool `json:"identityVerifiable,omitempty"`
 }
 
 // ValueOption is one entry in an enumerated attribute's value set.

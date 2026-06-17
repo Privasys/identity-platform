@@ -50,7 +50,7 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer", "urn:ietf:params:oauth:grant-type:device_code"},
 		"subject_types_supported":               []string{"pairwise"},
 		"id_token_signing_alg_values_supported": []string{"ES256"},
-		"scopes_supported":                      []string{"openid", "profile", "email", "phone", "offline_access"},
+		"scopes_supported":                      []string{"openid", "profile", "email", "phone", "identity", "offline_access"},
 		"token_endpoint_auth_methods_supported": []string{"none", "client_secret_post", "client_secret_basic"},
 		"code_challenge_methods_supported":      []string{"S256"},
 		"claims_supported": []string{

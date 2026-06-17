@@ -26,8 +26,15 @@ export interface VerificationRecord {
     verifier: string;
     /** Human-readable verifier name for UI display. */
     verifierDisplayName: string;
-    /** Verification method (e.g. 'oidc_claim', 'email_code', 'nfc_bac', 'nfc_pace'). */
-    method: 'oidc_claim' | 'email_code' | 'sms_code' | 'nfc_bac' | 'nfc_pace' | 'manual';
+    /** Verification method (e.g. 'oidc_claim', 'email_code', 'nfc_pace', 'kyc_enclave'). */
+    method: 'oidc_claim' | 'email_code' | 'sms_code' | 'nfc_bac' | 'nfc_pace' | 'kyc_enclave' | 'manual';
+    /**
+     * Assurance level reached by this verification:
+     *   'provider' — asserted by a linked IdP (an OIDC claim like email_verified)
+     *   'gov'      — certified by the identity-verifier enclave (passport/ID + biometric)
+     * Absent/'none' = self-asserted. See kyc-enclave-design.md §3.
+     */
+    assurance?: 'none' | 'provider' | 'gov';
     /** Epoch seconds when the verification was performed. */
     verifiedAt: number;
     /**

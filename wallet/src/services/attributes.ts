@@ -31,7 +31,7 @@ export interface AttributeDefinition {
     /** Human-readable label for UI display. */
     label: string;
     /** OIDC scope that gates this attribute. */
-    scope: 'openid' | 'email' | 'profile' | 'phone' | 'address';
+    scope: 'openid' | 'email' | 'profile' | 'phone' | 'address' | 'identity';
     /**
      * Corresponding top-level field on UserProfile, if any.
      * Attributes without a profileField are stored in the `attributes` bag.
@@ -55,6 +55,12 @@ export interface AttributeDefinition {
      * prompted for. The wallet maps the key to its reader in device-attributes.ts.
      */
     deviceSourced?: boolean;
+    /**
+     * Whether this attribute can reach 'gov' assurance via the identity-verifier
+     * enclave (passport/ID + biometric). Such attributes live under the
+     * request-gated 'identity' scope. See kyc-enclave-design.md §3.
+     */
+    identityVerifiable?: boolean;
 }
 
 // Map JSON profileField strings to the typed union.
@@ -77,6 +83,7 @@ export const CANONICAL_ATTRIBUTES: AttributeDefinition[] = canonicalDoc.attribut
     verifiable: a.verifiable,
     valuesUrl: (a as { valuesUrl?: string }).valuesUrl,
     deviceSourced: (a as { deviceSourced?: boolean }).deviceSourced,
+    identityVerifiable: (a as { identityVerifiable?: boolean }).identityVerifiable,
 }));
 
 /** Lookup table keyed by canonical attribute key. */
@@ -253,6 +260,7 @@ export function claimsToProfileAttributes(
                 verifier: provider,
                 verifierDisplayName: providerDisplayName(provider),
                 method: 'oidc_claim',
+                assurance: 'provider',
                 verifiedAt: now,
                 evidence: `${provider}:${key}_verified=true`,
             });

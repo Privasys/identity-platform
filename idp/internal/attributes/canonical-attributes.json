@@ -1,15 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "Single source of truth for canonical user attributes and provider claim mappings. Used by both the Go IdP and the TypeScript wallet/SDK. Attribute keys follow OIDC Standard Claims (RFC 7519 §5.1).",
+  "$comment": "Single source of truth for canonical user attributes and provider claim mappings. Used by both the Go IdP and the TypeScript wallet/SDK. Attribute keys follow OIDC Standard Claims (RFC 7519 §5.1). 'verifiable' = can reach 'provider' assurance (an OIDC claim like email_verified); 'identityVerifiable' = can reach 'gov' assurance via the identity-verifier enclave (passport/ID + biometric). Assurance levels: none < provider < gov (see kyc-enclave-design.md §3). The 'identity' scope is request-gated so gov attributes are never pulled by an ordinary 'profile' request.",
   "attributes": [
-    { "key": "email",        "label": "Email",        "scope": "email",   "profileField": "email",       "verifiable": true },
-    { "key": "name",         "label": "Display Name", "scope": "profile", "profileField": "displayName", "verifiable": false },
-    { "key": "given_name",   "label": "First Name",   "scope": "profile", "profileField": null,          "verifiable": false },
-    { "key": "family_name",  "label": "Last Name",    "scope": "profile", "profileField": null,          "verifiable": false },
-    { "key": "nickname",     "label": "Nickname",      "scope": "profile", "profileField": null,          "verifiable": false },
-    { "key": "picture",      "label": "Avatar",        "scope": "profile", "profileField": "avatarUri",   "verifiable": false },
-    { "key": "locale",       "label": "Language",      "scope": "profile", "profileField": "locale",      "verifiable": false, "valuesUrl": "/referential/locale.json", "deviceSourced": true },
-    { "key": "phone_number", "label": "Phone Number",  "scope": "phone",  "profileField": null,          "verifiable": true }
+    { "key": "email",        "label": "Email",         "scope": "email",    "profileField": "email",       "verifiable": true },
+    { "key": "name",         "label": "Display Name",  "scope": "profile",  "profileField": "displayName", "verifiable": false },
+    { "key": "given_name",   "label": "First Name",    "scope": "profile",  "profileField": null,          "verifiable": false, "identityVerifiable": true },
+    { "key": "family_name",  "label": "Last Name",     "scope": "profile",  "profileField": null,          "verifiable": false, "identityVerifiable": true },
+    { "key": "nickname",     "label": "Nickname",      "scope": "profile",  "profileField": null,          "verifiable": false },
+    { "key": "picture",      "label": "Avatar",        "scope": "profile",  "profileField": "avatarUri",   "verifiable": false },
+    { "key": "locale",       "label": "Language",      "scope": "profile",  "profileField": "locale",      "verifiable": false, "valuesUrl": "/referential/locale.json", "deviceSourced": true },
+    { "key": "phone_number", "label": "Phone Number",  "scope": "phone",    "profileField": null,          "verifiable": true },
+    { "key": "birthdate",    "label": "Date of Birth", "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true },
+    { "key": "nationality",  "label": "Nationality",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true },
+    { "key": "age_over_18",  "label": "18 or older",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true },
+    { "key": "age_over_21",  "label": "21 or older",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true }
   ],
   "providers": {
     "google": {

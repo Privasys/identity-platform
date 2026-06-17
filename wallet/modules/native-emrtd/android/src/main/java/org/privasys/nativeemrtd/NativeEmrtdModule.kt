@@ -29,9 +29,9 @@ import java.security.Security
  */
 class NativeEmrtdModule : Module() {
     init {
-        // jMRTD relies on a registered SpongyCastle/BouncyCastle JCE provider.
+        // jMRTD 0.7.x relies on a registered BouncyCastle JCE provider.
         try {
-            Security.insertProviderAt(org.spongycastle.jce.provider.BouncyCastleProvider(), 1)
+            Security.insertProviderAt(org.bouncycastle.jce.provider.BouncyCastleProvider(), 1)
         } catch (_: Throwable) {
         }
     }

@@ -32,12 +32,14 @@ dependencies {
     implementation project(':expo-modules-core')
 
     // eMRTD secure messaging + DG parsing (jMRTD, LGPL — kept wallet-side per
-    // the licence separation in kyc-enclave-design.md §7). scuba provides the
-    // smartcard layer; SpongyCastle is the JCE provider jMRTD relies on.
-    implementation 'org.jmrtd:jmrtd:0.7.18'
-    implementation 'net.sf.scuba:scuba-sc-android:0.0.20'
-    implementation 'com.madgag.spongycastle:prov:1.58.0.0'
-    implementation 'com.madgag.spongycastle:core:1.58.0.0'
+    // the licence separation in kyc-enclave-design.md §7); scuba is the
+    // smartcard layer. Exclude jMRTD's bundled monolithic bcprov-jdk15on (1.64)
+    // — it duplicates classes with the app's split BouncyCastle 1.81 — and pin
+    // the matching jdk15to18:1.81 provider + util ourselves.
+    implementation('org.jmrtd:jmrtd:0.7.18') { exclude group: 'org.bouncycastle' }
+    implementation('net.sf.scuba:scuba-sc-android:0.0.20') { exclude group: 'org.bouncycastle' }
+    implementation 'org.bouncycastle:bcprov-jdk15to18:1.81'
+    implementation 'org.bouncycastle:bcutil-jdk15to18:1.81'
 }
 
 def safeExtGet(prop, fallback) {

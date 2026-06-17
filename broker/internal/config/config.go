@@ -19,12 +19,6 @@ type Config struct {
 	AppleTeamID   string // Apple Developer Team ID
 	AppleBundleID string // App bundle identifier
 	Production    bool   // App Store (true) vs TestFlight/dev (false)
-
-	// OAuth proxy — provider secrets for token exchange
-	GitHubClientID       string
-	GitHubClientSecret   string
-	LinkedInClientID     string
-	LinkedInClientSecret string
 }
 
 func Load() *Config {
@@ -71,11 +65,6 @@ func Load() *Config {
 		AppleTeamID:   os.Getenv("APPLE_TEAM_ID"),
 		AppleBundleID: os.Getenv("APPLE_BUNDLE_ID"),
 		Production:    os.Getenv("PRODUCTION") == "true",
-
-		GitHubClientID:       os.Getenv("OAUTH_GITHUB_CLIENT_ID"),
-		GitHubClientSecret:   os.Getenv("OAUTH_GITHUB_CLIENT_SECRET"),
-		LinkedInClientID:     os.Getenv("OAUTH_LINKEDIN_CLIENT_ID"),
-		LinkedInClientSecret: os.Getenv("OAUTH_LINKEDIN_CLIENT_SECRET"),
 	}
 }
 

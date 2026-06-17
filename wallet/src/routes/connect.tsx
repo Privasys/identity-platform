@@ -48,6 +48,7 @@ import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, getProfileAssurance, getProfileValue, setProfileValue } from '@/services/attributes';
+import { discloseAttribute } from '@/services/kyc';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
 import { useAuthStore } from '@/stores/auth';
@@ -131,7 +132,18 @@ async function resolveRequestedAttributes(
         }
         const value = getProfileValue(profile, attr);
         if (value) {
-            attrs[attr] = value;
+            if (assuranceFor(attr, payload.attributeRequirements) === 'gov') {
+                // Gov claims are presented as enclave-signed, audience-bound
+                // disclosure tokens (commit-and-prove), never the raw value.
+                try {
+                    attrs[attr] = await discloseAttribute(payload.rpId, attr, payload.nonce ?? payload.sessionId);
+                } catch (e: any) {
+                    // Never fall back to the raw gov value; omit on failure.
+                    console.warn(`[CONNECT] disclosure for ${attr} failed: ${e?.message}`);
+                }
+            } else {
+                attrs[attr] = value;
+            }
         } else if (ATTRIBUTE_MAP[attr]?.deviceSourced) {
             // Device-sourceable (e.g. locale) — read from the OS so we never have
             // to ask the user for it.

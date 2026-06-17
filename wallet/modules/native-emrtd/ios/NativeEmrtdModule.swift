@@ -3,18 +3,16 @@
 
 import ExpoModulesCore
 import CoreNFC
+import NFCPassportReader
 
-/// eMRTD (ICAO 9303) NFC reader.
+/// eMRTD (ICAO 9303) NFC reader, backed by AndyQ/NFCPassportReader (MIT).
 ///
-/// `isSupported` reports real device NFC availability. `readDocument` is the
-/// integration point for the chip-read protocol (open `NFCTagReaderSession`,
-/// select the LDS applet, run BAC/PACE with the MRZ-derived key, read
-/// DG1/DG2/EF.SOD, return parsed fields + portrait + SOD). That protocol layer
-/// is completed against AndyQ/NFCPassportReader (MIT) in a device-tested step,
-/// and requires the `com.apple.developer.nfc.readersession.formats` entitlement
-/// (an Apple App ID capability, provisioned separately). Until then it returns a
-/// structured "not enabled" error and callers fall back (dev stub / coming-soon).
+/// Reads the chip with the MRZ-derived BAC/PACE key and returns DG1 fields +
+/// the DG2 portrait. Requires the NFC reader-session entitlement
+/// (`com.apple.developer.nfc.readersession.formats`) and an NFC-capable device.
 public class NativeEmrtdModule: Module {
+    private let passportReader = PassportReader()
+
     public func definition() -> ModuleDefinition {
         Name("NativeEmrtd")
 
@@ -24,8 +22,61 @@ public class NativeEmrtdModule: Module {
             return "{\"supported\":\(available),\"reason\":\"\(reason)\"}"
         }
 
-        AsyncFunction("readDocument") { (_ documentNumber: String, _ dateOfBirth: String, _ dateOfExpiry: String) -> String in
-            return "{\"error\":\"eMRTD chip reading is not yet enabled in this build\"}"
+        AsyncFunction("readDocument") {
+            (documentNumber: String, dateOfBirth: String, dateOfExpiry: String, promise: Promise) in
+            let mrzKey = PassportUtils.getMRZKey(
+                passportNumber: documentNumber,
+                dateOfBirth: dateOfBirth,
+                dateOfExpiry: dateOfExpiry
+            )
+            Task { [weak self] in
+                guard let self = self else { return }
+                do {
+                    let passport = try await self.passportReader.readPassport(mrzKey: mrzKey)
+                    promise.resolve(NativeEmrtdModule.toJson(passport))
+                } catch {
+                    promise.resolve("{\"error\":\"\(NativeEmrtdModule.escape(error.localizedDescription))\"}")
+                }
+            }
         }
+    }
+
+    private static func toJson(_ p: NFCPassportModel) -> String {
+        var fields: [String: String] = [
+            "given_name": p.firstName,
+            "family_name": p.lastName,
+            "nationality": p.nationality,
+            "document_number": p.documentNumber,
+        ]
+        if let bd = isoDate(p.dateOfBirth) { fields["birthdate"] = bd }
+        if let ex = isoDate(p.documentExpiryDate) { fields["expiry_date"] = ex }
+
+        let fieldsJson = fields
+            .map { "\"\($0.key)\":\"\(escape($0.value))\"" }
+            .joined(separator: ",")
+
+        var portrait = "null"
+        if let img = p.passportImage, let data = img.jpegData(compressionQuality: 0.85) {
+            portrait = "\"\(data.base64EncodedString())\""
+        }
+        return "{\"fields\":{\(fieldsJson)},\"portraitBase64\":\(portrait)}"
+    }
+
+    /// MRZ dates are YYMMDD; expand to YYYY-MM-DD with a century heuristic
+    /// (years greater than the current 2-digit year are treated as 19xx).
+    private static func isoDate(_ yymmdd: String) -> String? {
+        guard yymmdd.count == 6,
+              let yy = Int(yymmdd.prefix(2)),
+              let mm = Int(yymmdd.dropFirst(2).prefix(2)),
+              let dd = Int(yymmdd.suffix(2)) else { return nil }
+        let currentYY = Calendar.current.component(.year, from: Date()) % 100
+        let century = yy > currentYY ? 1900 : 2000
+        return String(format: "%04d-%02d-%02d", century + yy, mm, dd)
+    }
+
+    private static func escape(_ s: String) -> String {
+        return s
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 }

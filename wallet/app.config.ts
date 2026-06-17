@@ -123,7 +123,12 @@ export default (context: ConfigContext): ExpoConfig => {
                 ]
             },
             config: { usesNonExemptEncryption: false },
-            associatedDomains: ['applinks:privasys.id', 'webcredentials:privasys.id']
+            associatedDomains: ['applinks:privasys.id', 'webcredentials:privasys.id'],
+            // NFC tag reading for the eMRTD (passport/ID chip) KYC flow. Requires
+            // the matching capability enabled on the org.privasys.wallet App ID.
+            entitlements: {
+                'com.apple.developer.nfc.readersession.formats': ['TAG']
+            }
         },
         android: {
             // Submission to Google Play requires a unique package name.

@@ -1,0 +1,9 @@
+{
+    "platforms": ["ios", "android"],
+    "ios": {
+        "modules": ["NativeEmrtdModule"]
+    },
+    "android": {
+        "modules": ["org.privasys.nativeemrtd.NativeEmrtdModule"]
+    }
+}

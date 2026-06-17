@@ -105,6 +105,11 @@ export default (context: ConfigContext): ExpoConfig => {
             infoPlist: {
                 ITSAppUsesNonExemptEncryption: false,
                 CFBundleAllowMixedLocalizations: true,
+                // Shown when reading a passport/ID chip over NFC (KYC flow). The
+                // NFC reader-session *entitlement* is added with the device-tested
+                // chip-read implementation (it needs an Apple App ID capability).
+                NFCReaderUsageDescription:
+                    'Privasys reads your ID document chip to verify your identity. The data stays on your device.',
                 // Google OAuth requires the reversed client ID as a registered URL scheme
                 // so iOS can route the redirect back to the app after authentication.
                 CFBundleURLTypes: [

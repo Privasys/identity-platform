@@ -16,7 +16,7 @@
  */
 
 import * as Clipboard from 'expo-clipboard';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack, type Href } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     StyleSheet,
@@ -48,7 +48,6 @@ import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, getProfileAssurance, getProfileValue, setProfileValue } from '@/services/attributes';
-import { verifyIdentity as runKycVerification } from '@/services/kyc';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
 import { useAuthStore } from '@/stores/auth';
@@ -1584,9 +1583,9 @@ function AttributeAcquisitionView({
     const { updateProfile, setAttribute, createProfile } = useProfileStore();
     const profile = useProfileStore((s) => s.profile);
 
+    const router = useRouter();
     const [mode, setMode] = useState<'choose' | 'manual'>('choose');
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
-    const [verifyingId, setVerifyingId] = useState(false);
     const [manualValues, setManualValues] = useState<Record<string, string>>({});
     const [localePickerOpen, setLocalePickerOpen] = useState(false);
     const [localeOptions, setLocaleOptions] = useState<ValueOption[]>([]);
@@ -1644,33 +1643,13 @@ function AttributeAcquisitionView({
         (attr) => assuranceFor(attr, attributeRequirements) === 'gov',
     );
 
-    const handleVerifyIdentity = async () => {
-        setVerifyingId(true);
-        try {
-            // The NFC + biometric capture module (Phase 2 §3.3) will supply the
-            // document fields. Until it ships, a dev build uses a stub so the
-            // enclave round-trip (attestation → /verify-identity → auto-fill) is
-            // exercisable end to end. Never ship stub identity data in production.
-            if (!__DEV__) {
-                Alert.alert(
-                    'ID verification coming soon',
-                    'Scanning your ID document over NFC is not available in this build yet.',
-                );
-                return;
-            }
-            const devStub = {
-                given_name: 'Ada',
-                family_name: 'Lovelace',
-                birthdate: '1990-05-17',
-                nationality: 'GBR',
-            };
-            const result = await runKycVerification(devStub);
-            console.log('[CONNECT] identity verified — filled:', result.filled.join(', '));
-        } catch (e: any) {
-            Alert.alert('Verification failed', e.message);
-        } finally {
-            setVerifyingId(false);
-        }
+    // Launch the KYC capture flow (NFC chip read + selfie → verifier enclave →
+    // gov-assurance auto-fill). On return, the profile is updated and the gating
+    // below recomputes, satisfying the gov claim.
+    const handleVerifyIdentity = () => {
+        // Cast: the typed-routes union regenerates at build time (the route file
+        // is new); the path resolves correctly at runtime.
+        router.push('/kyc-capture' as Href);
     };
 
     const handleLinkProvider = async (providerKey: string) => {
@@ -1822,14 +1801,10 @@ function AttributeAcquisitionView({
                                     <Pressable
                                         style={acqStyles.providerButton}
                                         onPress={handleVerifyIdentity}
-                                        disabled={verifyingId || linkingProvider !== null}
+                                        disabled={linkingProvider !== null}
                                     >
                                         <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
-                                        {verifyingId ? (
-                                            <ActivityIndicator size="small" color="#FFFFFF" />
-                                        ) : (
-                                            <Text style={acqStyles.providerButtonText}>Verify with your ID</Text>
-                                        )}
+                                        <Text style={acqStyles.providerButtonText}>Verify with your ID</Text>
                                     </Pressable>
                                     <RNView style={acqStyles.privacyNotice}>
                                         <Ionicons name="lock-closed-outline" size={16} color="#F59E0B" />

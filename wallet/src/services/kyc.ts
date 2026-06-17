@@ -150,14 +150,23 @@ async function postToVerifier<T>(path: string, body: unknown): Promise<T> {
  * @param documentFields Parsed document fields (dev stub today; NFC chip data
  *   in production). At minimum: given_name, family_name, birthdate (YYYY-MM-DD),
  *   nationality (ISO 3166-1 alpha-3).
+ * @param opts.liveImageBase64 Optional live selfie for the enclave face match +
+ *   liveness (DG2 ↔ live capture). Processed in-enclave, never persisted.
  */
-export async function verifyIdentity(documentFields: Record<string, string>): Promise<VerifyIdentityResult> {
+export async function verifyIdentity(
+    documentFields: Record<string, string>,
+    opts: { liveImageBase64?: string } = {},
+): Promise<VerifyIdentityResult> {
     const enclave = await verifyVerifierEnclave();
     const holderPub = await getHolderPublicKey();
 
     const resp = await postToVerifier<{ ivr: string; salts: Record<string, string>; fields: Record<string, string> }>(
         '/verify-identity',
-        { holder_pub: holderPub, fields: documentFields },
+        {
+            holder_pub: holderPub,
+            fields: documentFields,
+            ...(opts.liveImageBase64 ? { live_image: opts.liveImageBase64 } : {}),
+        },
     );
 
     const jti = decodeJwtId(resp.ivr);

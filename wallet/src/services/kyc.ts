@@ -20,10 +20,14 @@
  * real eMRTD chip data here without changing this interface.
  */
 
+import * as Crypto from 'expo-crypto';
+
 import * as SecureStore from '@/utils/storage';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, verifyAttestation } from '@/services/attestation';
 import { setProfileValue } from '@/services/attributes';
+import { deriveAppSub } from '@/services/did';
+import { derToRawEcdsa } from '@/services/encauth';
 import { useProfileStore, type VerificationRecord } from '@/stores/profile';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
@@ -237,6 +241,132 @@ function decodeJwtId(jws: string): string {
     } catch {
         return '';
     }
+}
+
+// ── Disclosure derivations (prove_*) ────────────────────────────────────────
+//
+// At relay time the wallet derives a short-lived, audience-bound, enclave-signed
+// disclosure token for exactly the one claim a relying party asked for, opening
+// only that commitment — the raw value never leaves the wallet. Each request is
+// holder-signed (the IVR is bound to the holder key) and consented.
+
+function b64uBytes(bytes: Uint8Array): string {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i] ?? 0);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function b64uToBytes(s: string): Uint8Array {
+    const std = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4);
+    const bin = atob(std);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+}
+
+/** Canonical JSON matching the verifier's crypto.canonical_json: sorted keys,
+ *  compact separators (",",":"), no whitespace. Values here are ASCII strings
+ *  + one integer, so JS and Python serialise identically. */
+function canonicalJson(obj: Record<string, string | number>): string {
+    const keys = Object.keys(obj).sort();
+    return '{' + keys.map((k) => JSON.stringify(k) + ':' + JSON.stringify(obj[k])).join(',') + '}';
+}
+
+interface SignedBase {
+    ivr: string;
+    sub: string;
+    rp_id: string;
+    nonce: string;
+    ts: number;
+    holder_pub: string;
+    holder_sig: string;
+}
+
+/** Holder-sign canonical_json({ivr,nonce,rp_id,ts}) with the hardware key,
+ *  returning base64url(64-byte raw R‖S) as the verifier expects. */
+async function holderSignature(jti: string, rpId: string, nonce: string, ts: number): Promise<string> {
+    const msg = new TextEncoder().encode(canonicalJson({ ivr: jti, nonce, rp_id: rpId, ts }));
+    const { signature } = await NativeKeys.sign(HOLDER_KEY_ID, b64uBytes(msg));
+    const raw = derToRawEcdsa(b64uToBytes(signature));
+    if (raw.length !== 64) throw new Error('holder_sig must be 64 bytes');
+    return b64uBytes(raw);
+}
+
+async function buildSignedBase(record: KycRecord, rpId: string, nonce?: string): Promise<SignedBase> {
+    const profile = useProfileStore.getState().profile;
+    if (!profile?.pairwiseSeed) throw new Error('Profile is not initialised');
+    const sub = await deriveAppSub(profile.pairwiseSeed, rpId);
+    const n = nonce ?? b64uBytes(Crypto.getRandomBytes(16));
+    const ts = Math.floor(Date.now() / 1000);
+    const holderPub = await getHolderPublicKey();
+    const holderSig = await holderSignature(record.jti, rpId, n, ts);
+    return { ivr: record.ivr, sub, rp_id: rpId, nonce: n, ts, holder_pub: holderPub, holder_sig: holderSig };
+}
+
+async function requireRecord(): Promise<KycRecord> {
+    const record = await getLatestKycRecord();
+    if (!record) throw new Error('No verified identity on file — verify your ID first.');
+    return record;
+}
+
+/** prove_age_over: signed "age_over_N = yes/no" without revealing the birth date. */
+export async function proveAgeOver(rpId: string, threshold: number, nonce?: string): Promise<string> {
+    const record = await requireRecord();
+    const base = await buildSignedBase(record, rpId, nonce);
+    const resp = await postToVerifier<{ token: string }>('/prove/age-over', {
+        ...base,
+        birthdate: record.fields.birthdate,
+        salt: record.salts.birthdate,
+        threshold,
+    });
+    return resp.token;
+}
+
+/** prove_age_band: signed age band (e.g. "18-20") instead of a threshold. */
+export async function proveAgeBand(rpId: string, bands?: number[], nonce?: string): Promise<string> {
+    const record = await requireRecord();
+    const base = await buildSignedBase(record, rpId, nonce);
+    const resp = await postToVerifier<{ token: string }>('/prove/age-band', {
+        ...base,
+        birthdate: record.fields.birthdate,
+        salt: record.salts.birthdate,
+        ...(bands ? { bands } : {}),
+    });
+    return resp.token;
+}
+
+/** prove_field: signed disclosure of one certified document field. */
+export async function proveField(rpId: string, field: string, nonce?: string): Promise<string> {
+    const record = await requireRecord();
+    const value = record.fields[field];
+    const salt = record.salts[field];
+    if (value == null || salt == null) {
+        throw new Error(`No verified value for "${field}" in the identity receipt.`);
+    }
+    const base = await buildSignedBase(record, rpId, nonce);
+    const resp = await postToVerifier<{ token: string }>('/prove/field', { ...base, field, value, salt });
+    return resp.token;
+}
+
+/** prove_document_valid: signed assertion that a genuine document was verified,
+ *  disclosing no attribute. */
+export async function proveDocumentValid(rpId: string, nonce?: string): Promise<string> {
+    const record = await requireRecord();
+    const base = await buildSignedBase(record, rpId, nonce);
+    const resp = await postToVerifier<{ token: string }>('/prove/document-valid', base);
+    return resp.token;
+}
+
+/**
+ * Produce the right disclosure token for a requested gov-assurance attribute.
+ * `age_over_N` → prove_age_over; `age_band` → prove_age_band; any certified
+ * field (birthdate, nationality, given_name, family_name) → prove_field.
+ */
+export async function discloseAttribute(rpId: string, key: string, nonce?: string): Promise<string> {
+    const ageOver = /^age_over_(\d+)$/.exec(key);
+    if (ageOver) return proveAgeOver(rpId, Number(ageOver[1]), nonce);
+    if (key === 'age_band') return proveAgeBand(rpId, undefined, nonce);
+    return proveField(rpId, key, nonce);
 }
 
 // ── Sealed persistence ──────────────────────────────────────────────────────

@@ -365,9 +365,11 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		// derived from the requested OIDC scope, then filtered by the
 		// client's required_attributes whitelist (if set).
 		requestedAttributes := requestedAttributesForScope(scope, client)
+		attributeRequirements := attributeRequirementsForScope(scope, client)
 
 		if len(requestedAttributes) > 0 {
 			qrPayload["requestedAttributes"] = requestedAttributes
+			qrPayload["attributeRequirements"] = attributeRequirements
 		}
 
 		qrJSON, _ := json.Marshal(qrPayload)
@@ -383,6 +385,7 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		}
 		if len(requestedAttributes) > 0 {
 			resp["requested_attributes"] = requestedAttributes
+			resp["attribute_requirements"] = attributeRequirements
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
@@ -1198,6 +1201,45 @@ func requestedAttributesForScope(scope string, client *clients.Client) []string 
 		requested = filtered
 	}
 	return requested
+}
+
+// AttributeRequirement tells the wallet what a relying party needs for one
+// attribute: whether it is essential (must be present to complete sign-in) and
+// the assurance level (see kyc-enclave-design.md §3).
+type AttributeRequirement struct {
+	Essential bool   `json:"essential"`
+	Assurance string `json:"assurance"` // "gov" | "any"
+}
+
+// attributeRequirementsForScope returns per-attribute requirements for the
+// requested scope. Essential = the client's required_attributes whitelist, or
+// the email+name identity baseline when the client declares none (so the wallet
+// has a consistent essential set without its own heuristic). Assurance = "gov"
+// for identity-scoped attributes (only the identity-verifier enclave can certify
+// them), else "any". Additive to the payload: older wallets ignore it.
+func attributeRequirementsForScope(scope string, client *clients.Client) map[string]AttributeRequirement {
+	essential := map[string]bool{}
+	if client != nil && len(client.RequiredAttributes) > 0 {
+		for _, a := range client.RequiredAttributes {
+			essential[a] = true
+		}
+	} else {
+		essential["email"] = true
+		essential["name"] = true
+	}
+
+	out := map[string]AttributeRequirement{}
+	for _, key := range requestedAttributesForScope(scope, client) {
+		if key == "sub" {
+			continue
+		}
+		assurance := "any"
+		if attr, ok := attributes.ByKey[key]; ok && attr.Scope == "identity" {
+			assurance = "gov"
+		}
+		out[key] = AttributeRequirement{Essential: essential[key], Assurance: assurance}
+	}
+	return out
 }
 
 // filterAttributesByScope returns only the attributes allowed by the OIDC scope,

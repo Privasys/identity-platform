@@ -265,8 +265,10 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 			qrPayload["requestedBy"] = agentName
 		}
 		requestedAttributes := requestedAttributesForScope(scope, client)
+		attributeRequirements := attributeRequirementsForScope(scope, client)
 		if len(requestedAttributes) > 0 {
 			qrPayload["requestedAttributes"] = requestedAttributes
+			qrPayload["attributeRequirements"] = attributeRequirements
 		}
 		qrJSON, _ := json.Marshal(qrPayload)
 		universalLink := "https://privasys.id/scp?p=" + base64.RawURLEncoding.EncodeToString(qrJSON)
@@ -299,6 +301,7 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 		}
 		if len(requestedAttributes) > 0 {
 			resp["requested_attributes"] = requestedAttributes
+			resp["attribute_requirements"] = attributeRequirements
 		}
 
 		w.Header().Set("Content-Type", "application/json")

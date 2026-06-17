@@ -11,7 +11,7 @@
     { "key": "locale",       "label": "Language",      "scope": "profile",  "profileField": "locale",      "verifiable": false, "valuesUrl": "/referential/locale.json", "deviceSourced": true },
     { "key": "phone_number", "label": "Phone Number",  "scope": "phone",    "profileField": null,          "verifiable": true },
     { "key": "birthdate",    "label": "Date of Birth", "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true },
-    { "key": "nationality",  "label": "Nationality",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true },
+    { "key": "nationality",  "label": "Nationality",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true, "valuesUrl": "/referential/nationality.json" },
     { "key": "age_over_18",  "label": "18 or older",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true },
     { "key": "age_over_21",  "label": "21 or older",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true }
   ],

@@ -33,6 +33,31 @@ func TestReferentialFile(t *testing.T) {
 	}
 }
 
+func TestValueSet_Nationality(t *testing.T) {
+	vs := ValueSet("nationality")
+	if len(vs) < 150 {
+		t.Fatalf("nationality value set too small: %d", len(vs))
+	}
+	want := map[string]bool{"GBR": false, "USA": false, "FRA": false}
+	for _, v := range vs {
+		if len(v.Value) != 3 {
+			t.Errorf("expected ISO 3166-1 alpha-3, got %q", v.Value)
+		}
+		if _, ok := want[v.Value]; ok {
+			want[v.Value] = true
+		}
+	}
+	for code, found := range want {
+		if !found {
+			t.Errorf("nationality value set missing %q", code)
+		}
+	}
+	// The attribute references the served set.
+	if ByKey["nationality"].ValuesURL != "/referential/nationality.json" {
+		t.Errorf("nationality valuesUrl = %q", ByKey["nationality"].ValuesURL)
+	}
+}
+
 func TestNormalizeLocale(t *testing.T) {
 	cases := map[string]string{
 		"en-GB": "en-GB", // already canonical

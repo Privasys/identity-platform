@@ -47,7 +47,7 @@ import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid }
 import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
-import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, getProfileValue, setProfileValue } from '@/services/attributes';
+import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, getProfileAssurance, getProfileValue, setProfileValue } from '@/services/attributes';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
 import { useAuthStore } from '@/stores/auth';
@@ -168,18 +168,48 @@ function getMissingAttributes(
     for (const attr of requested) {
         if (attr === 'sub') continue;
         if (!CANONICAL_KEYS.has(attr)) continue;
-        if (profile && getProfileValue(profile, attr)) continue;
-        // Device-sourceable attributes are never "missing" if the OS can supply
-        // them (e.g. locale from expo-localization), so we don't ask the user.
-        if (ATTRIBUTE_MAP[attr]?.deviceSourced && getDeviceAttribute(attr)) continue;
+        const needsGov = assuranceFor(attr, payload.attributeRequirements) === 'gov';
+        const value = profile ? getProfileValue(profile, attr) : undefined;
+        if (value) {
+            // Present — but a 'gov' requirement is only satisfied by a
+            // gov-assured (document-verified) value, never a provider/manual one.
+            if (!needsGov || getProfileAssurance(profile!, attr) === 'gov') continue;
+        } else if (ATTRIBUTE_MAP[attr]?.deviceSourced && getDeviceAttribute(attr)) {
+            // Device-sourceable attributes are never "missing" if the OS can
+            // supply them (e.g. locale from expo-localization).
+            continue;
+        }
         missing.push(attr);
     }
     return missing;
 }
 
+/** Per-attribute requirement hints from the IdP, keyed by attribute key. */
+export type AttributeRequirements = Record<string, { essential: boolean; assurance: string }>;
+
+/**
+ * Whether a requested attribute blocks sign-in. Prefer the IdP's per-attribute
+ * `essential` flag (threaded via `attributeRequirements`); fall back to the
+ * email+name heuristic for IdPs that predate it.
+ */
+function isEssential(attr: string, reqs?: AttributeRequirements): boolean {
+    const r = reqs?.[attr];
+    if (r) return r.essential;
+    return REQUIRED_ATTRIBUTE_KEYS.has(attr);
+}
+
+/**
+ * Assurance level an attribute must carry. 'gov' means it can only come from an
+ * enclave-backed identity verification and must never be hand-typed; 'any'
+ * (the default) accepts a provider or manual value.
+ */
+function assuranceFor(attr: string, reqs?: AttributeRequirements): string {
+    return reqs?.[attr]?.assurance ?? 'any';
+}
+
 /** Subset of missing attributes that block sign-in (the rest are optional). */
-function getRequiredMissing(missing: string[]): string[] {
-    return missing.filter((k) => REQUIRED_ATTRIBUTE_KEYS.has(k));
+function getRequiredMissing(missing: string[], reqs?: AttributeRequirements): string[] {
+    return missing.filter((k) => isEssential(k, reqs));
 }
 
 type FlowStep =
@@ -239,6 +269,12 @@ interface QRPayload {
     brokerUrl: string;
     userAgent?: string;
     requestedAttributes?: string[];
+    /** Per-attribute requirement hints from the IdP, keyed by attribute key:
+     *  whether each is `essential` (gates sign-in) and the `assurance` it must
+     *  carry ('gov' = enclave-verified identity that cannot be self-asserted,
+     *  'any' = a provider/manual value is fine). Absent on IdPs that predate the
+     *  identity scope — callers then fall back to the email+name heuristic. */
+    attributeRequirements?: AttributeRequirements;
     appName?: string;
     privacyPolicyUrl?: string;
     clientIP?: string;
@@ -949,10 +985,13 @@ export default function ConnectScreen() {
         const pending = pendingRelay.current;
         if (!pending) return;
 
-        // Re-check: are any *required* attributes still missing? Optional ones
-        // (anything outside REQUIRED_ATTRIBUTE_KEYS) never block.
+        // Re-check: are any *essential* attributes still missing? Optional ones
+        // (per the IdP's attributeRequirements, or the email+name fallback) never block.
         const updatedProfile = useProfileStore.getState().profile;
-        const requiredMissing = getRequiredMissing(getMissingAttributes(pending.payload, updatedProfile));
+        const requiredMissing = getRequiredMissing(
+            getMissingAttributes(pending.payload, updatedProfile),
+            pending.payload.attributeRequirements,
+        );
         if (requiredMissing.length > 0) {
             Alert.alert(
                 'Missing information',
@@ -1096,6 +1135,7 @@ export default function ConnectScreen() {
                         appName={qr.appName}
                         privacyPolicyUrl={qr.privacyPolicyUrl}
                         missingAttributes={missingAttrs}
+                        attributeRequirements={qr.attributeRequirements}
                         attestation={attestation}
                         onComplete={handleAttributesAcquired}
                         onCancel={handleReject}
@@ -1525,6 +1565,7 @@ function AttributeAcquisitionView({
     appName: appNameProp,
     privacyPolicyUrl,
     missingAttributes,
+    attributeRequirements,
     attestation,
     onComplete,
     onCancel,
@@ -1533,6 +1574,7 @@ function AttributeAcquisitionView({
     appName?: string;
     privacyPolicyUrl?: string;
     missingAttributes: string[];
+    attributeRequirements?: AttributeRequirements;
     attestation: AttestationResult | null;
     onComplete: () => void;
     onCancel: () => void;
@@ -1582,12 +1624,18 @@ function AttributeAcquisitionView({
         })();
     }, [profile]);
 
-    // Check if all missing attributes are now present in the profile
-    const stillMissing = missingAttributes.filter(
-        (attr) => !profile || !getProfileValue(profile, attr),
-    );
-    // Only required attributes (email, name) block Continue; the rest are optional.
-    const requiredMissing = getRequiredMissing(stillMissing);
+    // Check if all missing attributes are now present in the profile (a 'gov'
+    // requirement is only met by a gov-assured value, not a provider/manual one).
+    const stillMissing = missingAttributes.filter((attr) => {
+        if (!profile || !getProfileValue(profile, attr)) return true;
+        if (assuranceFor(attr, attributeRequirements) === 'gov') {
+            return getProfileAssurance(profile, attr) !== 'gov';
+        }
+        return false;
+    });
+    // Essential attributes (per the IdP's attributeRequirements, or the
+    // email+name fallback) block Continue; the rest are optional.
+    const requiredMissing = getRequiredMissing(stillMissing, attributeRequirements);
 
     const handleLinkProvider = async (providerKey: string) => {
         setLinkingProvider(providerKey);
@@ -1628,10 +1676,12 @@ function AttributeAcquisitionView({
     };
 
     const displayAppName = appNameProp || appName(rpId);
-    // Save is enabled once the required fields are filled; optional fields
-    // (anything outside REQUIRED_ATTRIBUTE_KEYS) may be left blank.
+    // Save is enabled once the essential, typeable fields are filled. Optional
+    // fields may be left blank; gov-assurance fields are never hand-typed (they
+    // come from ID verification) so they don't gate the manual Save either.
     const manualRequiredFilled = missingAttributes
-        .filter((attr) => REQUIRED_ATTRIBUTE_KEYS.has(attr))
+        .filter((attr) => isEssential(attr, attributeRequirements)
+            && assuranceFor(attr, attributeRequirements) !== 'gov')
         .every((attr) => manualValues[attr]?.trim());
 
     const handleContinue = () => {
@@ -1699,16 +1749,18 @@ function AttributeAcquisitionView({
                     <RNView style={acqStyles.attributeList}>
                         {missingAttributes.map((attr) => {
                             const isFilled = !stillMissing.includes(attr);
-                            const isOptional = !REQUIRED_ATTRIBUTE_KEYS.has(attr);
+                            const govVerified = assuranceFor(attr, attributeRequirements) === 'gov';
+                            const isOptional = !isEssential(attr, attributeRequirements);
+                            const suffix = govVerified ? ' (verified ID)' : isOptional ? ' (optional)' : '';
                             return (
                                 <RNView key={attr} style={acqStyles.attributeRow}>
                                     <Ionicons
-                                        name={isFilled ? 'checkmark-circle' : 'ellipse-outline'}
+                                        name={isFilled ? 'checkmark-circle' : govVerified ? 'shield-checkmark-outline' : 'ellipse-outline'}
                                         size={20}
-                                        color={isFilled ? '#34C759' : '#94A3B8'}
+                                        color={isFilled ? '#34C759' : govVerified ? '#F59E0B' : '#94A3B8'}
                                     />
                                     <Text style={[acqStyles.attributeLabel, isFilled && acqStyles.attributeFilled]}>
-                                        {attributeLabel(attr)}{isOptional ? ' (optional)' : ''}
+                                        {attributeLabel(attr)}{suffix}
                                     </Text>
                                     {isFilled && profile && (
                                         <Text style={acqStyles.attributeValue} numberOfLines={1}>
@@ -1776,6 +1828,24 @@ function AttributeAcquisitionView({
                             {missingAttributes.map((attr) => {
                                 if (!stillMissing.includes(attr)) return null;
                                 const label = attributeLabel(attr);
+                                // Gov-assurance attributes (birthdate, nationality,
+                                // age_over_*) are produced only by an enclave-backed
+                                // identity verification — never hand-typed. The NFC +
+                                // biometric capture flow (Phase 2) fills these; until it
+                                // ships, surface the requirement instead of a text box.
+                                if (assuranceFor(attr, attributeRequirements) === 'gov') {
+                                    return (
+                                        <RNView key={attr} style={acqStyles.inputContainer}>
+                                            <Text style={acqStyles.inputLabel}>{label}</Text>
+                                            <RNView style={acqStyles.privacyNotice}>
+                                                <Ionicons name="shield-checkmark-outline" size={16} color="#F59E0B" />
+                                                <Text style={acqStyles.privacyNoticeText}>
+                                                    Filled by verifying your ID document — not typed.
+                                                </Text>
+                                            </RNView>
+                                        </RNView>
+                                    );
+                                }
                                 // locale must be a standard BCP-47 tag — offer a
                                 // constrained picker instead of free text.
                                 if (attr === 'locale') {

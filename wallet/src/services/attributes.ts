@@ -116,6 +116,27 @@ export function getProfileValue(profile: UserProfile, key: string): string | und
 }
 
 /**
+ * Highest assurance recorded for a canonical attribute, or undefined if the
+ * attribute is not present. Enforces the assurance model: a 'gov' requirement
+ * is satisfied only by an enclave-verified (document) value, never a
+ * self-asserted ('manual') or provider one. Top-level profile fields
+ * (email/name/locale/picture) are never gov-assured.
+ */
+export function getProfileAssurance(
+    profile: UserProfile,
+    key: string,
+): 'none' | 'provider' | 'gov' | undefined {
+    const attr = profile.attributes?.find((a) => a.key === key);
+    if (!attr) return getProfileValue(profile, key) ? 'none' : undefined;
+    const rank = { none: 0, provider: 1, gov: 2 } as const;
+    let best: 'none' | 'provider' | 'gov' = attr.source === 'document' ? 'gov' : 'none';
+    for (const v of attr.verifications ?? []) {
+        if (v.assurance && rank[v.assurance] > rank[best]) best = v.assurance;
+    }
+    return best;
+}
+
+/**
  * Write a canonical attribute to the profile store using the appropriate
  * method (top-level field update or attribute bag).
  */

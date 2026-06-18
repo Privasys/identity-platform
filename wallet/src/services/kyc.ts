@@ -137,7 +137,20 @@ async function postToVerifier<T>(path: string, body: unknown): Promise<T> {
     const url = new URL(`https://${VERIFIER_ORIGIN}`);
     const host = url.hostname;
     const port = parseInt(url.port || '443', 10);
-    const res = await NativeRaTls.post(host, port, path, JSON.stringify(body));
+    let res: { status: number; body: string };
+    try {
+        res = await NativeRaTls.post(host, port, path, JSON.stringify(body));
+    } catch (e: any) {
+        // A frozen (unconfigured) verifier answers a large body (e.g. the selfie)
+        // with a 503 but closes before draining the request, so the client sees a
+        // broken pipe / connection reset rather than the 503. Surface the same
+        // actionable message instead of a raw socket error.
+        const msg = String(e?.message ?? e);
+        if (/broken pipe|connection reset|connection closed|os error 32|reset by peer/i.test(msg)) {
+            throw new Error('The identity verifier is unavailable or awaiting configuration (trust anchors). Try again shortly.');
+        }
+        throw e;
+    }
     if (res.status === 503) {
         throw new Error('The identity verifier is not yet configured (trust anchors pending). Try again shortly.');
     }

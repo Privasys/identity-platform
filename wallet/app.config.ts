@@ -110,6 +110,13 @@ export default (context: ConfigContext): ExpoConfig => {
                 // chip-read implementation (it needs an Apple App ID capability).
                 NFCReaderUsageDescription:
                     'Privasys reads your ID document chip to verify your identity. The data stays on your device.',
+                // REQUIRED for reading the passport/ID (eMRTD) chip: iOS only lets
+                // the app SELECT these ISO-7816 application IDs. Without this the
+                // chip is never detected even with a correct BAC key.
+                'com.apple.developer.nfc.readersession.iso7816.select-identifiers': [
+                    'A0000002471001', // eMRTD LDS1 (ICAO 9303 passport application)
+                    'A0000002472001', // eMRTD LDS2
+                ],
                 // Google OAuth requires the reversed client ID as a registered URL scheme
                 // so iOS can route the redirect back to the app after authentication.
                 CFBundleURLTypes: [

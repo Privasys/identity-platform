@@ -196,7 +196,10 @@ func main() {
 		ClientID:     cfg.LinkedInClientID,
 		ClientSecret: cfg.LinkedInClientSecret,
 		Scopes:       []string{"openid", "profile", "email"},
-		PKCE:         true,
+		// LinkedIn is a confidential client and does not support PKCE; it
+		// authenticates with the client secret only. Sending a code_verifier
+		// makes LinkedIn reject the token exchange as invalid_client.
+		PKCE:         false,
 	})
 
 	socialHandler := social.NewHandler(socialProviders, codeStore, sessionStore, cfg.IssuerURL)

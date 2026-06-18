@@ -36,9 +36,11 @@ type Provider struct {
 	ClientID     string
 	ClientSecret string
 	Scopes       []string
-	// PKCE indicates the provider's authorization server supports PKCE (S256).
-	// We require it on every upstream authorization-code leg; a provider with
-	// PKCE=false is refused rather than downgraded to a no-PKCE exchange.
+	// PKCE indicates the provider's authorization server supports PKCE (S256),
+	// which we then use on the upstream authorization-code leg. Confidential
+	// providers that don't support it (e.g. LinkedIn) set PKCE=false and
+	// authenticate with the client secret only; sending a code_verifier to such
+	// a provider is rejected as invalid_client.
 	PKCE bool
 }
 
@@ -283,23 +285,11 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// PKCE is mandatory on every upstream authorization-code leg. Refuse a
-	// provider that does not support it rather than downgrading.
-	if !prov.PKCE {
-		http.Error(w, "provider does not support PKCE", http.StatusBadRequest)
-		return
-	}
-
 	// Verify session exists.
 	if _, ok := h.sessions.Get(sessionID); !ok {
 		http.Error(w, "session not found or expired", http.StatusBadRequest)
 		return
 	}
-
-	// Generate the PKCE verifier/challenge for this flow and bind the verifier
-	// to the CSRF state so the callback can complete the token exchange.
-	verifier, challenge := generatePKCE()
-	state := h.states.create(sessionID, providerName, verifier)
 
 	// Build authorization URL.
 	authURL, _ := url.Parse(prov.AuthURL)
@@ -308,9 +298,19 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 	q.Set("redirect_uri", h.issuerURL+"/auth/social/callback")
 	q.Set("response_type", "code")
 	q.Set("scope", strings.Join(prov.Scopes, " "))
+
+	// PKCE on the upstream leg when the provider supports it. Confidential
+	// providers that don't (e.g. LinkedIn) authenticate with the client secret
+	// only — sending a code_verifier there is rejected as invalid_client.
+	var verifier string
+	if prov.PKCE {
+		var challenge string
+		verifier, challenge = generatePKCE()
+		q.Set("code_challenge", challenge)
+		q.Set("code_challenge_method", "S256")
+	}
+	state := h.states.create(sessionID, providerName, verifier)
 	q.Set("state", state)
-	q.Set("code_challenge", challenge)
-	q.Set("code_challenge_method", "S256")
 	authURL.RawQuery = q.Encode()
 
 	http.Redirect(w, r, authURL.String(), http.StatusFound)
@@ -516,24 +516,23 @@ func (h *Handler) HandleWalletLink(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown provider", http.StatusBadRequest)
 		return
 	}
-	if !prov.PKCE {
-		http.Error(w, "provider does not support PKCE", http.StatusBadRequest)
-		return
-	}
-
-	// Upstream PKCE verifier/challenge, bound to the CSRF state.
-	verifier, upstreamChallenge := generatePKCE()
-	state := h.states.createWallet(providerName, verifier, redirectURI, nonce, challenge)
-
 	authURL, _ := url.Parse(prov.AuthURL)
 	uq := authURL.Query()
 	uq.Set("client_id", prov.ClientID)
 	uq.Set("redirect_uri", h.issuerURL+"/auth/social/callback")
 	uq.Set("response_type", "code")
 	uq.Set("scope", strings.Join(prov.Scopes, " "))
+
+	// Upstream PKCE only when the provider supports it (see HandleRedirect).
+	var verifier string
+	if prov.PKCE {
+		var upstreamChallenge string
+		verifier, upstreamChallenge = generatePKCE()
+		uq.Set("code_challenge", upstreamChallenge)
+		uq.Set("code_challenge_method", "S256")
+	}
+	state := h.states.createWallet(providerName, verifier, redirectURI, nonce, challenge)
 	uq.Set("state", state)
-	uq.Set("code_challenge", upstreamChallenge)
-	uq.Set("code_challenge_method", "S256")
 	authURL.RawQuery = uq.Encode()
 
 	http.Redirect(w, r, authURL.String(), http.StatusFound)
@@ -643,7 +642,11 @@ func (h *Handler) exchangeCode(prov *Provider, code, verifier string) (string, e
 		"code":          {code},
 		"redirect_uri":  {h.issuerURL + "/auth/social/callback"},
 		"grant_type":    {"authorization_code"},
-		"code_verifier": {verifier},
+	}
+	// Only PKCE providers get a code_verifier; LinkedIn (confidential, no PKCE)
+	// rejects the request as invalid_client when one is present.
+	if verifier != "" {
+		data.Set("code_verifier", verifier)
 	}
 
 	req, _ := http.NewRequest("POST", prov.TokenURL, strings.NewReader(data.Encode()))

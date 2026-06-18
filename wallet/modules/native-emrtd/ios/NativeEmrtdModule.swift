@@ -49,8 +49,19 @@ public class NativeEmrtdModule: Module {
                     promise.resolve(NativeEmrtdModule.toJson(passport))
                 } catch {
                     let reason = NativeEmrtdModule.escape(error.localizedDescription)
-                    let keyDbg = NativeEmrtdModule.escape(mrzKey)
-                    promise.resolve("{\"error\":\"\(reason)\",\"diag\":\"\(NativeEmrtdModule.escape(diag))\",\"key\":\"\(keyDbg)\"}")
+                    // The exact enum case (e.g. ResponseError carries SW1/SW2 APDU
+                    // status words) plus the NSError domain/code, so the precise
+                    // failure stage is visible — "InvalidMRZKey" alone is ambiguous.
+                    // No document number is logged (the key fingerprint in `diag`
+                    // is enough to tell a rejected key from a chip/comms failure).
+                    let ns = error as NSError
+                    let detail = NativeEmrtdModule.escape(
+                        "\(String(describing: error)) | \(ns.domain)#\(ns.code)"
+                    )
+                    promise.resolve(
+                        "{\"error\":\"\(reason)\",\"diag\":\"\(NativeEmrtdModule.escape(diag))\","
+                        + "\"detail\":\"\(detail)\"}"
+                    )
                 }
             }
         }

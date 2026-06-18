@@ -50,15 +50,13 @@ export async function isSupported(): Promise<EmrtdSupport> {
 export async function readDocument(key: MrzKey): Promise<EmrtdReadResult> {
     if (!Native) throw new Error('eMRTD reader is unavailable on this platform/build');
     const json = await Native.readDocument(key.documentNumber, key.dateOfBirth, key.dateOfExpiry);
-    const result = JSON.parse(json) as EmrtdReadResult & { error?: string; diag?: string; key?: string };
+    const result = JSON.parse(json) as EmrtdReadResult & { error?: string; diag?: string; detail?: string };
     if (result.error) {
-        // Keep the key fingerprint on the error so a rejected MRZ key can be told
-        // apart from a chip/comms failure when inspecting the in-app logs.
+        // Key fingerprint (field lengths + check digits, no document number) so a
+        // rejected key can be told apart from a chip/comms failure in the logs.
         if (result.diag) console.warn('[eMRTD] read failed:', result.error, '·', result.diag);
-        // The full derived BAC key, to compare char-by-char against the passport's
-        // printed MRZ when a key keeps getting rejected. (Debug; contains the
-        // document number — remove once the InvalidMRZKey cause is found.)
-        if (result.key) console.warn('[eMRTD] derived key:', result.key);
+        // The exact failure stage (enum case + any APDU status words).
+        if (result.detail) console.warn('[eMRTD] error detail:', result.detail);
         throw new Error(result.diag ? `${result.error} [${result.diag}]` : result.error);
     }
     return result;

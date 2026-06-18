@@ -64,6 +64,11 @@ export default function KycCaptureScreen() {
         }
         scanningRef.current = true;
         let cancelled = false;
+        // Require the same MRZ from two separate frames before accepting it. A
+        // single OCR misread (e.g. the OCR-B 'I' read as '1') rarely repeats
+        // identically, so consensus filters out transient errors that would
+        // otherwise pass the check digits as a self-consistent but wrong key.
+        let previous: string | null = null;
         const loop = async () => {
             while (scanningRef.current && !cancelled) {
                 try {
@@ -76,17 +81,21 @@ export default function KycCaptureScreen() {
                     if (photo?.base64) {
                         const mrz = await Emrtd.scanMrz(photo.base64);
                         if (cancelled) return;
-                        scanningRef.current = false;
-                        setDocNumber(mrz.documentNumber);
-                        setDob(mrz.dateOfBirth);
-                        setExpiry(mrz.dateOfExpiry);
-                        setStep('mrz');
-                        return;
+                        const fingerprint = `${mrz.documentNumber}|${mrz.dateOfBirth}|${mrz.dateOfExpiry}`;
+                        if (fingerprint === previous) {
+                            scanningRef.current = false;
+                            setDocNumber(mrz.documentNumber);
+                            setDob(mrz.dateOfBirth);
+                            setExpiry(mrz.dateOfExpiry);
+                            setStep('mrz');
+                            return;
+                        }
+                        previous = fingerprint;
                     }
                 } catch {
                     // No valid MRZ in this frame (or camera not ready) — keep trying.
                 }
-                await new Promise((r) => setTimeout(r, 500));
+                await new Promise((r) => setTimeout(r, 350));
             }
         };
         const t = setTimeout(loop, 800); // let the camera mount first
@@ -123,7 +132,21 @@ export default function KycCaptureScreen() {
             setStep('selfie');
         } catch (e: any) {
             console.warn('[KYC] chip read failed:', e?.message);
-            Alert.alert('Could not read the document', e.message);
+            // A rejected key (vs a chip/comms drop) is almost always a single
+            // mistyped/misread character in the document number, so point the user
+            // straight at the usual OCR-B look-alikes and let them fix it.
+            const rejectedKey = typeof e?.message === 'string' && e.message.includes('InvalidMRZKey');
+            if (rejectedKey) {
+                Alert.alert(
+                    "The code didn't match the chip",
+                    'Check the document number for look-alike characters: I vs 1, O vs 0, S vs 5, B vs 8, Z vs 2. Tap Edit details to correct it, then try again.',
+                );
+            } else {
+                Alert.alert(
+                    'Could not read the chip',
+                    `${e.message}\n\nHold your ${docLabel} flat against the top of your phone and keep it still.`,
+                );
+            }
         } finally {
             setBusy(false);
         }

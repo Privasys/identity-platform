@@ -16,7 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View } from '@/components/Themed';
@@ -114,13 +114,21 @@ export default function KycCaptureScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <Pressable style={[styles.close, { top: insets.top + 12 }]} onPress={close} hitSlop={12}>
                 <Ionicons name="close" size={26} color="#8E8E93" />
             </Pressable>
 
             {step === 'mrz' && (
-                <View style={styles.pad}>
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.padContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
                     <Ionicons name="id-card-outline" size={40} color="#007AFF" />
                     <Text style={styles.title}>Verify your ID</Text>
                     <Text style={styles.body}>
@@ -180,7 +188,7 @@ export default function KycCaptureScreen() {
                             <Text style={styles.secondaryText}>Use test identity (dev)</Text>
                         </Pressable>
                     )}
-                </View>
+                </ScrollView>
             )}
 
             {step === 'selfie' && (
@@ -216,21 +224,23 @@ export default function KycCaptureScreen() {
                     </Pressable>
                 </View>
             )}
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
+    container: { flex: 1, backgroundColor: '#F8FAFB' },
     flex: { flex: 1 },
     pad: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 },
+    padContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14, paddingTop: 72 },
     close: { position: 'absolute', right: 16, zIndex: 10, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-    title: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
-    body: { fontSize: 15, lineHeight: 22, textAlign: 'center', opacity: 0.8 },
+    title: { fontSize: 22, fontWeight: '700', textAlign: 'center', color: '#0F172A' },
+    body: { fontSize: 15, lineHeight: 22, textAlign: 'center', color: '#475569' },
     note: { fontSize: 13, color: '#F59E0B', textAlign: 'center' },
     input: {
-        width: '100%', borderWidth: 1, borderColor: '#3A3A3C', borderRadius: 10,
-        paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: '#FFFFFF',
+        width: '100%', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14, paddingVertical: 14, fontSize: 16, color: '#0F172A',
     },
     primary: {
         flexDirection: 'row', backgroundColor: '#007AFF', borderRadius: 10, paddingVertical: 14,

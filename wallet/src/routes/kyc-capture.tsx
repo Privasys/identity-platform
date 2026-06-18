@@ -23,7 +23,8 @@ import { Text, View } from '@/components/Themed';
 import { verifyIdentity } from '@/services/kyc';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
-type Step = 'mrz' | 'mrz-camera' | 'selfie' | 'verifying' | 'done';
+type Step = 'doctype' | 'mrz' | 'mrz-camera' | 'read' | 'selfie' | 'verifying' | 'done';
+type DocType = 'passport' | 'id-card';
 
 // Dev-only stub document fields, used when the device can't read a chip yet so
 // the verify_identity → auto-fill round-trip is exercisable. Never used in prod.
@@ -37,7 +38,8 @@ const DEV_STUB_FIELDS: Record<string, string> = {
 export default function KycCaptureScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const [step, setStep] = useState<Step>('mrz');
+    const [step, setStep] = useState<Step>('doctype');
+    const [docType, setDocType] = useState<DocType>('passport');
     const [support, setSupport] = useState<Emrtd.EmrtdSupport | null>(null);
     const [docNumber, setDocNumber] = useState('');
     const [dob, setDob] = useState('');
@@ -100,9 +102,17 @@ export default function KycCaptureScreen() {
         else router.replace('/(tabs)');
     };
 
-    // ── Step 1: read the document (NFC chip, or dev stub) ───────────────────
+    const docLabel = docType === 'passport' ? 'passport' : 'ID card';
+    const mrzReady = docNumber.trim().length > 0 && dob.trim().length === 6 && expiry.trim().length === 6;
+
+    // ── Step 2: read the document chip over NFC (or dev stub) ────────────────
     const handleScan = async () => {
         setBusy(true);
+        // Log the access-field shapes (not values) so a rejected key vs a chip
+        // failure is diagnosable from the in-app logs.
+        console.log(
+            `[KYC] reading ${docType} chip — doc=${docNumber.trim().length}c dob=${dob.trim().length}c exp=${expiry.trim().length}c`,
+        );
         try {
             const read = await Emrtd.readDocument({
                 documentNumber: docNumber.trim(),
@@ -112,6 +122,7 @@ export default function KycCaptureScreen() {
             setFields(read.fields);
             setStep('selfie');
         } catch (e: any) {
+            console.warn('[KYC] chip read failed:', e?.message);
             Alert.alert('Could not read the document', e.message);
         } finally {
             setBusy(false);
@@ -179,6 +190,48 @@ export default function KycCaptureScreen() {
                 <Ionicons name="close" size={26} color="#8E8E93" />
             </Pressable>
 
+            {step === 'doctype' && (
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.padContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Ionicons name="id-card-outline" size={40} color="#007AFF" />
+                    <Text style={styles.title}>What are you verifying?</Text>
+                    <Text style={styles.body}>
+                        Pick the document with an NFC chip. We read it in a secure enclave, on device.
+                    </Text>
+
+                    <Pressable
+                        style={styles.docOption}
+                        onPress={() => { setDocType('passport'); setStep('mrz'); }}
+                    >
+                        <Ionicons name="airplane-outline" size={22} color="#007AFF" />
+                        <View style={styles.docOptionBody}>
+                            <Text style={styles.docOptionTitle}>Passport</Text>
+                            <Text style={styles.docOptionSub}>Any country&apos;s biometric passport</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                    </Pressable>
+
+                    <Pressable
+                        style={styles.docOption}
+                        onPress={() => { setDocType('id-card'); setStep('mrz'); }}
+                    >
+                        <Ionicons name="card-outline" size={22} color="#007AFF" />
+                        <View style={styles.docOptionBody}>
+                            <Text style={styles.docOptionTitle}>National ID card</Text>
+                            <Text style={styles.docOptionSub}>Biometric (eMRTD) ID cards</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                    </Pressable>
+
+                    <Text style={styles.note}>
+                        Driving licences don&apos;t carry an NFC identity chip and can&apos;t be verified this way.
+                    </Text>
+                </ScrollView>
+            )}
+
             {step === 'mrz' && (
                 <ScrollView
                     style={styles.flex}
@@ -186,19 +239,17 @@ export default function KycCaptureScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <Ionicons name="id-card-outline" size={40} color="#007AFF" />
-                    <Text style={styles.title}>Verify your ID</Text>
+                    <Ionicons name="scan-outline" size={40} color="#007AFF" />
+                    <Text style={styles.title}>Step 1 · Read the code</Text>
                     <Text style={styles.body}>
-                        Scan the machine-readable zone (the two lines of {'<<<'} at the bottom of the
-                        photo page) to fill these automatically, or enter them by hand. The chip
-                        stays locked until your phone proves these values, then you hold the document
-                        to the top of your phone to read it. Verified in a secure enclave, on device.
+                        Scan the machine-readable zone (the rows of {'<<<'} on your {docLabel}) to fill
+                        these automatically, or enter them by hand. This unlocks the chip in the next step.
                     </Text>
 
                     {support?.supported && (
                         <Pressable style={styles.primary} onPress={openMrzCamera}>
                             <Ionicons name="camera-outline" size={18} color="#FFFFFF" />
-                            <Text style={styles.primaryText}>Scan passport to auto-fill</Text>
+                            <Text style={styles.primaryText}>Scan {docLabel} to auto-fill</Text>
                         </Pressable>
                     )}
                     <Text style={styles.orText}>or enter the details by hand</Text>
@@ -237,15 +288,11 @@ export default function KycCaptureScreen() {
                     )}
 
                     <Pressable
-                        style={[styles.primary, (busy || !support?.supported) && styles.disabled]}
-                        onPress={handleScan}
-                        disabled={busy || !support?.supported}
+                        style={[styles.primary, (!mrzReady || !support?.supported) && styles.disabled]}
+                        onPress={() => setStep('read')}
+                        disabled={!mrzReady || !support?.supported}
                     >
-                        {busy ? (
-                            <ActivityIndicator color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.primaryText}>Scan document chip</Text>
-                        )}
+                        <Text style={styles.primaryText}>Continue</Text>
                     </Pressable>
 
                     {__DEV__ && (
@@ -254,6 +301,38 @@ export default function KycCaptureScreen() {
                         </Pressable>
                     )}
                 </ScrollView>
+            )}
+
+            {step === 'read' && (
+                <View style={styles.pad}>
+                    <Ionicons name="phone-portrait-outline" size={40} color="#007AFF" />
+                    <Text style={styles.title}>Step 2 · Scan the chip</Text>
+                    <Text style={styles.body}>
+                        Hold your {docLabel} flat against the top of your phone and keep it still. The chip
+                        unlocks with the code from step 1.
+                    </Text>
+
+                    <View style={styles.summaryCard}>
+                        <SummaryRow label="Document" value={docNumber.trim()} />
+                        <SummaryRow label="Date of birth" value={dob.trim()} />
+                        <SummaryRow label="Expiry" value={expiry.trim()} />
+                    </View>
+
+                    <Pressable
+                        style={[styles.primary, busy && styles.disabled]}
+                        onPress={handleScan}
+                        disabled={busy}
+                    >
+                        {busy ? (
+                            <ActivityIndicator color="#FFFFFF" />
+                        ) : (
+                            <Text style={styles.primaryText}>Scan document chip</Text>
+                        )}
+                    </Pressable>
+                    <Pressable style={styles.secondary} onPress={() => setStep('mrz')} disabled={busy}>
+                        <Text style={styles.secondaryText}>Edit details</Text>
+                    </Pressable>
+                </View>
             )}
 
             {step === 'mrz-camera' && (
@@ -310,6 +389,15 @@ export default function KycCaptureScreen() {
     );
 }
 
+function SummaryRow({ label, value }: { label: string; value: string }) {
+    return (
+        <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>{label}</Text>
+            <Text style={styles.summaryValue}>{value || '—'}</Text>
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8FAFB' },
     flex: { flex: 1 },
@@ -337,4 +425,22 @@ const styles = StyleSheet.create({
     selfieOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, gap: 12, backgroundColor: 'rgba(0,0,0,0.55)' },
     selfieText: { color: '#FFFFFF', fontSize: 15, textAlign: 'center' },
     scanningRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+    docOption: {
+        flexDirection: 'row', alignItems: 'center', gap: 14, alignSelf: 'stretch',
+        backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0',
+        padding: 16,
+    },
+    docOptionBody: { flex: 1 },
+    docOptionTitle: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
+    docOptionSub: { fontSize: 13, color: '#64748B', marginTop: 2 },
+    summaryCard: {
+        alignSelf: 'stretch', backgroundColor: '#FFFFFF', borderRadius: 12,
+        borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 16, paddingVertical: 4,
+    },
+    summaryRow: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F1F5F9',
+    },
+    summaryLabel: { fontSize: 14, color: '#64748B' },
+    summaryValue: { fontSize: 15, fontWeight: '600', color: '#0F172A', letterSpacing: 1 },
 });

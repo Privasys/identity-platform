@@ -31,7 +31,7 @@ import { useTrustedAppsStore } from '@/stores/trusted-apps';
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { profile, updateProfile, clearProfile } =
+    const { profile, clearProfile } =
         useProfileStore();
     const { credentials, removeCredential } = useAuthStore();
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
@@ -121,6 +121,9 @@ export default function ProfileScreen() {
                             <Image
                                 source={{ uri: profile.avatarUri }}
                                 style={styles.avatarImage}
+                                onError={(e) =>
+                                    console.warn('[avatar] failed to load', profile.avatarUri, e.nativeEvent?.error)
+                                }
                             />
                         ) : profile.displayName ? (
                             <RNView style={styles.avatar}>

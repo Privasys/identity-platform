@@ -26,18 +26,30 @@ public class NativeEmrtdModule: Module {
 
         AsyncFunction("readDocument") {
             (documentNumber: String, dateOfBirth: String, dateOfExpiry: String, promise: Promise) in
+            // Normalise: BAC fields are upper-case, no spaces; dates must be the
+            // 6-digit YYMMDD as printed in the MRZ (not the human-readable date).
+            let docNo = documentNumber.uppercased().trimmingCharacters(in: .whitespaces)
+            let dob = dateOfBirth.trimmingCharacters(in: .whitespaces)
+            let exp = dateOfExpiry.trimmingCharacters(in: .whitespaces)
             let mrzKey = NativeEmrtdModule.computeMrzKey(
-                documentNumber: documentNumber,
-                dateOfBirth: dateOfBirth,
-                dateOfExpiry: dateOfExpiry
+                documentNumber: docNo,
+                dateOfBirth: dob,
+                dateOfExpiry: exp
             )
+            // Diagnostic fingerprint (no full document number) so a rejected key
+            // can be told apart from a chip/comms failure in the app logs.
+            let padded = docNo.padding(toLength: 9, withPad: "<", startingAt: 0)
+            let diag = "doc=\(docNo.count)c+cd\(NativeEmrtdModule.checkDigit(padded)) "
+                + "dob=\(dob.count)c+cd\(NativeEmrtdModule.checkDigit(dob)) "
+                + "exp=\(exp.count)c+cd\(NativeEmrtdModule.checkDigit(exp))"
             Task { [weak self] in
                 guard let self = self else { return }
                 do {
                     let passport = try await self.passportReader.readPassport(mrzKey: mrzKey)
                     promise.resolve(NativeEmrtdModule.toJson(passport))
                 } catch {
-                    promise.resolve("{\"error\":\"\(NativeEmrtdModule.escape(error.localizedDescription))\"}")
+                    let reason = NativeEmrtdModule.escape(error.localizedDescription)
+                    promise.resolve("{\"error\":\"\(reason)\",\"diag\":\"\(NativeEmrtdModule.escape(diag))\"}")
                 }
             }
         }

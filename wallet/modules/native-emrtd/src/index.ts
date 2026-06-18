@@ -50,8 +50,13 @@ export async function isSupported(): Promise<EmrtdSupport> {
 export async function readDocument(key: MrzKey): Promise<EmrtdReadResult> {
     if (!Native) throw new Error('eMRTD reader is unavailable on this platform/build');
     const json = await Native.readDocument(key.documentNumber, key.dateOfBirth, key.dateOfExpiry);
-    const result = JSON.parse(json) as EmrtdReadResult & { error?: string };
-    if (result.error) throw new Error(result.error);
+    const result = JSON.parse(json) as EmrtdReadResult & { error?: string; diag?: string };
+    if (result.error) {
+        // Keep the key fingerprint on the error so a rejected MRZ key can be told
+        // apart from a chip/comms failure when inspecting the in-app logs.
+        if (result.diag) console.warn('[eMRTD] read failed:', result.error, '·', result.diag);
+        throw new Error(result.diag ? `${result.error} [${result.diag}]` : result.error);
+    }
     return result;
 }
 

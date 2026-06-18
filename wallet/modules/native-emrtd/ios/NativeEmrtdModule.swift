@@ -4,6 +4,8 @@
 import ExpoModulesCore
 import CoreNFC
 import NFCPassportReader
+import Vision
+import UIKit
 
 /// eMRTD (ICAO 9303) NFC reader, backed by AndyQ/NFCPassportReader (MIT).
 ///
@@ -39,6 +41,58 @@ public class NativeEmrtdModule: Module {
                 }
             }
         }
+
+        AsyncFunction("scanMrz") { (imageBase64: String, promise: Promise) in
+            guard let data = Data(base64Encoded: imageBase64),
+                  let image = UIImage(data: data),
+                  let cgImage = image.cgImage else {
+                promise.resolve("{\"error\":\"could not decode the photo\"}")
+                return
+            }
+            let request = VNRecognizeTextRequest { (req, err) in
+                if let err = err {
+                    promise.resolve("{\"error\":\"\(NativeEmrtdModule.escape(err.localizedDescription))\"}")
+                    return
+                }
+                let observations = (req.results as? [VNRecognizedTextObservation]) ?? []
+                let lines = observations.compactMap { $0.topCandidates(1).first?.string }
+                if let json = NativeEmrtdModule.parseTd3(lines) {
+                    promise.resolve(json)
+                } else {
+                    promise.resolve("{\"error\":\"Could not find the MRZ. Frame the two lines of < at the bottom of the photo page.\"}")
+                }
+            }
+            request.recognitionLevel = .accurate
+            request.usesLanguageCorrection = false
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            DispatchQueue.global(qos: .userInitiated).async {
+                do { try handler.perform([request]) }
+                catch { promise.resolve("{\"error\":\"\(NativeEmrtdModule.escape(error.localizedDescription))\"}") }
+            }
+        }
+    }
+
+    /// Parse a TD3 MRZ (two 44-char lines) from OCR'd text lines and return the
+    /// chip-access fields. Line 2 carries documentNumber(0..9), DOB(13..19) and
+    /// expiry(21..27); we pick the candidate line whose DOB/expiry slots are
+    /// numeric, which reliably identifies the data line despite OCR noise.
+    private static func parseTd3(_ rawLines: [String]) -> String? {
+        let charset = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<")
+        let candidates = rawLines
+            .map { $0.uppercased().replacingOccurrences(of: " ", with: "") }
+            .filter { $0.count >= 28 && $0.allSatisfy { charset.contains($0) } }
+
+        for line in candidates.reversed() {
+            let chars = Array(line)
+            if chars.count < 28 { continue }
+            let docNo = String(chars[0..<9]).replacingOccurrences(of: "<", with: "")
+            let dob = String(chars[13..<19])
+            let exp = String(chars[21..<27])
+            if !docNo.isEmpty && dob.allSatisfy({ $0.isNumber }) && exp.allSatisfy({ $0.isNumber }) {
+                return "{\"documentNumber\":\"\(escape(docNo))\",\"dateOfBirth\":\"\(dob)\",\"dateOfExpiry\":\"\(exp)\"}"
+            }
+        }
+        return nil
     }
 
     private static func toJson(_ p: NFCPassportModel) -> String {

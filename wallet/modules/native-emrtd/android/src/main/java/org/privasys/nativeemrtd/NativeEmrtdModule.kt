@@ -51,6 +51,12 @@ class NativeEmrtdModule : Module() {
             "{\"supported\":$supported,\"reason\":\"$reason\"}"
         }
 
+        AsyncFunction("scanMrz") { _: String ->
+            // TODO(android): ML Kit text recognition + TD3 parse. Until then the
+            // wallet falls back to manual MRZ entry on Android.
+            "{\"error\":\"MRZ scanning is not yet available on Android\"}"
+        }
+
         AsyncFunction("readDocument") { documentNumber: String, dateOfBirth: String, dateOfExpiry: String, promise: Promise ->
             val activity = appContext.currentActivity
             val adapter = activity?.let { NfcAdapter.getDefaultAdapter(it) }

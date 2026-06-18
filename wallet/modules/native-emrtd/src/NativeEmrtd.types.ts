@@ -35,3 +35,11 @@ export interface EmrtdSupport {
     /** Human-readable reason when not supported. */
     reason?: string;
 }
+
+/** MRZ fields OCR'd from a photo of the document's machine-readable zone,
+ *  ready to use as the chip access key (see MrzKey). */
+export interface MrzScan {
+    documentNumber: string;
+    dateOfBirth: string;
+    dateOfExpiry: string;
+}

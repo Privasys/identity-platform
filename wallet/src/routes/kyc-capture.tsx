@@ -23,7 +23,7 @@ import { Text, View } from '@/components/Themed';
 import { verifyIdentity } from '@/services/kyc';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
-type Step = 'mrz' | 'selfie' | 'verifying' | 'done';
+type Step = 'mrz' | 'mrz-camera' | 'selfie' | 'verifying' | 'done';
 
 // Dev-only stub document fields, used when the device can't read a chip yet so
 // the verify_identity → auto-fill round-trip is exercisable. Never used in prod.
@@ -44,6 +44,7 @@ export default function KycCaptureScreen() {
     const [expiry, setExpiry] = useState('');
     const [fields, setFields] = useState<Record<string, string> | null>(null);
     const [busy, setBusy] = useState(false);
+    const [ocrBusy, setOcrBusy] = useState(false);
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
 
@@ -77,6 +78,35 @@ export default function KycCaptureScreen() {
     const handleUseDevStub = () => {
         setFields(DEV_STUB_FIELDS);
         setStep('selfie');
+    };
+
+    // ── MRZ OCR: photograph the photo page, auto-fill the access fields ─────
+    const openMrzCamera = async () => {
+        if (permission && !permission.granted) {
+            const res = await requestPermission();
+            if (!res.granted) {
+                Alert.alert('Camera needed', 'Allow camera access to scan your document.');
+                return;
+            }
+        }
+        setStep('mrz-camera');
+    };
+
+    const handleScanMrz = async () => {
+        setOcrBusy(true);
+        try {
+            const photo = await cameraRef.current?.takePictureAsync({ base64: true, quality: 0.5 });
+            if (!photo?.base64) throw new Error('No photo captured');
+            const mrz = await Emrtd.scanMrz(photo.base64);
+            setDocNumber(mrz.documentNumber);
+            setDob(mrz.dateOfBirth);
+            setExpiry(mrz.dateOfExpiry);
+            setStep('mrz');
+        } catch (e: any) {
+            Alert.alert('Could not read the MRZ', `${e.message}\n\nYou can also enter the details by hand.`);
+        } finally {
+            setOcrBusy(false);
+        }
     };
 
     // ── Step 2: capture a live selfie (for the enclave face match) ──────────
@@ -132,11 +162,19 @@ export default function KycCaptureScreen() {
                     <Ionicons name="id-card-outline" size={40} color="#007AFF" />
                     <Text style={styles.title}>Verify your ID</Text>
                     <Text style={styles.body}>
-                        Enter these from the machine-readable zone (the two lines of {'<<<'} at the
-                        bottom of the photo page). The chip stays locked until your phone proves it
-                        with these values, then you hold the document to the top of your phone to
-                        read it. Everything is verified in a secure enclave and stays on your device.
+                        Scan the machine-readable zone (the two lines of {'<<<'} at the bottom of the
+                        photo page) to fill these automatically, or enter them by hand. The chip
+                        stays locked until your phone proves these values, then you hold the document
+                        to the top of your phone to read it. Verified in a secure enclave, on device.
                     </Text>
+
+                    {support?.supported && (
+                        <Pressable style={styles.primary} onPress={openMrzCamera}>
+                            <Ionicons name="camera-outline" size={18} color="#FFFFFF" />
+                            <Text style={styles.primaryText}>Scan passport to auto-fill</Text>
+                        </Pressable>
+                    )}
+                    <Text style={styles.orText}>or enter the details by hand</Text>
 
                     <TextInput
                         style={styles.input}
@@ -191,6 +229,27 @@ export default function KycCaptureScreen() {
                 </ScrollView>
             )}
 
+            {step === 'mrz-camera' && (
+                <View style={styles.flex}>
+                    <CameraView ref={cameraRef} style={styles.camera} facing="back" autofocus="on" />
+                    <View style={styles.selfieOverlay}>
+                        <Text style={styles.selfieText}>
+                            Frame the two lines of {'<<<'} at the bottom of the passport photo page.
+                        </Text>
+                        <Pressable style={styles.primary} onPress={handleScanMrz} disabled={ocrBusy}>
+                            {ocrBusy ? (
+                                <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.primaryText}>Capture MRZ</Text>
+                            )}
+                        </Pressable>
+                        <Pressable style={styles.secondary} onPress={() => setStep('mrz')}>
+                            <Text style={[styles.secondaryText, { color: '#FFFFFF' }]}>Enter manually instead</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            )}
+
             {step === 'selfie' && (
                 <View style={styles.flex}>
                     <CameraView ref={cameraRef} style={styles.camera} facing="front" />
@@ -237,6 +296,7 @@ const styles = StyleSheet.create({
     title: { fontSize: 22, fontWeight: '700', textAlign: 'center', color: '#0F172A' },
     body: { fontSize: 15, lineHeight: 22, textAlign: 'center', color: '#475569' },
     note: { fontSize: 13, color: '#F59E0B', textAlign: 'center' },
+    orText: { fontSize: 13, color: '#94A3B8', textAlign: 'center' },
     input: {
         width: '100%', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10,
         backgroundColor: '#FFFFFF',

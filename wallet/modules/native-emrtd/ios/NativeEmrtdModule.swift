@@ -24,8 +24,8 @@ public class NativeEmrtdModule: Module {
 
         AsyncFunction("readDocument") {
             (documentNumber: String, dateOfBirth: String, dateOfExpiry: String, promise: Promise) in
-            let mrzKey = PassportUtils.getMRZKey(
-                passportNumber: documentNumber,
+            let mrzKey = NativeEmrtdModule.computeMrzKey(
+                documentNumber: documentNumber,
                 dateOfBirth: dateOfBirth,
                 dateOfExpiry: dateOfExpiry
             )
@@ -78,5 +78,35 @@ public class NativeEmrtdModule: Module {
         return s
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    /// Build the eMRTD BAC/PACE MRZ key: the 9-char document number (padded
+    /// with `<`) + its check digit, then DOB (YYMMDD) + check digit, then
+    /// expiry (YYMMDD) + check digit. NFCPassportReader's readPassport derives
+    /// the access key from this string.
+    private static func computeMrzKey(documentNumber: String, dateOfBirth: String, dateOfExpiry: String) -> String {
+        let docNo = documentNumber.uppercased().padding(toLength: 9, withPad: "<", startingAt: 0)
+        return docNo + checkDigit(docNo)
+            + dateOfBirth + checkDigit(dateOfBirth)
+            + dateOfExpiry + checkDigit(dateOfExpiry)
+    }
+
+    /// ICAO 9303 check digit: weighted (7,3,1) sum mod 10 over the field
+    /// (digits = value, A–Z = 10–35, `<` = 0).
+    private static func checkDigit(_ value: String) -> String {
+        let weights = [7, 3, 1]
+        var sum = 0
+        for (i, ch) in value.uppercased().enumerated() {
+            let v: Int
+            if ("0"..."9").contains(ch), let d = ch.wholeNumberValue {
+                v = d
+            } else if let a = ch.asciiValue, a >= 65, a <= 90 {
+                v = Int(a) - 65 + 10
+            } else {
+                v = 0 // '<' and any filler
+            }
+            sum += v * weights[i % 3]
+        }
+        return String(sum % 10)
     }
 }

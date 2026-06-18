@@ -194,6 +194,25 @@ export default function ProfileScreen() {
                     </RNView>
                 </Pressable>
 
+                {/* Verify identity (gov-assurance attributes via the enclave) */}
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/kyc-capture' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="shield-checkmark-outline" size={20} color="#34C759" />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>Verify your ID</Text>
+                            <Text style={styles.sharingDetail}>
+                                Scan your passport or ID to add government-verified attributes
+                            </Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                    </RNView>
+                </Pressable>
+
                 {/* Export all data */}
                 {profile.attributes.length > 0 && (
                     <Pressable

@@ -190,6 +190,12 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
     const userInfo: ProviderUserInfo = { sub: data.sub };
     const seedAttributes: ProfileAttribute[] = [];
 
+    // Diagnostic: which canonical attributes the IdP returned (e.g. is `picture`
+    // present?). Visible in Settings → Logs.
+    console.log(
+        `[link] ${providerKey} returned: ${(data.attributes ?? []).map((a) => a.key).join(', ') || '(none)'}`,
+    );
+
     for (const a of data.attributes ?? []) {
         if (!a.value) continue;
 

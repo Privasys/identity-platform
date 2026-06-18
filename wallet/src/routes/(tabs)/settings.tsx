@@ -18,15 +18,13 @@ import { Text, View, Image } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
-import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { getLogs } from '@/utils/logs';
 
 export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { credentials, removeCredential } = useAuthStore();
+    const { credentials } = useAuthStore();
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
-    const { remove: removeTrustedApp } = useTrustedAppsStore();
     const pushToken = useExpoPushToken();
 
     return (
@@ -64,47 +62,15 @@ export default function SettingsScreen() {
                     ))}
                 </View>
 
-                {/* Registered Credentials */}
+                {/* Registered Credentials → subpage */}
                 <Text style={styles.sectionTitle}>Registered Credentials</Text>
-                {credentials.length === 0 ? (
-                    <View style={styles.emptyCard}>
-                        <Ionicons name="key-outline" size={32} color="#C7C7CC" />
-                        <Text style={styles.emptyText}>No credentials registered yet</Text>
-                    </View>
-                ) : (
-                    credentials.map((cred) => (
-                        <View key={cred.credentialId} style={styles.credentialCard}>
-                            <View style={styles.credentialInfo}>
-                                <Text style={styles.credentialRp}>{cred.rpId}</Text>
-                                <Text style={styles.credentialMeta}>
-                                    {cred.userName} · Registered{' '}
-                                    {new Date(cred.registeredAt * 1000).toLocaleDateString()}
-                                </Text>
-                            </View>
-                            <Pressable
-                                onPress={() =>
-                                    Alert.alert(
-                                        'Remove Credential',
-                                        `Remove credential for ${cred.rpId}?`,
-                                        [
-                                            { text: 'Cancel', style: 'cancel' },
-                                            {
-                                                text: 'Remove',
-                                                style: 'destructive',
-                                                onPress: () => {
-                                                    removeCredential(cred.credentialId);
-                                                    removeTrustedApp(cred.rpId);
-                                                }
-                                            }
-                                        ]
-                                    )
-                                }
-                            >
-                                <Text style={styles.removeButton}>Remove</Text>
-                            </Pressable>
-                        </View>
-                    ))
-                )}
+                <Pressable style={styles.logsButton} onPress={() => router.push('/credentials' as never)}>
+                    <Ionicons name="key-outline" size={18} color="#0F172A" />
+                    <Text style={styles.logsButtonText}>
+                        Manage Credentials{credentials.length > 0 ? ` (${credentials.length})` : ''}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </Pressable>
 
                 {/* Push Token */}
                 {pushToken ? (

@@ -12,14 +12,13 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View as RNView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text } from '@/components/Themed';
+import { ensurePrivasysSession } from '@/services/privasys-id';
 import { listMySessions, revokeSession, type IdpSession } from '@/services/sessions-api';
-import { useAuthStore } from '@/stores/auth';
 
 function shortSid(sid: string): string {
     return sid.length > 12 ? `${sid.slice(0, 6)}\u2026${sid.slice(-6)}` : sid;
@@ -34,23 +33,18 @@ function relative(unixSeconds: number): string {
 }
 
 export default function ServerSessionsScreen() {
-    const router = useRouter();
-    const insets = useSafeAreaInsets();
-    const privasysId = useAuthStore((s) => s.privasysId);
-    const sessionToken = privasysId?.sessionToken ?? '';
-    const sessionExpiresAt = privasysId?.sessionExpiresAt ?? 0;
-    const haveAuth = sessionToken !== '' && sessionExpiresAt > Date.now();
-
     const [sessions, setSessions] = useState<IdpSession[] | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [revoking, setRevoking] = useState<string | null>(null);
 
+    // The wallet owns the privasys.id key, so it establishes its own session
+    // (a biometric prompt) instead of asking the user to "sign in".
     const refresh = useCallback(async () => {
-        if (!haveAuth) return;
         setLoading(true);
         setError(null);
         try {
+            const { sessionToken } = await ensurePrivasysSession();
             const list = await listMySessions(sessionToken);
             setSessions(list);
         } catch (e) {
@@ -58,11 +52,11 @@ export default function ServerSessionsScreen() {
         } finally {
             setLoading(false);
         }
-    }, [haveAuth, sessionToken]);
+    }, []);
 
     useEffect(() => {
-        if (haveAuth) refresh();
-    }, [haveAuth, refresh]);
+        refresh();
+    }, [refresh]);
 
     const handleRevoke = (sess: IdpSession) => {
         Alert.alert(
@@ -76,6 +70,7 @@ export default function ServerSessionsScreen() {
                     onPress: async () => {
                         setRevoking(sess.sid);
                         try {
+                            const { sessionToken } = await ensurePrivasysSession();
                             await revokeSession(sessionToken, sess.sid);
                             setSessions((cur) => (cur ?? []).filter((s) => s.sid !== sess.sid));
                         } catch (e) {
@@ -91,15 +86,8 @@ export default function ServerSessionsScreen() {
 
     return (
         <>
-            <Stack.Screen options={{ headerShown: false }} />
             <RNView style={styles.screen}>
-                <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                    <Pressable onPress={() => router.back()} style={styles.backArrow}>
-                        <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-                    </Pressable>
-                    <Text style={styles.headerTitle}>Server Sessions</Text>
-                    <RNView style={{ width: 36 }} />
-                </RNView>
+                <SubPageHeader title="Server Sessions" />
 
                 <ScrollView
                     contentContainerStyle={styles.content}
@@ -112,16 +100,6 @@ export default function ServerSessionsScreen() {
                         sign-in.
                     </Text>
 
-                    {!haveAuth && (
-                        <RNView style={styles.notice}>
-                            <Ionicons name="information-circle-outline" size={18} color="#0F172A" />
-                            <Text style={styles.noticeText}>
-                                Sign in to your privasys.id account from Settings to manage server
-                                sessions.
-                            </Text>
-                        </RNView>
-                    )}
-
                     {error && (
                         <RNView style={[styles.notice, styles.noticeError]}>
                             <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
@@ -129,17 +107,17 @@ export default function ServerSessionsScreen() {
                         </RNView>
                     )}
 
-                    {haveAuth && loading && sessions === null && (
+                    {loading && sessions === null && (
                         <RNView style={styles.loading}>
                             <ActivityIndicator color="#34E89E" />
                         </RNView>
                     )}
 
-                    {haveAuth && sessions !== null && sessions.length === 0 && !loading && (
+                    {sessions !== null && sessions.length === 0 && !loading && (
                         <Text style={styles.empty}>No active server sessions.</Text>
                     )}
 
-                    {haveAuth && sessions !== null && sessions.map((sess) => (
+                    {sessions !== null && sessions.map((sess) => (
                         <RNView key={sess.sid} style={styles.row}>
                             <RNView style={styles.rowMain}>
                                 <Text style={styles.client}>{sess.client_id}</Text>

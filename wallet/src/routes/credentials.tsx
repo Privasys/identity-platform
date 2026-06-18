@@ -8,10 +8,10 @@
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, View } from '@/components/Themed';
 import { useAuthStore } from '@/stores/auth';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
@@ -57,7 +57,7 @@ export default function CredentialsScreen() {
 
     return (
         <View style={styles.screen}>
-            <Stack.Screen options={{ title: 'Registered Credentials', headerBackTitle: 'Settings' }} />
+            <SubPageHeader title="Registered Credentials" />
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
                 {credentials.length === 0 ? (
                     <View style={styles.emptyCard}>

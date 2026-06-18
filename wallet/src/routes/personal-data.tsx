@@ -26,9 +26,9 @@ import {
     Image,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
+import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES } from '@/services/attributes';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
@@ -42,7 +42,6 @@ const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function PersonalDataScreen() {
-    const insets = useSafeAreaInsets();
     const router = useRouter();
     const { profile, updateProfile, linkProvider, setAttribute, removeAttribute } = useProfileStore();
 
@@ -164,14 +163,7 @@ export default function PersonalDataScreen() {
 
     return (
         <RNView style={styles.screen}>
-            {/* Header */}
-            <RNView style={[styles.header, { paddingTop: insets.top + 8 }]}>
-                <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerTitle}>Personal Data</Text>
-                <RNView style={{ width: 32 }} />
-            </RNView>
+            <SubPageHeader title="Personal Data" />
 
             <ScrollView
                 style={styles.scrollView}

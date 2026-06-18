@@ -124,9 +124,10 @@ export default function KycCaptureScreen() {
                     <Ionicons name="id-card-outline" size={40} color="#007AFF" />
                     <Text style={styles.title}>Verify your ID</Text>
                     <Text style={styles.body}>
-                        Enter the details from your passport or ID, then hold it to the top of your
-                        phone to read the chip. Your data is verified in a secure enclave and stays
-                        on your device.
+                        Enter these from the machine-readable zone (the two lines of {'<<<'} at the
+                        bottom of the photo page). The chip stays locked until your phone proves it
+                        with these values, then you hold the document to the top of your phone to
+                        read it. Everything is verified in a secure enclave and stays on your device.
                     </Text>
 
                     <TextInput

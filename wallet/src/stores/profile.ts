@@ -351,7 +351,13 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         const raw = await SecureStore.getItemAsync(STORE_KEY);
         if (!raw) return;
         try {
-            const data = JSON.parse(raw);
+            const data = JSON.parse(raw) as UserProfile;
+            // Migration: earlier builds cached avatars to a local file:// path that
+            // did not survive cache eviction / a container-id change. Drop it so the
+            // initial-letter fallback shows; a re-import stores the remote URL.
+            if (typeof data.avatarUri === 'string' && data.avatarUri.startsWith('file://')) {
+                data.avatarUri = '';
+            }
             set({ profile: data });
         } catch {
             // Corrupted data — start fresh

@@ -49,7 +49,8 @@ public class NativeEmrtdModule: Module {
                     promise.resolve(NativeEmrtdModule.toJson(passport))
                 } catch {
                     let reason = NativeEmrtdModule.escape(error.localizedDescription)
-                    promise.resolve("{\"error\":\"\(reason)\",\"diag\":\"\(NativeEmrtdModule.escape(diag))\"}")
+                    let keyDbg = NativeEmrtdModule.escape(mrzKey)
+                    promise.resolve("{\"error\":\"\(reason)\",\"diag\":\"\(NativeEmrtdModule.escape(diag))\",\"key\":\"\(keyDbg)\"}")
                 }
             }
         }

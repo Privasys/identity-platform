@@ -24,7 +24,6 @@
 
 import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
-import { File, Paths } from 'expo-file-system';
 import * as WebBrowser from 'expo-web-browser';
 
 import { attributeLabel } from '@/services/attributes';
@@ -112,25 +111,6 @@ export async function fetchAvailableProviders(): Promise<string[]> {
 }
 
 /**
- * Download an avatar image from a remote URL and cache it locally.
- * Returns the local file URI. If the image is already cached, returns the
- * existing local URI without re-downloading.
- */
-export async function downloadAndCacheAvatar(url: string): Promise<string> {
-    const hash = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        url,
-    );
-    const ext = url.match(/\.(png|gif|webp)/i)?.[1] ?? 'jpg';
-    const destination = new File(Paths.cache, `avatar-${hash.substring(0, 16)}.${ext}`);
-
-    if (destination.exists) return destination.uri;
-
-    const downloaded = await File.downloadFileAsync(url, destination, { idempotent: true });
-    return downloaded.uri;
-}
-
-/**
  * Link an external identity provider through the IdP and return the resulting
  * LinkedProvider, a distilled userInfo, and the seed ProfileAttributes (with
  * provenance + verification) to write into the local profile.
@@ -199,14 +179,11 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
     for (const a of data.attributes ?? []) {
         if (!a.value) continue;
 
-        let value = a.value;
+        const value = a.value;
         if (a.key === 'picture') {
-            // Cache the avatar locally so we don't depend on the provider after import.
-            try {
-                value = await downloadAndCacheAvatar(a.value);
-            } catch {
-                value = a.value; // fallback to remote URL
-            }
+            // Store the remote URL; React Native's Image disk-caches it. A local
+            // file:// path under Caches did not survive cache eviction or a
+            // container-id change across installs (the avatar then 404'd).
             userInfo.picture = value;
         } else if (a.key === 'name') {
             userInfo.name = a.value;

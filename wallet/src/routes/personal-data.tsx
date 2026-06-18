@@ -28,10 +28,11 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { Text } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES } from '@/services/attributes';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
-import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
+import { useProfileStore, type LinkedProvider, type ProfileAttribute } from '@/stores/profile';
 
 const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     github: 'logo-github',
@@ -47,6 +48,8 @@ export default function PersonalDataScreen() {
 
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
     const [showImportPicker, setShowImportPicker] = useState(false);
+    const [pendingImport, setPendingImport] = useState<{ linked: LinkedProvider; attributes: ProfileAttribute[] } | null>(null);
+    const [importSelected, setImportSelected] = useState<Set<string>>(new Set());
     const [addingAttribute, setAddingAttribute] = useState<string | null>(null);
     const [newAttrValue, setNewAttrValue] = useState('');
 
@@ -60,19 +63,16 @@ export default function PersonalDataScreen() {
         try {
             const result = await linkProviderViaIdP(providerKey);
 
-            linkProvider(result.provider);
-
-            for (const attr of result.seedAttributes) {
-                const existing = profile.attributes.find((a) => a.key === attr.key);
-                if (!existing) {
-                    setAttribute(attr);
-                    if (attr.key === 'email' && attr.value) updateProfile({ email: attr.value });
-                    if (attr.key === 'name' && attr.value) updateProfile({ displayName: attr.value });
-                    if (attr.key === 'picture' && attr.value) updateProfile({ avatarUri: attr.value });
-                    if (attr.key === 'locale' && attr.value) updateProfile({ locale: attr.value });
-                }
+            if (result.seedAttributes.length === 0) {
+                // Nothing to choose — just record the linked provider.
+                linkProvider(result.provider);
+                setShowImportPicker(false);
+                return;
             }
 
+            // Let the user choose what to import (all selected by default).
+            setPendingImport({ linked: result.provider, attributes: result.seedAttributes });
+            setImportSelected(new Set(result.seedAttributes.map((a) => a.key)));
             setShowImportPicker(false);
         } catch (e: any) {
             if (e.message !== 'Authentication cancelled') {
@@ -81,6 +81,31 @@ export default function PersonalDataScreen() {
         } finally {
             setLinkingProvider(null);
         }
+    };
+
+    const toggleImport = (key: string) =>
+        setImportSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+
+    const applyImport = () => {
+        if (!pendingImport) return;
+        linkProvider(pendingImport.linked);
+        for (const attr of pendingImport.attributes) {
+            if (!importSelected.has(attr.key)) continue;
+            const existing = profile.attributes.find((a) => a.key === attr.key);
+            if (!existing) {
+                setAttribute(attr);
+                if (attr.key === 'email' && attr.value) updateProfile({ email: attr.value });
+                if (attr.key === 'name' && attr.value) updateProfile({ displayName: attr.value });
+                if (attr.key === 'picture' && attr.value) updateProfile({ avatarUri: attr.value });
+                if (attr.key === 'locale' && attr.value) updateProfile({ locale: attr.value });
+            }
+        }
+        setPendingImport(null);
     };
 
     const handleRemoveAttribute = (attr: ProfileAttribute) => {
@@ -234,7 +259,16 @@ export default function PersonalDataScreen() {
                 ) : null}
 
                 {/* Import from account */}
-                {showImportPicker ? (
+                {pendingImport ? (
+                    <ImportSelectionSheet
+                        providerName={pendingImport.linked.displayName}
+                        attributes={pendingImport.attributes}
+                        selected={importSelected}
+                        onToggle={toggleImport}
+                        onConfirm={applyImport}
+                        onCancel={() => setPendingImport(null)}
+                    />
+                ) : showImportPicker ? (
                     <RNView style={styles.importPickerCard}>
                         <Text style={styles.importPickerTitle}>Import from</Text>
                         <Text style={styles.importPickerSubtitle}>

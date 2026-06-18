@@ -7,8 +7,6 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -23,7 +21,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
-import { exportAttributesForAudit } from '@/services/attributes';
 import { getDeviceLocale } from '@/services/device-locale';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { useAuthStore } from '@/stores/auth';
@@ -194,49 +191,43 @@ export default function ProfileScreen() {
                     </RNView>
                 </Pressable>
 
-                {/* Verify identity (gov-assurance attributes via the enclave) */}
+                {/* Import data (gov ID + external IdPs) */}
                 <Pressable
                     style={styles.sharingCard}
-                    onPress={() => router.push('/kyc-capture' as never)}
+                    onPress={() => router.push('/import' as never)}
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="shield-checkmark-outline" size={20} color="#34C759" />
+                            <Ionicons name="cloud-download-outline" size={20} color="#00BCF2" />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>Verify your ID</Text>
+                            <Text style={styles.sharingLabel}>Import Data</Text>
                             <Text style={styles.sharingDetail}>
-                                Scan your passport or ID to add government-verified attributes
+                                Scan your passport or ID, or import from Google, LinkedIn
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                     </RNView>
                 </Pressable>
 
-                {/* Export all data */}
-                {profile.attributes.length > 0 && (
-                    <Pressable
-                        style={styles.exportButton}
-                        onPress={async () => {
-                            try {
-                                const data = exportAttributesForAudit(profile);
-                                const json = JSON.stringify(data, null, 2);
-                                const file = new File(Paths.cache, `privasys-profile-${Date.now()}.json`);
-                                file.write(json);
-                                await Sharing.shareAsync(file.uri, {
-                                    mimeType: 'application/json',
-                                    dialogTitle: 'Save Profile Data',
-                                    UTI: 'public.json',
-                                });
-                            } catch (e: any) {
-                                Alert.alert('Export failed', e.message);
-                            }
-                        }}
-                    >
-                        <Ionicons name="download-outline" size={18} color="#00BCF2" />
-                        <Text style={styles.exportButtonText}>Export All Data (JSON)</Text>
-                    </Pressable>
-                )}
+                {/* Export data */}
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/export' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="share-outline" size={20} color="#00BCF2" />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>Export Data</Text>
+                            <Text style={styles.sharingDetail}>
+                                Choose what to export, or export everything as JSON
+                            </Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                    </RNView>
+                </Pressable>
 
                 {/* Account Recovery */}
                 <Text style={styles.sectionTitle}>ACCOUNT RECOVERY</Text>

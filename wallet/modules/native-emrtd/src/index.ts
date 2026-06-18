@@ -15,6 +15,7 @@
  * `isSupported()` and fall back accordingly.
  */
 
+import { parse as parseMrz } from 'mrz';
 import { Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
@@ -64,7 +65,48 @@ export async function readDocument(key: MrzKey): Promise<EmrtdReadResult> {
 export async function scanMrz(imageBase64: string): Promise<MrzScan> {
     if (!Native?.scanMrz) throw new Error('MRZ scanning is unavailable on this platform/build');
     const json = await Native.scanMrz(imageBase64);
-    const result = JSON.parse(json) as MrzScan & { error?: string };
+    const result = JSON.parse(json) as { lines?: string[]; error?: string };
     if (result.error) throw new Error(result.error);
-    return result;
+    const fields = parseMrzLines(result.lines ?? []);
+    if (!fields) throw new Error('No valid MRZ detected');
+    return fields;
+}
+
+/**
+ * Pick the MRZ lines out of the OCR'd text and parse them with the `mrz`
+ * library, which validates each field's ICAO check digit. We only accept a
+ * result whose document-number / DOB / expiry check digits pass, so an OCR
+ * misread can never produce a wrong BAC key (it just isn't returned, and the
+ * caller scans the next frame).
+ */
+function parseMrzLines(rawLines: string[]): MrzScan | null {
+    const candidates = rawLines
+        .map((l) => l.toUpperCase().replace(/\s/g, ''))
+        .filter((l) => /^[A-Z0-9<]{28,44}$/.test(l));
+
+    // TD3 = 2 lines (~44 chars), TD1 = 3 lines (~30 chars).
+    for (const n of [2, 3]) {
+        if (candidates.length < n) continue;
+        try {
+            const res = parseMrz(candidates.slice(-n));
+            const f = res.fields;
+            const detailValid = (field: string) => {
+                const d = (res.details as Array<{ field: string; valid: boolean | null }>).find((x) => x.field === field);
+                return d ? d.valid !== false : false;
+            };
+            if (
+                f.documentNumber && f.birthDate && f.expirationDate &&
+                detailValid('documentNumber') && detailValid('birthDate') && detailValid('expirationDate')
+            ) {
+                return {
+                    documentNumber: f.documentNumber,
+                    dateOfBirth: f.birthDate,
+                    dateOfExpiry: f.expirationDate,
+                };
+            }
+        } catch {
+            // not these lines / not an MRZ — try the next grouping
+        }
+    }
+    return null;
 }

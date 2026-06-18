@@ -44,13 +44,56 @@ export default function KycCaptureScreen() {
     const [expiry, setExpiry] = useState('');
     const [fields, setFields] = useState<Record<string, string> | null>(null);
     const [busy, setBusy] = useState(false);
-    const [ocrBusy, setOcrBusy] = useState(false);
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
+    const scanningRef = useRef(false);
 
     useEffect(() => {
         Emrtd.isSupported().then(setSupport).catch(() => setSupport({ supported: false }));
     }, []);
+
+    // Continuously OCR the MRZ while the camera is open: scan a frame, and only
+    // accept it when the `mrz` parser confirms the check digits (so a misread
+    // never yields a wrong BAC key). Stops as soon as a valid MRZ is found.
+    useEffect(() => {
+        if (step !== 'mrz-camera') {
+            scanningRef.current = false;
+            return;
+        }
+        scanningRef.current = true;
+        let cancelled = false;
+        const loop = async () => {
+            while (scanningRef.current && !cancelled) {
+                try {
+                    const photo = await cameraRef.current?.takePictureAsync({
+                        base64: true,
+                        quality: 0.5,
+                        skipProcessing: true,
+                        shutterSound: false,
+                    });
+                    if (photo?.base64) {
+                        const mrz = await Emrtd.scanMrz(photo.base64);
+                        if (cancelled) return;
+                        scanningRef.current = false;
+                        setDocNumber(mrz.documentNumber);
+                        setDob(mrz.dateOfBirth);
+                        setExpiry(mrz.dateOfExpiry);
+                        setStep('mrz');
+                        return;
+                    }
+                } catch {
+                    // No valid MRZ in this frame (or camera not ready) — keep trying.
+                }
+                await new Promise((r) => setTimeout(r, 500));
+            }
+        };
+        const t = setTimeout(loop, 800); // let the camera mount first
+        return () => {
+            cancelled = true;
+            scanningRef.current = false;
+            clearTimeout(t);
+        };
+    }, [step]);
 
     const close = () => {
         if (router.canGoBack()) router.back();
@@ -92,22 +135,6 @@ export default function KycCaptureScreen() {
         setStep('mrz-camera');
     };
 
-    const handleScanMrz = async () => {
-        setOcrBusy(true);
-        try {
-            const photo = await cameraRef.current?.takePictureAsync({ base64: true, quality: 0.5 });
-            if (!photo?.base64) throw new Error('No photo captured');
-            const mrz = await Emrtd.scanMrz(photo.base64);
-            setDocNumber(mrz.documentNumber);
-            setDob(mrz.dateOfBirth);
-            setExpiry(mrz.dateOfExpiry);
-            setStep('mrz');
-        } catch (e: any) {
-            Alert.alert('Could not read the MRZ', `${e.message}\n\nYou can also enter the details by hand.`);
-        } finally {
-            setOcrBusy(false);
-        }
-    };
 
     // ── Step 2: capture a live selfie (for the enclave face match) ──────────
     const captureAndVerify = async (liveImageBase64?: string) => {
@@ -233,16 +260,12 @@ export default function KycCaptureScreen() {
                 <View style={styles.flex}>
                     <CameraView ref={cameraRef} style={styles.camera} facing="back" autofocus="on" />
                     <View style={styles.selfieOverlay}>
-                        <Text style={styles.selfieText}>
-                            Frame the two lines of {'<<<'} at the bottom of the passport photo page.
-                        </Text>
-                        <Pressable style={styles.primary} onPress={handleScanMrz} disabled={ocrBusy}>
-                            {ocrBusy ? (
-                                <ActivityIndicator color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.primaryText}>Capture MRZ</Text>
-                            )}
-                        </Pressable>
+                        <View style={styles.scanningRow}>
+                            <ActivityIndicator color="#FFFFFF" />
+                            <Text style={styles.selfieText}>
+                                Hold the bottom two lines of {'<<<'} steady in view…
+                            </Text>
+                        </View>
                         <Pressable style={styles.secondary} onPress={() => setStep('mrz')}>
                             <Text style={[styles.secondaryText, { color: '#FFFFFF' }]}>Enter manually instead</Text>
                         </Pressable>
@@ -313,4 +336,5 @@ const styles = StyleSheet.create({
     camera: { flex: 1, width: '100%' },
     selfieOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, gap: 12, backgroundColor: 'rgba(0,0,0,0.55)' },
     selfieText: { color: '#FFFFFF', fontSize: 15, textAlign: 'center' },
+    scanningRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
 });

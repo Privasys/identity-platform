@@ -22,33 +22,19 @@ import {
     View as RNView,
     TextInput,
     Alert,
-    ActivityIndicator,
     Image,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
-import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES } from '@/services/attributes';
-import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
-import { useProfileStore, type LinkedProvider, type ProfileAttribute } from '@/stores/profile';
-
-const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-    github: 'logo-github',
-    google: 'logo-google',
-    microsoft: 'logo-microsoft',
-    linkedin: 'logo-linkedin',
-};
+import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
 export default function PersonalDataScreen() {
     const router = useRouter();
-    const { profile, updateProfile, linkProvider, setAttribute, removeAttribute } = useProfileStore();
+    const { profile, updateProfile, setAttribute, removeAttribute } = useProfileStore();
 
-    const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
-    const [showImportPicker, setShowImportPicker] = useState(false);
-    const [pendingImport, setPendingImport] = useState<{ linked: LinkedProvider; attributes: ProfileAttribute[] } | null>(null);
-    const [importSelected, setImportSelected] = useState<Set<string>>(new Set());
     const [addingAttribute, setAddingAttribute] = useState<string | null>(null);
     const [newAttrValue, setNewAttrValue] = useState('');
 
@@ -56,56 +42,6 @@ export default function PersonalDataScreen() {
         router.back();
         return null;
     }
-
-    const handleImportFromProvider = async (providerKey: string) => {
-        setLinkingProvider(providerKey);
-        try {
-            const result = await linkProviderViaIdP(providerKey);
-
-            if (result.seedAttributes.length === 0) {
-                // Nothing to choose — just record the linked provider.
-                linkProvider(result.provider);
-                setShowImportPicker(false);
-                return;
-            }
-
-            // Let the user choose what to import (all selected by default).
-            setPendingImport({ linked: result.provider, attributes: result.seedAttributes });
-            setImportSelected(new Set(result.seedAttributes.map((a) => a.key)));
-            setShowImportPicker(false);
-        } catch (e: any) {
-            if (e.message !== 'Authentication cancelled') {
-                Alert.alert('Import failed', e.message);
-            }
-        } finally {
-            setLinkingProvider(null);
-        }
-    };
-
-    const toggleImport = (key: string) =>
-        setImportSelected((prev) => {
-            const next = new Set(prev);
-            if (next.has(key)) next.delete(key);
-            else next.add(key);
-            return next;
-        });
-
-    const applyImport = () => {
-        if (!pendingImport) return;
-        linkProvider(pendingImport.linked);
-        for (const attr of pendingImport.attributes) {
-            if (!importSelected.has(attr.key)) continue;
-            const existing = profile.attributes.find((a) => a.key === attr.key);
-            if (!existing) {
-                setAttribute(attr);
-                if (attr.key === 'email' && attr.value) updateProfile({ email: attr.value });
-                if (attr.key === 'name' && attr.value) updateProfile({ displayName: attr.value });
-                if (attr.key === 'picture' && attr.value) updateProfile({ avatarUri: attr.value });
-                if (attr.key === 'locale' && attr.value) updateProfile({ locale: attr.value });
-            }
-        }
-        setPendingImport(null);
-    };
 
     const handleRemoveAttribute = (attr: ProfileAttribute) => {
         Alert.alert(
@@ -250,63 +186,11 @@ export default function PersonalDataScreen() {
                     </RNView>
                 ) : null}
 
-                {/* Import from account */}
-                {pendingImport ? (
-                    <ImportSelectionSheet
-                        providerName={pendingImport.linked.displayName}
-                        attributes={pendingImport.attributes}
-                        selected={importSelected}
-                        onToggle={toggleImport}
-                        onConfirm={applyImport}
-                        onCancel={() => setPendingImport(null)}
-                    />
-                ) : showImportPicker ? (
-                    <RNView style={styles.importPickerCard}>
-                        <Text style={styles.importPickerTitle}>Import from</Text>
-                        <Text style={styles.importPickerSubtitle}>
-                            Sign in once to fill your profile. The provider cannot access your Privasys data.
-                        </Text>
-                        {Object.entries(PROVIDERS).map(([key, config]) => {
-                            const isLinking = linkingProvider === key;
-                            return (
-                                <Pressable
-                                    key={key}
-                                    style={styles.providerRow}
-                                    onPress={() => handleImportFromProvider(key)}
-                                    disabled={isLinking}
-                                >
-                                    <Ionicons
-                                        name={PROVIDER_ICONS[key] ?? 'globe-outline'}
-                                        size={22}
-                                        color="#64748B"
-                                    />
-                                    <RNView style={styles.providerInfo}>
-                                        <Text style={styles.providerName}>{config.displayName}</Text>
-                                    </RNView>
-                                    {isLinking ? (
-                                        <ActivityIndicator size="small" color="#00BCF2" />
-                                    ) : (
-                                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                                    )}
-                                </Pressable>
-                            );
-                        })}
-                        <Pressable
-                            style={styles.importPickerCancel}
-                            onPress={() => setShowImportPicker(false)}
-                        >
-                            <Text style={styles.importPickerCancelText}>Cancel</Text>
-                        </Pressable>
-                    </RNView>
-                ) : (
-                    <Pressable
-                        style={styles.importButton}
-                        onPress={() => setShowImportPicker(true)}
-                    >
-                        <Ionicons name="cloud-download-outline" size={18} color="#00BCF2" />
-                        <Text style={styles.importButtonText}>Import from an account</Text>
-                    </Pressable>
-                )}
+                {/* Import — opens the dedicated Import Data subpage */}
+                <Pressable style={styles.importButton} onPress={() => router.push('/import' as never)}>
+                    <Ionicons name="cloud-download-outline" size={18} color="#00BCF2" />
+                    <Text style={styles.importButtonText}>Import data</Text>
+                </Pressable>
 
                 <RNView style={{ height: 40 }} />
             </ScrollView>

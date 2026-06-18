@@ -143,6 +143,84 @@ describe('profile store', () => {
         });
     });
 
+    describe('mergeAttribute', () => {
+        const incoming = (over: Partial<ProfileAttribute>): ProfileAttribute => ({
+            key: 'name', label: 'Display Name', value: 'X', source: 'manual', verified: false, ...over,
+        });
+
+        it('adds a brand-new attribute with a seeded source list', () => {
+            useProfileStore.getState().createProfile(baseProfile());
+            const res = useProfileStore.getState().mergeAttribute(
+                incoming({ value: 'Bob', source: 'manual' }), false,
+            );
+            expect(res.status).toBe('added');
+            const a = useProfileStore.getState().profile!.attributes;
+            expect(a).toHaveLength(1);
+            expect(a[0].sources).toHaveLength(1);
+        });
+
+        it('strengthens with a second source when the value matches', () => {
+            useProfileStore.getState().createProfile(baseProfile());
+            useProfileStore.getState().mergeAttribute(
+                incoming({ value: 'Bob', source: 'manual' }), false,
+            );
+            const res = useProfileStore.getState().mergeAttribute(
+                incoming({ value: 'Bob', source: 'provider', sourceProvider: 'linkedin', verified: true }), false,
+            );
+            expect(res.status).toBe('strengthened');
+            const a = useProfileStore.getState().profile!.attributes;
+            expect(a).toHaveLength(1);
+            expect(a[0].sources).toHaveLength(2);
+            expect(a[0].source).toBe('provider'); // primary promoted to higher assurance
+            expect(a[0].verified).toBe(true);
+        });
+
+        it('raises a conflict for a differing single-valued attribute', () => {
+            useProfileStore.getState().createProfile(baseProfile());
+            useProfileStore.getState().mergeAttribute(incoming({ value: 'bob' }), false);
+            const res = useProfileStore.getState().mergeAttribute(incoming({ value: 'Bob' }), false);
+            expect(res.status).toBe('conflict');
+            // Nothing written until resolved.
+            expect(useProfileStore.getState().profile!.attributes).toHaveLength(1);
+            expect(useProfileStore.getState().profile!.attributes[0].value).toBe('bob');
+        });
+
+        it('resolveConflict replace swaps the value', () => {
+            useProfileStore.getState().createProfile(baseProfile());
+            useProfileStore.getState().mergeAttribute(incoming({ value: 'bob' }), false);
+            const res = useProfileStore.getState().mergeAttribute(incoming({ value: 'Bob' }), false);
+            if (res.status !== 'conflict') throw new Error('expected conflict');
+            useProfileStore.getState().resolveConflict(res.existing, res.incoming, 'replace');
+            const a = useProfileStore.getState().profile!.attributes;
+            expect(a).toHaveLength(1);
+            expect(a[0].value).toBe('Bob');
+        });
+
+        it('keeps both differing values for a multi-valued attribute', () => {
+            useProfileStore.getState().createProfile(baseProfile());
+            useProfileStore.getState().mergeAttribute(
+                incoming({ key: 'email', value: 'a@x.com' }), true,
+            );
+            const res = useProfileStore.getState().mergeAttribute(
+                incoming({ key: 'email', value: 'b@y.com' }), true,
+            );
+            expect(res.status).toBe('added-value');
+            expect(useProfileStore.getState().profile!.attributes.filter((x) => x.key === 'email')).toHaveLength(2);
+        });
+
+        it('treats email case-insensitively when matching', () => {
+            useProfileStore.getState().createProfile(baseProfile());
+            useProfileStore.getState().mergeAttribute(
+                incoming({ key: 'email', value: 'Bob@X.com' }), true,
+            );
+            const res = useProfileStore.getState().mergeAttribute(
+                incoming({ key: 'email', value: 'bob@x.com' }), true,
+            );
+            expect(res.status).toBe('strengthened');
+            expect(useProfileStore.getState().profile!.attributes.filter((x) => x.key === 'email')).toHaveLength(1);
+        });
+    });
+
     it('clearProfile removes everything', () => {
         useProfileStore.getState().createProfile(baseProfile());
         expect(useProfileStore.getState().profile).not.toBeNull();

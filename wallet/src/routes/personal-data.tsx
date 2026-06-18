@@ -33,7 +33,7 @@ import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
 export default function PersonalDataScreen() {
     const router = useRouter();
-    const { profile, updateProfile, setAttribute, removeAttribute } = useProfileStore();
+    const { profile, updateProfile, setAttribute, updateAttributeValue, removeAttributeValue } = useProfileStore();
 
     const [addingAttribute, setAddingAttribute] = useState<string | null>(null);
     const [newAttrValue, setNewAttrValue] = useState('');
@@ -46,17 +46,24 @@ export default function PersonalDataScreen() {
     const handleRemoveAttribute = (attr: ProfileAttribute) => {
         Alert.alert(
             `Remove ${attr.label}?`,
-            'This attribute will no longer be available for sharing.',
+            'This value will no longer be available for sharing.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Remove',
                     style: 'destructive',
                     onPress: () => {
-                        removeAttribute(attr.key);
-                        if (attr.key === 'email') updateProfile({ email: '' });
-                        if (attr.key === 'name') updateProfile({ displayName: '' });
-                        if (attr.key === 'picture') updateProfile({ avatarUri: '' });
+                        // Other values stored under the same key (multi-valued attrs).
+                        const others = profile.attributes.filter(
+                            (a) => a.key === attr.key && a.value !== attr.value,
+                        );
+                        removeAttributeValue(attr.key, attr.value);
+                        // Keep the mirrored top-level field pointing at a value that
+                        // still exists (or clear it if this was the last one).
+                        const fallback = others[0]?.value ?? '';
+                        if (attr.key === 'email') updateProfile({ email: fallback });
+                        if (attr.key === 'name') updateProfile({ displayName: fallback });
+                        if (attr.key === 'picture') updateProfile({ avatarUri: fallback });
                     },
                 },
             ],
@@ -121,16 +128,18 @@ export default function PersonalDataScreen() {
                 ) : (
                     profile.attributes.map((attr) => (
                         <AttributeCard
-                            key={attr.key}
+                            key={`${attr.key}:${attr.value}`}
                             attr={attr}
                             onRemove={() => handleRemoveAttribute(attr)}
                             onEdit={(newValue) => {
                                 const now = Math.floor(Date.now() / 1000);
-                                setAttribute({
-                                    ...attr,
+                                // Editing makes the value self-asserted again: reset
+                                // provenance to a single manual source.
+                                updateAttributeValue(attr.key, attr.value, {
                                     value: newValue,
                                     source: 'manual',
-                                    updatedAt: now,
+                                    sourceProvider: undefined,
+                                    sources: [{ source: 'manual', displayName: 'Manual', addedAt: now }],
                                     verified: false,
                                     verifications: [],
                                 });
@@ -213,6 +222,11 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
             : attr.source === 'document'
             ? 'from document'
             : attr.source;
+
+    // Every party that has asserted this value. More than one = confirmations
+    // that strengthen the attribute (e.g. entered manually, confirmed by LinkedIn).
+    const sources = attr.sources && attr.sources.length > 0 ? attr.sources : null;
+    const confirmed = sources && sources.length > 1;
 
     const acquiredDate = attr.acquiredAt
         ? new Date(attr.acquiredAt * 1000).toLocaleDateString(undefined, {
@@ -326,7 +340,16 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                                     <Text style={[styles.verifiedText, { color: '#F59E0B' }]}>Unverified</Text>
                                 </RNView>
                             )}
-                            <Text style={styles.sourceText}>{sourceLabel}</Text>
+                            {confirmed ? (
+                                <RNView style={styles.confirmBadge}>
+                                    <Ionicons name="shield-checkmark" size={12} color="#00BCF2" />
+                                    <Text style={styles.confirmText}>
+                                        Confirmed by {sources!.length} sources
+                                    </Text>
+                                </RNView>
+                            ) : (
+                                <Text style={styles.sourceText}>{sourceLabel}</Text>
+                            )}
                         </RNView>
 
                         {expanded && (
@@ -342,6 +365,21 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                                         <Text style={styles.provenanceLabel}>Updated</Text>
                                         <Text style={styles.provenanceValue}>{updatedDate}</Text>
                                     </RNView>
+                                )}
+                                {sources && sources.length > 0 && (
+                                    <>
+                                        <Text style={[styles.provenanceLabel, { marginTop: 8, marginBottom: 4 }]}>
+                                            Sources
+                                        </Text>
+                                        {sources.map((s, i) => (
+                                            <RNView key={i} style={styles.provenanceRow}>
+                                                <Text style={styles.provenanceValue}>{s.displayName}</Text>
+                                                <Text style={styles.provenanceValue}>
+                                                    {new Date(s.addedAt * 1000).toLocaleDateString()}
+                                                </Text>
+                                            </RNView>
+                                        ))}
+                                    </>
                                 )}
                                 {(attr.verifications ?? []).length > 0 && (
                                     <>
@@ -439,6 +477,8 @@ const styles = StyleSheet.create({
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     verifiedText: { fontSize: 11, color: '#34E89E', fontWeight: '600' },
     sourceText: { fontSize: 11, color: '#94A3B8' },
+    confirmBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    confirmText: { fontSize: 11, color: '#00BCF2', fontWeight: '600' },
 
     inlineEditRow: {
         flexDirection: 'row',

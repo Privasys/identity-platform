@@ -61,6 +61,12 @@ export interface AttributeDefinition {
      * request-gated 'identity' scope. See kyc-enclave-design.md §3.
      */
     identityVerifiable?: boolean;
+    /**
+     * Whether the wallet may hold more than one value for this key (e.g. several
+     * emails or phone numbers). On import, a differing value is added alongside
+     * rather than raising a conflict. See profile.mergeAttribute.
+     */
+    multiValued?: boolean;
 }
 
 // Map JSON profileField strings to the typed union.
@@ -84,6 +90,7 @@ export const CANONICAL_ATTRIBUTES: AttributeDefinition[] = canonicalDoc.attribut
     valuesUrl: (a as { valuesUrl?: string }).valuesUrl,
     deviceSourced: (a as { deviceSourced?: boolean }).deviceSourced,
     identityVerifiable: (a as { identityVerifiable?: boolean }).identityVerifiable,
+    multiValued: (a as { multiValued?: boolean }).multiValued,
 }));
 
 /** Lookup table keyed by canonical attribute key. */
@@ -126,12 +133,15 @@ export function getProfileAssurance(
     profile: UserProfile,
     key: string,
 ): 'none' | 'provider' | 'gov' | undefined {
-    const attr = profile.attributes?.find((a) => a.key === key);
-    if (!attr) return getProfileValue(profile, key) ? 'none' : undefined;
+    const attrs = (profile.attributes ?? []).filter((a) => a.key === key);
+    if (attrs.length === 0) return getProfileValue(profile, key) ? 'none' : undefined;
     const rank = { none: 0, provider: 1, gov: 2 } as const;
-    let best: 'none' | 'provider' | 'gov' = attr.source === 'document' ? 'gov' : 'none';
-    for (const v of attr.verifications ?? []) {
-        if (v.assurance && rank[v.assurance] > rank[best]) best = v.assurance;
+    let best: 'none' | 'provider' | 'gov' = 'none';
+    for (const attr of attrs) {
+        if (attr.source === 'document' && rank.gov > rank[best]) best = 'gov';
+        for (const v of attr.verifications ?? []) {
+            if (v.assurance && rank[v.assurance] > rank[best]) best = v.assurance;
+        }
     }
     return best;
 }
@@ -327,6 +337,7 @@ export function exportAttributesForAudit(profile: UserProfile): {
         value: string;
         source: string;
         sourceProvider?: string;
+        sources: Array<{ source: string; displayName: string; addedAt: string }>;
         acquiredAt: string;
         updatedAt: string;
         verified: boolean;
@@ -356,6 +367,11 @@ export function exportAttributesForAudit(profile: UserProfile): {
             value: a.value,
             source: a.source,
             sourceProvider: a.sourceProvider,
+            sources: (a.sources ?? []).map((s) => ({
+                source: s.source,
+                displayName: s.displayName,
+                addedAt: new Date(s.addedAt * 1000).toISOString(),
+            })),
             acquiredAt: new Date((a.acquiredAt ?? 0) * 1000).toISOString(),
             updatedAt: new Date((a.updatedAt ?? 0) * 1000).toISOString(),
             verified: a.verified,

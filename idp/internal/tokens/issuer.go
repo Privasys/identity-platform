@@ -205,6 +205,28 @@ func (iss *Issuer) IssueAccessTokenWithTTL(subject, audience, sid string, roles 
 	return iss.sign(c)
 }
 
+// IssueVaultApprovalToken issues a short-lived, operation-bound access token
+// for the Enclave Vault promote step-up (policies-plan.md §9). The caller
+// proved a fresh WebAuthn assertion bound to `vaultOp`, so the token carries
+// `amr:["webauthn"]` plus the `vault_op`/`nonce` the vault recomputes and
+// checks against the operation it is being asked to promote. `iat`/`exp` are
+// fixed by the begin step (they are inputs to the binding) and passed through
+// verbatim.
+func (iss *Issuer) IssueVaultApprovalToken(subject, audience, vaultOp, nonce string, iat, exp int64) (string, error) {
+	c := jwt.MapClaims{
+		"iss":      iss.issuerURL,
+		"sub":      subject,
+		"aud":      audience,
+		"iat":      iat,
+		"exp":      exp,
+		"typ":      "at+jwt",
+		"amr":      []string{"webauthn"},
+		"vault_op": vaultOp,
+		"nonce":    nonce,
+	}
+	return iss.sign(c)
+}
+
 // VerifyAccessToken parses and validates a JWT signed by this issuer.
 func (iss *Issuer) VerifyAccessToken(tokenStr string) (map[string]interface{}, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {

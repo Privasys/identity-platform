@@ -203,6 +203,22 @@ type challengeEntry struct {
 	sessionID    string // OIDC authorization session ID
 	discoverable bool   // true when authenticate/begin had no credentialId
 	expiresAt    time.Time
+	// vaultApproval is set when this challenge is a vault promote step-up
+	// (policies-plan.md §9). On /complete the handler issues an operation-bound
+	// access token from these values instead of a session token.
+	vaultApproval *vaultApprovalMeta
+}
+
+// vaultApprovalMeta carries the operation-binding values fixed at begin time so
+// /complete can mint the matching token. vaultOp is base64url(SHA-256(binding))
+// and is also the WebAuthn challenge, so a verified assertion proves the user
+// approved exactly this operation.
+type vaultApprovalMeta struct {
+	sub     string
+	vaultOp string
+	nonce   string
+	iat     int64
+	exp     int64
 }
 
 type challengeStore struct {

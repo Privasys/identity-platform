@@ -23,10 +23,11 @@ export interface EmrtdReadResult {
     portraitBase64?: string;
     /** EF.SOD (base64) — the signed Document Security Object the enclave uses
      *  for Passive Authentication (DSC→CSCA chain + DG hash integrity). */
-    sodBase64?: string;
-    /** Device-side preliminary Passive-Auth result (DG hashes ↔ SOD). The
-     *  enclave re-verifies authoritatively; this is only a fast-fail hint. */
-    passiveAuthHint?: boolean;
+    sod?: string;
+    /** Raw data groups as exact on-chip bytes, keyed by DG number ("1", "2"):
+     *  the enclave hash-checks each against the SOD and parses DG1 / face-matches
+     *  DG2. */
+    dataGroups?: Record<string, string>;
 }
 
 /** Whether eMRTD NFC reading is available on this device/build. */

@@ -44,7 +44,7 @@ export default function KycCaptureScreen() {
     const [docNumber, setDocNumber] = useState('');
     const [dob, setDob] = useState('');
     const [expiry, setExpiry] = useState('');
-    const [fields, setFields] = useState<Record<string, string> | null>(null);
+    const [docRead, setDocRead] = useState<Emrtd.EmrtdReadResult | null>(null);
     const [busy, setBusy] = useState(false);
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
@@ -128,7 +128,7 @@ export default function KycCaptureScreen() {
                 dateOfBirth: dob.trim(),
                 dateOfExpiry: expiry.trim(),
             });
-            setFields(read.fields);
+            setDocRead(read);
             setStep('selfie');
         } catch (e: any) {
             console.warn('[KYC] chip read failed:', e?.message);
@@ -153,7 +153,7 @@ export default function KycCaptureScreen() {
     };
 
     const handleUseDevStub = () => {
-        setFields(DEV_STUB_FIELDS);
+        setDocRead({ fields: DEV_STUB_FIELDS });
         setStep('selfie');
     };
 
@@ -172,11 +172,11 @@ export default function KycCaptureScreen() {
 
     // ── Step 2: capture a live selfie (for the enclave face match) ──────────
     const captureAndVerify = async (liveImageBase64?: string) => {
-        if (!fields) return;
+        if (!docRead) return;
         setStep('verifying');
         setBusy(true);
         try {
-            const result = await verifyIdentity(fields, { liveImageBase64 });
+            const result = await verifyIdentity(docRead, { liveImageBase64 });
             console.log('[KYC] verified — filled:', result.filled.join(', '));
             setStep('done');
         } catch (e: any) {

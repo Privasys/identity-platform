@@ -112,7 +112,27 @@ public class NativeEmrtdModule: Module {
         if let img = p.passportImage, let data = img.jpegData(compressionQuality: 0.85) {
             portrait = "\"\(data.base64EncodedString())\""
         }
-        return "{\"fields\":{\(fieldsJson)},\"portraitBase64\":\(portrait)}"
+
+        // Raw EF.SOD + data groups (exact on-chip bytes) so the verifier enclave
+        // can run Passive Authentication (SOD signature → DSC → CSCA + per-DG hash
+        // check) and the DG2↔selfie face match itself. The parsed `fields` above
+        // are a convenience; the enclave certifies from these raw bytes.
+        let sod = rawDataGroup(p, .SOD)
+        var dgEntries: [String] = []
+        for (id, num) in [(DataGroupId.DG1, "1"), (DataGroupId.DG2, "2")] {
+            if let dg = p.getDataGroup(id) {
+                dgEntries.append("\"\(num)\":\"\(Data(dg.data).base64EncodedString())\"")
+            }
+        }
+        let dgJson = dgEntries.joined(separator: ",")
+        return "{\"fields\":{\(fieldsJson)},\"portraitBase64\":\(portrait),"
+            + "\"sod\":\(sod),\"dataGroups\":{\(dgJson)}}"
+    }
+
+    /// Base64 of a data group's exact on-chip bytes, or JSON null if absent.
+    private static func rawDataGroup(_ p: NFCPassportModel, _ id: DataGroupId) -> String {
+        guard let dg = p.getDataGroup(id) else { return "null" }
+        return "\"\(Data(dg.data).base64EncodedString())\""
     }
 
     /// MRZ dates are YYMMDD; expand to YYYY-MM-DD with a century heuristic

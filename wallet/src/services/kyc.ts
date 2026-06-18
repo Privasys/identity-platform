@@ -171,7 +171,13 @@ async function postToVerifier<T>(path: string, body: unknown): Promise<T> {
  *   liveness (DG2 ↔ live capture). Processed in-enclave, never persisted.
  */
 export async function verifyIdentity(
-    documentFields: Record<string, string>,
+    doc: {
+        fields: Record<string, string>;
+        /** EF.SOD (base64) — required by the enclave for Passive Authentication. */
+        sod?: string;
+        /** Raw data groups keyed by DG number ("1", "2"), base64. */
+        dataGroups?: Record<string, string>;
+    },
     opts: { liveImageBase64?: string } = {},
 ): Promise<VerifyIdentityResult> {
     const enclave = await verifyVerifierEnclave();
@@ -181,7 +187,12 @@ export async function verifyIdentity(
         '/verify-identity',
         {
             holder_pub: holderPub,
-            fields: documentFields,
+            fields: doc.fields,
+            // The enclave certifies from the raw chip bytes (SOD + DGs); it runs
+            // Passive Authentication against the configured CSCA trust anchors and
+            // the DG2↔selfie face match in-enclave. `fields` is only a convenience.
+            ...(doc.sod ? { sod: doc.sod } : {}),
+            ...(doc.dataGroups ? { data_groups: doc.dataGroups } : {}),
             ...(opts.liveImageBase64 ? { live_image: opts.liveImageBase64 } : {}),
         },
     );
@@ -191,7 +202,7 @@ export async function verifyIdentity(
         jti,
         ivr: resp.ivr,
         salts: resp.salts ?? {},
-        fields: resp.fields ?? documentFields,
+        fields: resp.fields ?? doc.fields,
         measurement: enclave.measurement,
         imageRef: enclave.imageRef,
         verifiedAt: Math.floor(Date.now() / 1000),

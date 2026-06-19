@@ -112,6 +112,9 @@ function parseMrzLines(rawLines: string[]): MrzScan | null {
                     documentNumber: f.documentNumber,
                     dateOfBirth: f.birthDate,
                     dateOfExpiry: f.expirationDate,
+                    // The exact accepted MRZ lines, joined — for the enclave's
+                    // visual↔chip cross-reference (GPG45 box 3).
+                    mrz: candidates.slice(-n).join(''),
                 };
             }
         } catch {

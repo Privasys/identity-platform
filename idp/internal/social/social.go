@@ -459,7 +459,7 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 // --- Wallet-link handlers ---
 
 // allowedWalletSchemes is the set of custom URL schemes the wallet may use as
-// its link callback (one per build stage, see auth.md "Custom URL Schemes").
+// its link callback (one per build stage, see the auth design "Custom URL Schemes").
 // Restricting the redirect prevents an open redirect / token-leak to a
 // malicious app.
 var allowedWalletSchemes = []string{

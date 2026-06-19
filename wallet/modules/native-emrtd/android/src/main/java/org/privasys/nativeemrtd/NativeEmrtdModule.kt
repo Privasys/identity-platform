@@ -3,10 +3,14 @@
 
 package org.privasys.nativeemrtd
 
+import android.graphics.BitmapFactory
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import android.util.Base64
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -15,6 +19,7 @@ import org.jmrtd.BACKey
 import org.jmrtd.PassportService
 import org.jmrtd.lds.icao.DG1File
 import org.jmrtd.lds.icao.DG2File
+import org.json.JSONArray
 import org.json.JSONObject
 import java.security.Security
 
@@ -51,10 +56,38 @@ class NativeEmrtdModule : Module() {
             "{\"supported\":$supported,\"reason\":\"$reason\"}"
         }
 
-        AsyncFunction("scanMrz") { _: String ->
-            // TODO(android): ML Kit text recognition + TD3 parse. Until then the
-            // wallet falls back to manual MRZ entry on Android.
-            "{\"error\":\"MRZ scanning is not yet available on Android\"}"
+        AsyncFunction("scanMrz") { imageBase64: String, promise: Promise ->
+            val bytes = try {
+                Base64.decode(imageBase64, Base64.DEFAULT)
+            } catch (_: Throwable) {
+                null
+            }
+            val bitmap = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            if (bitmap == null) {
+                promise.resolve("{\"error\":\"could not decode the photo\"}")
+                return@AsyncFunction
+            }
+
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            recognizer.process(InputImage.fromBitmap(bitmap, 0))
+                .addOnSuccessListener { text ->
+                    val lines = JSONArray()
+                    text.textBlocks.forEach { block ->
+                        block.lines.forEach { line -> lines.put(line.text) }
+                    }
+                    promise.resolve(JSONObject().put("lines", lines).toString())
+                }
+                .addOnFailureListener { error ->
+                    promise.resolve(
+                        JSONObject()
+                            .put("error", error.localizedMessage ?: "text recognition failed")
+                            .toString()
+                    )
+                }
+                .addOnCompleteListener {
+                    bitmap.recycle()
+                    recognizer.close()
+                }
         }
 
         AsyncFunction("readDocument") { documentNumber: String, dateOfBirth: String, dateOfExpiry: String, promise: Promise ->

@@ -58,7 +58,7 @@ export interface AttributeDefinition {
     /**
      * Whether this attribute can reach 'gov' assurance via the identity-verifier
      * enclave (passport/ID + biometric). Such attributes live under the
-     * request-gated 'identity' scope. See kyc-enclave-design.md §3.
+     * request-gated 'identity' scope. See the identity-verifier (KYC) design
      */
     identityVerifiable?: boolean;
     /**

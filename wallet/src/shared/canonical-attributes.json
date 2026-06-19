@@ -13,7 +13,16 @@
     { "key": "birthdate",    "label": "Date of Birth", "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true },
     { "key": "nationality",  "label": "Nationality",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true, "valuesUrl": "/referential/nationality.json" },
     { "key": "age_over_18",  "label": "18 or older",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true },
-    { "key": "age_over_21",  "label": "21 or older",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true }
+    { "key": "age_over_21",  "label": "21 or older",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true },
+    { "key": "document_number", "label": "Passport Number", "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
+    { "key": "document_type",   "label": "Document Type",   "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
+    { "key": "sex",             "label": "Sex",             "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
+    { "key": "issuing_state",   "label": "Issuing Country", "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true, "valuesUrl": "/referential/nationality.json" },
+    { "key": "doc_expiry",      "label": "Passport Expiry", "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
+    { "key": "place_of_birth",  "label": "Place of Birth",  "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
+    { "key": "personal_number", "label": "Personal Number", "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
+    { "key": "given_name_id",   "label": "Given Names (ID)","scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
+    { "key": "family_name_id",  "label": "Surname (ID)",    "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true }
   ],
   "providers": {
     "google": {

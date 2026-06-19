@@ -3,7 +3,7 @@
 
 package fido2
 
-// Enclave Vault promote step-up (policies-plan.md §9).
+// Enclave Vault promote step-up (the vault promote-step-up design).
 //
 // A vault key's promote rule may carry Condition::OidcStepUp{operation_bound},
 // requiring the owner's bearer to additionally prove a fresh WebAuthn assertion
@@ -35,7 +35,7 @@ import (
 )
 
 // vaultApprovalDomain MUST match the vault (enclave-os-vault/src/policy.rs) and
-// every client. See policies-plan.md §9.
+// every client. See the vault promote-step-up design.
 const vaultApprovalDomain = "privasys-vault-approval/v1"
 
 // computeVaultApprovalBinding hashes the canonical newline-joined operation

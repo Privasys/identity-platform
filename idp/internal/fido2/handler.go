@@ -204,7 +204,7 @@ type challengeEntry struct {
 	discoverable bool   // true when authenticate/begin had no credentialId
 	expiresAt    time.Time
 	// vaultApproval is set when this challenge is a vault promote step-up
-	// (policies-plan.md §9). On /complete the handler issues an operation-bound
+	// (the vault promote-step-up design). On /complete the handler issues an operation-bound
 	// access token from these values instead of a session token.
 	vaultApproval *vaultApprovalMeta
 }

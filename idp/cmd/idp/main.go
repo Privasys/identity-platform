@@ -149,7 +149,7 @@ func main() {
 	mux.HandleFunc("POST /fido2/authenticate/begin", fido2Handler.BeginAuthentication)
 	mux.HandleFunc("POST /fido2/authenticate/complete",
 		fido2Handler.CompleteAuthentication(codeStore, sessionStore))
-	// Enclave Vault promote step-up (policies-plan.md §9): a fresh WebAuthn
+	// Enclave Vault promote step-up (the vault promote-step-up design): a fresh WebAuthn
 	// assertion bound to a specific promote, exchanged for an operation-bound
 	// access token (aud = the vault audience).
 	mux.HandleFunc("POST /fido2/vault-approval/begin",

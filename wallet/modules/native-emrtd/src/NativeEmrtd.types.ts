@@ -43,4 +43,7 @@ export interface MrzScan {
     documentNumber: string;
     dateOfBirth: string;
     dateOfExpiry: string;
+    /** The full OCR'd MRZ lines, joined — sent to the enclave so it can
+     *  cross-reference the visual data against the chip's DG1 (GPG45 box 3). */
+    mrz: string;
 }

@@ -40,6 +40,10 @@ dependencies {
     implementation('net.sf.scuba:scuba-sc-android:0.0.20') { exclude group: 'org.bouncycastle' }
     implementation 'org.bouncycastle:bcprov-jdk15to18:1.81'
     implementation 'org.bouncycastle:bcutil-jdk15to18:1.81'
+
+    // Bundled so passport alignment detection works immediately, including on
+    // devices without Google Play Services or a downloaded OCR model.
+    implementation 'com.google.mlkit:text-recognition:16.0.1'
 }
 
 def safeExtGet(prop, fallback) {

@@ -32,7 +32,7 @@ export interface VerificationRecord {
      * Assurance level reached by this verification:
      *   'provider' — asserted by a linked IdP (an OIDC claim like email_verified)
      *   'gov'      — certified by the identity-verifier enclave (passport/ID + biometric)
-     * Absent/'none' = self-asserted. See kyc-enclave-design.md §3.
+     * Absent/'none' = self-asserted. See the identity-verifier (KYC) design
      */
     assurance?: 'none' | 'provider' | 'gov';
     /** Epoch seconds when the verification was performed. */

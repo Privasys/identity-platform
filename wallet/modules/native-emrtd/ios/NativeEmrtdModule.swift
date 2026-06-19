@@ -102,7 +102,7 @@ public class NativeEmrtdModule: Module {
             "document_number": p.documentNumber,
         ]
         if let bd = isoDate(p.dateOfBirth) { fields["birthdate"] = bd }
-        if let ex = isoDate(p.documentExpiryDate) { fields["expiry_date"] = ex }
+        if let ex = isoDate(p.documentExpiryDate, future: true) { fields["expiry_date"] = ex }
 
         let fieldsJson = fields
             .map { "\"\($0.key)\":\"\(escape($0.value))\"" }
@@ -119,7 +119,9 @@ public class NativeEmrtdModule: Module {
         // are a convenience; the enclave certifies from these raw bytes.
         let sod = rawDataGroup(p, .SOD)
         var dgEntries: [String] = []
-        for (id, num) in [(DataGroupId.DG1, "1"), (DataGroupId.DG2, "2")] {
+        // DG1 (MRZ) + DG2 (portrait) are required; DG11 (additional personal
+        // details: place of birth, personal number) is sent when present.
+        for (id, num) in [(DataGroupId.DG1, "1"), (DataGroupId.DG2, "2"), (DataGroupId.DG11, "11")] {
             if let dg = p.getDataGroup(id) {
                 dgEntries.append("\"\(num)\":\"\(Data(dg.data).base64EncodedString())\"")
             }
@@ -135,15 +137,16 @@ public class NativeEmrtdModule: Module {
         return "\"\(Data(dg.data).base64EncodedString())\""
     }
 
-    /// MRZ dates are YYMMDD; expand to YYYY-MM-DD with a century heuristic
-    /// (years greater than the current 2-digit year are treated as 19xx).
-    private static func isoDate(_ yymmdd: String) -> String? {
+    /// MRZ dates are YYMMDD; expand to YYYY-MM-DD. Birth dates are in the past, so
+    /// a 2-digit year above the current one rolls back to 19xx; expiry dates are
+    /// always in the future, so `future: true` always uses the 2000s.
+    private static func isoDate(_ yymmdd: String, future: Bool = false) -> String? {
         guard yymmdd.count == 6,
               let yy = Int(yymmdd.prefix(2)),
               let mm = Int(yymmdd.dropFirst(2).prefix(2)),
               let dd = Int(yymmdd.suffix(2)) else { return nil }
         let currentYY = Calendar.current.component(.year, from: Date()) % 100
-        let century = yy > currentYY ? 1900 : 2000
+        let century = future ? 2000 : (yy > currentYY ? 1900 : 2000)
         return String(format: "%04d-%02d-%02d", century + yy, mm, dd)
     }
 

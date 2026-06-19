@@ -44,7 +44,7 @@ type Attribute struct {
 	DeviceSourced bool `json:"deviceSourced,omitempty"`
 	// IdentityVerifiable marks an attribute that can reach 'gov' assurance via
 	// the identity-verifier enclave (passport/ID + biometric). Carried under the
-	// request-gated 'identity' scope (see kyc-enclave-design.md §3).
+	// request-gated 'identity' scope (see the identity-verifier (KYC) design).
 	IdentityVerifiable bool `json:"identityVerifiable,omitempty"`
 }
 

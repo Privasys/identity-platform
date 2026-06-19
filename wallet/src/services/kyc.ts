@@ -12,8 +12,8 @@
  * derive consented disclosure tokens (prove_*), and auto-fills its profile with
  * the verified, gov-assurance attributes.
  *
- * See .operations/identity-platform/kyc-enclave-design.md (receipt-based,
- * commit-and-prove) and wallet-improve-plan.md §3.
+ * See the identity-verifier (KYC) design (receipt-based,
+ * commit-and-prove) and the wallet improvement design
  *
  * NOTE: the document fields are supplied by the caller. Today that is a dev
  * stub; the NFC + biometric capture native module (Phase 2 §3.3) will feed the
@@ -48,19 +48,26 @@ const VERIFIER_ORIGIN =
  *  (org.privasys, 1.3.6.1.4.1.65230.3.2). Pinning this is what makes "send my
  *  passport to the enclave" safe: we only talk to the published, auditable code. */
 const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.3.2';
-// container-app-identity-verifier v0.1.3 (ghcr.io/privasys/container-app-identity-verifier).
+// container-app-identity-verifier v0.2.7 (ghcr.io/privasys/container-app-identity-verifier).
 // This is the OCI image digest the enclave attests at OID 3.2; it changes only
 // when the verifier image is rebuilt (not on a plain redeploy). Bump it here when
 // a new verifier image is published, or override per-build with the env var.
 const VERIFIER_IMAGE_DIGEST =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_DIGEST ??
-    '4bf5a32c6d6e5f48ddc21a6abefa24b05b17fc9dd0e14522af5d5c53eeb9f15d';
+    '5d7de7209b70c38270316b6eacc3f40b512a6ec02d68588c327c6439555534f1';
 
 const ATTESTATION_SERVER = 'https://as.privasys.org';
 const VERIFIER_DISPLAY = 'Privasys identity verifier';
 
-/** Canonical document fields the enclave can certify and the wallet auto-fills. */
-const DOCUMENT_ATTRIBUTE_KEYS = ['given_name', 'family_name', 'birthdate', 'nationality'] as const;
+/** Canonical document fields the enclave can certify and the wallet auto-fills.
+ *  All are sourced from the passport chip (DG1 MRZ; place_of_birth from DG11) and
+ *  carry 'gov' assurance — the set the wallet can present for, e.g., a one-tap
+ *  flight check-in. Keys match the enclave's parse_dg1 output. */
+const DOCUMENT_ATTRIBUTE_KEYS = [
+    'given_name', 'family_name', 'birthdate', 'nationality',
+    'document_number', 'document_type', 'sex', 'issuing_state', 'doc_expiry',
+    'place_of_birth', 'personal_number',
+] as const;
 /** Age thresholds derived locally from the gov-verified birth date. */
 const AGE_THRESHOLDS = [18, 21] as const;
 
@@ -88,6 +95,39 @@ export interface VerifyIdentityResult {
     /** Profile attribute keys that were auto-filled at gov assurance. */
     filled: string[];
     measurement: string;
+}
+
+/** BAC/PACE access-key fields, MRZ form (dates YYMMDD), from the enclave OCR. */
+export interface DocMrzFields {
+    documentNumber: string;
+    dateOfBirth: string;   // YYMMDD (MRZ form) — the eMRTD chip key shape
+    dateOfExpiry: string;  // YYMMDD
+    isScreenshot?: boolean | null;
+}
+
+/**
+ * Pre-NFC MRZ read. Forwards the data-page image to the attested enclave, which
+ * OCRs it with OmniMRZ — far more reliable on the OCR-B machine-readable zone
+ * than on-device OCR — and returns the BAC/PACE access-key fields, check-digit
+ * validated. The wallet then unlocks the chip with this enclave-grade read.
+ * Attestation is re-verified (same pin as verifyIdentity) because the raw page
+ * image leaves the device. Throws if the MRZ couldn't be read clearly (HTTP 422)
+ * so the caller can prompt a retake.
+ */
+export async function readDocumentMrz(docImageBase64: string): Promise<DocMrzFields> {
+    await verifyVerifierEnclave();
+    const resp = await postToVerifier<{
+        document_number: string;
+        date_of_birth: string;
+        date_of_expiry: string;
+        is_screenshot?: boolean | null;
+    }>('/read-mrz', { doc_image: docImageBase64 });
+    return {
+        documentNumber: resp.document_number,
+        dateOfBirth: resp.date_of_birth,
+        dateOfExpiry: resp.date_of_expiry,
+        isScreenshot: resp.is_screenshot,
+    };
 }
 
 /** Holder public key (base64url SEC1 uncompressed P-256) for IVR binding. */
@@ -178,7 +218,7 @@ export async function verifyIdentity(
         /** Raw data groups keyed by DG number ("1", "2"), base64. */
         dataGroups?: Record<string, string>;
     },
-    opts: { liveImageBase64?: string } = {},
+    opts: { liveImageBase64?: string; docImage?: string } = {},
 ): Promise<VerifyIdentityResult> {
     const enclave = await verifyVerifierEnclave();
     const holderPub = await getHolderPublicKey();
@@ -194,6 +234,11 @@ export async function verifyIdentity(
             ...(doc.sod ? { sod: doc.sod } : {}),
             ...(doc.dataGroups ? { data_groups: doc.dataGroups } : {}),
             ...(opts.liveImageBase64 ? { live_image: opts.liveImageBase64 } : {}),
+            // Data-page image → the enclave runs the heavy OCR (VIZ + MRZ) and
+            // cross-references it against the chip to detect a tampered document
+            // (GPG45 box 3), keeping the wallet thin. The enclave treats the chip
+            // as authoritative; box 3 is skipped if no image is sent.
+            ...(opts.docImage ? { doc_image: opts.docImage } : {}),
         },
     );
 
@@ -227,14 +272,22 @@ function autofillGovAttributes(record: KycRecord): string[] {
         evidence,
     });
 
+    // The legal names from the document go to dedicated *_id attributes — never
+    // overwrite the holder's preferred everyday name (e.g. "Bertrand" vs the
+    // passport's legal "BERTRAND FRANCOIS"). The wallet then *asks* whether to
+    // adopt the ID name (see kyc-capture). Other fields store under their own key.
+    const STORE_KEY: Record<string, string> = {
+        given_name: 'given_name_id',
+        family_name: 'family_name_id',
+    };
     for (const key of DOCUMENT_ATTRIBUTE_KEYS) {
         const value = record.fields[key];
         if (!value) continue;
-        setProfileValue(store, key, value, 'document', {
+        setProfileValue(store, STORE_KEY[key] ?? key, value, 'document', {
             verified: true,
             verifications: [govRecord(`ivr:${record.jti}`)],
         });
-        filled.push(key);
+        filled.push(STORE_KEY[key] ?? key);
     }
 
     // age_over_N is a privacy-preserving boolean derived from the gov-verified

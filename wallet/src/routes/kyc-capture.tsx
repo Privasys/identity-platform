@@ -14,26 +14,23 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View as NativeView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View } from '@/components/Themed';
-import { verifyIdentity } from '@/services/kyc';
+import { getProfileValue, setProfileValue } from '@/services/attributes';
+import { readDocumentMrz, verifyIdentity } from '@/services/kyc';
+import { useProfileStore } from '@/stores/profile';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
-type Step = 'doctype' | 'mrz' | 'mrz-camera' | 'read' | 'selfie' | 'verifying' | 'done';
+type Step = 'doctype' | 'capture' | 'read' | 'selfie' | 'verifying' | 'done';
 type DocType = 'passport' | 'id-card';
+type CaptureState = 'positioning' | 'checking' | 'captured';
 
-// Dev-only stub document fields, used when the device can't read a chip yet so
-// the verify_identity → auto-fill round-trip is exercisable. Never used in prod.
-const DEV_STUB_FIELDS: Record<string, string> = {
-    given_name: 'Ada',
-    family_name: 'Lovelace',
-    birthdate: '1990-05-17',
-    nationality: 'GBR',
-};
+// Data-page (TD3 photo page) aspect ≈ 125×88 mm ≈ 1.42:1.
+const DOC_PAGE_RATIO = 1.42;
 
 export default function KycCaptureScreen() {
     const router = useRouter();
@@ -45,66 +42,46 @@ export default function KycCaptureScreen() {
     const [dob, setDob] = useState('');
     const [expiry, setExpiry] = useState('');
     const [docRead, setDocRead] = useState<Emrtd.EmrtdReadResult | null>(null);
+    // The captured data-page frame — sent to the enclave for the heavy OCR +
+    // visual↔chip cross-reference (GPG45 box 3). The wallet stays thin (no OCR
+    // lib); it just forwards the image.
+    const [docImage, setDocImage] = useState('');
     const [busy, setBusy] = useState(false);
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
-    const scanningRef = useRef(false);
+    const [cameraReady, setCameraReady] = useState(false);
+    const [cameraKey, setCameraKey] = useState(0);
+    const [captureState, setCaptureState] = useState<CaptureState>('positioning');
+    const captureInFlight = useRef(false);
+    const captureFinished = useRef(false);
+    // The authoritative MRZ (BAC key) comes back from the enclave once we reach
+    // the read step; gate the chip scan on it.
+    const [mrzReadDone, setMrzReadDone] = useState(false);
+
+    // Size the guide from the live landscape viewport and leave a dark margin so
+    // every edge of the document remains visible.
+    const { width: winW, height: winH } = useWindowDimensions();
+    const usableH = winH - insets.top - insets.bottom;
+    const frameW = Math.min(winW * 0.94, usableH * 0.9 * DOC_PAGE_RATIO);
+    const frameH = frameW / DOC_PAGE_RATIO;
+    const frameLeft = (winW - frameW) / 2;
+    const frameTop = (winH - frameH) / 2;
 
     useEffect(() => {
         Emrtd.isSupported().then(setSupport).catch(() => setSupport({ supported: false }));
     }, []);
 
-    // Continuously OCR the MRZ while the camera is open: scan a frame, and only
-    // accept it when the `mrz` parser confirms the check digits (so a misread
-    // never yields a wrong BAC key). Stops as soon as a valid MRZ is found.
+    // Force a fresh camera session once the landscape layout has settled. Mounting
+    // CameraView the instant `step` becomes 'capture' coincides with the portrait
+    // →landscape flip (Stack.Screen), so the preview can come up blank/white when
+    // the session starts mid-rotation. Remounting via a changing `key` after the
+    // viewport dimensions change is the same stale-stream reset the QR scanner
+    // uses (routes/scan.tsx). Resetting cameraReady restarts the inspect loop.
     useEffect(() => {
-        if (step !== 'mrz-camera') {
-            scanningRef.current = false;
-            return;
-        }
-        scanningRef.current = true;
-        let cancelled = false;
-        // Require the same MRZ from two separate frames before accepting it. A
-        // single OCR misread (e.g. the OCR-B 'I' read as '1') rarely repeats
-        // identically, so consensus filters out transient errors that would
-        // otherwise pass the check digits as a self-consistent but wrong key.
-        let previous: string | null = null;
-        const loop = async () => {
-            while (scanningRef.current && !cancelled) {
-                try {
-                    const photo = await cameraRef.current?.takePictureAsync({
-                        base64: true,
-                        quality: 0.5,
-                        skipProcessing: true,
-                        shutterSound: false,
-                    });
-                    if (photo?.base64) {
-                        const mrz = await Emrtd.scanMrz(photo.base64);
-                        if (cancelled) return;
-                        const fingerprint = `${mrz.documentNumber}|${mrz.dateOfBirth}|${mrz.dateOfExpiry}`;
-                        if (fingerprint === previous) {
-                            scanningRef.current = false;
-                            setDocNumber(mrz.documentNumber);
-                            setDob(mrz.dateOfBirth);
-                            setExpiry(mrz.dateOfExpiry);
-                            setStep('mrz');
-                            return;
-                        }
-                        previous = fingerprint;
-                    }
-                } catch {
-                    // No valid MRZ in this frame (or camera not ready) — keep trying.
-                }
-                await new Promise((r) => setTimeout(r, 350));
-            }
-        };
-        const t = setTimeout(loop, 800); // let the camera mount first
-        return () => {
-            cancelled = true;
-            scanningRef.current = false;
-            clearTimeout(t);
-        };
-    }, [step]);
+        if (step !== 'capture') return;
+        setCameraReady(false);
+        setCameraKey((k) => k + 1);
+    }, [step, winW, winH]);
 
     const close = () => {
         if (router.canGoBack()) router.back();
@@ -112,7 +89,6 @@ export default function KycCaptureScreen() {
     };
 
     const docLabel = docType === 'passport' ? 'passport' : 'ID card';
-    const mrzReady = docNumber.trim().length > 0 && dob.trim().length === 6 && expiry.trim().length === 6;
 
     // ── Step 2: read the document chip over NFC (or dev stub) ────────────────
     const handleScan = async () => {
@@ -139,7 +115,7 @@ export default function KycCaptureScreen() {
             if (rejectedKey) {
                 Alert.alert(
                     "The code didn't match the chip",
-                    'Check the document number for look-alike characters: I vs 1, O vs 0, S vs 5, B vs 8, Z vs 2. Tap Edit details to correct it, then try again.',
+                    'This usually means a look-alike character was misread (I vs 1, O vs 0, S vs 5, B vs 8, Z vs 2). Tap Retake photo, hold the page flat and steady, then try again.',
                 );
             } else {
                 Alert.alert(
@@ -152,33 +128,170 @@ export default function KycCaptureScreen() {
         }
     };
 
-    const handleUseDevStub = () => {
-        setDocRead({ fields: DEV_STUB_FIELDS });
-        setStep('selfie');
-    };
-
-    // ── MRZ OCR: photograph the photo page, auto-fill the access fields ─────
-    const openMrzCamera = async () => {
-        if (permission && !permission.granted) {
-            const res = await requestPermission();
-            if (!res.granted) {
-                Alert.alert('Camera needed', 'Allow camera access to scan your document.');
-                return;
-            }
+    // ── Step 1: photograph the data page ────────────────────────────────────
+    const openCapture = async () => {
+        // Always resolve permission via the hook before mounting the camera —
+        // `permission` can still be null on the first tap, and CameraView shows a
+        // blank/white preview until the hook itself has granted.
+        let p = permission;
+        if (!p || !p.granted) p = await requestPermission();
+        if (!p?.granted) {
+            Alert.alert('Camera needed', 'Allow camera access to photograph your document.');
+            return;
         }
-        setStep('mrz-camera');
+        setDocNumber(''); setDob(''); setExpiry(''); setDocImage('');
+        setMrzReadDone(false);
+        captureFinished.current = false;
+        setCameraReady(false);
+        setCaptureState('positioning');
+        setStep('capture');
     };
 
+    // One clear photo of the data page does double duty: we OCR it for the chip
+    // access key (BAC/PACE) and forward the same image to the enclave for the
+    // visual↔chip cross-reference (GPG45 box 3).
+    // CameraView does not expose raw preview frames. Sample a still roughly once
+    // per second and run on-device OCR over it. scanMrz only succeeds when the
+    // ICAO document-number, DOB and expiry check digits all validate, making it
+    // a useful signal that the passport is sharp, readable and correctly placed.
+    useEffect(() => {
+        if (step !== 'capture' || !cameraReady) return;
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+
+        const inspectFrame = async () => {
+            if (cancelled || captureFinished.current || captureInFlight.current) return;
+            captureInFlight.current = true;
+            setCaptureState('checking');
+            try {
+                // Fast, low-resolution probe purely to detect a sharp, well-placed
+                // MRZ in frame — keeps the green positioning feedback snappy.
+                const probe = await cameraRef.current?.takePictureAsync({
+                    base64: true,
+                    quality: 0.3,
+                    shutterSound: false,
+                });
+                if (!probe?.base64 || cancelled) return;
+                const mrz = await Emrtd.scanMrz(probe.base64); // throws until placed & sharp
+                if (cancelled) return;
+
+                captureFinished.current = true;
+                setCaptureState('captured');
+                // Provisional BAC/PACE key from the on-device read. This on-device
+                // scan is unreliable on some documents, so it is only a positioning
+                // trigger; the authoritative MRZ comes back from the enclave's
+                // OmniMRZ read of docImage (see services/kyc.ts) — next step.
+                setDocNumber(mrz.documentNumber);
+                setDob(mrz.dateOfBirth);
+                setExpiry(mrz.dateOfExpiry);
+
+                // Grab one clean, full-quality frame for the enclave OCR (OmniMRZ)
+                // + box-3 cross-reference.
+                const shot = await cameraRef.current?.takePictureAsync({
+                    base64: true,
+                    quality: 0.9,
+                    shutterSound: false,
+                });
+                setDocImage(shot?.base64 ?? probe.base64);
+
+                // Keep the green confirmation visible long enough to register.
+                await new Promise((resolve) => setTimeout(resolve, 500));
+                if (!cancelled) setStep('read');
+            } catch {
+                if (!cancelled) setCaptureState('positioning');
+            } finally {
+                captureInFlight.current = false;
+                if (!cancelled && !captureFinished.current) {
+                    timer = setTimeout(inspectFrame, 350);
+                }
+            }
+        };
+
+        timer = setTimeout(inspectFrame, 400);
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
+    }, [cameraReady, step]);
+
+    // ── Between Step 1 and Step 2: derive the BAC key from the captured image ─
+    // The on-device OCR is unreliable on the OCR-B MRZ, so we send the data-page
+    // photo to the attested enclave (OmniMRZ) and use its check-digit-validated
+    // read as the chip access key. Runs once on entering the read step; a failed
+    // read sends the user back to retake the photo.
+    useEffect(() => {
+        if (step !== 'read' || !docImage || mrzReadDone) return;
+        let cancelled = false;
+        (async () => {
+            setBusy(true);
+            try {
+                const mrz = await readDocumentMrz(docImage);
+                if (cancelled) return;
+                setDocNumber(mrz.documentNumber);
+                setDob(mrz.dateOfBirth);
+                setExpiry(mrz.dateOfExpiry);
+                setMrzReadDone(true);
+            } catch (e: any) {
+                if (cancelled) return;
+                console.warn('[KYC] enclave MRZ read failed:', e?.message);
+                Alert.alert(
+                    "Couldn't read the photo page",
+                    'Make sure the whole page is in frame, flat and well lit, then retake the photo.',
+                    [{ text: 'Retake photo', onPress: () => { openCapture(); } }],
+                );
+            } finally {
+                if (!cancelled) setBusy(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [step, docImage, mrzReadDone]);
 
     // ── Step 2: capture a live selfie (for the enclave face match) ──────────
+    // After verification the legal names are stored as given_name_id/family_name_id
+    // (gov). Offer — never force — adopting them as the everyday first/last name,
+    // since a passport's legal given names ("BERTRAND FRANCOIS") are often not the
+    // name someone goes by ("Bertrand").
+    const offerAdoptIdName = () => {
+        const store = useProfileStore.getState();
+        const profile = store.profile;
+        if (!profile) return;
+        const idGiven = getProfileValue(profile, 'given_name_id');
+        const idFamily = getProfileValue(profile, 'family_name_id');
+        if (!idGiven && !idFamily) return;
+        const curGiven = getProfileValue(profile, 'given_name');
+        const curFamily = getProfileValue(profile, 'family_name');
+        if (idGiven === curGiven && idFamily === curFamily) return; // nothing to offer
+        const current = curGiven || curFamily ? `\n\nKeep your current name (${[curGiven, curFamily].filter(Boolean).join(' ')})?` : '';
+        Alert.alert(
+            'Use your verified name?',
+            `Your ID shows:\n  First name: ${idGiven ?? '—'}\n  Last name: ${idFamily ?? '—'}${current}`,
+            [
+                { text: 'Keep current', style: 'cancel' },
+                {
+                    text: 'Use ID name',
+                    onPress: () => {
+                        const rec = [{
+                            verifier: 'privasys-kyc', verifierDisplayName: 'Privasys identity verifier',
+                            method: 'kyc_enclave' as const, assurance: 'gov' as const,
+                            verifiedAt: Math.floor(Date.now() / 1000),
+                        }];
+                        if (idGiven) setProfileValue(store, 'given_name', idGiven, 'document', { verified: true, verifications: rec });
+                        if (idFamily) setProfileValue(store, 'family_name', idFamily, 'document', { verified: true, verifications: rec });
+                    },
+                },
+            ],
+        );
+    };
+
     const captureAndVerify = async (liveImageBase64?: string) => {
         if (!docRead) return;
         setStep('verifying');
         setBusy(true);
         try {
-            const result = await verifyIdentity(docRead, { liveImageBase64 });
+            const result = await verifyIdentity(docRead, { liveImageBase64, docImage: docImage || undefined });
             console.log('[KYC] verified — filled:', result.filled.join(', '));
             setStep('done');
+            offerAdoptIdName();
         } catch (e: any) {
             Alert.alert('Verification failed', e.message);
             setStep('selfie');
@@ -209,6 +322,7 @@ export default function KycCaptureScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
+            <Stack.Screen options={{ orientation: step === 'capture' ? 'landscape' : 'portrait' }} />
             <Pressable style={[styles.close, { top: insets.top + 12 }]} onPress={close} hitSlop={12}>
                 <Ionicons name="close" size={26} color="#8E8E93" />
             </Pressable>
@@ -227,7 +341,7 @@ export default function KycCaptureScreen() {
 
                     <Pressable
                         style={styles.docOption}
-                        onPress={() => { setDocType('passport'); setStep('mrz'); }}
+                        onPress={() => { setDocType('passport'); openCapture(); }}
                     >
                         <Ionicons name="airplane-outline" size={22} color="#007AFF" />
                         <View style={styles.docOptionBody}>
@@ -239,7 +353,7 @@ export default function KycCaptureScreen() {
 
                     <Pressable
                         style={styles.docOption}
-                        onPress={() => { setDocType('id-card'); setStep('mrz'); }}
+                        onPress={() => { setDocType('id-card'); openCapture(); }}
                     >
                         <Ionicons name="card-outline" size={22} color="#007AFF" />
                         <View style={styles.docOptionBody}>
@@ -252,126 +366,131 @@ export default function KycCaptureScreen() {
                     <Text style={styles.note}>
                         Driving licences don&apos;t carry an NFC identity chip and can&apos;t be verified this way.
                     </Text>
+                    {support && !support.supported && (
+                        <Text style={[styles.note, { color: '#F59E0B' }]}>
+                            NFC is unavailable on this device{support.reason ? ` (${support.reason})` : ''}, so the chip can&apos;t be read.
+                        </Text>
+                    )}
                 </ScrollView>
             )}
 
-            {step === 'mrz' && (
-                <ScrollView
-                    style={styles.flex}
-                    contentContainerStyle={styles.padContent}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                >
-                    <Ionicons name="scan-outline" size={40} color="#007AFF" />
-                    <Text style={styles.title}>Step 1 · Read the code</Text>
-                    <Text style={styles.body}>
-                        Scan the machine-readable zone (the rows of {'<<<'} on your {docLabel}) to fill
-                        these automatically, or enter them by hand. This unlocks the chip in the next step.
-                    </Text>
-
-                    {support?.supported && (
-                        <Pressable style={styles.primary} onPress={openMrzCamera}>
-                            <Ionicons name="camera-outline" size={18} color="#FFFFFF" />
-                            <Text style={styles.primaryText}>Scan {docLabel} to auto-fill</Text>
-                        </Pressable>
-                    )}
-                    <Text style={styles.orText}>or enter the details by hand</Text>
-
-                    <TextInput
-                        style={styles.input}
-                        value={docNumber}
-                        onChangeText={setDocNumber}
-                        placeholder="Document number"
-                        placeholderTextColor="#94A3B8"
-                        autoCapitalize="characters"
+            {step === 'capture' && (
+                <NativeView style={[styles.flex, { backgroundColor: '#000' }]}>
+                    <CameraView
+                        key={cameraKey}
+                        ref={cameraRef}
+                        style={styles.camera}
+                        facing="back"
+                        autofocus="on"
+                        active={step === 'capture'}
+                        onCameraReady={() => {
+                            console.log('[KYC] capture camera ready');
+                            setCameraReady(true);
+                        }}
+                        onMountError={(e) => console.warn('[KYC] capture camera mount error:', e?.message)}
                     />
-                    <TextInput
-                        style={styles.input}
-                        value={dob}
-                        onChangeText={setDob}
-                        placeholder="Date of birth (YYMMDD)"
-                        placeholderTextColor="#94A3B8"
-                        keyboardType="number-pad"
-                        maxLength={6}
+                    <NativeView style={[styles.captureMask, { top: 0, left: 0, right: 0, height: frameTop }]} pointerEvents="none" />
+                    <NativeView
+                        style={[styles.captureMask, { top: frameTop + frameH, left: 0, right: 0, bottom: 0 }]}
+                        pointerEvents="none"
                     />
-                    <TextInput
-                        style={styles.input}
-                        value={expiry}
-                        onChangeText={setExpiry}
-                        placeholder="Expiry date (YYMMDD)"
-                        placeholderTextColor="#94A3B8"
-                        keyboardType="number-pad"
-                        maxLength={6}
+                    <NativeView
+                        style={[styles.captureMask, { top: frameTop, left: 0, width: frameLeft, height: frameH }]}
+                        pointerEvents="none"
                     />
-
-                    {support && !support.supported && (
-                        <Text style={styles.note}>
-                            NFC scanning is unavailable on this device{support.reason ? ` (${support.reason})` : ''}.
-                        </Text>
-                    )}
-
-                    <Pressable
-                        style={[styles.primary, (!mrzReady || !support?.supported) && styles.disabled]}
-                        onPress={() => setStep('read')}
-                        disabled={!mrzReady || !support?.supported}
+                    <NativeView
+                        style={[styles.captureMask, {
+                            top: frameTop,
+                            right: 0,
+                            width: frameLeft,
+                            height: frameH,
+                        }]}
+                        pointerEvents="none"
+                    />
+                    <NativeView
+                        pointerEvents="none"
+                        style={[
+                            styles.frameGuide,
+                            {
+                                left: frameLeft,
+                                top: frameTop,
+                                width: frameW,
+                                height: frameH,
+                                borderColor: captureState === 'captured' ? '#34C759' : '#D1D5DB',
+                            },
+                        ]}
                     >
-                        <Text style={styles.primaryText}>Continue</Text>
-                    </Pressable>
-
-                    {__DEV__ && (
-                        <Pressable style={styles.secondary} onPress={handleUseDevStub}>
-                            <Text style={styles.secondaryText}>Use test identity (dev)</Text>
-                        </Pressable>
+                        <PassportPageGuide active={captureState === 'captured'} />
+                    </NativeView>
+                    {captureState !== 'captured' && (
+                        <NativeView style={[styles.captureHint, { top: insets.top + 14 }]} pointerEvents="none">
+                            <Text style={styles.captureHintText}>
+                                Position the camera over your {docLabel}&apos;s photo page
+                            </Text>
+                            <Text style={styles.captureHintSub}>
+                                It captures on its own once the page is sharp and in frame
+                            </Text>
+                        </NativeView>
                     )}
-                </ScrollView>
+                    <NativeView style={[styles.capturePrompt, { bottom: insets.bottom + 14 }]} pointerEvents="none">
+                        {captureState === 'captured' ? (
+                            <>
+                                <Ionicons name="checkmark-circle" size={25} color="#34C759" />
+                                <Text style={styles.capturePromptReady}>Passport captured</Text>
+                            </>
+                        ) : (
+                            <>
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                                <Text style={styles.capturePromptText}>
+                                    Fit the photo page inside the frame and hold still
+                                </Text>
+                            </>
+                        )}
+                    </NativeView>
+                </NativeView>
             )}
 
             {step === 'read' && (
                 <View style={styles.pad}>
-                    <Ionicons name="phone-portrait-outline" size={40} color="#007AFF" />
-                    <Text style={styles.title}>Step 2 · Scan the chip</Text>
-                    <Text style={styles.body}>
-                        Hold your {docLabel} flat against the top of your phone and keep it still. The chip
-                        unlocks with the code from step 1.
-                    </Text>
-
-                    <View style={styles.summaryCard}>
-                        <SummaryRow label="Document" value={docNumber.trim()} />
-                        <SummaryRow label="Date of birth" value={dob.trim()} />
-                        <SummaryRow label="Expiry" value={expiry.trim()} />
-                    </View>
-
-                    <Pressable
-                        style={[styles.primary, busy && styles.disabled]}
-                        onPress={handleScan}
-                        disabled={busy}
-                    >
-                        {busy ? (
-                            <ActivityIndicator color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.primaryText}>Scan document chip</Text>
-                        )}
-                    </Pressable>
-                    <Pressable style={styles.secondary} onPress={() => setStep('mrz')} disabled={busy}>
-                        <Text style={styles.secondaryText}>Edit details</Text>
-                    </Pressable>
-                </View>
-            )}
-
-            {step === 'mrz-camera' && (
-                <View style={styles.flex}>
-                    <CameraView ref={cameraRef} style={styles.camera} facing="back" autofocus="on" />
-                    <View style={styles.selfieOverlay}>
-                        <View style={styles.scanningRow}>
-                            <ActivityIndicator color="#FFFFFF" />
-                            <Text style={styles.selfieText}>
-                                Hold the bottom two lines of {'<<<'} steady in view…
+                    {!mrzReadDone ? (
+                        <>
+                            <ActivityIndicator size="large" color="#007AFF" />
+                            <Text style={styles.body}>Reading the photo page securely…</Text>
+                            <Pressable style={styles.secondary} onPress={openCapture}>
+                                <Text style={styles.secondaryText}>Cancel</Text>
+                            </Pressable>
+                        </>
+                    ) : (
+                        <>
+                            <Ionicons name="phone-portrait-outline" size={40} color="#007AFF" />
+                            <Text style={styles.title}>Step 2 · Scan the chip</Text>
+                            <Text style={styles.body}>
+                                Hold your {docLabel} flat against the top of your phone and keep it still. The chip
+                                unlocks using the details read from your photo.
                             </Text>
-                        </View>
-                        <Pressable style={styles.secondary} onPress={() => setStep('mrz')}>
-                            <Text style={[styles.secondaryText, { color: '#FFFFFF' }]}>Enter manually instead</Text>
-                        </Pressable>
-                    </View>
+
+                            <View style={styles.summaryCard}>
+                                <SummaryRow label="Document" value={docNumber.trim()} />
+                                <SummaryRow label="Date of birth" value={dob.trim()} />
+                                <SummaryRow label="Expiry" value={expiry.trim()} />
+                            </View>
+
+                            <Pressable
+                                style={[styles.primary, busy && styles.disabled]}
+                                onPress={handleScan}
+                                disabled={busy}
+                            >
+                                {busy ? (
+                                    <ActivityIndicator color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.primaryText}>Scan document chip</Text>
+                                )}
+                            </Pressable>
+                            <Pressable style={styles.secondary} onPress={openCapture} disabled={busy}>
+                                <Text style={styles.secondaryText}>Retake photo</Text>
+                            </Pressable>
+                        </>
+                    )}
                 </View>
             )}
 
@@ -412,6 +531,40 @@ export default function KycCaptureScreen() {
     );
 }
 
+function PassportPageGuide({ active }: { active: boolean }) {
+    const color = active ? '#34C759' : '#C7C7C7';
+    const textLineWidths = ['88%', '95%', '82%', '92%', '76%', '96%', '85%'] as const;
+
+    return (
+        <>
+            <NativeView style={[styles.innerSafeGuide, { borderColor: color }]} />
+            <NativeView style={[styles.passportPhotoGuide, { borderColor: color }]}>
+                <NativeView style={[styles.passportFaceGuide, { borderColor: color }]} />
+            </NativeView>
+            <NativeView style={styles.passportTextGuides}>
+                {textLineWidths.map((width, index) => (
+                    <NativeView
+                        key={index}
+                        style={[styles.passportTextLine, { backgroundColor: color, width }]}
+                    />
+                ))}
+            </NativeView>
+            <NativeView style={[styles.passportMrzGuide, { borderColor: color }]}>
+                <Text style={[styles.passportMrzText, { color }]}>
+                    {'<<<<<<<<<<<<<<<<<<<<<<<<<<<<'}
+                </Text>
+                <Text style={[styles.passportMrzText, { color }]}>
+                    {'<<<<<<<<<<<<<<<<<<<<<<<<<<<<'}
+                </Text>
+            </NativeView>
+            <NativeView style={[styles.guideCorner, styles.guideCornerTopLeft, { borderColor: active ? '#34C759' : '#F3F4F6' }]} />
+            <NativeView style={[styles.guideCorner, styles.guideCornerTopRight, { borderColor: active ? '#34C759' : '#F3F4F6' }]} />
+            <NativeView style={[styles.guideCorner, styles.guideCornerBottomRight, { borderColor: active ? '#34C759' : '#F3F4F6' }]} />
+            <NativeView style={[styles.guideCorner, styles.guideCornerBottomLeft, { borderColor: active ? '#34C759' : '#F3F4F6' }]} />
+        </>
+    );
+}
+
 function SummaryRow({ label, value }: { label: string; value: string }) {
     return (
         <View style={styles.summaryRow}>
@@ -447,7 +600,49 @@ const styles = StyleSheet.create({
     camera: { flex: 1, width: '100%' },
     selfieOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, gap: 12, backgroundColor: 'rgba(0,0,0,0.55)' },
     selfieText: { color: '#FFFFFF', fontSize: 15, textAlign: 'center' },
-    scanningRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+    captureMask: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.3)' },
+    frameGuide: {
+        position: 'absolute', borderWidth: 3, borderRadius: 14,
+        backgroundColor: 'transparent',
+    },
+    innerSafeGuide: {
+        position: 'absolute', left: '2.7%', right: '2.7%', top: '3.8%', bottom: '3.8%',
+        borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, opacity: 0.72,
+    },
+    passportPhotoGuide: {
+        position: 'absolute', left: '6.8%', top: '16%', width: '25%', height: '46%',
+        borderWidth: 1.5, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
+    },
+    passportFaceGuide: {
+        width: '46%', height: '49%', borderWidth: 1.5, borderRadius: 999, opacity: 0.8,
+    },
+    passportTextGuides: {
+        position: 'absolute', left: '37%', right: '7%', top: '17%', height: '45%',
+        justifyContent: 'space-between',
+    },
+    passportTextLine: { height: 2, borderRadius: 2, opacity: 0.82 },
+    passportMrzGuide: {
+        position: 'absolute', left: '6.8%', right: '6.8%', bottom: '10.5%', height: '15.5%',
+        borderWidth: 1.5, borderRadius: 6, justifyContent: 'center', paddingHorizontal: '3%',
+    },
+    passportMrzText: {
+        fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+        fontSize: 12, lineHeight: 15, letterSpacing: 0.3, opacity: 0.9,
+    },
+    guideCorner: { position: 'absolute', width: 34, height: 34 },
+    guideCornerTopLeft: { left: -3, top: -3, borderLeftWidth: 5, borderTopWidth: 5, borderTopLeftRadius: 14 },
+    guideCornerTopRight: { right: -3, top: -3, borderRightWidth: 5, borderTopWidth: 5, borderTopRightRadius: 14 },
+    guideCornerBottomRight: { right: -3, bottom: -3, borderRightWidth: 5, borderBottomWidth: 5, borderBottomRightRadius: 14 },
+    guideCornerBottomLeft: { left: -3, bottom: -3, borderLeftWidth: 5, borderBottomWidth: 5, borderBottomLeftRadius: 14 },
+    capturePrompt: {
+        position: 'absolute', left: 64, right: 64, flexDirection: 'row',
+        alignItems: 'center', justifyContent: 'center', gap: 9,
+    },
+    capturePromptText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', textAlign: 'center' },
+    capturePromptReady: { color: '#34C759', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+    captureHint: { position: 'absolute', left: 32, right: 32, alignItems: 'center', gap: 4 },
+    captureHintText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+    captureHintSub: { color: 'rgba(255,255,255,0.82)', fontSize: 13, textAlign: 'center' },
     docOption: {
         flexDirection: 'row', alignItems: 'center', gap: 14, alignSelf: 'stretch',
         backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0',

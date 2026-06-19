@@ -155,7 +155,7 @@ function RootLayoutNav({ isOnboarded }: { isOnboarded: boolean }) {
         <>
             {__DEV__ && <KeepAwake />}
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <Stack screenOptions={{ headerShown: false }} />
+                <Stack screenOptions={{ headerShown: false, orientation: 'portrait' }} />
             </ThemeProvider>
         </>
     );

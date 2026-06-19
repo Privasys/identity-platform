@@ -206,7 +206,7 @@ func (iss *Issuer) IssueAccessTokenWithTTL(subject, audience, sid string, roles 
 }
 
 // IssueVaultApprovalToken issues a short-lived, operation-bound access token
-// for the Enclave Vault promote step-up (policies-plan.md §9). The caller
+// for the Enclave Vault promote step-up (the vault promote-step-up design). The caller
 // proved a fresh WebAuthn assertion bound to `vaultOp`, so the token carries
 // `amr:["webauthn"]` plus the `vault_op`/`nonce` the vault recomputes and
 // checks against the operation it is being asked to promote. `iat`/`exp` are

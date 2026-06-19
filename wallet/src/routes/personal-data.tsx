@@ -104,6 +104,23 @@ export default function PersonalDataScreen() {
         (a) => !existingKeys.has(a.key) && a.key !== 'picture',
     );
 
+    // Logical display order, not insertion order: keep related attributes together
+    // — the everyday name then its legal ID counterpart, contact grouped, then the
+    // identity/document group. Same-key values (e.g. several emails) stay adjacent
+    // (stable sort). Unlisted keys fall to the end.
+    const ATTR_ORDER = [
+        'name', 'given_name', 'given_name_id', 'family_name', 'family_name_id',
+        'nickname', 'picture', 'email', 'phone_number',
+        'birthdate', 'age_over_18', 'age_over_21', 'sex', 'nationality',
+        'place_of_birth', 'document_type', 'document_number', 'doc_expiry',
+        'issuing_state', 'personal_number', 'locale',
+    ];
+    const orderOf = (k: string) => {
+        const i = ATTR_ORDER.indexOf(k);
+        return i === -1 ? ATTR_ORDER.length : i;
+    };
+    const sortedAttributes = [...profile.attributes].sort((a, b) => orderOf(a.key) - orderOf(b.key));
+
     return (
         <RNView style={styles.screen}>
             <SubPageHeader title="Personal Data" />
@@ -126,7 +143,7 @@ export default function PersonalDataScreen() {
                         </Text>
                     </RNView>
                 ) : (
-                    profile.attributes.map((attr) => (
+                    sortedAttributes.map((attr) => (
                         <AttributeCard
                             key={`${attr.key}:${attr.value}`}
                             attr={attr}

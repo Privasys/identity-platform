@@ -1205,7 +1205,7 @@ func requestedAttributesForScope(scope string, client *clients.Client) []string 
 
 // AttributeRequirement tells the wallet what a relying party needs for one
 // attribute: whether it is essential (must be present to complete sign-in) and
-// the assurance level (see kyc-enclave-design.md §3).
+// the assurance level (see the identity-verifier (KYC) design).
 type AttributeRequirement struct {
 	Essential bool   `json:"essential"`
 	Assurance string `json:"assurance"` // "gov" | "any"

@@ -89,7 +89,7 @@ export default (context: ConfigContext): ExpoConfig => {
         },
         assetBundlePatterns: ['**/*'],
         userInterfaceStyle: 'light',
-        orientation: 'portrait',
+        orientation: 'default',
         updates: {
             fallbackToCacheTimeout: 0,
             checkAutomatically: 'WIFI_ONLY',
@@ -101,6 +101,7 @@ export default (context: ConfigContext): ExpoConfig => {
         scheme: config.scheme,
         ios: {
             supportsTablet: true,
+            requireFullScreen: true,
             bundleIdentifier: config.bundle,
             infoPlist: {
                 ITSAppUsesNonExemptEncryption: false,

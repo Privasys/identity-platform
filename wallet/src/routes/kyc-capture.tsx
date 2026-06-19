@@ -24,13 +24,14 @@ import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { Text, View } from '@/components/Themed';
 import { getProfileValue, setProfileValue } from '@/services/attributes';
 import {
-    applyGovAttributes, govAttributeCandidates, readDocumentMrz, verifyIdentity,
+    applyGovAttributes, govAttributeCandidates, readDocumentMrz, verifyEnclaveTrust, verifyIdentity,
     type KycRecord,
 } from '@/services/kyc';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
-type Step = 'doctype' | 'capture' | 'read' | 'selfie' | 'verifying' | 'select' | 'done';
+type Step = 'doctype' | 'consent' | 'capture' | 'read' | 'selfie' | 'verifying' | 'select' | 'done';
+type TrustState = 'checking' | 'verified' | 'failed';
 type DocType = 'passport' | 'id-card';
 type CaptureState = 'positioning' | 'checking' | 'captured';
 
@@ -112,6 +113,9 @@ export default function KycCaptureScreen() {
     const [verifiedRecord, setVerifiedRecord] = useState<KycRecord | null>(null);
     const [candidates, setCandidates] = useState<ProfileAttribute[]>([]);
     const [selected, setSelected] = useState<Set<string>>(new Set());
+    // Consent step: attest the verifier enclave before the holder agrees to send
+    // any document data to it.
+    const [trust, setTrust] = useState<TrustState>('checking');
 
     // Size the guide from the live landscape viewport and leave a dark margin so
     // every edge of the document remains visible.
@@ -137,6 +141,23 @@ export default function KycCaptureScreen() {
         setCameraReady(false);
         setCameraKey((k) => k + 1);
     }, [step, winW, winH]);
+
+    // On the consent screen, attest the verifier enclave so the holder can see
+    // they are dealing with the published, verified code before agreeing to send
+    // any document data. The same check is re-enforced at send time.
+    useEffect(() => {
+        if (step !== 'consent') return;
+        let cancelled = false;
+        setTrust('checking');
+        verifyEnclaveTrust()
+            .then(() => { if (!cancelled) setTrust('verified'); })
+            .catch((e) => {
+                if (cancelled) return;
+                console.warn('[KYC] enclave attestation failed:', e?.message);
+                setTrust('failed');
+            });
+        return () => { cancelled = true; };
+    }, [step]);
 
     const close = () => {
         if (router.canGoBack()) router.back();
@@ -422,7 +443,7 @@ export default function KycCaptureScreen() {
 
                     <Pressable
                         style={styles.docOption}
-                        onPress={() => { setDocType('passport'); openCapture(); }}
+                        onPress={() => { setDocType('passport'); setStep('consent'); }}
                     >
                         <Ionicons name="airplane-outline" size={22} color="#007AFF" />
                         <View style={styles.docOptionBody}>
@@ -434,7 +455,7 @@ export default function KycCaptureScreen() {
 
                     <Pressable
                         style={styles.docOption}
-                        onPress={() => { setDocType('id-card'); openCapture(); }}
+                        onPress={() => { setDocType('id-card'); setStep('consent'); }}
                     >
                         <Ionicons name="card-outline" size={22} color="#007AFF" />
                         <View style={styles.docOptionBody}>
@@ -452,6 +473,58 @@ export default function KycCaptureScreen() {
                             NFC is unavailable on this device{support.reason ? ` (${support.reason})` : ''}, so the chip can&apos;t be read.
                         </Text>
                     )}
+                </ScrollView>
+            )}
+
+            {step === 'consent' && (
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.padContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Ionicons name="lock-closed-outline" size={40} color="#007AFF" />
+                    <Text style={styles.title}>Verify with Privasys ID</Text>
+                    <Text style={styles.body}>
+                        To verify your {docLabel}, the Privasys identity verifier processes the
+                        following on your behalf. It runs published, attested code in a secure
+                        enclave and keeps nothing once done. Your data otherwise stays on this device.
+                    </Text>
+
+                    <View style={styles.consentCard}>
+                        <ConsentItem icon="camera-outline" label={`Your ${docLabel}'s photo page`} />
+                        <ConsentItem icon="hardware-chip-outline" label={`Your ${docLabel} chip, read over NFC`} />
+                        <ConsentItem icon="person-outline" label="A live selfie" />
+                    </View>
+
+                    <View style={[styles.trustRow, trust === 'failed' && { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' }]}>
+                        {trust === 'checking' ? (
+                            <>
+                                <ActivityIndicator size="small" color="#007AFF" />
+                                <Text style={styles.trustText}>Verifying the enclave…</Text>
+                            </>
+                        ) : trust === 'verified' ? (
+                            <>
+                                <Ionicons name="shield-checkmark" size={18} color="#34C759" />
+                                <Text style={[styles.trustText, { color: '#15803D' }]}>Enclave verified · identity-verifier</Text>
+                            </>
+                        ) : (
+                            <>
+                                <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                                <Text style={[styles.trustText, { color: '#B91C1C' }]}>Couldn&apos;t verify the enclave — do not proceed.</Text>
+                            </>
+                        )}
+                    </View>
+
+                    <Pressable
+                        style={[styles.primary, trust !== 'verified' && styles.disabled]}
+                        onPress={openCapture}
+                        disabled={trust !== 'verified'}
+                    >
+                        <Text style={styles.primaryText}>Agree and continue</Text>
+                    </Pressable>
+                    <Pressable style={styles.secondary} onPress={close}>
+                        <Text style={styles.secondaryText}>Cancel</Text>
+                    </Pressable>
                 </ScrollView>
             )}
 
@@ -677,9 +750,33 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     );
 }
 
+function ConsentItem({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
+    return (
+        <View style={styles.consentItem}>
+            <Ionicons name={icon} size={20} color="#007AFF" />
+            <Text style={styles.consentItemText}>{label}</Text>
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8FAFB' },
     flex: { flex: 1 },
+    consentCard: {
+        alignSelf: 'stretch', backgroundColor: '#FFFFFF', borderRadius: 12,
+        borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 16, paddingVertical: 6,
+    },
+    consentItem: {
+        flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F1F5F9',
+    },
+    consentItemText: { fontSize: 15, color: '#0F172A', flex: 1 },
+    trustRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch',
+        backgroundColor: '#F0FDF4', borderRadius: 10, borderWidth: 1, borderColor: '#BBF7D0',
+        paddingHorizontal: 14, paddingVertical: 12,
+    },
+    trustText: { fontSize: 13, color: '#475569', fontWeight: '600', flex: 1 },
     pad: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 },
     padContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14, paddingTop: 72 },
     close: { position: 'absolute', right: 16, zIndex: 10, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

@@ -175,6 +175,16 @@ async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
     };
 }
 
+/**
+ * Verify the identity-verifier enclave's RA-TLS attestation + pinned image digest
+ * up front, so the wallet can show the holder it is dealing with the published,
+ * attested verifier *before* asking them to consent to sending any document data.
+ * Throws if attestation is missing, mismatched, or doesn't verify.
+ */
+export async function verifyEnclaveTrust(): Promise<{ measurement: string; imageRef?: string }> {
+    return verifyVerifierEnclave();
+}
+
 async function postToVerifier<T>(path: string, body: unknown): Promise<T> {
     const url = new URL(`https://${VERIFIER_ORIGIN}`);
     const host = url.hostname;

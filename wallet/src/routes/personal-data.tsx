@@ -261,10 +261,12 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
           })
         : null;
 
-    const isAvatar = attr.key === 'picture';
+    // Image attributes (everyday avatar + the gov ID portrait) render as a
+    // picture, not editable text.
+    const isImage = attr.key === 'picture' || attr.key === 'picture_id';
 
     const handleStartEdit = () => {
-        if (isAvatar) return;
+        if (isImage) return;
         if (attr.verified) {
             Alert.alert(
                 'Edit verified attribute?',
@@ -330,15 +332,15 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                                     <Ionicons name="close-circle" size={24} color="#94A3B8" />
                                 </Pressable>
                             </RNView>
-                        ) : isAvatar && attr.value ? (
+                        ) : isImage && attr.value ? (
                             <Image
                                 source={{ uri: attr.value }}
                                 style={styles.attributeAvatar}
                             />
                         ) : (
                             <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={[styles.attributeValue, { flex: 1 }]}>{attr.value}</Text>
-                                {!isAvatar && (
+                                <Text style={[styles.attributeValue, { flex: 1 }]} numberOfLines={2}>{attr.value}</Text>
+                                {!isImage && (
                                     <Pressable onPress={handleStartEdit} hitSlop={8}>
                                         <Ionicons name="pencil-outline" size={16} color="#94A3B8" />
                                     </Pressable>

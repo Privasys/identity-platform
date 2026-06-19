@@ -48,13 +48,13 @@ const VERIFIER_ORIGIN =
  *  (org.privasys, 1.3.6.1.4.1.65230.3.2). Pinning this is what makes "send my
  *  passport to the enclave" safe: we only talk to the published, auditable code. */
 const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.3.2';
-// container-app-identity-verifier v0.2.7 (ghcr.io/privasys/container-app-identity-verifier).
+// container-app-identity-verifier v0.3.0 (ghcr.io/privasys/container-app-identity-verifier).
 // This is the OCI image digest the enclave attests at OID 3.2; it changes only
 // when the verifier image is rebuilt (not on a plain redeploy). Bump it here when
 // a new verifier image is published, or override per-build with the env var.
 const VERIFIER_IMAGE_DIGEST =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_DIGEST ??
-    '5d7de7209b70c38270316b6eacc3f40b512a6ec02d68588c327c6439555534f1';
+    '776034388ccce49c90a0ba2163d8ad56e8061375df1d8a1c4e3d3af8606c0ac4';
 
 const ATTESTATION_SERVER = 'https://as.privasys.org';
 const VERIFIER_DISPLAY = 'Privasys identity verifier';

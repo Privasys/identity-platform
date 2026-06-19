@@ -22,7 +22,8 @@
     { "key": "place_of_birth",  "label": "Place of Birth",  "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
     { "key": "personal_number", "label": "Personal Number", "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
     { "key": "given_name_id",   "label": "Given Names (ID)","scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
-    { "key": "family_name_id",  "label": "Surname (ID)",    "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true }
+    { "key": "family_name_id",  "label": "Surname (ID)",    "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true },
+    { "key": "picture_id",      "label": "Photo (ID)",      "scope": "identity", "profileField": null,       "verifiable": false, "identityVerifiable": true }
   ],
   "providers": {
     "google": {

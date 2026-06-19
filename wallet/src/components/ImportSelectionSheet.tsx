@@ -45,7 +45,7 @@ export function ImportSelectionSheet({
                 const isOn = selected.has(attr.key);
                 return (
                     <Pressable key={attr.key} style={styles.row} onPress={() => onToggle(attr.key)}>
-                        {attr.key === 'picture' && attr.value ? (
+                        {(attr.key === 'picture' || attr.key === 'picture_id') && attr.value ? (
                             <Image source={{ uri: attr.value }} style={styles.avatar} />
                         ) : (
                             <RNView style={styles.iconCircle}>
@@ -55,7 +55,9 @@ export function ImportSelectionSheet({
                         <RNView style={styles.rowInfo}>
                             <Text style={styles.rowLabel}>{attributeLabel(attr.key)}</Text>
                             <Text style={styles.rowValue} numberOfLines={1}>
-                                {attr.key === 'picture' ? 'Profile photo' : attr.value}
+                                {attr.key === 'picture' ? 'Profile photo'
+                                    : attr.key === 'picture_id' ? 'ID photo'
+                                    : attr.value}
                                 {attr.verified ? '  ·  verified' : ''}
                             </Text>
                         </RNView>

@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Import Data sub-page. Government-verified import (scan an ID document in the
- * enclave-backed KYC flow) is the first, highest-assurance option; below it,
- * link an external IdP (Google / LinkedIn / Microsoft / GitHub) and choose
- * which returned attributes to import.
+ * Import Data sub-page. Link an external IdP (Google / LinkedIn / Microsoft /
+ * GitHub) and choose which returned attributes to import. Government-verified
+ * import (scan an ID document) is its own "ID Verify & Import" entry on the
+ * profile screen, routed straight to the KYC flow.
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 
@@ -29,7 +28,6 @@ const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function ImportDataScreen() {
-    const router = useRouter();
     const { profile, updateProfile, linkProvider, mergeAttribute, resolveConflict } = useProfileStore();
 
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
@@ -154,25 +152,11 @@ export default function ImportDataScreen() {
                     />
                 ) : (
                     <>
-                        {/* Government-verified — highest assurance, first. */}
-                        <Pressable style={styles.govCard} onPress={() => router.push('/kyc-capture' as never)}>
-                            <RNView style={styles.govIcon}>
-                                <Ionicons name="shield-checkmark" size={22} color="#FFFFFF" />
-                            </RNView>
-                            <RNView style={{ flex: 1 }}>
-                                <Text style={styles.govTitle}>Import from ID</Text>
-                                <Text style={styles.govSub}>
-                                    Scan your passport or national ID to add government-verified
-                                    attributes (name, date of birth, nationality).
-                                </Text>
-                            </RNView>
-                            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                        </Pressable>
-
                         <Text style={styles.sectionTitle}>Import from an account</Text>
                         <Text style={styles.sectionSub}>
                             Sign in once to fill your profile. The provider cannot access your
-                            Privasys data, and you choose what to import.
+                            Privasys data, and you choose what to import. For government-verified
+                            attributes, use ID Verify &amp; Import on the profile screen.
                         </Text>
                         {Object.entries(PROVIDERS).map(([key, config]) => {
                             const isLinking = linkingProvider === key;
@@ -203,17 +187,6 @@ export default function ImportDataScreen() {
 const styles = StyleSheet.create({
     screen: { flex: 1, backgroundColor: '#F8FAFB' },
     content: { padding: 20 },
-    govCard: {
-        flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF',
-        borderRadius: 14, padding: 16, marginBottom: 20,
-        borderWidth: 1, borderColor: '#D1FADF',
-    },
-    govIcon: {
-        width: 40, height: 40, borderRadius: 20, backgroundColor: '#34C759',
-        alignItems: 'center', justifyContent: 'center',
-    },
-    govTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
-    govSub: { fontSize: 13, color: '#64748B', lineHeight: 18, marginTop: 2 },
     sectionTitle: { fontSize: 15, fontWeight: '600', color: '#0F172A', marginBottom: 4 },
     sectionSub: { fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 12 },
     providerRow: {

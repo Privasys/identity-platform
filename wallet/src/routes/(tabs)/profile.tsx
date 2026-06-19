@@ -194,7 +194,26 @@ export default function ProfileScreen() {
                     </RNView>
                 </Pressable>
 
-                {/* Import data (gov ID + external IdPs) */}
+                {/* Government-verified ID scan (highest assurance) */}
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/kyc-capture' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="shield-checkmark-outline" size={20} color="#00BCF2" />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>ID Verify & Import</Text>
+                            <Text style={styles.sharingDetail}>
+                                Scan your passport or national ID for government-verified attributes
+                            </Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                    </RNView>
+                </Pressable>
+
+                {/* Import data (external IdPs) */}
                 <Pressable
                     style={styles.sharingCard}
                     onPress={() => router.push('/import' as never)}
@@ -206,7 +225,7 @@ export default function ProfileScreen() {
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>Import Data</Text>
                             <Text style={styles.sharingDetail}>
-                                Scan your passport or ID, or import from Google, LinkedIn
+                                Import from Google, LinkedIn, Microsoft or GitHub
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color="#94A3B8" />

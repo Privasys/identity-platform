@@ -14,23 +14,74 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View as NativeView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { Text, View } from '@/components/Themed';
 import { getProfileValue, setProfileValue } from '@/services/attributes';
-import { readDocumentMrz, verifyIdentity } from '@/services/kyc';
-import { useProfileStore } from '@/stores/profile';
+import {
+    applyGovAttributes, govAttributeCandidates, readDocumentMrz, verifyIdentity,
+    type KycRecord,
+} from '@/services/kyc';
+import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
-type Step = 'doctype' | 'capture' | 'read' | 'selfie' | 'verifying' | 'done';
+type Step = 'doctype' | 'capture' | 'read' | 'selfie' | 'verifying' | 'select' | 'done';
 type DocType = 'passport' | 'id-card';
 type CaptureState = 'positioning' | 'checking' | 'captured';
 
 // Data-page (TD3 photo page) aspect ≈ 125×88 mm ≈ 1.42:1.
 const DOC_PAGE_RATIO = 1.42;
+
+/**
+ * Crop a captured still to the on-screen guide frame (plus a generous margin) so
+ * only the document page — not the surroundings — leaves the device. The preview
+ * is shown "cover" (fills the viewport), so map the guide rect (screen points)
+ * back to image pixels through that same cover transform. Returns base64, or null
+ * to fall back to the full frame when the orientation/mapping can't be trusted —
+ * a wrong crop must never break the enclave read.
+ */
+async function cropDocToFrame(
+    shot: { uri?: string; width?: number; height?: number },
+    view: { winW: number; winH: number; frameLeft: number; frameTop: number; frameW: number; frameH: number },
+): Promise<string | null> {
+    const { uri, width: iw, height: ih } = shot;
+    if (!uri || !iw || !ih) return null;
+    const { winW, winH, frameLeft, frameTop, frameW, frameH } = view;
+    // Only crop when the image orientation matches the (landscape) viewport;
+    // otherwise the screen→image mapping is wrong, so fall back to the full frame.
+    if ((winW >= winH) !== (iw >= ih)) return null;
+
+    const f = Math.max(winW / iw, winH / ih);   // image px → screen pts (cover)
+    const offX = (iw * f - winW) / 2;
+    const offY = (ih * f - winH) / 2;
+    const m = frameW * 0.12;                     // generous margin around the guide
+
+    const sx = Math.max(0, frameLeft - m);
+    const sy = Math.max(0, frameTop - m);
+    const sw = Math.min(winW, frameLeft + frameW + m) - sx;
+    const sh = Math.min(winH, frameTop + frameH + m) - sy;
+
+    let ox = (sx + offX) / f;
+    let oy = (sy + offY) / f;
+    let cw = sw / f;
+    let ch = sh / f;
+    ox = Math.max(0, Math.min(ox, iw));
+    oy = Math.max(0, Math.min(oy, ih));
+    cw = Math.max(1, Math.min(cw, iw - ox));
+    ch = Math.max(1, Math.min(ch, ih - oy));
+
+    const out = await manipulateAsync(
+        uri,
+        [{ crop: { originX: ox, originY: oy, width: cw, height: ch } }],
+        { compress: 0.9, base64: true, format: SaveFormat.JPEG },
+    );
+    return out.base64 ?? null;
+}
 
 export default function KycCaptureScreen() {
     const router = useRouter();
@@ -57,6 +108,10 @@ export default function KycCaptureScreen() {
     // The authoritative MRZ (BAC key) comes back from the enclave once we reach
     // the read step; gate the chip scan on it.
     const [mrzReadDone, setMrzReadDone] = useState(false);
+    // Post-verification: the user chooses which gov attributes to import.
+    const [verifiedRecord, setVerifiedRecord] = useState<KycRecord | null>(null);
+    const [candidates, setCandidates] = useState<ProfileAttribute[]>([]);
+    const [selected, setSelected] = useState<Set<string>>(new Set());
 
     // Size the guide from the live landscape viewport and leave a dark margin so
     // every edge of the document remains visible.
@@ -186,13 +241,19 @@ export default function KycCaptureScreen() {
                 setExpiry(mrz.dateOfExpiry);
 
                 // Grab one clean, full-quality frame for the enclave OCR (OmniMRZ)
-                // + box-3 cross-reference.
+                // + box-3 cross-reference. Crop it to the on-screen guide before it
+                // leaves the device, so only the document page (not the
+                // surroundings) is sent — falls back to the full frame if the crop
+                // can't be computed, so a mapping quirk never breaks the read.
                 const shot = await cameraRef.current?.takePictureAsync({
                     base64: true,
                     quality: 0.9,
                     shutterSound: false,
                 });
-                setDocImage(shot?.base64 ?? probe.base64);
+                const cropped = shot
+                    ? await cropDocToFrame(shot, { winW, winH, frameLeft, frameTop, frameW, frameH }).catch(() => null)
+                    : null;
+                setDocImage(cropped ?? shot?.base64 ?? probe.base64);
 
                 // Keep the green confirmation visible long enough to register.
                 await new Promise((resolve) => setTimeout(resolve, 500));
@@ -289,15 +350,35 @@ export default function KycCaptureScreen() {
         setBusy(true);
         try {
             const result = await verifyIdentity(docRead, { liveImageBase64, docImage: docImage || undefined });
-            console.log('[KYC] verified — filled:', result.filled.join(', '));
-            setStep('done');
-            offerAdoptIdName();
+            // Present the verified attributes for the holder to choose what to
+            // import (same pattern as the IdP import flow), including the ID photo.
+            const cands = govAttributeCandidates(result.record, docRead.portraitBase64);
+            setVerifiedRecord(result.record);
+            setCandidates(cands);
+            setSelected(new Set(cands.map((c) => c.key)));
+            setStep('select');
         } catch (e: any) {
             Alert.alert('Verification failed', e.message);
             setStep('selfie');
         } finally {
             setBusy(false);
         }
+    };
+
+    const toggleAttr = (key: string) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+
+    const applySelectedAttributes = () => {
+        if (!verifiedRecord) return;
+        const filled = applyGovAttributes(verifiedRecord, selected, docRead?.portraitBase64);
+        console.log('[KYC] imported:', filled.join(', '));
+        setStep('done');
+        offerAdoptIdName();
     };
 
     const handleSelfie = async () => {
@@ -515,12 +596,34 @@ export default function KycCaptureScreen() {
                 </View>
             )}
 
+            {step === 'select' && (
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.padContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Ionicons name="shield-checkmark" size={40} color="#34C759" />
+                    <Text style={styles.title}>Identity verified</Text>
+                    <Text style={styles.body}>
+                        Choose which government-verified details to add to your wallet.
+                    </Text>
+                    <ImportSelectionSheet
+                        providerName="your ID"
+                        attributes={candidates}
+                        selected={selected}
+                        onToggle={toggleAttr}
+                        onConfirm={applySelectedAttributes}
+                        onCancel={() => setStep('done')}
+                    />
+                </ScrollView>
+            )}
+
             {step === 'done' && (
                 <View style={styles.pad}>
                     <Ionicons name="checkmark-circle" size={48} color="#34C759" />
-                    <Text style={styles.title}>Identity verified</Text>
+                    <Text style={styles.title}>All set</Text>
                     <Text style={styles.body}>
-                        Your government-verified attributes have been added to your wallet.
+                        Your selected government-verified attributes have been added to your wallet.
                     </Text>
                     <Pressable style={styles.primary} onPress={close}>
                         <Text style={styles.primaryText}>Done</Text>

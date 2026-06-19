@@ -25,10 +25,10 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from '@/utils/storage';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, verifyAttestation } from '@/services/attestation';
-import { setProfileValue } from '@/services/attributes';
+import { attributeLabel, setProfileValue } from '@/services/attributes';
 import { deriveAppSub } from '@/services/did';
 import { derToRawEcdsa } from '@/services/encauth';
-import { useProfileStore, type VerificationRecord } from '@/stores/profile';
+import { useProfileStore, type ProfileAttribute, type VerificationRecord } from '@/stores/profile';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
 
@@ -92,9 +92,11 @@ export interface KycRecord {
 
 export interface VerifyIdentityResult {
     jti: string;
-    /** Profile attribute keys that were auto-filled at gov assurance. */
-    filled: string[];
     measurement: string;
+    /** The signed receipt. The caller presents its gov attributes
+     *  (govAttributeCandidates) for the user to choose which to import, then
+     *  applies the selection (applyGovAttributes). */
+    record: KycRecord;
 }
 
 /** BAC/PACE access-key fields, MRZ form (dates YYMMDD), from the enclave OCR. */
@@ -254,57 +256,77 @@ export async function verifyIdentity(
     };
     await saveKycRecord(record);
 
-    const filled = autofillGovAttributes(record);
-    return { jti, filled, measurement: enclave.measurement };
+    return { jti, measurement: enclave.measurement, record };
 }
 
-/** Auto-fill the profile with gov-certified attributes from a verified record. */
-function autofillGovAttributes(record: KycRecord): string[] {
-    const store = useProfileStore.getState();
-    const filled: string[] = [];
+// The legal names from the document go to dedicated *_id attributes — never
+// overwrite the holder's preferred everyday name (e.g. "Bertrand" vs the
+// passport's legal "BERTRAND FRANCOIS"). The wallet then *asks* whether to adopt
+// the ID name (see kyc-capture). Other fields store under their own key.
+const GOV_STORE_KEY: Record<string, string> = {
+    given_name: 'given_name_id',
+    family_name: 'family_name_id',
+};
 
-    const govRecord = (evidence: string): VerificationRecord => ({
+function govRecord(record: KycRecord, evidence: string): VerificationRecord {
+    return {
         verifier: 'privasys-kyc',
         verifierDisplayName: VERIFIER_DISPLAY,
         method: 'kyc_enclave',
         assurance: 'gov',
         verifiedAt: record.verifiedAt,
         evidence,
-    });
-
-    // The legal names from the document go to dedicated *_id attributes — never
-    // overwrite the holder's preferred everyday name (e.g. "Bertrand" vs the
-    // passport's legal "BERTRAND FRANCOIS"). The wallet then *asks* whether to
-    // adopt the ID name (see kyc-capture). Other fields store under their own key.
-    const STORE_KEY: Record<string, string> = {
-        given_name: 'given_name_id',
-        family_name: 'family_name_id',
     };
+}
+
+/** Image data-URI for the DG2 portrait (raw base64 from the chip). */
+function portraitDataUri(b64: string): string {
+    return b64.startsWith('data:') ? b64 : `data:image/jpeg;base64,${b64}`;
+}
+
+/**
+ * The gov-certified attributes a verified record offers, as display rows for the
+ * import-selection sheet (so the user chooses what to import, like the IdP import
+ * flow). Includes age_over_N booleans derived from the certified DOB and, when
+ * supplied, the ID portrait as `picture_id` (Photo (ID)).
+ */
+export function govAttributeCandidates(record: KycRecord, portraitBase64?: string): ProfileAttribute[] {
+    const out: ProfileAttribute[] = [];
+    const push = (key: string, value: string) =>
+        out.push({ key, label: attributeLabel(key), value, source: 'document', verified: true });
+
     for (const key of DOCUMENT_ATTRIBUTE_KEYS) {
         const value = record.fields[key];
-        if (!value) continue;
-        setProfileValue(store, STORE_KEY[key] ?? key, value, 'document', {
-            verified: true,
-            verifications: [govRecord(`ivr:${record.jti}`)],
-        });
-        filled.push(STORE_KEY[key] ?? key);
+        if (value) push(GOV_STORE_KEY[key] ?? key, value);
     }
-
-    // age_over_N is a privacy-preserving boolean derived from the gov-verified
-    // birth date; it inherits gov assurance (its source is the certified DOB).
+    // age_over_N: privacy-preserving boolean derived from the gov-verified DOB.
     const birthdate = record.fields.birthdate;
     if (birthdate) {
         const age = ageFromBirthdate(birthdate);
-        if (age != null) {
-            for (const threshold of AGE_THRESHOLDS) {
-                const key = `age_over_${threshold}`;
-                setProfileValue(store, key, age >= threshold ? 'true' : 'false', 'document', {
-                    verified: true,
-                    verifications: [govRecord(`ivr:${record.jti}#age_over_${threshold}`)],
-                });
-                filled.push(key);
-            }
-        }
+        if (age != null) for (const t of AGE_THRESHOLDS) push(`age_over_${t}`, age >= t ? 'true' : 'false');
+    }
+    if (portraitBase64) push('picture_id', portraitDataUri(portraitBase64));
+    return out;
+}
+
+/** Apply the user-selected gov attributes to the profile at gov assurance. */
+export function applyGovAttributes(
+    record: KycRecord,
+    selected: Set<string>,
+    portraitBase64?: string,
+): string[] {
+    const store = useProfileStore.getState();
+    const filled: string[] = [];
+    for (const attr of govAttributeCandidates(record, portraitBase64)) {
+        if (!selected.has(attr.key)) continue;
+        const evidence = attr.key.startsWith('age_over_')
+            ? `ivr:${record.jti}#${attr.key}`
+            : `ivr:${record.jti}`;
+        setProfileValue(store, attr.key, attr.value, 'document', {
+            verified: true,
+            verifications: [govRecord(record, evidence)],
+        });
+        filled.push(attr.key);
     }
     return filled;
 }

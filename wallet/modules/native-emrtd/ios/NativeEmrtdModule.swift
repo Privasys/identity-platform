@@ -42,12 +42,19 @@ public class NativeEmrtdModule: Module {
             let diag = "doc=\(docNo.count)c+cd\(NativeEmrtdModule.checkDigit(padded)) "
                 + "dob=\(dob.count)c+cd\(NativeEmrtdModule.checkDigit(dob)) "
                 + "exp=\(exp.count)c+cd\(NativeEmrtdModule.checkDigit(exp))"
+            // Read only what we need + can read. DG1 (MRZ) and DG2 (portrait) are
+            // the verification minimum; EF.COM/EF.SOD are read alongside for
+            // Passive Authentication. DG11 (extra personal details: place of
+            // birth, personal number) is requested too, as a best-effort extra.
+            // EAC-protected groups (DG3 fingerprints / DG4 iris) are NEVER
+            // requested — they need Terminal Authentication we don't hold, and an
+            // unbounded read selects them and aborts (e.g. German passports list
+            // DG3 in EF.COM → SELECT DG3 → SW 0x6A88, killing the whole read).
+            let optionalTags: [DataGroupId] = [.COM, .SOD, .DG1, .DG2, .DG11]
+            let minimumTags: [DataGroupId] = [.COM, .SOD, .DG1, .DG2]
             Task { [weak self] in
                 guard let self = self else { return }
-                do {
-                    let passport = try await self.passportReader.readPassport(mrzKey: mrzKey)
-                    promise.resolve(NativeEmrtdModule.toJson(passport))
-                } catch {
+                func resolveError(_ error: Error) {
                     let reason = NativeEmrtdModule.escape(error.localizedDescription)
                     // The exact enum case (e.g. ResponseError carries SW1/SW2 APDU
                     // status words) plus the NSError domain/code, so the precise
@@ -62,6 +69,26 @@ public class NativeEmrtdModule: Module {
                         "{\"error\":\"\(reason)\",\"diag\":\"\(NativeEmrtdModule.escape(diag))\","
                         + "\"detail\":\"\(detail)\"}"
                     )
+                }
+                do {
+                    let passport = try await self.passportReader.readPassport(mrzKey: mrzKey, tags: optionalTags)
+                    promise.resolve(NativeEmrtdModule.toJson(passport))
+                } catch {
+                    // A document without DG11 (or with it access-protected) answers
+                    // the DG11 SELECT with SW 0x6A88 "Referenced data not found".
+                    // That optional group must never fail the whole read: retry
+                    // once with just the verification minimum. Any other failure —
+                    // or a minimum read that also fails — is surfaced to the caller.
+                    if NativeEmrtdModule.isReferencedDataNotFound(error) {
+                        do {
+                            let passport = try await self.passportReader.readPassport(mrzKey: mrzKey, tags: minimumTags)
+                            promise.resolve(NativeEmrtdModule.toJson(passport))
+                        } catch {
+                            resolveError(error)
+                        }
+                    } else {
+                        resolveError(error)
+                    }
                 }
             }
         }
@@ -148,6 +175,16 @@ public class NativeEmrtdModule: Module {
         let currentYY = Calendar.current.component(.year, from: Date()) % 100
         let century = future ? 2000 : (yy > currentYY ? 1900 : 2000)
         return String(format: "%04d-%02d-%02d", century + yy, mm, dd)
+    }
+
+    /// True for an ISO-7816 SW 0x6A88 ("Referenced data not found") — what the
+    /// chip answers when we SELECT a data group it doesn't have (e.g. an absent
+    /// DG11). NFCPassportReader surfaces it as `ResponseError(_, sw1, sw2)`.
+    private static func isReferencedDataNotFound(_ error: Error) -> Bool {
+        if case NFCPassportReaderError.ResponseError(_, let sw1, let sw2) = error {
+            return sw1 == 0x6A && sw2 == 0x88
+        }
+        return false
     }
 
     private static func escape(_ s: String) -> String {

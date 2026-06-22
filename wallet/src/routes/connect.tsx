@@ -59,6 +59,7 @@ import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
+import { AttestationView, type AttestationVerificationLevel } from '@/components/AttestationView';
 
 function appName(rpId: string): string {
     const dot = rpId.indexOf('.');
@@ -249,10 +250,6 @@ type FlowStep =
  *   behind a Let's Encrypt cert). The wallet supports FIDO2 sign-in to
  *   non-enclave RPs; attestation simply does not apply.
  */
-type AttestationVerificationLevel =
-    | 'fresh-as-verified'
-    | 'cached-trusted'
-    | 'non-enclave';
 
 // Re-verification cadence for already-trusted enclaves.
 //
@@ -1094,6 +1091,7 @@ export default function ConnectScreen() {
                     <AttestationView
                         attestation={attestation}
                         rpId={qr.rpId}
+                        displayName={appName(qr.rpId)}
                         isChanged={false}
                         verificationLevel={verificationLevel}
                         onApprove={handleApprove}
@@ -1105,6 +1103,7 @@ export default function ConnectScreen() {
                     <AttestationView
                         attestation={attestation}
                         rpId={qr.rpId}
+                        displayName={appName(qr.rpId)}
                         isChanged={true}
                         verificationLevel={verificationLevel}
                         onApprove={handleApprove}
@@ -1336,232 +1335,6 @@ const reportStyles = StyleSheet.create({
 });
 
 // ── Attestation detail view ─────────────────────────────────────────────
-
-function AttestationView({
-    attestation,
-    rpId,
-    isChanged,
-    verificationLevel,
-    onApprove,
-    onReject
-}: {
-    attestation: AttestationResult;
-    rpId: string;
-    isChanged: boolean;
-    verificationLevel: AttestationVerificationLevel | null;
-    onApprove: () => void;
-    onReject: () => void;
-}) {
-    const [detailsOpen, setDetailsOpen] = useState(false);
-    const insets = useSafeAreaInsets();
-    const appType = attestation.tee_type === 'sgx' ? 'WASM Application' : 'Container Application';
-    const teeColor = attestation.tee_type === 'sgx' ? '#34E89E' : '#00BCF2';
-
-    return (
-        <RNView style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={[styles.attestationContainer, { paddingBottom: 100 + insets.bottom }]}>
-                {isChanged && (
-                    <View style={styles.warningBanner}>
-                        <Text style={styles.warningText}>
-                            ⚠ This app's attestation has changed since you last verified it.
-                        </Text>
-                    </View>
-                )}
-
-                <Text style={styles.title}>{isChanged ? 'App Changed' : 'Verify Enclave'}</Text>
-                <Text style={styles.attestationAppName}>{appName(rpId)}</Text>
-                <Text style={styles.attestationOrigin}>{rpId}</Text>
-
-                {/* Verification Status */}
-                <View
-                    style={[
-                        styles.statusBanner,
-                        attestation.valid ? styles.statusBannerValid : styles.statusBannerInvalid
-                    ]}
-                >
-                    <Text style={styles.statusIcon}>{attestation.valid ? '✓' : '✕'}</Text>
-                    <View style={styles.statusInfo}>
-                        <Text
-                            style={[
-                                styles.statusTitle,
-                                attestation.valid
-                                    ? styles.statusTitleValid
-                                    : styles.statusTitleInvalid
-                            ]}
-                        >
-                            {attestation.valid ? 'Attestation Valid' : 'Attestation Invalid'}
-                        </Text>
-                        <Text style={styles.statusDetail}>
-                            {appType} · {attestation.tee_type?.toUpperCase()} enclave
-                        </Text>
-                    </View>
-                    <View style={[styles.teeBadge, { backgroundColor: teeColor }]}>
-                        <Text style={styles.teeBadgeText}>{attestation.tee_type?.toUpperCase()}</Text>
-                    </View>
-                </View>
-
-                {/* Verification-level badge — surfaces whether we just contacted
-                    the attestation server or trusted a recent local cache. */}
-                {verificationLevel === 'fresh-as-verified' && (
-                    <View style={[styles.verifyBadge, styles.verifyBadgeFresh]}>
-                        <Text style={styles.verifyBadgeIcon}>✓</Text>
-                        <Text style={styles.verifyBadgeText}>
-                            Verified just now by as.privasys.org
-                        </Text>
-                    </View>
-                )}
-                {verificationLevel === 'cached-trusted' && (
-                    <View style={[styles.verifyBadge, styles.verifyBadgeCached]}>
-                        <Text style={styles.verifyBadgeIcon}>↻</Text>
-                        <Text style={styles.verifyBadgeText}>
-                            Trusted from a recent verification on this device
-                        </Text>
-                    </View>
-                )}
-
-                {/* Collapsible details toggle */}
-                <Pressable
-                    style={styles.detailsToggle}
-                    onPress={() => setDetailsOpen(!detailsOpen)}
-                >
-                    <Text style={styles.detailsToggleText}>
-                        {detailsOpen ? 'Hide details' : 'Show attestation details'}
-                    </Text>
-                    <Text style={styles.detailsToggleIcon}>{detailsOpen ? '▲' : '▼'}</Text>
-                </Pressable>
-
-                {detailsOpen && (
-                    <>
-                        {/* Verification Details */}
-                        {(attestation.quote_verification_status ||
-                            attestation.attestation_servers_hash ||
-                            attestation.workload_key_source) && (
-                            <>
-                                <Text style={styles.sectionHeader}>Verification</Text>
-                                <View style={styles.attestationCard}>
-                                    {attestation.quote_verification_status && (
-                                        <AttestationRow
-                                            label="Quote Status"
-                                            value={attestation.quote_verification_status}
-                                        />
-                                    )}
-                                    {attestation.attestation_servers_hash && (
-                                        <AttestationRow
-                                            label="Attestation Server"
-                                            value={truncateHex(attestation.attestation_servers_hash)}
-                                        />
-                                    )}
-                                    {attestation.workload_key_source && (
-                                        <AttestationRow label="Key Source" value={attestation.workload_key_source} />
-                                    )}
-                                </View>
-                            </>
-                        )}
-
-                        {/* Enclave Identity */}
-                        <Text style={styles.sectionHeader}>Enclave Identity</Text>
-                        <View style={styles.attestationCard}>
-                            {attestation.mrenclave && (
-                                <AttestationRow
-                                    label="MRENCLAVE"
-                                    value={truncateHex(attestation.mrenclave)}
-                                />
-                            )}
-                            {attestation.mrsigner && (
-                                <AttestationRow
-                                    label="MRSIGNER"
-                                    value={truncateHex(attestation.mrsigner)}
-                                />
-                            )}
-                            {attestation.mrtd && (
-                                <AttestationRow label="MRTD" value={truncateHex(attestation.mrtd)} />
-                            )}
-                            {attestation.workload_code_hash && (
-                                <AttestationRow
-                                    label="Code Hash"
-                                    value={truncateHex(attestation.workload_code_hash)}
-                                />
-                            )}
-                            {attestation.workload_config_merkle_root && (
-                                <AttestationRow
-                                    label="Config Root"
-                                    value={truncateHex(attestation.workload_config_merkle_root)}
-                                />
-                            )}
-                        </View>
-
-                        {/* Certificate */}
-                        <Text style={styles.sectionHeader}>Certificate</Text>
-                        <View style={styles.attestationCard}>
-                            <AttestationRow label="Subject" value={attestation.cert_subject} />
-                            <AttestationRow label="Valid From" value={attestation.cert_not_before} />
-                            <AttestationRow label="Valid Until" value={attestation.cert_not_after} />
-                        </View>
-
-                        {/* Advisory IDs */}
-                        {attestation.advisory_ids && attestation.advisory_ids.length > 0 && (
-                            <>
-                                <Text style={styles.sectionHeader}>Advisories</Text>
-                                <View style={styles.attestationCard}>
-                                    {attestation.advisory_ids.map((id) => (
-                                        <AttestationRow key={id} label={id} value="Known advisory" />
-                                    ))}
-                                </View>
-                            </>
-                        )}
-
-                        {/* Custom OIDs */}
-                        {attestation.custom_oids && attestation.custom_oids.length > 0 && (
-                            <>
-                                <Text style={styles.sectionHeader}>Custom Extensions</Text>
-                                <View style={styles.attestationCard}>
-                                    {attestation.custom_oids.map((oid) => (
-                                        <AttestationRow
-                                            key={oid.oid}
-                                            label={oid.label || oid.oid}
-                                            value={truncateHex(oid.value_hex)}
-                                        />
-                                    ))}
-                                </View>
-                            </>
-                        )}
-                    </>
-                )}
-            </ScrollView>
-
-            {/* Fixed bottom action buttons */}
-            <RNView style={[styles.bottomActions, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-                <View style={styles.buttonRow}>
-                    <Pressable style={styles.rejectButton} onPress={onReject}>
-                        <Text style={styles.rejectButtonText}>Reject</Text>
-                    </Pressable>
-                    <Pressable style={styles.approveButton} onPress={onApprove}>
-                        <Text style={styles.approveButtonText}>
-                            {isChanged ? 'Trust Anyway' : 'Approve'}
-                        </Text>
-                    </Pressable>
-                </View>
-            </RNView>
-        </RNView>
-    );
-}
-
-function AttestationRow({ label, value }: { label: string; value?: string }) {
-    if (!value) return null;
-    return (
-        <View style={styles.attestationRow}>
-            <Text style={styles.attestationLabel}>{label}</Text>
-            <Text style={styles.attestationValue} selectable>
-                {value}
-            </Text>
-        </View>
-    );
-}
-
-function truncateHex(hex: string): string {
-    if (hex.length <= 16) return hex;
-    return `${hex.slice(0, 8)}…${hex.slice(-8)}`;
-}
 
 // ── Attribute acquisition view ──────────────────────────────────────────
 

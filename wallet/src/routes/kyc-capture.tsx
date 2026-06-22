@@ -20,18 +20,18 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View as NativeView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AttestationView } from '@/components/AttestationView';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { Text, View } from '@/components/Themed';
 import { getProfileValue, setProfileValue } from '@/services/attributes';
 import {
-    applyGovAttributes, govAttributeCandidates, readDocumentMrz, verifyEnclaveTrust, verifyIdentity,
-    type KycRecord,
+    applyGovAttributes, attestVerifier, govAttributeCandidates, readDocumentMrz, verifyIdentity,
+    type KycRecord, type VerifierAttestation,
 } from '@/services/kyc';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
-type Step = 'doctype' | 'consent' | 'capture' | 'read' | 'selfie' | 'verifying' | 'select' | 'done';
-type TrustState = 'checking' | 'verified' | 'failed';
+type Step = 'doctype' | 'consent' | 'attest' | 'capture' | 'read' | 'selfie' | 'verifying' | 'select' | 'done';
 type DocType = 'passport' | 'id-card';
 type CaptureState = 'positioning' | 'checking' | 'captured';
 
@@ -113,9 +113,11 @@ export default function KycCaptureScreen() {
     const [verifiedRecord, setVerifiedRecord] = useState<KycRecord | null>(null);
     const [candidates, setCandidates] = useState<ProfileAttribute[]>([]);
     const [selected, setSelected] = useState<Set<string>>(new Set());
-    // Consent step: attest the verifier enclave before the holder agrees to send
-    // any document data to it.
-    const [trust, setTrust] = useState<TrustState>('checking');
+    // Enclave verification step: the attested verifier is shown on its own page
+    // (the same view as sign-in) before any document data is captured.
+    const [verifierAtt, setVerifierAtt] = useState<VerifierAttestation | null>(null);
+    const [attError, setAttError] = useState<string | null>(null);
+    const [attRetry, setAttRetry] = useState(0);
 
     // Size the guide from the live landscape viewport and leave a dark margin so
     // every edge of the document remains visible.
@@ -142,22 +144,23 @@ export default function KycCaptureScreen() {
         setCameraKey((k) => k + 1);
     }, [step, winW, winH]);
 
-    // On the consent screen, attest the verifier enclave so the holder can see
-    // they are dealing with the published, verified code before agreeing to send
-    // any document data. The same check is re-enforced at send time.
+    // Enclave verification page: attest the verifier and show the holder the same
+    // "Verify Enclave" view they see at sign-in, before any document data is
+    // captured. The digest pin + attestation are re-enforced again at send time.
     useEffect(() => {
-        if (step !== 'consent') return;
+        if (step !== 'attest') return;
         let cancelled = false;
-        setTrust('checking');
-        verifyEnclaveTrust()
-            .then(() => { if (!cancelled) setTrust('verified'); })
+        setVerifierAtt(null);
+        setAttError(null);
+        attestVerifier()
+            .then((res) => { if (!cancelled) setVerifierAtt(res); })
             .catch((e) => {
                 if (cancelled) return;
                 console.warn('[KYC] enclave attestation failed:', e?.message);
-                setTrust('failed');
+                setAttError(e?.message ?? 'Could not verify the enclave.');
             });
         return () => { cancelled = true; };
-    }, [step]);
+    }, [step, attRetry]);
 
     const close = () => {
         if (router.canGoBack()) router.back();
@@ -496,36 +499,48 @@ export default function KycCaptureScreen() {
                         <ConsentItem icon="person-outline" label="A live selfie" />
                     </View>
 
-                    <View style={[styles.trustRow, trust === 'failed' && { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' }]}>
-                        {trust === 'checking' ? (
-                            <>
-                                <ActivityIndicator size="small" color="#007AFF" />
-                                <Text style={styles.trustText}>Verifying the enclave…</Text>
-                            </>
-                        ) : trust === 'verified' ? (
-                            <>
-                                <Ionicons name="shield-checkmark" size={18} color="#34C759" />
-                                <Text style={[styles.trustText, { color: '#15803D' }]}>Enclave verified · identity-verifier</Text>
-                            </>
-                        ) : (
-                            <>
-                                <Ionicons name="alert-circle" size={18} color="#DC2626" />
-                                <Text style={[styles.trustText, { color: '#B91C1C' }]}>Couldn&apos;t verify the enclave — do not proceed.</Text>
-                            </>
-                        )}
-                    </View>
+                    <Text style={styles.note}>
+                        Next, you&apos;ll verify the enclave before any data is captured.
+                    </Text>
 
-                    <Pressable
-                        style={[styles.primary, trust !== 'verified' && styles.disabled]}
-                        onPress={openCapture}
-                        disabled={trust !== 'verified'}
-                    >
+                    <Pressable style={styles.primary} onPress={() => setStep('attest')}>
                         <Text style={styles.primaryText}>Agree and continue</Text>
                     </Pressable>
                     <Pressable style={styles.secondary} onPress={close}>
                         <Text style={styles.secondaryText}>Cancel</Text>
                     </Pressable>
                 </ScrollView>
+            )}
+
+            {step === 'attest' && (
+                attError ? (
+                    <View style={styles.pad}>
+                        <Ionicons name="alert-circle" size={40} color="#DC2626" />
+                        <Text style={styles.title}>Couldn&apos;t verify the enclave</Text>
+                        <Text style={styles.body}>{attError}</Text>
+                        <Pressable style={styles.primary} onPress={() => setAttRetry((n) => n + 1)}>
+                            <Text style={styles.primaryText}>Try again</Text>
+                        </Pressable>
+                        <Pressable style={styles.secondary} onPress={close}>
+                            <Text style={styles.secondaryText}>Cancel</Text>
+                        </Pressable>
+                    </View>
+                ) : !verifierAtt ? (
+                    <View style={styles.pad}>
+                        <ActivityIndicator size="large" color="#007AFF" />
+                        <Text style={styles.body}>Verifying the enclave…</Text>
+                    </View>
+                ) : (
+                    <AttestationView
+                        attestation={verifierAtt.attestation}
+                        rpId={verifierAtt.origin}
+                        displayName={verifierAtt.displayName}
+                        isChanged={false}
+                        verificationLevel="fresh-as-verified"
+                        onApprove={openCapture}
+                        onReject={close}
+                    />
+                )
             )}
 
             {step === 'capture' && (
@@ -771,12 +786,6 @@ const styles = StyleSheet.create({
         borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F1F5F9',
     },
     consentItemText: { fontSize: 15, color: '#0F172A', flex: 1 },
-    trustRow: {
-        flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch',
-        backgroundColor: '#F0FDF4', borderRadius: 10, borderWidth: 1, borderColor: '#BBF7D0',
-        paddingHorizontal: 14, paddingVertical: 12,
-    },
-    trustText: { fontSize: 13, color: '#475569', fontWeight: '600', flex: 1 },
     pad: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 },
     padContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14, paddingTop: 72 },
     close: { position: 'absolute', right: 16, zIndex: 10, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

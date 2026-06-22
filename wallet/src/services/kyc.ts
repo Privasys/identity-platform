@@ -24,7 +24,7 @@ import * as Crypto from 'expo-crypto';
 
 import * as SecureStore from '@/utils/storage';
 import { getAttestationServerToken } from '@/services/app-attest';
-import { inspectAttestation, verifyAttestation } from '@/services/attestation';
+import { inspectAttestation, verifyAttestation, type AttestationResult } from '@/services/attestation';
 import { attributeLabel, setProfileValue } from '@/services/attributes';
 import { deriveAppSub } from '@/services/did';
 import { derToRawEcdsa } from '@/services/encauth';
@@ -241,6 +241,57 @@ async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
  */
 export async function verifyEnclaveTrust(): Promise<{ measurement: string; imageRef?: string }> {
     return verifyVerifierEnclave();
+}
+
+export interface VerifierAttestation {
+    /** RA-TLS origin (hostname) the wallet attested. */
+    origin: string;
+    /** Human-readable name for the "Verify Enclave" header. */
+    displayName: string;
+    /** Full attestation result to render in the shared AttestationView. */
+    attestation: AttestationResult;
+}
+
+/**
+ * Attest the verifier enclave and return the full result for the user-facing
+ * "Verify Enclave" screen (the same view shown at sign-in). Inspects the cert for
+ * the rich measurement/extension fields, pins the published image digest exactly
+ * as verifyVerifierEnclave does, then verifies against the attestation server for
+ * the authoritative `valid`. Throws on a missing/mismatched digest or a failed
+ * verification, so the screen only ever shows a genuinely attested verifier.
+ */
+export async function attestVerifier(): Promise<VerifierAttestation> {
+    const v = await resolveVerifier();
+    const inspected = await inspectAttestation(v.origin);
+
+    const oid = inspected.custom_oids?.find((o) => o.oid === v.imageOid);
+    if (!oid) {
+        throw new Error('verifier attestation is missing the identity image OID — refusing to proceed');
+    }
+    if (oid.value_hex.toLowerCase() !== v.imageDigest.toLowerCase()) {
+        throw new Error('verifier image digest does not match the expected published build — refusing to proceed');
+    }
+
+    const asToken = await getAttestationServerToken();
+    const verified = await verifyAttestation(v.origin, {
+        tee: inspected.tee_type ?? 'tdx',
+        attestation_server: ATTESTATION_SERVER,
+        attestation_server_token: asToken,
+    });
+    if (!verified.valid) {
+        throw new Error('verifier attestation did not verify against the attestation server');
+    }
+
+    // Rich display fields (cert, extensions) from inspect; authoritative validity
+    // and measurements from the verified result.
+    const attestation: AttestationResult = {
+        ...inspected,
+        valid: verified.valid,
+        mrtd: verified.mrtd ?? inspected.mrtd,
+        mrenclave: verified.mrenclave ?? inspected.mrenclave,
+        quote_verification_status: verified.quote_verification_status ?? inspected.quote_verification_status,
+    };
+    return { origin: v.origin, displayName: VERIFIER_DISPLAY, attestation };
 }
 
 async function postToVerifier<T>(path: string, body: unknown): Promise<T> {

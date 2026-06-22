@@ -39,27 +39,82 @@ const HOLDER_KEY_ID = 'privasys-wallet-default';
 /** Sealed storage key for the KYC receipt record(s). */
 const KYC_STORE_KEY = 'privasys.kyc.records';
 
-/** Verifier enclave. Overridable per build; defaults to the dev TDX deployment.
- *  Prod should resolve this from the app registry + a pinned attestation policy. */
-const VERIFIER_ORIGIN =
-    process.env.EXPO_PUBLIC_KYC_VERIFIER_ORIGIN ?? 'identity-verifier.apps-test.privasys.org';
+/** Platform (management-service) API base. The wallet resolves the verifier app
+ *  by name from the app store, so its origin + pinned image digest are NOT baked
+ *  into the build. Defaults to the test platform (matching the dev verifier
+ *  fallback below); set EXPO_PUBLIC_PLATFORM_API_URL for prod. */
+const PLATFORM_API_BASE =
+    process.env.EXPO_PUBLIC_PLATFORM_API_URL ?? 'https://api-test.developer.privasys.org';
 
-/** Published identity-verifier image digest, attested at the Identity image OID
- *  (org.privasys, 1.3.6.1.4.1.65230.3.2). Pinning this is what makes "send my
- *  passport to the enclave" safe: we only talk to the published, auditable code. */
+/** Store name of the identity-verifier app to resolve. */
+const VERIFIER_APP_NAME =
+    process.env.EXPO_PUBLIC_KYC_VERIFIER_APP ?? 'container-app-identity-verifier';
+
+/** Attestation extension carrying the workload image digest (org.privasys,
+ *  1.3.6.1.4.1.65230.3.2). Pinning this is what makes "send my passport to the
+ *  enclave" safe: we only talk to the published, auditable code. The resolve API
+ *  returns this too; this is the default. */
 const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.3.2';
-// container-app-identity-verifier v0.3.1 (ghcr.io/privasys/container-app-identity-verifier).
-// This is the OCI image digest the enclave attests at OID 3.2; it changes only
-// when the verifier image is rebuilt (not on a plain redeploy). Bump it here when
-// a new verifier image is published, or override per-build with the env var.
-// v0.3.1: passive auth accepts Brainpool explicit-params + RSASSA-PSS DSC keys
-// (German passport fix). Must match the image deployed on the verifier enclave.
-const VERIFIER_IMAGE_DIGEST =
+
+/** Fallback verifier coordinates, used only until the app is resolvable from the
+ *  store (then the resolved hostname + attested digest win). Defaults are the dev
+ *  TDX deployment; both overridable per build.
+ *  container-app-identity-verifier v0.3.1: passive auth accepts Brainpool
+ *  explicit-params + RSASSA-PSS DSC keys (German passport fix). */
+const FALLBACK_VERIFIER_ORIGIN =
+    process.env.EXPO_PUBLIC_KYC_VERIFIER_ORIGIN ?? 'identity-verifier.apps-test.privasys.org';
+const FALLBACK_VERIFIER_IMAGE_DIGEST =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_DIGEST ??
     '0b3b669f2b3f398529bae0be9790e90958cfd3890410c049657f95af191441da';
 
 const ATTESTATION_SERVER = 'https://as.privasys.org';
 const VERIFIER_DISPLAY = 'Privasys identity verifier';
+
+/** Resolved verifier coordinates (origin + the image digest to pin), fetched
+ *  once from the platform store and cached for the session. */
+interface ResolvedVerifier {
+    origin: string;
+    imageOid: string;
+    imageDigest: string;
+}
+let resolvedVerifier: ResolvedVerifier | null = null;
+
+/**
+ * Resolve the identity-verifier's deployment from the app store by name: its
+ * hostname and the attested image digest to pin (OID 3.2). This replaces the
+ * hard-coded origin + digest. The values are still only *hints*: verifyVerifierEnclave
+ * re-verifies the enclave's RA-TLS attestation against as.privasys.org and pins
+ * the digest against the certificate, so the resolve channel cannot direct the
+ * wallet to an un-attested enclave. Falls back to the build defaults if the app
+ * is not yet in the store or the platform is unreachable.
+ */
+async function resolveVerifier(): Promise<ResolvedVerifier> {
+    if (resolvedVerifier) return resolvedVerifier;
+    try {
+        const res = await fetch(
+            `${PLATFORM_API_BASE}/api/v1/apps/by-name/${encodeURIComponent(VERIFIER_APP_NAME)}/resolve`,
+        );
+        if (res.ok) {
+            const j = (await res.json()) as { hostname?: string; image_oid?: string; image_digest?: string };
+            if (j.hostname && j.image_digest) {
+                resolvedVerifier = {
+                    origin: j.hostname,
+                    imageOid: j.image_oid || VERIFIER_IMAGE_OID,
+                    imageDigest: j.image_digest.toLowerCase(),
+                };
+                return resolvedVerifier;
+            }
+        }
+    } catch {
+        // fall through to the build fallback
+    }
+    resolvedVerifier = {
+        origin: FALLBACK_VERIFIER_ORIGIN,
+        imageOid: VERIFIER_IMAGE_OID,
+        imageDigest: FALLBACK_VERIFIER_IMAGE_DIGEST,
+    };
+    return resolvedVerifier;
+}
 
 /** Canonical document fields the enclave can certify and the wallet auto-fills.
  *  All are sourced from the passport chip (DG1 MRZ; place_of_birth from DG11) and
@@ -152,18 +207,19 @@ interface VerifierIdentity {
  * document data to an unverified or unexpected enclave.
  */
 async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
-    const inspected = await inspectAttestation(VERIFIER_ORIGIN);
+    const v = await resolveVerifier();
+    const inspected = await inspectAttestation(v.origin);
 
-    const oid = inspected.custom_oids?.find((o) => o.oid === VERIFIER_IMAGE_OID);
+    const oid = inspected.custom_oids?.find((o) => o.oid === v.imageOid);
     if (!oid) {
         throw new Error('verifier attestation is missing the identity image OID — refusing to send identity data');
     }
-    if (oid.value_hex.toLowerCase() !== VERIFIER_IMAGE_DIGEST.toLowerCase()) {
+    if (oid.value_hex.toLowerCase() !== v.imageDigest.toLowerCase()) {
         throw new Error('verifier image digest does not match the expected published build — refusing to proceed');
     }
 
     const asToken = await getAttestationServerToken();
-    const result = await verifyAttestation(VERIFIER_ORIGIN, {
+    const result = await verifyAttestation(v.origin, {
         tee: inspected.tee_type ?? 'tdx',
         attestation_server: ATTESTATION_SERVER,
         attestation_server_token: asToken,
@@ -188,7 +244,8 @@ export async function verifyEnclaveTrust(): Promise<{ measurement: string; image
 }
 
 async function postToVerifier<T>(path: string, body: unknown): Promise<T> {
-    const url = new URL(`https://${VERIFIER_ORIGIN}`);
+    const { origin } = await resolveVerifier();
+    const url = new URL(`https://${origin}`);
     const host = url.hostname;
     const port = parseInt(url.port || '443', 10);
     let res: { status: number; body: string };

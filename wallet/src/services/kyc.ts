@@ -200,49 +200,6 @@ interface VerifierIdentity {
     imageRef?: string;
 }
 
-/**
- * Verify that the enclave we are about to send identity data to is the
- * published identity-verifier, by RA-TLS attestation + pinning its image digest
- * at the Identity image OID. Throws if anything is off — we never send raw
- * document data to an unverified or unexpected enclave.
- */
-async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
-    const v = await resolveVerifier();
-    const inspected = await inspectAttestation(v.origin);
-
-    const oid = inspected.custom_oids?.find((o) => o.oid === v.imageOid);
-    if (!oid) {
-        throw new Error('verifier attestation is missing the identity image OID — refusing to send identity data');
-    }
-    if (oid.value_hex.toLowerCase() !== v.imageDigest.toLowerCase()) {
-        throw new Error('verifier image digest does not match the expected published build — refusing to proceed');
-    }
-
-    const asToken = await getAttestationServerToken();
-    const result = await verifyAttestation(v.origin, {
-        tee: inspected.tee_type ?? 'tdx',
-        attestation_server: ATTESTATION_SERVER,
-        attestation_server_token: asToken,
-    });
-    if (!result.valid) {
-        throw new Error('verifier attestation did not verify against the attestation server');
-    }
-    return {
-        measurement: result.mrtd ?? result.mrenclave ?? '',
-        imageRef: result.workload_image_ref,
-    };
-}
-
-/**
- * Verify the identity-verifier enclave's RA-TLS attestation + pinned image digest
- * up front, so the wallet can show the holder it is dealing with the published,
- * attested verifier *before* asking them to consent to sending any document data.
- * Throws if attestation is missing, mismatched, or doesn't verify.
- */
-export async function verifyEnclaveTrust(): Promise<{ measurement: string; imageRef?: string }> {
-    return verifyVerifierEnclave();
-}
-
 export interface VerifierAttestation {
     /** RA-TLS origin (hostname) the wallet attested. */
     origin: string;
@@ -253,12 +210,13 @@ export interface VerifierAttestation {
 }
 
 /**
- * Attest the verifier enclave and return the full result for the user-facing
- * "Verify Enclave" screen (the same view shown at sign-in). Inspects the cert for
- * the rich measurement/extension fields, pins the published image digest exactly
- * as verifyVerifierEnclave does, then verifies against the attestation server for
- * the authoritative `valid`. Throws on a missing/mismatched digest or a failed
- * verification, so the screen only ever shows a genuinely attested verifier.
+ * Attest the verifier enclave: resolve it, inspect the RA-TLS cert, pin the
+ * published image digest at the Identity image OID, then verify against the
+ * attestation server. This is the single source of truth for "is this the
+ * genuine, published identity-verifier?" — used both to gate sending any
+ * document data and to render the user-facing "Verify Enclave" screen (the same
+ * view shown at sign-in). Throws on a missing/mismatched digest or a failed
+ * verification, so the wallet never trusts an unexpected enclave.
  */
 export async function attestVerifier(): Promise<VerifierAttestation> {
     const v = await resolveVerifier();
@@ -266,7 +224,7 @@ export async function attestVerifier(): Promise<VerifierAttestation> {
 
     const oid = inspected.custom_oids?.find((o) => o.oid === v.imageOid);
     if (!oid) {
-        throw new Error('verifier attestation is missing the identity image OID — refusing to proceed');
+        throw new Error('verifier attestation is missing the identity image OID — refusing to send identity data');
     }
     if (oid.value_hex.toLowerCase() !== v.imageDigest.toLowerCase()) {
         throw new Error('verifier image digest does not match the expected published build — refusing to proceed');
@@ -282,16 +240,30 @@ export async function attestVerifier(): Promise<VerifierAttestation> {
         throw new Error('verifier attestation did not verify against the attestation server');
     }
 
-    // Rich display fields (cert, extensions) from inspect; authoritative validity
-    // and measurements from the verified result.
+    // Rich display fields (cert, extensions) from inspect; authoritative validity,
+    // measurements and image ref from the verified result.
     const attestation: AttestationResult = {
         ...inspected,
         valid: verified.valid,
         mrtd: verified.mrtd ?? inspected.mrtd,
         mrenclave: verified.mrenclave ?? inspected.mrenclave,
+        workload_image_ref: verified.workload_image_ref ?? inspected.workload_image_ref,
         quote_verification_status: verified.quote_verification_status ?? inspected.quote_verification_status,
     };
     return { origin: v.origin, displayName: VERIFIER_DISPLAY, attestation };
+}
+
+/**
+ * The measurement + image ref of the attested verifier, for stamping into the
+ * KycRecord. A thin derivation of attestVerifier() so the attestation logic
+ * lives in exactly one place.
+ */
+async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
+    const { attestation } = await attestVerifier();
+    return {
+        measurement: attestation.mrtd ?? attestation.mrenclave ?? '',
+        imageRef: attestation.workload_image_ref,
+    };
 }
 
 async function postToVerifier<T>(path: string, body: unknown): Promise<T> {

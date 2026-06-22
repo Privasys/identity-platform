@@ -1,6 +1,7 @@
 // Copyright (c) Privasys. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.0.
 
+import { bytesToBase64url as b64urlEncode } from '@/utils/encoding';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 /** Default relay host the SDK and wallet talk to in production. */
@@ -8,12 +9,6 @@ export const DEFAULT_RELAY_HOST = 'relay.privasys.org';
 
 /** Highest descriptor version this wallet build understands. */
 export const SUPPORTED_DESCRIPTOR_VERSION = 1;
-
-function b64urlEncode(bytes: Uint8Array): string {
-    let s = '';
-    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
 
 /**
  * Fetch a published descriptor from `https://<relayHost>/connect/<sessionId>`,

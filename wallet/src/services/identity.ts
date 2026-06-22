@@ -22,6 +22,7 @@
  * The linked identity is NOT used for enclave authentication — that's always FIDO2.
  */
 
+import { bytesToBase64url as base64urlEncode } from '@/utils/encoding';
 import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
@@ -83,14 +84,6 @@ async function generatePKCE(): Promise<{ verifier: string; challenge: string }> 
     );
     const challenge = digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     return { verifier, challenge };
-}
-
-function base64urlEncode(bytes: Uint8Array): string {
-    let binary = '';
-    for (const byte of bytes) {
-        binary += String.fromCharCode(byte);
-    }
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**

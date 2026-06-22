@@ -21,6 +21,7 @@
  *    always produces the same sub, but different apps get different subs.
  */
 
+import { base64urlToBytes } from '@/utils/encoding';
 import * as Crypto from 'expo-crypto';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -32,18 +33,6 @@ const P256_MULTICODEC_PREFIX = new Uint8Array([0x80, 0x24]);
 
 // Base58btc alphabet
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
-function base64urlToBytes(b64url: string): Uint8Array {
-    const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
-    const pad = (4 - (b64.length % 4)) % 4;
-    const padded = b64 + '='.repeat(pad);
-    const binary = atob(padded);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-}
 
 /**
  * Compress an uncompressed P-256 public key (65 bytes: 04 || x || y)

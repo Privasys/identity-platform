@@ -21,6 +21,7 @@
  * exactly (P-256 + SHA-256, fixed 64-byte R||S).
  */
 
+import { bytesToBase64url as b64uEncode, base64urlToBytes as b64uDecode } from '@/utils/encoding';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -193,12 +194,6 @@ export function derToRawEcdsa(der: Uint8Array): Uint8Array {
 
 // ---- base64url helpers ----------------------------------------------
 
-function b64uEncode(bytes: Uint8Array): string {
-    let bin = '';
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i] ?? 0);
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
 function hexToBytes(hex: string): Uint8Array {
     if (hex.length % 2 !== 0) throw new Error('hexToBytes: odd length');
     const out = new Uint8Array(hex.length / 2);
@@ -207,15 +202,6 @@ function hexToBytes(hex: string): Uint8Array {
         if (Number.isNaN(byte)) throw new Error('hexToBytes: invalid hex');
         out[i] = byte;
     }
-    return out;
-}
-
-function b64uDecode(s: string): Uint8Array {
-    const pad = s.length % 4 === 0 ? 0 : 4 - (s.length % 4);
-    const std = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(pad);
-    const bin = atob(std);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
 }
 

@@ -20,6 +20,7 @@
  * real eMRTD chip data here without changing this interface.
  */
 
+import { bytesToBase64url as b64uBytes, base64urlToBytes as b64uToBytes, canonicalJson } from '@/utils/encoding';
 import * as Crypto from 'expo-crypto';
 
 import * as SecureStore from '@/utils/storage';
@@ -453,28 +454,6 @@ function decodeJwtId(jws: string): string {
 // disclosure token for exactly the one claim a relying party asked for, opening
 // only that commitment — the raw value never leaves the wallet. Each request is
 // holder-signed (the IVR is bound to the holder key) and consented.
-
-function b64uBytes(bytes: Uint8Array): string {
-    let bin = '';
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i] ?? 0);
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function b64uToBytes(s: string): Uint8Array {
-    const std = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4);
-    const bin = atob(std);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-}
-
-/** Canonical JSON matching the verifier's crypto.canonical_json: sorted keys,
- *  compact separators (",",":"), no whitespace. Values here are ASCII strings
- *  + one integer, so JS and Python serialise identically. */
-function canonicalJson(obj: Record<string, string | number>): string {
-    const keys = Object.keys(obj).sort();
-    return '{' + keys.map((k) => JSON.stringify(k) + ':' + JSON.stringify(obj[k])).join(',') + '}';
-}
 
 interface SignedBase {
     ivr: string;

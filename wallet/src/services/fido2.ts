@@ -8,6 +8,7 @@
  * communicating with the FIDO2 server over an RA-TLS connection.
  */
 
+import { bytesToBase64url as base64urlEncode, base64urlToBytes as base64urlDecode } from '@/utils/encoding';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -51,25 +52,6 @@ interface CompleteResponse {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
-
-function base64urlEncode(data: Uint8Array): string {
-    let binary = '';
-    for (let i = 0; i < data.length; i++) {
-        binary += String.fromCharCode(data[i]!);
-    }
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64urlDecode(str: string): Uint8Array {
-    const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-    const binary = atob(padded);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-}
 
 async function fido2Fetch<T extends object>(origin: string, path: string, body?: object): Promise<T> {
     const url = new URL(`https://${origin}`);

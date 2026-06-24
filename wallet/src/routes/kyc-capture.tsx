@@ -21,12 +21,13 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Sc
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AttestationView } from '@/components/AttestationView';
+import { DataRequestConsent } from '@/components/DataRequestConsent';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { Text, View } from '@/components/Themed';
 import { getProfileValue, setProfileValue } from '@/services/attributes';
 import {
-    applyGovAttributes, attestVerifier, govAttributeCandidates, readDocumentMrz, verifyIdentity,
-    type KycRecord, type VerifierAttestation,
+    applyGovAttributes, attestVerifier, getVerifierInfo, govAttributeCandidates, readDocumentMrz,
+    verifyIdentity, type KycRecord, type VerifierAttestation,
 } from '@/services/kyc';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
@@ -118,6 +119,9 @@ export default function KycCaptureScreen() {
     const [verifierAtt, setVerifierAtt] = useState<VerifierAttestation | null>(null);
     const [attError, setAttError] = useState<string | null>(null);
     const [attRetry, setAttRetry] = useState(0);
+    // Verifier identity (name + origin) for the consent card, resolved from the
+    // store before the user agrees (the RA-TLS verification is the next page).
+    const [verifierInfo, setVerifierInfo] = useState<{ origin: string; displayName: string } | null>(null);
 
     // Size the guide from the live landscape viewport and leave a dark margin so
     // every edge of the document remains visible.
@@ -143,6 +147,17 @@ export default function KycCaptureScreen() {
         setCameraReady(false);
         setCameraKey((k) => k + 1);
     }, [step, winW, winH]);
+
+    // Resolve the verifier's name + origin for the consent card (no attestation
+    // yet — that is the dedicated enclave page after consent).
+    useEffect(() => {
+        if (step !== 'consent' || verifierInfo) return;
+        let cancelled = false;
+        getVerifierInfo()
+            .then((info) => { if (!cancelled) setVerifierInfo(info); })
+            .catch(() => { if (!cancelled) setVerifierInfo({ origin: '', displayName: 'Privasys identity verifier' }); });
+        return () => { cancelled = true; };
+    }, [step, verifierInfo]);
 
     // Enclave verification page: attest the verifier and show the holder the same
     // "Verify Enclave" view they see at sign-in, before any document data is
@@ -480,36 +495,25 @@ export default function KycCaptureScreen() {
             )}
 
             {step === 'consent' && (
-                <ScrollView
-                    style={styles.flex}
-                    contentContainerStyle={styles.padContent}
-                    showsVerticalScrollIndicator={false}
-                >
-                    <Ionicons name="lock-closed-outline" size={40} color="#007AFF" />
-                    <Text style={styles.title}>Verify with Privasys ID</Text>
-                    <Text style={styles.body}>
-                        To verify your {docLabel}, the Privasys identity verifier processes the
-                        following on your behalf. It runs published, attested code in a secure
-                        enclave and keeps nothing once done. Your data otherwise stays on this device.
-                    </Text>
-
-                    <View style={styles.consentCard}>
-                        <ConsentItem icon="camera-outline" label={`Your ${docLabel}'s photo page`} />
-                        <ConsentItem icon="hardware-chip-outline" label={`Your ${docLabel} chip, read over NFC`} />
-                        <ConsentItem icon="person-outline" label="A live selfie" />
-                    </View>
-
-                    <Text style={styles.note}>
-                        Next, you&apos;ll verify the enclave before any data is captured.
-                    </Text>
-
-                    <Pressable style={styles.primary} onPress={() => setStep('attest')}>
-                        <Text style={styles.primaryText}>Agree and continue</Text>
-                    </Pressable>
-                    <Pressable style={styles.secondary} onPress={close}>
-                        <Text style={styles.secondaryText}>Cancel</Text>
-                    </Pressable>
-                </ScrollView>
+                <DataRequestConsent
+                    appName={verifierInfo?.displayName ?? 'Privasys identity verifier'}
+                    origin={verifierInfo?.origin ?? ''}
+                    appIcon="id-card-outline"
+                    sectionTitle="WHAT THE VERIFIER READS"
+                    sectionDescription={`To verify your ${docLabel}, the Privasys identity verifier processes the following in a secure enclave and keeps nothing once done. Your data otherwise stays on this device.`}
+                    items={[
+                        { key: 'doc', label: `Your ${docLabel}'s photo page`, icon: 'camera-outline' },
+                        { key: 'chip', label: `Your ${docLabel} chip, read over NFC`, icon: 'hardware-chip-outline' },
+                        { key: 'selfie', label: 'A live selfie', icon: 'person-outline' },
+                    ]}
+                    note="You'll verify the enclave next; your chip is read over NFC only after you agree."
+                    denyLabel="Cancel"
+                    approveLabel="Agree and continue"
+                    onDeny={close}
+                    onApprove={() => setStep('attest')}
+                    contentTopInset={insets.top + 36}
+                    actionsBottomInset={insets.bottom + 16}
+                />
             )}
 
             {step === 'attest' && (
@@ -765,27 +769,9 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     );
 }
 
-function ConsentItem({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
-    return (
-        <View style={styles.consentItem}>
-            <Ionicons name={icon} size={20} color="#007AFF" />
-            <Text style={styles.consentItemText}>{label}</Text>
-        </View>
-    );
-}
-
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8FAFB' },
     flex: { flex: 1 },
-    consentCard: {
-        alignSelf: 'stretch', backgroundColor: '#FFFFFF', borderRadius: 12,
-        borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 16, paddingVertical: 6,
-    },
-    consentItem: {
-        flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12,
-        borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F1F5F9',
-    },
-    consentItemText: { fontSize: 15, color: '#0F172A', flex: 1 },
     pad: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 },
     padContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14, paddingTop: 72 },
     close: { position: 'absolute', right: 16, zIndex: 10, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

@@ -255,6 +255,16 @@ export async function attestVerifier(): Promise<VerifierAttestation> {
 }
 
 /**
+ * Resolved verifier identity for display (origin + name) WITHOUT attesting — so
+ * the consent screen can name the app + show its origin before the user agrees,
+ * deferring the actual RA-TLS verification to the dedicated enclave page.
+ */
+export async function getVerifierInfo(): Promise<{ origin: string; displayName: string }> {
+    const v = await resolveVerifier();
+    return { origin: v.origin, displayName: VERIFIER_DISPLAY };
+}
+
+/**
  * The measurement + image ref of the attested verifier, for stamping into the
  * KycRecord. A thin derivation of attestVerifier() so the attestation logic
  * lives in exactly one place.

@@ -12,6 +12,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -51,6 +52,7 @@ export function DataRequestConsent({
     purpose,
     appIcon = 'cube-outline',
     attestation,
+    expandable = false,
     sectionTitle = 'REQUESTED DATA',
     sectionDescription,
     items,
@@ -72,6 +74,9 @@ export function DataRequestConsent({
     purpose?: string;
     appIcon?: keyof typeof Ionicons.glyphMap;
     attestation?: AttestationSummary;
+    /** When true, the attestation summary collapses behind a tap (measurement
+     *  hidden by default); otherwise it is always shown. */
+    expandable?: boolean;
     sectionTitle?: string;
     sectionDescription?: string;
     items: ConsentDataItem[];
@@ -89,6 +94,8 @@ export function DataRequestConsent({
     actionsBottomInset?: number;
     contentTopInset?: number;
 }) {
+    const [showMeasurement, setShowMeasurement] = useState(false);
+    const showDetails = !expandable || showMeasurement;
     return (
         <RNView style={styles.flex}>
             <ScrollView
@@ -113,28 +120,43 @@ export function DataRequestConsent({
 
                 {/* Optional attestation summary (omitted when verified on a separate page) */}
                 {attestation ? (
-                    <RNView style={styles.attestationCard}>
-                        <RNView style={styles.attestationBadge}>
-                            <Ionicons name="shield-checkmark" size={16} color="#34E89E" />
-                            <Text style={styles.attestationLabel}>
-                                Attested · {teeLabel(attestation.teeType)}
-                            </Text>
-                        </RNView>
-                        <RNView style={styles.measurementDetails}>
-                            <Text style={styles.measurementLabel}>Measurement</Text>
-                            <Text style={styles.measurementValue} numberOfLines={2}>
-                                {attestation.measurement}
-                            </Text>
-                            {attestation.codeHash ? (
-                                <>
-                                    <Text style={styles.measurementLabel}>Code Hash</Text>
-                                    <Text style={styles.measurementValue} numberOfLines={2}>
-                                        {attestation.codeHash}
-                                    </Text>
-                                </>
+                    <Pressable
+                        style={styles.attestationCard}
+                        onPress={expandable ? () => setShowMeasurement((v) => !v) : undefined}
+                        disabled={!expandable}
+                    >
+                        <RNView style={styles.attestationHeader}>
+                            <RNView style={styles.attestationBadge}>
+                                <Ionicons name="shield-checkmark" size={16} color="#34E89E" />
+                                <Text style={styles.attestationLabel}>
+                                    Attested · {teeLabel(attestation.teeType)}
+                                </Text>
+                            </RNView>
+                            {expandable ? (
+                                <Ionicons
+                                    name={showMeasurement ? 'chevron-up' : 'chevron-down'}
+                                    size={18}
+                                    color="#94A3B8"
+                                />
                             ) : null}
                         </RNView>
-                    </RNView>
+                        {showDetails ? (
+                            <RNView style={styles.measurementDetails}>
+                                <Text style={styles.measurementLabel}>Measurement</Text>
+                                <Text style={styles.measurementValue} numberOfLines={2}>
+                                    {attestation.measurement}
+                                </Text>
+                                {attestation.codeHash ? (
+                                    <>
+                                        <Text style={styles.measurementLabel}>Code Hash</Text>
+                                        <Text style={styles.measurementValue} numberOfLines={2}>
+                                            {attestation.codeHash}
+                                        </Text>
+                                    </>
+                                ) : null}
+                            </RNView>
+                        ) : null}
+                    </Pressable>
                 ) : null}
 
                 {/* Requested data */}
@@ -231,6 +253,7 @@ const styles = StyleSheet.create({
     purposeText: { fontSize: 13, color: '#64748B', flex: 1, lineHeight: 18 },
 
     attestationCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 20 },
+    attestationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     attestationBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     attestationLabel: { fontSize: 14, fontWeight: '600', color: '#34E89E' },
     measurementDetails: { marginTop: 12, paddingTop: 12, borderTopWidth: 0.5, borderTopColor: '#F1F5F9' },

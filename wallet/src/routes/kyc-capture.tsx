@@ -39,6 +39,20 @@ type CaptureState = 'positioning' | 'checking' | 'captured';
 // Data-page (TD3 photo page) aspect ≈ 125×88 mm ≈ 1.42:1.
 const DOC_PAGE_RATIO = 1.42;
 
+// The raw inputs the verifier reads during capture, shown on the consent screen.
+// These are transient processing inputs — consumed in the enclave and never
+// stored — NOT disclosable profile attributes, so they are defined here (local to
+// the capture flow) rather than in the shared canonical-attributes referential,
+// which models stored/disclosed attributes (with scope + assurance). The verifier
+// turns these into the gov-assured *output* attributes (birthdate, nationality,
+// age_over_18, …) that the user picks in the post-verify "select" step; those
+// outputs ARE in the referential. `doc` is the document noun (passport / ID card).
+const KYC_INPUT_ITEMS: { key: string; icon: keyof typeof Ionicons.glyphMap; label: (doc: string) => string }[] = [
+    { key: 'doc_page', icon: 'camera-outline', label: (doc) => `Your ${doc}'s photo page` },
+    { key: 'nfc_chip', icon: 'hardware-chip-outline', label: (doc) => `Your ${doc} chip, read over NFC` },
+    { key: 'live_selfie', icon: 'person-outline', label: () => 'A live selfie' },
+];
+
 /**
  * Crop a captured still to the on-screen guide frame (plus a generous margin) so
  * only the document page — not the surroundings — leaves the device. The preview
@@ -501,11 +515,7 @@ export default function KycCaptureScreen() {
                     appIcon="id-card-outline"
                     sectionTitle="WHAT THE VERIFIER READS"
                     sectionDescription={`To verify your ${docLabel}, the Privasys identity verifier processes the following in a secure enclave and keeps nothing once done. Your data otherwise stays on this device.`}
-                    items={[
-                        { key: 'doc', label: `Your ${docLabel}'s photo page`, icon: 'camera-outline' },
-                        { key: 'chip', label: `Your ${docLabel} chip, read over NFC`, icon: 'hardware-chip-outline' },
-                        { key: 'selfie', label: 'A live selfie', icon: 'person-outline' },
-                    ]}
+                    items={KYC_INPUT_ITEMS.map((i) => ({ key: i.key, icon: i.icon, label: i.label(docLabel) }))}
                     note="You'll verify the enclave next; your chip is read over NFC only after you agree."
                     denyLabel="Cancel"
                     approveLabel="Agree and continue"

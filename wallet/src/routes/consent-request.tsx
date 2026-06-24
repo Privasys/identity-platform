@@ -168,6 +168,7 @@ export default function ConsentRequestScreen() {
                     measurement: request.enclaveMeasurement,
                     codeHash: request.codeHash,
                 }}
+                expandable
                 sectionDescription={`Select which data to share with this app. ${approvedCount} of ${totalCount} selected.`}
                 items={items}
                 persistent={{ value: persistent, onChange: setPersistent }}

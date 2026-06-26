@@ -15,15 +15,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
 )
 
 const (
 	appScopePrefix  = "apps.privasys.org/"
 	userScopePrefix = "users/"
-	// platformManagerRole gates app-scoped grants: only the platform service
-	// account (carrying this role) may mint a grant naming an arbitrary owner.
-	platformManagerRole = "manager"
+	// platformManagerRole gates app-scoped grants: only an account holding the
+	// platform control-plane manager role may mint a grant naming an arbitrary
+	// owner. This is checked against the account's granted roles in the DB, NOT
+	// the bearer token's audience-filtered `roles` claim - so it is unaffected by
+	// whatever audience the caller minted its token with (the platform may serve
+	// many audiences; this authority is always the canonical platform one).
+	platformManagerRole = "privasys-platform:manager"
 	defaultTTLSeconds   = 300
 	maxTTLSeconds       = 900
 )
@@ -49,7 +54,7 @@ type grantRequest struct {
 //     only the real app TEE can spend it.
 //   - users/<sub>: the caller's own sub must equal <sub>; owner is that sub.
 //     A holder-of-key cnf is required (binds the grant to the caller's cert).
-func HandleKeyCreationGrant(iss *tokens.Issuer) http.HandlerFunc {
+func HandleKeyCreationGrant(iss *tokens.Issuer, db *store.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, err := bearerClaims(r, iss)
 		if err != nil {
@@ -65,7 +70,7 @@ func HandleKeyCreationGrant(iss *tokens.Issuer) http.HandlerFunc {
 			return
 		}
 
-		owner, err := authorize(&req, callerSub, claims)
+		owner, err := authorize(&req, callerSub, db)
 		if err != nil {
 			errorJSON(w, http.StatusForbidden, err.Error())
 			return
@@ -96,10 +101,10 @@ func HandleKeyCreationGrant(iss *tokens.Issuer) http.HandlerFunc {
 
 // authorize validates the request against the caller and returns the owner the
 // grant must name.
-func authorize(req *grantRequest, callerSub string, claims map[string]interface{}) (string, error) {
+func authorize(req *grantRequest, callerSub string, db *store.DB) (string, error) {
 	switch {
 	case strings.HasPrefix(req.Scope, appScopePrefix):
-		if !hasRole(claims, platformManagerRole) {
+		if !accountHasRole(db, callerSub, platformManagerRole) {
 			return "", errForbidden("app-scoped grants require the platform manager role")
 		}
 		if req.Owner == "" {
@@ -130,14 +135,20 @@ func bearerClaims(r *http.Request, iss *tokens.Issuer) (map[string]interface{}, 
 	return iss.VerifyAccessToken(strings.TrimPrefix(auth, "Bearer "))
 }
 
-// hasRole reports whether the token's `roles` claim contains role.
-func hasRole(claims map[string]interface{}, role string) bool {
-	roles, ok := claims["roles"].([]interface{})
-	if !ok {
+// accountHasRole reports whether the account `sub` has been granted `role`,
+// read from the DB (the source of truth) rather than the bearer token's
+// audience-filtered `roles` claim - so it holds regardless of which audience
+// the caller's token was minted for.
+func accountHasRole(db *store.DB, sub, role string) bool {
+	if sub == "" {
+		return false
+	}
+	roles, err := db.GetRoles(sub)
+	if err != nil {
 		return false
 	}
 	for _, r := range roles {
-		if s, ok := r.(string); ok && s == role {
+		if r == role {
 			return true
 		}
 	}

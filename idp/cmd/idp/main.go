@@ -44,8 +44,8 @@ import (
 	"github.com/Privasys/idp/internal/sessions"
 	"github.com/Privasys/idp/internal/social"
 	"github.com/Privasys/idp/internal/store"
-	"github.com/Privasys/idp/internal/vault"
 	"github.com/Privasys/idp/internal/tokens"
+	"github.com/Privasys/idp/internal/vault"
 )
 
 func main() {
@@ -163,7 +163,7 @@ func main() {
 	// platform SA, or a CLI agent acting for a user) can create a key the
 	// owner governs.
 	mux.HandleFunc("POST /vault/key-creation-grant",
-		vault.HandleKeyCreationGrant(issuer))
+		vault.HandleKeyCreationGrant(issuer, db))
 
 	// Session status — browser polls this to know when wallet approved.
 	mux.HandleFunc("GET /session/status", oidc.HandleSessionStatus(sessionStore))
@@ -214,7 +214,7 @@ func main() {
 		// LinkedIn is a confidential client and does not support PKCE; it
 		// authenticates with the client secret only. Sending a code_verifier
 		// makes LinkedIn reject the token exchange as invalid_client.
-		PKCE:         false,
+		PKCE: false,
 	})
 
 	socialHandler := social.NewHandler(socialProviders, codeStore, sessionStore, cfg.IssuerURL)

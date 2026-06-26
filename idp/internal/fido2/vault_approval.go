@@ -63,14 +63,34 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			return
 		}
 		var req struct {
+			// Operation discriminates the bound op. "promote" (default) binds
+			// the promoted profile's measurement; "export" has no target
+			// measurement and binds the empty measurement slot, matching the
+			// vault's handle_export OpBinding.
+			Operation         string `json:"operation"`
 			Handle            string `json:"handle"`
 			MeasurementDigest string `json:"measurement_digest"`
 			PolicyVersion     uint64 `json:"policy_version"`
 			TTLSeconds        int64  `json:"ttl_seconds"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
-			req.Handle == "" || req.MeasurementDigest == "" {
-			errorJSON(w, http.StatusBadRequest, "handle and measurement_digest required")
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Handle == "" {
+			errorJSON(w, http.StatusBadRequest, "handle required")
+			return
+		}
+		switch req.Operation {
+		case "export":
+			// Export binds the empty measurement slot; a measurement_digest is
+			// neither required nor honoured (force it empty so a caller cannot
+			// smuggle a non-empty binding that would collide with promote).
+			req.MeasurementDigest = ""
+		case "", "promote":
+			req.Operation = "promote"
+			if req.MeasurementDigest == "" {
+				errorJSON(w, http.StatusBadRequest, "measurement_digest required for promote")
+				return
+			}
+		default:
+			errorJSON(w, http.StatusBadRequest, "unknown operation")
 			return
 		}
 		ttl := req.TTLSeconds

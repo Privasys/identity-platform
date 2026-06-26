@@ -44,6 +44,7 @@ import (
 	"github.com/Privasys/idp/internal/sessions"
 	"github.com/Privasys/idp/internal/social"
 	"github.com/Privasys/idp/internal/store"
+	"github.com/Privasys/idp/internal/vault"
 	"github.com/Privasys/idp/internal/tokens"
 )
 
@@ -156,6 +157,13 @@ func main() {
 		fido2Handler.VaultApprovalBegin(issuer, "privasys-platform"))
 	mux.HandleFunc("POST /fido2/vault-approval/complete",
 		fido2Handler.VaultApprovalComplete(issuer, "privasys-platform"))
+
+	// Vault key-creation grant (the key-creation-grants design): mints a
+	// single-call grant so a caller holding the material (an app TEE via the
+	// platform SA, or a CLI agent acting for a user) can create a key the
+	// owner governs.
+	mux.HandleFunc("POST /vault/key-creation-grant",
+		vault.HandleKeyCreationGrant(issuer))
 
 	// Session status — browser polls this to know when wallet approved.
 	mux.HandleFunc("GET /session/status", oidc.HandleSessionStatus(sessionStore))

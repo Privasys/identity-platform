@@ -227,6 +227,42 @@ func (iss *Issuer) IssueVaultApprovalToken(subject, audience, vaultOp, nonce str
 	return iss.sign(c)
 }
 
+// KeyCreationGrant carries the claims of a vault key-creation grant. The
+// owner (`sub`) holds governance of the key; the caller presenting the grant
+// to the vault only holds the material and is bound to it by attested app-id
+// (OID 3.6 == the scope's app-id) or a holder-of-key `cnf`.
+type KeyCreationGrant struct {
+	Owner      string          // the privasys.id sub that governs the key
+	Scope      string          // e.g. apps.privasys.org/<app-id> or users/<sub>
+	KeyType    string          // Aes256GcmKey | P256SigningKey | HmacSha256Key
+	Exportable bool            // whether the key may ever be exported
+	Policy     json.RawMessage // the full vault KeyPolicy, embedded verbatim
+	CnfX5tS256 string          // optional base64url SHA-256 of the caller's RA-TLS leaf
+	Exp        int64           // expiry (unix seconds)
+}
+
+// IssueKeyCreationGrant signs a single-call vault key-creation grant
+// (`aud = privasys-vault-keycreate`). The policy is embedded verbatim; the
+// vault validates it and checks that its owner principal matches `sub`.
+func (iss *Issuer) IssueKeyCreationGrant(g KeyCreationGrant) (string, error) {
+	now := time.Now().Unix()
+	c := jwt.MapClaims{
+		"iss":        iss.issuerURL,
+		"aud":        "privasys-vault-keycreate",
+		"sub":        g.Owner,
+		"scope":      g.Scope,
+		"key_type":   g.KeyType,
+		"exportable": g.Exportable,
+		"policy":     g.Policy,
+		"iat":        now,
+		"exp":        g.Exp,
+	}
+	if g.CnfX5tS256 != "" {
+		c["cnf"] = map[string]string{"x5t#S256": g.CnfX5tS256}
+	}
+	return iss.sign(c)
+}
+
 // VerifyAccessToken parses and validates a JWT signed by this issuer.
 func (iss *Issuer) VerifyAccessToken(tokenStr string) (map[string]interface{}, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {

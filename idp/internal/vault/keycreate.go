@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	appScopePrefix  = "apps.privasys.org/"
-	userScopePrefix = "users/"
+	appScopePrefix   = "apps.privasys.org/"
+	userScopePrefix  = "users/"
+	vaultScopePrefix = "vaults/"
 	// platformManagerRole gates app-scoped grants: only an account holding the
 	// platform control-plane manager role may mint a grant naming an arbitrary
 	// owner. This is checked against the account's granted roles in the DB, NOT
@@ -54,6 +55,10 @@ type grantRequest struct {
 //     only the real app TEE can spend it.
 //   - users/<sub>: the caller's own sub must equal <sub>; owner is that sub.
 //     A holder-of-key cnf is required (binds the grant to the caller's cert).
+//   - vaults/<vault-id>: a key in a user-facing vault. The caller must carry the
+//     platform manager role (the control plane mints these after verifying vault
+//     membership); owner is taken from the request and a holder-of-key cnf binds
+//     the grant to the creating agent.
 func HandleKeyCreationGrant(iss *tokens.Issuer, db *store.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, err := bearerClaims(r, iss)
@@ -121,6 +126,24 @@ func authorize(req *grantRequest, callerSub string, db *store.DB) (string, error
 			return "", errForbidden("a user-scoped grant requires a holder-of-key cnf")
 		}
 		return sub, nil
+
+	case strings.HasPrefix(req.Scope, vaultScopePrefix):
+		// A key inside a user-facing vault. The platform control plane (manager
+		// role) mints these, having verified the caller's membership of the
+		// vault's billing account; the owner is the vault's owner and a
+		// holder-of-key cnf binds the grant to the agent that creates the key.
+		// The policy (which may grant ExportKey to a Tee principal) is authored
+		// by the control plane and signed here verbatim.
+		if !accountHasRole(db, callerSub, platformManagerRole) {
+			return "", errForbidden("vault-scoped grants require the platform manager role")
+		}
+		if req.Owner == "" {
+			return "", errForbidden("owner is required for a vault-scoped grant")
+		}
+		if req.CnfX5tS256 == "" {
+			return "", errForbidden("a vault-scoped grant requires a holder-of-key cnf")
+		}
+		return req.Owner, nil
 
 	default:
 		return "", errForbidden("unsupported scope")

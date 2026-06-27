@@ -50,7 +50,10 @@ public class NativeEmrtdModule: Module {
             // requested — they need Terminal Authentication we don't hold, and an
             // unbounded read selects them and aborts (e.g. German passports list
             // DG3 in EF.COM → SELECT DG3 → SW 0x6A88, killing the whole read).
-            let optionalTags: [DataGroupId] = [.COM, .SOD, .DG1, .DG2, .DG11]
+            // DG15 (the Active Authentication public key) is requested so the chip
+            // runs AA during the read; we relay its challenge + signature to the
+            // enclave to prove the chip is genuine and not a clone.
+            let optionalTags: [DataGroupId] = [.COM, .SOD, .DG1, .DG2, .DG11, .DG15]
             let minimumTags: [DataGroupId] = [.COM, .SOD, .DG1, .DG2]
             Task { [weak self] in
                 guard let self = self else { return }
@@ -153,9 +156,45 @@ public class NativeEmrtdModule: Module {
                 dgEntries.append("\"\(num)\":\"\(Data(dg.data).base64EncodedString())\"")
             }
         }
-        let dgJson = dgEntries.joined(separator: ",")
+        // DG15 (the Active Authentication public key) and the AA relay are sent
+        // *together or not at all*: the enclave requires AA whenever DG15 is in
+        // data_groups, so emitting DG15 without a usable signature (e.g. the
+        // reader could not complete AA) would spuriously hard-fail a genuine read.
+        let aa = aaRelay(p)
+        if let aa = aa, let dg15 = p.getDataGroup(.DG15) {
+            dgEntries.append("\"15\":\"\(Data(dg15.data).base64EncodedString())\"")
+            return "{\"fields\":{\(fieldsJson)},\"portraitBase64\":\(portrait),"
+                + "\"sod\":\(sod),\"dataGroups\":{\(dgEntries.joined(separator: ","))},\(aa)}"
+        }
         return "{\"fields\":{\(fieldsJson)},\"portraitBase64\":\(portrait),"
-            + "\"sod\":\(sod),\"dataGroups\":{\(dgJson)}}"
+            + "\"sod\":\(sod),\"dataGroups\":{\(dgEntries.joined(separator: ","))}}"
+    }
+
+    /// Active Authentication relay JSON (`"aa":{…}`), or nil when the chip has no
+    /// usable AA result. When the chip carries DG15, NFCPassportReader runs AA
+    /// during the read with its own random per-read challenge and exposes the
+    /// challenge + the chip's signature. We forward both (base64url, the shape the
+    /// enclave decodes) so the enclave can verify the chip signed a fresh
+    /// challenge with its non-extractable AA key — proving it is the original and
+    /// not a clone. nil for chips without an AA key, or when the reader could not
+    /// obtain a signature (e.g. an RSA AA chip the relay can't yet carry).
+    private static func aaRelay(_ p: NFCPassportModel) -> String? {
+        guard p.activeAuthenticationSupported,
+              !p.activeAuthenticationChallenge.isEmpty,
+              !p.activeAuthenticationSignature.isEmpty else { return nil }
+        let challenge = b64url(p.activeAuthenticationChallenge)
+        let signature = b64url(p.activeAuthenticationSignature)
+        return "\"aa\":{\"challenge\":\"\(challenge)\",\"signature\":\"\(signature)\","
+            + "\"passed\":\(p.activeAuthenticationPassed)}"
+    }
+
+    /// Base64url (RFC 4648 §5, no padding) of raw bytes — the encoding the
+    /// verifier enclave's b64u_decode expects for the AA challenge/signature.
+    private static func b64url(_ bytes: [UInt8]) -> String {
+        return Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 
     /// Base64 of a data group's exact on-chip bytes, or JSON null if absent.

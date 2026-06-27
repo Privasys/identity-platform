@@ -320,8 +320,12 @@ export async function verifyIdentity(
         fields: Record<string, string>;
         /** EF.SOD (base64) — required by the enclave for Passive Authentication. */
         sod?: string;
-        /** Raw data groups keyed by DG number ("1", "2"), base64. */
+        /** Raw data groups keyed by DG number ("1", "2", "15"), base64. */
         dataGroups?: Record<string, string>;
+        /** Active Authentication relay (present iff the chip carries DG15): the
+         *  reader's per-read challenge + the chip's signature, base64url. The
+         *  enclave re-verifies it against DG15 to prove the chip is not a clone. */
+        aa?: { challenge: string; signature: string; passed?: boolean };
     },
     opts: { liveImageBase64?: string; docImage?: string } = {},
 ): Promise<VerifyIdentityResult> {
@@ -338,6 +342,10 @@ export async function verifyIdentity(
             // the DG2↔selfie face match in-enclave. `fields` is only a convenience.
             ...(doc.sod ? { sod: doc.sod } : {}),
             ...(doc.dataGroups ? { data_groups: doc.dataGroups } : {}),
+            // Active Authentication (anti-clone): forward the chip's signature over
+            // its per-read challenge. The enclave requires this when DG15 is
+            // present (in data_groups) and re-verifies it against the chip's key.
+            ...(doc.aa ? { aa: { challenge: doc.aa.challenge, signature: doc.aa.signature } } : {}),
             ...(opts.liveImageBase64 ? { live_image: opts.liveImageBase64 } : {}),
             // Data-page image → the enclave runs the heavy OCR (VIZ + MRZ) and
             // cross-references it against the chip to detect a tampered document

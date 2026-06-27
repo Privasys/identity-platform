@@ -24,10 +24,22 @@ export interface EmrtdReadResult {
     /** EF.SOD (base64) — the signed Document Security Object the enclave uses
      *  for Passive Authentication (DSC→CSCA chain + DG hash integrity). */
     sod?: string;
-    /** Raw data groups as exact on-chip bytes, keyed by DG number ("1", "2"):
-     *  the enclave hash-checks each against the SOD and parses DG1 / face-matches
-     *  DG2. */
+    /** Raw data groups as exact on-chip bytes, keyed by DG number ("1", "2",
+     *  "11", "15"): the enclave hash-checks each against the SOD, parses DG1 /
+     *  face-matches DG2, and reads the AA public key from DG15. */
     dataGroups?: Record<string, string>;
+    /** Active Authentication result, present only when the chip carries an AA
+     *  key (DG15). The reader signs its own random per-read challenge with the
+     *  chip's non-extractable key; the wallet relays both to the enclave, which
+     *  re-verifies the signature against DG15 to prove the chip is not a clone.
+     *  `challenge` and `signature` are base64url (the enclave's wire shape). */
+    aa?: {
+        challenge: string;
+        signature: string;
+        /** The reader's own local AA verification result (informational; the
+         *  enclave re-verifies independently). */
+        passed: boolean;
+    };
 }
 
 /** Whether eMRTD NFC reading is available on this device/build. */

@@ -36,9 +36,10 @@ export interface EmrtdReadResult {
     aa?: {
         challenge: string;
         signature: string;
-        /** The reader's own local AA verification result (informational; the
-         *  enclave re-verifies independently). */
-        passed: boolean;
+        /** The reader's own local AA verification result, when it performs one
+         *  (iOS NFCPassportReader does; the Android jMRTD path leaves it to the
+         *  enclave). Informational only — the enclave re-verifies independently. */
+        passed?: boolean;
     };
 }
 

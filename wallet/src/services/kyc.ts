@@ -60,13 +60,15 @@ const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.3.2';
 /** Fallback verifier coordinates, used only until the app is resolvable from the
  *  store (then the resolved hostname + attested digest win). Defaults are the dev
  *  TDX deployment; both overridable per build.
- *  container-app-identity-verifier v0.3.1: passive auth accepts Brainpool
- *  explicit-params + RSASSA-PSS DSC keys (German passport fix). */
+ *  container-app-identity-verifier v0.3.11: fail-closed biometrics — verify-identity
+ *  denies on a face mismatch; liveness PAD (MiniFASNetV2) enforced. Keep this pinned
+ *  to the live test deployment's image digest (OID 3.2) so the fallback attests the
+ *  current enclave when the resolve API is unreachable. */
 const FALLBACK_VERIFIER_ORIGIN =
-    process.env.EXPO_PUBLIC_KYC_VERIFIER_ORIGIN ?? 'identity-verifier.apps-test.privasys.org';
+    process.env.EXPO_PUBLIC_KYC_VERIFIER_ORIGIN ?? 'container-app-identity-verifier.apps-test.privasys.org';
 const FALLBACK_VERIFIER_IMAGE_DIGEST =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_DIGEST ??
-    '0b3b669f2b3f398529bae0be9790e90958cfd3890410c049657f95af191441da';
+    'aa922a94d6f8ef6765c2e930ae31bf63025c69958da6bfbe078d221bde1fa01f';
 
 const ATTESTATION_SERVER = 'https://as.privasys.org';
 const VERIFIER_DISPLAY = 'Privasys identity verifier';

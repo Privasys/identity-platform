@@ -121,36 +121,51 @@ func TestMultiAppEncAuth(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	app1, app2 := bytes32(0x11), bytes32(0x22)
+	hosts := map[byte]string{app1[0]: "a.example", app2[0]: "b.example"}
 	for _, appID := range [][]byte{app1, app2} {
 		payload, hwSig := signedVoucher(t, "user-1", row.SID, appID)
-		if _, err := s.PutEncAuth("user-1", payload, hwSig, iss); err != nil {
+		if _, err := s.PutEncAuth("user-1", payload, hwSig, hosts[appID[0]], iss); err != nil {
 			t.Fatalf("PutEncAuth(%x): %v", appID[0], err)
 		}
 	}
 
 	// Each enclave's voucher is selectable by its app_id.
 	for _, appID := range [][]byte{app1, app2} {
-		env, err := s.GetEncAuth(row.SID, appID)
+		env, err := s.GetEncAuth(row.SID, appID, "")
 		if err != nil {
-			t.Fatalf("GetEncAuth(%x): %v", appID[0], err)
+			t.Fatalf("GetEncAuth(app_id %x): %v", appID[0], err)
 		}
 		if got := voucherAppID(t, env); !bytes.Equal(got, appID) {
 			t.Fatalf("voucher app_id = %x, want %x", got[0], appID[0])
 		}
 	}
 
+	// ...and by host (the browser SDK's selector).
+	for _, appID := range [][]byte{app1, app2} {
+		env, err := s.GetEncAuth(row.SID, nil, hosts[appID[0]])
+		if err != nil {
+			t.Fatalf("GetEncAuth(host %s): %v", hosts[appID[0]], err)
+		}
+		if got := voucherAppID(t, env); !bytes.Equal(got, appID) {
+			t.Fatalf("host %s returned app_id %x, want %x", hosts[appID[0]], got[0], appID[0])
+		}
+	}
+
 	// No selector → the most recently stored voucher (app2).
-	recent, err := s.GetEncAuth(row.SID, nil)
+	recent, err := s.GetEncAuth(row.SID, nil, "")
 	if err != nil {
-		t.Fatalf("GetEncAuth(nil): %v", err)
+		t.Fatalf("GetEncAuth(no selector): %v", err)
 	}
 	if got := voucherAppID(t, recent); !bytes.Equal(got, app2) {
 		t.Fatalf("no-selector returned app_id %x, want most-recent %x", got[0], app2[0])
 	}
 
-	// An unknown app_id is not found (not silently the wrong voucher).
-	if _, err := s.GetEncAuth(row.SID, bytes32(0x99)); err == nil {
+	// An unknown selector is not found (not silently the wrong voucher).
+	if _, err := s.GetEncAuth(row.SID, bytes32(0x99), ""); err == nil {
 		t.Fatal("GetEncAuth(unknown app_id): want ErrNotFound, got nil")
+	}
+	if _, err := s.GetEncAuth(row.SID, nil, "nope.example"); err == nil {
+		t.Fatal("GetEncAuth(unknown host): want ErrNotFound, got nil")
 	}
 }
 

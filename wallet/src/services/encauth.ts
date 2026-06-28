@@ -357,6 +357,9 @@ export async function issueEncAuthForSignIn(args: {
     quoteHashHex: string;
     /** The verified attestation backing this sign-in. */
     attestation: AttestationResult;
+    /** Enclave hostname this voucher is for — the browser SDK's resume selector
+     *  (defaults to ''). */
+    host?: string;
     /** Optional stable device identifier (defaults to ''). */
     deviceId?: string;
 }): Promise<{ sid: string }> {
@@ -366,6 +369,7 @@ export async function issueEncAuthForSignIn(args: {
         walletSessionToken: args.walletSessionToken,
         keyId: args.keyId,
         clientId: args.clientId,
+        host: args.host,
         deviceId: args.deviceId,
         payload: {
             sub: args.sub,
@@ -386,6 +390,8 @@ export async function signAndUploadEncAuth(args: {
     keyId: string;
     clientId: string;
     deviceId?: string;
+    /** Enclave hostname this voucher is for — the browser SDK's resume selector. */
+    host?: string;
     payload: Omit<EncAuthPayload, 'sid'>;
 }): Promise<{ sid: string; envelope: EncAuthEnvelope }> {
     // Step 1: allocate (or reuse) a sid for (user, client_id, device).
@@ -422,6 +428,10 @@ export async function signAndUploadEncAuth(args: {
             device_id: args.deviceId ?? '',
             payload: b64uEncode(cborBytes),
             hw_sig: b64uEncode(hwSig),
+            // Unsigned selection hint: the browser SDK can't compute app_id, so
+            // it resumes vouchers by host. The enclave re-verifies app_id at
+            // consumption, so this hint can't be used to smuggle a wrong voucher.
+            host: args.host ?? '',
         }),
     });
     if (!putResp.ok) {

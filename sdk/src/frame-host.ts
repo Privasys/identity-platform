@@ -72,16 +72,21 @@ function jwtClaim(token: string, claim: string): string | null {
  * there is no session, no `sid` claim, or no stored voucher — the
  * caller then falls back to a wallet ceremony.
  */
-function makeGetEncAuth(rpId: string): () => Promise<EncAuthEnvelope | null> {
+function makeGetEncAuth(rpId: string, host: string): () => Promise<EncAuthEnvelope | null> {
     return async () => {
         const session = sessions.get(rpId);
         if (!session?.token) return null;
         const sid = jwtClaim(session.token, 'sid');
         if (!sid) return null;
-        const resp = await fetch(
-            `${globalThis.location.origin}/sessions/${encodeURIComponent(sid)}/encauth`,
-            { headers: { Authorization: `Bearer ${session.token}` } },
-        );
+        // Select the voucher for THIS enclave by host. The browser can't compute
+        // app_id (it never attests), so host is the resume selector; the enclave
+        // re-verifies the voucher's app_id at consumption. Multi-app sessions
+        // hold one voucher per host on the same sid — without the selector the
+        // IdP would return the most-recent (wrong) one.
+        const url =
+            `${globalThis.location.origin}/sessions/${encodeURIComponent(sid)}/encauth` +
+            (host ? `?host=${encodeURIComponent(host)}` : '');
+        const resp = await fetch(url, { headers: { Authorization: `Bearer ${session.token}` } });
         if (!resp.ok) return null;
         return (await resp.json()) as EncAuthEnvelope;
     };
@@ -1026,7 +1031,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             reply({ sessionId: activeSession.sessionId, appHost, expiresAt: activeSession.expiresAt });
             return;
         }
-        const getEncAuth = makeGetEncAuth(rpId);
+        const getEncAuth = makeGetEncAuth(rpId, appHost);
         const result = await PrivasysSession.resume({ host: appHost, getEncAuth });
         if ('error' in result) {
             // 'no-voucher'    → user never completed a sealed sign-in here
@@ -1123,7 +1128,7 @@ async function installSessionRelay(
             // TTL, restart with the same identity) the next request's
             // unsealed 401 triggers a voucher-based re-bootstrap with no
             // wallet involvement.
-            getEncAuth: makeGetEncAuth(rpId),
+            getEncAuth: makeGetEncAuth(rpId, appHost),
         });
         activeSession = {
             appHost,

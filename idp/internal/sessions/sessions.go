@@ -119,20 +119,62 @@ func New(db *store.DB) (*Store, error) {
 		CREATE TABLE IF NOT EXISTS session_encauth (
 			sid        TEXT NOT NULL,
 			app_id     BLOB NOT NULL,
+			host       TEXT NOT NULL DEFAULT '',
 			blob       BLOB NOT NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (sid, app_id)
 		);
 		CREATE INDEX IF NOT EXISTS idx_session_encauth_sid
 			ON session_encauth(sid, created_at);
+		CREATE INDEX IF NOT EXISTS idx_session_encauth_host
+			ON session_encauth(sid, host);
 	`); err != nil {
 		return nil, fmt.Errorf("create session_encauth table: %w", err)
+	}
+	// Migration: add the `host` selection hint to an existing table (the wallet
+	// sends it at issuance; the browser SDK can't compute app_id, so it selects
+	// vouchers by host — the enclave still re-verifies app_id at consumption).
+	if err := addColumnIfMissing(db, "session_encauth", "host",
+		`ALTER TABLE session_encauth ADD COLUMN host TEXT NOT NULL DEFAULT ''`); err != nil {
+		return nil, err
 	}
 	s := &Store{db: db}
 	if err := s.migrateEncAuthBlobs(); err != nil {
 		return nil, fmt.Errorf("migrate encauth blobs: %w", err)
 	}
 	return s, nil
+}
+
+// addColumnIfMissing runs `alterSQL` to add `column` to `table` only when it is
+// not already present (SQLite has no IF NOT EXISTS for ALTER TABLE ADD COLUMN).
+func addColumnIfMissing(db *store.DB, table, column, alterSQL string) error {
+	rows, err := db.Query(fmt.Sprintf(`PRAGMA table_info(%s)`, table))
+	if err != nil {
+		return fmt.Errorf("inspect %s: %w", table, err)
+	}
+	has := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt *string
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		if name == column {
+			has = true
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if !has {
+		if _, err := db.Exec(alterSQL); err != nil {
+			return fmt.Errorf("add %s.%s: %w", table, column, err)
+		}
+	}
+	return nil
 }
 
 // migrateEncAuthBlobs backfills the per-(sid, app_id) table from any legacy

@@ -101,7 +101,7 @@ func VerifyES256Raw(pubSEC1, sig, msg []byte) error {
 // wallet session token). PutEncAuth additionally checks that the
 // payload's `Sub` matches `userID` and that `SID` matches an active
 // session row owned by `userID`.
-func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, issuer *tokens.Issuer) (*Envelope, error) {
+func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, host string, issuer *tokens.Issuer) (*Envelope, error) {
 	p, err := DecodeEncAuthPayload(payloadBytes)
 	if err != nil {
 		return nil, err
@@ -166,11 +166,13 @@ func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, issuer *to
 		return nil, err
 	}
 	// Upsert keyed by (sid, app_id) so a session can hold one voucher per
-	// enclave. p.AppID is the SHA-256 of the target enclave's workload OIDs.
+	// enclave. p.AppID is the SHA-256 of the target enclave's workload OIDs;
+	// `host` is the unsigned selection hint the browser SDK resumes by (the
+	// enclave re-verifies app_id at consumption, so a wrong host fails closed).
 	if _, err := s.db.Exec(
-		`INSERT INTO session_encauth (sid, app_id, blob) VALUES (?, ?, ?)
-		 ON CONFLICT(sid, app_id) DO UPDATE SET blob = excluded.blob, created_at = CURRENT_TIMESTAMP`,
-		p.SID, p.AppID, envBytes,
+		`INSERT INTO session_encauth (sid, app_id, host, blob) VALUES (?, ?, ?, ?)
+		 ON CONFLICT(sid, app_id) DO UPDATE SET host = excluded.host, blob = excluded.blob, created_at = CURRENT_TIMESTAMP`,
+		p.SID, p.AppID, host, envBytes,
 	); err != nil {
 		return nil, fmt.Errorf("store encauth: %w", err)
 	}
@@ -211,18 +213,28 @@ func decodeEnvelope(blob []byte) (*Envelope, error) {
 // allowed to read it (typically: the user owns the session, or it is
 // being fetched anonymously by the SDK because the JWT claim already
 // carries the binding context).
-// A 32-byte appID selects that enclave's voucher; a nil/empty appID returns the
-// most-recently stored voucher (back-compat for single-voucher callers).
-func (s *Store) GetEncAuth(sid string, appID []byte) (*Envelope, error) {
+// Selection precedence: a non-empty `host` (the browser SDK's selector, since
+// it can't compute app_id) picks that enclave's voucher; else a 32-byte appID
+// picks by measurement; else the most-recently stored voucher (back-compat for
+// single-voucher callers).
+func (s *Store) GetEncAuth(sid string, appID []byte, host string) (*Envelope, error) {
 	var blob []byte
 	var err error
-	if len(appID) == 32 {
+	switch {
+	case host != "":
+		err = s.db.QueryRow(
+			`SELECT se.blob FROM session_encauth se
+			   JOIN sessions s ON s.sid = se.sid
+			  WHERE se.sid = ? AND se.host = ? AND s.revoked_at IS NULL
+			  ORDER BY se.created_at DESC LIMIT 1`,
+			sid, host).Scan(&blob)
+	case len(appID) == 32:
 		err = s.db.QueryRow(
 			`SELECT se.blob FROM session_encauth se
 			   JOIN sessions s ON s.sid = se.sid
 			  WHERE se.sid = ? AND se.app_id = ? AND s.revoked_at IS NULL`,
 			sid, appID).Scan(&blob)
-	} else {
+	default:
 		err = s.db.QueryRow(
 			`SELECT se.blob FROM session_encauth se
 			   JOIN sessions s ON s.sid = se.sid
@@ -234,8 +246,8 @@ func (s *Store) GetEncAuth(sid string, appID []byte) (*Envelope, error) {
 		return decodeEnvelope(blob)
 	}
 	// Back-compat: fall back to the legacy single-voucher column when the
-	// table has no row yet (only meaningful without an app_id selector).
-	if len(appID) == 0 {
+	// table has no row yet (only meaningful without a selector).
+	if host == "" && len(appID) == 0 {
 		if err := s.db.QueryRow(
 			`SELECT COALESCE(encauth_blob, '') FROM sessions WHERE sid = ? AND revoked_at IS NULL`, sid,
 		).Scan(&blob); err == nil && len(blob) > 0 {
@@ -271,6 +283,7 @@ func (s *Store) HandlePutEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 		var req struct {
 			Payload string `json:"payload"`
 			HwSig   string `json:"hw_sig"`
+			Host    string `json:"host"`
 		}
 		if err := json.Unmarshal(body, &req); err != nil {
 			httpErr(w, http.StatusBadRequest, "invalid json")
@@ -297,7 +310,7 @@ func (s *Store) HandlePutEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			httpErr(w, http.StatusBadRequest, "payload sid mismatch")
 			return
 		}
-		env, err := s.PutEncAuth(userID, payload, hwSig, issuer)
+		env, err := s.PutEncAuth(userID, payload, hwSig, req.Host, issuer)
 		if err != nil {
 			if errors.Is(err, ErrRevoked) {
 				httpErr(w, http.StatusGone, err.Error())
@@ -336,8 +349,9 @@ func (s *Store) HandleGetEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			httpErr(w, http.StatusGone, "session revoked")
 			return
 		}
-		// Optional selector: ?app_id=<base64url 32B> picks that enclave's
-		// voucher; omitted returns the most-recent (back-compat).
+		// Optional selectors: ?host=<hostname> (the browser SDK's selector) or
+		// ?app_id=<base64url 32B>; omitted returns the most-recent (back-compat).
+		host := r.URL.Query().Get("host")
 		var appID []byte
 		if q := r.URL.Query().Get("app_id"); q != "" {
 			appID, err = base64.RawURLEncoding.DecodeString(q)
@@ -346,7 +360,7 @@ func (s *Store) HandleGetEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 				return
 			}
 		}
-		env, err := s.GetEncAuth(sid, appID)
+		env, err := s.GetEncAuth(sid, appID, host)
 		if err != nil {
 			httpErr(w, http.StatusNotFound, "encauth not found")
 			return
@@ -357,7 +371,7 @@ func (s *Store) HandleGetEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 
 // PutEncAuthForSession is like PutEncAuth but pins to a server-chosen
 // sid: the wallet does not need to know its sid ahead of time.
-func (s *Store) PutEncAuthForSession(sid string, payloadBytes, hwSig []byte, issuer *tokens.Issuer) (*Envelope, error) {
+func (s *Store) PutEncAuthForSession(sid string, payloadBytes, hwSig []byte, host string, issuer *tokens.Issuer) (*Envelope, error) {
 	p, err := DecodeEncAuthPayload(payloadBytes)
 	if err != nil {
 		return nil, err
@@ -365,7 +379,7 @@ func (s *Store) PutEncAuthForSession(sid string, payloadBytes, hwSig []byte, iss
 	if p.SID != sid {
 		return nil, errors.New("payload sid does not match session row")
 	}
-	return s.PutEncAuth(p.Sub, payloadBytes, hwSig, issuer)
+	return s.PutEncAuth(p.Sub, payloadBytes, hwSig, host, issuer)
 }
 
 // defaultEncAuthTTL is the lifetime of an EncAuth-anchored session
@@ -400,6 +414,7 @@ func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			DeviceID string `json:"device_id"`
 			Payload  string `json:"payload"`
 			HwSig    string `json:"hw_sig"`
+			Host     string `json:"host"`
 		}
 		if err := json.Unmarshal(body, &req); err != nil {
 			httpErr(w, http.StatusBadRequest, "invalid json")
@@ -426,7 +441,7 @@ func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 				httpErr(w, http.StatusBadRequest, "invalid hw_sig b64")
 				return
 			}
-			env, perr := s.PutEncAuthForSession(sess.SID, payload, hwSig, issuer)
+			env, perr := s.PutEncAuthForSession(sess.SID, payload, hwSig, req.Host, issuer)
 			if perr != nil {
 				if errors.Is(perr, ErrRevoked) {
 					httpErr(w, http.StatusGone, perr.Error())

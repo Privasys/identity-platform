@@ -713,6 +713,7 @@ export default function ConnectScreen() {
             encPubB64: result.sessionRelay.encPub,
             quoteHashHex: relayArg.quoteHash,
             attestation: att,
+            host: payload.appHost,
         }).then(
             ({ sid }) => console.log(`[CONNECT] EncAuth voucher uploaded (sid=${sid.substring(0, 8)}…)`),
             (err) => console.warn('[CONNECT] EncAuth voucher upload failed (silent rebind disabled):', err),
@@ -771,6 +772,7 @@ export default function ConnectScreen() {
                     encPubB64: bs.encPub,
                     quoteHashHex: deriveQuoteHash(att),
                     attestation: att,
+                    host,
                 });
                 addTrustedApp({
                     rpId: host,

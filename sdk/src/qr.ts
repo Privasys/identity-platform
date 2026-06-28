@@ -58,6 +58,10 @@ export interface QRDescriptor {
     sdkPub?: string;
     /** Hostname (no scheme) of the enclave app to attest + bootstrap. */
     appHost?: string;
+    /** Additional enclave hosts to seal in the SAME wallet ceremony (multi-app
+     *  attestation): the wallet issues one EncAuth voucher per host under a
+     *  single unlock. Old wallets ignore this and seal only `appHost`. */
+    extraAppHosts?: string[];
     /** Per-session replay nonce (base64url). Falls back to sessionId. */
     nonce?: string;
     /** OIDC client_id of the relying party. The wallet uses it to anchor
@@ -157,6 +161,7 @@ export function generateQRPayload(opts: {
     mode?: 'session-relay' | 'standard';
     sdkPub?: string;
     appHost?: string;
+    extraAppHosts?: string[];
     nonce?: string;
     clientId?: string;
     /** Override for the relay base URL (defaults to `brokerUrl`'s host). */
@@ -189,6 +194,7 @@ export function generateQRPayload(opts: {
         desc.mode = 'session-relay';
         desc.sdkPub = opts.sdkPub;
         desc.appHost = opts.appHost;
+        if (opts.extraAppHosts?.length) desc.extraAppHosts = opts.extraAppHosts;
         if (opts.nonce) desc.nonce = opts.nonce;
     }
 

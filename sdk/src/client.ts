@@ -50,7 +50,7 @@ export class PrivasysAuth {
      */
     createQR(
         sessionId?: string,
-        sessionRelay?: { sdkPub: string; appHost: string; nonce?: string },
+        sessionRelay?: { sdkPub: string; appHost: string; extraAppHosts?: string[]; nonce?: string },
     ): { sessionId: string; payload: string } {
         return generateQRPayload({
             rpId: this.config.rpId,
@@ -66,6 +66,7 @@ export class PrivasysAuth {
                     mode: 'session-relay' as const,
                     sdkPub: sessionRelay.sdkPub,
                     appHost: sessionRelay.appHost,
+                    extraAppHosts: sessionRelay.extraAppHosts,
                     nonce: sessionRelay.nonce,
                 }
                 : {}),
@@ -142,7 +143,7 @@ export class PrivasysAuth {
     async notifyAndWait(
         pushToken: string,
         sessionId?: string,
-        sessionRelay?: { sdkPub: string; appHost: string; nonce?: string },
+        sessionRelay?: { sdkPub: string; appHost: string; extraAppHosts?: string[]; nonce?: string },
     ): Promise<AuthResult> {
         const sid = sessionId ?? this.createQR().sessionId;
 
@@ -168,6 +169,9 @@ export class PrivasysAuth {
                         mode: 'session-relay' as const,
                         sdkPub: sessionRelay.sdkPub,
                         appHost: sessionRelay.appHost,
+                        ...(sessionRelay.extraAppHosts?.length
+                            ? { extraAppHosts: sessionRelay.extraAppHosts }
+                            : {}),
                         nonce: sessionRelay.nonce,
                     }
                     : {}),

@@ -6,11 +6,18 @@
 package sessions
 
 import (
+	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/Privasys/idp/internal/store"
+	"github.com/Privasys/idp/internal/tokens"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -98,6 +105,97 @@ func TestListByUser(t *testing.T) {
 	if len(list) != 1 || list[0].SID != b.SID {
 		t.Fatalf("expected only b, got %#v", list)
 	}
+}
+
+// TestMultiAppEncAuth verifies one session can hold a separate voucher per
+// enclave (app_id), each retrievable by its app_id, with the no-selector read
+// returning the most recent — the storage half of multi-app attestation.
+func TestMultiAppEncAuth(t *testing.T) {
+	s := newTestStore(t)
+	iss, err := tokens.NewIssuer(filepath.Join(t.TempDir(), "key.pem"), "https://privasys.id")
+	if err != nil {
+		t.Fatalf("NewIssuer: %v", err)
+	}
+	row, err := s.Create("", "user-1", "client-a", "", time.Hour)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	app1, app2 := bytes32(0x11), bytes32(0x22)
+	for _, appID := range [][]byte{app1, app2} {
+		payload, hwSig := signedVoucher(t, "user-1", row.SID, appID)
+		if _, err := s.PutEncAuth("user-1", payload, hwSig, iss); err != nil {
+			t.Fatalf("PutEncAuth(%x): %v", appID[0], err)
+		}
+	}
+
+	// Each enclave's voucher is selectable by its app_id.
+	for _, appID := range [][]byte{app1, app2} {
+		env, err := s.GetEncAuth(row.SID, appID)
+		if err != nil {
+			t.Fatalf("GetEncAuth(%x): %v", appID[0], err)
+		}
+		if got := voucherAppID(t, env); !bytes.Equal(got, appID) {
+			t.Fatalf("voucher app_id = %x, want %x", got[0], appID[0])
+		}
+	}
+
+	// No selector → the most recently stored voucher (app2).
+	recent, err := s.GetEncAuth(row.SID, nil)
+	if err != nil {
+		t.Fatalf("GetEncAuth(nil): %v", err)
+	}
+	if got := voucherAppID(t, recent); !bytes.Equal(got, app2) {
+		t.Fatalf("no-selector returned app_id %x, want most-recent %x", got[0], app2[0])
+	}
+
+	// An unknown app_id is not found (not silently the wrong voucher).
+	if _, err := s.GetEncAuth(row.SID, bytes32(0x99)); err == nil {
+		t.Fatal("GetEncAuth(unknown app_id): want ErrNotFound, got nil")
+	}
+}
+
+// signedVoucher builds a valid canonical EncAuth payload + hw_sig for tests.
+func signedVoucher(t *testing.T, sub, sid string, appID []byte) (payload, hwSig []byte) {
+	t.Helper()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hwPub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y)
+	now := uint64(time.Now().Unix())
+	p := &EncAuth{
+		V: 1, Sub: sub, SID: sid,
+		AppID: appID, EncMeas: bytes32(0xe0), EncPub: sec1Pub(),
+		QuoteHash: bytes32(0xc0), NotBefore: now - 10, NotAfter: now + 3600,
+		HwPub: hwPub,
+	}
+	payload, err = EncAuthCanonicalCBOR(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(payload)
+	r, ss, err := ecdsa.Sign(rand.Reader, priv, digest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	hwSig = make([]byte, 64)
+	rb, sb := r.Bytes(), ss.Bytes()
+	copy(hwSig[32-len(rb):32], rb)
+	copy(hwSig[64-len(sb):], sb)
+	return payload, hwSig
+}
+
+func voucherAppID(t *testing.T, env *Envelope) []byte {
+	t.Helper()
+	pb, err := base64.RawURLEncoding.DecodeString(env.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := DecodeEncAuthPayload(pb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p.AppID
 }
 
 func TestNewSIDUnique(t *testing.T) {

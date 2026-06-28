@@ -111,7 +111,68 @@ func New(db *store.DB) (*Store, error) {
 			return nil, fmt.Errorf("add encauth_blob: %w", err)
 		}
 	}
-	return &Store{db: db}, nil
+	// Multi-app vouchers: one EncAuth per (sid, app_id), so a single wallet
+	// ceremony can seal a session to several enclaves. Supersedes the single
+	// sessions.encauth_blob column, which is kept for back-compat reads and
+	// backfilled into this table below.
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS session_encauth (
+			sid        TEXT NOT NULL,
+			app_id     BLOB NOT NULL,
+			blob       BLOB NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (sid, app_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_session_encauth_sid
+			ON session_encauth(sid, created_at);
+	`); err != nil {
+		return nil, fmt.Errorf("create session_encauth table: %w", err)
+	}
+	s := &Store{db: db}
+	if err := s.migrateEncAuthBlobs(); err != nil {
+		return nil, fmt.Errorf("migrate encauth blobs: %w", err)
+	}
+	return s, nil
+}
+
+// migrateEncAuthBlobs backfills the per-(sid, app_id) table from any legacy
+// single-voucher sessions.encauth_blob values. Idempotent (INSERT OR IGNORE);
+// malformed legacy blobs are skipped rather than failing startup.
+func (s *Store) migrateEncAuthBlobs() error {
+	rows, err := s.db.Query(
+		`SELECT sid, encauth_blob FROM sessions WHERE encauth_blob IS NOT NULL AND length(encauth_blob) > 0`)
+	if err != nil {
+		return err
+	}
+	type rec struct {
+		sid  string
+		blob []byte
+	}
+	var recs []rec
+	for rows.Next() {
+		var r rec
+		if err := rows.Scan(&r.sid, &r.blob); err != nil {
+			rows.Close()
+			return err
+		}
+		recs = append(recs, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, r := range recs {
+		appID, err := appIDFromEnvelope(r.blob)
+		if err != nil {
+			continue
+		}
+		if _, err := s.db.Exec(
+			`INSERT OR IGNORE INTO session_encauth (sid, app_id, blob) VALUES (?, ?, ?)`,
+			r.sid, appID, r.blob); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // NewSID returns a fresh, URL-safe session id (32 random bytes,

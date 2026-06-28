@@ -165,13 +165,45 @@ func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, issuer *to
 	if err != nil {
 		return nil, err
 	}
+	// Upsert keyed by (sid, app_id) so a session can hold one voucher per
+	// enclave. p.AppID is the SHA-256 of the target enclave's workload OIDs.
 	if _, err := s.db.Exec(
-		`UPDATE sessions SET encauth_blob = ? WHERE sid = ? AND revoked_at IS NULL`,
-		envBytes, p.SID,
+		`INSERT INTO session_encauth (sid, app_id, blob) VALUES (?, ?, ?)
+		 ON CONFLICT(sid, app_id) DO UPDATE SET blob = excluded.blob, created_at = CURRENT_TIMESTAMP`,
+		p.SID, p.AppID, envBytes,
 	); err != nil {
 		return nil, fmt.Errorf("store encauth: %w", err)
 	}
 	return env, nil
+}
+
+// appIDFromEnvelope extracts the voucher's app_id (payload field 4) from a
+// stored JSON envelope, for keying/migration.
+func appIDFromEnvelope(blob []byte) ([]byte, error) {
+	env, err := decodeEnvelope(blob)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(env.Payload)
+	if err != nil {
+		return nil, err
+	}
+	p, err := DecodeEncAuthPayload(payload)
+	if err != nil {
+		return nil, err
+	}
+	if len(p.AppID) != 32 {
+		return nil, errors.New("envelope app_id is not 32 bytes")
+	}
+	return p.AppID, nil
+}
+
+func decodeEnvelope(blob []byte) (*Envelope, error) {
+	var env Envelope
+	if err := json.Unmarshal(blob, &env); err != nil {
+		return nil, fmt.Errorf("decode envelope: %w", err)
+	}
+	return &env, nil
 }
 
 // GetEncAuth returns the stored envelope for sid, or ErrNotFound.
@@ -179,21 +211,38 @@ func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, issuer *to
 // allowed to read it (typically: the user owns the session, or it is
 // being fetched anonymously by the SDK because the JWT claim already
 // carries the binding context).
-func (s *Store) GetEncAuth(sid string) (*Envelope, error) {
+// A 32-byte appID selects that enclave's voucher; a nil/empty appID returns the
+// most-recently stored voucher (back-compat for single-voucher callers).
+func (s *Store) GetEncAuth(sid string, appID []byte) (*Envelope, error) {
 	var blob []byte
-	if err := s.db.QueryRow(
-		`SELECT COALESCE(encauth_blob, '') FROM sessions WHERE sid = ? AND revoked_at IS NULL`, sid,
-	).Scan(&blob); err != nil {
-		return nil, ErrNotFound
+	var err error
+	if len(appID) == 32 {
+		err = s.db.QueryRow(
+			`SELECT se.blob FROM session_encauth se
+			   JOIN sessions s ON s.sid = se.sid
+			  WHERE se.sid = ? AND se.app_id = ? AND s.revoked_at IS NULL`,
+			sid, appID).Scan(&blob)
+	} else {
+		err = s.db.QueryRow(
+			`SELECT se.blob FROM session_encauth se
+			   JOIN sessions s ON s.sid = se.sid
+			  WHERE se.sid = ? AND s.revoked_at IS NULL
+			  ORDER BY se.created_at DESC LIMIT 1`,
+			sid).Scan(&blob)
 	}
-	if len(blob) == 0 {
-		return nil, ErrNotFound
+	if err == nil && len(blob) > 0 {
+		return decodeEnvelope(blob)
 	}
-	var env Envelope
-	if err := json.Unmarshal(blob, &env); err != nil {
-		return nil, fmt.Errorf("decode envelope: %w", err)
+	// Back-compat: fall back to the legacy single-voucher column when the
+	// table has no row yet (only meaningful without an app_id selector).
+	if len(appID) == 0 {
+		if err := s.db.QueryRow(
+			`SELECT COALESCE(encauth_blob, '') FROM sessions WHERE sid = ? AND revoked_at IS NULL`, sid,
+		).Scan(&blob); err == nil && len(blob) > 0 {
+			return decodeEnvelope(blob)
+		}
 	}
-	return &env, nil
+	return nil, ErrNotFound
 }
 
 // HandlePutEncAuth accepts a wallet-signed payload + hw_sig pair and
@@ -287,7 +336,17 @@ func (s *Store) HandleGetEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			httpErr(w, http.StatusGone, "session revoked")
 			return
 		}
-		env, err := s.GetEncAuth(sid)
+		// Optional selector: ?app_id=<base64url 32B> picks that enclave's
+		// voucher; omitted returns the most-recent (back-compat).
+		var appID []byte
+		if q := r.URL.Query().Get("app_id"); q != "" {
+			appID, err = base64.RawURLEncoding.DecodeString(q)
+			if err != nil || len(appID) != 32 {
+				httpErr(w, http.StatusBadRequest, "invalid app_id selector")
+				return
+			}
+		}
+		env, err := s.GetEncAuth(sid, appID)
 		if err != nil {
 			httpErr(w, http.StatusNotFound, "encauth not found")
 			return

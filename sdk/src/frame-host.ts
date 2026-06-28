@@ -585,7 +585,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const config: AuthUIConfig & {
             clientId?: string;
             scope?: string | string[];
-            sessionRelay?: { appHost: string };
+            sessionRelay?: { appHost: string; extraAppHosts?: string[] };
         } = data.config;
         const parentOrigin = e.origin;
 
@@ -610,7 +610,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 sdkKeyPair: keyPair,
                 sdkPubB64,
             };
-            sessionRelayUI = { sdkPub: sdkPubB64, appHost: config.sessionRelay.appHost };
+            sessionRelayUI = {
+                sdkPub: sdkPubB64,
+                appHost: config.sessionRelay.appHost,
+                ...(config.sessionRelay.extraAppHosts?.length
+                    ? { extraAppHosts: config.sessionRelay.extraAppHosts }
+                    : {}),
+            };
         }
 
         // IdP base URL (same origin as this iframe).

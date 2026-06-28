@@ -60,7 +60,7 @@ export interface AuthUIConfig {
      * the enclave-issued `sessionId` + `encPub` over the broker so the SDK
      * can derive the AES-GCM key and instantiate `PrivasysSession`.
      */
-    sessionRelay?: { sdkPub: string; appHost: string; nonce?: string };
+    sessionRelay?: { sdkPub: string; appHost: string; extraAppHosts?: string[]; nonce?: string };
 }
 
 /** Resolved result returned by `signIn()`. */

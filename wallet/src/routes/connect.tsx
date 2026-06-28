@@ -303,6 +303,11 @@ interface QRPayload {
      *  `/__privasys/session-bootstrap`. Different from `origin`/`rpId`,
      *  which point at the IdP. Required when mode==='session-relay'. */
     appHost?: string;
+    /** Additional enclave hosts to seal in the SAME ceremony (multi-app
+     *  attestation). For each, the wallet attests + bootstraps + issues an
+     *  EncAuth voucher under the one unlock, so the browser can later resume a
+     *  sealed session to each without another phone touch. */
+    extraAppHosts?: string[];
     /** Per-session replay nonce (base64url). When omitted we fall back to
      *  `sessionId` for the session-relay challenge binding. */
     nonce?: string;
@@ -714,6 +719,78 @@ export default function ConnectScreen() {
         );
     };
 
+    /** Full attestation (inspect + attestation-server verify) of an additional
+     *  enclave host. Always verifies through as.privasys.org — extra hosts are
+     *  attested once per ceremony, so we never trust a cache for them. Throws on
+     *  an invalid/unreachable enclave so the caller can skip just that host. */
+    const attestExtraHost = async (host: string): Promise<AttestationResult> => {
+        const inspected = await inspectAttestation(host);
+        const asToken = await getAttestationServerToken();
+        const verified = await verifyAttestation(host, {
+            tee: inspected.tee_type ?? 'sgx',
+            attestation_server: 'https://as.privasys.org',
+            attestation_server_token: asToken,
+        });
+        if (!verified.valid) throw new Error(`attestation did not verify for ${host}`);
+        // Merge: inspect carries the rich OID-derived fields the voucher hashes,
+        // verify carries the authoritative measurements/validity.
+        return { ...inspected, ...verified };
+    };
+
+    /** Multi-app attestation: for every host in `extraAppHosts`, attest +
+     *  bootstrap + issue an EncAuth voucher, so one ceremony seals the session
+     *  to several enclaves. Runs back-to-back right after the primary voucher so
+     *  the keystore's biometric grace window covers every signature in one
+     *  unlock. Per-host failures are swallowed — the primary sign-in already
+     *  succeeded; an unsealed extra host just falls back to a ceremony next time. */
+    const issueExtraAppVouchers = async (
+        payload: QRPayload,
+        keyAlias: string,
+        result: { sessionToken: string; userId?: string },
+    ) => {
+        const hosts = (payload.extraAppHosts ?? []).filter((h) => h && h !== payload.appHost);
+        if (
+            hosts.length === 0 ||
+            payload.mode !== 'session-relay' ||
+            !payload.sdkPub ||
+            !payload.clientId ||
+            !result.userId ||
+            !result.sessionToken
+        ) {
+            return;
+        }
+        for (const host of hosts) {
+            try {
+                const att = await attestExtraHost(host);
+                const bs = await fido2.bootstrapHost(host, payload.sdkPub);
+                await issueEncAuthForSignIn({
+                    walletSessionToken: result.sessionToken,
+                    keyId: keyAlias,
+                    clientId: payload.clientId,
+                    sub: result.userId,
+                    encPubB64: bs.encPub,
+                    quoteHashHex: deriveQuoteHash(att),
+                    attestation: att,
+                });
+                addTrustedApp({
+                    rpId: host,
+                    origin: host,
+                    appName: payload.appName,
+                    mrenclave: att.mrenclave,
+                    mrtd: att.mrtd,
+                    codeHash: att.workload_code_hash,
+                    configRoot: att.workload_config_merkle_root,
+                    teeType: att.tee_type || 'sgx',
+                    lastVerified: Math.floor(Date.now() / 1000),
+                    credentialId: '', // voucher-only trust row (no passkey on this host)
+                });
+                console.log(`[CONNECT] extra-app voucher issued for ${host}`);
+            } catch (err: any) {
+                console.warn(`[CONNECT] extra-app voucher for ${host} failed:`, err?.message ?? err);
+            }
+        }
+    };
+
     const doRegister = async (payload: QRPayload) => {
         setStep('authenticating');
         console.log(`[CONNECT] doRegister — origin=${payload.origin}, rpId=${payload.rpId}`);
@@ -796,6 +873,9 @@ export default function ConnectScreen() {
             // biometric grace (where supported) still covers the extra
             // hardware signature.
             maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg);
+            // Multi-app attestation: seal any extra enclave hosts in the same
+            // ceremony (back-to-back, under the one biometric grace window).
+            void issueExtraAppVouchers(payload, keyAlias, result);
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
@@ -911,6 +991,9 @@ export default function ConnectScreen() {
             // biometric grace (where supported) still covers the extra
             // hardware signature.
             maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg);
+            // Multi-app attestation: seal any extra enclave hosts in the same
+            // ceremony (back-to-back, under the one biometric grace window).
+            void issueExtraAppVouchers(payload, keyAlias, result);
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);

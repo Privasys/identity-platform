@@ -452,6 +452,25 @@ export interface SessionRelayBinding {
     expiresAt: number;
 }
 
+/**
+ * Bootstrap a sealed session against an additional enclave host (multi-app
+ * attestation), with the same `sdkPub` the primary ceremony used. Returns the
+ * enclave's `enc_pub` so the caller can mint an EncAuth voucher for this host.
+ *
+ * This does NOT verify the enclave — the caller MUST attest `host` (RA-TLS + AS)
+ * first; bootstrap only establishes the ECDH half against an already-trusted
+ * enclave.
+ */
+export async function bootstrapHost(host: string, sdkPub: string): Promise<SessionRelayBinding> {
+    if (!host || !sdkPub) throw new Error('bootstrapHost requires host and sdkPub');
+    const bs = await fido2Fetch<{ session_id: string; enc_pub: string; expires_at: number }>(
+        host,
+        '/__privasys/session-bootstrap',
+        { sdk_pub: sdkPub },
+    );
+    return { sessionId: bs.session_id, encPub: bs.enc_pub, sdkPub, expiresAt: bs.expires_at };
+}
+
 // ── Internal helpers ────────────────────────────────────────────────────
 
 function concat(arrays: Uint8Array[]): Uint8Array {

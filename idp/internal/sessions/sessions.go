@@ -114,7 +114,8 @@ func New(db *store.DB) (*Store, error) {
 	// Multi-app vouchers: one EncAuth per (sid, app_id), so a single wallet
 	// ceremony can seal a session to several enclaves. Supersedes the single
 	// sessions.encauth_blob column, which is kept for back-compat reads and
-	// backfilled into this table below.
+	// backfilled into this table below. (The `app_id` column holds the
+	// workload digest — voucher field 4; name kept for schema back-compat.)
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS session_encauth (
 			sid        TEXT NOT NULL,
@@ -132,8 +133,9 @@ func New(db *store.DB) (*Store, error) {
 		return nil, fmt.Errorf("create session_encauth table: %w", err)
 	}
 	// Migration: add the `host` selection hint to an existing table (the wallet
-	// sends it at issuance; the browser SDK can't compute app_id, so it selects
-	// vouchers by host — the enclave still re-verifies app_id at consumption).
+	// sends it at issuance; the browser SDK can't compute the workload digest,
+	// so it selects vouchers by host — the enclave still re-verifies the
+	// workload digest at consumption).
 	if err := addColumnIfMissing(db, "session_encauth", "host",
 		`ALTER TABLE session_encauth ADD COLUMN host TEXT NOT NULL DEFAULT ''`); err != nil {
 		return nil, err
@@ -204,13 +206,13 @@ func (s *Store) migrateEncAuthBlobs() error {
 		return err
 	}
 	for _, r := range recs {
-		appID, err := appIDFromEnvelope(r.blob)
+		workloadDigest, err := workloadDigestFromEnvelope(r.blob)
 		if err != nil {
 			continue
 		}
 		if _, err := s.db.Exec(
 			`INSERT OR IGNORE INTO session_encauth (sid, app_id, blob) VALUES (?, ?, ?)`,
-			r.sid, appID, r.blob); err != nil {
+			r.sid, workloadDigest, r.blob); err != nil {
 			return err
 		}
 	}

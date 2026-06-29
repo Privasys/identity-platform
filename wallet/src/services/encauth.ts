@@ -101,12 +101,17 @@ function concat(parts: Uint8Array[]): Uint8Array {
  *
  * All byte arrays must be raw bytes (NOT base64). hwPub and encPub
  * MUST be P-256 SEC1 uncompressed (65 bytes starting with 0x04).
- * appId, encMeas, quoteHash MUST be SHA-256 outputs (32 bytes each).
+ * workloadDigest, encMeas, quoteHash MUST be SHA-256 outputs (32 bytes each).
+ *
+ * `workloadDigest` is CBOR key 4 (named `app_id` in the wire format /
+ * crypto-contract §8.1). It is NOT the static OID 3.6 app-id; it is the
+ * workload-measurement digest over OIDs 3.1/3.2/3.3/3.4 (see
+ * workloadDigestHash), so it moves with the OID 3.2 code hash.
  */
 export interface EncAuthPayload {
     sub: string;
     sid: string;
-    appId: Uint8Array;
+    workloadDigest: Uint8Array;
     encMeas: Uint8Array;
     encPub: Uint8Array;
     quoteHash: Uint8Array;
@@ -118,14 +123,14 @@ export interface EncAuthPayload {
 /**
  * Build the canonical CBOR encoding of an EncAuth payload.
  *
- * Map keys are integer-tagged (1=v, 2=sub, 3=sid, 4=app_id,
+ * Map keys are integer-tagged (1=v, 2=sub, 3=sid, 4=workload_digest,
  * 5=enc_meas, 6=enc_pub, 7=quote_hash, 8=not_before, 9=not_after,
  * 10=hw_pub) and emitted in ascending order, matching the IdP/enclave
  * canonical encoder. The output bytes are signed verbatim (no
  * base64) by `signEncAuth()`.
  */
 export function buildEncAuthPayload(p: EncAuthPayload): Uint8Array {
-    if (p.appId.length !== 32) throw new Error('app_id must be 32 bytes');
+    if (p.workloadDigest.length !== 32) throw new Error('workload_digest must be 32 bytes');
     if (p.encMeas.length !== 32) throw new Error('enc_meas must be 32 bytes');
     if (p.quoteHash.length !== 32) throw new Error('quote_hash must be 32 bytes');
     if (p.encPub.length !== 65 || p.encPub[0] !== 0x04) {
@@ -141,7 +146,7 @@ export function buildEncAuthPayload(p: EncAuthPayload): Uint8Array {
         concat([encUint(1), encUint(1)]),
         concat([encUint(2), encTstr(p.sub)]),
         concat([encUint(3), encTstr(p.sid)]),
-        concat([encUint(4), encBstr(p.appId)]),
+        concat([encUint(4), encBstr(p.workloadDigest)]),
         concat([encUint(5), encBstr(p.encMeas)]),
         concat([encUint(6), encBstr(p.encPub)]),
         concat([encUint(7), encBstr(p.quoteHash)]),
@@ -315,8 +320,17 @@ export function encMeasHash(att: AttestationResult): Uint8Array {
     });
 }
 
-/** SHA-256 over the workload half (3.x OIDs) of a verified attestation. */
-export function appIdHash(att: AttestationResult): Uint8Array {
+/**
+ * SHA-256 over the workload-measurement OIDs (3.1 config-merkle, 3.2 code
+ * hash, 3.3 image-ref, 3.4 key-source) of a verified attestation — CBOR
+ * field 4 of the voucher. Named `app_id` in the wire format, but it is NOT
+ * the static OID 3.6 app-id; it moves with the OID 3.2 code hash. The
+ * enclave re-verifies it at consumption when the host arms the per-app
+ * binding (SetExpectedWorkloadDigest, Sc 1 — see enc-pub-plan.md), so it
+ * must match the manager's digest byte-for-byte. (Renamed from
+ * `appIdHash`, ≤2026-06-29.)
+ */
+export function workloadDigestHash(att: AttestationResult): Uint8Array {
     return hashOidSubset({
         workload_config_merkle_root: att.workload_config_merkle_root,
         workload_code_hash: att.workload_code_hash,
@@ -373,7 +387,7 @@ export async function issueEncAuthForSignIn(args: {
         deviceId: args.deviceId,
         payload: {
             sub: args.sub,
-            appId: appIdHash(args.attestation),
+            workloadDigest: workloadDigestHash(args.attestation),
             encMeas: encMeasHash(args.attestation),
             encPub: b64uDecode(args.encPubB64),
             quoteHash: hexToBytes(args.quoteHashHex),
@@ -428,9 +442,10 @@ export async function signAndUploadEncAuth(args: {
             device_id: args.deviceId ?? '',
             payload: b64uEncode(cborBytes),
             hw_sig: b64uEncode(hwSig),
-            // Unsigned selection hint: the browser SDK can't compute app_id, so
-            // it resumes vouchers by host. The enclave re-verifies app_id at
-            // consumption, so this hint can't be used to smuggle a wrong voucher.
+            // Unsigned selection hint: the browser SDK can't compute the
+            // workload digest, so it resumes vouchers by host. The enclave
+            // re-verifies the workload digest at consumption, so this hint
+            // can't be used to smuggle a wrong voucher.
             host: args.host ?? '',
         }),
     });

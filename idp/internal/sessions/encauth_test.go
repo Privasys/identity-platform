@@ -28,16 +28,16 @@ func TestEncAuthRoundTrip(t *testing.T) {
 	}
 
 	p := &EncAuth{
-		V:         1,
-		Sub:       "user-1",
-		SID:       "sid-abc",
-		AppID:     bytes32(0xa1),
-		EncMeas:   bytes32(0xe1),
-		EncPub:    sec1Pub(),
-		QuoteHash: bytes32(0xb2),
-		NotBefore: 1_000,
-		NotAfter:  2_000,
-		HwPub:     hwPub,
+		V:              1,
+		Sub:            "user-1",
+		SID:            "sid-abc",
+		WorkloadDigest: bytes32(0xa1),
+		EncMeas:        bytes32(0xe1),
+		EncPub:         sec1Pub(),
+		QuoteHash:      bytes32(0xb2),
+		NotBefore:      1_000,
+		NotAfter:       2_000,
+		HwPub:          hwPub,
 	}
 	enc, err := EncAuthCanonicalCBOR(p)
 	if err != nil {
@@ -82,7 +82,7 @@ func TestEncAuthRoundTrip(t *testing.T) {
 func TestEncAuthCanonicalDeterministic(t *testing.T) {
 	p := &EncAuth{
 		V: 1, Sub: "u", SID: "s",
-		AppID: bytes32(1), EncMeas: bytes32(2),
+		WorkloadDigest: bytes32(1), EncMeas: bytes32(2),
 		EncPub: sec1Pub(), QuoteHash: bytes32(3),
 		NotBefore: 10, NotAfter: 20, HwPub: sec1Pub(),
 	}

@@ -27,16 +27,20 @@ import (
 // shortest-form integers) are enforced by the cbor.CTAP2EncOptions
 // preset that EncAuthEncode() uses.
 type EncAuth struct {
-	V         uint64 `cbor:"1,keyasint"`
-	Sub       string `cbor:"2,keyasint"`
-	SID       string `cbor:"3,keyasint"`
-	AppID     []byte `cbor:"4,keyasint"`  // SHA-256 of canonical workload OIDs
-	EncMeas   []byte `cbor:"5,keyasint"`  // SHA-256 of canonical platform OIDs
-	EncPub    []byte `cbor:"6,keyasint"`  // P-256 SEC1 uncompressed (65 B)
-	QuoteHash []byte `cbor:"7,keyasint"`  // wallet attestation digest (crypto-contract §4.1)
-	NotBefore uint64 `cbor:"8,keyasint"`  // unix seconds
-	NotAfter  uint64 `cbor:"9,keyasint"`  // unix seconds
-	HwPub     []byte `cbor:"10,keyasint"` // P-256 SEC1 uncompressed (65 B)
+	V   uint64 `cbor:"1,keyasint"`
+	Sub string `cbor:"2,keyasint"`
+	SID string `cbor:"3,keyasint"`
+	// WorkloadDigest is CBOR key 4 (named `app_id` in the wire format /
+	// crypto-contract §8.1). NOT the static OID 3.6 app-id; it is the
+	// SHA-256 of the canonical workload OIDs (3.1/3.2/3.3/3.4), so it
+	// moves with the OID 3.2 code hash. Integer key 4 is unchanged.
+	WorkloadDigest []byte `cbor:"4,keyasint"`
+	EncMeas        []byte `cbor:"5,keyasint"`  // SHA-256 of canonical platform OIDs
+	EncPub         []byte `cbor:"6,keyasint"`  // P-256 SEC1 uncompressed (65 B)
+	QuoteHash      []byte `cbor:"7,keyasint"`  // wallet attestation digest (crypto-contract §4.1)
+	NotBefore      uint64 `cbor:"8,keyasint"`  // unix seconds
+	NotAfter       uint64 `cbor:"9,keyasint"`  // unix seconds
+	HwPub          []byte `cbor:"10,keyasint"` // P-256 SEC1 uncompressed (65 B)
 }
 
 // Envelope is the JSON transport for a stored voucher.
@@ -118,7 +122,7 @@ func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, host strin
 	if len(p.EncPub) != 65 || p.EncPub[0] != 0x04 {
 		return nil, errors.New("enc_pub must be P-256 SEC1 uncompressed")
 	}
-	if len(p.AppID) != 32 || len(p.EncMeas) != 32 || len(p.QuoteHash) != 32 {
+	if len(p.WorkloadDigest) != 32 || len(p.EncMeas) != 32 || len(p.QuoteHash) != 32 {
 		return nil, errors.New("hash fields must be 32 bytes")
 	}
 	now := uint64(time.Now().Unix())
@@ -165,23 +169,26 @@ func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, host strin
 	if err != nil {
 		return nil, err
 	}
-	// Upsert keyed by (sid, app_id) so a session can hold one voucher per
-	// enclave. p.AppID is the SHA-256 of the target enclave's workload OIDs;
-	// `host` is the unsigned selection hint the browser SDK resumes by (the
-	// enclave re-verifies app_id at consumption, so a wrong host fails closed).
+	// Upsert keyed by (sid, workload_digest) so a session can hold one
+	// voucher per enclave. p.WorkloadDigest is the SHA-256 of the target
+	// enclave's workload OIDs; `host` is the unsigned selection hint the
+	// browser SDK resumes by (the enclave re-verifies the workload digest at
+	// consumption, so a wrong host fails closed). The DB column is still
+	// named `app_id` for historical reasons; it holds the workload digest.
 	if _, err := s.db.Exec(
 		`INSERT INTO session_encauth (sid, app_id, host, blob) VALUES (?, ?, ?, ?)
 		 ON CONFLICT(sid, app_id) DO UPDATE SET host = excluded.host, blob = excluded.blob, created_at = CURRENT_TIMESTAMP`,
-		p.SID, p.AppID, host, envBytes,
+		p.SID, p.WorkloadDigest, host, envBytes,
 	); err != nil {
 		return nil, fmt.Errorf("store encauth: %w", err)
 	}
 	return env, nil
 }
 
-// appIDFromEnvelope extracts the voucher's app_id (payload field 4) from a
-// stored JSON envelope, for keying/migration.
-func appIDFromEnvelope(blob []byte) ([]byte, error) {
+// workloadDigestFromEnvelope extracts the voucher's workload digest
+// (payload field 4, named `app_id` on the wire) from a stored JSON
+// envelope, for keying/migration.
+func workloadDigestFromEnvelope(blob []byte) ([]byte, error) {
 	env, err := decodeEnvelope(blob)
 	if err != nil {
 		return nil, err
@@ -194,10 +201,10 @@ func appIDFromEnvelope(blob []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(p.AppID) != 32 {
-		return nil, errors.New("envelope app_id is not 32 bytes")
+	if len(p.WorkloadDigest) != 32 {
+		return nil, errors.New("envelope workload_digest is not 32 bytes")
 	}
-	return p.AppID, nil
+	return p.WorkloadDigest, nil
 }
 
 func decodeEnvelope(blob []byte) (*Envelope, error) {
@@ -214,10 +221,11 @@ func decodeEnvelope(blob []byte) (*Envelope, error) {
 // being fetched anonymously by the SDK because the JWT claim already
 // carries the binding context).
 // Selection precedence: a non-empty `host` (the browser SDK's selector, since
-// it can't compute app_id) picks that enclave's voucher; else a 32-byte appID
-// picks by measurement; else the most-recently stored voucher (back-compat for
-// single-voucher callers).
-func (s *Store) GetEncAuth(sid string, appID []byte, host string) (*Envelope, error) {
+// it can't compute the workload digest) picks that enclave's voucher; else a
+// 32-byte workloadDigest picks by measurement; else the most-recently stored
+// voucher (back-compat for single-voucher callers). (The `se.app_id` column
+// holds the workload digest — name kept for schema back-compat.)
+func (s *Store) GetEncAuth(sid string, workloadDigest []byte, host string) (*Envelope, error) {
 	var blob []byte
 	var err error
 	switch {
@@ -228,12 +236,12 @@ func (s *Store) GetEncAuth(sid string, appID []byte, host string) (*Envelope, er
 			  WHERE se.sid = ? AND se.host = ? AND s.revoked_at IS NULL
 			  ORDER BY se.created_at DESC LIMIT 1`,
 			sid, host).Scan(&blob)
-	case len(appID) == 32:
+	case len(workloadDigest) == 32:
 		err = s.db.QueryRow(
 			`SELECT se.blob FROM session_encauth se
 			   JOIN sessions s ON s.sid = se.sid
 			  WHERE se.sid = ? AND se.app_id = ? AND s.revoked_at IS NULL`,
-			sid, appID).Scan(&blob)
+			sid, workloadDigest).Scan(&blob)
 	default:
 		err = s.db.QueryRow(
 			`SELECT se.blob FROM session_encauth se
@@ -247,7 +255,7 @@ func (s *Store) GetEncAuth(sid string, appID []byte, host string) (*Envelope, er
 	}
 	// Back-compat: fall back to the legacy single-voucher column when the
 	// table has no row yet (only meaningful without a selector).
-	if host == "" && len(appID) == 0 {
+	if host == "" && len(workloadDigest) == 0 {
 		if err := s.db.QueryRow(
 			`SELECT COALESCE(encauth_blob, '') FROM sessions WHERE sid = ? AND revoked_at IS NULL`, sid,
 		).Scan(&blob); err == nil && len(blob) > 0 {
@@ -350,17 +358,19 @@ func (s *Store) HandleGetEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			return
 		}
 		// Optional selectors: ?host=<hostname> (the browser SDK's selector) or
-		// ?app_id=<base64url 32B>; omitted returns the most-recent (back-compat).
+		// ?app_id=<base64url 32B> (query-param name kept for wire back-compat;
+		// the value is the workload digest); omitted returns the most-recent
+		// (back-compat).
 		host := r.URL.Query().Get("host")
-		var appID []byte
+		var workloadDigest []byte
 		if q := r.URL.Query().Get("app_id"); q != "" {
-			appID, err = base64.RawURLEncoding.DecodeString(q)
-			if err != nil || len(appID) != 32 {
+			workloadDigest, err = base64.RawURLEncoding.DecodeString(q)
+			if err != nil || len(workloadDigest) != 32 {
 				httpErr(w, http.StatusBadRequest, "invalid app_id selector")
 				return
 			}
 		}
-		env, err := s.GetEncAuth(sid, appID, host)
+		env, err := s.GetEncAuth(sid, workloadDigest, host)
 		if err != nil {
 			httpErr(w, http.StatusNotFound, "encauth not found")
 			return

@@ -180,7 +180,7 @@ func signedVoucher(t *testing.T, sub, sid string, appID []byte) (payload, hwSig 
 	now := uint64(time.Now().Unix())
 	p := &EncAuth{
 		V: 1, Sub: sub, SID: sid,
-		AppID: appID, EncMeas: bytes32(0xe0), EncPub: sec1Pub(),
+		WorkloadDigest: appID, EncMeas: bytes32(0xe0), EncPub: sec1Pub(),
 		QuoteHash: bytes32(0xc0), NotBefore: now - 10, NotAfter: now + 3600,
 		HwPub: hwPub,
 	}
@@ -210,7 +210,7 @@ func voucherAppID(t *testing.T, env *Envelope) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return p.AppID
+	return p.WorkloadDigest
 }
 
 func TestNewSIDUnique(t *testing.T) {

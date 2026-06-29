@@ -404,6 +404,34 @@ export class PrivasysSession {
      * decrypted body bytes.
      */
     async stream(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedStreamResponse> {
+        const r = await this.streamOnce(method, path, body, init);
+        // Silent-rebind for the streaming path, mirroring request(): when
+        // the enclave no longer recognises our session it answers with an
+        // UNSEALED 401 (same shape the gateway returns when there's no
+        // session at all). If the caller wired a getEncAuth fetcher, fetch
+        // a fresh voucher, re-bootstrap, and replay the stream once — so a
+        // back-end redeploy that kept its measurement recovers transparently
+        // instead of surfacing a dead "chat request failed: 401" to the UI.
+        // A measurement change makes tryRebind() return false and the
+        // original 401 propagates, which the front-end turns into a
+        // reconnect prompt.
+        if (
+            r.status === 401 &&
+            !r.sealed &&
+            this.getEncAuth &&
+            path !== INIT_PATH
+        ) {
+            const rebound = await this.tryRebind();
+            if (rebound) {
+                // Discard the unsealed error stream before replaying.
+                try { await r.body.cancel(); } catch { /* tearing down */ }
+                return this.streamOnce(method, path, body, init);
+            }
+        }
+        return r;
+    }
+
+    private async streamOnce(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedStreamResponse> {
         const upperMethod = method.toUpperCase();
         const ad = encodeAD(upperMethod, path, this.sessionId);
 

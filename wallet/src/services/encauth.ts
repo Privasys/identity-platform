@@ -22,11 +22,12 @@
  */
 
 import { bytesToBase64url as b64uEncode, base64urlToBytes as b64uDecode } from '@/utils/encoding';
-import { sha256 } from '@noble/hashes/sha2.js';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
+
+import { encMeasHash, workloadDigestHash } from './oid-digest';
 
 const IDP_BASE_URL = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
@@ -287,57 +288,9 @@ export async function uploadEncAuth(
  * this app. The remaining fields come from the verified attestation.
  */
 // ---- measurement hashing --------------------------------------------
-
-/**
- * Deterministic serialisation of an OID-value subset: sorted
- * `key=value` lines joined by `\n`, hashed with SHA-256. The enclave
- * does not re-derive these hashes (its acceptance pins `enc_pub` +
- * `quote_hash`, which transitively cover the measurement); they exist
- * so the wallet can detect when an (app, enclave) measurement it
- * previously approved has changed and a fresh voucher is required.
- * Stability across wallet versions matters; renaming a key silently
- * invalidates all outstanding vouchers' measurement identities.
- */
-function hashOidSubset(fields: Record<string, string | undefined>): Uint8Array {
-    const lines = Object.keys(fields)
-        .filter((k) => fields[k] !== undefined && fields[k] !== '')
-        .sort()
-        .map((k) => `${k}=${fields[k]}`);
-    return sha256(new TextEncoder().encode(lines.join('\n')));
-}
-
-/** SHA-256 over the platform half (TEE + 1.x/2.x OIDs) of a verified attestation. */
-export function encMeasHash(att: AttestationResult): Uint8Array {
-    return hashOidSubset({
-        tee_type: att.tee_type,
-        mrenclave: att.mrenclave,
-        mrsigner: att.mrsigner,
-        mrtd: att.mrtd,
-        config_merkle_root: att.config_merkle_root,
-        combined_workloads_hash: att.combined_workloads_hash,
-        dek_origin: att.dek_origin,
-        attestation_servers_hash: att.attestation_servers_hash,
-    });
-}
-
-/**
- * SHA-256 over the workload-measurement OIDs (3.1 config-merkle, 3.2 code
- * hash, 3.3 image-ref, 3.4 key-source) of a verified attestation — CBOR
- * field 4 of the voucher. Named `app_id` in the wire format, but it is NOT
- * the static OID 3.6 app-id; it moves with the OID 3.2 code hash. The
- * enclave re-verifies it at consumption when the host arms the per-app
- * binding (SetExpectedWorkloadDigest, Sc 1 — see enc-pub-plan.md), so it
- * must match the manager's digest byte-for-byte. (Renamed from
- * `appIdHash`, ≤2026-06-29.)
- */
-export function workloadDigestHash(att: AttestationResult): Uint8Array {
-    return hashOidSubset({
-        workload_config_merkle_root: att.workload_config_merkle_root,
-        workload_code_hash: att.workload_code_hash,
-        workload_image_ref: att.workload_image_ref,
-        workload_key_source: att.workload_key_source,
-    });
-}
+// Moved to ./oid-digest (pure, native-dep-free, unit-testable). Re-exported
+// here for back-compat with existing import sites.
+export { encMeasHash, workloadDigestHash };
 
 /** Default voucher lifetime (crypto-contract §8.3: ≤ 90 days). */
 const ENCAUTH_TTL_SECONDS = 90 * 24 * 3600;

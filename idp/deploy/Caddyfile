@@ -54,7 +54,7 @@ privasys.id {
     }
 
     # OIDC / FIDO2 / session endpoints + wallet-link + referential -> IdP backend
-    @idp path /.well-known/openid-configuration /jwks /authorize /token /userinfo /fido2/* /session/* /clients /admin/* /healthz /e2e/* /recovery/* /guardians/* /devices /push-token /device_authorization /device /device/* /wallet/* /referential/*
+    @idp path /.well-known/openid-configuration /jwks /authorize /token /userinfo /fido2/* /session/* /sessions /sessions/* /api-keys /api-keys/* /clients /admin/* /healthz /e2e/* /recovery/* /guardians/* /devices /push-token /device_authorization /device /device/* /wallet/* /referential/* /vault/*
     handle @idp {
         reverse_proxy localhost:8091
     }

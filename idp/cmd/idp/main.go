@@ -136,6 +136,14 @@ func main() {
 	// Unified session management (revoke, list).
 	mux.HandleFunc("GET /sessions/me", sessionsStore.HandleListMine(issuer))
 	mux.HandleFunc("POST /sessions/{sid}/revoke", sessionsStore.HandleRevoke(issuer))
+	// Revoked-sid feed for resource servers (e.g. the confidential-ai enclave)
+	// to poll so they can reject revoked tokens without a per-request callout.
+	mux.HandleFunc("GET /sessions/revoked", sessionsStore.HandleListRevoked())
+	// API keys: long-lived access tokens bound to a session (listable + revocable
+	// via the routes above). The audience is a scoped default; the caller
+	// (management-service) may override per app in the request body.
+	mux.HandleFunc("POST /api-keys", sessionsStore.HandleCreateAPIKey(issuer, "privasys-inference"))
+	mux.HandleFunc("GET /api-keys", sessionsStore.HandleListAPIKeys(issuer))
 	mux.HandleFunc("PUT /sessions/{sid}/encauth", sessionsStore.HandlePutEncAuth(issuer))
 	mux.HandleFunc("GET /sessions/{sid}/encauth", sessionsStore.HandleGetEncAuth(issuer))
 	mux.HandleFunc("POST /sessions/encauth", sessionsStore.HandlePostEncAuth(issuer))

@@ -42,6 +42,7 @@ import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { verifyAttestation, inspectAttestation } from '@/services/attestation';
+import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
 import { relaySessionToken } from '@/services/broker';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { issueEncAuthForSignIn } from '@/services/encauth';
@@ -350,6 +351,10 @@ export default function ConnectScreen() {
     const [qr, setQr] = useState<QRPayload | null>(null);
     const [isTrusted, setIsTrusted] = useState(false);
     const [attestationChanged, setAttestationChanged] = useState(false);
+    // Field-level breakdown of WHAT changed vs the trusted record (app code,
+    // config, platform), computed when entering the attestation-changed step.
+    // Drives the kind-specific title/summary + "What changed" card.
+    const [attestationDiff, setAttestationDiff] = useState<AttestationDiff | null>(null);
     // How the current attestation was established. Drives the badge in
     // AttestationView so the user can tell apart a fresh attestation-server
     // round-trip from a cache hit (and so we never silently accept either
@@ -596,6 +601,7 @@ export default function ConnectScreen() {
 
                 if (trustedApp) {
                     setAttestationChanged(true);
+                    setAttestationDiff(diffTrustedAttestation(trustedApp, result));
                     setStep('attestation-changed');
                     return;
                 }
@@ -1190,6 +1196,7 @@ export default function ConnectScreen() {
                         rpId={qr.rpId}
                         displayName={appName(qr.rpId)}
                         isChanged={true}
+                        diff={attestationDiff}
                         verificationLevel={verificationLevel}
                         onApprove={handleApprove}
                         onReject={handleReject}

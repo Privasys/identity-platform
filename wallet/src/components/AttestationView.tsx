@@ -13,6 +13,7 @@ import { Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View } from '@/components/Themed';
+import type { AttestationDiff } from '@/services/attestation-diff';
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
 
 /**
@@ -33,11 +34,18 @@ export type AttestationVerificationLevel =
     | 'cached-trusted'
     | 'non-enclave';
 
+const CHANGED_TITLES: Record<AttestationDiff['kind'], string> = {
+    'app-update': 'App Updated',
+    'platform-update': 'Platform Updated',
+    'app-and-platform-update': 'App & Platform Changed',
+};
+
 export function AttestationView({
     attestation,
     rpId,
     displayName,
     isChanged,
+    diff,
     verificationLevel,
     onApprove,
     onReject,
@@ -47,6 +55,13 @@ export function AttestationView({
     /** Human-readable app name shown above the origin (caller-derived). */
     displayName: string;
     isChanged: boolean;
+    /**
+     * Field-level change breakdown vs the trusted record (attestation-changed
+     * step only). Drives the kind-specific title, the summary sentence and the
+     * "What changed" card; without it the changed state falls back to the
+     * generic warning.
+     */
+    diff?: AttestationDiff | null;
     verificationLevel: AttestationVerificationLevel | null;
     onApprove: () => void;
     onReject: () => void;
@@ -55,6 +70,7 @@ export function AttestationView({
     const insets = useSafeAreaInsets();
     const appType = attestation.tee_type === 'sgx' ? 'WASM Application' : 'Container Application';
     const teeColor = attestation.tee_type === 'sgx' ? '#34E89E' : '#00BCF2';
+    const changedTitle = (diff && CHANGED_TITLES[diff.kind]) || 'App Changed';
 
     return (
         <RNView style={{ flex: 1 }}>
@@ -62,12 +78,14 @@ export function AttestationView({
                 {isChanged && (
                     <View style={styles.warningBanner}>
                         <Text style={styles.warningText}>
-                            ⚠ This app&apos;s attestation has changed since you last verified it.
+                            {diff
+                                ? `⚠ ${diff.summary}`
+                                : "⚠ This app's attestation has changed since you last verified it."}
                         </Text>
                     </View>
                 )}
 
-                <Text style={styles.title}>{isChanged ? 'App Changed' : 'Verify Enclave'}</Text>
+                <Text style={styles.title}>{isChanged ? changedTitle : 'Verify Enclave'}</Text>
                 <Text style={styles.attestationAppName}>{displayName}</Text>
                 <Text style={styles.attestationOrigin}>{rpId}</Text>
 
@@ -110,6 +128,31 @@ export function AttestationView({
                         <Text style={styles.verifyBadgeIcon}>↻</Text>
                         <Text style={styles.verifyBadgeText}>Trusted from a recent verification on this device</Text>
                     </View>
+                )}
+
+                {/* What changed — always visible on the changed step, so the
+                    user approves a specific, named change rather than a
+                    generic warning. */}
+                {isChanged && diff && diff.changes.length > 0 && (
+                    <>
+                        <Text style={styles.sectionHeader}>What Changed</Text>
+                        <View style={styles.attestationCard}>
+                            {diff.changes.map((c) => (
+                                <View key={c.label} style={styles.changeRow}>
+                                    <Text style={styles.changeLabel}>{c.label}</Text>
+                                    <View style={styles.changeValues}>
+                                        <Text style={styles.changeOld} selectable>
+                                            {c.previous ? truncateHex(c.previous) : 'not recorded'}
+                                        </Text>
+                                        <Text style={styles.changeArrow}>→</Text>
+                                        <Text style={styles.changeNew} selectable>
+                                            {c.current ? truncateHex(c.current) : 'removed'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </>
                 )}
 
                 {/* Collapsible details toggle */}
@@ -202,7 +245,9 @@ export function AttestationView({
                         <Text style={styles.rejectButtonText}>Reject</Text>
                     </Pressable>
                     <Pressable style={styles.approveButton} onPress={onApprove}>
-                        <Text style={styles.approveButtonText}>{isChanged ? 'Trust Anyway' : 'Approve'}</Text>
+                        <Text style={styles.approveButtonText}>
+                            {isChanged ? (diff ? 'Approve Changes' : 'Trust Anyway') : 'Approve'}
+                        </Text>
                     </Pressable>
                 </View>
             </RNView>
@@ -271,6 +316,15 @@ const styles = StyleSheet.create({
     },
     attestationLabel: { fontSize: 13, opacity: 0.6, flex: 1 },
     attestationValue: { fontSize: 13, fontFamily: 'Inter', flex: 2, textAlign: 'right' },
+    changeRow: {
+        paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(128,128,128,0.3)', backgroundColor: 'transparent',
+    },
+    changeLabel: { fontSize: 13, fontWeight: '600', marginBottom: 4 },
+    changeValues: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'transparent' },
+    changeOld: { fontSize: 12, fontFamily: 'Inter', color: '#94A3B8', textDecorationLine: 'line-through' },
+    changeArrow: { fontSize: 12, color: '#64748B' },
+    changeNew: { fontSize: 12, fontFamily: 'Inter', fontWeight: '600' },
     buttonRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
     approveButton: { flex: 1, backgroundColor: '#34C759', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
     approveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },

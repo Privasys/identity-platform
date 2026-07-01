@@ -142,8 +142,12 @@ assertEq(
     const evilFetch = async (url, init) => {
         if (url.endsWith('/__privasys/session-bootstrap')) {
             sub.count++;
+            // NB: includes `sub` — the bootstrap response crosses the
+            // terminate leg in the clear, so a MITM can inject any subject.
+            // Passing the voucher-consumed gate here keeps this KAT proving
+            // the enc_pub PIN is what rejects the substitution.
             return new Response(
-                JSON.stringify({ session_id: b64u(hexToBytes(SESSION_ID_RAW_HEX)), enc_pub: b64u(evilPub) }),
+                JSON.stringify({ session_id: b64u(hexToBytes(SESSION_ID_RAW_HEX)), enc_pub: b64u(evilPub), sub: 'u' }),
                 { status: 200, headers: { 'Content-Type': 'application/json' } },
             );
         }

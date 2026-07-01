@@ -90,6 +90,35 @@ export interface SessionInitOptions {
  * the enclave's `/__privasys/session-bootstrap` endpoint; verification
  * happens entirely inside the enclave.
  */
+/**
+ * Stable reason the enclave gives for refusing an EncAuth voucher
+ * (crypto-contract §8.4). `workload-changed` = the app's code or
+ * configuration changed since the user verified it; `enc-changed` = the
+ * hosting platform's identity/measurement changed; both require a fresh
+ * wallet ceremony in which the wallet shows the user exactly what
+ * changed. `voucher-expired` / `voucher-invalid` are voucher-lifecycle
+ * refusals — nothing changed on the enclave side.
+ */
+export type EncAuthRejectReason =
+    | 'enc-changed'
+    | 'workload-changed'
+    | 'voucher-expired'
+    | 'voucher-invalid';
+
+const ENCAUTH_REJECT_REASONS: readonly EncAuthRejectReason[] = [
+    'enc-changed',
+    'workload-changed',
+    'voucher-expired',
+    'voucher-invalid',
+];
+
+/** Narrow an enclave-supplied reject-reason string to the known union. */
+function parseRejectReason(v: string | undefined): EncAuthRejectReason | undefined {
+    return ENCAUTH_REJECT_REASONS.includes(v as EncAuthRejectReason)
+        ? (v as EncAuthRejectReason)
+        : undefined;
+}
+
 export interface EncAuthEnvelope {
     v: 1;
     payload: string;  // base64url(canonical CBOR)
@@ -162,7 +191,10 @@ export class PrivasysSession {
         host: string;
         getEncAuth: () => Promise<EncAuthEnvelope | null | undefined>;
         fetchImpl?: typeof fetch;
-    }): Promise<{ session: PrivasysSession } | { error: 'no-voucher' | 'rejected' | 'unavailable' }> {
+    }): Promise<
+        | { session: PrivasysSession }
+        | { error: 'no-voucher' | 'rejected' | 'unavailable'; reason?: EncAuthRejectReason }
+    > {
         const fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
         let env: EncAuthEnvelope | null | undefined;
         try {
@@ -173,7 +205,7 @@ export class PrivasysSession {
         if (!env) return { error: 'no-voucher' };
 
         const handshake = await bootstrapWithEncAuth(opts.host, env, fetchImpl);
-        if (!handshake.ok) return { error: handshake.error };
+        if (!handshake.ok) return { error: handshake.error, reason: handshake.reason };
 
         const session = await PrivasysSession.fromHandshake({
             host: opts.host,
@@ -556,9 +588,14 @@ export interface SealedResponse {
  * handshake inputs. Shared by silent rebind (`tryRebind`) and cold
  * resume (`PrivasysSession.resume`).
  *
- * `rejected` means the enclave actively refused the voucher
- * (`X-Privasys-EncAuth-Reject` or a non-OK status) — the measurement or
- * enclave identity changed and a wallet ceremony is required.
+ * `rejected` means the enclave actively refused the voucher — the
+ * measurement, app workload or enclave identity changed and a wallet
+ * ceremony is required. When the enclave says WHY (`encauth_reject` in
+ * the bootstrap body, mirrored in `X-Privasys-Reason` for non-browser
+ * clients — the gateway's CORS does not expose custom headers to
+ * browser JS), `reason` carries the stable token so the UI can explain
+ * the wake: `workload-changed` (the app was updated), `enc-changed`
+ * (the hosting platform changed), `voucher-expired`, `voucher-invalid`.
  * `unavailable` is a transport/parse failure worth retrying.
  */
 async function bootstrapWithEncAuth(
@@ -567,7 +604,7 @@ async function bootstrapWithEncAuth(
     fetchImpl: typeof fetch,
 ): Promise<
     | { ok: true; sessionId: string; encPub: string; sdkPrivateKey: CryptoKey }
-    | { ok: false; error: 'rejected' | 'unavailable' }
+    | { ok: false; error: 'rejected' | 'unavailable'; reason?: EncAuthRejectReason }
 > {
     try {
         const sdkKeyPair = (await crypto.subtle.generateKey(
@@ -585,13 +622,30 @@ async function bootstrapWithEncAuth(
             body: JSON.stringify({ sdk_pub: sdkPubB64, encauth: env }),
         });
         if (!resp.ok) return { ok: false, error: 'rejected' };
-        // If the enclave couldn't accept the voucher it sets a diagnostic
-        // header and falls through to the legacy random-id path. Treat
-        // that as a refusal even if the response otherwise looks fine, so
-        // callers fall back to a wallet ceremony.
-        if (resp.headers.get('X-Privasys-EncAuth-Reject')) return { ok: false, error: 'rejected' };
 
-        const data = (await resp.json()) as { session_id: string; enc_pub: string };
+        const data = (await resp.json()) as {
+            session_id: string;
+            enc_pub: string;
+            sub?: string;
+            encauth_reject?: string;
+        };
+        // If the enclave couldn't accept the voucher it reports the stable
+        // reason in the body (readable regardless of CORS) and falls
+        // through to the legacy random-id path. Header fallback covers
+        // non-browser fetch implementations against older enclaves.
+        const reason = parseRejectReason(
+            data.encauth_reject ?? resp.headers.get('X-Privasys-Reason') ?? undefined,
+        );
+        if (reason || resp.headers.get('X-Privasys-EncAuth-Reject')) {
+            return { ok: false, error: 'rejected', reason };
+        }
+        // A voucher-backed bootstrap that the enclave accepted always
+        // carries the authenticated subject. Its absence means the voucher
+        // was NOT consumed (e.g. an enclave that predates the reject-reason
+        // body field refused it, and the gateway's CORS hid the header):
+        // adopting the session would leave the app unauthenticated, so
+        // treat it as a refusal and fall back to a wallet ceremony.
+        if (!data.sub) return { ok: false, error: 'rejected' };
         if (!data.session_id || !data.enc_pub) return { ok: false, error: 'rejected' };
 
         // SECURITY: pin the response enc_pub to the wallet-attested

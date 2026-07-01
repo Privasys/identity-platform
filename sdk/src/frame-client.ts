@@ -509,9 +509,13 @@ export class AuthFrame {
      * variant).
      *
      * Rejects with `no-voucher` (the user never completed a sealed sign-in
-     * for this app), `rejected` (the enclave identity or measurement
-     * changed — a full wallet ceremony is required), or `unavailable`
-     * (transient transport failure, worth retrying).
+     * for this app), `rejected` (the enclave refused the voucher — a full
+     * wallet ceremony is required), or `unavailable` (transient transport
+     * failure, worth retrying). When the enclave reported WHY it refused,
+     * the message is `rejected:<reason>` with reason one of
+     * `workload-changed` (the app was updated), `enc-changed` (the hosting
+     * platform changed), `voucher-expired`, `voucher-invalid` — so the app
+     * can explain the wake instead of showing a generic re-sign-in prompt.
      */
     resumeSession(): Promise<SealedSession> {
         if (this.sealedSession) return Promise.resolve(this.sealedSession);
@@ -562,7 +566,9 @@ export class AuthFrame {
                 if (data.type === 'privasys:session:resume:response' && data.id === id) {
                     if (settled) return;
                     if (data.error) {
-                        fail(new Error(String(data.error)));
+                        fail(new Error(
+                            data.reason ? `${String(data.error)}:${String(data.reason)}` : String(data.error),
+                        ));
                         return;
                     }
                     settled = true;

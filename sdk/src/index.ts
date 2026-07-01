@@ -22,6 +22,7 @@ export { AuthFrame } from './frame-client';
 export type { AuthFrameConfig, SealedResponse, SealedSession, SealedStreamResponse } from './frame-client';
 export { PrivasysSession } from './enclave-session';
 export type {
+    EncAuthRejectReason,
     SessionInitOptions,
     WalletAttestationResult,
 } from './enclave-session';

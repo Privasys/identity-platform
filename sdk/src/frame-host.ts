@@ -1035,10 +1035,14 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const result = await PrivasysSession.resume({ host: appHost, getEncAuth });
         if ('error' in result) {
             // 'no-voucher'    → user never completed a sealed sign-in here
-            // 'rejected'      → enclave identity/measurement changed; a
-            //                   wallet ceremony is required
+            // 'rejected'      → enclave refused the voucher; a wallet
+            //                   ceremony is required. `reason` (when the
+            //                   enclave said why) distinguishes
+            //                   'workload-changed' (the app was updated)
+            //                   from 'enc-changed' (the platform changed)
+            //                   so the tab can explain the wake.
             // 'unavailable'   → transport failure, worth retrying
-            reply({ error: result.error });
+            reply({ error: result.error, reason: result.reason });
             return;
         }
         activeSession = {

@@ -874,6 +874,49 @@ export class AuthFrame {
     }
 
     /**
+     * One-call sealed-session acquisition for this frame's
+     * `sessionRelay.appHost` — the API adopters should use instead of
+     * hand-rolling resume/approval logic:
+     *
+     *   1. try the silent voucher resume (`resumeSession`);
+     *   2. if there is NO voucher yet, ask the user's wallet to issue one
+     *      via a push approval (`requestAppVoucher` — one biometric tap on
+     *      the phone, no sign-out, no redirect), then resume again.
+     *
+     * A `rejected` resume (the enclave's identity or measurement changed)
+     * is NOT auto-recovered — it needs a fresh verification ceremony, so it
+     * is rethrown for the app to route to sign-in. Other rejections:
+     * `no-push` (session not wallet-backed), `timeout` (approval not
+     * granted / wallet app too old), `no-session`.
+     */
+    async ensureAppSession(opts?: {
+        /** Set false to disable the push-approval fallback (resume only). */
+        pushApproval?: boolean;
+        /** Fired when the flow starts waiting on the phone approval. */
+        onAwaitingApproval?: () => void;
+    }): Promise<SealedSession> {
+        const appHost = this.config.sessionRelay?.appHost;
+        if (!appHost) {
+            throw new Error('AuthFrame: ensureAppSession() requires sessionRelay config');
+        }
+        try {
+            return await this.resumeSession();
+        } catch (err) {
+            const msg = (err as Error).message ?? '';
+            // Only a missing voucher is recoverable with a push approval.
+            if ((opts?.pushApproval ?? true) === false || !msg.includes('no-voucher')) {
+                throw err;
+            }
+        }
+        // Mount the persistent session iframe (idempotent) so the voucher
+        // RPC has a live channel, then request + resume.
+        await this.getSession();
+        opts?.onAwaitingApproval?.();
+        await this.requestAppVoucher(appHost);
+        return this.resumeSession();
+    }
+
+    /**
      * Ask the user's wallet — via push notification — to voucher an
      * ADDITIONAL enclave host for the current session (incremental
      * multi-app attestation). One biometric approval on the phone mints

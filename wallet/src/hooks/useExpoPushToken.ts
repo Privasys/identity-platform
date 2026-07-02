@@ -19,7 +19,8 @@ async function getNotifications() {
                 const data = notification?.request?.content?.data as
                     | Record<string, unknown>
                     | undefined;
-                const isAuthRequest = data?.type === 'auth-request';
+                const isAuthRequest =
+                    data?.type === 'auth-request' || data?.type === 'voucher-request';
                 return {
                     shouldShowAlert: !isAuthRequest,
                     shouldPlaySound: !isAuthRequest,
@@ -33,8 +34,28 @@ async function getNotifications() {
     return Notifications;
 }
 
-/** Build the connect-screen JSON payload from an auth-request notification's data. */
+/** Build the connect-screen JSON payload from an auth-request or a
+ *  voucher-request notification's data, or null when it's neither / malformed. */
 function authRequestPayload(data: Record<string, unknown>): string | null {
+    // Voucher-only: extend a LIVE session to an additional enclave with one
+    // biometric — no sign-in ceremony. Needs the target host + the IdP session
+    // row (sid) the browser is polling + a throwaway sdkPub to read enc_pub.
+    if (data?.type === 'voucher-request') {
+        if (!data.appHost || !data.rpId || !data.sid || !data.sdkPub) return null;
+        return JSON.stringify({
+            mode: 'voucher-only',
+            appHost: data.appHost,
+            rpId: data.rpId,
+            sid: data.sid,
+            sdkPub: data.sdkPub,
+            clientId: data.clientId,
+            appName: data.appName,
+            origin: data.origin,
+            brokerUrl: data.brokerUrl,
+            userAgent: data.userAgent,
+            clientIP: data.clientIP,
+        });
+    }
     if (data?.type !== 'auth-request' || !data.origin || !data.sessionId || !data.rpId) {
         return null;
     }

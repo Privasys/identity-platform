@@ -90,6 +90,10 @@ type notifyRequest struct {
 	SdkPub  string `json:"sdkPub,omitempty"`  // SEC1 P-256 base64url
 	AppHost string `json:"appHost,omitempty"` // attestation target host
 	Nonce   string `json:"nonce,omitempty"`   // replay window nonce
+	// Sid: the IdP session id (from the browser's JWT) the voucher must
+	// be written to, so the wallet targets the SAME row the browser polls.
+	// Only sent on the voucher-only path.
+	Sid string `json:"sid,omitempty"`
 	// ExtraAppHosts: additional enclave hosts to voucher in the same
 	// ceremony (multi-app attestation). The SDK has always sent this on
 	// the push path; the broker previously dropped it, silently degrading
@@ -142,9 +146,16 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 		clientIP, _, _ = net.SplitHostPort(r.RemoteAddr)
 	}
 
+	// Distinct push `type` so wallets route (and OLD wallets IGNORE) a
+	// voucher-only request instead of mis-handling it as a sign-in — the
+	// mis-route crashed the connect flow on a missing appHost.
+	pushType := "auth-request"
+	if req.Mode == "voucher-only" {
+		pushType = "voucher-request"
+	}
 	// Build Expo push message
 	pushData := map[string]string{
-		"type":      "auth-request",
+		"type":      pushType,
 		"sessionId": req.SessionID,
 		"rpId":      req.RpID,
 		"appName":   req.AppName,
@@ -177,6 +188,9 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 	}
 	if req.ClientID != "" {
 		pushData["clientId"] = req.ClientID
+	}
+	if req.Sid != "" {
+		pushData["sid"] = req.Sid
 	}
 	pushMsg := map[string]interface{}{
 		"to":   req.PushToken,

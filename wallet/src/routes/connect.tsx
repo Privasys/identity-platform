@@ -293,10 +293,14 @@ interface QRPayload {
      *  token that acts as the user, so we surface it prominently as a
      *  delegation warning. Never treat it as a verified identity. */
     requestedBy?: string;
-    /** When set to 'session-relay', the wallet must call /__privasys/session-bootstrap
-     *  with `sdkPub` before the FIDO2 ceremony so the IdP can bind the issued
-     *  JWT to a sealed-CBOR transport session. */
-    mode?: 'session-relay' | 'standard';
+    /** 'session-relay' — bootstrap a sealed session + bind the JWT (sign-in).
+     *  'voucher-only' — extend a LIVE session to `appHost` with one biometric:
+     *  attest + issue an EncAuth voucher (no WebAuthn, no relay); `sid` is the
+     *  browser's session row to write to. 'standard' — plain passkey. */
+    mode?: 'session-relay' | 'voucher-only' | 'standard';
+    /** IdP session id (from the browser's JWT) to write the voucher to.
+     *  Required for mode==='voucher-only'. */
+    sid?: string;
     /** SDK ephemeral P-256 SEC1 uncompressed public key, base64url. Required
      *  when mode==='session-relay'. */
     sdkPub?: string;
@@ -427,7 +431,7 @@ export default function ConnectScreen() {
             // a generic IdP scope. Without an `appHost` we fall back to
             // `rpId`.
             const attestationTarget =
-                payload.mode === 'session-relay' && payload.appHost
+                (payload.mode === 'session-relay' || payload.mode === 'voucher-only') && payload.appHost
                     ? payload.appHost
                     : payload.rpId;
             console.log(`[CONNECT] startFlow — verifying attestation for ${attestationTarget}` +
@@ -459,7 +463,7 @@ export default function ConnectScreen() {
                 // back to its public LE wildcard because the wallet's RA-TLS
                 // client did not advertise the `privasys-ratls/1` ALPN) leaves
                 // us with nothing to bind — fail fast with a clear message.
-                if (payload.mode === 'session-relay' && !hasMeasurements) {
+                if ((payload.mode === 'session-relay' || payload.mode === 'voucher-only') && !hasMeasurements) {
                     console.error(
                         `[CONNECT] session-relay attestation missing — ` +
                         `target=${attestationTarget} served a non-attested cert ` +
@@ -632,6 +636,13 @@ export default function ConnectScreen() {
     const handleApprove = useCallback(async () => {
         if (!qr || !attestation) return;
 
+        // Voucher-only: extend the live session to this enclave (one biometric,
+        // no sign-in). Handled separately — no WebAuthn registration/relay.
+        if (qr.mode === 'voucher-only') {
+            await doVoucherOnly(qr);
+            return;
+        }
+
         // If attestation changed, the enclave has a new KV store and our
         // old credential no longer exists server-side.  Remove it and
         // re-register so the user gets a fresh credential.
@@ -686,6 +697,83 @@ export default function ConnectScreen() {
             // the QR is still on v1 (no `nonce` field).
             nonce: payload.nonce ?? payload.sessionId,
         };
+    };
+
+    /** Voucher-only approval: extend a LIVE browser session to an additional
+     *  enclave (`qr.appHost`) with a SINGLE biometric — no sign-in ceremony,
+     *  no relay. Reuses the credential the user already has for `qr.rpId`:
+     *   1. FIDO2 authenticate against that credential → a fresh wallet session
+     *      token + the pairwise sub (one biometric; its grace window covers the
+     *      voucher signature that follows);
+     *   2. bootstrap `appHost` with the browser-supplied throwaway sdkPub to
+     *      read the enclave's enc_pub;
+     *   3. sign + upload the EncAuth voucher for `appHost` (lands on the same
+     *      IdP session row the browser polls, since it's the same
+     *      (user, client_id, device) tuple).
+     *  The browser's poll then sees the new voucher and resumes the sealed
+     *  session silently. */
+    const doVoucherOnly = async (payload: QRPayload) => {
+        const att = attestationRef.current ?? attestation;
+        if (!att) {
+            setError('No verified attestation for this app.');
+            return;
+        }
+        if (!payload.appHost || !payload.clientId || !payload.sdkPub || !payload.sid) {
+            setError('Malformed approval request (missing appHost/clientId/sdkPub/sid).');
+            return;
+        }
+        const credential = getCredentialForRp(payload.rpId);
+        if (!credential) {
+            setError(`No credential for ${payload.rpId}. Sign in first, then add the tool.`);
+            return;
+        }
+        setStep('authenticating');
+        try {
+            // 1. Authenticate against the existing credential to mint a fresh
+            //    wallet session token (and get the pairwise sub). No relay.
+            const auth = await fido2.authenticate(
+                payload.origin ?? payload.rpId,
+                credential.keyAlias,
+                credential.credentialId,
+                payload.sid, // correlation only; no browser relay on this path
+                credential.serverRpId,
+            );
+            if (!auth.sessionToken || !auth.userId) {
+                throw new Error('authentication did not return a session');
+            }
+            // 2. Bootstrap the enclave to read its enc_pub (throwaway sdkPub).
+            const bs = await fido2.bootstrapHost(payload.appHost, payload.sdkPub);
+            // 3. Sign + upload the voucher for this host.
+            await issueEncAuthForSignIn({
+                walletSessionToken: auth.sessionToken,
+                keyId: credential.keyAlias,
+                clientId: payload.clientId,
+                sub: auth.userId,
+                encPubB64: bs.encPub,
+                quoteHashHex: deriveQuoteHash(att),
+                attestation: att,
+                host: payload.appHost,
+            });
+            // Surface the newly-trusted enclave on the Home tab.
+            addTrustedApp({
+                rpId: payload.appHost,
+                origin: payload.appHost,
+                appName: payload.appName ?? payload.appHost,
+                mrenclave: att.mrenclave,
+                mrtd: att.mrtd,
+                codeHash: att.workload_code_hash,
+                configRoot: att.workload_config_merkle_root,
+                teeType: att.tee_type || 'sgx',
+                lastVerified: Math.floor(Date.now() / 1000),
+                credentialId: '', // voucher-only trust row (no passkey on this host)
+            });
+            setStep('done');
+            console.log(`[CONNECT] voucher-only: issued voucher for ${payload.appHost}`);
+        } catch (e: any) {
+            console.error('[CONNECT] voucher-only failed:', e?.message ?? e);
+            setError(`Could not add ${payload.appHost}: ${e?.message ?? e}`);
+            setStep('error');
+        }
     };
 
     /** Fire-and-forget EncAuth voucher issuance after a successful

@@ -1026,6 +1026,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
             };
             const before = await fetchEnvelope();
 
+            // A throwaway SDK keypair the wallet uses to complete the enclave
+            // bootstrap and READ its enc_pub (which the voucher binds). The
+            // browser mints its own fresh keypair when it later resumes the
+            // sealed session, so this pub is discarded after enc_pub is read.
+            const { sdkPubB64 } = await generateSdkKeyPair();
+
             // Trigger the wallet push via the broker (same endpoint the
             // returning-user sign-in uses), mode "voucher-only".
             const brokerBase = String(session.brokerUrl)
@@ -1046,6 +1052,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     brokerUrl: session.brokerUrl,
                     mode: 'voucher-only',
                     appHost,
+                    sdkPub: sdkPubB64,
+                    // The exact IdP session the voucher must land on (the one
+                    // this poll reads) so the wallet writes to the same row.
+                    sid,
                     ...(data.clientId ? { clientId: String(data.clientId) } : {}),
                 }),
             });

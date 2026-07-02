@@ -86,10 +86,20 @@ type notifyRequest struct {
 	// vanilla passkey against `rpId` (typically the IdP, which has
 	// no enclave measurements) and stores a bogus `teeType:'none'`
 	// trust row.
-	Mode    string `json:"mode,omitempty"`    // "session-relay"
+	Mode    string `json:"mode,omitempty"`    // "session-relay" | "voucher-only"
 	SdkPub  string `json:"sdkPub,omitempty"`  // SEC1 P-256 base64url
 	AppHost string `json:"appHost,omitempty"` // attestation target host
 	Nonce   string `json:"nonce,omitempty"`   // replay window nonce
+	// ExtraAppHosts: additional enclave hosts to voucher in the same
+	// ceremony (multi-app attestation). The SDK has always sent this on
+	// the push path; the broker previously dropped it, silently degrading
+	// returning-user PUSH sign-ins to a single-host voucher (QR scans
+	// were unaffected).
+	ExtraAppHosts []string `json:"extraAppHosts,omitempty"`
+	// ClientID: the OIDC client the session belongs to. The wallet needs
+	// it on the voucher-only path to locate/create the session row via
+	// POST /sessions/encauth {client_id, device_id}.
+	ClientID string `json:"clientId,omitempty"`
 }
 
 // HandleNotify sends a push notification to the wallet via Expo push service.
@@ -158,6 +168,16 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 	if req.Nonce != "" {
 		pushData["nonce"] = req.Nonce
 	}
+	// Expo push `data` values must be strings; encode the host list as a
+	// JSON array string. The wallet JSON-parses it back.
+	if len(req.ExtraAppHosts) > 0 {
+		if enc, err := json.Marshal(req.ExtraAppHosts); err == nil {
+			pushData["extraAppHosts"] = string(enc)
+		}
+	}
+	if req.ClientID != "" {
+		pushData["clientId"] = req.ClientID
+	}
 	pushMsg := map[string]interface{}{
 		"to":   req.PushToken,
 		"data": pushData,
@@ -168,8 +188,15 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 		displayName = req.RpID
 	}
 	pushMsg["sound"] = "default"
-	pushMsg["title"] = "Sign-in request"
-	pushMsg["body"] = displayName + " wants to sign you in"
+	if req.Mode == "voucher-only" {
+		// Incremental session extension: no sign-in ceremony, one
+		// biometric approval to voucher an additional enclave host.
+		pushMsg["title"] = "Approval request"
+		pushMsg["body"] = displayName + " wants to add a secure back-end to your session"
+	} else {
+		pushMsg["title"] = "Sign-in request"
+		pushMsg["body"] = displayName + " wants to sign you in"
+	}
 
 	pushBody, _ := json.Marshal(pushMsg)
 

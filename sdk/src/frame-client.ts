@@ -874,6 +874,65 @@ export class AuthFrame {
     }
 
     /**
+     * Ask the user's wallet — via push notification — to voucher an
+     * ADDITIONAL enclave host for the current session (incremental
+     * multi-app attestation). One biometric approval on the phone mints
+     * the EncAuth voucher; afterwards `resumeSession()` (or a per-host
+     * frame's `getSealedSession` equivalent) establishes the sealed
+     * session silently. No sign-out, no WebAuthn ceremony, no redirect.
+     *
+     * Resolves once the wallet has issued a NEW voucher for `appHost`.
+     * Rejects with:
+     *  - `no-session`  — no active session for this rpId;
+     *  - `no-push`     — the session has no wallet push token (e.g. a
+     *                    social/passkey sign-in) — fall back to a fresh
+     *                    wallet sign-in;
+     *  - `timeout`     — the user did not approve in time (or the wallet
+     *                    app predates voucher-only pushes).
+     *
+     * Requires an active session — call {@link AuthFrame.getSession} first.
+     */
+    requestAppVoucher(appHost: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            if (!this.sessionIframe?.contentWindow) {
+                reject(new Error('no active session iframe; call getSession() first'));
+                return;
+            }
+            const id = `vch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const target = this.sessionIframe.contentWindow;
+            const handler = (e: MessageEvent) => {
+                if (e.origin !== this.authOrigin) return;
+                if (e.source !== target) return;
+                const data = e.data;
+                if (!data || data.type !== 'privasys:voucher-request:response' || data.id !== id) return;
+                window.removeEventListener('message', handler);
+                clearTimeout(timer);
+                if (typeof data.error === 'string') reject(new Error(data.error));
+                else resolve();
+            };
+            // Generous timeout: a human has to pick up their phone. The
+            // frame-host runs its own (shorter) poll deadline and reports
+            // `timeout` before this fires in the normal case.
+            const timer = setTimeout(() => {
+                window.removeEventListener('message', handler);
+                reject(new Error('timeout'));
+            }, 150_000);
+            window.addEventListener('message', handler);
+            target.postMessage(
+                {
+                    type: 'privasys:voucher-request',
+                    id,
+                    rpId: this.rpId,
+                    appHost,
+                    appName: this.config.appName,
+                    clientId: this.config.clientId
+                },
+                this.authOrigin,
+            );
+        });
+    }
+
+    /**
      * Tear down any active iframes owned by THIS instance only.
      *
      * Important: only iframes that this `AuthFrame` created (the

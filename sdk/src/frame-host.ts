@@ -976,6 +976,102 @@ window.addEventListener('message', async (e: MessageEvent) => {
         }
     }
 
+    // Incremental multi-app attestation: ask the wallet — via push — to
+    // voucher an ADDITIONAL enclave host for the live session, then wait
+    // for the (new) voucher to appear at the IdP. One biometric approval
+    // on the phone; no WebAuthn ceremony, no sign-out. The parent then
+    // resumes the sealed session for that host as usual.
+    if (data.type === 'privasys:voucher-request') {
+        const id = data.id;
+        const reply = (payload: Record<string, unknown>) =>
+            window.parent.postMessage(
+                { type: 'privasys:voucher-request:response', id, ...payload },
+                e.origin,
+            );
+        const session = sessions.get(data.rpId);
+        if (!session?.token) {
+            reply({ error: 'no-session' });
+            return;
+        }
+        if (!session.pushToken || !session.brokerUrl) {
+            // Session was not established through the wallet (social or
+            // plain passkey) — there is no phone to push to.
+            reply({ error: 'no-push' });
+            return;
+        }
+        const sid = jwtClaim(session.token, 'sid');
+        if (!sid) {
+            reply({ error: 'no-session' });
+            return;
+        }
+        const appHost = String(data.appHost || '').trim();
+        if (!appHost) {
+            reply({ error: 'appHost required' });
+            return;
+        }
+        try {
+            // Snapshot the existing voucher (if any) so we can tell a NEWLY
+            // issued one apart — a stale voucher the enclave already refused
+            // would otherwise satisfy the poll instantly and change nothing.
+            const encauthURL =
+                `${globalThis.location.origin}/sessions/${encodeURIComponent(sid)}/encauth` +
+                `?host=${encodeURIComponent(appHost)}`;
+            const fetchEnvelope = async (): Promise<string | null> => {
+                const r = await fetch(encauthURL, {
+                    headers: { Authorization: `Bearer ${session.token}` },
+                });
+                if (!r.ok) return null;
+                const body = await r.json().catch(() => null);
+                return body ? JSON.stringify(body) : null;
+            };
+            const before = await fetchEnvelope();
+
+            // Trigger the wallet push via the broker (same endpoint the
+            // returning-user sign-in uses), mode "voucher-only".
+            const brokerBase = String(session.brokerUrl)
+                .replace('wss://', 'https://')
+                .replace('ws://', 'http://')
+                .replace(/\/relay\/?$/, '');
+            const notifyResp = await fetch(`${brokerBase}/notify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pushToken: session.pushToken,
+                    // The broker requires a sessionId; the voucher flow has
+                    // no WS relay, so this is just a correlation id.
+                    sessionId: `voucher-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    rpId: data.rpId,
+                    appName: String(data.appName || data.rpId),
+                    origin: globalThis.location.origin,
+                    brokerUrl: session.brokerUrl,
+                    mode: 'voucher-only',
+                    appHost,
+                    ...(data.clientId ? { clientId: String(data.clientId) } : {}),
+                }),
+            });
+            if (!notifyResp.ok) {
+                reply({ error: `push failed: ${notifyResp.status}` });
+                return;
+            }
+
+            // Poll until a NEW voucher for this host lands (the wallet
+            // POSTs it to /sessions/encauth). Human-scale deadline.
+            const deadline = Date.now() + 120_000;
+            while (Date.now() < deadline) {
+                await new Promise((r) => setTimeout(r, 2_500));
+                const now = await fetchEnvelope();
+                if (now && now !== before) {
+                    reply({ ok: true });
+                    return;
+                }
+            }
+            reply({ error: 'timeout' });
+        } catch (err) {
+            reply({ error: (err as Error).message });
+        }
+        return;
+    }
+
     // Sealed session-relay RPC. The parent serialises the request as
     // {method, path, body?} and we relay it through PrivasysSession.request
     // (CBOR-sealed AES-256-GCM over fetch). Only the iframe holds K, so the

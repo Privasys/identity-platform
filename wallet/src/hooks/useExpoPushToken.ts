@@ -57,7 +57,29 @@ function authRequestPayload(data: Record<string, unknown>): string | null {
         appHost: data.appHost,
         nonce: data.nonce,
         expectedAppSni: data.expectedAppSni,
+        // OIDC client of the requesting app. Required for EncAuth voucher
+        // issuance (silent rebind) — without it, push-driven sign-ins mint
+        // no voucher and the browser cannot silently resume sealed sessions.
+        clientId: data.clientId,
+        // Multi-app attestation: additional enclave hosts to voucher in the
+        // same ceremony. Expo push data values are strings, so the broker
+        // sends a JSON-array string; parse defensively.
+        extraAppHosts: parseHostList(data.extraAppHosts),
     });
+}
+
+/** Parse the broker's JSON-array-string host list ("[\"a\",\"b\"]") safely. */
+function parseHostList(v: unknown): string[] | undefined {
+    if (Array.isArray(v)) return v.filter((h): h is string => typeof h === 'string');
+    if (typeof v !== 'string' || !v) return undefined;
+    try {
+        const arr = JSON.parse(v);
+        return Array.isArray(arr)
+            ? arr.filter((h): h is string => typeof h === 'string')
+            : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 let ambientPushToken: string | null = null;

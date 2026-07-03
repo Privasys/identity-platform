@@ -36,6 +36,10 @@
  */
 
 const SEALED_CONTENT_TYPE = 'application/privasys-sealed+cbor';
+// Envelope-in-header transport for bodyless methods (GET/HEAD): fetch
+// refuses a body on those, so the sealed envelope rides base64url in
+// this header. Mirrored by the enclave relay (sessionrelay.go).
+const SEALED_ENVELOPE_HEADER = 'X-Privasys-Sealed';
 const SEALED_STREAM_CONTENT_TYPE = 'application/privasys-sealed-stream+cbor';
 const SESSION_AUTH_SCHEME = 'PrivasysSession';
 const HKDF_INFO = new TextEncoder().encode('privasys-session/v1');
@@ -335,12 +339,19 @@ export class PrivasysSession {
         headers.set('Content-Type', SEALED_CONTENT_TYPE);
         headers.set('Authorization', `${SESSION_AUTH_SCHEME} ${this.sessionId}`);
 
+        // fetch forbids a body on GET/HEAD, so for those methods the (tiny —
+        // empty-plaintext) envelope travels in the X-Privasys-Sealed header
+        // instead. The AAD already binds the real method and path, so the
+        // header envelope cannot be replayed onto another route or verb.
+        const bodyless = upperMethod === 'GET' || upperMethod === 'HEAD';
+        if (bodyless) headers.set(SEALED_ENVELOPE_HEADER, base64UrlEncode(reqBody));
+
         const url = `https://${this.host}${path}`;
         const resp = await this.fetchImpl(url, {
             ...init,
             method: upperMethod,
             headers,
-            body: reqBody as BodyInit,
+            ...(bodyless ? {} : { body: reqBody as BodyInit }),
         });
 
         const respBody = new Uint8Array(await resp.arrayBuffer());
@@ -483,12 +494,19 @@ export class PrivasysSession {
         headers.set('Content-Type', SEALED_CONTENT_TYPE);
         headers.set('Authorization', `${SESSION_AUTH_SCHEME} ${this.sessionId}`);
 
+        // fetch forbids a body on GET/HEAD, so for those methods the (tiny —
+        // empty-plaintext) envelope travels in the X-Privasys-Sealed header
+        // instead. The AAD already binds the real method and path, so the
+        // header envelope cannot be replayed onto another route or verb.
+        const bodyless = upperMethod === 'GET' || upperMethod === 'HEAD';
+        if (bodyless) headers.set(SEALED_ENVELOPE_HEADER, base64UrlEncode(reqBody));
+
         const url = `https://${this.host}${path}`;
         const resp = await this.fetchImpl(url, {
             ...init,
             method: upperMethod,
             headers,
-            body: reqBody as BodyInit,
+            ...(bodyless ? {} : { body: reqBody as BodyInit }),
         });
 
         const respCT = resp.headers.get('content-type') ?? '';

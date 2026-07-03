@@ -731,8 +731,11 @@ export default function ConnectScreen() {
         try {
             // 1. Authenticate against the existing credential to mint a fresh
             //    wallet session token (and get the pairwise sub). No relay.
+            // Use the bare IdP host (rpId) as the FIDO2 fetch host. `origin`
+            // may arrive scheme-prefixed ("https://privasys.id"), which the
+            // native RA-TLS layer would resolve to host "https" and fail DNS.
             const auth = await fido2.authenticate(
-                payload.origin ?? payload.rpId,
+                payload.rpId,
                 credential.keyAlias,
                 credential.credentialId,
                 payload.sid, // correlation only; no browser relay on this path

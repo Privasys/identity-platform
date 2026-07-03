@@ -1048,7 +1048,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     sessionId: `voucher-${Date.now()}-${Math.random().toString(36).slice(2)}`,
                     rpId: data.rpId,
                     appName: String(data.appName || data.rpId),
-                    origin: globalThis.location.origin,
+                    // Bare host, NOT the full origin: the wallet uses this
+                    // value directly as the FIDO2 fetch host and separately
+                    // prefixes `https://` for clientDataJSON. Sending the
+                    // scheme-prefixed origin makes the wallet resolve host
+                    // "https" and the /fido2/authenticate call fails DNS.
+                    origin: globalThis.location.hostname,
                     brokerUrl: session.brokerUrl,
                     mode: 'voucher-only',
                     appHost,

@@ -155,6 +155,15 @@ export function AttestationView({
                     </>
                 )}
 
+                {/* The change is the user's to accept: nudge them to actually
+                    review it before approving, since everything above reads as
+                    reassuring green. */}
+                {isChanged && (
+                    <Text style={styles.reviewPrompt}>
+                        Please review the changes and approve only if you accept them.
+                    </Text>
+                )}
+
                 {/* Collapsible details toggle */}
                 <Pressable style={styles.detailsToggle} onPress={() => setDetailsOpen(!detailsOpen)}>
                     <Text style={styles.detailsToggleText}>
@@ -281,6 +290,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14,
         marginBottom: 8, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.04)', gap: 8,
     },
+    reviewPrompt: { fontSize: 14, color: '#334155', textAlign: 'center', lineHeight: 20, marginTop: 4, marginBottom: 16 },
     detailsToggleText: { fontSize: 14, fontWeight: '500', color: '#64748B' },
     detailsToggleIcon: { fontSize: 10, color: '#94A3B8' },
     bottomActions: {

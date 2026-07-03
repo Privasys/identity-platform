@@ -772,6 +772,10 @@ export default function ConnectScreen() {
             });
             setStep('done');
             console.log(`[CONNECT] voucher-only: issued voucher for ${payload.appHost}`);
+            // Return to Home like the other success paths — without this the
+            // "Connected" screen is a dead end and the only way out is to kill
+            // the app.
+            setTimeout(() => router.replace('/(tabs)'), 1500);
         } catch (e: any) {
             console.error('[CONNECT] voucher-only failed:', e?.message ?? e);
             setError(`Could not add ${payload.appHost}: ${e?.message ?? e}`);
@@ -1350,6 +1354,11 @@ export default function ConnectScreen() {
                         <Text style={styles.subtitle}>
                             You can now use the service in your browser.
                         </Text>
+                        {/* Explicit exit so the screen is never a dead end, even
+                            if the auto-return timer is missed. */}
+                        <Pressable style={styles.secondaryButton} onPress={() => router.replace('/(tabs)')}>
+                            <Text style={styles.secondaryButtonText}>Done</Text>
+                        </Pressable>
                     </View>
                 )}
 

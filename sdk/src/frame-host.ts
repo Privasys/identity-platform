@@ -86,7 +86,15 @@ function makeGetEncAuth(rpId: string, host: string): () => Promise<EncAuthEnvelo
         const url =
             `${globalThis.location.origin}/sessions/${encodeURIComponent(sid)}/encauth` +
             (host ? `?host=${encodeURIComponent(host)}` : '');
-        const resp = await fetch(url, { headers: { Authorization: `Bearer ${session.token}` } });
+        // cache: 'no-store' — bypass the browser HTTP cache entirely. A
+        // historically mis-cached response for this URL (e.g. the static
+        // index.html from before the route existed, heuristically cached
+        // because it carried no Cache-Control) would otherwise be replayed
+        // forever, making every silent resume fail 'unavailable'.
+        const resp = await fetch(url, {
+            headers: { Authorization: `Bearer ${session.token}` },
+            cache: 'no-store',
+        });
         if (!resp.ok) return null;
         return (await resp.json()) as EncAuthEnvelope;
     };
@@ -1017,8 +1025,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 `${globalThis.location.origin}/sessions/${encodeURIComponent(sid)}/encauth` +
                 `?host=${encodeURIComponent(appHost)}`;
             const fetchEnvelope = async (): Promise<string | null> => {
+                // no-store: see makeGetEncAuth — a poisoned cache entry for
+                // this URL would blind the new-voucher poll permanently.
                 const r = await fetch(encauthURL, {
                     headers: { Authorization: `Bearer ${session.token}` },
+                    cache: 'no-store',
                 });
                 if (!r.ok) return null;
                 const body = await r.json().catch(() => null);

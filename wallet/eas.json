@@ -24,7 +24,14 @@
             "extends": "base",
             "distribution": "store",
             "autoIncrement": true,
-            "env": { "NODE_ENV": "production", "STAGE": "production" }
+            "env": {
+                "NODE_ENV": "production",
+                "STAGE": "production",
+                "EXPO_PUBLIC_PLATFORM_API_URL": "https://api.developer.privasys.org",
+                "EXPO_PUBLIC_KYC_VERIFIER_APP": "privasys-identity-verifier",
+                "EXPO_PUBLIC_KYC_VERIFIER_ORIGIN": "privasys-identity-verifier.apps.privasys.org",
+                "EXPO_PUBLIC_KYC_VERIFIER_DIGEST": "597d5f01682ea7546bc2babeb177073ab727db2b2747ae35a34fe564921e83e5"
+            }
         }
     },
     "submit": {

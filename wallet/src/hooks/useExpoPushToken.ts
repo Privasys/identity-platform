@@ -3,6 +3,9 @@ import { useRouter, type Router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { getPrivasysAccount } from '../services/privasys-id';
+import { registerPushTokenWithIdp } from '../services/vault-approval-api';
+
 let _notificationsSetup = false;
 
 async function getNotifications() {
@@ -20,7 +23,9 @@ async function getNotifications() {
                     | Record<string, unknown>
                     | undefined;
                 const isAuthRequest =
-                    data?.type === 'auth-request' || data?.type === 'voucher-request';
+                    data?.type === 'auth-request' ||
+                    data?.type === 'voucher-request' ||
+                    data?.type === 'vault-approval';
                 return {
                     shouldShowAlert: !isAuthRequest,
                     shouldPlaySound: !isAuthRequest,
@@ -87,6 +92,35 @@ function authRequestPayload(data: Record<string, unknown>): string | null {
         // sends a JSON-array string; parse defensively.
         extraAppHosts: parseHostList(data.extraAppHosts),
     });
+}
+
+/** Route an inbound notification to the right screen by its `type`. Vault
+ *  approvals go to the Vault approvals screen; everything else runs through the
+ *  auth/voucher connect flow. */
+function dispatchPush(data: Record<string, unknown>, router: Router): void {
+    if (data?.type === 'vault-approval') {
+        router.push({
+            pathname: '/vault-approvals',
+            params: { vault_op: String(data.vault_op ?? ''), source: 'push' },
+        });
+        return;
+    }
+    const payload = authRequestPayload(data);
+    if (payload) {
+        router.push({ pathname: '/connect', params: { payload, source: 'push' } });
+    }
+}
+
+/** Register the Expo push token with the IdP when a privasys.id session exists,
+ *  so the IdP can push vault approvals keyed by the owner sub. Best-effort. */
+async function maybeRegisterPushToken(token: string): Promise<void> {
+    const account = getPrivasysAccount();
+    if (!account?.sessionToken) return;
+    try {
+        await registerPushTokenWithIdp(account.sessionToken, token);
+    } catch (e) {
+        console.warn('[notifications] register push token with IdP failed', e);
+    }
 }
 
 /** Parse the broker's JSON-array-string host list ("[\"a\",\"b\"]") safely. */
@@ -161,6 +195,8 @@ async function registerForPushNotifications(): Promise<void> {
 
     const token = (await Notifications.getExpoPushTokenAsync()).data;
     publishToken(token);
+    // Tell the IdP our token so it can push vault approvals to this owner.
+    void maybeRegisterPushToken(token);
 
     if (Platform.OS === 'android') {
         Notifications.setNotificationChannelAsync('default', {
@@ -190,12 +226,9 @@ async function setupListeners(router: Router): Promise<void> {
                 const data = initial.notification.request.content.data as
                     | Record<string, unknown>
                     | undefined;
-                const payload = data ? authRequestPayload(data) : null;
-                if (payload) {
+                if (data) {
                     // Defer one tick so the router is mounted before pushing.
-                    setTimeout(() => {
-                        router.push({ pathname: '/connect', params: { payload, source: 'push' } });
-                    }, 0);
+                    setTimeout(() => dispatchPush(data, router), 0);
                 }
             }
         } catch (e) {
@@ -211,10 +244,7 @@ async function setupListeners(router: Router): Promise<void> {
     Notifications.addNotificationReceivedListener((n) => {
         const data = n.request.content.data as Record<string, unknown> | undefined;
         if (!data) return;
-        const payload = authRequestPayload(data);
-        if (payload) {
-            router.push({ pathname: '/connect', params: { payload, source: 'push' } });
-        }
+        dispatchPush(data, router);
     });
 
     // Tap-to-open handler — fires when the user taps a notification
@@ -226,10 +256,7 @@ async function setupListeners(router: Router): Promise<void> {
             | Record<string, unknown>
             | undefined;
         if (!data) return;
-        const payload = authRequestPayload(data);
-        if (payload) {
-            router.push({ pathname: '/connect', params: { payload, source: 'push' } });
-        }
+        dispatchPush(data, router);
     });
 }
 

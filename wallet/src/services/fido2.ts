@@ -441,6 +441,54 @@ export async function authenticate(
     return { sessionToken: completeResp.sessionToken || '', userId: completeResp.userId, sessionRelay: relay };
 }
 
+/**
+ * Sign a vault-approval WebAuthn assertion for the operation-bound challenge the
+ * IdP already issued (options.challenge IS the vault_op). Returns the assertion
+ * body to POST to /fido2/vault-approval/complete.
+ *
+ * Unlike authenticate(), this does NOT call /begin — the CLI drove begin and the
+ * wallet fetched the resulting options from /fido2/vault-approval/pending, so the
+ * wallet signs the identical challenge. The signing key is biometric-gated
+ * natively in NativeKeys.sign. `origin` is the IdP host (privasys.id).
+ */
+export async function signVaultAssertion(
+    origin: string,
+    keyAlias: string,
+    credentialId: string,
+    options: { challenge: string; rpId?: string; allowCredentials?: Array<{ type: string; id: string }> },
+): Promise<{ id: string; rawId: string; type: string; response: { clientDataJSON: string; authenticatorData: string; signature: string } }> {
+    const clientData = JSON.stringify({
+        type: 'webauthn.get',
+        challenge: options.challenge,
+        origin: `https://${origin}`,
+        crossOrigin: false,
+    });
+    const clientDataBytes = new TextEncoder().encode(clientData);
+    const clientDataB64 = base64urlEncode(clientDataBytes);
+
+    const effectiveRpId = options.rpId || origin.split(':')[0];
+    const rpIdHash = sha256(new TextEncoder().encode(effectiveRpId));
+    const flags = new Uint8Array([0x05]); // UP | UV
+    const signCount = new Uint8Array([0, 0, 0, 0]);
+    const authData = concat([rpIdHash, flags, signCount]);
+    const authDataB64 = base64urlEncode(authData);
+
+    const clientDataHash = sha256(clientDataBytes);
+    const signedData = concat([authData, clientDataHash]);
+    const sigResult = await NativeKeys.sign(keyAlias, base64urlEncode(signedData));
+
+    return {
+        id: credentialId,
+        rawId: credentialId,
+        type: 'public-key',
+        response: {
+            clientDataJSON: clientDataB64,
+            authenticatorData: authDataB64,
+            signature: sigResult.signature,
+        },
+    };
+}
+
 /** Result of a session-relay bootstrap, returned from authenticate() when
  *  the caller requested `mode:"session-relay"`. */
 export interface SessionRelayBinding {

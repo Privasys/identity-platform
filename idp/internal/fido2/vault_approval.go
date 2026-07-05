@@ -246,6 +246,16 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				exp:     exp,
 			},
 		})
+		// Record the pending approval + push the owner's wallet, so the ceremony
+		// can also be completed from the Privasys Wallet (its fido2 credential is
+		// not a system passkey a browser can reach). The wallet fetches these exact
+		// options from /pending and posts the assertion to /complete.
+		optionsJS, _ := json.Marshal(options)
+		h.recordPendingAndPush(sub, vaultOp, optionsJS, vaultApprovalSummary{
+			Operation:   req.Operation,
+			Handle:      req.Handle,
+			Measurement: req.MeasurementDigest,
+		}, exp)
 		writeJSON(w, options)
 	}
 }
@@ -279,6 +289,7 @@ func (h *Handler) VaultApprovalComplete(iss *tokens.Issuer, audience string) htt
 		// token by polling GET /fido2/vault-approval/token. Owner-scoped + single-
 		// use. Direct callers (e2e software authenticator) still read the response.
 		h.vaultResults.put(m.vaultOp, m.sub, tok, m.exp)
+		h.vaultPending.remove(m.vaultOp)
 		log.Printf("fido2: vault-approval issued for %s (vault_op %s…)", m.sub, m.vaultOp[:12])
 		writeJSON(w, map[string]interface{}{"access_token": tok, "expires_at": m.exp})
 	}

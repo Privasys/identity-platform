@@ -170,6 +170,8 @@ func main() {
 	// passkey assertion + /complete). See the CLI stepup_browser.go driver.
 	mux.HandleFunc("GET /fido2/vault-approval", fido2Handler.VaultApprovalPage())
 	mux.HandleFunc("GET /fido2/vault-approval/token", fido2Handler.VaultApprovalToken(issuer))
+	// The wallet lists its owner's pending approvals here (push arm of the flow).
+	mux.HandleFunc("GET /fido2/vault-approval/pending", fido2Handler.VaultApprovalPending(issuer))
 
 	// Vault key-creation grant (the key-creation-grants design): mints a
 	// single-call grant so a caller holding the material (an app TEE via the

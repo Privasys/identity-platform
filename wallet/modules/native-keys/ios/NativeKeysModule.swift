@@ -8,6 +8,22 @@ import LocalAuthentication
 public class NativeKeysModule: Module {
     private static let keyTagPrefix = "org.privasys.wallet.key."
 
+    // Shared biometric grace window. A single "connect" action signs several
+    // times on the same Secure Enclave key back-to-back — the FIDO2 assertion,
+    // the EncAuth voucher, and one voucher per extra app host (multi-app
+    // attestation). Without a reuse window each SecKeyCreateSignature prompts
+    // Face ID again, so one connect became three prompts. Binding signing to a
+    // shared LAContext with a short reuse duration means the first signature
+    // prompts and the rest of the burst ride that authentication; once the
+    // window lapses the next signature prompts afresh. Public-key reads never
+    // use this context, so they never prompt.
+    private static let signingContext: LAContext = {
+        let ctx = LAContext()
+        ctx.touchIDAuthenticationAllowableReuseDuration =
+            min(60, LATouchIDAuthenticationMaximumAllowableReuseDuration)
+        return ctx
+    }()
+
     public func definition() -> ModuleDefinition {
         Name("NativeKeys")
 
@@ -65,7 +81,9 @@ public class NativeKeysModule: Module {
         AsyncFunction("sign") { (keyId: String, dataBase64url: String) -> String in
             let tag = Self.tag(for: keyId)
 
-            guard let privateKey = Self.loadPrivateKey(tag: tag) else {
+            // Sign with the shared biometric context so a burst of signatures
+            // in one ceremony rides a single Face ID (see signingContext).
+            guard let privateKey = Self.loadPrivateKey(tag: tag, context: Self.signingContext) else {
                 return "{\"error\":\"key not found\"}"
             }
 
@@ -118,13 +136,19 @@ public class NativeKeysModule: Module {
         (keyTagPrefix + keyId).data(using: .utf8)!
     }
 
-    private static func loadPrivateKey(tag: Data) -> SecKey? {
-        let query: [String: Any] = [
+    private static func loadPrivateKey(tag: Data, context: LAContext? = nil) -> SecKey? {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrApplicationTag as String: tag,
             kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
             kSecReturnRef as String: true,
         ]
+        // Bind the biometric authentication to the caller's context so the
+        // Secure Enclave can honour its reuse window; omitted for public-key
+        // reads, which must never prompt.
+        if let context = context {
+            query[kSecUseAuthenticationContext as String] = context
+        }
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess else { return nil }

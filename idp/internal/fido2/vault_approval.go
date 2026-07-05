@@ -21,18 +21,125 @@ package fido2
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
 
 	"github.com/Privasys/idp/internal/tokens"
 )
+
+// vaultApprovalPage is the browser ceremony page the CLI opens: it reads the
+// WebAuthn options the CLI passed in the URL fragment, runs
+// navigator.credentials.get() against the owner's passkey, and POSTs the
+// assertion to /fido2/vault-approval/complete. Served same-origin so the
+// assertion validates against the IdP RP ID. See stepup_browser.go in the CLI.
+//
+//go:embed vault_approval.html
+var vaultApprovalPage []byte
+
+// VaultApprovalPage serves GET /fido2/vault-approval (the ceremony page).
+func (h *Handler) VaultApprovalPage() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Write(vaultApprovalPage)
+	}
+}
+
+// vaultResultStore briefly holds the operation-bound token issued by
+// VaultApprovalComplete, keyed by vault_op, so the CLI (which drove /begin but
+// not /complete, since the browser did) can collect it by polling. The token is
+// owner-scoped (only the matching sub may fetch it) and single-use.
+type vaultResultStore struct {
+	mu      sync.Mutex
+	results map[string]vaultResultEntry
+}
+
+type vaultResultEntry struct {
+	sub       string
+	token     string
+	expiresAt time.Time
+}
+
+func newVaultResultStore() *vaultResultStore {
+	s := &vaultResultStore{results: make(map[string]vaultResultEntry)}
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+			s.cleanup()
+		}
+	}()
+	return s
+}
+
+func (s *vaultResultStore) put(vaultOp, sub, token string, exp int64) {
+	s.mu.Lock()
+	s.results[vaultOp] = vaultResultEntry{sub: sub, token: token, expiresAt: time.Unix(exp, 0)}
+	s.mu.Unlock()
+}
+
+// take returns the stashed token for vaultOp iff it exists, has not expired, and
+// belongs to sub. It is single-use: a hit is deleted. The bool reports whether a
+// (live, sub-matching) entry was found.
+func (s *vaultResultStore) take(vaultOp, sub string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.results[vaultOp]
+	if !ok || time.Now().After(e.expiresAt) || e.sub != sub {
+		return "", false
+	}
+	delete(s.results, vaultOp)
+	return e.token, true
+}
+
+func (s *vaultResultStore) cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for k, v := range s.results {
+		if now.After(v.expiresAt) {
+			delete(s.results, k)
+		}
+	}
+}
+
+// VaultApprovalToken handles GET /fido2/vault-approval/token?challenge=<vault_op>.
+//
+// Auth: Authorization: Bearer <owner access token> (the same owner that drove
+// /begin). Returns { access_token, expires_at } once the browser has completed
+// the ceremony and the token was stashed; 202 while still pending. Single-use.
+func (h *Handler) VaultApprovalToken(iss *tokens.Issuer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sub, err := bearerSubject(r, iss)
+		if err != nil {
+			errorJSON(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		vaultOp := r.URL.Query().Get("challenge")
+		if vaultOp == "" {
+			errorJSON(w, http.StatusBadRequest, "challenge required")
+			return
+		}
+		tok, ok := h.vaultResults.take(vaultOp, sub)
+		if !ok {
+			// Not yet completed (or expired / not this owner's): tell the CLI to
+			// keep polling.
+			w.WriteHeader(http.StatusAccepted)
+			writeJSON(w, map[string]string{"status": "pending"})
+			return
+		}
+		writeJSON(w, map[string]string{"access_token": tok})
+	}
+}
 
 // vaultApprovalDomain MUST match the vault (enclave-os-vault/src/policy.rs) and
 // every client. See the vault promote-step-up design.
@@ -167,6 +274,11 @@ func (h *Handler) VaultApprovalComplete(iss *tokens.Issuer, audience string) htt
 			errorJSON(w, http.StatusInternalServerError, "token issuance failed")
 			return
 		}
+		// Stash for browser-driven flows: when the ceremony ran in a browser page
+		// (the CLI drove /begin but the page did /complete), the CLI collects the
+		// token by polling GET /fido2/vault-approval/token. Owner-scoped + single-
+		// use. Direct callers (e2e software authenticator) still read the response.
+		h.vaultResults.put(m.vaultOp, m.sub, tok, m.exp)
 		log.Printf("fido2: vault-approval issued for %s (vault_op %s…)", m.sub, m.vaultOp[:12])
 		writeJSON(w, map[string]interface{}{"access_token": tok, "expires_at": m.exp})
 	}

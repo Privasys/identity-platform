@@ -165,6 +165,11 @@ func main() {
 		fido2Handler.VaultApprovalBegin(issuer, "privasys-platform"))
 	mux.HandleFunc("POST /fido2/vault-approval/complete",
 		fido2Handler.VaultApprovalComplete(issuer, "privasys-platform"))
+	// Browser ceremony page + the CLI's poll endpoint to collect the token the
+	// page's /complete issued (the CLI drives /begin, the browser does the
+	// passkey assertion + /complete). See the CLI stepup_browser.go driver.
+	mux.HandleFunc("GET /fido2/vault-approval", fido2Handler.VaultApprovalPage())
+	mux.HandleFunc("GET /fido2/vault-approval/token", fido2Handler.VaultApprovalToken(issuer))
 
 	// Vault key-creation grant (the key-creation-grants design): mints a
 	// single-call grant so a caller holding the material (an app TEE via the

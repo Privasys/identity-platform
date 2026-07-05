@@ -88,6 +88,7 @@ type Handler struct {
 	db             *store.DB
 	challenges     *challengeStore
 	walletSessions *walletSessionStore
+	vaultResults   *vaultResultStore
 }
 
 // walletSessionStore is a tiny in-memory map of sessionToken → user_id with TTL.
@@ -178,6 +179,7 @@ func NewHandler(cfg Config) (*Handler, error) {
 		db:             cfg.DB,
 		challenges:     newChallengeStore(),
 		walletSessions: newWalletSessionStore(),
+		vaultResults:   newVaultResultStore(),
 	}, nil
 }
 

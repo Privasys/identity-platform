@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="referrer" content="no-referrer" />
+<title>Privasys — Vault approval</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         margin: 0; display: grid; place-items: center; min-height: 100vh;
+         background: #0b0c10; color: #e8eaf0; }
+  .card { width: min(92vw, 460px); background: #14161d; border: 1px solid #262a36;
+          border-radius: 16px; padding: 28px 30px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  p  { font-size: 14px; line-height: 1.5; color: #aab0c0; margin: 8px 0; }
+  .op { font-size: 13px; background: #0f1117; border: 1px solid #262a36; border-radius: 10px;
+        padding: 12px 14px; margin: 14px 0; word-break: break-all; }
+  .op b { color: #e8eaf0; }
+  button { width: 100%; padding: 13px; font-size: 15px; font-weight: 600; border: 0;
+           border-radius: 10px; background: #4f7cff; color: #fff; cursor: pointer; margin-top: 8px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { margin-top: 16px; font-size: 13px; min-height: 18px; }
+  .status.err { color: #ff6b6b; }
+  .status.ok  { color: #4fd18b; }
+  .muted { color: #6b7180; font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Approve vault operation</h1>
+    <p>Your terminal requested a hardware-backed approval. Review the operation, then
+       confirm with your passkey. This authorises this one operation and nothing else.</p>
+    <div class="op" id="op"></div>
+    <button id="go">Approve with passkey</button>
+    <div class="status" id="status"></div>
+    <p class="muted" id="hint">You can close this tab after approving; return to your terminal.</p>
+  </div>
+
+<script>
+"use strict";
+
+function b64urlToBytes(s) {
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = s.length % 4; if (pad) s += "=".repeat(4 - pad);
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function bytesToB64url(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+const statusEl = document.getElementById("status");
+const btn = document.getElementById("go");
+function fail(msg) { statusEl.textContent = msg; statusEl.className = "status err"; }
+
+// The CLI passes {options, summary} as a base64url JSON fragment (never sent to
+// the server; the vault_op binding lives in options.publicKey.challenge).
+let payload;
+try {
+  const frag = location.hash.replace(/^#/, "");
+  if (!frag) throw new Error("no request payload in URL");
+  payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(frag)));
+} catch (e) {
+  fail("Malformed approval request: " + e.message);
+  btn.disabled = true;
+}
+
+if (payload) {
+  const s = payload.summary || {};
+  document.getElementById("op").innerHTML =
+    "<b>Operation</b>: " + (s.operation || "?") + "<br/>" +
+    "<b>Key</b>: " + (s.handle || "?") +
+    (s.measurement ? "<br/><b>New measurement</b>: " + s.measurement : "");
+}
+
+async function approve() {
+  btn.disabled = true;
+  statusEl.className = "status";
+  statusEl.textContent = "Waiting for your passkey…";
+  try {
+    const pk = payload.options.publicKey;
+    const vaultOp = pk.challenge; // base64url; also the /complete challenge key
+    const publicKey = {
+      challenge: b64urlToBytes(pk.challenge),
+      timeout: pk.timeout,
+      rpId: pk.rpId,
+      userVerification: pk.userVerification || "preferred",
+      allowCredentials: (pk.allowCredentials || []).map(function (c) {
+        return { type: c.type, id: b64urlToBytes(c.id), transports: c.transports };
+      }),
+    };
+    const cred = await navigator.credentials.get({ publicKey: publicKey });
+    if (!cred) throw new Error("no credential returned");
+    const r = cred.response;
+    const assertion = {
+      id: cred.id,
+      rawId: bytesToB64url(cred.rawId),
+      type: cred.type,
+      response: {
+        clientDataJSON: bytesToB64url(r.clientDataJSON),
+        authenticatorData: bytesToB64url(r.authenticatorData),
+        signature: bytesToB64url(r.signature),
+        userHandle: r.userHandle ? bytesToB64url(r.userHandle) : null,
+      },
+    };
+    statusEl.textContent = "Verifying…";
+    // Complete the ceremony same-origin. The IdP verifies the assertion, issues
+    // the operation-bound token, and briefly stashes it for the CLI to collect.
+    const resp = await fetch(
+      "/fido2/vault-approval/complete?challenge=" + encodeURIComponent(vaultOp),
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(assertion) }
+    );
+    if (!resp.ok) {
+      const t = await resp.text();
+      throw new Error("verification failed (" + resp.status + "): " + t);
+    }
+    statusEl.className = "status ok";
+    statusEl.textContent = "Approved. Return to your terminal — you can close this tab.";
+    btn.style.display = "none";
+    document.getElementById("hint").textContent = "The terminal will continue automatically.";
+  } catch (e) {
+    btn.disabled = false;
+    fail("Approval failed: " + (e && e.message ? e.message : e));
+  }
+}
+
+btn.addEventListener("click", approve);
+</script>
+</body>
+</html>

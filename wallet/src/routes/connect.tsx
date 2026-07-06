@@ -44,6 +44,7 @@ import { getAttestationServerToken } from '@/services/app-attest';
 import { verifyAttestation, inspectAttestation } from '@/services/attestation';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
 import { relaySessionToken } from '@/services/broker';
+import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
@@ -953,6 +954,16 @@ export default function ConnectScreen() {
             // Relay succeeded — now persist locally.
             persistCredentialAndTrust(payload, result.credentialId, keyAlias, result.userHandle, result.userName, result.serverRpId);
 
+            // Register the push token under THIS pairwise identity's session so
+            // the IdP can push vault approvals for keys this identity owns. The
+            // IdP learns no linkage it doesn't already have (it sees each
+            // pairwise sub independently). Best-effort.
+            if (pushToken && result.sessionToken) {
+                registerPushTokenWithIdp(result.sessionToken, pushToken).catch((e) =>
+                    console.warn('[CONNECT] push-token registration (pairwise) failed', e),
+                );
+            }
+
             // Surface the live sealed session on the Home screen so the
             // user sees the relay countdown next to the connected service.
             if (result.sessionRelay) {
@@ -1041,6 +1052,14 @@ export default function ConnectScreen() {
                 attributes,
                 result.sessionRelay,
             );
+
+            // Keep the IdP's push target fresh for this pairwise identity
+            // (vault approvals for keys it owns). Best-effort.
+            if (pushToken && result.sessionToken) {
+                registerPushTokenWithIdp(result.sessionToken, pushToken).catch((e) =>
+                    console.warn('[CONNECT] push-token registration (pairwise) failed', e),
+                );
+            }
 
             // Refresh the trusted-app row so the Home tab reflects the
             // most-recent sign-in. Look the row up under the same key

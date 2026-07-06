@@ -41,6 +41,7 @@ export interface AuthState {
     addCredential: (credential: Credential) => void;
     removeCredential: (credentialId: string) => void;
     getCredentialForRp: (rpId: string) => Credential | undefined;
+    getCredentialById: (credentialId: string) => Credential | undefined;
     setUnlocked: (durationMs: number) => void;
     checkUnlocked: () => boolean;
     setPrivasysId: (account: PrivasysIdAccount | null) => void;
@@ -90,6 +91,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     getCredentialForRp: (rpId) => {
         return get().credentials.find((c) => c.rpId === rpId);
+    },
+
+    getCredentialById: (credentialId) => {
+        return get().credentials.find((c) => c.credentialId === credentialId);
     },
 
     setUnlocked: (durationMs) => {

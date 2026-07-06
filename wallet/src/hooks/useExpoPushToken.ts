@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { getPrivasysAccount } from '../services/privasys-id';
-import { registerPushTokenWithIdp } from '../services/vault-approval-api';
+import { registerPushTokenWithIdp, rememberVaultOp } from '../services/vault-approval-api';
 
 let _notificationsSetup = false;
 
@@ -99,9 +99,13 @@ function authRequestPayload(data: Record<string, unknown>): string | null {
  *  auth/voucher connect flow. */
 function dispatchPush(data: Record<string, unknown>, router: Router): void {
     if (data?.type === 'vault-approval') {
+        const vaultOp = String(data.vault_op ?? '');
+        // Remember the capability so the screen lists it even when the user
+        // reaches the screen another way (missed banner, foreground arrival).
+        rememberVaultOp(vaultOp);
         router.push({
             pathname: '/vault-approvals',
-            params: { vault_op: String(data.vault_op ?? ''), source: 'push' },
+            params: { vault_op: vaultOp, source: 'push' },
         });
         return;
     }

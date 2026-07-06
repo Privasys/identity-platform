@@ -118,6 +118,10 @@ export default function KycCaptureScreen() {
     const cameraRef = useRef<CameraView>(null);
     const [cameraReady, setCameraReady] = useState(false);
     const [cameraKey, setCameraKey] = useState(0);
+    // Toggled off→on to kick expo-camera's continuous autofocus (see the
+    // effect below); starts 'on' so behaviour is unchanged if the kick never
+    // runs.
+    const [autofocus, setAutofocus] = useState<'on' | 'off'>('on');
     const [captureState, setCaptureState] = useState<CaptureState>('positioning');
     const captureInFlight = useRef(false);
     const captureFinished = useRef(false);
@@ -161,6 +165,27 @@ export default function KycCaptureScreen() {
         setCameraReady(false);
         setCameraKey((k) => k + 1);
     }, [step, winW, winH]);
+
+    // Kick continuous autofocus. On iOS, expo-camera's `autofocus="on"`
+    // intermittently fails to engage on the *first* camera session, so the
+    // opening data-page still comes up soft and the only recovery the user has
+    // is to close and reopen (a fresh session where AF happens to work).
+    // Toggling the prop off→on forces the native layer to re-apply the focus
+    // mode: once as soon as the camera is ready, then on a short cadence while
+    // the user is still positioning, so a stuck focus self-heals in place. The
+    // in-flight guard avoids flipping to fixed focus during a still capture.
+    useEffect(() => {
+        if (step !== 'capture' || !cameraReady) return;
+        let cancelled = false;
+        const kick = () => {
+            if (cancelled || captureFinished.current || captureInFlight.current) return;
+            setAutofocus('off');
+            setTimeout(() => { if (!cancelled) setAutofocus('on'); }, 150);
+        };
+        kick();
+        const iv = setInterval(kick, 2000);
+        return () => { cancelled = true; clearInterval(iv); };
+    }, [step, cameraReady]);
 
     // Resolve the verifier's name + origin for the consent card (no attestation
     // yet — that is the dedicated enclave page after consent).
@@ -564,7 +589,7 @@ export default function KycCaptureScreen() {
                         ref={cameraRef}
                         style={styles.camera}
                         facing="back"
-                        autofocus="on"
+                        autofocus={autofocus}
                         active={step === 'capture'}
                         onCameraReady={() => {
                             console.log('[KYC] capture camera ready');

@@ -264,6 +264,13 @@ func main() {
 	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
 	mux.HandleFunc("GET /admin/roles", admin.HandleListRoles(db, cfg.AdminToken))
 
+	// Admin: app-scoped roles (privasys-platform:app:<uuid>:owner|admin).
+	// Callable by the management-service SA (AppRoleAdminRole), not just the
+	// static admin token — mgmt syncs per-app team roles here so enclaves can
+	// gate the configure surface from the caller's token alone.
+	mux.HandleFunc("POST /admin/app-roles", admin.HandleGrantAppRole(db, issuer, cfg.AdminToken))
+	mux.HandleFunc("DELETE /admin/app-roles", admin.HandleRevokeAppRole(db, issuer, cfg.AdminToken))
+
 	// Admin: service account management.
 	mux.HandleFunc("POST /admin/service-accounts", admin.HandleCreateServiceAccount(db, cfg.AdminToken))
 

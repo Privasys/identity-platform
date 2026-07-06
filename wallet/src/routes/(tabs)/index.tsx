@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/Themed';
 import { useSessionsStore, type RelaySession } from '@/stores/sessions';
 import { useTrustedAppsStore, type TrustedApp } from '@/stores/trusted-apps';
+import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 
 /** Threshold above which the search/filter box appears. */
 const SEARCH_THRESHOLD = 10;
@@ -64,6 +65,8 @@ export default function HomeScreen() {
     const { apps } = useTrustedAppsStore();
     const sessions = useSessionsStore((s) => s.sessions);
     const pruneExpired = useSessionsStore((s) => s.pruneExpired);
+    const pendingApprovals = useVaultApprovalsStore((s) => s.pending);
+    const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const [now, setNow] = useState(() => Date.now());
@@ -77,6 +80,14 @@ export default function HomeScreen() {
         }, 1000);
         return () => clearInterval(id);
     }, [pruneExpired]);
+
+    // Keep the pending-approvals banner live: fetch on mount and every 20s so
+    // the count reflects approvals that arrived (tray sweep) or expired.
+    useEffect(() => {
+        void refreshApprovals();
+        const id = setInterval(() => void refreshApprovals(), 20000);
+        return () => clearInterval(id);
+    }, [refreshApprovals]);
 
     const rows = useMemo(() => buildRows(apps, sessions, now), [apps, sessions, now]);
     const showSearch = rows.length > SEARCH_THRESHOLD;
@@ -102,6 +113,25 @@ export default function HomeScreen() {
 
             {/* Content */}
             <RNView style={styles.content}>
+                {pendingApprovals.length > 0 && (
+                    <Pressable
+                        style={styles.approvalsBanner}
+                        onPress={() => router.push('/vault-approvals')}
+                        accessibilityLabel={`${pendingApprovals.length} pending vault approval${pendingApprovals.length !== 1 ? 's' : ''}`}
+                    >
+                        <RNView style={styles.approvalsIcon}>
+                            <Ionicons name="key" size={18} color="#0F766E" />
+                        </RNView>
+                        <RNView style={styles.approvalsInfo}>
+                            <Text style={styles.approvalsTitle}>
+                                {pendingApprovals.length} pending approval
+                                {pendingApprovals.length !== 1 ? 's' : ''}
+                            </Text>
+                            <Text style={styles.approvalsMeta}>Tap to review and approve with your passkey</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color="#0F766E" />
+                    </Pressable>
+                )}
                 {rows.length === 0 ? (
                     <RNView style={styles.emptyState}>
                         <RNView style={styles.emptyIconContainer}>
@@ -257,6 +287,28 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.8)'
     },
     content: { flex: 1 },
+    approvalsBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginHorizontal: 20,
+        marginTop: 16,
+        backgroundColor: 'rgba(52, 232, 158, 0.12)',
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 14
+    },
+    approvalsIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(52, 232, 158, 0.22)',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    approvalsInfo: { flex: 1 },
+    approvalsTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+    approvalsMeta: { fontSize: 12, color: '#0F766E', marginTop: 2 },
     emptyState: {
         flex: 1,
         alignItems: 'center',

@@ -1,10 +1,11 @@
-﻿import * as Device from 'expo-device';
+import * as Device from 'expo-device';
 import { useRouter, type Router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { getPrivasysAccount } from '../services/privasys-id';
-import { registerPushTokenWithIdp, rememberVaultOp } from '../services/vault-approval-api';
+import { registerPushTokenWithIdp } from '../services/vault-approval-api';
+import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 
 let _notificationsSetup = false;
 
@@ -100,9 +101,10 @@ function authRequestPayload(data: Record<string, unknown>): string | null {
 function dispatchPush(data: Record<string, unknown>, router: Router): void {
     if (data?.type === 'vault-approval') {
         const vaultOp = String(data.vault_op ?? '');
-        // Remember the capability so the screen lists it even when the user
-        // reaches the screen another way (missed banner, foreground arrival).
-        rememberVaultOp(vaultOp);
+        // Remember the capability so the Home banner + the screen list it even
+        // when the user reaches the screen another way (missed banner,
+        // foreground arrival).
+        useVaultApprovalsStore.getState().remember(vaultOp);
         router.push({
             pathname: '/vault-approvals',
             params: { vault_op: vaultOp, source: 'push' },
@@ -112,6 +114,30 @@ function dispatchPush(data: Record<string, unknown>, router: Router): void {
     const payload = authRequestPayload(data);
     if (payload) {
         router.push({ pathname: '/connect', params: { payload, source: 'push' } });
+    }
+}
+
+/** Sweep the OS notification tray for vault-approval notifications and remember
+ *  their capabilities. This is what makes pending approvals visible when the
+ *  user just OPENS the wallet (app icon) after a push arrived while it was
+ *  backgrounded — without a tap there is no response event and no cold-start
+ *  record, so the capability would otherwise never reach the app. The
+ *  notification carries the vault_op in its data (see the IdP push payload);
+ *  server-side expiry + the store's refresh prune anything already dead. */
+async function sweepPresentedApprovals(): Promise<void> {
+    if (Platform.OS === 'web') return;
+    try {
+        const Notifications = await getNotifications();
+        const presented = await Notifications.getPresentedNotificationsAsync();
+        const store = useVaultApprovalsStore.getState();
+        for (const n of presented) {
+            const data = n.request.content.data as Record<string, unknown> | undefined;
+            if (data?.type === 'vault-approval' && data.vault_op) {
+                store.remember(String(data.vault_op));
+            }
+        }
+    } catch (e) {
+        console.warn('[notifications] sweep presented approvals failed', e);
     }
 }
 
@@ -261,6 +287,13 @@ async function setupListeners(router: Router): Promise<void> {
             | undefined;
         if (!data) return;
         dispatchPush(data, router);
+    });
+
+    // Surface pending approvals the user never tapped: sweep the tray now (app
+    // just came up) and again whenever it returns to the foreground.
+    void sweepPresentedApprovals();
+    AppState.addEventListener('change', (state) => {
+        if (state === 'active') void sweepPresentedApprovals();
     });
 }
 

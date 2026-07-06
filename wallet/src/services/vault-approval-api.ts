@@ -121,22 +121,7 @@ export async function registerPushTokenWithIdp(walletSessionToken: string, expoP
     }
 }
 
-// ── In-session pending register ─────────────────────────────────────────
-// Capabilities received via push this app session, so the Vault approvals
-// screen can show requests whose banner was missed. Deliberately in-memory:
-// pendings expire server-side in minutes, so persistence would only ever
-// surface dead entries.
-
-const knownVaultOps = new Set<string>();
-
-export function rememberVaultOp(vaultOp: string): void {
-    if (vaultOp) knownVaultOps.add(vaultOp);
-}
-
-export function forgetVaultOp(vaultOp: string): void {
-    knownVaultOps.delete(vaultOp);
-}
-
-export function knownVaultOpsList(): string[] {
-    return [...knownVaultOps];
-}
+// The set of capabilities seen this session — and the fetch/prune that turns
+// them into the live `pending` list — now lives in stores/vaultApprovals, so
+// the Home banner and the approvals screen share one reactive source. This
+// module stays the thin transport layer (fetch/approve/resolve/push-token).

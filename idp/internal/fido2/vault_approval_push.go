@@ -84,14 +84,29 @@ func (s *vaultPendingStore) listFor(sub string) []map[string]interface{} {
 		if e.sub != sub || now.After(e.expiresAt) {
 			continue
 		}
-		out = append(out, map[string]interface{}{
-			"vault_op":   vaultOp,
-			"options":    e.optionsJS,
-			"summary":    e.summary,
-			"expires_at": e.expiresAt.Unix(),
-		})
+		out = append(out, pendingJSON(vaultOp, e))
 	}
 	return out
+}
+
+// get returns the live pending approval for vaultOp, if any.
+func (s *vaultPendingStore) get(vaultOp string) (*vaultPendingEntry, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.pending[vaultOp]
+	if !ok || time.Now().After(e.expiresAt) {
+		return nil, false
+	}
+	return e, true
+}
+
+func pendingJSON(vaultOp string, e *vaultPendingEntry) map[string]interface{} {
+	return map[string]interface{}{
+		"vault_op":   vaultOp,
+		"options":    e.optionsJS,
+		"summary":    e.summary,
+		"expires_at": e.expiresAt.Unix(),
+	}
 }
 
 func (s *vaultPendingStore) cleanup() {
@@ -136,17 +151,17 @@ func sendVaultApprovalPush(pushToken, vaultOp string, summary vaultApprovalSumma
 	default:
 		body = "A vault operation needs your approval"
 	}
+	// Data carries only the routing type + the capability (vault_op). The wallet
+	// fetches the operation details from /pending?challenge= over TLS, so no
+	// operation/identity material transits third-party push infrastructure.
 	msg := []map[string]interface{}{{
 		"to":    pushToken,
 		"sound": "default",
 		"title": "Vault approval",
 		"body":  body,
 		"data": map[string]string{
-			"type":        "vault-approval",
-			"vault_op":    vaultOp,
-			"operation":   summary.Operation,
-			"handle":      summary.Handle,
-			"measurement": summary.Measurement,
+			"type":     "vault-approval",
+			"vault_op": vaultOp,
 		},
 	}}
 	payload, _ := json.Marshal(msg)
@@ -181,12 +196,31 @@ func shortHandle(handle string) string {
 	return "your app"
 }
 
-// VaultApprovalPending handles GET /fido2/vault-approval/pending — the wallet
-// lists its owner's live pending approvals (in case the push was missed) and
-// gets the WebAuthn options it needs to sign. Accepts either an owner JWT or a
-// wallet session (Authorization: Bearer wallet:<token>).
+// VaultApprovalPending handles GET /fido2/vault-approval/pending.
+//
+// Two access modes:
+//
+//   - ?challenge=<vault_op>: capability-based single fetch, no bearer. The
+//     vault_op is a 256-bit, short-TTL, single-use value delivered only via the
+//     owner-authenticated /begin (and its push); possessing it authorises
+//     VIEWING this one request. Approval still requires the WebAuthn assertion
+//     on /complete. This is how the wallet fetches the request: the wallet's
+//     identity for the platform RP is pairwise and unlinkable server-side (by
+//     design — the pairwise map lives only on the device), so no wallet bearer
+//     could list an owner's pendings.
+//
+//   - no challenge: owner-bearer list (the CLI/browser diagnostics path).
 func (h *Handler) VaultApprovalPending(iss *tokens.Issuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if vaultOp := r.URL.Query().Get("challenge"); vaultOp != "" {
+			e, ok := h.vaultPending.get(vaultOp)
+			if !ok {
+				errorJSON(w, http.StatusNotFound, "no pending approval for this challenge")
+				return
+			}
+			writeJSON(w, map[string]interface{}{"pending": []map[string]interface{}{pendingJSON(vaultOp, e)}})
+			return
+		}
 		sub, err := h.resolveSubject(r, iss)
 		if err != nil {
 			errorJSON(w, http.StatusUnauthorized, "unauthorized")

@@ -24,8 +24,11 @@ import {
     View as RNView,
     Alert,
     ActivityIndicator,
+    Platform,
     RefreshControl,
 } from 'react-native';
+
+import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text } from '@/components/Themed';
@@ -94,11 +97,23 @@ export default function VaultApprovalsScreen() {
                 );
                 return;
             }
-            const biometric = await LocalAuthentication.authenticateAsync({
-                promptMessage: 'Approve vault operation',
-                cancelLabel: 'Cancel',
-            });
-            if (!biometric.success) return;
+            // One fresh biometric for the whole approval. On iOS the
+            // operation-bound signature (approveVaultApproval → NativeKeys.sign)
+            // is itself Face ID-gated by the Secure Enclave, so a separate
+            // expo prompt here made it two; authenticating our own signing
+            // context instead lets that signature ride this same Face ID. On
+            // Android the hardware signature doesn't prompt again, so the OS
+            // biometric shown here is already the only one.
+            const approved =
+                Platform.OS === 'ios'
+                    ? await NativeKeys.authenticateForSigning('Approve vault operation')
+                    : (
+                          await LocalAuthentication.authenticateAsync({
+                              promptMessage: 'Approve vault operation',
+                              cancelLabel: 'Cancel',
+                          })
+                      ).success;
+            if (!approved) return;
 
             setApprovingOp(req.vault_op);
             try {

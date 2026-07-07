@@ -17,12 +17,14 @@ public class NativeKeysModule: Module {
     // prompts and the rest of the burst ride that authentication; once the
     // window lapses the next signature prompts afresh. Public-key reads never
     // use this context, so they never prompt.
-    private static let signingContext: LAContext = {
+    private static var signingContext = makeSigningContext()
+
+    private static func makeSigningContext() -> LAContext {
         let ctx = LAContext()
         ctx.touchIDAuthenticationAllowableReuseDuration =
             min(60, LATouchIDAuthenticationMaximumAllowableReuseDuration)
         return ctx
-    }()
+    }
 
     public func definition() -> ModuleDefinition {
         Name("NativeKeys")
@@ -104,6 +106,22 @@ public class NativeKeysModule: Module {
 
             let sigB64 = Self.base64urlEncode(signature)
             return "{\"signature\":\"\(sigB64)\"}"
+        }
+
+        // Force a fresh biometric bound to the signing context for a sensitive
+        // step-up (e.g. a vault approval). A brand-new context never silently
+        // reuses an earlier unlock, so this always prompts; binding the
+        // signature that immediately follows to the same context means that one
+        // prompt also authorises the operation-bound signature, instead of the
+        // caller showing its own biometric gate AND the Secure Enclave prompting
+        // again on the signature (two Face IDs). Resolves false on cancel or
+        // when biometry is unavailable.
+        AsyncFunction("authenticateForSigning") { (reason: String, promise: Promise) in
+            let ctx = Self.makeSigningContext()
+            Self.signingContext = ctx
+            ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, _ in
+                promise.resolve(success)
+            }
         }
 
         AsyncFunction("keyExists") { (keyId: String) -> Bool in

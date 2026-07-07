@@ -77,4 +77,20 @@ export async function getPublicKey(keyId: string): Promise<KeyInfo> {
     return JSON.parse(json);
 }
 
+/**
+ * iOS only. Force a fresh biometric bound to the signing context so that a
+ * hardware signature issued immediately afterwards rides the same
+ * authentication instead of prompting again. Use this for a sensitive step-up
+ * that needs exactly one, guaranteed-fresh, clearly-labelled biometric before a
+ * single signature (e.g. a vault approval). Returns `false` if the user cancels
+ * or biometry is unavailable.
+ *
+ * On Android the hardware signature does not present its own prompt, so callers
+ * should gate with the OS biometric directly rather than calling this.
+ */
+export async function authenticateForSigning(reason: string): Promise<boolean> {
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
+    return NativeKeys.authenticateForSigning(reason);
+}
+
 export type { KeyInfo, SignatureResult } from './NativeKeys.types.js';

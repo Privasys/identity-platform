@@ -89,6 +89,7 @@ export async function verify(
  * @param port  Enclave port number.
  * @param path  HTTP path (e.g. "/fido2/register/begin").
  * @param body  JSON request body string.
+ * @param headers  Optional extra request headers (e.g. the disclosure voucher).
  * @param caCertPath  Optional path to a CA PEM file on disk.
  * @returns Parsed response with status code and body.
  */
@@ -97,13 +98,16 @@ export async function post(
     port: number,
     path: string,
     body: string,
+    headers?: Record<string, string>,
     caCertPath?: string
 ): Promise<PostResult> {
     if (!NativeRaTls) throw new Error('NativeRaTls is not available on web');
     console.log(`[RA-TLS] post → ${host}:${port}${path} (${body.length} bytes)`);
+    const headersJson =
+        headers && Object.keys(headers).length > 0 ? JSON.stringify(headers) : null;
     let json: string;
     try {
-        json = await NativeRaTls.post(host, port, path, body, caCertPath ?? null);
+        json = await NativeRaTls.post(host, port, path, body, headersJson, caCertPath ?? null);
     } catch (e: any) {
         console.error(`[RA-TLS] post NATIVE THREW: ${e.message}`, e);
         throw e;

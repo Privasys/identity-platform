@@ -139,7 +139,7 @@ async function resolveRequestedAttributes(
                 // Gov claims are presented as enclave-signed, audience-bound
                 // disclosure tokens (commit-and-prove), never the raw value.
                 try {
-                    attrs[attr] = await discloseAttribute(payload.rpId, attr, payload.nonce ?? payload.sessionId);
+                    attrs[attr] = await discloseAttribute(payload.rpId, attr, payload.nonce ?? payload.sessionId, payload.disclosureVouchers);
                 } catch (e: any) {
                     // Never fall back to the raw gov value; omit on failure.
                     console.warn(`[CONNECT] disclosure for ${attr} failed: ${e?.message}`);
@@ -286,6 +286,11 @@ interface QRPayload {
      *  'any' = a provider/manual value is fine). Absent on IdPs that predate the
      *  identity scope — callers then fall back to the email+name heuristic. */
     attributeRequirements?: AttributeRequirements;
+    /** Paid-disclosure vouchers the IdP minted for the relying party, one per
+     *  provider, each authorising a set of marketplace attribute keys. The
+     *  wallet routes the matching voucher to the issuing enclave when disclosing
+     *  a gov attribute; absent for free/unbilled requests. */
+    disclosureVouchers?: import('@/services/kyc').DisclosureVoucher[];
     appName?: string;
     privacyPolicyUrl?: string;
     clientIP?: string;

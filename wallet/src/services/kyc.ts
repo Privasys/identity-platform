@@ -307,7 +307,7 @@ async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
     };
 }
 
-async function postToVerifier<T>(path: string, body: unknown): Promise<T> {
+async function postToVerifier<T>(path: string, body: unknown, voucher?: string): Promise<T> {
     const { origin } = await resolveVerifier();
     const url = new URL(`https://${origin}`);
     const host = url.hostname;
@@ -325,9 +325,13 @@ async function postToVerifier<T>(path: string, body: unknown): Promise<T> {
         const wia = await getValidWia();
         if (wia) finalBody = { ...(body as Record<string, unknown>), wia };
     }
+    // A paid disclosure carries the relying party's voucher on a header the
+    // enclave runtime verifies (and meters) before the verifier app sees the
+    // request. Free proofs (a self-audience check) carry none.
+    const headers = voucher ? { 'X-Privasys-Voucher': voucher } : undefined;
     let res: { status: number; body: string };
     try {
-        res = await NativeRaTls.post(host, port, path, JSON.stringify(finalBody));
+        res = await NativeRaTls.post(host, port, path, JSON.stringify(finalBody), headers);
     } catch (e: any) {
         // A frozen (unconfigured) verifier answers a large body (e.g. the selfie)
         // with a 503 but closes before draining the request, so the client sees a
@@ -590,7 +594,8 @@ async function requireRecord(): Promise<KycRecord> {
 export async function proveAgeOver(
     rpId: string,
     threshold: number,
-    nonce?: string
+    nonce?: string,
+    voucher?: string
 ): Promise<string> {
     const record = await requireRecord();
     const base = await buildSignedBase(record, rpId, nonce);
@@ -599,7 +604,7 @@ export async function proveAgeOver(
         birthdate: record.fields.birthdate,
         salt: record.salts.birthdate,
         threshold
-    });
+    }, voucher);
     return resp.token;
 }
 
@@ -607,7 +612,8 @@ export async function proveAgeOver(
 export async function proveAgeBand(
     rpId: string,
     bands?: number[],
-    nonce?: string
+    nonce?: string,
+    voucher?: string
 ): Promise<string> {
     const record = await requireRecord();
     const base = await buildSignedBase(record, rpId, nonce);
@@ -616,12 +622,17 @@ export async function proveAgeBand(
         birthdate: record.fields.birthdate,
         salt: record.salts.birthdate,
         ...(bands ? { bands } : {})
-    });
+    }, voucher);
     return resp.token;
 }
 
 /** prove_field: signed disclosure of one certified document field. */
-export async function proveField(rpId: string, field: string, nonce?: string): Promise<string> {
+export async function proveField(
+    rpId: string,
+    field: string,
+    nonce?: string,
+    voucher?: string
+): Promise<string> {
     const record = await requireRecord();
     const value = record.fields[field];
     const salt = record.salts[field];
@@ -634,33 +645,69 @@ export async function proveField(rpId: string, field: string, nonce?: string): P
         field,
         value,
         salt
-    });
+    }, voucher);
     return resp.token;
 }
 
 /** prove_document_valid: signed assertion that a genuine document was verified,
  *  disclosing no attribute. */
-export async function proveDocumentValid(rpId: string, nonce?: string): Promise<string> {
+export async function proveDocumentValid(
+    rpId: string,
+    nonce?: string,
+    voucher?: string
+): Promise<string> {
     const record = await requireRecord();
     const base = await buildSignedBase(record, rpId, nonce);
-    const resp = await postToVerifier<{ token: string }>('/prove/document-valid', base);
+    const resp = await postToVerifier<{ token: string }>('/prove/document-valid', base, voucher);
     return resp.token;
+}
+
+/** A paid-disclosure voucher the IdP minted for the relying party (from the
+ *  authorize/device payload's `disclosureVouchers`). `claims` lists the
+ *  marketplace attribute keys it authorises, e.g. `privasys:age_over_18`. */
+export interface DisclosureVoucher {
+    token: string;
+    provider_namespace?: string;
+    issuer_url?: string;
+    issuing_app_id?: string;
+    claims: string[];
+}
+
+/** The marketplace attribute key a requested gov attribute discloses as, in the
+ *  provider-namespaced form the voucher authorises (mirrors the verifier). */
+export function marketplaceKey(key: string): string {
+    return `privasys:${key}`;
+}
+
+/** Pick the voucher that authorises `key` (its `claims` cover the marketplace
+ *  key), or undefined when none was minted for it (a free/self-audience proof). */
+export function voucherForAttribute(
+    key: string,
+    vouchers?: DisclosureVoucher[]
+): string | undefined {
+    if (!vouchers?.length) return undefined;
+    const mk = marketplaceKey(key);
+    return vouchers.find((v) => v.claims?.includes(mk))?.token;
 }
 
 /**
  * Produce the right disclosure token for a requested gov-assurance attribute.
  * `age_over_N` → prove_age_over; `age_band` → prove_age_band; any certified
- * field (birthdate, nationality, given_name, family_name) → prove_field.
+ * field (birthdate, nationality, given_name, family_name) → prove_field. When
+ * the relying party's `disclosureVouchers` cover the attribute, the matching
+ * voucher rides the request so the enclave meters the paid disclosure.
  */
 export async function discloseAttribute(
     rpId: string,
     key: string,
-    nonce?: string
+    nonce?: string,
+    vouchers?: DisclosureVoucher[]
 ): Promise<string> {
+    const voucher = voucherForAttribute(key, vouchers);
     const ageOver = /^age_over_(\d+)$/.exec(key);
-    if (ageOver) return proveAgeOver(rpId, Number(ageOver[1]), nonce);
-    if (key === 'age_band') return proveAgeBand(rpId, undefined, nonce);
-    return proveField(rpId, key, nonce);
+    if (ageOver) return proveAgeOver(rpId, Number(ageOver[1]), nonce, voucher);
+    if (key === 'age_band') return proveAgeBand(rpId, undefined, nonce, voucher);
+    return proveField(rpId, key, nonce, voucher);
 }
 
 // ── Sealed persistence ──────────────────────────────────────────────────────

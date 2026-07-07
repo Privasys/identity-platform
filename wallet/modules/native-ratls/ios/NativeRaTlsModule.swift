@@ -60,18 +60,26 @@ public class NativeRaTlsModule: Module {
             }
         }
 
-        AsyncFunction("post") { (host: String, port: Int, path: String, body: String, caCertPath: String?) -> String in
+        AsyncFunction("post") { (host: String, port: Int, path: String, body: String, headersJson: String?, caCertPath: String?) -> String in
             return await withCheckedContinuation { continuation in
                 DispatchQueue.global(qos: .userInitiated).async {
                     let result = host.withCString { hostPtr in
                         path.withCString { pathPtr in
                             body.withCString { bodyPtr in
-                                if let caPath = caCertPath {
-                                    return caPath.withCString { caPtr in
-                                        ratls_post(hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr)
+                                // Resolve the optional CA path and headers-JSON to
+                                // C pointers (or NULL) before the single FFI call.
+                                func call(_ caPtr: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>? {
+                                    if let headersJson {
+                                        return headersJson.withCString { hPtr in
+                                            ratls_post(hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr, hPtr)
+                                        }
                                     }
+                                    return ratls_post(hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr, nil)
+                                }
+                                if let caPath = caCertPath {
+                                    return caPath.withCString { caPtr in call(caPtr) }
                                 } else {
-                                    return ratls_post(hostPtr, UInt16(port), nil, pathPtr, bodyPtr)
+                                    return call(nil)
                                 }
                             }
                         }

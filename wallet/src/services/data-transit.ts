@@ -113,6 +113,7 @@ export async function deliverDirect(
             options.port,
             options.path,
             payload,
+            undefined,
             options.caCertPath
         );
 

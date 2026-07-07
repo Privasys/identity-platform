@@ -37,6 +37,19 @@ type Config struct {
 	AzureClientID     string
 	AzureClientSecret string
 	MailSender        string // Sender email address (default: no-reply@privasys.org)
+
+	// Wallet Instance Attestation (WIA). The IdP, as wallet provider, attests
+	// the wallet's hardware holder key and issues a short-lived WIA JWT the
+	// verifier enclave requires. See attribute-billing-plan §3.
+	WIASigningKeyPath   string // wallet-provider signing key PEM (distinct from the OIDC key)
+	WIAAttestationMode  string // "soft" (default) | "strict"
+	WIATTLHours         int    // WIA lifetime in hours (24–72)
+	AppleTeamID         string
+	AppleBundleID       string
+	AppleAppAttestRoot  string // Apple App Attest Root CA (PEM or path); required for strict iOS
+	AndroidPackage      string
+	AndroidAttestRoot   string // Google hardware-attestation root (PEM or path); required for strict android
+	AndroidAllowTEE     bool   // when false, require StrongBox (reject plain TEE)
 }
 
 // ListenAddr returns the formatted listen address.
@@ -83,7 +96,33 @@ func Load() *Config {
 		AzureClientID:     envStr("IDP_AZURE_CLIENT_ID", ""),
 		AzureClientSecret: envStr("IDP_AZURE_CLIENT_SECRET", ""),
 		MailSender:        envStr("IDP_MAIL_SENDER", "no-reply@privasys.org"),
+
+		WIASigningKeyPath:  envStr("IDP_WIA_SIGNING_KEY_FILE", "/data/wia-signing-key.pem"),
+		WIAAttestationMode: envStr("IDP_WIA_ATTESTATION_MODE", "soft"),
+		WIATTLHours:        envInt("IDP_WIA_TTL_HOURS", 48),
+		AppleTeamID:        envStr("IDP_APPLE_TEAM_ID", ""),
+		AppleBundleID:      envStr("IDP_APPLE_BUNDLE_ID", ""),
+		AppleAppAttestRoot: envPEM("IDP_APPLE_APPATTEST_ROOT"),
+		AndroidPackage:     envStr("IDP_ANDROID_PACKAGE", ""),
+		AndroidAttestRoot:  envPEM("IDP_ANDROID_ATTEST_ROOT"),
+		AndroidAllowTEE:    envStr("IDP_WIA_ANDROID_ALLOW_TEE", "true") == "true",
 	}
+}
+
+// envPEM reads a PEM trust root from an env var that is either an inline PEM
+// block or a path to a PEM file. Empty when unset.
+func envPEM(key string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		return ""
+	}
+	if strings.Contains(v, "-----BEGIN") {
+		return v
+	}
+	if data, err := os.ReadFile(v); err == nil {
+		return string(data)
+	}
+	return v
 }
 
 func envStr(key, defaultVal string) string {

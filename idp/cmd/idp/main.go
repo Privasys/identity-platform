@@ -46,6 +46,7 @@ import (
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
 	"github.com/Privasys/idp/internal/vault"
+	"github.com/Privasys/idp/internal/wia"
 )
 
 func main() {
@@ -63,6 +64,15 @@ func main() {
 	issuer, err := tokens.NewIssuer(cfg.SigningKeyPath, cfg.IssuerURL)
 	if err != nil {
 		log.Fatalf("failed to create token issuer: %v", err)
+	}
+
+	// Wallet-provider signing key — a DISTINCT key that signs Wallet Instance
+	// Attestations, verified via /wallet-provider/jwks (provisioned into the
+	// verifier enclave like the CSCA anchors). Kept separate from the OIDC key so
+	// WIA lifetime/rotation is independent. See attribute-billing-plan §3.
+	walletIssuer, err := tokens.NewIssuer(cfg.WIASigningKeyPath, cfg.IssuerURL+"/wallet-provider")
+	if err != nil {
+		log.Fatalf("failed to create wallet-provider issuer: %v", err)
 	}
 
 	// Client registry.
@@ -109,6 +119,24 @@ func main() {
 	}
 	sessionsStore.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 
+	// Wallet Instance Attestation: attest the wallet's hardware holder key
+	// (Android Keystore key attestation / iOS App Attest) and issue a
+	// holder-bound WIA the verifier enclave requires for free identity checks.
+	wiaHandler := wia.New(wia.Config{
+		Issuer:   walletIssuer,
+		Resolver: fido2Handler.WalletSessionResolver(),
+		Policy: wia.AttestPolicy{
+			Mode:            cfg.WIAAttestationMode,
+			AppleTeamID:     cfg.AppleTeamID,
+			AppleBundleID:   cfg.AppleBundleID,
+			AppleRootPEM:    cfg.AppleAppAttestRoot,
+			AndroidPackage:  cfg.AndroidPackage,
+			AndroidRootPEM:  cfg.AndroidAttestRoot,
+			AndroidAllowTEE: cfg.AndroidAllowTEE,
+		},
+		TTL: time.Duration(cfg.WIATTLHours) * time.Hour,
+	})
+
 	mux := http.NewServeMux()
 
 	// OIDC discovery (OpenID Connect + RFC 8414).
@@ -147,6 +175,12 @@ func main() {
 	mux.HandleFunc("PUT /sessions/{sid}/encauth", sessionsStore.HandlePutEncAuth(issuer))
 	mux.HandleFunc("GET /sessions/{sid}/encauth", sessionsStore.HandleGetEncAuth(issuer))
 	mux.HandleFunc("POST /sessions/encauth", sessionsStore.HandlePostEncAuth(issuer))
+
+	// Wallet Instance Attestation: the wallet-provider JWKS (verifiers fetch it /
+	// have it provisioned), a fresh challenge, and enrolment → a holder-bound WIA.
+	mux.HandleFunc("GET /wallet-provider/jwks", wiaHandler.HandleJWKS)
+	mux.HandleFunc("POST /wia/challenge", wiaHandler.HandleChallenge)
+	mux.HandleFunc("POST /wia/enrol", wiaHandler.HandleEnrol)
 
 	// UserInfo endpoint.
 	mux.HandleFunc("GET /userinfo", oidc.HandleUserInfo(issuer, db))

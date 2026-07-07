@@ -20,18 +20,28 @@
  * real eMRTD chip data here without changing this interface.
  */
 
-import { bytesToBase64url as b64uBytes, base64urlToBytes as b64uToBytes, canonicalJson } from '@/utils/encoding';
 import * as Crypto from 'expo-crypto';
 
-import * as SecureStore from '@/utils/storage';
 import { getAttestationServerToken } from '@/services/app-attest';
-import { inspectAttestation, verifyAttestation, type AttestationResult } from '@/services/attestation';
+import {
+    inspectAttestation,
+    verifyAttestation,
+    type AttestationResult
+} from '@/services/attestation';
 import { attributeLabel, setProfileValue } from '@/services/attributes';
 import { deriveAppSub } from '@/services/did';
 import { derToRawEcdsa } from '@/services/encauth';
 import { useProfileStore, type ProfileAttribute, type VerificationRecord } from '@/stores/profile';
+import {
+    bytesToBase64url as b64uBytes,
+    base64urlToBytes as b64uToBytes,
+    canonicalJson
+} from '@/utils/encoding';
+import * as SecureStore from '@/utils/storage';
+
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
+import { ensureWia, getValidWia } from './wia';
 
 /** Hardware-bound holder key; the IVR binds to it and prove_* requests are
  *  signed by it. Same key the wallet uses for its DID / FIDO2 signing. */
@@ -65,7 +75,8 @@ const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.3.2';
  *  to the live test deployment's image digest (OID 3.2) so the fallback attests the
  *  current enclave when the resolve API is unreachable. */
 const FALLBACK_VERIFIER_ORIGIN =
-    process.env.EXPO_PUBLIC_KYC_VERIFIER_ORIGIN ?? 'container-app-identity-verifier.apps-test.privasys.org';
+    process.env.EXPO_PUBLIC_KYC_VERIFIER_ORIGIN ??
+    'container-app-identity-verifier.apps-test.privasys.org';
 const FALLBACK_VERIFIER_IMAGE_DIGEST =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_DIGEST ??
     'aa922a94d6f8ef6765c2e930ae31bf63025c69958da6bfbe078d221bde1fa01f';
@@ -95,15 +106,19 @@ async function resolveVerifier(): Promise<ResolvedVerifier> {
     if (resolvedVerifier) return resolvedVerifier;
     try {
         const res = await fetch(
-            `${PLATFORM_API_BASE}/api/v1/apps/by-name/${encodeURIComponent(VERIFIER_APP_NAME)}/resolve`,
+            `${PLATFORM_API_BASE}/api/v1/apps/by-name/${encodeURIComponent(VERIFIER_APP_NAME)}/resolve`
         );
         if (res.ok) {
-            const j = (await res.json()) as { hostname?: string; image_oid?: string; image_digest?: string };
+            const j = (await res.json()) as {
+                hostname?: string;
+                image_oid?: string;
+                image_digest?: string;
+            };
             if (j.hostname && j.image_digest) {
                 resolvedVerifier = {
                     origin: j.hostname,
                     imageOid: j.image_oid || VERIFIER_IMAGE_OID,
-                    imageDigest: j.image_digest.toLowerCase(),
+                    imageDigest: j.image_digest.toLowerCase()
                 };
                 return resolvedVerifier;
             }
@@ -114,7 +129,7 @@ async function resolveVerifier(): Promise<ResolvedVerifier> {
     resolvedVerifier = {
         origin: FALLBACK_VERIFIER_ORIGIN,
         imageOid: VERIFIER_IMAGE_OID,
-        imageDigest: FALLBACK_VERIFIER_IMAGE_DIGEST,
+        imageDigest: FALLBACK_VERIFIER_IMAGE_DIGEST
     };
     return resolvedVerifier;
 }
@@ -124,9 +139,17 @@ async function resolveVerifier(): Promise<ResolvedVerifier> {
  *  carry 'gov' assurance — the set the wallet can present for, e.g., a one-tap
  *  flight check-in. Keys match the enclave's parse_dg1 output. */
 const DOCUMENT_ATTRIBUTE_KEYS = [
-    'given_name', 'family_name', 'birthdate', 'nationality',
-    'document_number', 'document_type', 'sex', 'issuing_state', 'doc_expiry',
-    'place_of_birth', 'personal_number',
+    'given_name',
+    'family_name',
+    'birthdate',
+    'nationality',
+    'document_number',
+    'document_type',
+    'sex',
+    'issuing_state',
+    'doc_expiry',
+    'place_of_birth',
+    'personal_number'
 ] as const;
 /** Age thresholds derived locally from the gov-verified birth date. */
 const AGE_THRESHOLDS = [18, 21] as const;
@@ -162,8 +185,8 @@ export interface VerifyIdentityResult {
 /** BAC/PACE access-key fields, MRZ form (dates YYMMDD), from the enclave OCR. */
 export interface DocMrzFields {
     documentNumber: string;
-    dateOfBirth: string;   // YYMMDD (MRZ form) — the eMRTD chip key shape
-    dateOfExpiry: string;  // YYMMDD
+    dateOfBirth: string; // YYMMDD (MRZ form) — the eMRTD chip key shape
+    dateOfExpiry: string; // YYMMDD
     isScreenshot?: boolean | null;
 }
 
@@ -188,7 +211,7 @@ export async function readDocumentMrz(docImageBase64: string): Promise<DocMrzFie
         documentNumber: resp.document_number,
         dateOfBirth: resp.date_of_birth,
         dateOfExpiry: resp.date_of_expiry,
-        isScreenshot: resp.is_screenshot,
+        isScreenshot: resp.is_screenshot
     };
 }
 
@@ -227,17 +250,21 @@ export async function attestVerifier(): Promise<VerifierAttestation> {
 
     const oid = inspected.custom_oids?.find((o) => o.oid === v.imageOid);
     if (!oid) {
-        throw new Error('verifier attestation is missing the identity image OID — refusing to send identity data');
+        throw new Error(
+            'verifier attestation is missing the identity image OID — refusing to send identity data'
+        );
     }
     if (oid.value_hex.toLowerCase() !== v.imageDigest.toLowerCase()) {
-        throw new Error('verifier image digest does not match the expected published build — refusing to proceed');
+        throw new Error(
+            'verifier image digest does not match the expected published build — refusing to proceed'
+        );
     }
 
     const asToken = await getAttestationServerToken();
     const verified = await verifyAttestation(v.origin, {
         tee: inspected.tee_type ?? 'tdx',
         attestation_server: ATTESTATION_SERVER,
-        attestation_server_token: asToken,
+        attestation_server_token: asToken
     });
     if (!verified.valid) {
         throw new Error('verifier attestation did not verify against the attestation server');
@@ -251,7 +278,8 @@ export async function attestVerifier(): Promise<VerifierAttestation> {
         mrtd: verified.mrtd ?? inspected.mrtd,
         mrenclave: verified.mrenclave ?? inspected.mrenclave,
         workload_image_ref: verified.workload_image_ref ?? inspected.workload_image_ref,
-        quote_verification_status: verified.quote_verification_status ?? inspected.quote_verification_status,
+        quote_verification_status:
+            verified.quote_verification_status ?? inspected.quote_verification_status
     };
     return { origin: v.origin, displayName: VERIFIER_DISPLAY, attestation };
 }
@@ -275,7 +303,7 @@ async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
     const { attestation } = await attestVerifier();
     return {
         measurement: attestation.mrtd ?? attestation.mrenclave ?? '',
-        imageRef: attestation.workload_image_ref,
+        imageRef: attestation.workload_image_ref
     };
 }
 
@@ -284,9 +312,22 @@ async function postToVerifier<T>(path: string, body: unknown): Promise<T> {
     const url = new URL(`https://${origin}`);
     const host = url.hostname;
     const port = parseInt(url.port || '443', 10);
+    // Attach the (cached, non-prompting) Wallet Instance Attestation to the
+    // WIA-gated endpoints so the enclave can prove this is our wallet before
+    // doing free identity work. Omitted when none is cached — the enclave gate
+    // is fail-open during rollout (IDENTITY_VERIFIER_REQUIRE_WIA).
+    let finalBody = body;
+    if (
+        (path === '/verify-identity' || path.startsWith('/prove/')) &&
+        body &&
+        typeof body === 'object'
+    ) {
+        const wia = await getValidWia();
+        if (wia) finalBody = { ...(body as Record<string, unknown>), wia };
+    }
     let res: { status: number; body: string };
     try {
-        res = await NativeRaTls.post(host, port, path, JSON.stringify(body));
+        res = await NativeRaTls.post(host, port, path, JSON.stringify(finalBody));
     } catch (e: any) {
         // A frozen (unconfigured) verifier answers a large body (e.g. the selfie)
         // with a 503 but closes before draining the request, so the client sees a
@@ -294,12 +335,16 @@ async function postToVerifier<T>(path: string, body: unknown): Promise<T> {
         // actionable message instead of a raw socket error.
         const msg = String(e?.message ?? e);
         if (/broken pipe|connection reset|connection closed|os error 32|reset by peer/i.test(msg)) {
-            throw new Error('The identity verifier is unavailable or awaiting configuration (trust anchors). Try again shortly.');
+            throw new Error(
+                'The identity verifier is unavailable or awaiting configuration (trust anchors). Try again shortly.'
+            );
         }
         throw e;
     }
     if (res.status === 503) {
-        throw new Error('The identity verifier is not yet configured (trust anchors pending). Try again shortly.');
+        throw new Error(
+            'The identity verifier is not yet configured (trust anchors pending). Try again shortly.'
+        );
     }
     if (res.status < 200 || res.status >= 300) {
         throw new Error(`Identity verifier returned HTTP ${res.status}: ${res.body.slice(0, 200)}`);
@@ -329,33 +374,41 @@ export async function verifyIdentity(
          *  enclave re-verifies it against DG15 to prove the chip is not a clone. */
         aa?: { challenge: string; signature: string; passed?: boolean };
     },
-    opts: { liveImageBase64?: string; docImage?: string } = {},
+    opts: { liveImageBase64?: string; docImage?: string } = {}
 ): Promise<VerifyIdentityResult> {
     const enclave = await verifyVerifierEnclave();
     const holderPub = await getHolderPublicKey();
 
-    const resp = await postToVerifier<{ ivr: string; salts: Record<string, string>; fields: Record<string, string> }>(
-        '/verify-identity',
-        {
-            holder_pub: holderPub,
-            fields: doc.fields,
-            // The enclave certifies from the raw chip bytes (SOD + DGs); it runs
-            // Passive Authentication against the configured CSCA trust anchors and
-            // the DG2↔selfie face match in-enclave. `fields` is only a convenience.
-            ...(doc.sod ? { sod: doc.sod } : {}),
-            ...(doc.dataGroups ? { data_groups: doc.dataGroups } : {}),
-            // Active Authentication (anti-clone): forward the chip's signature over
-            // its per-read challenge. The enclave requires this when DG15 is
-            // present (in data_groups) and re-verifies it against the chip's key.
-            ...(doc.aa ? { aa: { challenge: doc.aa.challenge, signature: doc.aa.signature } } : {}),
-            ...(opts.liveImageBase64 ? { live_image: opts.liveImageBase64 } : {}),
-            // Data-page image → the enclave runs the heavy OCR (VIZ + MRZ) and
-            // cross-references it against the chip to detect a tampered document
-            // (GPG45 box 3), keeping the wallet thin. The enclave treats the chip
-            // as authoritative; box 3 is skipped if no image is sent.
-            ...(opts.docImage ? { doc_image: opts.docImage } : {}),
-        },
-    );
+    // Enrol (or refresh) the Wallet Instance Attestation now — inside the KYC
+    // flow, where a biometric is expected — so it is cached for this request and
+    // the follow-up prove_* derivations. Best-effort: a failure leaves the wallet
+    // WIA-less and verification proceeds (the enclave gate is fail-open until the
+    // fleet enforces it).
+    await ensureWia().catch(() => undefined);
+
+    const resp = await postToVerifier<{
+        ivr: string;
+        salts: Record<string, string>;
+        fields: Record<string, string>;
+    }>('/verify-identity', {
+        holder_pub: holderPub,
+        fields: doc.fields,
+        // The enclave certifies from the raw chip bytes (SOD + DGs); it runs
+        // Passive Authentication against the configured CSCA trust anchors and
+        // the DG2↔selfie face match in-enclave. `fields` is only a convenience.
+        ...(doc.sod ? { sod: doc.sod } : {}),
+        ...(doc.dataGroups ? { data_groups: doc.dataGroups } : {}),
+        // Active Authentication (anti-clone): forward the chip's signature over
+        // its per-read challenge. The enclave requires this when DG15 is
+        // present (in data_groups) and re-verifies it against the chip's key.
+        ...(doc.aa ? { aa: { challenge: doc.aa.challenge, signature: doc.aa.signature } } : {}),
+        ...(opts.liveImageBase64 ? { live_image: opts.liveImageBase64 } : {}),
+        // Data-page image → the enclave runs the heavy OCR (VIZ + MRZ) and
+        // cross-references it against the chip to detect a tampered document
+        // (GPG45 box 3), keeping the wallet thin. The enclave treats the chip
+        // as authoritative; box 3 is skipped if no image is sent.
+        ...(opts.docImage ? { doc_image: opts.docImage } : {})
+    });
 
     const jti = decodeJwtId(resp.ivr);
     const record: KycRecord = {
@@ -365,7 +418,7 @@ export async function verifyIdentity(
         fields: resp.fields ?? doc.fields,
         measurement: enclave.measurement,
         imageRef: enclave.imageRef,
-        verifiedAt: Math.floor(Date.now() / 1000),
+        verifiedAt: Math.floor(Date.now() / 1000)
     };
     await saveKycRecord(record);
 
@@ -378,7 +431,7 @@ export async function verifyIdentity(
 // the ID name (see kyc-capture). Other fields store under their own key.
 const GOV_STORE_KEY: Record<string, string> = {
     given_name: 'given_name_id',
-    family_name: 'family_name_id',
+    family_name: 'family_name_id'
 };
 
 function govRecord(record: KycRecord, evidence: string): VerificationRecord {
@@ -388,7 +441,7 @@ function govRecord(record: KycRecord, evidence: string): VerificationRecord {
         method: 'kyc_enclave',
         assurance: 'gov',
         verifiedAt: record.verifiedAt,
-        evidence,
+        evidence
     };
 }
 
@@ -403,7 +456,10 @@ function portraitDataUri(b64: string): string {
  * flow). Includes age_over_N booleans derived from the certified DOB and, when
  * supplied, the ID portrait as `picture_id` (Photo (ID)).
  */
-export function govAttributeCandidates(record: KycRecord, portraitBase64?: string): ProfileAttribute[] {
+export function govAttributeCandidates(
+    record: KycRecord,
+    portraitBase64?: string
+): ProfileAttribute[] {
     const out: ProfileAttribute[] = [];
     const push = (key: string, value: string) =>
         out.push({ key, label: attributeLabel(key), value, source: 'document', verified: true });
@@ -416,7 +472,8 @@ export function govAttributeCandidates(record: KycRecord, portraitBase64?: strin
     const birthdate = record.fields.birthdate;
     if (birthdate) {
         const age = ageFromBirthdate(birthdate);
-        if (age != null) for (const t of AGE_THRESHOLDS) push(`age_over_${t}`, age >= t ? 'true' : 'false');
+        if (age != null)
+            for (const t of AGE_THRESHOLDS) push(`age_over_${t}`, age >= t ? 'true' : 'false');
     }
     if (portraitBase64) push('picture_id', portraitDataUri(portraitBase64));
     return out;
@@ -426,7 +483,7 @@ export function govAttributeCandidates(record: KycRecord, portraitBase64?: strin
 export function applyGovAttributes(
     record: KycRecord,
     selected: Set<string>,
-    portraitBase64?: string,
+    portraitBase64?: string
 ): string[] {
     const store = useProfileStore.getState();
     const filled: string[] = [];
@@ -437,7 +494,7 @@ export function applyGovAttributes(
             : `ivr:${record.jti}`;
         setProfileValue(store, attr.key, attr.value, 'document', {
             verified: true,
-            verifications: [govRecord(record, evidence)],
+            verifications: [govRecord(record, evidence)]
         });
         filled.push(attr.key);
     }
@@ -487,7 +544,12 @@ interface SignedBase {
 
 /** Holder-sign canonical_json({ivr,nonce,rp_id,ts}) with the hardware key,
  *  returning base64url(64-byte raw R‖S) as the verifier expects. */
-async function holderSignature(jti: string, rpId: string, nonce: string, ts: number): Promise<string> {
+async function holderSignature(
+    jti: string,
+    rpId: string,
+    nonce: string,
+    ts: number
+): Promise<string> {
     const msg = new TextEncoder().encode(canonicalJson({ ivr: jti, nonce, rp_id: rpId, ts }));
     const { signature } = await NativeKeys.sign(HOLDER_KEY_ID, b64uBytes(msg));
     const raw = derToRawEcdsa(b64uToBytes(signature));
@@ -495,7 +557,11 @@ async function holderSignature(jti: string, rpId: string, nonce: string, ts: num
     return b64uBytes(raw);
 }
 
-async function buildSignedBase(record: KycRecord, rpId: string, nonce?: string): Promise<SignedBase> {
+async function buildSignedBase(
+    record: KycRecord,
+    rpId: string,
+    nonce?: string
+): Promise<SignedBase> {
     const profile = useProfileStore.getState().profile;
     if (!profile?.pairwiseSeed) throw new Error('Profile is not initialised');
     const sub = await deriveAppSub(profile.pairwiseSeed, rpId);
@@ -503,7 +569,15 @@ async function buildSignedBase(record: KycRecord, rpId: string, nonce?: string):
     const ts = Math.floor(Date.now() / 1000);
     const holderPub = await getHolderPublicKey();
     const holderSig = await holderSignature(record.jti, rpId, n, ts);
-    return { ivr: record.ivr, sub, rp_id: rpId, nonce: n, ts, holder_pub: holderPub, holder_sig: holderSig };
+    return {
+        ivr: record.ivr,
+        sub,
+        rp_id: rpId,
+        nonce: n,
+        ts,
+        holder_pub: holderPub,
+        holder_sig: holderSig
+    };
 }
 
 async function requireRecord(): Promise<KycRecord> {
@@ -513,27 +587,35 @@ async function requireRecord(): Promise<KycRecord> {
 }
 
 /** prove_age_over: signed "age_over_N = yes/no" without revealing the birth date. */
-export async function proveAgeOver(rpId: string, threshold: number, nonce?: string): Promise<string> {
+export async function proveAgeOver(
+    rpId: string,
+    threshold: number,
+    nonce?: string
+): Promise<string> {
     const record = await requireRecord();
     const base = await buildSignedBase(record, rpId, nonce);
     const resp = await postToVerifier<{ token: string }>('/prove/age-over', {
         ...base,
         birthdate: record.fields.birthdate,
         salt: record.salts.birthdate,
-        threshold,
+        threshold
     });
     return resp.token;
 }
 
 /** prove_age_band: signed age band (e.g. "18-20") instead of a threshold. */
-export async function proveAgeBand(rpId: string, bands?: number[], nonce?: string): Promise<string> {
+export async function proveAgeBand(
+    rpId: string,
+    bands?: number[],
+    nonce?: string
+): Promise<string> {
     const record = await requireRecord();
     const base = await buildSignedBase(record, rpId, nonce);
     const resp = await postToVerifier<{ token: string }>('/prove/age-band', {
         ...base,
         birthdate: record.fields.birthdate,
         salt: record.salts.birthdate,
-        ...(bands ? { bands } : {}),
+        ...(bands ? { bands } : {})
     });
     return resp.token;
 }
@@ -547,7 +629,12 @@ export async function proveField(rpId: string, field: string, nonce?: string): P
         throw new Error(`No verified value for "${field}" in the identity receipt.`);
     }
     const base = await buildSignedBase(record, rpId, nonce);
-    const resp = await postToVerifier<{ token: string }>('/prove/field', { ...base, field, value, salt });
+    const resp = await postToVerifier<{ token: string }>('/prove/field', {
+        ...base,
+        field,
+        value,
+        salt
+    });
     return resp.token;
 }
 
@@ -565,7 +652,11 @@ export async function proveDocumentValid(rpId: string, nonce?: string): Promise<
  * `age_over_N` → prove_age_over; `age_band` → prove_age_band; any certified
  * field (birthdate, nationality, given_name, family_name) → prove_field.
  */
-export async function discloseAttribute(rpId: string, key: string, nonce?: string): Promise<string> {
+export async function discloseAttribute(
+    rpId: string,
+    key: string,
+    nonce?: string
+): Promise<string> {
     const ageOver = /^age_over_(\d+)$/.exec(key);
     if (ageOver) return proveAgeOver(rpId, Number(ageOver[1]), nonce);
     if (key === 'age_band') return proveAgeBand(rpId, undefined, nonce);

@@ -263,6 +263,66 @@ func (iss *Issuer) IssueKeyCreationGrant(g KeyCreationGrant) (string, error) {
 	return iss.sign(c)
 }
 
+// WIAClaims are the claims of a Wallet Instance Attestation (WIA). The WIA
+// identifies a wallet INSTANCE, never an account (§3.3 of attribute-billing):
+// `cnf.jwk` is the attested, pairwise-neutral hardware holder key and there is
+// no `sub`. A verifier requires a valid WIA (and cnf.jwk == holder_pub) before
+// issuing an IVR or a disclosure, so free identity verification is wallet-only
+// by construction.
+type WIAClaims struct {
+	HolderJWK     map[string]interface{} // cnf.jwk — the attested hardware holder key
+	Level         string                 // attested security level (strongbox|tee|app-attest)
+	Platform      string                 // ios | android
+	WalletVersion string
+	TTL           time.Duration
+}
+
+// IssueWIA signs a Wallet Instance Attestation with the wallet-provider key
+// (typ = "wia+jwt"). Verifiers resolve the signing key via the wallet-provider
+// JWKS provisioned into them (like the CSCA anchors) and check cnf.jwk against
+// the holder key presented on the request.
+func (iss *Issuer) IssueWIA(c WIAClaims) (string, error) {
+	now := time.Now()
+	ttl := c.TTL
+	if ttl <= 0 {
+		ttl = 48 * time.Hour
+	}
+	claims := jwt.MapClaims{
+		"iss": iss.issuerURL,
+		"iat": now.Unix(),
+		"exp": now.Add(ttl).Unix(),
+		"cnf": map[string]interface{}{"jwk": c.HolderJWK},
+	}
+	if c.Level != "" {
+		claims["level"] = c.Level
+	}
+	if c.Platform != "" {
+		claims["platform"] = c.Platform
+	}
+	if c.WalletVersion != "" {
+		claims["wallet_version"] = c.WalletVersion
+	}
+	return iss.signTyp(claims, "wia+jwt")
+}
+
+// ECPublicJWK renders a P-256 public key as a minimal EC public JWK
+// (kty/crv/x/y with fixed 32-byte coordinates) — the exact `cnf.jwk` shape the
+// verifier compares against the holder key it is handed.
+func ECPublicJWK(pub *ecdsa.PublicKey) map[string]interface{} {
+	xBytes := pub.X.Bytes()
+	yBytes := pub.Y.Bytes()
+	x := make([]byte, 32)
+	y := make([]byte, 32)
+	copy(x[32-len(xBytes):], xBytes)
+	copy(y[32-len(yBytes):], yBytes)
+	return map[string]interface{}{
+		"kty": "EC",
+		"crv": "P-256",
+		"x":   base64.RawURLEncoding.EncodeToString(x),
+		"y":   base64.RawURLEncoding.EncodeToString(y),
+	}
+}
+
 // VerifyAccessToken parses and validates a JWT signed by this issuer.
 func (iss *Issuer) VerifyAccessToken(tokenStr string) (map[string]interface{}, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
@@ -317,6 +377,16 @@ func VerifyServiceAccountJWT(tokenStr string, publicKeyPEM string, expectedAudie
 func (iss *Issuer) sign(claims map[string]interface{}) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims(claims))
 	token.Header["kid"] = iss.keyID
+	return token.SignedString(iss.privateKey)
+}
+
+// signTyp is sign with an explicit JOSE `typ` header (e.g. "wia+jwt").
+func (iss *Issuer) signTyp(claims map[string]interface{}, typ string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims(claims))
+	token.Header["kid"] = iss.keyID
+	if typ != "" {
+		token.Header["typ"] = typ
+	}
 	return token.SignedString(iss.privateKey)
 }
 

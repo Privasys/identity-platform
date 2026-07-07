@@ -41,15 +41,21 @@ type Config struct {
 	// Wallet Instance Attestation (WIA). The IdP, as wallet provider, attests
 	// the wallet's hardware holder key and issues a short-lived WIA JWT the
 	// verifier enclave requires. See attribute-billing-plan §3.
-	WIASigningKeyPath   string // wallet-provider signing key PEM (distinct from the OIDC key)
-	WIAAttestationMode  string // "soft" (default) | "strict"
-	WIATTLHours         int    // WIA lifetime in hours (24–72)
-	AppleTeamID         string
-	AppleBundleID       string
-	AppleAppAttestRoot  string // Apple App Attest Root CA (PEM or path); required for strict iOS
-	AndroidPackage      string
-	AndroidAttestRoot   string // Google hardware-attestation root (PEM or path); required for strict android
-	AndroidAllowTEE     bool   // when false, require StrongBox (reject plain TEE)
+	WIASigningKeyPath  string // wallet-provider signing key PEM (distinct from the OIDC key)
+	WIAAttestationMode string // "soft" (default) | "strict"
+	WIATTLHours        int    // WIA lifetime in hours (24–72)
+	AppleTeamID        string
+	AppleBundleID      string
+	AppleAppAttestRoot string // Apple App Attest Root CA (PEM or path); required for strict iOS
+	AndroidPackage     string
+	AndroidAttestRoot  string // Google hardware-attestation root (PEM or path); required for strict android
+	AndroidAllowTEE    bool   // when false, require StrongBox (reject plain TEE)
+
+	// Attribute marketplace: the IdP mints disclosure vouchers by calling the
+	// management-service, which resolves the attribute registry and reserves
+	// the RP's credits on the ledger (keeping ledger access solely in mgmt).
+	MgmtURL      string // management-service base URL for the reserve endpoint
+	IdpMgmtToken string // static bearer for the internal reserve endpoint
 }
 
 // ListenAddr returns the formatted listen address.
@@ -106,6 +112,9 @@ func Load() *Config {
 		AndroidPackage:     envStr("IDP_ANDROID_PACKAGE", ""),
 		AndroidAttestRoot:  envPEM("IDP_ANDROID_ATTEST_ROOT"),
 		AndroidAllowTEE:    envStr("IDP_WIA_ANDROID_ALLOW_TEE", "true") == "true",
+
+		MgmtURL:      envStr("IDP_MGMT_URL", ""),
+		IdpMgmtToken: envStr("IDP_MGMT_TOKEN", ""),
 	}
 }
 

@@ -238,6 +238,38 @@ func migrate(db *sql.DB) error {
 		}
 	}
 
+	// Migration: billable relying-party columns. A client flagged billable_rp
+	// is the paying consumer of attributes: at voucher-mint time its
+	// billing_account_id (a management-service account UUID) is charged, and
+	// rp_id is stamped into the voucher/disclosure audience.
+	clientCols := map[string]bool{}
+	ccRows, err := db.Query("PRAGMA table_info(clients)")
+	if err != nil {
+		return err
+	}
+	for ccRows.Next() {
+		var cid, notnull, pk int
+		var colName, ctype string
+		var dflt *string
+		if err := ccRows.Scan(&cid, &colName, &ctype, &notnull, &dflt, &pk); err != nil {
+			ccRows.Close()
+			return err
+		}
+		clientCols[colName] = true
+	}
+	ccRows.Close()
+	for _, add := range []struct{ col, ddl string }{
+		{"billable_rp", "ALTER TABLE clients ADD COLUMN billable_rp INTEGER NOT NULL DEFAULT 0"},
+		{"billing_account_id", "ALTER TABLE clients ADD COLUMN billing_account_id TEXT NOT NULL DEFAULT ''"},
+		{"rp_id", "ALTER TABLE clients ADD COLUMN rp_id TEXT NOT NULL DEFAULT ''"},
+	} {
+		if !clientCols[add.col] {
+			if _, err = db.Exec(add.ddl); err != nil {
+				return err
+			}
+		}
+	}
+
 	// Migration: backfill users rows for existing service accounts so that
 	// FK constraints (roles, etc.) work uniformly for all principal types.
 	_, err = db.Exec(`

@@ -48,3 +48,40 @@ func TestRegister_AcceptsCanonicalAndEmpty(t *testing.T) {
 		t.Fatalf("Register with nil whitelist: %v", err)
 	}
 }
+
+// TestSetBilling flags a client as a billable relying party and links its
+// billing account + rp_id (defaulting rp_id to the client id), and confirms
+// Get round-trips the new columns.
+func TestSetBilling(t *testing.T) {
+	reg := newTestRegistry(t)
+	c, err := reg.Register("Acme RP", []string{"https://acme/cb"}, "", nil)
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	// Default: not billable.
+	got, _ := reg.Get(c.ClientID)
+	if got.BillableRP {
+		t.Fatal("new client should not be billable by default")
+	}
+	// Flag billable with an explicit rp_id.
+	acct := "11111111-1111-1111-1111-111111111111"
+	if _, err := reg.SetBilling(c.ClientID, true, acct, "acme.example"); err != nil {
+		t.Fatalf("set billing: %v", err)
+	}
+	got, _ = reg.Get(c.ClientID)
+	if !got.BillableRP || got.BillingAccountID != acct || got.RPID != "acme.example" {
+		t.Fatalf("billing not persisted: %+v", got)
+	}
+	// Empty rp_id defaults to the client id.
+	if _, err := reg.SetBilling(c.ClientID, true, acct, ""); err != nil {
+		t.Fatalf("set billing (default rp_id): %v", err)
+	}
+	got, _ = reg.Get(c.ClientID)
+	if got.RPID != c.ClientID {
+		t.Fatalf("rp_id should default to client_id, got %q", got.RPID)
+	}
+	// Unknown client → error.
+	if _, err := reg.SetBilling("nope", true, acct, ""); err == nil {
+		t.Fatal("expected error for unknown client")
+	}
+}

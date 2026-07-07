@@ -291,6 +291,9 @@ func main() {
 
 	// Client registration (admin endpoint).
 	mux.HandleFunc("POST /clients", clients.HandleRegister(clientReg, cfg.AdminToken))
+	// Flag a client as a billable relying party + link its billing account
+	// (the attribute-marketplace consumer side).
+	mux.HandleFunc("POST /clients/{id}/billing", clients.HandleSetBilling(clientReg, cfg.AdminToken))
 
 	// Admin: metrics and role management.
 	mux.HandleFunc("GET /admin/metrics", admin.HandleGetMetrics(db, cfg.AdminToken))

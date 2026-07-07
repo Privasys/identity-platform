@@ -25,6 +25,12 @@ type Client struct {
 	RedirectURIs       []string `json:"redirect_uris"`
 	Confidential       bool     `json:"confidential"`                  // true if client has a secret
 	RequiredAttributes []string `json:"required_attributes,omitempty"` // per-app attribute whitelist; empty = all scope-derived
+	// Billable relying party: this client is the paying consumer of attributes.
+	// At voucher mint, BillingAccountID (a management-service account UUID) is
+	// charged and RPID is stamped into the voucher + disclosure audience.
+	BillableRP       bool   `json:"billable_rp,omitempty"`
+	BillingAccountID string `json:"billing_account_id,omitempty"`
+	RPID             string `json:"rp_id,omitempty"`
 }
 
 // ValidRedirectURI checks if the given URI is in the client's registered redirect URIs.
@@ -49,11 +55,12 @@ func NewRegistry(db *store.DB) *Registry {
 
 // Get retrieves a client by ID.
 func (reg *Registry) Get(clientID string) (*Client, error) {
-	var name, secretHash, redirectURIsJSON, requiredAttrsJSON string
+	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID string
+	var billableRP int
 	err := reg.db.QueryRow(
-		"SELECT client_name, client_secret, redirect_uris, required_attributes FROM clients WHERE client_id = ?",
+		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id FROM clients WHERE client_id = ?",
 		clientID,
-	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON)
+	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID)
 	if err != nil {
 		return nil, fmt.Errorf("client not found: %w", err)
 	}
@@ -70,7 +77,34 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 		RedirectURIs:       uris,
 		Confidential:       secretHash != "",
 		RequiredAttributes: requiredAttrs,
+		BillableRP:         billableRP != 0,
+		BillingAccountID:   billingAccountID,
+		RPID:               rpID,
 	}, nil
+}
+
+// SetBilling marks a client as a billable relying party and links the
+// management-service billing account + RP id (used by the voucher-mint path).
+// rpID defaults to the client_id when empty. Returns the updated client.
+func (reg *Registry) SetBilling(clientID string, billable bool, billingAccountID, rpID string) (*Client, error) {
+	if rpID == "" {
+		rpID = clientID
+	}
+	b := 0
+	if billable {
+		b = 1
+	}
+	res, err := reg.db.Exec(
+		"UPDATE clients SET billable_rp = ?, billing_account_id = ?, rp_id = ? WHERE client_id = ?",
+		b, billingAccountID, rpID, clientID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("set billing: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, fmt.Errorf("client not found")
+	}
+	return reg.Get(clientID)
 }
 
 // validateRequiredAttributes rejects any attribute key that is not in the
@@ -222,6 +256,48 @@ func HandleRegister(reg *Registry, adminToken string) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(client)
+	}
+}
+
+// HandleSetBilling handles POST /clients/{id}/billing — flag a client as a
+// billable relying party and link its management-service billing account +
+// rp_id. Admin-token gated, like registration.
+//
+//	Request: {"billable_rp": true, "billing_account_id": "<uuid>", "rp_id": "..."}
+func HandleSetBilling(reg *Registry, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminToken != "" {
+			auth := r.Header.Get("Authorization")
+			if len(auth) < 8 || auth[7:] != adminToken {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+		}
+		clientID := r.PathValue("id")
+		if clientID == "" {
+			http.Error(w, `{"error":"client id required"}`, http.StatusBadRequest)
+			return
+		}
+		var req struct {
+			BillableRP       bool   `json:"billable_rp"`
+			BillingAccountID string `json:"billing_account_id"`
+			RPID             string `json:"rp_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+		if req.BillableRP && req.BillingAccountID == "" {
+			http.Error(w, `{"error":"billing_account_id required when billable_rp is true"}`, http.StatusBadRequest)
+			return
+		}
+		client, err := reg.SetBilling(clientID, req.BillableRP, req.BillingAccountID, req.RPID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(client)
 	}
 }

@@ -46,6 +46,7 @@ import (
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
 	"github.com/Privasys/idp/internal/vault"
+	"github.com/Privasys/idp/internal/voucher"
 	"github.com/Privasys/idp/internal/wia"
 )
 
@@ -137,6 +138,15 @@ func main() {
 		TTL: time.Duration(cfg.WIATTLHours) * time.Hour,
 	})
 
+	// Disclosure-voucher minter: at attribute-request time the IdP reserves the
+	// relying party's credits via the management-service and signs a voucher the
+	// wallet carries to the issuing enclave. No mgmt config → disabled (the IdP
+	// runs without the attribute marketplace).
+	voucherMinter := voucher.NewMinter(issuer, cfg.MgmtURL, cfg.IdpMgmtToken)
+	if voucherMinter.Enabled() {
+		log.Printf("attribute marketplace: voucher minting enabled via %s", cfg.MgmtURL)
+	}
+
 	mux := http.NewServeMux()
 
 	// OIDC discovery (OpenID Connect + RFC 8414).
@@ -146,10 +156,10 @@ func main() {
 	mux.HandleFunc("GET /jwks", issuer.HandleJWKS)
 
 	// Authorization endpoint.
-	mux.HandleFunc("GET /authorize", oidc.HandleAuthorize(clientReg, sessionStore, cfg.IssuerURL))
+	mux.HandleFunc("GET /authorize", oidc.HandleAuthorize(clientReg, sessionStore, cfg.IssuerURL, voucherMinter))
 
 	// Device authorization endpoint (RFC 8628) — CLI / agent auth backbone.
-	mux.HandleFunc("POST /device_authorization", oidc.HandleDeviceAuthorization(clientReg, sessionStore, deviceStore, cfg.IssuerURL))
+	mux.HandleFunc("POST /device_authorization", oidc.HandleDeviceAuthorization(clientReg, sessionStore, deviceStore, cfg.IssuerURL, voucherMinter))
 
 	// Verification page (privasys.id/device) + its JSON endpoints: consent
 	// lookup, approve (Bearer user token from the page's SDK login) and deny.

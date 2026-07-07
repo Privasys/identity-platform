@@ -34,6 +34,7 @@ import (
 	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/tokens"
+	"github.com/Privasys/idp/internal/voucher"
 )
 
 const (
@@ -200,7 +201,7 @@ func (ds *DeviceStore) cleanup() {
 //	device_code, user_code, verification_uri, verification_uri_complete,
 //	expires_in, interval, plus qr_payload (wallet universal link) and
 //	requested_attributes.
-func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, devices *DeviceStore, issuerURL string) http.HandlerFunc {
+func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, devices *DeviceStore, issuerURL string, minter *voucher.Minter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			errorResponse(w, http.StatusBadRequest, "invalid_request", "Cannot parse form")
@@ -270,6 +271,23 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 			qrPayload["requestedAttributes"] = requestedAttributes
 			qrPayload["attributeRequirements"] = attributeRequirements
 		}
+
+		// Reserve the relying party's credits for any paid (gov) attributes and
+		// carry the disclosure vouchers to the wallet in the same payload.
+		vouchers, mintErr := mintDisclosureVouchers(r.Context(), minter, client, attributeRequirements)
+		if mintErr == voucher.ErrInsufficient {
+			errorResponse(w, http.StatusPaymentRequired, "insufficient_credits",
+				"The relying party has insufficient credits for the requested attributes")
+			return
+		} else if mintErr != nil {
+			errorResponse(w, http.StatusBadGateway, "voucher_error",
+				"Could not reserve attribute credits")
+			return
+		}
+		if len(vouchers) > 0 {
+			qrPayload["disclosureVouchers"] = vouchers
+		}
+
 		qrJSON, _ := json.Marshal(qrPayload)
 		universalLink := "https://privasys.id/scp?p=" + base64.RawURLEncoding.EncodeToString(qrJSON)
 

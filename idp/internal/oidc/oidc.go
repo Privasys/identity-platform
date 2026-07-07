@@ -5,6 +5,7 @@
 package oidc
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -14,6 +15,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +25,7 @@ import (
 	"github.com/Privasys/idp/internal/sessions"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
+	"github.com/Privasys/idp/internal/voucher"
 )
 
 const (
@@ -266,7 +269,7 @@ func (ss *SessionStore) cleanup() {
 // HandleAuthorize handles the OIDC authorization request.
 // Creates a session with a QR payload for the Privasys Wallet app and returns
 // the session data as JSON for the SDK iframe to consume.
-func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL string) http.HandlerFunc {
+func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL string, minter *voucher.Minter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 
@@ -370,6 +373,24 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		if len(requestedAttributes) > 0 {
 			qrPayload["requestedAttributes"] = requestedAttributes
 			qrPayload["attributeRequirements"] = attributeRequirements
+		}
+
+		// Reserve the relying party's credits for any paid (gov) attributes and
+		// carry the resulting disclosure vouchers to the wallet, which relays
+		// them to the issuing enclave.
+		vouchers, err := mintDisclosureVouchers(r.Context(), minter, client, attributeRequirements)
+		if err == voucher.ErrInsufficient {
+			errorResponse(w, http.StatusPaymentRequired, "insufficient_credits",
+				"The relying party has insufficient credits for the requested attributes")
+			return
+		} else if err != nil {
+			log.Printf("authorize: mint disclosure vouchers: %v", err)
+			errorResponse(w, http.StatusBadGateway, "voucher_error",
+				"Could not reserve attribute credits")
+			return
+		}
+		if len(vouchers) > 0 {
+			qrPayload["disclosureVouchers"] = vouchers
 		}
 
 		qrJSON, _ := json.Marshal(qrPayload)
@@ -1240,6 +1261,40 @@ func attributeRequirementsForScope(scope string, client *clients.Client) map[str
 		out[key] = AttributeRequirement{Essential: essential[key], Assurance: assurance}
 	}
 	return out
+}
+
+// disclosureReservationTTL is how long a per-attribute credit hold survives. It
+// must outlive first-time capture (a passport read on onboarding), so it is well
+// longer than the signed voucher's own lifetime; an unused hold is released on
+// expiry.
+const disclosureReservationTTL = 30 * time.Minute
+
+// mintDisclosureVouchers reserves the relying party's credits for the
+// gov-assurance attributes it is requesting and returns the signed vouchers to
+// thread into the wallet payload. It fires only for a billable relying party
+// with a configured minter, and only for gov attributes (today reachable solely
+// through the Privasys identity-verifier, hence the `privasys:` marketplace
+// namespace); everything else discloses free and returns (nil, nil). A returned
+// voucher.ErrInsufficient means the RP cannot pay — the caller answers 402.
+func mintDisclosureVouchers(ctx context.Context, m *voucher.Minter, client *clients.Client, reqs map[string]AttributeRequirement) ([]voucher.MintedVoucher, error) {
+	if m == nil || !m.Enabled() || client == nil || !client.BillableRP || client.BillingAccountID == "" {
+		return nil, nil
+	}
+	var keys []string
+	for key, req := range reqs {
+		if req.Assurance == "gov" {
+			keys = append(keys, "privasys:"+key)
+		}
+	}
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	sort.Strings(keys) // stable request for deterministic grouping/tests
+	rpID := client.RPID
+	if rpID == "" {
+		rpID = client.ClientID
+	}
+	return m.Mint(ctx, client.BillingAccountID, rpID, keys, disclosureReservationTTL)
 }
 
 // filterAttributesByScope returns only the attributes allowed by the OIDC scope,

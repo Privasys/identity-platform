@@ -90,7 +90,7 @@ func TestDeviceFlowEndToEnd(t *testing.T) {
 	sessions := NewSessionStore()
 	devices := NewDeviceStore()
 
-	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id")
+	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id", nil)
 	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, nil)
 
 	// 1. Begin device authorization.
@@ -167,7 +167,7 @@ func TestDeviceFlowPKCEMismatch(t *testing.T) {
 	codes := NewCodeStore()
 	sessions := NewSessionStore()
 	devices := NewDeviceStore()
-	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id")
+	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id", nil)
 	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, nil)
 
 	_, body := postForm(t, devHandler, "/device_authorization", url.Values{
@@ -196,7 +196,7 @@ func TestDeviceFlowDenied(t *testing.T) {
 	codes := NewCodeStore()
 	sessions := NewSessionStore()
 	devices := NewDeviceStore()
-	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id")
+	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id", nil)
 	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, nil)
 
 	_, body := postForm(t, devHandler, "/device_authorization", url.Values{
@@ -228,7 +228,7 @@ func TestDeviceAuthorizationValidation(t *testing.T) {
 	reg, _, _ := newDeviceTestEnv(t)
 	sessions := NewSessionStore()
 	devices := NewDeviceStore()
-	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id")
+	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id", nil)
 
 	// Unknown client.
 	c, b := postForm(t, devHandler, "/device_authorization", url.Values{
@@ -253,7 +253,7 @@ func TestDeviceCodeSlowDown(t *testing.T) {
 	codes := NewCodeStore()
 	sessions := NewSessionStore()
 	devices := NewDeviceStore()
-	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id")
+	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id", nil)
 	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, nil)
 
 	_, body := postForm(t, devHandler, "/device_authorization", url.Values{
@@ -286,7 +286,7 @@ func TestDeviceVerificationPageApprove(t *testing.T) {
 	codes := NewCodeStore()
 	sessions := NewSessionStore()
 	devices := NewDeviceStore()
-	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id")
+	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id", nil)
 	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, nil)
 	lookupHandler := HandleDeviceLookup(devices, sessions)
 	approveHandler := HandleDeviceApprove(iss, devices, sessions, codes)
@@ -359,7 +359,7 @@ func TestDeviceVerificationPageDeny(t *testing.T) {
 	codes := NewCodeStore()
 	sessions := NewSessionStore()
 	devices := NewDeviceStore()
-	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id")
+	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id", nil)
 	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, nil)
 	denyHandler := HandleDeviceDeny(devices)
 

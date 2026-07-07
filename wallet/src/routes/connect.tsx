@@ -38,6 +38,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 import { buildErrorReport, REPORT_DESTINATION } from '@/utils/logs';
 
+import { DataRequestConsent } from '@/components/DataRequestConsent';
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
@@ -120,6 +121,7 @@ function friendlyBrowser(ua?: string): string | null {
 async function resolveRequestedAttributes(
     payload: QRPayload,
     profile: import('@/stores/profile').UserProfile | null,
+    approved?: Set<string> | null,
 ): Promise<Record<string, string> | undefined> {
     const requested = payload.requestedAttributes;
     if (!requested?.length || !profile) return undefined;
@@ -133,6 +135,10 @@ async function resolveRequestedAttributes(
             }
             continue;
         }
+        // Consent gate: only attributes the user approved on the consent
+        // screen (or via standing consent) leave the wallet. `sub` is exempt —
+        // it IS the sign-in.
+        if (approved && !approved.has(attr)) continue;
         const value = getProfileValue(profile, attr);
         if (value) {
             if (assuranceFor(attr, payload.attributeRequirements) === 'gov') {
@@ -227,11 +233,56 @@ function getRequiredMissing(missing: string[], reqs?: AttributeRequirements): st
     return missing.filter((k) => isEssential(k, reqs));
 }
 
+/** One row on the sign-in consent screen. */
+interface SignInConsentItem {
+    key: string;
+    label: string;
+    /** The relying party requires it to complete sign-in (locked on). */
+    essential: boolean;
+    /** Gov-assurance: shared as an enclave-signed, paid disclosure token. */
+    gov: boolean;
+    /** Whether the wallet can supply it right now (profile or device value). */
+    hasValue: boolean;
+}
+
+/** Stable per-relying-party consent key. `rpId` is the shared FIDO2 RP
+ *  (privasys.id) for every IdP-brokered client, so consent must key on the
+ *  client identity; older IdPs omit clientId → fall back to appName@rpId. */
+function consentKeyFor(payload: QRPayload): string {
+    return payload.clientId || `${payload.appName ?? ''}@${payload.rpId}`;
+}
+
+/**
+ * What the consent screen must cover: every requested canonical attribute the
+ * wallet could share — a present profile/device value, or an essential one the
+ * acquisition step will collect. Optional attributes with no value cannot be
+ * shared and are not asked about. `sub` is the sign-in itself, never listed.
+ */
+function buildConsentPlan(
+    payload: QRPayload,
+    profile: import('@/stores/profile').UserProfile | null,
+): SignInConsentItem[] {
+    const reqs = payload.attributeRequirements;
+    return (payload.requestedAttributes ?? [])
+        .filter((k) => k !== 'sub' && ATTRIBUTE_MAP[k])
+        .map((key) => ({
+            key,
+            label: attributeLabel(key),
+            essential: isEssential(key, reqs),
+            gov: assuranceFor(key, reqs) === 'gov',
+            hasValue:
+                !!(profile && getProfileValue(profile, key)) ||
+                !!ATTRIBUTE_MAP[key]?.deviceSourced,
+        }))
+        .filter((i) => i.hasValue || i.essential);
+}
+
 type FlowStep =
     | 'verifying'
     | 'confirm'
     | 'attestation'
     | 'attestation-changed'
+    | 'consent'
     | 'biometric'
     | 'authenticating'
     | 'acquire-attributes'
@@ -330,6 +381,7 @@ interface QRPayload {
 
 export default function ConnectScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const params = useLocalSearchParams<{
         payload?: string; // JSON-encoded QRPayload
         serviceUrl?: string; // Legacy fallback
@@ -374,6 +426,14 @@ export default function ConnectScreen() {
 
     // Attribute acquisition state — holds FIDO2 result while user provides missing profile data
     const [missingAttrs, setMissingAttrs] = useState<string[]>([]);
+    // Sign-in consent: what the consent screen shows, which rows are on, and
+    // the approved set the disclosure step is filtered by. The continuation is
+    // the register/authenticate path stashed while the user decides.
+    const [consentItems, setConsentItems] = useState<SignInConsentItem[]>([]);
+    const [consentSelected, setConsentSelected] = useState<Set<string>>(new Set());
+    const [consentRemember, setConsentRemember] = useState(true);
+    const approvedAttrsRef = useRef<Set<string> | null>(null);
+    const consentContinuation = useRef<(() => Promise<void>) | null>(null);
     const pendingRelay = useRef<{
         payload: QRPayload;
         sessionToken: string;
@@ -630,14 +690,131 @@ export default function ConnectScreen() {
         [getApp, isAttestationMatch, addTrustedApp, getCredentialForRp, checkUnlocked, gracePeriodSec]
     );
 
+    /**
+     * Consent gate for the sign-in flow. Before any register/authenticate
+     * continuation runs (and so before any attribute leaves the wallet), the
+     * user must have approved the shareable set for THIS relying party:
+     *  - nothing shareable → proceed, with an empty approved set;
+     *  - a remembered ("always share") decision that already covers every
+     *    requested attribute → proceed silently with the remembered set;
+     *  - otherwise show the consent screen. Essential attributes are locked
+     *    on; optional gov-assurance ones default OFF (explicit opt-in),
+     *    optional profile ones default ON, and prior per-attribute decisions
+     *    are preserved. A request that grows the attribute set re-prompts.
+     */
+    const ensureConsentThen = useCallback(
+        async (payload: QRPayload, cont: () => Promise<void>) => {
+            const plan = buildConsentPlan(payload, profile);
+            if (plan.length === 0) {
+                approvedAttrsRef.current = new Set();
+                await cont();
+                return;
+            }
+            const key = consentKeyFor(payload);
+            const att = attestationRef.current ?? attestation;
+            const meas = att?.mrtd ?? att?.mrenclave ?? '';
+            const codeHash = att?.workload_code_hash ?? '';
+            const consent = useConsentStore.getState();
+            const standing = consent.getStandingConsent(key, meas, codeHash);
+            const latest = consent.getRecordsForApp(key)[0];
+            const decided = new Set(latest?.requestedAttributes ?? []);
+            if (
+                standing &&
+                latest?.persistent &&
+                plan.every((i) => decided.has(i.key))
+            ) {
+                approvedAttrsRef.current = new Set(standing.attributes);
+                await cont();
+                return;
+            }
+            const prevApproved = new Set(standing?.attributes ?? []);
+            setConsentItems(plan);
+            setConsentSelected(
+                new Set(
+                    plan
+                        .filter((i) =>
+                            i.essential ||
+                            (decided.has(i.key) ? prevApproved.has(i.key) : !i.gov),
+                        )
+                        .map((i) => i.key),
+                ),
+            );
+            setConsentRemember(true);
+            consentContinuation.current = cont;
+            setStep('consent');
+        },
+        [profile, attestation],
+    );
+
+    /** User confirmed the consent screen: record the decision (and standing
+     *  consent when asked to remember), then run the stashed continuation with
+     *  the approved set gating every disclosure. */
+    const handleConsentApprove = useCallback(async () => {
+        if (!qr) return;
+        const key = consentKeyFor(qr);
+        const att = attestationRef.current ?? attestation;
+        const meas = att?.mrtd ?? att?.mrenclave ?? '';
+        const codeHash = att?.workload_code_hash ?? '';
+        const teeType =
+            att?.tee_type === 'sgx' || att?.tee_type === 'tdx' ||
+            att?.tee_type === 'sev-snp' || att?.tee_type === 'nvidia-gpu'
+                ? att.tee_type
+                : ('none' as const);
+        const approved = consentItems.filter((i) => consentSelected.has(i.key)).map((i) => i.key);
+        const denied = consentItems.filter((i) => !consentSelected.has(i.key)).map((i) => i.key);
+        const now = Math.floor(Date.now() / 1000);
+        const consent = useConsentStore.getState();
+        consent.addRecord({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            rpId: key,
+            origin: qr.rpId,
+            appName: qr.appName,
+            requestedAttributes: consentItems.map((i) => i.key),
+            approvedAttributes: approved,
+            deniedAttributes: denied,
+            decision: denied.length === 0 ? 'approved' : approved.length === 0 ? 'denied' : 'partial',
+            persistent: consentRemember,
+            teeType,
+            enclaveMeasurement: meas,
+            codeHash,
+            consentedAt: now,
+            expiresAt: 0,
+        });
+        if (consentRemember) {
+            consent.setStandingConsent({
+                rpId: key,
+                attributes: approved,
+                enclaveMeasurement: meas,
+                codeHash,
+                grantedAt: now,
+            });
+        }
+        approvedAttrsRef.current = new Set(approved);
+        const cont = consentContinuation.current;
+        consentContinuation.current = null;
+        if (cont) await cont();
+    }, [qr, attestation, consentItems, consentSelected, consentRemember]);
+
+    const toggleConsentAttr = useCallback((key: string) => {
+        setConsentSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    }, []);
+
     const handleConfirm = useCallback(async () => {
         if (!qr) return;
         const credential = getCredentialForRp(qr.rpId);
         if (!credential) return;
 
-        // Go directly to FIDO2 — NativeKeys.sign() handles biometric.
-        await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
-    }, [qr]);
+        // Consent first — the disclosure step is gated by what it approves.
+        await ensureConsentThen(qr, async () => {
+            // Go directly to FIDO2 — NativeKeys.sign() handles biometric.
+            await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
+        });
+    }, [qr, ensureConsentThen]);
 
     const handleApprove = useCallback(async () => {
         if (!qr || !attestation) return;
@@ -649,20 +826,23 @@ export default function ConnectScreen() {
             return;
         }
 
-        // If attestation changed, the enclave has a new KV store and our
-        // old credential no longer exists server-side.  Remove it and
-        // re-register so the user gets a fresh credential.
-        const credential = getCredentialForRp(qr.rpId);
-        if (credential && attestationChanged) {
-            console.log('[CONNECT] attestation changed — removing old credential and re-registering');
-            removeCredential(credential.credentialId);
-            await doRegister(qr);
-        } else if (credential) {
-            await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
-        } else {
-            await doRegister(qr);
-        }
-    }, [qr, attestation, attestationChanged]);
+        // Consent first — the disclosure step is gated by what it approves.
+        await ensureConsentThen(qr, async () => {
+            // If attestation changed, the enclave has a new KV store and our
+            // old credential no longer exists server-side.  Remove it and
+            // re-register so the user gets a fresh credential.
+            const credential = getCredentialForRp(qr.rpId);
+            if (credential && attestationChanged) {
+                console.log('[CONNECT] attestation changed — removing old credential and re-registering');
+                removeCredential(credential.credentialId);
+                await doRegister(qr);
+            } else if (credential) {
+                await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
+            } else {
+                await doRegister(qr);
+            }
+        });
+    }, [qr, attestation, attestationChanged, ensureConsentThen]);
 
     /** Build the wallet-side session-relay argument from the QR payload
      *  and the verified attestation, or return undefined when the QR did
@@ -945,7 +1125,7 @@ export default function ConnectScreen() {
             setStep('relaying');
 
             // Resolve only the attributes the app actually requested.
-            const attributes = await resolveRequestedAttributes(payload, profile);
+            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current);
 
             await relaySessionToken(
                 payload.brokerUrl,
@@ -1047,7 +1227,7 @@ export default function ConnectScreen() {
             setStep('relaying');
 
             // Resolve only the attributes the app actually requested.
-            const attributes = await resolveRequestedAttributes(payload, profile);
+            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current);
 
             await relaySessionToken(
                 payload.brokerUrl,
@@ -1221,7 +1401,7 @@ export default function ConnectScreen() {
 
         setStep('relaying');
         try {
-            const attributes = await resolveRequestedAttributes(pending.payload, updatedProfile);
+            const attributes = await resolveRequestedAttributes(pending.payload, updatedProfile, approvedAttrsRef.current);
 
             await relaySessionToken(
                 pending.payload.brokerUrl,
@@ -1320,6 +1500,46 @@ export default function ConnectScreen() {
                         onApprove={handleApprove}
                         onReject={handleReject}
                     />
+                )}
+
+                {step === 'consent' && qr && (
+                    <RNView style={{ flex: 1, paddingTop: insets.top }}>
+                        <DataRequestConsent
+                            appName={qr.appName || appName(qr.rpId)}
+                            origin={qr.clientId || qr.rpId}
+                            sectionTitle="THIS SERVICE WILL RECEIVE"
+                            sectionDescription="Choose what to share. Items marked required are needed to sign in."
+                            items={consentItems.map((i) => ({
+                                key: i.key,
+                                label: i.label,
+                                sublabel: !i.hasValue
+                                    ? 'Will be verified during sign-in'
+                                    : i.gov
+                                        ? i.essential
+                                            ? 'Required · passport-verified proof'
+                                            : 'Passport-verified proof'
+                                        : i.essential
+                                            ? 'Required'
+                                            : undefined,
+                                missing: !i.hasValue,
+                                toggle: {
+                                    value: consentSelected.has(i.key),
+                                    onChange: () => toggleConsentAttr(i.key),
+                                    disabled: i.essential,
+                                },
+                            }))}
+                            note={
+                                consentItems.some((i) => i.gov)
+                                    ? 'Verified attributes are shared as enclave-signed proofs bound to this service — never the raw document. The service pays for them; you pay nothing.'
+                                    : undefined
+                            }
+                            persistent={{ value: consentRemember, onChange: setConsentRemember }}
+                            approveLabel="Share"
+                            approveCount={consentSelected.size}
+                            onDeny={handleReject}
+                            onApprove={handleConsentApprove}
+                        />
+                    </RNView>
                 )}
 
                 {step === 'biometric' && (

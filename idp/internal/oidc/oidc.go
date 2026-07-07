@@ -355,11 +355,14 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		}
 		sessions.Create(session)
 
-		// Build QR payload for wallet universal link.
+		// Build QR payload for wallet universal link. clientId identifies the
+		// relying party stably (rpId is the shared FIDO2 RP, privasys.id, for
+		// every brokered client) — the wallet keys per-app consent on it.
 		qrPayload := map[string]interface{}{
 			"origin":    "privasys.id",
 			"sessionId": sessionID,
 			"rpId":      "privasys.id",
+			"clientId":  clientID,
 			"appName":   "Privasys",
 			"brokerUrl": "wss://relay.privasys.org/relay",
 		}

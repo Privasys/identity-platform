@@ -259,6 +259,7 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 			"origin":    "privasys.id",
 			"sessionId": sessionID,
 			"rpId":      "privasys.id",
+			"clientId":  clientID,
 			"appName":   client.ClientName,
 			"brokerUrl": "wss://relay.privasys.org/relay",
 		}

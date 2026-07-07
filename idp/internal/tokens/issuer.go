@@ -277,6 +277,45 @@ type WIAClaims struct {
 	TTL           time.Duration
 }
 
+// VoucherClaims are the claims of a paid disclosure voucher (the attribute
+// marketplace toll booth). The IdP mints one at attribute-request time after
+// reserving the RP's credits; the wallet passes it to the issuing enclave,
+// which refuses to mint a disclosure without a valid voucher and stamps its
+// `jti` into the token evidence. It carries NO user identity — only the paying
+// RP, the provider it is spent with, and the claims it covers (§7 privacy
+// invariants).
+type VoucherClaims struct {
+	JTI      string   // reservation key + evidence anchor (ledger settles on this)
+	RPID     string   // the paying relying party; the enclave checks == request rp_id
+	Provider string   // provider namespace; the enclave checks == its own provider
+	Claims   []string // namespaced attribute keys this voucher covers
+	Credits  int64    // total price reserved (audit; the enclave does not price)
+	TTL      time.Duration
+}
+
+// IssueVoucher signs a disclosure voucher with the IdP's OIDC key (typ =
+// "voucher+jwt"); the issuing enclave verifies it against the IdP JWKS
+// provisioned into it (like the CSCA anchors and the wallet-provider JWKS).
+func (iss *Issuer) IssueVoucher(c VoucherClaims) (string, error) {
+	now := time.Now()
+	ttl := c.TTL
+	if ttl <= 0 {
+		ttl = 10 * time.Minute
+	}
+	claims := jwt.MapClaims{
+		"iss":      iss.issuerURL,
+		"iat":      now.Unix(),
+		"exp":      now.Add(ttl).Unix(),
+		"jti":      c.JTI,
+		"rp_id":    c.RPID,
+		"provider": c.Provider,
+		"claims":   c.Claims,
+		"credits":  c.Credits,
+		"v":        1,
+	}
+	return iss.signTyp(claims, "voucher+jwt")
+}
+
 // IssueWIA signs a Wallet Instance Attestation with the wallet-provider key
 // (typ = "wia+jwt"). Verifiers resolve the signing key via the wallet-provider
 // JWKS provisioned into them (like the CSCA anchors) and check cnf.jwk against

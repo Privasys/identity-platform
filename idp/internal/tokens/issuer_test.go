@@ -165,3 +165,40 @@ func TestVerifyExpiredToken(t *testing.T) {
 		t.Fatal("expected expired token to fail verification")
 	}
 }
+
+// TestIssueVoucher signs a disclosure voucher and confirms it round-trips
+// (ES256, the same key the issuing enclave provisions via the IdP JWKS) and
+// carries exactly the paying RP + provider + claims + jti — and no user
+// identity.
+func TestIssueVoucher(t *testing.T) {
+	dir := t.TempDir()
+	iss, err := NewIssuer(filepath.Join(dir, "key.pem"), "https://privasys.id")
+	if err != nil {
+		t.Fatalf("NewIssuer: %v", err)
+	}
+	tok, err := iss.IssueVoucher(VoucherClaims{
+		JTI:      "resv-1",
+		RPID:     "acme.example",
+		Provider: "privasys",
+		Claims:   []string{"privasys:age_over", "privasys:document_valid"},
+		Credits:  20000,
+		TTL:      10 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("IssueVoucher: %v", err)
+	}
+	claims, err := iss.VerifyAccessToken(tok)
+	if err != nil {
+		t.Fatalf("verify voucher: %v", err)
+	}
+	if claims["jti"] != "resv-1" || claims["rp_id"] != "acme.example" || claims["provider"] != "privasys" {
+		t.Fatalf("voucher claims wrong: %+v", claims)
+	}
+	if _, hasSub := claims["sub"]; hasSub {
+		t.Fatal("voucher must carry no user identity (sub)")
+	}
+	got, _ := claims["claims"].([]interface{})
+	if len(got) != 2 {
+		t.Fatalf("expected 2 covered claims, got %v", claims["claims"])
+	}
+}

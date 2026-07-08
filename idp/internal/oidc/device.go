@@ -214,6 +214,14 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 		codeChallengeMethod := r.FormValue("code_challenge_method")
 		agentName := sanitizeAgentName(r.FormValue("agent_name"))
 
+		// acr_values: same tier semantics as /authorize (gov-presence adds
+		// the ceremonial holder_present attribute + its voucher below).
+		acrValues, acrErr := validateACRValues(r.FormValue("acr_values"))
+		if acrErr != nil {
+			errorResponse(w, http.StatusBadRequest, "invalid_request", acrErr.Error())
+			return
+		}
+
 		client, err := reg.Get(clientID)
 		if err != nil {
 			errorResponse(w, http.StatusBadRequest, "invalid_client", "Unknown client_id")
@@ -245,6 +253,7 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 			ClientID:            clientID,
 			RedirectURI:         "",
 			Scope:               scope,
+			ACRValues:           acrValues,
 			CodeChallenge:       codeChallenge,
 			CodeChallengeMethod: codeChallengeMethod,
 			CreatedAt:           now,
@@ -268,6 +277,8 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 		}
 		requestedAttributes := requestedAttributesForScope(scope, client)
 		attributeRequirements := attributeRequirementsForScope(scope, client)
+		requestedAttributes, attributeRequirements =
+			applyPresenceACR(acrValues, requestedAttributes, attributeRequirements)
 		if len(requestedAttributes) > 0 {
 			qrPayload["requestedAttributes"] = requestedAttributes
 			qrPayload["attributeRequirements"] = attributeRequirements

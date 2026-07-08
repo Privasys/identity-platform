@@ -71,6 +71,46 @@ func acrRequested(acrValues, v string) bool {
 	return false
 }
 
+// validateACRValues rejects unknown acr_values entries (hard error — never a
+// silent downgrade). Returns the trimmed value. Shared by /authorize and
+// /device_authorization.
+func validateACRValues(raw string) (string, error) {
+	acrValues := strings.TrimSpace(raw)
+	for _, v := range strings.Fields(acrValues) {
+		if !acrSupported(v) {
+			return "", fmt.Errorf("unsupported acr_values entry: %s", v)
+		}
+	}
+	return acrValues, nil
+}
+
+// applyPresenceACR: gov-presence asks for a live holder-presence ceremony.
+// Add the ceremonial holder_present attribute (essential, gov) — per-request,
+// never scope-derived, and deliberately not subject to the client whitelist:
+// it discloses no personal data, only "the document holder is present now".
+// It IS a priced gov attribute, so the voucher mint reserves credits for it
+// like any other. Shared by /authorize and /device_authorization.
+func applyPresenceACR(acrValues string, requested []string,
+	reqs map[string]AttributeRequirement) ([]string, map[string]AttributeRequirement) {
+	if !acrRequested(acrValues, "gov-presence") {
+		return requested, reqs
+	}
+	present := false
+	for _, k := range requested {
+		if k == presenceAttribute {
+			present = true
+		}
+	}
+	if !present {
+		requested = append(requested, presenceAttribute)
+	}
+	if reqs == nil {
+		reqs = map[string]AttributeRequirement{}
+	}
+	reqs[presenceAttribute] = AttributeRequirement{Essential: true, Assurance: "gov"}
+	return requested, reqs
+}
+
 func acrSupported(v string) bool {
 	for _, s := range acrValuesSupported {
 		if v == s {
@@ -434,16 +474,12 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 
 		// Validate acr_values (assurance tiers). Unknown values are a hard
 		// error rather than the spec's "ignore voluntary claims" — silently
-		// downgrading an RP that asked for a stronger ceremony (e.g. a
-		// future gov-presence) is exactly the failure a regulated RP cannot
-		// tolerate.
-		acrValues := strings.TrimSpace(q.Get("acr_values"))
-		for _, v := range strings.Fields(acrValues) {
-			if !acrSupported(v) {
-				errorResponse(w, http.StatusBadRequest, "invalid_request",
-					"unsupported acr_values entry: "+v)
-				return
-			}
+		// downgrading an RP that asked for a stronger ceremony is exactly
+		// the failure a regulated RP cannot tolerate.
+		acrValues, acrErr := validateACRValues(q.Get("acr_values"))
+		if acrErr != nil {
+			errorResponse(w, http.StatusBadRequest, "invalid_request", acrErr.Error())
+			return
 		}
 
 		// max_age: accepted for OIDC compliance. Every authorization here is
@@ -494,29 +530,8 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		requestedAttributes := requestedAttributesForScope(scope, client)
 		attributeRequirements := attributeRequirementsForScope(scope, client)
 
-		// gov-presence: the RP asked for a live holder-presence ceremony.
-		// Add the ceremonial holder_present attribute (essential, gov) —
-		// per-request, never scope-derived, and deliberately not subject to
-		// the client whitelist: it discloses no personal data, only "the
-		// document holder is present now". It IS a priced gov attribute, so
-		// the voucher mint below reserves credits for it like any other.
-		if acrRequested(acrValues, "gov-presence") {
-			present := false
-			for _, k := range requestedAttributes {
-				if k == presenceAttribute {
-					present = true
-				}
-			}
-			if !present {
-				requestedAttributes = append(requestedAttributes, presenceAttribute)
-			}
-			if attributeRequirements == nil {
-				attributeRequirements = map[string]AttributeRequirement{}
-			}
-			attributeRequirements[presenceAttribute] = AttributeRequirement{
-				Essential: true, Assurance: "gov",
-			}
-		}
+		requestedAttributes, attributeRequirements =
+			applyPresenceACR(acrValues, requestedAttributes, attributeRequirements)
 
 		if len(requestedAttributes) > 0 {
 			qrPayload["requestedAttributes"] = requestedAttributes

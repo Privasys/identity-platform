@@ -197,6 +197,29 @@ async function resolveRequestedAttributes(
 }
 
 /**
+ * Patch resolved attributes onto the IdP auth code (POST /session/complete).
+ * The SDK's frame-host does this in the iframe flow; in the device flow the
+ * wallet is the only party that can. IdP-brokered payloads only (clientId
+ * set, origin = the IdP); best-effort — the sign-in itself already succeeded.
+ */
+async function patchSessionAttributes(
+    payload: QRPayload,
+    attributes: Record<string, string> | undefined,
+): Promise<void> {
+    if (!payload.clientId || !attributes || Object.keys(attributes).length === 0) return;
+    if (!payload.origin?.includes('privasys.id')) return;
+    try {
+        await fetch(`https://${payload.origin}/session/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: payload.sessionId, attributes }),
+        });
+    } catch (e: any) {
+        console.warn('[CONNECT] session attribute patch failed:', e?.message);
+    }
+}
+
+/**
  * Determine which requested attributes are missing from the user's profile.
  * Returns the list of attribute keys that the app wants but the profile
  * doesn't have values for. 'sub' is excluded since it's always derivable.
@@ -1356,6 +1379,15 @@ export default function ConnectScreen() {
                 result.sessionRelay,
             );
 
+            // IdP-brokered flows: ALSO patch the attributes onto the auth code
+            // directly. In the SDK (iframe) flow the frame-host relays them to
+            // /session/complete for us, but in the DEVICE flow nobody listens
+            // on the relay — without this call the ceremony's disclosures
+            // (including paid gov proofs the RP was already charged for) never
+            // reach the issued tokens. The IdP's patch branch is idempotent,
+            // so double delivery via the SDK path is harmless.
+            await patchSessionAttributes(payload, attributes);
+
             // Relay succeeded — now persist locally.
             persistCredentialAndTrust(payload, result.credentialId, keyAlias, result.userHandle, result.userName, result.serverRpId);
 
@@ -1469,6 +1501,9 @@ export default function ConnectScreen() {
                 attributes,
                 result.sessionRelay,
             );
+
+            // Device-flow attribute delivery (see patchSessionAttributes).
+            await patchSessionAttributes(payload, attributes);
 
             // Keep the IdP's push target fresh for this pairwise identity
             // (vault approvals for keys it owns). Best-effort.
@@ -1653,6 +1688,9 @@ export default function ConnectScreen() {
                 pushToken,
                 attributes,
             );
+
+            // Device-flow attribute delivery (see patchSessionAttributes).
+            await patchSessionAttributes(pending.payload, attributes);
 
             // For registration, persist the credential now
             if (pending.credential) {

@@ -163,11 +163,15 @@ async function enrol(): Promise<string | null> {
  * attestation is unavailable, so the wallet degrades to WIA-less rather than
  * throwing during the soft rollout.
  *
- * NOTE (iOS follow-up): the App Attest key is shared with the attestation-server
- * flow and can be *attested* only once; after that this yields an assertion, not
- * a full attestation object. The IdP tolerates that in soft mode (the holder PoP
- * is the binding gate); strict mode will need a dedicated WIA App Attest key.
+ * iOS uses a FRESH, WIA-scoped App Attest key per enrolment (reset → generate
+ * → attest), so every enrol carries a full attestation object — the shape the
+ * IdP's strict mode requires. A key attests only once, and the legacy key is
+ * shared with the attestation-server flow, so reusing keys degrades to
+ * assertions that strict mode rejects. Keys are cheap; enrolment is rare
+ * (WIA TTL is days), so a per-enrol key costs one Apple round-trip.
  */
+const WIA_ATTEST_SCOPE = 'wia';
+
 async function acquireDeviceAttestation(
     challengeB64url: string,
     holderPubB64url: string
@@ -175,18 +179,23 @@ async function acquireDeviceAttestation(
     try {
         const clientDataHash = await clientDataHashB64(challengeB64url, holderPubB64url);
 
-        const state = await AppAttest.getState();
+        const state = await AppAttest.getState(WIA_ATTEST_SCOPE);
         if (!state.supported) return null;
+
+        if (Platform.OS === 'ios') {
+            // Fresh key per enrolment → always a full attestation object.
+            await AppAttest.reset(WIA_ATTEST_SCOPE);
+            const keyId = await AppAttest.generateKey(WIA_ATTEST_SCOPE);
+            const blob = await AppAttest.attestKey(clientDataHash, WIA_ATTEST_SCOPE);
+            return { key_id: keyId, attestation: blob };
+        }
+
+        // Android: each Play Integrity token is freshly minted already.
         if (!state.keyId) await AppAttest.generateKey();
         const refreshed = await AppAttest.getState();
-
         const blob = refreshed.attested
             ? await AppAttest.generateAssertion(clientDataHash)
             : await AppAttest.attestKey(clientDataHash);
-
-        if (Platform.OS === 'ios') {
-            return { key_id: refreshed.keyId, attestation: blob };
-        }
         // Android: the blob is a Play Integrity token bound to the client-data hash.
         return { integrity_token: blob };
     } catch (e) {

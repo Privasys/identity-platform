@@ -19,19 +19,23 @@ public class AppAttestModule: Module {
     public func definition() -> ModuleDefinition {
         Name("AppAttest")
 
-        AsyncFunction("getState") { () -> String in
+        AsyncFunction("getState") { (scope: String?) -> String in
             let service = DCAppAttestService.shared
             let supported = service.isSupported
-            let keyId = Self.loadKeyId()
-            let attested = Self.loadAttested()
+            let keyId = Self.loadKeyId(scope)
+            let attested = Self.loadAttested(scope)
             return """
             {"supported":\(supported),"keyId":\(keyId.map { "\"\($0)\"" } ?? "null"),"attested":\(attested)}
             """
         }
 
-        AsyncFunction("generateKey") { () -> String in
+        // `scope` namespaces the key (nil = the legacy shared key). The WIA
+        // flow uses a fresh scoped key per enrolment so every enrol carries a
+        // FULL attestation object (a key attests once; assertions cannot
+        // satisfy the IdP's strict mode).
+        AsyncFunction("generateKey") { (scope: String?) -> String in
             // Return existing key if already generated.
-            if let existing = Self.loadKeyId() {
+            if let existing = Self.loadKeyId(scope) {
                 return existing
             }
 
@@ -41,12 +45,12 @@ public class AppAttestModule: Module {
             }
 
             let keyId = try await service.generateKey()
-            Self.saveKeyId(keyId)
+            Self.saveKeyId(keyId, scope)
             return keyId
         }
 
-        AsyncFunction("attestKey") { (challengeBase64: String) -> String in
-            guard let keyId = Self.loadKeyId() else {
+        AsyncFunction("attestKey") { (challengeBase64: String, scope: String?) -> String in
+            guard let keyId = Self.loadKeyId(scope) else {
                 throw AppAttestError.noKey
             }
 
@@ -63,12 +67,12 @@ public class AppAttestModule: Module {
             let hash = Data(SHA256.hash(data: challengeData))
 
             let attestation = try await service.attestKey(keyId, clientDataHash: hash)
-            Self.saveAttested(true)
+            Self.saveAttested(true, scope)
             return attestation.base64EncodedString()
         }
 
-        AsyncFunction("generateAssertion") { (clientDataHashBase64: String) -> String in
-            guard let keyId = Self.loadKeyId() else {
+        AsyncFunction("generateAssertion") { (clientDataHashBase64: String, scope: String?) -> String in
+            guard let keyId = Self.loadKeyId(scope) else {
                 throw AppAttestError.noKey
             }
 
@@ -92,28 +96,35 @@ public class AppAttestModule: Module {
         // survive uninstall, but our Keychain entry does). Apple
         // rejects attestKey/generateAssertion calls against an unknown
         // keyId with `DCError.invalidInput` (numeric code 2).
-        AsyncFunction("reset") { () -> Void in
-            Self.deleteKeychainEntry(account: Self.keychainKeyIdAccount)
-            Self.deleteKeychainEntry(account: Self.keychainAttestedAccount)
+        AsyncFunction("reset") { (scope: String?) -> Void in
+            Self.deleteKeychainEntry(account: Self.account(Self.keychainKeyIdAccount, scope))
+            Self.deleteKeychainEntry(account: Self.account(Self.keychainAttestedAccount, scope))
         }
     }
 
     // MARK: - Keychain helpers
 
-    private static func saveKeyId(_ keyId: String) {
-        saveKeychainString(keyId, account: keychainKeyIdAccount)
+    /// Keychain account for a key scope: nil/empty = the legacy shared key
+    /// ("keyId"), otherwise "keyId-<scope>" (e.g. the WIA enrolment key).
+    private static func account(_ base: String, _ scope: String?) -> String {
+        guard let s = scope, !s.isEmpty else { return base }
+        return "\(base)-\(s)"
     }
 
-    private static func loadKeyId() -> String? {
-        loadKeychainString(account: keychainKeyIdAccount)
+    private static func saveKeyId(_ keyId: String, _ scope: String?) {
+        saveKeychainString(keyId, account: account(keychainKeyIdAccount, scope))
     }
 
-    private static func saveAttested(_ value: Bool) {
-        saveKeychainString(value ? "1" : "0", account: keychainAttestedAccount)
+    private static func loadKeyId(_ scope: String?) -> String? {
+        loadKeychainString(account: account(keychainKeyIdAccount, scope))
     }
 
-    private static func loadAttested() -> Bool {
-        loadKeychainString(account: keychainAttestedAccount) == "1"
+    private static func saveAttested(_ value: Bool, _ scope: String?) {
+        saveKeychainString(value ? "1" : "0", account: account(keychainAttestedAccount, scope))
+    }
+
+    private static func loadAttested(_ scope: String?) -> Bool {
+        loadKeychainString(account: account(keychainAttestedAccount, scope)) == "1"
     }
 
     private static func saveKeychainString(_ value: String, account: String) {

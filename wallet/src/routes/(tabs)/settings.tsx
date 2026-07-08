@@ -13,8 +13,8 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import AboutPrivasysWallet from '@/components/AboutPrivasysWallet';
-import { Text, View, Image } from '@/components/Themed';
+import { ExternalLink } from '@/components/ExternalLink';
+import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
@@ -91,20 +91,6 @@ export default function SettingsScreen() {
                     </>
                 ) : null}
 
-                {/* About */}
-                <Text style={styles.sectionTitle}>About</Text>
-                <View style={styles.aboutCard}>
-                    <AboutPrivasysWallet />
-                </View>
-
-                <View style={styles.buildInfoCard}>
-                    <BuildInfoRow label="Version" value={Constants.expoConfig?.extra?.CODE_VERSION} />
-                    <BuildInfoRow label="Build Number" value={Constants.expoConfig?.extra?.BUILD_NUMBER} />
-                    <BuildInfoRow label="Build ID" value={Constants.expoConfig?.extra?.BUILD_ID?.slice(0, 7)} />
-                    <BuildInfoRow label="Build Type" value={Constants.expoConfig?.extra?.STAGE} />
-                    <BuildInfoRow label="Commit ID" value={Constants.expoConfig?.extra?.COMMIT_HASH?.slice(0, 7)} />
-                </View>
-
                 {/* Logs */}
                 <Text style={styles.sectionTitle}>Logs</Text>
                 <Text style={styles.sectionDescription}>
@@ -117,17 +103,24 @@ export default function SettingsScreen() {
                     <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                 </Pressable>
 
-                {/* Server-side sessions (revoke). */}
-                <Text style={styles.sectionTitle}>Server Sessions</Text>
-                <Text style={styles.sectionDescription}>
-                    Manage the JWTs the privasys.id IdP has issued for your account. Revoke
-                    here to stop tokens working immediately, e.g. after losing a browser.
-                </Text>
-                <Pressable style={styles.logsButton} onPress={() => router.push('/server-sessions')}>
-                    <Ionicons name="server-outline" size={18} color="#0F172A" />
-                    <Text style={styles.logsButtonText}>Manage Server Sessions</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                </Pressable>
+                {/* About — one tile: everything as key/value rows. */}
+                <Text style={styles.sectionTitle}>About</Text>
+                <View style={styles.buildInfoCard}>
+                    <BuildInfoRow label="Version" value={Constants.expoConfig?.extra?.CODE_VERSION} />
+                    <BuildInfoRow label="Build Number" value={Constants.expoConfig?.extra?.BUILD_NUMBER} />
+                    <BuildInfoRow label="Build ID" value={Constants.expoConfig?.extra?.BUILD_ID?.slice(0, 7)} />
+                    <BuildInfoRow label="Build Type" value={Constants.expoConfig?.extra?.STAGE} />
+                    <BuildInfoRow label="Commit ID" value={Constants.expoConfig?.extra?.COMMIT_HASH?.slice(0, 7)} />
+                    <BuildInfoRow label="Developer" value="Privasys Ltd" />
+                    <BuildInfoRow label="Registered" value="England & Wales" />
+                    <BuildInfoRow label="Company No." value="16866500" />
+                    <View style={styles.buildInfoRow}>
+                        <Text style={styles.buildInfoLabel}>Website</Text>
+                        <ExternalLink href="https://privasys.org">
+                            <Text style={styles.buildInfoLink}>privasys.org</Text>
+                        </ExternalLink>
+                    </View>
+                </View>
             </ScrollView>
         </RNView>
     );
@@ -236,22 +229,6 @@ const styles = StyleSheet.create({
         lineHeight: 18
     },
 
-    aboutCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12
-    },
-    aboutHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        backgroundColor: 'transparent'
-    },
-    aboutLogo: { width: 36, height: 36, backgroundColor: 'transparent' },
-    aboutTitle: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
-    aboutSeparator: { height: 1, marginVertical: 12 },
-
     buildInfoCard: {
         backgroundColor: '#F1F5F9',
         borderRadius: 12,
@@ -265,6 +242,7 @@ const styles = StyleSheet.create({
     },
     buildInfoLabel: { fontSize: 14, color: '#64748B' },
     buildInfoValue: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
+    buildInfoLink: { fontSize: 14, fontWeight: '600', color: '#00BCF2' },
 
     logsButton: {
         flexDirection: 'row',

@@ -251,6 +251,33 @@ export default function ProfileScreen() {
                     </RNView>
                 </Pressable>
 
+                {/* Data Sharing — above recovery: reviewing what left the
+                    wallet is the more frequent task. */}
+                <Text style={styles.sectionTitle}>DATA SHARING</Text>
+                <Text style={styles.sectionDescription}>
+                    Review what you've shared with services.
+                </Text>
+
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/consent-history' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="time-outline" size={20} color="#00BCF2" />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>Consent History</Text>
+                            <Text style={styles.sharingDetail}>
+                                {consentRecordCount === 0
+                                    ? 'No sharing events yet'
+                                    : `${consentRecordCount} event${consentRecordCount !== 1 ? 's' : ''}`}
+                            </Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                    </RNView>
+                </Pressable>
+
                 {/* Account Recovery */}
                 <Text style={styles.sectionTitle}>ACCOUNT RECOVERY</Text>
                 <Text style={styles.sectionDescription}>
@@ -287,32 +314,6 @@ export default function ProfileScreen() {
                             <Text style={styles.sharingLabel}>Recover Account</Text>
                             <Text style={styles.sharingDetail}>
                                 Lost access? Start recovery here
-                            </Text>
-                        </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                    </RNView>
-                </Pressable>
-
-                {/* Data Sharing */}
-                <Text style={styles.sectionTitle}>DATA SHARING</Text>
-                <Text style={styles.sectionDescription}>
-                    Review what you've shared with services.
-                </Text>
-
-                <Pressable
-                    style={styles.sharingCard}
-                    onPress={() => router.push('/consent-history' as never)}
-                >
-                    <RNView style={styles.sharingRow}>
-                        <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="time-outline" size={20} color="#00BCF2" />
-                        </RNView>
-                        <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>Consent History</Text>
-                            <Text style={styles.sharingDetail}>
-                                {consentRecordCount === 0
-                                    ? 'No sharing events yet'
-                                    : `${consentRecordCount} event${consentRecordCount !== 1 ? 's' : ''}`}
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color="#94A3B8" />

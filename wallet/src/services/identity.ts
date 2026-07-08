@@ -33,7 +33,7 @@ import type { LinkedProvider, ProfileAttribute, VerificationRecord } from '@/sto
 // Ensure web browser sessions are cleaned up on redirect
 WebBrowser.maybeCompleteAuthSession();
 
-/** Base URL of the Privasys IdP (matches recovery-api.ts / sessions-api.ts). */
+/** Base URL of the Privasys IdP (matches recovery-api.ts). */
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
 /** Userinfo distilled from a linked provider, for convenient profile seeding. */

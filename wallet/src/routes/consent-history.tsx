@@ -10,7 +10,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -317,17 +317,33 @@ function ConsentRecordCard({
 }) {
     const [expanded, setExpanded] = useState(false);
     const colors = DECISION_COLORS[record.decision] ?? DECISION_COLORS.denied;
+    // A swipe must not double as a tap: without this guard the release of a
+    // left-swipe also fired the card's onPress, expanding the tile mid-swipe
+    // (and the revealed delete action then stretched to the expanded height).
+    const swiping = useRef(false);
 
     const renderRightActions = () => (
-        <Pressable style={styles.swipeDelete} onPress={onDelete} accessibilityLabel="Delete record">
-            <Ionicons name="trash" size={20} color="#FFFFFF" />
-            <Text style={styles.swipeDeleteText}>Delete</Text>
-        </Pressable>
+        // The wrapper stretches to the row height; the button itself stays a
+        // fixed, centred size so it never towers over an expanded card.
+        <RNView style={styles.swipeDeleteWrap}>
+            <Pressable style={styles.swipeDelete} onPress={onDelete} accessibilityLabel="Delete record">
+                <Ionicons name="trash" size={20} color="#FFFFFF" />
+                <Text style={styles.swipeDeleteText}>Delete</Text>
+            </Pressable>
+        </RNView>
     );
 
     return (
-        <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
-        <Pressable style={styles.recordCard} onPress={() => setExpanded(!expanded)}>
+        <Swipeable
+            renderRightActions={renderRightActions}
+            overshootRight={false}
+            onSwipeableOpenStartDrag={() => { swiping.current = true; }}
+            onSwipeableClose={() => { swiping.current = false; }}
+        >
+        <Pressable
+            style={styles.recordCard}
+            onPress={() => { if (!swiping.current) setExpanded(!expanded); }}
+        >
             <RNView style={styles.recordHeader}>
                 <RNView style={styles.recordAppInfo}>
                     <Text style={styles.recordAppName}>
@@ -581,9 +597,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12, marginBottom: 12,
     },
     searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: '#0F172A' },
+    swipeDeleteWrap: { justifyContent: 'center', marginBottom: 10 },
     swipeDelete: {
         backgroundColor: '#DC2626', justifyContent: 'center', alignItems: 'center',
-        width: 84, marginBottom: 10, borderRadius: 12, gap: 2,
+        width: 84, height: 72, borderRadius: 12, gap: 2,
     },
     swipeDeleteText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
     chipTextMuted: { color: '#94A3B8', textDecorationLine: 'line-through' },

@@ -16,9 +16,10 @@ import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
-import { attributeLabel, ATTRIBUTE_MAP } from '@/services/attributes';
+import { attributeLabel, ATTRIBUTE_MAP, getProfileValue } from '@/services/attributes';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
+import { useProfileStore } from '@/stores/profile';
 import {
     IDENTITY_LABELS,
     KIND_LABELS,
@@ -84,6 +85,22 @@ export default function ServiceDetailScreen() {
     // legacy trusted-app row for pre-trail installs.
     const latestAtt = traces.find((t) => t.attestations?.length)?.attestations?.[0];
     const teeType = latestAtt?.teeType ?? app?.teeType ?? 'none';
+
+    // "What have I shared with this app" at a glance: the latest ceremony
+    // that shared anything. Pre-trace installs fall back to the consent
+    // records (keyed per client, like serviceKey) with live profile values.
+    const records = useConsentStore((s) => s.records);
+    const profile = useProfileStore((s) => s.profile);
+    const lastSharedTrace = traces.find((t) => (t.sharedAttributes?.length ?? 0) > 0);
+    const legacyShared = !lastSharedTrace
+        ? records.find(
+              (r) =>
+                  r.approvedAttributes.length > 0 &&
+                  (r.rpId === serviceKey ||
+                      r.origin === serviceKey ||
+                      (app && (r.origin === app.rpId || r.appName === app.appName)))
+          )
+        : undefined;
 
     const name = latest?.displayName ?? app?.appName ?? appName(serviceKey);
     const primaryHost = latest?.appHost ?? latest?.rpId ?? app?.rpId ?? serviceKey;
@@ -245,6 +262,47 @@ export default function ServiceDetailScreen() {
                         )}
                     </RNView>
 
+                    {/* Shared attributes — the most recent share, at a glance
+                        (the per-session breakdown lives in the trail below). */}
+                    {(lastSharedTrace || legacyShared) && (
+                        <RNView style={styles.card}>
+                            <RNView style={styles.cardTitleRow}>
+                                <Text style={styles.cardTitle}>Shared attributes</Text>
+                                <Text style={styles.traceCount}>
+                                    {formatWhen(
+                                        lastSharedTrace
+                                            ? lastSharedTrace.startedAt
+                                            : legacyShared!.consentedAt * 1000
+                                    )}
+                                </Text>
+                            </RNView>
+                            {lastSharedTrace
+                                ? lastSharedTrace.sharedAttributes!.map((s) => (
+                                      <SharedAttributeRow
+                                          key={s.key}
+                                          label={ATTRIBUTE_MAP[s.key] ? attributeLabel(s.key) : s.key}
+                                          value={s.gov ? 'Verified proof (raw value not shared)' : (s.value ?? '—')}
+                                          gov={!!s.gov}
+                                      />
+                                  ))
+                                : legacyShared!.approvedAttributes.map((key) => {
+                                      const gov = !!ATTRIBUTE_MAP[key]?.identityVerifiable;
+                                      return (
+                                          <SharedAttributeRow
+                                              key={key}
+                                              label={attributeLabel(key)}
+                                              value={
+                                                  gov
+                                                      ? 'Verified proof'
+                                                      : (profile && getProfileValue(profile, key)) || '—'
+                                              }
+                                              gov={gov}
+                                          />
+                                      );
+                                  })}
+                        </RNView>
+                    )}
+
                     {/* Session trail — every ceremony for this app. */}
                     {traces.length > 0 && (
                         <RNView style={styles.card}>
@@ -377,6 +435,25 @@ function TraceRow({
                             <DetailRow label="Verified" value={new Date(a.verifiedAt).toLocaleString()} />
                         </RNView>
                     ))}
+                </RNView>
+            )}
+        </RNView>
+    );
+}
+
+function SharedAttributeRow({ label, value, gov }: { label: string; value: string; gov: boolean }) {
+    return (
+        <RNView style={styles.sharedRow}>
+            <RNView style={styles.sharedInfo}>
+                <Text style={styles.sharedLabel}>{label}</Text>
+                <Text style={styles.sharedValue} numberOfLines={1}>
+                    {value}
+                </Text>
+            </RNView>
+            {gov && (
+                <RNView style={styles.verifiedBadge}>
+                    <Ionicons name="shield-checkmark" size={12} color="#059669" />
+                    <Text style={styles.verifiedText}>Proof</Text>
                 </RNView>
             )}
         </RNView>

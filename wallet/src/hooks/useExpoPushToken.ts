@@ -3,6 +3,7 @@ import { useRouter, type Router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
+import { DEFAULT_RELAY_HOST, fetchDescriptor } from '../services/descriptor';
 import { getPrivasysAccount } from '../services/privasys-id';
 import { registerPushTokenWithIdp } from '../services/vault-approval-api';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
@@ -95,10 +96,20 @@ function authRequestPayload(data: Record<string, unknown>): string | null {
     });
 }
 
+/** Relay host for a broker URL (`wss://relay.privasys.org/relay` → host). */
+function relayHostFrom(brokerUrl: unknown): string {
+    try {
+        const host = new URL(String(brokerUrl ?? '')).host;
+        return host || DEFAULT_RELAY_HOST;
+    } catch {
+        return DEFAULT_RELAY_HOST;
+    }
+}
+
 /** Route an inbound notification to the right screen by its `type`. Vault
  *  approvals go to the Vault approvals screen; everything else runs through the
  *  auth/voucher connect flow. */
-function dispatchPush(data: Record<string, unknown>, router: Router): void {
+async function dispatchPush(data: Record<string, unknown>, router: Router): Promise<void> {
     if (data?.type === 'vault-approval') {
         const vaultOp = String(data.vault_op ?? '');
         // Remember the capability so the Home banner + the screen list it even
@@ -112,9 +123,36 @@ function dispatchPush(data: Record<string, unknown>, router: Router): void {
         return;
     }
     const payload = authRequestPayload(data);
-    if (payload) {
-        router.push({ pathname: '/connect', params: { payload, source: 'push' } });
+    if (!payload) return;
+
+    // When the SDK published a relay descriptor for this session it pins the
+    // hash in the push (Expo push data is size-capped, so attribute
+    // requirements and paid-disclosure vouchers ride the descriptor instead).
+    // Fetch and pin-verify it — same trust model as a QR scan — and let it
+    // enrich the push payload. On any failure fall back to the push payload
+    // alone (pre-descriptor behaviour: plain profile sign-in still works).
+    let finalPayload = payload;
+    if (
+        data.type === 'auth-request' &&
+        typeof data.descriptorHash === 'string' &&
+        data.descriptorHash
+    ) {
+        try {
+            const desc = await fetchDescriptor(
+                relayHostFrom(data.brokerUrl),
+                String(data.sessionId),
+                data.descriptorHash,
+            );
+            if (desc?.sessionId === data.sessionId) {
+                // Descriptor wins where it speaks; push-only fields
+                // (userAgent, clientIP, …) survive the overlay.
+                finalPayload = JSON.stringify({ ...JSON.parse(payload), ...desc });
+            }
+        } catch (e) {
+            console.warn('[notifications] descriptor fetch failed; using push payload alone', e);
+        }
     }
+    router.push({ pathname: '/connect', params: { payload: finalPayload, source: 'push' } });
 }
 
 /** Sweep the OS notification tray for vault-approval notifications and remember
@@ -258,7 +296,7 @@ async function setupListeners(router: Router): Promise<void> {
                     | undefined;
                 if (data) {
                     // Defer one tick so the router is mounted before pushing.
-                    setTimeout(() => dispatchPush(data, router), 0);
+                    setTimeout(() => void dispatchPush(data, router), 0);
                 }
             }
         } catch (e) {
@@ -274,7 +312,7 @@ async function setupListeners(router: Router): Promise<void> {
     Notifications.addNotificationReceivedListener((n) => {
         const data = n.request.content.data as Record<string, unknown> | undefined;
         if (!data) return;
-        dispatchPush(data, router);
+        void dispatchPush(data, router);
     });
 
     // Tap-to-open handler — fires when the user taps a notification
@@ -286,7 +324,7 @@ async function setupListeners(router: Router): Promise<void> {
             | Record<string, unknown>
             | undefined;
         if (!data) return;
-        dispatchPush(data, router);
+        void dispatchPush(data, router);
     });
 
     // Surface pending approvals the user never tapped: sweep the tray now (app

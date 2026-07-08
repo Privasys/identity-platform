@@ -23,6 +23,7 @@ import { inspectAttestation, verifyAttestation } from '@/services/attestation';
 import { relaySessionToken } from '@/services/broker';
 import * as fido2 from '@/services/fido2';
 import { useAuthStore } from '@/stores/auth';
+import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
@@ -293,6 +294,34 @@ export default function BatchConnectScreen() {
                         });
                     }
                 }
+
+                // Audit trail: one trace per app authenticated in the batch.
+                const hasMeasurements = !!(app.attestation?.mrenclave || app.attestation?.mrtd);
+                useServiceSessionsStore.getState().record({
+                    serviceKey: app.rpId,
+                    kind: hasMeasurements ? 'enclave' : 'sign-in',
+                    identity: 'passkey',
+                    rpId: app.rpId,
+                    origin: app.rpId,
+                    channel: 'qr',
+                    startedAt: Date.now(),
+                    attestations:
+                        app.attestation && hasMeasurements
+                            ? [
+                                  {
+                                      host: app.rpId,
+                                      teeType: app.attestation.tee_type ?? 'sgx',
+                                      mrenclave: app.attestation.mrenclave,
+                                      mrtd: app.attestation.mrtd,
+                                      codeHash: app.attestation.workload_code_hash,
+                                      configRoot: app.attestation.workload_config_merkle_root,
+                                      imageRef: app.attestation.workload_image_ref,
+                                      quoteStatus: app.attestation.quote_verification_status,
+                                      verifiedAt: Date.now()
+                                  }
+                              ]
+                            : undefined
+                });
 
                 updatedApps[i] = { ...app, status: 'relayed' };
                 setApps([...updatedApps]);

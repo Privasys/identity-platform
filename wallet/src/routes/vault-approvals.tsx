@@ -37,6 +37,7 @@ import {
     resolveApprovalCredential,
     type VaultApprovalRequest,
 } from '@/services/vault-approval-api';
+import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 
 function shortHandle(handle: string): string {
@@ -118,6 +119,24 @@ export default function VaultApprovalsScreen() {
             setApprovingOp(req.vault_op);
             try {
                 await approveVaultApproval(req, credential);
+                // Audit trail: a one-shot, operation-bound authentication.
+                useServiceSessionsStore.getState().record({
+                    serviceKey: 'privasys-enclave-vault',
+                    displayName: 'Enclave Vault',
+                    kind: 'approval',
+                    identity: 'privasys-id',
+                    rpId: req.options.publicKey.rpId ?? 'privasys.id',
+                    origin: 'privasys.id',
+                    channel: 'push',
+                    startedAt: Date.now(),
+                    oneShot: true,
+                    detail:
+                        req.summary.operation === 'promote'
+                            ? `Approved a new version for key ${req.summary.handle}`
+                            : req.summary.operation === 'export'
+                              ? `Approved a key export for ${req.summary.handle}`
+                              : `Approved a vault operation on ${req.summary.handle}`
+                });
                 forget(req.vault_op);
                 Alert.alert('Approved', 'The operation is authorised. Your terminal will continue automatically.');
             } catch (e: any) {

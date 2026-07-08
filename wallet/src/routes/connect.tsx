@@ -57,6 +57,13 @@ import { getDeviceAttribute } from '@/services/device-attributes';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
+import {
+    serviceKeyFor,
+    useServiceSessionsStore,
+    type AttestationTrace,
+    type SessionTrace,
+    type SharedAttributeTrace,
+} from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
@@ -250,6 +257,90 @@ interface SignInConsentItem {
  *  client identity; older IdPs omit clientId → fall back to appName@rpId. */
 function consentKeyFor(payload: QRPayload): string {
     return payload.clientId || `${payload.appName ?? ''}@${payload.rpId}`;
+}
+
+/** Snapshot of one verified enclave attestation for the session trace. */
+function attestationTraceFrom(host: string, att: AttestationResult): AttestationTrace {
+    return {
+        host,
+        teeType:
+            att.tee_type === 'sgx' || att.tee_type === 'tdx' ||
+            att.tee_type === 'sev-snp' || att.tee_type === 'nvidia-gpu'
+                ? att.tee_type
+                : 'none',
+        mrenclave: att.mrenclave,
+        mrtd: att.mrtd,
+        codeHash: att.workload_code_hash,
+        configRoot: att.workload_config_merkle_root,
+        imageRef: att.workload_image_ref,
+        quoteStatus: att.quote_verification_status,
+        verifiedAt: Date.now(),
+    };
+}
+
+/** Record one completed authentication ceremony as a per-app session trace
+ *  (the audit trail Home + Service Details render). Returns the trace id so
+ *  multi-app ceremonies can attach companion-enclave attestations. */
+function recordCeremonyTrace(
+    payload: QRPayload,
+    opts: {
+        channel: 'qr' | 'push';
+        attestation?: AttestationResult | null;
+        /** Attribute values as actually sent (gov attrs are disclosure tokens). */
+        sharedValues?: Record<string, string>;
+        /** The consent-approved set (null when no consent gate ran). */
+        approved?: Set<string> | null;
+        relay?: { sessionId: string; expiresAt: number };
+    },
+): string {
+    const requested = (payload.requestedAttributes ?? []).filter(
+        (k) => k !== 'sub' && ATTRIBUTE_MAP[k],
+    );
+    const shared: SharedAttributeTrace[] = [];
+    for (const key of Object.keys(opts.sharedValues ?? {})) {
+        if (key === 'sub') continue; // the sign-in itself, never listed
+        const gov = assuranceFor(key, payload.attributeRequirements) === 'gov';
+        // Gov attributes leave as enclave-signed proofs — never snapshot the
+        // token (or the raw value); the marker is the honest record.
+        shared.push(gov ? { key, gov: true } : { key, value: opts.sharedValues![key] });
+    }
+    const sharedKeys = new Set(shared.map((s) => s.key));
+    const denied = opts.approved
+        ? requested.filter((k) => !opts.approved!.has(k) && !sharedKeys.has(k))
+        : [];
+    const kind: SessionTrace['kind'] = payload.requestedBy
+        ? 'device-auth'
+        : payload.mode === 'session-relay' || payload.mode === 'voucher-only'
+            ? 'relayed'
+            : opts.attestation
+                ? 'enclave'
+                : 'sign-in';
+    const att = opts.attestation
+        ? [attestationTraceFrom(payload.appHost ?? payload.rpId, opts.attestation)]
+        : undefined;
+    return useServiceSessionsStore.getState().record({
+        serviceKey: serviceKeyFor(payload),
+        displayName: payload.appName,
+        kind,
+        // An OIDC client_id means the sign-in was brokered by our IdP; a bare
+        // privasys.id RP likewise. Everything else is a plain passkey RP.
+        identity:
+            payload.clientId || payload.rpId.includes('privasys.id') ? 'privasys-id' : 'passkey',
+        clientId: payload.clientId,
+        rpId: payload.rpId,
+        origin: payload.origin,
+        appHost: payload.appHost,
+        channel: opts.channel,
+        requestedBy: payload.requestedBy,
+        startedAt: Date.now(),
+        expiresAt: opts.relay?.expiresAt,
+        oneShot: kind === 'device-auth' || undefined,
+        requestedAttributes: requested.length > 0 ? requested : undefined,
+        sharedAttributes: shared.length > 0 ? shared : undefined,
+        deniedAttributes: denied.length > 0 ? denied : undefined,
+        attestations: att,
+        sessionId: opts.relay?.sessionId,
+    });
 }
 
 /**
@@ -969,6 +1060,12 @@ export default function ConnectScreen() {
                 lastVerified: Math.floor(Date.now() / 1000),
                 credentialId: '', // voucher-only trust row (no passkey on this host)
             });
+            // Audit trail: the user was asked to authenticate to extend the
+            // sealed session to this enclave — a ceremony in its own right.
+            recordCeremonyTrace(payload, {
+                channel: params.source === 'push' ? 'push' : 'qr',
+                attestation: att,
+            });
             setStep('done');
             console.log(`[CONNECT] voucher-only: issued voucher for ${payload.appHost}`);
             // Return to Home like the other success paths — without this the
@@ -1048,6 +1145,7 @@ export default function ConnectScreen() {
         payload: QRPayload,
         keyAlias: string,
         result: { sessionToken: string; userId?: string },
+        ceremonyTraceId?: string,
     ) => {
         const hosts = (payload.extraAppHosts ?? []).filter((h) => h && h !== payload.appHost);
         if (
@@ -1086,6 +1184,14 @@ export default function ConnectScreen() {
                     lastVerified: Math.floor(Date.now() / 1000),
                     credentialId: '', // voucher-only trust row (no passkey on this host)
                 });
+                // One ceremony = one trace: companion enclaves sealed under the
+                // same unlock attach to the primary trace rather than fabricating
+                // a second "session" the user never separately approved.
+                if (ceremonyTraceId) {
+                    useServiceSessionsStore
+                        .getState()
+                        .attachAttestation(ceremonyTraceId, attestationTraceFrom(host, att));
+                }
                 console.log(`[CONNECT] extra-app voucher issued for ${host}`);
             } catch (err: any) {
                 console.warn(`[CONNECT] extra-app voucher for ${host} failed:`, err?.message ?? err);
@@ -1164,11 +1270,13 @@ export default function ConnectScreen() {
 
             // Surface the live sealed session on the Home screen so the
             // user sees the relay countdown next to the connected service.
+            let relayInfo: { sessionId: string; expiresAt: number } | undefined;
             if (result.sessionRelay) {
                 const safeExpiresAt = sanitizeRelayExpiresAt(result.sessionRelay.expiresAt);
                 console.log(
                     `[CONNECT] registering relay session on Home: sessionId=${result.sessionRelay.sessionId.substring(0, 8)}... rawExpiresAt=${result.sessionRelay.expiresAt} safeExpiresAt=${safeExpiresAt} (in ${Math.round((safeExpiresAt - Date.now()) / 1000)}s)`
                 );
+                relayInfo = { sessionId: result.sessionRelay.sessionId, expiresAt: safeExpiresAt };
                 addRelaySession({
                     sessionId: result.sessionRelay.sessionId,
                     rpId: payload.rpId,
@@ -1181,13 +1289,23 @@ export default function ConnectScreen() {
                 console.warn('[CONNECT] registration result has no sessionRelay binding — Home tab will not show this session');
             }
 
+            // Audit trail: one trace per ceremony, keyed by the APP (client),
+            // carrying what was requested/shared and the verified attestation.
+            const traceId = recordCeremonyTrace(payload, {
+                channel: params.source === 'push' ? 'push' : 'qr',
+                attestation: attestationRef.current ?? attestation,
+                sharedValues: attributes,
+                approved: approvedAttrsRef.current,
+                relay: relayInfo,
+            });
+
             // Upload the silent-rebind voucher while the keystore's
             // biometric grace (where supported) still covers the extra
             // hardware signature.
             maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg);
             // Multi-app attestation: seal any extra enclave hosts in the same
             // ceremony (back-to-back, under the one biometric grace window).
-            void issueExtraAppVouchers(payload, keyAlias, result);
+            void issueExtraAppVouchers(payload, keyAlias, result, traceId);
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
@@ -1285,11 +1403,13 @@ export default function ConnectScreen() {
             // Phase E: when the SDK opted into the sealed session-relay
             // bootstrap, surface the live session on the Home screen
             // until the enclave-side binding expires.
+            let relayInfo: { sessionId: string; expiresAt: number } | undefined;
             if (result.sessionRelay) {
                 const safeExpiresAt = sanitizeRelayExpiresAt(result.sessionRelay.expiresAt);
                 console.log(
                     `[CONNECT] registering relay session on Home: sessionId=${result.sessionRelay.sessionId.substring(0, 8)}... rawExpiresAt=${result.sessionRelay.expiresAt} safeExpiresAt=${safeExpiresAt} (in ${Math.round((safeExpiresAt - Date.now()) / 1000)}s)`
                 );
+                relayInfo = { sessionId: result.sessionRelay.sessionId, expiresAt: safeExpiresAt };
                 addRelaySession({
                     sessionId: result.sessionRelay.sessionId,
                     // Key the relay session by the same identity as the
@@ -1307,13 +1427,22 @@ export default function ConnectScreen() {
                 });
             }
 
+            // Audit trail: one trace per ceremony, keyed by the APP (client).
+            const traceId = recordCeremonyTrace(payload, {
+                channel: params.source === 'push' ? 'push' : 'qr',
+                attestation: attestationRef.current ?? attestation,
+                sharedValues: attributes,
+                approved: approvedAttrsRef.current,
+                relay: relayInfo,
+            });
+
             // Upload the silent-rebind voucher while the keystore's
             // biometric grace (where supported) still covers the extra
             // hardware signature.
             maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg);
             // Multi-app attestation: seal any extra enclave hosts in the same
             // ceremony (back-to-back, under the one biometric grace window).
-            void issueExtraAppVouchers(payload, keyAlias, result);
+            void issueExtraAppVouchers(payload, keyAlias, result, traceId);
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
@@ -1435,6 +1564,14 @@ export default function ConnectScreen() {
                     pending.credential.serverRpId,
                 );
             }
+
+            // Audit trail (no sealed relay rides this late-relay path).
+            recordCeremonyTrace(pending.payload, {
+                channel: params.source === 'push' ? 'push' : 'qr',
+                attestation: attestationRef.current ?? attestation,
+                sharedValues: attributes,
+                approved: approvedAttrsRef.current,
+            });
 
             pendingRelay.current = null;
             setStep('done');

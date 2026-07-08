@@ -5,6 +5,12 @@ import { StyleSheet, ScrollView, Pressable, TextInput, View as RNView } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
+import {
+    KIND_LABELS,
+    serviceHosts,
+    type SessionTrace,
+    useServiceSessionsStore
+} from '@/stores/service-sessions';
 import { useSessionsStore, type RelaySession } from '@/stores/sessions';
 import { useTrustedAppsStore, type TrustedApp } from '@/stores/trusted-apps';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
@@ -19,50 +25,118 @@ function appName(rpId: string): string {
 }
 
 /**
- * One row in the unified Active Sessions list. Rows are keyed by
- * rpId. A row may originate from a trusted app, a live relay session,
- * or both (sealed transport on a known app).
+ * One card in the sessions list — one per APP the user authenticated to
+ * (serviceKey = OIDC client id / enclave host), never per shared rpId, so
+ * "Privasys Chat" and "Developer Platform" stay separate cards even though
+ * both ride the privasys.id RP. A card aggregates that app's session traces,
+ * plus its live sealed relay session and legacy trusted-app row when present.
  */
 interface SessionRow {
-    rpId: string;
+    key: string;
     name: string;
+    /** Latest trace for this app (drives the type label + subtitle). */
+    trace?: SessionTrace;
+    /** Legacy trusted-app row (pre-trace installs) backing this card. */
     app?: TrustedApp;
     session?: RelaySession;
+    teeType: TrustedApp['teeType'];
     /** Sort key: most-recently-active first. */
     lastActiveMs: number;
 }
 
-function buildRows(apps: TrustedApp[], sessions: RelaySession[], now: number): SessionRow[] {
+function buildRows(
+    traces: SessionTrace[],
+    apps: TrustedApp[],
+    sessions: RelaySession[],
+    now: number
+): SessionRow[] {
     const live = sessions.filter((s) => s.expiresAt > now);
-    const sessionByRpId = new Map<string, RelaySession>();
-    for (const s of live) sessionByRpId.set(s.rpId, s);
+    const sessionByHost = new Map<string, RelaySession>();
+    for (const s of live) sessionByHost.set(s.rpId, s);
 
-    const rows: SessionRow[] = apps.map((app) => {
-        const session = sessionByRpId.get(app.rpId);
-        sessionByRpId.delete(app.rpId);
-        return {
-            rpId: app.rpId,
+    // Group traces per app.
+    const byService = new Map<string, SessionTrace[]>();
+    for (const t of traces) {
+        const list = byService.get(t.serviceKey);
+        if (list) list.push(t);
+        else byService.set(t.serviceKey, [t]);
+    }
+
+    const coveredHosts = new Set<string>();
+    const coveredSessions = new Set<string>();
+    const rows: SessionRow[] = [];
+
+    for (const [key, list] of byService) {
+        const latest = list[0]; // store is newest-first
+        const hosts = serviceHosts(list);
+        for (const h of hosts) coveredHosts.add(h);
+        // A live sealed session belongs to this card when it is keyed by any
+        // host this app's ceremonies touched.
+        let session: RelaySession | undefined;
+        for (const h of hosts) {
+            const s = sessionByHost.get(h);
+            if (s) {
+                session = s;
+                coveredSessions.add(s.sessionId);
+                break;
+            }
+        }
+        const att = list.find((t) => t.attestations?.length)?.attestations?.[0];
+        rows.push({
+            key,
+            name: latest.displayName ?? appName(key),
+            trace: latest,
+            app: apps.find((a) => hosts.has(a.rpId)),
+            session,
+            teeType: att?.teeType ?? 'none',
+            lastActiveMs: session ? Math.max(session.startedAt, latest.startedAt) : latest.startedAt
+        });
+    }
+
+    // Legacy trusted-app rows not covered by any trace yet (installs that
+    // predate the per-app trail) keep their card so nothing disappears.
+    for (const app of apps) {
+        if (coveredHosts.has(app.rpId)) continue;
+        const session = sessionByHost.get(app.rpId);
+        if (session) coveredSessions.add(session.sessionId);
+        rows.push({
+            key: app.rpId,
             name: app.appName ?? appName(app.rpId),
             app,
             session,
+            teeType: app.teeType,
             lastActiveMs: session ? session.startedAt : app.lastVerified * 1000
-        };
-    });
-    // Orphan live sessions (no trusted-app row yet — rare, but possible).
-    for (const session of sessionByRpId.values()) {
+        });
+    }
+
+    // Orphan live sessions (no trace, no trusted-app row — rare).
+    for (const session of live) {
+        if (coveredSessions.has(session.sessionId)) continue;
         rows.push({
-            rpId: session.rpId,
+            key: session.rpId,
             name: session.appName ?? appName(session.rpId),
             session,
+            teeType: 'none',
             lastActiveMs: session.startedAt
         });
     }
+
     rows.sort((a, b) => b.lastActiveMs - a.lastActiveMs);
     return rows;
 }
 
+/** Compact "when" for the card subtitle. */
+function relativeWhen(ms: number, now: number): string {
+    const diff = now - ms;
+    if (diff < 60_000) return 'just now';
+    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+    return new Date(ms).toLocaleDateString();
+}
+
 export default function HomeScreen() {
     const { apps } = useTrustedAppsStore();
+    const traces = useServiceSessionsStore((s) => s.traces);
     const sessions = useSessionsStore((s) => s.sessions);
     const pruneExpired = useSessionsStore((s) => s.pruneExpired);
     const pendingApprovals = useVaultApprovalsStore((s) => s.pending);
@@ -89,13 +163,16 @@ export default function HomeScreen() {
         return () => clearInterval(id);
     }, [refreshApprovals]);
 
-    const rows = useMemo(() => buildRows(apps, sessions, now), [apps, sessions, now]);
+    const rows = useMemo(
+        () => buildRows(traces, apps, sessions, now),
+        [traces, apps, sessions, now]
+    );
     const showSearch = rows.length > SEARCH_THRESHOLD;
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return rows;
         return rows.filter(
-            (r) => r.name.toLowerCase().includes(q) || r.rpId.toLowerCase().includes(q)
+            (r) => r.name.toLowerCase().includes(q) || r.key.toLowerCase().includes(q)
         );
     }, [rows, query]);
 
@@ -192,12 +269,11 @@ export default function HomeScreen() {
                             </Text>
                         ) : (
                             filtered.map((row) => {
-                                // Sealed transport is deliberately NOT
-                                // surfaced: it is an internal transport
-                                // guarantee, not a session property the
-                                // user should reason about (plan WS5 —
-                                // "no visible sealed/normal split").
-                                const teeType = row.app?.teeType ?? 'none';
+                                // Type/tech differences stay SUBTLE: same card
+                                // anatomy for every session type; only the icon
+                                // tint and the one-line meta text vary, plus a
+                                // small live dot when a sealed session is up.
+                                const teeType = row.teeType;
                                 const iconBg =
                                     teeType === 'sgx'
                                         ? '#34E89E'
@@ -210,16 +286,23 @@ export default function HomeScreen() {
                                         : teeType === 'tdx'
                                             ? 'shield-checkmark'
                                             : 'key';
-                                const onPress = row.app
-                                    ? () =>
-                                        router.push({
-                                            pathname: '/service-detail',
-                                            params: { rpId: row.rpId }
-                                        })
-                                    : undefined;
+                                const kindLabel = row.trace
+                                    ? KIND_LABELS[row.trace.kind]
+                                    : teeType === 'none'
+                                        ? 'Passkey'
+                                        : 'Enclave';
+                                const meta = `${kindLabel} · ${relativeWhen(row.lastActiveMs, now)}`;
+                                const onPress =
+                                    row.trace || row.app
+                                        ? () =>
+                                            router.push({
+                                                pathname: '/service-detail',
+                                                params: { serviceKey: row.key }
+                                            })
+                                        : undefined;
                                 return (
                                     <Pressable
-                                        key={row.rpId}
+                                        key={row.key}
                                         style={styles.serviceCard}
                                         onPress={onPress}
                                         disabled={!onPress}
@@ -232,12 +315,9 @@ export default function HomeScreen() {
                                         <RNView style={styles.serviceInfo}>
                                             <RNView style={styles.serviceNameRow}>
                                                 <Text style={styles.serviceName}>{row.name}</Text>
+                                                {row.session && <RNView style={styles.liveDot} />}
                                             </RNView>
-                                            <Text style={styles.serviceMeta}>
-                                                {row.app
-                                                    ? `${teeType === 'none' ? 'Passkey' : teeType.toUpperCase()} · Connected ${new Date(row.app.lastVerified * 1000).toLocaleDateString()}`
-                                                    : 'Connected'}
-                                            </Text>
+                                            <Text style={styles.serviceMeta}>{meta}</Text>
                                         </RNView>
                                         {onPress && (
                                             <Ionicons
@@ -404,6 +484,13 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#0F172A'
+    },
+    liveDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: '#34E89E',
+        marginLeft: 8
     },
     serviceMeta: {
         fontSize: 12,

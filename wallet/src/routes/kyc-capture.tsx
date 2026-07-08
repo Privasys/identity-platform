@@ -30,6 +30,7 @@ import {
     verifyIdentity, type KycRecord, type VerifierAttestation,
 } from '@/services/kyc';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
+import { useServiceSessionsStore } from '@/stores/service-sessions';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
 type Step = 'doctype' | 'consent' | 'attest' | 'capture' | 'read' | 'selfie' | 'verifying' | 'select' | 'done';
@@ -428,6 +429,41 @@ export default function KycCaptureScreen() {
         setBusy(true);
         try {
             const result = await verifyIdentity(docRead, { liveImageBase64, docImage: docImage || undefined });
+            // Audit trail: the identity check is an authentication ceremony
+            // against the verifier enclave — record what left the device and
+            // the attestation the user approved before capture.
+            const att = verifierAtt?.attestation;
+            useServiceSessionsStore.getState().record({
+                serviceKey: verifierAtt?.origin ?? 'privasys-identity-verifier',
+                displayName: verifierAtt?.displayName ?? 'Privasys identity verifier',
+                kind: 'identity-check',
+                identity: 'privasys-id',
+                rpId: verifierAtt?.origin ?? '',
+                origin: verifierAtt?.origin ?? '',
+                startedAt: Date.now(),
+                oneShot: true,
+                detail: `Verified a ${docLabel}; raw document and selfie processed in the enclave and discarded`,
+                sharedAttributes: [
+                    { key: 'document_chip', value: `${docLabel} chip (NFC)` },
+                    ...(docImage ? [{ key: 'document_photo_page', value: 'Photo page image' }] : []),
+                    ...(liveImageBase64 ? [{ key: 'live_selfie', value: 'Live selfie' }] : [])
+                ],
+                attestations: att
+                    ? [
+                          {
+                              host: verifierAtt.origin,
+                              teeType: att.tee_type ?? 'tdx',
+                              mrenclave: att.mrenclave,
+                              mrtd: att.mrtd,
+                              codeHash: att.workload_code_hash,
+                              configRoot: att.workload_config_merkle_root,
+                              imageRef: att.workload_image_ref,
+                              quoteStatus: att.quote_verification_status,
+                              verifiedAt: Date.now()
+                          }
+                      ]
+                    : undefined
+            });
             // Present the verified attributes for the holder to choose what to
             // import (same pattern as the IdP import flow), including the ID photo.
             const cands = govAttributeCandidates(result.record, docRead.portraitBase64);

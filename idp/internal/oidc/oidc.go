@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +40,62 @@ const (
 	longLivedTokenTTLSeconds = 5 * 365 * 24 * 3600
 )
 
+// Authentication context classes (assurance tiers) an RP may request via
+// acr_values and that the issued ID token echoes back as `acr`:
+//
+//	wallet    — interactive device-bound ceremony (wallet push/QR or
+//	            passkey). Every authorization here is at least this;
+//	            prompt=none is refused.
+//	gov-fresh — this ceremony minted at least one gov-assured attribute
+//	            as an enclave-signed disclosure token (and none arrived
+//	            raw). The RP gets a fresh receipt, not a cached claim.
+//
+// gov-presence (selfie-vs-document holder check) is designed but NOT yet
+// supported — requesting it errors rather than silently downgrading.
+var acrValuesSupported = []string{"wallet", "gov-fresh"}
+
+func acrSupported(v string) bool {
+	for _, s := range acrValuesSupported {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+// looksLikeDisclosureToken reports whether an attribute value is an
+// enclave-signed SD-JWT VC disclosure (compact JWS + '~') rather than a
+// raw value relayed from the wallet profile.
+func looksLikeDisclosureToken(v string) bool {
+	return strings.HasPrefix(v, "eyJ") && strings.HasSuffix(v, "~") &&
+		strings.Count(v, ".") >= 2
+}
+
+// acrForCode computes the ACHIEVED authentication context class for a
+// completed ceremony: "gov-fresh" when at least one gov-assured attribute
+// arrived as a disclosure token and none arrived raw; otherwise "wallet".
+// Computed from what actually happened, never from what was requested.
+func acrForCode(ac *AuthCode, client *clients.Client) string {
+	reqs := attributeRequirementsForScope(ac.Scope, client)
+	govToken, govRaw := false, false
+	for key, req := range reqs {
+		if req.Assurance != "gov" {
+			continue
+		}
+		if v, ok := ac.Attributes[key]; ok && v != "" {
+			if looksLikeDisclosureToken(v) {
+				govToken = true
+			} else {
+				govRaw = true
+			}
+		}
+	}
+	if govToken && !govRaw {
+		return "gov-fresh"
+	}
+	return "wallet"
+}
+
 // HandleDiscovery returns the OIDC discovery document.
 func HandleDiscovery(issuerURL string) http.HandlerFunc {
 	doc := map[string]interface{}{
@@ -56,9 +113,10 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		"scopes_supported":                      []string{"openid", "profile", "email", "phone", "identity", "offline_access"},
 		"token_endpoint_auth_methods_supported": []string{"none", "client_secret_post", "client_secret_basic"},
 		"code_challenge_methods_supported":      []string{"S256"},
+		"acr_values_supported":                  acrValuesSupported,
 		"claims_supported": []string{
 			"sub", "name", "given_name", "family_name", "email", "email_verified",
-			"picture", "locale", "phone_number",
+			"picture", "locale", "phone_number", "acr",
 			"attestation_level", "auth_time", "iss", "aud", "exp", "iat",
 			"roles",
 		},
@@ -87,6 +145,13 @@ type AuthCode struct {
 	CodeChallengeMethod string
 	AuthTime            time.Time
 	ExpiresAt           time.Time
+
+	// ACRValues carries the relying party's requested authentication
+	// context classes ("wallet", "gov-fresh") from /authorize. The
+	// ACHIEVED class is computed at token issuance from what actually
+	// arrived on this code (see acrForCode) — a request is intent, not
+	// a promise.
+	ACRValues string
 
 	// Transient profile attributes — sourced from social IdP or wallet relay,
 	// carried in-memory through the auth code, embedded in the JWT, then GC'd.
@@ -196,6 +261,10 @@ type AuthSession struct {
 	CodeChallengeMethod string
 	CreatedAt           time.Time
 	ExpiresAt           time.Time
+
+	// ACRValues from the /authorize request (space-separated, validated
+	// against acrValuesSupported). Threaded onto the auth code.
+	ACRValues string
 
 	// Set when the wallet completes FIDO2 authentication.
 	Authenticated bool
@@ -338,6 +407,32 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 			return
 		}
 
+		// Validate acr_values (assurance tiers). Unknown values are a hard
+		// error rather than the spec's "ignore voluntary claims" — silently
+		// downgrading an RP that asked for a stronger ceremony (e.g. a
+		// future gov-presence) is exactly the failure a regulated RP cannot
+		// tolerate.
+		acrValues := strings.TrimSpace(q.Get("acr_values"))
+		for _, v := range strings.Fields(acrValues) {
+			if !acrSupported(v) {
+				errorResponse(w, http.StatusBadRequest, "invalid_request",
+					"unsupported acr_values entry: "+v)
+				return
+			}
+		}
+
+		// max_age: accepted for OIDC compliance. Every authorization here is
+		// an interactive wallet/passkey ceremony (prompt=none is refused), so
+		// auth_time is always fresh and no re-auth forcing is needed; the RP
+		// enforces its policy against the auth_time claim in the ID token.
+		if ma := q.Get("max_age"); ma != "" {
+			if _, err := strconv.Atoi(ma); err != nil {
+				errorResponse(w, http.StatusBadRequest, "invalid_request",
+					"max_age must be an integer")
+				return
+			}
+		}
+
 		// Generate session ID.
 		sessionID := generateID()
 
@@ -348,6 +443,7 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 			Scope:               scope,
 			State:               state,
 			Nonce:               nonce,
+			ACRValues:           acrValues,
 			CodeChallenge:       codeChallenge,
 			CodeChallengeMethod: codeChallengeMethod,
 			CreatedAt:           time.Now(),
@@ -518,6 +614,7 @@ func HandleSessionComplete(codes *CodeStore, sessions *SessionStore) http.Handle
 			UserID:              userID,
 			Scope:               session.Scope,
 			Nonce:               session.Nonce,
+			ACRValues:           session.ACRValues,
 			CodeChallenge:       session.CodeChallenge,
 			CodeChallengeMethod: session.CodeChallengeMethod,
 			AuthTime:            time.Now(),
@@ -783,6 +880,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 		Audience:         ac.ClientID,
 		Nonce:            ac.Nonce,
 		AuthTime:         ac.AuthTime,
+		ACR:              acrForCode(ac, client),
 		SID:              sid,
 		SessionRelay:     ac.SessionRelay,
 	})

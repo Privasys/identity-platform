@@ -434,6 +434,7 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		UserID:              userID,
 		Scope:               session.Scope,
 		Nonce:               session.Nonce,
+		ACRValues:           session.ACRValues,
 		CodeChallenge:       session.CodeChallenge,
 		CodeChallengeMethod: session.CodeChallengeMethod,
 		AuthTime:            time.Now(),

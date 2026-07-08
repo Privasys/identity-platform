@@ -441,6 +441,7 @@ func HandleDeviceApprove(issuer *tokens.Issuer, devices *DeviceStore, sessions *
 				ClientID:            session.ClientID,
 				UserID:              sub,
 				Scope:               session.Scope,
+				ACRValues:           session.ACRValues,
 				CodeChallenge:       session.CodeChallenge,
 				CodeChallengeMethod: session.CodeChallengeMethod,
 				AuthTime:            time.Now(),

@@ -104,6 +104,12 @@ type IDTokenClaims struct {
 	Nonce            string
 	AuthTime         time.Time
 
+	// ACR is the ACHIEVED authentication context class ("wallet",
+	// "gov-fresh"), computed by the token endpoint from what actually
+	// happened in the ceremony. Emitted as the standard `acr` claim so
+	// relying parties can enforce per-action assurance policy.
+	ACR string
+
 	// SID is the unified per-(user, app, device) session id (see
 	// `internal/sessions`). When non-empty it is emitted as a top-level
 	// `sid` claim on every issued ID/access token. The wallet, the
@@ -142,6 +148,9 @@ func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 	}
 	if claims.Nonce != "" {
 		c["nonce"] = claims.Nonce
+	}
+	if claims.ACR != "" {
+		c["acr"] = claims.ACR
 	}
 	if claims.SID != "" {
 		c["sid"] = claims.SID

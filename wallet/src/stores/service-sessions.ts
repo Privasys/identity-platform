@@ -177,7 +177,12 @@ export function serviceHosts(traces: SessionTrace[]): Set<string> {
     const hosts = new Set<string>();
     for (const t of traces) {
         hosts.add(t.serviceKey);
-        hosts.add(t.rpId);
+        // Include rpId ONLY for a plain passkey RP (where the rpId IS the app
+        // identity, so serviceKey === rpId). For an IdP-brokered app the rpId is
+        // the SHARED privasys.id RP — adding it here would link every unrelated
+        // app together, so signing into one (e.g. chat) would absorb another's
+        // card (e.g. the Developer Platform).
+        if (t.rpId && t.rpId === t.serviceKey) hosts.add(t.rpId);
         if (t.appHost) hosts.add(t.appHost);
         for (const a of t.attestations ?? []) hosts.add(a.host);
     }

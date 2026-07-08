@@ -1704,6 +1704,17 @@ export default function ConnectScreen() {
                             <Text style={styles.title}>Sign-in request</Text>
                             <Text style={styles.confirmAppName}>{qr.appName || appName(qr.rpId)}</Text>
                             <Text style={styles.confirmDomain}>{qr.rpId}</Text>
+                            {/* What this sign-in actually connects to. For a
+                                session-relay flow the sealed session binds to the
+                                enclave at `appHost` (verified on the next screen),
+                                not the IdP rpId above — surface it so the user can
+                                see the real endpoint before approving. */}
+                            {qr.appHost && qr.appHost !== qr.rpId && (
+                                <View style={styles.confirmEndpointRow}>
+                                    <Ionicons name="lock-closed" size={12} color="#0F766E" />
+                                    <Text style={styles.confirmEndpoint}>{qr.appHost}</Text>
+                                </View>
+                            )}
                             {(friendlyBrowser(qr.userAgent) || qr.clientIP) && (
                                 <Text style={styles.confirmHint}>
                                     {[friendlyBrowser(qr.userAgent), qr.clientIP].filter(Boolean).join(' · ')}
@@ -2881,6 +2892,22 @@ const styles = StyleSheet.create({
         color: '#94A3B8',
         textAlign: 'center',
         marginBottom: 12
+    },
+    confirmEndpointRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(15, 118, 110, 0.08)',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginBottom: 12
+    },
+    confirmEndpoint: {
+        fontSize: 13,
+        fontFamily: 'Inter',
+        color: '#0F766E',
+        flexShrink: 1
     },
     confirmHint: {
         fontSize: 14,

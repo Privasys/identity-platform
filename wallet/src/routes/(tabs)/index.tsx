@@ -63,6 +63,7 @@ function buildRows(
     }
 
     const coveredHosts = new Set<string>();
+    const coveredNames = new Set<string>();
     const coveredSessions = new Set<string>();
     const rows: SessionRow[] = [];
 
@@ -70,6 +71,7 @@ function buildRows(
         const latest = list[0]; // store is newest-first
         const hosts = serviceHosts(list);
         for (const h of hosts) coveredHosts.add(h);
+        coveredNames.add(latest.displayName ?? appName(key));
         // A live sealed session belongs to this card when it is keyed by any
         // host this app's ceremonies touched.
         let session: RelaySession | undefined;
@@ -94,9 +96,14 @@ function buildRows(
     }
 
     // Legacy trusted-app rows not covered by any trace yet (installs that
-    // predate the per-app trail) keep their card so nothing disappears.
+    // predate the per-app trail) keep their card so nothing disappears. A row
+    // is covered when a trace touched its host, OR when a trace card carries the
+    // same app name — so an app's OWN legacy row merges into its trace card once
+    // it exists, while an unrelated app's trace (sharing only the privasys.id
+    // rpId, now excluded from hosts) leaves it standing.
     for (const app of apps) {
-        if (coveredHosts.has(app.rpId)) continue;
+        const appLabel = app.appName ?? appName(app.rpId);
+        if (coveredHosts.has(app.rpId) || coveredNames.has(appLabel)) continue;
         const session = sessionByHost.get(app.rpId);
         if (session) coveredSessions.add(session.sessionId);
         rows.push({

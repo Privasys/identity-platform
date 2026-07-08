@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { attributeLabel, ATTRIBUTE_MAP, getProfileValue } from '@/services/attributes';
+import * as fido2 from '@/services/fido2';
+import { listMySessions, revokeSession } from '@/services/sessions-api';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -106,7 +108,63 @@ export default function ServiceDetailScreen() {
     const primaryHost = latest?.appHost ?? latest?.rpId ?? app?.rpId ?? serviceKey;
 
     const [removing, setRemoving] = useState(false);
+    const [signingOut, setSigningOut] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+
+    // Server-side sign-out: revoke every IdP session issued to THIS app
+    // (client_id-keyed rows), so its tokens stop working immediately — the
+    // "lost a browser" case. Authenticates with the same credential this
+    // app's ceremonies used, so the sessions listed/revoked are guaranteed to
+    // belong to the identity that actually signed in here. Only offered when
+    // both the client identity and the credential are known.
+    const clientId = latest?.clientId;
+    const handleServerSignOut = () => {
+        if (!clientId || !credential) return;
+        Alert.alert(
+            'Sign out from server',
+            `Revoke every server session for ${name}? Browsers and agents using them will need to sign in again.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Sign out',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setSigningOut(true);
+                        try {
+                            const auth = await fido2.authenticate(
+                                credential.rpId,
+                                credential.keyAlias,
+                                credential.credentialId,
+                                '', // no browser relay — wallet-only session
+                                credential.serverRpId
+                            );
+                            if (!auth.sessionToken) {
+                                throw new Error('authentication did not return a session');
+                            }
+                            const sessions = await listMySessions(auth.sessionToken);
+                            const mine = sessions.filter((s) => s.client_id === clientId);
+                            for (const s of mine) {
+                                await revokeSession(auth.sessionToken, s.sid);
+                            }
+                            Alert.alert(
+                                'Signed out',
+                                mine.length === 0
+                                    ? 'No active server sessions for this app.'
+                                    : `${mine.length} server session${mine.length !== 1 ? 's' : ''} revoked. Issued tokens stop working within a minute.`
+                            );
+                        } catch (e) {
+                            Alert.alert(
+                                'Sign out failed',
+                                e instanceof Error ? e.message : 'Could not revoke the sessions.'
+                            );
+                        } finally {
+                            setSigningOut(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const handleRemove = () => {
         Alert.alert(
@@ -319,6 +377,20 @@ export default function ServiceDetailScreen() {
                                 />
                             ))}
                         </RNView>
+                    )}
+
+                    {/* Sign out from server (per-app token revocation) */}
+                    {clientId && credential && (
+                        <Pressable
+                            style={[styles.signOutButton, signingOut && styles.removeButtonDisabled]}
+                            onPress={handleServerSignOut}
+                            disabled={signingOut}
+                        >
+                            <Ionicons name="log-out-outline" size={18} color="#0F766E" />
+                            <Text style={styles.signOutButtonText}>
+                                {signingOut ? 'Signing out…' : 'Sign Out from Server'}
+                            </Text>
+                        </Pressable>
                     )}
 
                     {/* Remove */}
@@ -633,6 +705,19 @@ const styles = StyleSheet.create({
     detailLabel: { fontSize: 13, color: '#64748B', flex: 1 },
     detailValue: { fontSize: 13, color: '#0F172A', flex: 2, textAlign: 'right' },
     mono: { fontFamily: 'Inter' },
+    signOutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingVertical: 14,
+        borderWidth: 1,
+        borderColor: '#0F766E',
+        marginBottom: 12
+    },
+    signOutButtonText: { fontSize: 16, fontWeight: '600', color: '#0F766E' },
     removeButton: {
         flexDirection: 'row',
         alignItems: 'center',

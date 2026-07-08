@@ -15,6 +15,7 @@
  *                      first so the user can reject unexpected requests.
  */
 
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams, Stack, type Href } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -51,7 +52,7 @@ import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, getProfileAssurance, getProfileValue, setProfileValue } from '@/services/attributes';
-import { discloseAttribute } from '@/services/kyc';
+import { discloseAttribute, provePresence, voucherForAttribute } from '@/services/kyc';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
 import { useAuthStore } from '@/stores/auth';
@@ -125,10 +126,15 @@ function friendlyBrowser(ua?: string): string | null {
  * `requestedAttributes` in the QR payload.  Returns undefined if
  * nothing was requested or the profile is empty.
  */
+/** Ceremonial presence attribute: proven by a fresh in-flow selfie matched to
+ *  the document portrait inside the enclave — never a stored profile value. */
+const PRESENCE_KEY = 'holder_present';
+
 async function resolveRequestedAttributes(
     payload: QRPayload,
     profile: import('@/stores/profile').UserProfile | null,
     approved?: Set<string> | null,
+    selfieBase64?: string | null,
 ): Promise<Record<string, string> | undefined> {
     const requested = payload.requestedAttributes;
     if (!requested?.length || !profile) return undefined;
@@ -146,6 +152,25 @@ async function resolveRequestedAttributes(
         // screen (or via standing consent) leave the wallet. `sub` is exempt —
         // it IS the sign-in.
         if (approved && !approved.has(attr)) continue;
+        if (attr === PRESENCE_KEY) {
+            // Fresh-presence ceremony: the selfie captured in THIS flow is
+            // matched in-enclave against the committed document portrait.
+            // No selfie (user skipped, or capture failed) → attribute omitted;
+            // the relying party applies its own policy to the absence.
+            if (!selfieBase64) continue;
+            try {
+                attrs[attr] = await provePresence(
+                    payload.rpId,
+                    selfieBase64,
+                    payload.nonce ?? payload.sessionId,
+                    voucherForAttribute(PRESENCE_KEY, payload.disclosureVouchers),
+                );
+            } catch (e: any) {
+                // Never fake presence; omit on failure (incl. face mismatch).
+                console.warn(`[CONNECT] presence proof failed: ${e?.message}`);
+            }
+            continue;
+        }
         const value = getProfileValue(profile, attr);
         if (value) {
             if (assuranceFor(attr, payload.attributeRequirements) === 'gov') {
@@ -355,16 +380,28 @@ function buildConsentPlan(
 ): SignInConsentItem[] {
     const reqs = payload.attributeRequirements;
     return (payload.requestedAttributes ?? [])
-        .filter((k) => k !== 'sub' && ATTRIBUTE_MAP[k])
-        .map((key) => ({
-            key,
-            label: attributeLabel(key),
-            essential: isEssential(key, reqs),
-            gov: assuranceFor(key, reqs) === 'gov',
-            hasValue:
-                !!(profile && getProfileValue(profile, key)) ||
-                !!ATTRIBUTE_MAP[key]?.deviceSourced,
-        }))
+        .filter((k) => k !== 'sub' && (ATTRIBUTE_MAP[k] || k === PRESENCE_KEY))
+        .map((key) =>
+            key === PRESENCE_KEY
+                ? {
+                    // Ceremonial: collected by the in-flow selfie check, so it
+                    // is always "available" — the user decides on this screen
+                    // whether the ceremony runs at all.
+                    key,
+                    label: attributeLabel(key),
+                    essential: isEssential(key, reqs),
+                    gov: true,
+                    hasValue: true,
+                }
+                : {
+                    key,
+                    label: attributeLabel(key),
+                    essential: isEssential(key, reqs),
+                    gov: assuranceFor(key, reqs) === 'gov',
+                    hasValue:
+                        !!(profile && getProfileValue(profile, key)) ||
+                        !!ATTRIBUTE_MAP[key]?.deviceSourced,
+                })
         .filter((i) => i.hasValue || i.essential);
 }
 
@@ -374,6 +411,7 @@ type FlowStep =
     | 'attestation'
     | 'attestation-changed'
     | 'consent'
+    | 'selfie'
     | 'biometric'
     | 'authenticating'
     | 'acquire-attributes'
@@ -525,6 +563,13 @@ export default function ConnectScreen() {
     const [consentRemember, setConsentRemember] = useState(true);
     const approvedAttrsRef = useRef<Set<string> | null>(null);
     const consentContinuation = useRef<(() => Promise<void>) | null>(null);
+    // Fresh-presence ceremony (holder_present): selfie captured in-flow, then
+    // matched in-enclave against the committed document portrait. The selfie
+    // lives only in this ref for the duration of the ceremony.
+    const selfieRef = useRef<string | null>(null);
+    const selfieContinuation = useRef<(() => Promise<void>) | null>(null);
+    const selfieCameraRef = useRef<CameraView>(null);
+    const [selfiePermission, requestSelfiePermission] = useCameraPermissions();
     const pendingRelay = useRef<{
         payload: QRPayload;
         sessionToken: string;
@@ -798,6 +843,23 @@ export default function ConnectScreen() {
      *    optional profile ones default ON, and prior per-attribute decisions
      *    are preserved. A request that grows the attribute set re-prompts.
      */
+    /** Interpose the fresh-presence ceremony when the approved set includes
+     *  holder_present: a selfie is required EVERY time (that is the point —
+     *  a remembered consent never skips the live check), so route through the
+     *  selfie step before the continuation runs. */
+    const runWithPresence = useCallback(
+        async (approved: Set<string>, cont: () => Promise<void>) => {
+            if (approved.has(PRESENCE_KEY)) {
+                selfieRef.current = null;
+                selfieContinuation.current = cont;
+                setStep('selfie');
+                return;
+            }
+            await cont();
+        },
+        [],
+    );
+
     // Reads live state (profile store + attestationRef) rather than closing over
     // it, so it is a STABLE callback safe to call from startFlow's fast paths
     // (which are defined earlier and memoised on their own deps).
@@ -826,7 +888,9 @@ export default function ConnectScreen() {
                 plan.every((i) => decided.has(i.key))
             ) {
                 approvedAttrsRef.current = new Set(standing.attributes);
-                await cont();
+                // A remembered decision can skip the consent SCREEN, never the
+                // live presence check.
+                await runWithPresence(approvedAttrsRef.current, cont);
                 return;
             }
             const prevApproved = new Set(standing?.attributes ?? []);
@@ -896,8 +960,8 @@ export default function ConnectScreen() {
         approvedAttrsRef.current = new Set(approved);
         const cont = consentContinuation.current;
         consentContinuation.current = null;
-        if (cont) await cont();
-    }, [qr, attestation, consentItems, consentSelected, consentRemember]);
+        if (cont) await runWithPresence(approvedAttrsRef.current, cont);
+    }, [qr, attestation, consentItems, consentSelected, consentRemember, runWithPresence]);
 
     const toggleConsentAttr = useCallback((key: string) => {
         setConsentSelected((prev) => {
@@ -906,6 +970,43 @@ export default function ConnectScreen() {
             else next.add(key);
             return next;
         });
+    }, []);
+
+    /** Capture the presence selfie and resume the sign-in continuation. */
+    const handleSelfieCapture = useCallback(async () => {
+        try {
+            if (selfiePermission && !selfiePermission.granted) {
+                const res = await requestSelfiePermission();
+                if (!res.granted) {
+                    Alert.alert(
+                        'Camera needed',
+                        'The presence check matches a quick selfie to your ID photo inside the secure enclave. Without the camera it will be skipped.',
+                    );
+                    return;
+                }
+            }
+            const photo = await selfieCameraRef.current?.takePictureAsync({
+                base64: true,
+                quality: 0.6,
+            });
+            if (!photo?.base64) throw new Error('Could not capture a selfie');
+            selfieRef.current = photo.base64;
+            const cont = selfieContinuation.current;
+            selfieContinuation.current = null;
+            if (cont) await cont();
+        } catch (e: any) {
+            Alert.alert('Presence check', e?.message ?? 'Camera error');
+        }
+    }, [selfiePermission, requestSelfiePermission]);
+
+    /** User declined the live check: drop holder_present (the relying party
+     *  sees the absence and applies its own policy) and continue signing in. */
+    const handleSelfieSkip = useCallback(async () => {
+        approvedAttrsRef.current?.delete(PRESENCE_KEY);
+        selfieRef.current = null;
+        const cont = selfieContinuation.current;
+        selfieContinuation.current = null;
+        if (cont) await cont();
     }, []);
 
     const handleConfirm = useCallback(async () => {
@@ -1244,7 +1345,7 @@ export default function ConnectScreen() {
             setStep('relaying');
 
             // Resolve only the attributes the app actually requested.
-            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current);
+            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current);
 
             await relaySessionToken(
                 payload.brokerUrl,
@@ -1358,7 +1459,7 @@ export default function ConnectScreen() {
             setStep('relaying');
 
             // Resolve only the attributes the app actually requested.
-            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current);
+            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current);
 
             await relaySessionToken(
                 payload.brokerUrl,
@@ -1543,7 +1644,7 @@ export default function ConnectScreen() {
 
         setStep('relaying');
         try {
-            const attributes = await resolveRequestedAttributes(pending.payload, updatedProfile, approvedAttrsRef.current);
+            const attributes = await resolveRequestedAttributes(pending.payload, updatedProfile, approvedAttrsRef.current, selfieRef.current);
 
             await relaySessionToken(
                 pending.payload.brokerUrl,
@@ -1662,15 +1763,18 @@ export default function ConnectScreen() {
                             items={consentItems.map((i) => ({
                                 key: i.key,
                                 label: i.label,
-                                sublabel: !i.hasValue
-                                    ? 'Will be verified during sign-in'
-                                    : i.gov
-                                        ? i.essential
-                                            ? 'Required · passport-verified proof'
-                                            : 'Passport-verified proof'
-                                        : i.essential
-                                            ? 'Required'
-                                            : undefined,
+                                sublabel: i.key === PRESENCE_KEY
+                                    ? (i.essential ? 'Required · ' : '') +
+                                      'Quick selfie matched to your ID in the enclave'
+                                    : !i.hasValue
+                                        ? 'Will be verified during sign-in'
+                                        : i.gov
+                                            ? i.essential
+                                                ? 'Required · passport-verified proof'
+                                                : 'Passport-verified proof'
+                                            : i.essential
+                                                ? 'Required'
+                                                : undefined,
                                 missing: !i.hasValue,
                                 toggle: {
                                     value: consentSelected.has(i.key),
@@ -1689,6 +1793,25 @@ export default function ConnectScreen() {
                             onDeny={handleReject}
                             onApprove={handleConsentApprove}
                         />
+                    </RNView>
+                )}
+
+                {step === 'selfie' && (
+                    <RNView style={styles.selfieContainer}>
+                        <CameraView ref={selfieCameraRef} style={styles.selfieCamera} facing="front" />
+                        <RNView style={[styles.selfieOverlay, { paddingBottom: insets.bottom + 24 }]}>
+                            <Text style={styles.selfieTitle}>Confirm it&apos;s you</Text>
+                            <Text style={styles.selfieText}>
+                                {(qr?.appName || 'This service') +
+                                    ' asked to confirm you are physically present. Your selfie is matched to your ID photo inside the secure enclave, then discarded.'}
+                            </Text>
+                            <Pressable style={styles.selfieCaptureButton} onPress={handleSelfieCapture}>
+                                <Text style={styles.selfieCaptureText}>Take selfie</Text>
+                            </Pressable>
+                            <Pressable onPress={handleSelfieSkip} hitSlop={8}>
+                                <Text style={styles.selfieSkipText}>Don&apos;t confirm presence</Text>
+                            </Pressable>
+                        </RNView>
                     </RNView>
                 )}
 
@@ -2696,6 +2819,31 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24
     },
     cancelButtonText: { fontSize: 16, color: '#8E8E93' },
+    selfieContainer: { flex: 1, backgroundColor: '#000' },
+    selfieCamera: { flex: 1 },
+    selfieOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.72)',
+        paddingHorizontal: 24,
+        paddingTop: 20,
+        gap: 12,
+        alignItems: 'center'
+    },
+    selfieTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF' },
+    selfieText: { fontSize: 14, color: '#E5E7EB', textAlign: 'center', lineHeight: 20 },
+    selfieCaptureButton: {
+        backgroundColor: '#007AFF',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 48,
+        alignSelf: 'stretch',
+        alignItems: 'center'
+    },
+    selfieCaptureText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+    selfieSkipText: { fontSize: 14, color: '#9CA3AF', paddingVertical: 6 },
     confirmContainer: {
         flex: 1,
         justifyContent: 'space-between',

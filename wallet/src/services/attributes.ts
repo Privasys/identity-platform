@@ -100,9 +100,17 @@ export const ATTRIBUTE_MAP: Record<string, AttributeDefinition> =
 /** All valid canonical attribute keys (for validation). */
 export const CANONICAL_KEYS = new Set(CANONICAL_ATTRIBUTES.map((a) => a.key));
 
+/** Ceremonial (non-profile) attribute labels. Requested by relying parties
+ *  (e.g. acr=gov-presence adds holder_present) but never stored in the
+ *  profile, so deliberately NOT in the canonical referential — adding them
+ *  there would make every identity-scope request pull them. */
+const CEREMONIAL_LABELS: Record<string, string> = {
+    holder_present: 'Physical presence check'
+};
+
 /** Human-friendly label for a canonical attribute key. */
 export function attributeLabel(key: string): string {
-    return ATTRIBUTE_MAP[key]?.label ?? key;
+    return ATTRIBUTE_MAP[key]?.label ?? CEREMONIAL_LABELS[key] ?? key;
 }
 
 // ── Profile ↔ canonical mapping ─────────────────────────────────────────

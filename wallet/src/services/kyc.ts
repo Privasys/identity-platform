@@ -171,6 +171,11 @@ export interface KycRecord {
     imageRef?: string;
     /** Epoch seconds. */
     verifiedAt: number;
+    /** Raw DG2 data group (standard base64, exactly as sent to the enclave).
+     *  Kept so /prove/presence can re-open the IVR's portrait commitment and
+     *  the enclave can match a FRESH selfie against this document's photo.
+     *  Absent on records that predate presence support (re-verify to enable). */
+    dg2?: string;
 }
 
 export interface VerifyIdentityResult {
@@ -422,7 +427,10 @@ export async function verifyIdentity(
         fields: resp.fields ?? doc.fields,
         measurement: enclave.measurement,
         imageRef: enclave.imageRef,
-        verifiedAt: Math.floor(Date.now() / 1000)
+        verifiedAt: Math.floor(Date.now() / 1000),
+        // Keep the DG2 the enclave committed to (salts.picture_dg2), so a
+        // later /prove/presence can re-open the portrait commitment.
+        ...(doc.dataGroups?.['2'] ? { dg2: doc.dataGroups['2'] } : {})
     };
     await saveKycRecord(record);
 
@@ -649,6 +657,46 @@ export async function proveField(
     return resp.token;
 }
 
+/** Salt key of the IVR's DG2 portrait commitment (mirrors the verifier). */
+export const PORTRAIT_SALT_KEY = 'picture_dg2';
+
+/** Whether the latest identity receipt can do a fresh-presence check
+ *  (needs the DG2 portrait + its commitment salt — both present only on
+ *  records minted by verifier >= 0.5.0 with the chip photo). */
+export async function presenceAvailable(): Promise<boolean> {
+    const record = await getLatestKycRecord();
+    return !!(record?.dg2 && record.salts[PORTRAIT_SALT_KEY]);
+}
+
+/** prove_presence: fresh selfie matched in-enclave against the document
+ *  portrait this IVR committed to. Proves the DOCUMENT HOLDER is present now —
+ *  device biometrics only prove someone enrolled on the phone. The selfie and
+ *  portrait are processed in the enclave and discarded; a non-match is a hard
+ *  error (the enclave never mints a negative). */
+export async function provePresence(
+    rpId: string,
+    selfieBase64: string,
+    nonce?: string,
+    voucher?: string
+): Promise<string> {
+    const record = await requireRecord();
+    if (!record.dg2 || !record.salts[PORTRAIT_SALT_KEY]) {
+        throw new Error(
+            'This identity receipt predates presence support — re-verify your ID to enable it.'
+        );
+    }
+    const base = await buildSignedBase(record, rpId, nonce);
+    const resp = await postToVerifier<{ token: string }>('/prove/presence', {
+        ...base,
+        // The commitment is over b64url(DG2 bytes); re-derive the exact string
+        // from the stored standard-base64 copy.
+        dg2: b64uBytes(b64uToBytes(record.dg2)),
+        salt: record.salts[PORTRAIT_SALT_KEY],
+        selfie: selfieBase64
+    }, voucher);
+    return resp.token;
+}
+
 /** prove_document_valid: signed assertion that a genuine document was verified,
  *  disclosing no attribute. */
 export async function proveDocumentValid(
@@ -707,6 +755,11 @@ export async function discloseAttribute(
     const ageOver = /^age_over_(\d+)$/.exec(key);
     if (ageOver) return proveAgeOver(rpId, Number(ageOver[1]), nonce, voucher);
     if (key === 'age_band') return proveAgeBand(rpId, undefined, nonce, voucher);
+    if (key === 'holder_present') {
+        // Presence needs a live selfie ceremony — the connect flow captures it
+        // and calls provePresence directly; it can never resolve as a field.
+        throw new Error('holder_present requires a live selfie — use provePresence');
+    }
     return proveField(rpId, key, nonce, voucher);
 }
 

@@ -26,6 +26,16 @@
         <string>com.apple.authentication-services-credential-provider-ui</string>
         <key>NSExtensionPrincipalClass</key>
         <string>$(PRODUCT_MODULE_NAME).CredentialProviderViewController</string>
+        <!-- Without ProvidesPasskeys, iOS treats the extension as a
+             password/OTP AutoFill provider only and never routes WebAuthn
+             passkey requests here — the single flag that makes the wallet
+             selectable next to Microsoft Authenticator/1Password for
+             passkeys (iOS 17+). -->
+        <key>NSExtensionAttributes</key>
+        <dict>
+            <key>ProvidesPasskeys</key>
+            <true/>
+        </dict>
     </dict>
 </dict>
 </plist>

@@ -157,14 +157,49 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
 
     // MARK: - Credential List
 
+    /// Password-style list request (no passkey parameters) — nothing we can
+    /// serve; the wallet holds passkeys only.
     override func prepareCredentialList(
         for serviceIdentifiers: [ASCredentialServiceIdentifier]
     ) {
-        let credentials = loadAllCredentials()
-        if credentials.isEmpty {
+        extensionContext.cancelRequest(withError: ASExtensionError(.credentialIdentityNotFound))
+    }
+
+    /// Passkey list request (iOS 17+): the OS hands us the request parameters
+    /// (rpId + clientDataHash), so we can complete an assertion directly for a
+    /// stored credential instead of cancelling — this is the path taken when
+    /// the user picks "Privasys Wallet" from the AutoFill key icon rather than
+    /// tapping a suggested credential.
+    override func prepareCredentialList(
+        for serviceIdentifiers: [ASCredentialServiceIdentifier],
+        requestParameters: ASPasskeyCredentialRequestParameters
+    ) {
+        let rpId = requestParameters.relyingPartyIdentifier
+        let allowed = requestParameters.allowedCredentials
+        let matching = loadAllCredentials()
+            .filter { ($0["rpId"] as? String) == rpId }
+            .compactMap { entry -> Data? in
+                guard let b64 = entry["credentialId"] as? String,
+                      let id = Data(base64Encoded: b64) else { return nil }
+                return id
+            }
+            .filter { allowed.isEmpty || allowed.contains($0) }
+        guard let credentialId = matching.first else {
             extensionContext.cancelRequest(withError: ASExtensionError(.credentialIdentityNotFound))
-        } else {
-            extensionContext.cancelRequest(withError: ASExtensionError(.userCanceled))
+            return
+        }
+
+        showVerifying(rpId: rpId)
+        verifyAndPrompt(rpId: rpId) { [weak self] approved in
+            guard let self, approved else {
+                self?.extensionContext.cancelRequest(withError: ASExtensionError(.userCanceled))
+                return
+            }
+            self.completeAssertionRaw(
+                rpId: rpId,
+                credentialId: [UInt8](credentialId),
+                clientDataHash: requestParameters.clientDataHash
+            )
         }
     }
 
@@ -181,9 +216,21 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
             DispatchQueue.main.async {
                 guard let self else { return }
 
-                if let att = attestation, att["valid"] as? Bool == true {
+                let hasMeasurements =
+                    attestation?["mrenclave"] != nil || attestation?["mrtd"] != nil
+
+                if let att = attestation, att["valid"] as? Bool == true, hasMeasurements {
+                    // A Privasys enclave: show what was attested before approval.
                     self.showAttestationResult(att, rpId: rpId, completion: completion)
+                } else if attestation?["valid"] as? Bool == true || attestation == nil {
+                    // Not an enclave (a regular website/app using the wallet as
+                    // its passkey provider), or RA-TLS is unavailable in the
+                    // extension context. Attestation does not apply — show a
+                    // plain consent prompt instead of failing, mirroring the
+                    // main app's non-enclave FIDO2 support.
+                    self.showPlainApproval(rpId: rpId, completion: completion)
                 } else {
+                    // The host IS an enclave whose attestation failed — hard stop.
                     self.showAttestationFailed(rpId: rpId)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                         completion(false)
@@ -275,6 +322,18 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
         approveButton.isHidden = true
     }
 
+    /// Consent prompt for a relying party that is not a Privasys enclave —
+    /// the wallet acting as a general-purpose OS passkey provider. No
+    /// "verified" claim is made; the biometric gate on the Secure Enclave key
+    /// still applies at signing time.
+    private func showPlainApproval(rpId: String, completion: @escaping (Bool) -> Void) {
+        spinner.stopAnimating()
+        statusLabel.text = "Use your Privasys passkey?"
+        detailLabel.text = rpId
+        approveButton.isHidden = false
+        approvalCompletion = completion
+    }
+
     // MARK: - Registration Completion
 
     private func completeRegistration(_ passkeyRequest: ASPasskeyCredentialRequest) {
@@ -310,7 +369,30 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
 
         let attestationObject = buildAttestationObjectCBOR(authData: authData)
 
-        storeCredential(rpId: rpId, credentialId: credentialId, keyTag: keyPair.keyTag)
+        storeCredential(
+            rpId: rpId,
+            credentialId: credentialId,
+            keyTag: keyPair.keyTag,
+            userName: identity.userName,
+            userHandle: identity.userHandle
+        )
+
+        // Tell the OS which passkey we now hold: without this registration in
+        // the credential identity store, AutoFill/QuickType never suggests the
+        // wallet's passkeys for this RP again (the OS has no other way to know).
+        let storedIdentity = ASPasskeyCredentialIdentity(
+            relyingPartyIdentifier: rpId,
+            userName: identity.userName,
+            credentialID: Data(credentialId),
+            userHandle: identity.userHandle
+        )
+        ASCredentialIdentityStore.shared.saveCredentialIdentities([storedIdentity]) { _, error in
+            if let error {
+                // Non-fatal: the passkey works via the provider list; it just
+                // won't be proactively suggested until the next save succeeds.
+                NSLog("PasskeyProvider: identity-store save failed: %@", error.localizedDescription)
+            }
+        }
 
         let credential = ASPasskeyRegistrationCredential(
             relyingParty: rpId,
@@ -329,11 +411,19 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
             extensionContext.cancelRequest(withError: ASExtensionError(.failed))
             return
         }
-        let rpId = identity.relyingPartyIdentifier
-        let clientDataHash = passkeyRequest.clientDataHash
-        let credentialIdData = identity.credentialID
+        completeAssertionRaw(
+            rpId: identity.relyingPartyIdentifier,
+            credentialId: [UInt8](identity.credentialID),
+            clientDataHash: passkeyRequest.clientDataHash
+        )
+    }
 
-        guard let keyTag = lookupKeyTag(rpId: rpId, credentialId: [UInt8](credentialIdData)) else {
+    /// Assertion by raw (rpId, credentialId, clientDataHash) — shared by the
+    /// identity-routed path and the credential-list path.
+    private func completeAssertionRaw(rpId: String, credentialId: [UInt8], clientDataHash: Data) {
+        let credentialIdData = Data(credentialId)
+
+        guard let keyTag = lookupKeyTag(rpId: rpId, credentialId: credentialId) else {
             extensionContext.cancelRequest(withError: ASExtensionError(.credentialIdentityNotFound))
             return
         }
@@ -452,11 +542,19 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
 
     // MARK: - Shared Keychain Credential Storage
 
-    private func storeCredential(rpId: String, credentialId: [UInt8], keyTag: String) {
+    private func storeCredential(
+        rpId: String,
+        credentialId: [UInt8],
+        keyTag: String,
+        userName: String,
+        userHandle: Data
+    ) {
         let entry: [String: Any] = [
             "rpId": rpId,
             "credentialId": Data(credentialId).base64EncodedString(),
             "keyTag": keyTag,
+            "userName": userName,
+            "userHandle": userHandle.base64EncodedString(),
             "createdAt": Date().timeIntervalSince1970
         ]
 

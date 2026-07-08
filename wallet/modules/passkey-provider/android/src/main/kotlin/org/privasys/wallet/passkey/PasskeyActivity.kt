@@ -148,12 +148,20 @@ class PasskeyActivity : Activity() {
             return
         }
 
-        // Find the passkey option
+        // The passkey option carries the WebAuthn request JSON and — for
+        // privileged callers (browsers) — the precomputed clientDataHash the
+        // assertion signature MUST cover. The previous code read the hash from
+        // an intent extra nobody set and silently signed over 32 zero bytes,
+        // producing signatures every relying party rejects.
         val option = request.credentialOptions
-            .filterIsInstance<androidx.credentials.provider.ProviderGetCredentialRequest>()
+            .filterIsInstance<androidx.credentials.GetPublicKeyCredentialOption>()
             .firstOrNull()
+        if (option == null) {
+            setResult(RESULT_CANCELED)
+            finish()
+            return
+        }
 
-        // Extract rpId from the first PublicKeyCredential option
         val rpId = intent.getStringExtra("rpId") ?: ""
 
         showVerifying(rpId)
@@ -166,7 +174,17 @@ class PasskeyActivity : Activity() {
 
             val credentialIdB64 = intent.getStringExtra("credentialId") ?: ""
             val credentialId = Base64.decode(credentialIdB64, Base64.URL_SAFE or Base64.NO_WRAP)
-            val clientDataHash = intent.getByteArrayExtra("clientDataHash") ?: ByteArray(32)
+
+            // Privileged caller → sign its hash, the system supplies the
+            // clientDataJSON. Ordinary app → build clientDataJSON ourselves
+            // (challenge from the request, android:apk-key-hash origin of the
+            // caller), sign over its hash, and return it in the response.
+            val providedHash = option.clientDataHash
+            val builtClientData: ByteArray? =
+                if (providedHash == null) buildClientDataJson(option.requestJson, request.callingAppInfo)
+                else null
+            val clientDataHash = providedHash
+                ?: MessageDigest.getInstance("SHA-256").digest(builtClientData!!)
 
             val assertion = signAssertion(rpId, credentialId, clientDataHash)
             if (assertion == null) {
@@ -183,7 +201,7 @@ class PasskeyActivity : Activity() {
                     put("authenticatorData", base64UrlEncode(assertion.authData))
                     put("signature", base64UrlEncode(assertion.signature))
                     put("userHandle", assertion.userHandleB64)
-                    put("clientDataJSON", base64UrlEncode(ByteArray(0)))
+                    put("clientDataJSON", base64UrlEncode(builtClientData ?: ByteArray(0)))
                 })
             }
 
@@ -195,6 +213,34 @@ class PasskeyActivity : Activity() {
             setResult(RESULT_OK, resultData)
             finish()
         }
+    }
+
+    /** WebAuthn clientDataJSON for a non-privileged caller: the challenge from
+     *  the request JSON plus the caller's android:apk-key-hash origin. */
+    private fun buildClientDataJson(
+        requestJson: String,
+        callingAppInfo: androidx.credentials.provider.CallingAppInfo?
+    ): ByteArray {
+        val challenge = try {
+            JSONObject(requestJson).optString("challenge", "")
+        } catch (_: Exception) {
+            ""
+        }
+        return JSONObject().apply {
+            put("type", "webauthn.get")
+            put("challenge", challenge)
+            put("origin", androidAppOrigin(callingAppInfo))
+            put("crossOrigin", false)
+        }.toString().toByteArray()
+    }
+
+    /** `android:apk-key-hash:<b64url SHA-256 of the caller's signing cert>` —
+     *  the origin format RPs registered for Android app callers expect. */
+    private fun androidAppOrigin(info: androidx.credentials.provider.CallingAppInfo?): String {
+        val cert = info?.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
+            ?: return "android:apk-key-hash:unknown"
+        val hash = MessageDigest.getInstance("SHA-256").digest(cert)
+        return "android:apk-key-hash:" + Base64.encodeToString(hash, Base64.URL_SAFE or Base64.NO_WRAP)
     }
 
     // ─── Attestation Verification ──────────────────────────────────────

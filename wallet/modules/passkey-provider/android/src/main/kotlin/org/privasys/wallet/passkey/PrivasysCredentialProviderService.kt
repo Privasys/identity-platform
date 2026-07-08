@@ -181,6 +181,16 @@ class PrivasysCredentialProviderService : CredentialProviderService() {
                     val beginOption = request.beginGetCredentialOptions
                         .filterIsInstance<androidx.credentials.provider.BeginGetPublicKeyCredentialOption>()
                         .firstOrNull() ?: continue
+                    // Only surface credentials for the RP actually being asked
+                    // about — offering every stored passkey for every site both
+                    // confuses the picker and leaks which RPs the user holds
+                    // credentials for.
+                    val requestedRpId = try {
+                        JSONObject(beginOption.requestJson).optString("rpId", "")
+                    } catch (_: Exception) {
+                        ""
+                    }
+                    if (requestedRpId.isNotEmpty() && requestedRpId != rpId) continue
                     entries.add(
                         PublicKeyCredentialEntry.Builder(
                             applicationContext,

@@ -49,10 +49,27 @@ const (
 //	gov-fresh — this ceremony minted at least one gov-assured attribute
 //	            as an enclave-signed disclosure token (and none arrived
 //	            raw). The RP gets a fresh receipt, not a cached claim.
-//
-// gov-presence (selfie-vs-document holder check) is designed but NOT yet
-// supported — requesting it errors rather than silently downgrading.
-var acrValuesSupported = []string{"wallet", "gov-fresh"}
+//	gov-presence — this ceremony additionally proved LIVE HOLDER PRESENCE:
+//	            a fresh selfie matched in-enclave against the government
+//	            document's portrait (holder_present disclosure). Device
+//	            biometrics prove "someone enrolled on this phone"; this
+//	            proves the document holder is in front of the camera.
+var acrValuesSupported = []string{"wallet", "gov-fresh", "gov-presence"}
+
+// presenceAttribute is the ceremonial marketplace attribute gov-presence
+// adds to a request. Deliberately NOT in the canonical referential (it is
+// no profile value, and canonical membership would pull it into every
+// identity-scope request); the wallet runs a live selfie ceremony for it.
+const presenceAttribute = "holder_present"
+
+func acrRequested(acrValues, v string) bool {
+	for _, s := range strings.Fields(acrValues) {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
 
 func acrSupported(v string) bool {
 	for _, s := range acrValuesSupported {
@@ -72,9 +89,11 @@ func looksLikeDisclosureToken(v string) bool {
 }
 
 // acrForCode computes the ACHIEVED authentication context class for a
-// completed ceremony: "gov-fresh" when at least one gov-assured attribute
-// arrived as a disclosure token and none arrived raw; otherwise "wallet".
-// Computed from what actually happened, never from what was requested.
+// completed ceremony, strongest first: "gov-presence" when a live
+// holder_present disclosure arrived (and no gov attribute arrived raw),
+// "gov-fresh" when at least one gov-assured attribute arrived as a
+// disclosure token and none arrived raw, otherwise "wallet". Computed from
+// what actually happened, never from what was requested.
 func acrForCode(ac *AuthCode, client *clients.Client) string {
 	reqs := attributeRequirementsForScope(ac.Scope, client)
 	govToken, govRaw := false, false
@@ -89,6 +108,12 @@ func acrForCode(ac *AuthCode, client *clients.Client) string {
 				govRaw = true
 			}
 		}
+	}
+	// Ceremonial: per-request (gov-presence), never scope-derived, so it is
+	// not in reqs. Only a genuine disclosure token counts as presence.
+	presence := looksLikeDisclosureToken(ac.Attributes[presenceAttribute])
+	if presence && !govRaw {
+		return "gov-presence"
 	}
 	if govToken && !govRaw {
 		return "gov-fresh"
@@ -468,6 +493,30 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		// client's required_attributes whitelist (if set).
 		requestedAttributes := requestedAttributesForScope(scope, client)
 		attributeRequirements := attributeRequirementsForScope(scope, client)
+
+		// gov-presence: the RP asked for a live holder-presence ceremony.
+		// Add the ceremonial holder_present attribute (essential, gov) —
+		// per-request, never scope-derived, and deliberately not subject to
+		// the client whitelist: it discloses no personal data, only "the
+		// document holder is present now". It IS a priced gov attribute, so
+		// the voucher mint below reserves credits for it like any other.
+		if acrRequested(acrValues, "gov-presence") {
+			present := false
+			for _, k := range requestedAttributes {
+				if k == presenceAttribute {
+					present = true
+				}
+			}
+			if !present {
+				requestedAttributes = append(requestedAttributes, presenceAttribute)
+			}
+			if attributeRequirements == nil {
+				attributeRequirements = map[string]AttributeRequirement{}
+			}
+			attributeRequirements[presenceAttribute] = AttributeRequirement{
+				Essential: true, Assurance: "gov",
+			}
+		}
 
 		if len(requestedAttributes) > 0 {
 			qrPayload["requestedAttributes"] = requestedAttributes
@@ -1406,6 +1455,15 @@ func filterAttributesByScope(attrs map[string]string, scope string) map[string]s
 	}
 	out := make(map[string]string)
 	for k, v := range attrs {
+		if k == presenceAttribute {
+			// Ceremonial (gov-presence): not canonical, allowed under the
+			// identity scope — and only ever as an enclave-signed disclosure
+			// token, never a raw value.
+			if strings.Contains(scope, "identity") && looksLikeDisclosureToken(v) {
+				out[k] = v
+			}
+			continue
+		}
 		if attr, ok := attributes.ByKey[k]; ok {
 			// Known canonical attribute — check if its scope is requested.
 			// Special case: email is also allowed under profile scope.

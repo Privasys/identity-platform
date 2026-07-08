@@ -18,8 +18,15 @@ export type {
 export type { WebAuthnConfig, WebAuthnState, WebAuthnEvents } from './webauthn';
 export { generateQRPayload, generateBatchQRPayload, generateSessionId } from './qr';
 export { SessionManager } from './session';
-export { AuthFrame } from './frame-client';
-export type { AuthFrameConfig, SealedResponse, SealedSession, SealedStreamResponse } from './frame-client';
+export { AuthFrame, InsufficientCreditsError } from './frame-client';
+export type {
+    AttributeDisclosure,
+    AuthFrameConfig,
+    PrivasysScope,
+    SealedResponse,
+    SealedSession,
+    SealedStreamResponse,
+} from './frame-client';
 export { PrivasysSession } from './enclave-session';
 export type {
     EncAuthRejectReason,

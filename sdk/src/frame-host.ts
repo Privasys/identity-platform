@@ -656,12 +656,37 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 });
                 if (!authResp.ok) {
                     const body = await authResp.json().catch(() => ({ error: authResp.statusText }));
-                    throw new Error(body.error_description || body.error || `Authorize failed: ${authResp.status}`);
+                    const err = new Error(body.error_description || body.error || `Authorize failed: ${authResp.status}`);
+                    // Preserve the OAuth error code (e.g. `insufficient_credits`
+                    // on 402) so the parent can raise a typed error.
+                    (err as Error & { code?: string }).code = body.error;
+                    throw err;
                 }
                 const authData = await authResp.json();
                 const oidcSessionId: string = authData.session_id;
                 const pollUrl: string = authData.poll_url;
                 const requestedAttributes: string[] | undefined = authData.requested_attributes;
+
+                // The authorize response embeds the full wallet payload —
+                // including per-attribute assurance requirements and any
+                // paid-disclosure vouchers minted for gov attributes — in
+                // the universal-link's `p=` parameter. Decode it and thread
+                // those fields into the AuthUI so the relay descriptor / push
+                // carries them; without them the wallet treats every attr as
+                // 'any' assurance and gov disclosure never happens on the
+                // iframe path.
+                let attributeRequirements: AuthUIConfig['attributeRequirements'];
+                let disclosureVouchers: AuthUIConfig['disclosureVouchers'];
+                try {
+                    const p = new URL(authData.qr_payload).searchParams.get('p');
+                    if (p) {
+                        const b64 = p.replace(/-/g, '+').replace(/_/g, '/');
+                        const pad = b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64;
+                        const decoded = JSON.parse(atob(pad));
+                        attributeRequirements = decoded.attributeRequirements;
+                        disclosureVouchers = decoded.disclosureVouchers;
+                    }
+                } catch { /* older IdP or plain profile flow — nothing to thread */ }
 
                 // 3. Fetch available social providers.
                 let socialProviders: string[] = [];
@@ -734,6 +759,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     socialProviders,
                     onSocialAuth,
                     requestedAttributes,
+                    attributeRequirements,
+                    disclosureVouchers,
                     sessionRelay: sessionRelayUI,
                 });
 
@@ -834,7 +861,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
                     window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
                 } else {
-                    window.parent.postMessage({ type: 'privasys:error', error: msg }, parentOrigin);
+                    const errorCode = err instanceof Error
+                        ? (err as Error & { code?: string }).code
+                        : undefined;
+                    window.parent.postMessage(
+                        { type: 'privasys:error', error: msg, ...(errorCode ? { errorCode } : {}) },
+                        parentOrigin,
+                    );
                 }
             } finally {
                 activeUI = null;

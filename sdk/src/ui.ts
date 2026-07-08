@@ -39,6 +39,13 @@ export interface AuthUIConfig {
     clientId?: string;
     /** Attribute keys the relying party needs from the wallet (e.g. ["email", "name"]). */
     requestedAttributes?: string[];
+    /** Per-attribute essential/assurance hints from the IdP (OIDC mode).
+     *  Gov attributes are only disclosed as enclave-signed tokens when the
+     *  wallet sees `assurance: 'gov'` here. */
+    attributeRequirements?: import('./qr').AttributeRequirements;
+    /** Paid-disclosure vouchers from the IdP authorize response (OIDC mode).
+     *  Relayed to the wallet via the QR descriptor / push payload. */
+    disclosureVouchers?: import('./qr').DisclosureVoucher[];
     /** Direct FIDO2 endpoint base URL (OIDC mode). When set, the WebAuthn
      *  client calls `${fido2Base}/${action}` instead of the management
      *  service proxy URL. */
@@ -1360,6 +1367,8 @@ export class AuthUI {
                 brokerUrl: this.cfg.brokerUrl,
                 timeout: this.cfg.timeout,
                 requestedAttributes: this.cfg.requestedAttributes,
+                attributeRequirements: this.cfg.attributeRequirements,
+                disclosureVouchers: this.cfg.disclosureVouchers,
                 appName: this.cfg.appName,
                 privacyPolicyUrl: this.cfg.privacyPolicyUrl,
                 clientId: this.cfg.clientId,

@@ -51,13 +51,15 @@ export class PrivasysAuth {
     createQR(
         sessionId?: string,
         sessionRelay?: { sdkPub: string; appHost: string; extraAppHosts?: string[]; nonce?: string },
-    ): { sessionId: string; payload: string } {
+    ): { sessionId: string; payload: string; descriptorHash: string; descriptorPublished: Promise<void> } {
         return generateQRPayload({
             rpId: this.config.rpId,
             idpOrigin: this.config.idpOrigin,
             brokerUrl: this.config.brokerUrl,
             sessionId,
             requestedAttributes: this.config.requestedAttributes,
+            attributeRequirements: this.config.attributeRequirements,
+            disclosureVouchers: this.config.disclosureVouchers,
             appName: this.config.appName,
             privacyPolicyUrl: this.config.privacyPolicyUrl,
             clientId: this.config.clientId,
@@ -145,7 +147,17 @@ export class PrivasysAuth {
         sessionId?: string,
         sessionRelay?: { sdkPub: string; appHost: string; extraAppHosts?: string[]; nonce?: string },
     ): Promise<AuthResult> {
-        const sid = sessionId ?? this.createQR().sessionId;
+        // Publish the descriptor even on the push path: Expo push data is
+        // size-capped and the broker forwards a fixed field set, so the
+        // attribute machinery (requestedAttributes, attributeRequirements,
+        // paid-disclosure vouchers) travels via the relay descriptor on BOTH
+        // paths. The push carries only the descriptor hash; the wallet
+        // fetches and pin-verifies the descriptor exactly as after a QR scan.
+        const qr = this.createQR(sessionId, sessionRelay);
+        const sid = qr.sessionId;
+        // Make sure the descriptor is on the relay before the push lands —
+        // the wallet fetches it by hash as soon as the notification opens.
+        await qr.descriptorPublished;
 
         // POST to broker /notify endpoint
         const brokerBase = this.config.brokerUrl
@@ -164,6 +176,11 @@ export class PrivasysAuth {
                 origin: this.config.idpOrigin ?? 'privasys.id',
                 brokerUrl: this.config.brokerUrl,
                 ...(this.config.clientId ? { clientId: this.config.clientId } : {}),
+                // Pin for the relay-published descriptor: the wallet GETs
+                // /connect/<sessionId> and hash-verifies it, giving the push
+                // path the same attribute/voucher payload as a QR scan
+                // (Expo push data is size-capped, so it can't ride inline).
+                descriptorHash: qr.descriptorHash,
                 ...(sessionRelay
                     ? {
                         mode: 'session-relay' as const,

@@ -44,9 +44,58 @@
  * | `email`          | `email`, `email_verified`                               |
  * | `profile`        | `name`, `given_name`, `family_name`, `picture`, `locale`|
  * | `phone`          | `phone_number`                                          |
+ * | `identity`       | Gov-verified document claims (`age_over_18`,            |
+ * |                  | `age_over_21`, `nationality`, `birthdate`, …) — each    |
+ * |                  | arrives as an enclave-signed SD-JWT VC, surfaced in     |
+ * |                  | {@link SignInResult.disclosures}. Requires the client   |
+ * |                  | to be registered billable; sign-in rejects with         |
+ * |                  | {@link InsufficientCreditsError} when out of credits.   |
  * | `offline_access` | Issues a refresh token (no attributes)                  |
  */
-export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'offline_access';
+export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'identity' | 'offline_access';
+
+/**
+ * A gov-verified attribute disclosure — an enclave-signed SD-JWT VC
+ * (`typ: dc+sd-jwt`) minted by the Privasys identity-verifier enclave from a
+ * government document, never a hand-typed value.
+ *
+ * Store {@link token} as the durable compliance receipt: it is offline
+ * re-verifiable (issuer JWKS at `{issuer}/.well-known/jwt-vc-issuer`) and its
+ * `evidence` ties the claim to the attested enclave measurement and the paid
+ * disclosure ceremony (`evidence.voucher` ↔ ledger reservation).
+ */
+export interface AttributeDisclosure {
+    /** Canonical attribute key, e.g. `"age_over_18"` or `"nationality"`. */
+    claim: string;
+    /** Disclosed value from the credential payload (e.g. `true`, `"GBR"`). */
+    value: unknown;
+    /** Assurance level — `"gov"` for document-verified claims. */
+    assurance?: string;
+    /** Issuance evidence: `ivr`, `measurement`, `issuing_state`, `verified_at`, `voucher`. */
+    evidence?: Record<string, unknown>;
+    /** Credential issuer (the verifier enclave origin). */
+    issuer?: string;
+    /** Epoch seconds the credential was issued. */
+    issuedAt?: number;
+    /** Epoch seconds the credential expires (short-lived by design — the
+     *  stored token remains the receipt of what was verified at `issuedAt`). */
+    expiresAt?: number;
+    /** The raw SD-JWT VC. Persist this, not just the value. */
+    token: string;
+}
+
+/**
+ * Sign-in was rejected because the relying party's billing account cannot
+ * cover the requested gov-verified attributes (IdP `402 insufficient_credits`).
+ * The user was never prompted; top up the account and retry.
+ */
+export class InsufficientCreditsError extends Error {
+    readonly code = 'insufficient_credits';
+    constructor(message?: string) {
+        super(message || 'Insufficient credits for the requested attributes');
+        this.name = 'InsufficientCreditsError';
+    }
+}
 
 export interface AuthFrameConfig {
     /** Management service API base URL. */
@@ -102,6 +151,12 @@ export interface SignInResult {
     pushToken?: string;
     /** JWT access_token from the IdP (present when clientId was set in config). */
     accessToken?: string;
+    /**
+     * Gov-verified attribute disclosures (present when the `identity` scope
+     * was requested and the user approved sharing). Each entry carries the
+     * decoded claim/value plus the raw SD-JWT VC to persist as a receipt.
+     */
+    disclosures?: AttributeDisclosure[];
     /** Wallet-attested sealed-transport binding (set when sessionRelay was configured). */
     sessionRelay?: { sessionId: string; encPub: string; expiresAt?: number };
 }
@@ -174,6 +229,53 @@ function sanitizeInit(init?: RequestInit): { headers?: Record<string, string> } 
         out.headers = h;
     }
     return out;
+}
+
+/** Decode a base64url JSON segment (JWT header/payload). */
+function b64uJson(seg: string): Record<string, unknown> {
+    const b64 = seg.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64;
+    return JSON.parse(atob(pad));
+}
+
+/** SD-JWT VC serialisation: a compact JWS followed by `~` (no disclosures). */
+const SD_JWT_RE = /^eyJ[\w-]*\.[\w-]+\.[\w-]+~$/;
+
+/**
+ * Pull gov-attribute disclosures out of an IdP access token. The wallet
+ * relays each gov claim as an enclave-signed SD-JWT VC in place of a raw
+ * value, so any claim whose value parses as one is a disclosure. Decoding
+ * here is presentation only — verification is the JWS signature against the
+ * issuer's JWKS, done server-side or at audit time.
+ */
+function extractDisclosures(accessToken?: string): AttributeDisclosure[] | undefined {
+    if (!accessToken) return undefined;
+    let claims: Record<string, unknown>;
+    try {
+        claims = b64uJson(accessToken.split('.')[1]);
+    } catch {
+        return undefined;
+    }
+    const out: AttributeDisclosure[] = [];
+    for (const [key, raw] of Object.entries(claims)) {
+        if (typeof raw !== 'string' || !SD_JWT_RE.test(raw)) continue;
+        try {
+            const vc = b64uJson(raw.slice(0, -1).split('.')[1]);
+            out.push({
+                claim: typeof vc.claim === 'string' ? vc.claim : key,
+                value: vc.value,
+                assurance: typeof vc.assurance === 'string' ? vc.assurance : undefined,
+                evidence: (vc.evidence && typeof vc.evidence === 'object')
+                    ? vc.evidence as Record<string, unknown>
+                    : undefined,
+                issuer: typeof vc.iss === 'string' ? vc.iss : undefined,
+                issuedAt: typeof vc.iat === 'number' ? vc.iat : undefined,
+                expiresAt: typeof vc.exp === 'number' ? vc.exp : undefined,
+                token: raw,
+            });
+        } catch { /* value merely looked like a JWS — not a credential, skip */ }
+    }
+    return out.length ? out : undefined;
 }
 
 export class AuthFrame {
@@ -349,9 +451,13 @@ export class AuthFrame {
                         );
                         break;
 
-                    case 'privasys:result':
-                        finishSignIn(data.result as SignInResult);
+                    case 'privasys:result': {
+                        const result = data.result as SignInResult;
+                        const disclosures = extractDisclosures(result.accessToken);
+                        if (disclosures) result.disclosures = disclosures;
+                        finishSignIn(result);
                         break;
+                    }
 
                     case 'privasys:cancel':
                         cleanup();
@@ -360,7 +466,9 @@ export class AuthFrame {
 
                     case 'privasys:error':
                         cleanup();
-                        reject(new Error(data.error || 'Authentication failed'));
+                        reject(data.errorCode === 'insufficient_credits'
+                            ? new InsufficientCreditsError(data.error)
+                            : new Error(data.error || 'Authentication failed'));
                         break;
 
                     case 'privasys:session:ready': {

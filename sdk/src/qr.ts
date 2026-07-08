@@ -37,6 +37,22 @@ export const DESCRIPTOR_VERSION = 1;
  * the relay's `/connect/{sessionId}` endpoint and fetched by the wallet
  * after scanning the QR.
  */
+/** Per-attribute requirement hints from the IdP, keyed by attribute key.
+ *  `assurance: 'gov'` marks a document-verified claim the wallet must
+ *  disclose as an enclave-signed token, never a raw profile value. */
+export type AttributeRequirements = Record<string, { essential: boolean; assurance: string }>;
+
+/** A paid-disclosure voucher the IdP minted for the relying party. The wallet
+ *  relays it to the issuing enclave, which refuses to mint a gov disclosure
+ *  without one (shape mirrors the wallet's `DisclosureVoucher`). */
+export interface DisclosureVoucher {
+    token: string;
+    provider_namespace?: string;
+    issuer_url?: string;
+    issuing_app_id?: string;
+    claims: string[];
+}
+
 export interface QRDescriptor {
     /** Descriptor format version. Wallets MUST reject unknown versions. */
     v: number;
@@ -45,6 +61,12 @@ export interface QRDescriptor {
     rpId: string;
     brokerUrl: string;
     requestedAttributes?: string[];
+    /** Per-attribute essential/assurance hints (gov attrs need these — the
+     *  wallet falls back to 'any' assurance without them). */
+    attributeRequirements?: AttributeRequirements;
+    /** Paid-disclosure vouchers for gov attributes (from the IdP authorize
+     *  response). Without them the issuing enclave will not mint. */
+    disclosureVouchers?: DisclosureVoucher[];
     appName?: string;
     privacyPolicyUrl?: string;
     /**
@@ -156,6 +178,8 @@ export function generateQRPayload(opts: {
     brokerUrl: string;
     sessionId?: string;
     requestedAttributes?: string[];
+    attributeRequirements?: AttributeRequirements;
+    disclosureVouchers?: DisclosureVoucher[];
     appName?: string;
     privacyPolicyUrl?: string;
     mode?: 'session-relay' | 'standard';
@@ -183,6 +207,12 @@ export function generateQRPayload(opts: {
     };
     if (opts.requestedAttributes?.length) {
         desc.requestedAttributes = opts.requestedAttributes;
+    }
+    if (opts.attributeRequirements && Object.keys(opts.attributeRequirements).length) {
+        desc.attributeRequirements = opts.attributeRequirements;
+    }
+    if (opts.disclosureVouchers?.length) {
+        desc.disclosureVouchers = opts.disclosureVouchers;
     }
     if (opts.appName) desc.appName = opts.appName;
     if (opts.privacyPolicyUrl) desc.privacyPolicyUrl = opts.privacyPolicyUrl;

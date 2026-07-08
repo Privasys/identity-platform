@@ -1,6 +1,8 @@
 // Copyright (c) Privasys. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.0.
 
+import type { AttributeRequirements, DisclosureVoucher } from './qr';
+
 /** Configuration for a Privasys Auth request. */
 export interface AuthConfig {
     /** The relying party ID (e.g., "myapp.apps.privasys.org"). */
@@ -20,6 +22,13 @@ export interface AuthConfig {
     timeout?: number;
     /** Attribute keys the relying party needs from the wallet (e.g. ["email", "name"]). */
     requestedAttributes?: string[];
+    /** Per-attribute essential/assurance hints from the IdP authorize
+     *  response. Gov attributes need these — without them the wallet treats
+     *  every request as 'any' assurance and gov disclosure never happens. */
+    attributeRequirements?: AttributeRequirements;
+    /** Paid-disclosure vouchers from the IdP authorize response. The wallet
+     *  relays them to the issuing enclave; gov claims cannot mint without. */
+    disclosureVouchers?: DisclosureVoucher[];
     /** Human-readable app name displayed in the wallet during consent. */
     appName?: string;
     /** URL to the app's privacy policy. Shown to the user when sharing attributes. */

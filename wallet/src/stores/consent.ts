@@ -89,6 +89,10 @@ export interface ConsentState {
 
     /** Record a new consent decision. */
     addRecord: (record: ConsentRecord) => void;
+    /** Delete one consent-history record by id. */
+    removeRecord: (id: string) => void;
+    /** Clear the consent history (keeps standing consents + receipts). */
+    clearRecords: () => void;
     /** Get consent history for a specific app. */
     getRecordsForApp: (rpId: string) => ConsentRecord[];
     /** Set a standing consent. */
@@ -116,6 +120,16 @@ export const useConsentStore = create<ConsentState>((set, get) => ({
 
     addRecord: (record) => {
         set((s) => ({ records: [record, ...s.records] }));
+        persist(get());
+    },
+
+    removeRecord: (id) => {
+        set((s) => ({ records: s.records.filter((r) => r.id !== id) }));
+        persist(get());
+    },
+
+    clearRecords: () => {
+        set({ records: [] });
         persist(get());
     },
 

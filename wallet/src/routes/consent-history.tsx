@@ -16,12 +16,18 @@ import {
     ScrollView,
     Pressable,
     View as RNView,
+    TextInput,
     Alert
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
+import { attributeLabel } from '@/services/attributes';
 import { useConsentStore, type ConsentRecord, type StandingConsent, type ComputationReceipt } from '@/stores/consent';
+
+/** Above this many records the history tab shows a search box. */
+const SEARCH_THRESHOLD = 10;
 
 /** Decision badge colours. */
 const DECISION_COLORS: Record<string, { bg: string; text: string }> = {
@@ -67,17 +73,46 @@ function uniqueApps(records: ConsentRecord[]): { rpId: string; name: string }[] 
 export default function ConsentHistoryScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { records, standingConsents, receipts, removeStandingConsent } = useConsentStore();
+    const { records, standingConsents, receipts, removeStandingConsent, removeRecord, clearRecords } =
+        useConsentStore();
 
     const [filterApp, setFilterApp] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'history' | 'standing' | 'receipts'>('history');
+    const [search, setSearch] = useState('');
 
     const apps = useMemo(() => uniqueApps(records), [records]);
-
-    const filteredRecords = useMemo(
-        () => (filterApp ? records.filter((r) => r.rpId === filterApp) : records),
-        [records, filterApp]
+    // Apps that still have a live "always share" rule — used to mark history
+    // entries whose auto-share was later revoked.
+    const standingRpIds = useMemo(
+        () => new Set(standingConsents.map((c) => c.rpId)),
+        [standingConsents]
     );
+
+    const filteredRecords = useMemo(() => {
+        const byApp = filterApp ? records.filter((r) => r.rpId === filterApp) : records;
+        const q = search.trim().toLowerCase();
+        if (!q) return byApp;
+        return byApp.filter(
+            (r) =>
+                (r.appName ?? '').toLowerCase().includes(q) ||
+                r.rpId.toLowerCase().includes(q) ||
+                r.decision.includes(q) ||
+                [...r.approvedAttributes, ...r.deniedAttributes].some((a) =>
+                    (attributeLabel(a) + a).toLowerCase().includes(q)
+                )
+        );
+    }, [records, filterApp, search]);
+
+    const handleClearHistory = () => {
+        Alert.alert(
+            'Clear consent history?',
+            'This removes the record of past decisions. It does not change your active auto-share rules.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Clear all', style: 'destructive', onPress: () => clearRecords() }
+            ]
+        );
+    };
 
     const filteredReceipts = useMemo(
         () => (filterApp ? receipts.filter((r) => r.rpId === filterApp) : receipts),
@@ -178,18 +213,49 @@ export default function ConsentHistoryScreen() {
             >
                 {activeTab === 'history' && (
                     <>
+                        {(filterApp ? records.filter((r) => r.rpId === filterApp) : records).length >
+                            SEARCH_THRESHOLD && (
+                            <RNView style={styles.searchBox}>
+                                <Ionicons name="search" size={16} color="#94A3B8" />
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search by app, attribute, or decision"
+                                    placeholderTextColor="#94A3B8"
+                                    value={search}
+                                    onChangeText={setSearch}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    clearButtonMode="while-editing"
+                                />
+                            </RNView>
+                        )}
                         {filteredRecords.length === 0 ? (
                             <RNView style={styles.emptyState}>
                                 <Ionicons name="time-outline" size={48} color="#C7C7CC" />
-                                <Text style={styles.emptyTitle}>No consent history</Text>
+                                <Text style={styles.emptyTitle}>
+                                    {search.trim() ? 'No matching records' : 'No consent history'}
+                                </Text>
                                 <Text style={styles.emptyText}>
-                                    Your data sharing decisions will appear here.
+                                    {search.trim()
+                                        ? 'Try a different search.'
+                                        : 'Your data sharing decisions will appear here.'}
                                 </Text>
                             </RNView>
                         ) : (
-                            filteredRecords.map((record) => (
-                                <ConsentRecordCard key={record.id} record={record} />
-                            ))
+                            <>
+                                {filteredRecords.map((record) => (
+                                    <ConsentRecordCard
+                                        key={record.id}
+                                        record={record}
+                                        standingActive={standingRpIds.has(record.rpId)}
+                                        onDelete={() => removeRecord(record.id)}
+                                    />
+                                ))}
+                                <Pressable style={styles.clearAllButton} onPress={handleClearHistory}>
+                                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                                    <Text style={styles.clearAllText}>Clear all history</Text>
+                                </Pressable>
+                            </>
                         )}
                     </>
                 )}
@@ -239,12 +305,28 @@ export default function ConsentHistoryScreen() {
     );
 }
 
-/** Individual consent record card. */
-function ConsentRecordCard({ record }: { record: ConsentRecord }) {
+/** Individual consent record card. Swipe left to delete. */
+function ConsentRecordCard({
+    record,
+    standingActive,
+    onDelete,
+}: {
+    record: ConsentRecord;
+    standingActive: boolean;
+    onDelete: () => void;
+}) {
     const [expanded, setExpanded] = useState(false);
     const colors = DECISION_COLORS[record.decision] ?? DECISION_COLORS.denied;
 
+    const renderRightActions = () => (
+        <Pressable style={styles.swipeDelete} onPress={onDelete} accessibilityLabel="Delete record">
+            <Ionicons name="trash" size={20} color="#FFFFFF" />
+            <Text style={styles.swipeDeleteText}>Delete</Text>
+        </Pressable>
+    );
+
     return (
+        <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
         <Pressable style={styles.recordCard} onPress={() => setExpanded(!expanded)}>
             <RNView style={styles.recordHeader}>
                 <RNView style={styles.recordAppInfo}>
@@ -279,8 +361,14 @@ function ConsentRecordCard({ record }: { record: ConsentRecord }) {
                 )}
                 {record.persistent && (
                     <RNView style={styles.attributeChips}>
-                        <Ionicons name="repeat" size={14} color="#00BCF2" />
-                        <Text style={styles.chipText}>Auto-share</Text>
+                        <Ionicons
+                            name={standingActive ? 'repeat' : 'repeat-outline'}
+                            size={14}
+                            color={standingActive ? '#00BCF2' : '#94A3B8'}
+                        />
+                        <Text style={[styles.chipText, !standingActive && styles.chipTextMuted]}>
+                            {standingActive ? 'Auto-share' : 'Auto-share · revoked'}
+                        </Text>
                     </RNView>
                 )}
             </RNView>
@@ -291,7 +379,7 @@ function ConsentRecordCard({ record }: { record: ConsentRecord }) {
                         <>
                             <Text style={styles.detailLabel}>SHARED</Text>
                             {record.approvedAttributes.map((a) => (
-                                <Text key={a} style={styles.detailItem}>✓ {a}</Text>
+                                <Text key={a} style={styles.detailItem}>✓ {attributeLabel(a)}</Text>
                             ))}
                         </>
                     )}
@@ -299,7 +387,7 @@ function ConsentRecordCard({ record }: { record: ConsentRecord }) {
                         <>
                             <Text style={[styles.detailLabel, { marginTop: 8 }]}>DENIED</Text>
                             {record.deniedAttributes.map((a) => (
-                                <Text key={a} style={styles.detailItem}>✗ {a}</Text>
+                                <Text key={a} style={styles.detailItem}>✗ {attributeLabel(a)}</Text>
                             ))}
                         </>
                     )}
@@ -311,6 +399,7 @@ function ConsentRecordCard({ record }: { record: ConsentRecord }) {
                 </RNView>
             )}
         </Pressable>
+        </Swipeable>
     );
 }
 
@@ -486,6 +575,23 @@ const styles = StyleSheet.create({
     emptyText: { fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20 },
 
     // Consent record card
+    searchBox: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: '#FFFFFF', borderRadius: 12,
+        paddingHorizontal: 12, marginBottom: 12,
+    },
+    searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: '#0F172A' },
+    swipeDelete: {
+        backgroundColor: '#DC2626', justifyContent: 'center', alignItems: 'center',
+        width: 84, marginBottom: 10, borderRadius: 12, gap: 2,
+    },
+    swipeDeleteText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+    chipTextMuted: { color: '#94A3B8', textDecorationLine: 'line-through' },
+    clearAllButton: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+        paddingVertical: 14, marginTop: 8,
+    },
+    clearAllText: { fontSize: 15, fontWeight: '600', color: '#DC2626' },
     recordCard: {
         backgroundColor: '#FFFFFF',
         borderRadius: 12,

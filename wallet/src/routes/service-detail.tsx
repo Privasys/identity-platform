@@ -8,7 +8,10 @@ import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
+import { attributeLabel, ATTRIBUTE_MAP, getProfileValue } from '@/services/attributes';
 import { useAuthStore } from '@/stores/auth';
+import { useConsentStore, type ConsentRecord } from '@/stores/consent';
+import { useProfileStore } from '@/stores/profile';
 import { useSessionsStore } from '@/stores/sessions';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
@@ -32,6 +35,16 @@ export default function ServiceDetailScreen() {
     // keyed by the same `appHost` (= `trustKey`) the trusted-app row
     // uses, so a direct rpId match is correct.
     const session = sessions.find((s) => s.rpId === rpId && s.expiresAt > Date.now());
+    const records = useConsentStore((s) => s.records);
+    const profile = useProfileStore((s) => s.profile);
+    // The most recent consent decision that actually shared something with this
+    // service. Consent is keyed on the relying party (client id / appName@rpId);
+    // match it to this row by rpId, origin, or app name.
+    const lastShared: ConsentRecord | undefined = records.find(
+        (r) =>
+            r.approvedAttributes.length > 0 &&
+            (r.rpId === rpId || r.origin === rpId || r.origin === app?.origin || r.appName === app?.appName)
+    );
     const [removing, setRemoving] = useState(false);
 
     const handleRemove = () => {
@@ -120,6 +133,43 @@ export default function ServiceDetailScreen() {
                             />
                         )}
                     </RNView>
+
+                    {/* Attributes shared with this service (from the last
+                        consent decision that shared anything). Gov-assurance
+                        attributes are disclosed as enclave-signed proofs, so
+                        the raw value stays on-device — shown as "Verified". */}
+                    {lastShared && (
+                        <RNView style={styles.card}>
+                            <RNView style={styles.cardTitleRow}>
+                                <Text style={styles.cardTitle}>Shared attributes</Text>
+                                <Text style={styles.sharedWhen}>
+                                    {new Date(lastShared.consentedAt * 1000).toLocaleDateString(undefined, {
+                                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                                    })}
+                                </Text>
+                            </RNView>
+                            {lastShared.approvedAttributes.map((key) => {
+                                const gov = !!ATTRIBUTE_MAP[key]?.identityVerifiable;
+                                const value = gov
+                                    ? 'Verified proof'
+                                    : (profile && getProfileValue(profile, key)) || '—';
+                                return (
+                                    <RNView key={key} style={styles.sharedRow}>
+                                        <RNView style={styles.sharedInfo}>
+                                            <Text style={styles.sharedLabel}>{attributeLabel(key)}</Text>
+                                            <Text style={styles.sharedValue} numberOfLines={1}>{value}</Text>
+                                        </RNView>
+                                        {gov && (
+                                            <RNView style={styles.verifiedBadge}>
+                                                <Ionicons name="shield-checkmark" size={12} color="#059669" />
+                                                <Text style={styles.verifiedText}>Passport</Text>
+                                            </RNView>
+                                        )}
+                                    </RNView>
+                                );
+                            })}
+                        </RNView>
+                    )}
 
                     {/* Sealed session (only when this app currently has a
                         live session-relay binding the wallet anchored on
@@ -238,6 +288,19 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
         marginBottom: 12
     },
+    sharedWhen: { fontSize: 12, color: '#94A3B8' },
+    sharedRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: '#F1F5F9',
+    },
+    sharedInfo: { flex: 1 },
+    sharedLabel: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
+    sharedValue: { fontSize: 13, color: '#64748B', marginTop: 1 },
+    verifiedBadge: {
+        flexDirection: 'row', alignItems: 'center', gap: 4,
+        backgroundColor: '#ECFDF5', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8,
+    },
+    verifiedText: { fontSize: 11, fontWeight: '700', color: '#059669' },
     cardTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',

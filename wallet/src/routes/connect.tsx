@@ -558,11 +558,13 @@ export default function ConnectScreen() {
                             setStep('confirm');
                             return;
                         }
-                        await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
+                        await ensureConsentRef.current(payload, () =>
+                            doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId),
+                        );
                         return;
                     }
                     // First time — register (FIDO2 handles biometric via NativeKeys)
-                    await doRegister(payload);
+                    await ensureConsentRef.current(payload, () => doRegister(payload));
                     return;
                 }
 
@@ -660,9 +662,12 @@ export default function ConnectScreen() {
                             setStep('confirm');
                             return;
                         }
-                        // QR-initiated or within grace period: go straight to FIDO2.
-                        // NativeKeys.sign() handles biometric — no app-level prompt needed.
-                        await doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId);
+                        // QR-initiated or within grace period: FIDO2 handles the
+                        // biometric — but consent still gates any disclosure. The
+                        // gate is silent when a remembered decision covers the set.
+                        await ensureConsentRef.current(payload, () =>
+                            doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId),
+                        );
                         return;
                     }
                     setStep('attestation');
@@ -702,22 +707,28 @@ export default function ConnectScreen() {
      *    optional profile ones default ON, and prior per-attribute decisions
      *    are preserved. A request that grows the attribute set re-prompts.
      */
+    // Reads live state (profile store + attestationRef) rather than closing over
+    // it, so it is a STABLE callback safe to call from startFlow's fast paths
+    // (which are defined earlier and memoised on their own deps).
     const ensureConsentThen = useCallback(
         async (payload: QRPayload, cont: () => Promise<void>) => {
-            const plan = buildConsentPlan(payload, profile);
+            const currentProfile = useProfileStore.getState().profile;
+            const plan = buildConsentPlan(payload, currentProfile);
             if (plan.length === 0) {
                 approvedAttrsRef.current = new Set();
                 await cont();
                 return;
             }
             const key = consentKeyFor(payload);
-            const att = attestationRef.current ?? attestation;
+            const att = attestationRef.current;
             const meas = att?.mrtd ?? att?.mrenclave ?? '';
             const codeHash = att?.workload_code_hash ?? '';
             const consent = useConsentStore.getState();
             const standing = consent.getStandingConsent(key, meas, codeHash);
             const latest = consent.getRecordsForApp(key)[0];
             const decided = new Set(latest?.requestedAttributes ?? []);
+            // Skip the screen only when a remembered decision already covers
+            // every requested attribute for this exact enclave measurement.
             if (
                 standing &&
                 latest?.persistent &&
@@ -743,8 +754,10 @@ export default function ConnectScreen() {
             consentContinuation.current = cont;
             setStep('consent');
         },
-        [profile, attestation],
+        [],
     );
+    const ensureConsentRef = useRef(ensureConsentThen);
+    ensureConsentRef.current = ensureConsentThen;
 
     /** User confirmed the consent screen: record the decision (and standing
      *  consent when asked to remember), then run the stashed continuation with

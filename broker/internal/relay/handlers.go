@@ -104,6 +104,12 @@ type notifyRequest struct {
 	// it on the voucher-only path to locate/create the session row via
 	// POST /sessions/encauth {client_id, device_id}.
 	ClientID string `json:"clientId,omitempty"`
+	// DescriptorHash: 16-byte SHA-256 prefix (base64url) of the relay
+	// descriptor the SDK published for this session. Expo push data is
+	// size-capped, so attribute requirements and paid-disclosure vouchers
+	// ride the descriptor; the wallet GETs /connect/<sessionId> and
+	// verifies it against this pin — same trust model as a QR scan.
+	DescriptorHash string `json:"descriptorHash,omitempty"`
 }
 
 // HandleNotify sends a push notification to the wallet via Expo push service.
@@ -188,6 +194,9 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 	}
 	if req.ClientID != "" {
 		pushData["clientId"] = req.ClientID
+	}
+	if req.DescriptorHash != "" {
+		pushData["descriptorHash"] = req.DescriptorHash
 	}
 	if req.Sid != "" {
 		pushData["sid"] = req.Sid

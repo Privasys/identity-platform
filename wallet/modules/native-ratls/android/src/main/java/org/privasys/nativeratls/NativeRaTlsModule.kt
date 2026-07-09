@@ -23,5 +23,20 @@ class NativeRaTlsModule : Module() {
                 NativeRaTlsBridge.nativeVerify(host, port, caCertPath, policyJson)
             }
         }
+
+        // Arg order matches the JS surface (native-ratls/src/index.ts): the TS
+        // `post`/`request` pass headers before caCertPath, so the bridge call
+        // re-orders them to the FFI (ca, path, body, headers) shape.
+        AsyncFunction("post") { host: String, port: Int, path: String, body: String, headersJson: String?, caCertPath: String? ->
+            runBlocking(Dispatchers.IO) {
+                NativeRaTlsBridge.nativePost(host, port, caCertPath, path, body, headersJson)
+            }
+        }
+
+        AsyncFunction("request") { method: String, host: String, port: Int, path: String, body: String, headersJson: String?, caCertPath: String? ->
+            runBlocking(Dispatchers.IO) {
+                NativeRaTlsBridge.nativeRequest(method, host, port, caCertPath, path, body, headersJson)
+            }
+        }
     }
 }

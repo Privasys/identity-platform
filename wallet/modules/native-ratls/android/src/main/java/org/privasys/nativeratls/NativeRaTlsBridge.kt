@@ -14,4 +14,16 @@ internal object NativeRaTlsBridge {
 
     @JvmStatic
     external fun nativeVerify(host: String, port: Int, caCertPath: String?, policyJson: String): String
+
+    @JvmStatic
+    external fun nativePost(
+        host: String, port: Int, caCertPath: String?,
+        path: String, body: String, headersJson: String?
+    ): String
+
+    @JvmStatic
+    external fun nativeRequest(
+        method: String, host: String, port: Int, caCertPath: String?,
+        path: String, body: String, headersJson: String?
+    ): String
 }

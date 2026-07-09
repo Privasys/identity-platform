@@ -45,6 +45,7 @@ import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { verifyAttestation, inspectAttestation } from '@/services/attestation';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
+import { appIdFromOids } from '@/services/release-provenance';
 import { relaySessionToken } from '@/services/broker';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
@@ -322,6 +323,7 @@ function attestationTraceFrom(host: string, att: AttestationResult): Attestation
         configRoot: att.workload_config_merkle_root,
         imageRef: att.workload_image_ref,
         quoteStatus: att.quote_verification_status,
+        appId: appIdFromOids(att.custom_oids),
         verifiedAt: Date.now(),
     };
 }

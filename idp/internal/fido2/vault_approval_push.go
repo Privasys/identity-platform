@@ -49,6 +49,11 @@ type vaultApprovalSummary struct {
 	Version string `json:"version,omitempty"`
 	Source  string `json:"source,omitempty"`
 	KeyType string `json:"key_type,omitempty"`
+
+	// Identifiers the wallet uses to fetch mgmt release provenance (the
+	// published release + old→new code diff) itself. Not display text.
+	AppID     string `json:"app_id,omitempty"`
+	VersionID string `json:"version_id,omitempty"`
 }
 
 // vaultPendingStore holds pending wallet approvals keyed by vault_op: the

@@ -11,13 +11,18 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Pressable, Alert, Linking, ScrollView, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { attributeLabel, ATTRIBUTE_MAP, getProfileValue } from '@/services/attributes';
 import * as fido2 from '@/services/fido2';
+import {
+    fetchRunningAppReleases,
+    type OsRelease,
+    type WorkloadRelease
+} from '@/services/release-provenance';
 import { listMySessions, revokeSession } from '@/services/sessions-api';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
@@ -110,6 +115,28 @@ export default function ServiceDetailScreen() {
     const [removing, setRemoving] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+
+    // Release provenance for the RUNNING app (its live /attest carries os_release
+    // + workload_release with server-computed digest/measurement match), so the
+    // user can see which published build this app is running and open the code.
+    const runningAppId = latestAtt?.appId;
+    const [releases, setReleases] = useState<{
+        os?: OsRelease;
+        workload?: WorkloadRelease;
+    } | null>(null);
+    useEffect(() => {
+        if (!runningAppId) {
+            setReleases(null);
+            return;
+        }
+        let cancelled = false;
+        void fetchRunningAppReleases(runningAppId).then((r) => {
+            if (!cancelled && r) setReleases({ os: r.os_release, workload: r.workload_release });
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [runningAppId]);
 
     // Server-side sign-out: revoke every IdP session issued to THIS app
     // (client_id-keyed rows), so its tokens stop working immediately — the
@@ -319,6 +346,38 @@ export default function ServiceDetailScreen() {
                             />
                         )}
                     </RNView>
+
+                    {/* Code provenance — which published build this app is
+                        currently running (server-computed digest / measurement
+                        match), with links to the release and the source. */}
+                    {releases && (releases.workload?.url || releases.os?.url) && (
+                        <RNView style={styles.card}>
+                            <Text style={styles.cardTitle}>Code provenance</Text>
+                            {releases.workload?.url ? (
+                                <ReleaseLink
+                                    label="App release"
+                                    value={releases.workload.label ?? 'View'}
+                                    url={releases.workload.url}
+                                    match={releases.workload.matches}
+                                />
+                            ) : null}
+                            {releases.os?.url ? (
+                                <ReleaseLink
+                                    label="Enclave OS"
+                                    value={releases.os.tag ?? 'View'}
+                                    url={releases.os.url}
+                                    match={
+                                        releases.os.status === 'verified'
+                                            ? true
+                                            : releases.os.status === 'mismatch'
+                                              ? false
+                                              : undefined
+                                    }
+                                />
+                            ) : null}
+                            <Text style={styles.provNote}>Verified by Privasys against the published release.</Text>
+                        </RNView>
+                    )}
 
                     {/* Shared attributes — the most recent share, at a glance
                         (the per-session breakdown lives in the trail below). */}
@@ -532,6 +591,36 @@ function SharedAttributeRow({ label, value, gov }: { label: string; value: strin
     );
 }
 
+/** A release/source link with an optional server-computed match badge. */
+function ReleaseLink({
+    label,
+    value,
+    url,
+    match
+}: {
+    label: string;
+    value: string;
+    url: string;
+    match?: boolean;
+}) {
+    return (
+        <Pressable style={styles.detailRow} onPress={() => void Linking.openURL(url)}>
+            <Text style={styles.detailLabel}>{label}</Text>
+            <RNView style={styles.provValueWrap}>
+                {match === true ? (
+                    <Ionicons name="checkmark-circle" size={14} color="#059669" />
+                ) : match === false ? (
+                    <Ionicons name="alert-circle" size={14} color="#DC2626" />
+                ) : null}
+                <Text style={styles.provLink} numberOfLines={1}>
+                    {value}
+                </Text>
+                <Ionicons name="open-outline" size={13} color="#0F766E" />
+            </RNView>
+        </Pressable>
+    );
+}
+
 function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
     return (
         <RNView style={styles.detailRow}>
@@ -705,6 +794,9 @@ const styles = StyleSheet.create({
     detailLabel: { fontSize: 13, color: '#64748B', flex: 1 },
     detailValue: { fontSize: 13, color: '#0F172A', flex: 2, textAlign: 'right' },
     mono: { fontFamily: 'Inter' },
+    provValueWrap: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 2, justifyContent: 'flex-end' },
+    provLink: { fontSize: 13, fontWeight: '600', color: '#0F766E', flexShrink: 1 },
+    provNote: { fontSize: 11, color: '#94A3B8', marginTop: 8 },
     signOutButton: {
         flexDirection: 'row',
         alignItems: 'center',

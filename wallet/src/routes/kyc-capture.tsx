@@ -25,6 +25,7 @@ import { DataRequestConsent } from '@/components/DataRequestConsent';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { Text, View } from '@/components/Themed';
 import { getProfileValue, setProfileValue } from '@/services/attributes';
+import { appIdFromOids } from '@/services/release-provenance';
 import {
     applyGovAttributes, attestVerifier, getVerifierInfo, govAttributeCandidates, readDocumentMrz,
     verifyIdentity, type KycRecord, type VerifierAttestation,
@@ -459,6 +460,7 @@ export default function KycCaptureScreen() {
                               configRoot: att.workload_config_merkle_root,
                               imageRef: att.workload_image_ref,
                               quoteStatus: att.quote_verification_status,
+                              appId: appIdFromOids(att.custom_oids),
                               verifiedAt: Date.now()
                           }
                       ]

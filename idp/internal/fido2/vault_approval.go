@@ -186,6 +186,10 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				Version string `json:"version"`
 				Source  string `json:"source"`
 				KeyType string `json:"key_type"`
+				// Identifiers the wallet uses to fetch release provenance
+				// (published release + code-diff) from mgmt itself.
+				AppID     string `json:"app_id"`
+				VersionID string `json:"version_id"`
 			} `json:"context"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Handle == "" {
@@ -268,6 +272,8 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			Version:       req.Context.Version,
 			Source:        req.Context.Source,
 			KeyType:       req.Context.KeyType,
+			AppID:         req.Context.AppID,
+			VersionID:     req.Context.VersionID,
 		}, exp)
 		writeJSON(w, options)
 	}

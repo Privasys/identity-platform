@@ -62,6 +62,8 @@ export interface AttestationTrace {
     configRoot?: string;
     imageRef?: string;
     quoteStatus?: string;
+    /** Management-service app id (from OID 3.6), for release-provenance lookups. */
+    appId?: string;
     /** Epoch ms of the verification. */
     verifiedAt: number;
 }

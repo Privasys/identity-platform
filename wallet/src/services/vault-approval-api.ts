@@ -39,6 +39,10 @@ export interface VaultApprovalSummary {
     version?: string; // e.g. "v1.2.3 · git:a1b2c3d · 23 Jun 2026"
     source?: string;
     key_type?: string; // export: the key kind (e.g. Aes256GcmKey)
+    // Identifiers the wallet uses to fetch mgmt release provenance itself (the
+    // published release + old→new code diff for the promote target).
+    app_id?: string;
+    version_id?: string;
 }
 
 export interface VaultApprovalRequest {

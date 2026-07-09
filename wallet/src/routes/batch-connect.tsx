@@ -20,6 +20,7 @@ import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, verifyAttestation } from '@/services/attestation';
+import { appIdFromOids } from '@/services/release-provenance';
 import { relaySessionToken } from '@/services/broker';
 import * as fido2 from '@/services/fido2';
 import { useAuthStore } from '@/stores/auth';
@@ -317,6 +318,7 @@ export default function BatchConnectScreen() {
                                       configRoot: app.attestation.workload_config_merkle_root,
                                       imageRef: app.attestation.workload_image_ref,
                                       quoteStatus: app.attestation.quote_verification_status,
+                                      appId: appIdFromOids(app.attestation.custom_oids),
                                       verifiedAt: Date.now()
                                   }
                               ]

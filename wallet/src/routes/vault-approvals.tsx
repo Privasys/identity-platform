@@ -24,6 +24,7 @@ import {
     View as RNView,
     Alert,
     ActivityIndicator,
+    Linking,
     Platform,
     RefreshControl,
 } from 'react-native';
@@ -32,6 +33,7 @@ import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text } from '@/components/Themed';
+import { fetchReleaseProvenance, type ReleaseProvenance } from '@/services/release-provenance';
 import {
     approveVaultApproval,
     resolveApprovalCredential,
@@ -47,6 +49,32 @@ function shortHandle(handle: string): string {
 function shortHex(hex: string): string {
     if (!hex) return '—';
     return hex.length > 20 ? `${hex.slice(0, 10)}…${hex.slice(-6)}` : hex;
+}
+
+/** A tappable row that opens a release / compare URL in the browser. */
+function ReleaseLinkRow({
+    icon,
+    label,
+    value,
+    url,
+}: {
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    value: string;
+    url: string;
+}) {
+    return (
+        <Pressable style={styles.row} onPress={() => void Linking.openURL(url)}>
+            <Text style={styles.label}>{label}</Text>
+            <RNView style={styles.linkValueWrap}>
+                <Text style={styles.linkValue} numberOfLines={1}>
+                    {value}
+                </Text>
+                <Ionicons name={icon} size={13} color="#0F766E" />
+                <Ionicons name="open-outline" size={13} color="#0F766E" />
+            </RNView>
+        </Pressable>
+    );
 }
 /** Human countdown to expiry (expires_at is epoch seconds). */
 function formatRemaining(expiresAtSec: number, nowMs: number): string {
@@ -69,6 +97,33 @@ export default function VaultApprovalsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [approvingOp, setApprovingOp] = useState<string | null>(null);
     const [now, setNow] = useState(() => Date.now());
+    // Release provenance keyed by vault_op — fetched from mgmt (public) for each
+    // promote that carries app_id + version_id, so the user can open the
+    // published release and the exact code diff before approving.
+    const [provenance, setProvenance] = useState<Record<string, ReleaseProvenance>>({});
+
+    useEffect(() => {
+        let cancelled = false;
+        for (const req of pending) {
+            const s = req.summary;
+            if (
+                s.operation !== 'promote' ||
+                !s.app_id ||
+                !s.version_id ||
+                provenance[req.vault_op] !== undefined
+            ) {
+                continue;
+            }
+            void fetchReleaseProvenance(s.app_id, s.version_id).then((p) => {
+                if (!cancelled && p) {
+                    setProvenance((prev) => ({ ...prev, [req.vault_op]: p }));
+                }
+            });
+        }
+        return () => {
+            cancelled = true;
+        };
+    }, [pending, provenance]);
 
     // Arriving via a push deep-link: register the capability, then refresh.
     useEffect(() => {
@@ -227,6 +282,41 @@ export default function VaultApprovalsScreen() {
                                         <Text style={styles.value}>{s.version}</Text>
                                     </RNView>
                                 ) : null}
+
+                                {/* Published release + the exact code changes since
+                                    the last promoted version. mgmt-resolved from the
+                                    catalogue (verified by Privasys), so the user can
+                                    read the diff before approving an upgrade. */}
+                                {(() => {
+                                    const prov = provenance[req.vault_op];
+                                    if (!prov) return null;
+                                    const rel = prov.workload_release;
+                                    const relLabel = prov.version?.label ?? rel?.label;
+                                    return (
+                                        <>
+                                            {rel?.url ? (
+                                                <ReleaseLinkRow
+                                                    icon="cube-outline"
+                                                    label="Published release"
+                                                    value={relLabel ?? 'View'}
+                                                    url={rel.url}
+                                                />
+                                            ) : null}
+                                            {prov.previous?.compare_url ? (
+                                                <ReleaseLinkRow
+                                                    icon="git-compare-outline"
+                                                    label="Code changes"
+                                                    value={
+                                                        prov.previous.label && relLabel
+                                                            ? `${prov.previous.label} → ${relLabel}`
+                                                            : 'View diff'
+                                                    }
+                                                    url={prov.previous.compare_url}
+                                                />
+                                            ) : null}
+                                        </>
+                                    );
+                                })()}
                                 {s.key_type ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>Key type</Text>
@@ -313,6 +403,8 @@ const styles = StyleSheet.create({
     cardHighlighted: { borderWidth: 1, borderColor: '#34E89E' },
     subject: { fontSize: 17, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
     plain: { fontSize: 13, lineHeight: 19, color: '#475569', marginBottom: 12 },
+    linkValueWrap: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
+    linkValue: { fontSize: 14, fontWeight: '600', color: '#0F766E', flexShrink: 1 },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',

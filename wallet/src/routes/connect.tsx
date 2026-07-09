@@ -37,6 +37,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { sha256 } from '@noble/hashes/sha2.js';
 
+import { base64urlToBytes } from '@/utils/encoding';
 import { buildErrorReport, REPORT_DESTINATION } from '@/utils/logs';
 
 import { DataRequestConsent } from '@/components/DataRequestConsent';
@@ -156,8 +157,17 @@ async function resolveRequestedAttributes(
         if (attr === PRESENCE_KEY) {
             // Fresh-presence ceremony: the selfie captured in THIS flow is
             // matched in-enclave against the committed document portrait.
-            // No selfie (user skipped, or capture failed) → attribute omitted;
-            // the relying party applies its own policy to the absence.
+            // No selfie (user skipped) → attribute omitted; the relying party
+            // applies its own policy to the absence.
+            //
+            // NB since verifier v0.6.0 a FAILED live check (e.g. wrong face)
+            // is NOT an exception — it returns HTTP 200 with a SIGNED failure
+            // receipt (value:false, failure.retryable). So the token below may
+            // be an affirmation OR a charged failure receipt; either way it is
+            // the truthful, RP-auditable result and is delivered as-is. The
+            // caller inspects it via presenceOutcome() to drive honest wallet
+            // UX. The catch now only covers a transport/enclave error (the
+            // ceremony did not run) — then presence is genuinely omitted.
             if (!selfieBase64) continue;
             try {
                 attrs[attr] = await provePresence(
@@ -167,8 +177,9 @@ async function resolveRequestedAttributes(
                     voucherForAttribute(PRESENCE_KEY, payload.disclosureVouchers),
                 );
             } catch (e: any) {
-                // Never fake presence; omit on failure (incl. face mismatch).
-                console.warn(`[CONNECT] presence proof failed: ${e?.message}`);
+                // The ceremony could not run (transport/enclave error) — never
+                // fake presence; omit and let the RP see the absence.
+                console.warn(`[CONNECT] presence proof failed to run: ${e?.message}`);
             }
             continue;
         }
@@ -195,6 +206,54 @@ async function resolveRequestedAttributes(
     }
 
     return Object.keys(attrs).length > 0 ? attrs : undefined;
+}
+
+/** Outcome of a fresh-presence ceremony, for honest wallet UX.
+ *  - null: presence was not part of this sign-in (or the user skipped it).
+ *  - 'affirmed': the enclave confirmed the document holder is present.
+ *  - 'failed-retryable': the live check did not pass, but a fresh attempt could
+ *    succeed (e.g. a poor selfie capture) — the RP was charged.
+ *  - 'failed-final': the check did not pass and retrying will not help, OR the
+ *    ceremony could not run (transport/enclave error). */
+type PresenceOutcome = null | 'affirmed' | 'failed-retryable' | 'failed-final';
+
+/** Decode an SD-JWT VC disclosure (`<jws>~`) payload — value + failure block —
+ *  WITHOUT verifying the signature. The relying party re-verifies the VC; the
+ *  wallet only needs the shape to show the user a truthful result. */
+function decodeDisclosurePayload(
+    token: string,
+): { value: unknown; failure?: { retryable?: boolean } } | null {
+    const parts = token.replace(/~$/, '').split('.');
+    if (parts.length < 2) return null;
+    try {
+        const json = new TextDecoder().decode(base64urlToBytes(parts[1]));
+        const p = JSON.parse(json);
+        return { value: p.value, failure: p.failure };
+    } catch {
+        return null;
+    }
+}
+
+/** Classify the presence result from the resolved attributes, so the flow can
+ *  show success vs a truthful "couldn't confirm it's you" instead of an
+ *  unconditional green screen (verifier v0.6.0 returns a signed failure receipt
+ *  rather than an error, so a failed check now arrives as a delivered token). */
+function presenceOutcome(
+    payload: QRPayload,
+    attributes: Record<string, string> | undefined,
+    selfieProvided: boolean,
+): PresenceOutcome {
+    if (!(payload.requestedAttributes ?? []).includes(PRESENCE_KEY)) return null;
+    const token = attributes?.[PRESENCE_KEY];
+    if (!token) {
+        // No presence token delivered: either the user skipped the selfie
+        // (conscious, not a failure) or the ceremony could not run at all.
+        return selfieProvided ? 'failed-final' : null;
+    }
+    const d = decodeDisclosurePayload(token);
+    if (!d) return null;
+    if (d.value === true && !d.failure) return 'affirmed';
+    return d.failure?.retryable ? 'failed-retryable' : 'failed-final';
 }
 
 /**
@@ -442,6 +501,7 @@ type FlowStep =
     | 'acquire-attributes'
     | 'relaying'
     | 'done'
+    | 'presence-failed'
     | 'error';
 
 /**
@@ -586,6 +646,9 @@ export default function ConnectScreen() {
     const [consentItems, setConsentItems] = useState<SignInConsentItem[]>([]);
     const [consentSelected, setConsentSelected] = useState<Set<string>>(new Set());
     const [consentRemember, setConsentRemember] = useState(true);
+    // Fresh-presence result, so the terminal screen can be honest rather than a
+    // blanket "Connected" when a live holder-presence check did not pass.
+    const [presenceFail, setPresenceFail] = useState<{ retryable: boolean } | null>(null);
     const approvedAttrsRef = useRef<Set<string> | null>(null);
     const consentContinuation = useRef<(() => Promise<void>) | null>(null);
     // Fresh-presence ceremony (holder_present): selfie captured in-flow, then
@@ -881,6 +944,27 @@ export default function ConnectScreen() {
                 return;
             }
             await cont();
+        },
+        [],
+    );
+
+    /** Choose the terminal screen from the presence result: a passed/absent
+     *  presence lands on the normal "Connected" success; a FAILED live check
+     *  (the v0.6.0 signed failure receipt) lands on an honest "couldn't confirm
+     *  it's you" screen instead of a misleading green. The sign-in itself still
+     *  completed and the truthful receipt was already relayed to the relying
+     *  party — this only fixes what the USER is shown. Returns true when it
+     *  routed to the failure screen (so the caller skips the auto-return). */
+    const routeTerminal = useCallback(
+        (payload: QRPayload, attributes?: Record<string, string>): boolean => {
+            const po = presenceOutcome(payload, attributes, !!selfieRef.current);
+            if (po === 'failed-retryable' || po === 'failed-final') {
+                setPresenceFail({ retryable: po === 'failed-retryable' });
+                setStep('presence-failed');
+                return true;
+            }
+            setStep('done');
+            return false;
         },
         [],
     );
@@ -1445,8 +1529,9 @@ export default function ConnectScreen() {
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
 
-            setStep('done');
-            setTimeout(() => router.replace('/(tabs)'), 1500);
+            if (!routeTerminal(payload, attributes)) {
+                setTimeout(() => router.replace('/(tabs)'), 1500);
+            }
         } catch (e: any) {
             console.error(`[CONNECT] registration FAILED:`, e.message, e);
             setError(`Registration failed: ${e.message}`);
@@ -1585,8 +1670,9 @@ export default function ConnectScreen() {
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
 
-            setStep('done');
-            setTimeout(() => router.replace('/(tabs)'), 1500);
+            if (!routeTerminal(payload, attributes)) {
+                setTimeout(() => router.replace('/(tabs)'), 1500);
+            }
         } catch (e: any) {
             console.error(`[CONNECT] authentication FAILED:`, e.message, e);
             setError(`Authentication failed: ${e.message}`);
@@ -1715,8 +1801,9 @@ export default function ConnectScreen() {
             });
 
             pendingRelay.current = null;
-            setStep('done');
-            setTimeout(() => router.replace('/(tabs)'), 1500);
+            if (!routeTerminal(pending.payload, attributes)) {
+                setTimeout(() => router.replace('/(tabs)'), 1500);
+            }
         } catch (e: any) {
             console.error(`[CONNECT] relay after acquisition FAILED:`, e.message, e);
             setError(`Failed to complete sign-in: ${e.message}`);
@@ -1924,6 +2011,25 @@ export default function ConnectScreen() {
                         </Text>
                         {/* Explicit exit so the screen is never a dead end, even
                             if the auto-return timer is missed. */}
+                        <Pressable style={styles.secondaryButton} onPress={() => router.replace('/(tabs)')}>
+                            <Text style={styles.secondaryButtonText}>Done</Text>
+                        </Pressable>
+                    </View>
+                )}
+
+                {step === 'presence-failed' && (
+                    <View style={styles.centered}>
+                        <Text style={styles.errorIcon}>⚠</Text>
+                        <Text style={styles.title}>Couldn&apos;t confirm it&apos;s you</Text>
+                        <Text style={styles.subtitle}>
+                            {presenceFail?.retryable
+                                ? 'The live selfie didn’t match your ID photo. Make sure it’s you, in good light, and try the sign-in again.'
+                                : 'The presence check didn’t pass. Contact the service if you believe this is an error.'}
+                        </Text>
+                        <Text style={styles.presenceNote}>
+                            You have been signed in, but the service was told the presence
+                            check did not pass and may not let you continue.
+                        </Text>
                         <Pressable style={styles.secondaryButton} onPress={() => router.replace('/(tabs)')}>
                             <Text style={styles.secondaryButtonText}>Done</Text>
                         </Pressable>
@@ -2710,6 +2816,7 @@ const styles = StyleSheet.create({
     },
     title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
     subtitle: { fontSize: 16, textAlign: 'center', opacity: 0.7, marginBottom: 20 },
+    presenceNote: { fontSize: 13, textAlign: 'center', opacity: 0.55, marginBottom: 24, paddingHorizontal: 8 },
     statusText: { fontSize: 16, marginTop: 16, opacity: 0.7, textAlign: 'center' },
     checkmark: { fontSize: 64, color: '#34C759', marginBottom: 16 },
     errorIcon: { fontSize: 64, color: '#FF3B30', marginBottom: 16 },

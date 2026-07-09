@@ -179,6 +179,14 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			MeasurementDigest string `json:"measurement_digest"`
 			PolicyVersion     uint64 `json:"policy_version"`
 			TTLSeconds        int64  `json:"ttl_seconds"`
+			// Advisory display context for the approver's wallet. Not part of the
+			// vault_op binding — the vault enforces only the operation tuple.
+			Context struct {
+				AppName string `json:"app_name"`
+				Version string `json:"version"`
+				Source  string `json:"source"`
+				KeyType string `json:"key_type"`
+			} `json:"context"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Handle == "" {
 			errorJSON(w, http.StatusBadRequest, "handle required")
@@ -252,9 +260,14 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		// options from /pending and posts the assertion to /complete.
 		optionsJS, _ := json.Marshal(options)
 		h.recordPendingAndPush(sub, vaultOp, optionsJS, vaultApprovalSummary{
-			Operation:   req.Operation,
-			Handle:      req.Handle,
-			Measurement: req.MeasurementDigest,
+			Operation:     req.Operation,
+			Handle:        req.Handle,
+			Measurement:   req.MeasurementDigest,
+			PolicyVersion: req.PolicyVersion,
+			AppName:       req.Context.AppName,
+			Version:       req.Context.Version,
+			Source:        req.Context.Source,
+			KeyType:       req.Context.KeyType,
 		}, exp)
 		writeJSON(w, options)
 	}

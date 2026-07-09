@@ -29,10 +29,26 @@ import (
 
 // vaultApprovalSummary is the human-facing description of a pending approval,
 // shown on the wallet screen and carried (as strings) in the push payload.
+//
+// The first three fields plus PolicyVersion are the OPERATION the wallet is
+// approving; the vault re-derives and enforces the binding from
+// (handle, measurement, policy_version, nonce, exp), so these are the
+// authoritative anchor. The remaining fields are DISPLAY CONTEXT the initiator
+// (the owner's CLI) supplied to help a human recognise the operation — they are
+// NOT bound into vault_op and must be read as advisory hints, never as the
+// security decision (the measurement digest is the truth). See
+// attribute-billing / vault promote-step-up design.
 type vaultApprovalSummary struct {
-	Operation   string `json:"operation"`
-	Handle      string `json:"handle"`
-	Measurement string `json:"measurement"`
+	Operation     string `json:"operation"`
+	Handle        string `json:"handle"`
+	Measurement   string `json:"measurement"`
+	PolicyVersion uint64 `json:"policy_version,omitempty"`
+
+	// Advisory context (initiator-supplied; not cryptographically bound).
+	AppName string `json:"app_name,omitempty"`
+	Version string `json:"version,omitempty"`
+	Source  string `json:"source,omitempty"`
+	KeyType string `json:"key_type,omitempty"`
 }
 
 // vaultPendingStore holds pending wallet approvals keyed by vault_op: the
@@ -142,12 +158,21 @@ func (h *Handler) recordPendingAndPush(sub, vaultOp string, optionsJS json.RawMe
 // wallet routes it to the Vault approvals screen. Mirrors the recovery flow's
 // sendGuardianPush. Values in data must be strings (Expo constraint).
 func sendVaultApprovalPush(pushToken, vaultOp string, summary vaultApprovalSummary) {
+	// Prefer the friendly app name in the push body when the initiator supplied
+	// it; fall back to the truncated handle.
+	who := summary.AppName
+	if who == "" {
+		who = shortHandle(summary.Handle)
+	}
 	body := ""
 	switch summary.Operation {
 	case "promote":
-		body = "Approve a new enclave measurement for " + shortHandle(summary.Handle)
+		body = "Approve a new version for " + who
+		if summary.Version != "" {
+			body += " (" + summary.Version + ")"
+		}
 	case "export":
-		body = "Approve exporting a key for " + shortHandle(summary.Handle)
+		body = "Approve exporting a key for " + who
 	default:
 		body = "A vault operation needs your approval"
 	}

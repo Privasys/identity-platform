@@ -179,6 +179,8 @@ export default function VaultApprovalsScreen() {
                         const busy = approvingOp === req.vault_op;
                         const remaining = formatRemaining(req.expires_at, now);
                         const urgent = req.expires_at - now / 1000 < 60;
+                        const s = req.summary;
+                        const subject = s.app_name || shortHandle(s.handle);
                         return (
                             <RNView key={req.vault_op} style={[styles.card, highlighted && styles.cardHighlighted]}>
                                 <RNView style={styles.cardHeader}>
@@ -187,9 +189,9 @@ export default function VaultApprovalsScreen() {
                                             <Ionicons name="key" size={16} color="#0F766E" />
                                         </RNView>
                                         <Text style={styles.cardTitle}>
-                                            {req.summary.operation === 'promote'
+                                            {s.operation === 'promote'
                                                 ? 'Approve new version'
-                                                : req.summary.operation === 'export'
+                                                : s.operation === 'export'
                                                   ? 'Approve key export'
                                                   : 'Approve operation'}
                                         </Text>
@@ -205,14 +207,46 @@ export default function VaultApprovalsScreen() {
                                         </Text>
                                     </RNView>
                                 </RNView>
+
+                                {/* Subject: the app (friendly name if the initiator
+                                    supplied it), then the plain-language action. */}
+                                <Text style={styles.subject}>{subject}</Text>
+                                <Text style={styles.plain}>
+                                    {s.operation === 'promote'
+                                        ? s.app_name
+                                            ? 'Authorise this app to release its data key to the new version below. Only approve an upgrade you started.'
+                                            : 'Authorise the enclave to release its data key to the new measurement below. Only approve an upgrade you started.'
+                                        : s.operation === 'export'
+                                          ? 'Authorise a one-time export of this key’s material. Only approve if you are exporting it yourself.'
+                                          : 'Approve this vault operation only if you started it.'}
+                                </Text>
+
+                                {s.version ? (
+                                    <RNView style={styles.row}>
+                                        <Text style={styles.label}>Version</Text>
+                                        <Text style={styles.value}>{s.version}</Text>
+                                    </RNView>
+                                ) : null}
+                                {s.key_type ? (
+                                    <RNView style={styles.row}>
+                                        <Text style={styles.label}>Key type</Text>
+                                        <Text style={styles.value}>{s.key_type}</Text>
+                                    </RNView>
+                                ) : null}
                                 <RNView style={styles.row}>
                                     <Text style={styles.label}>App key</Text>
-                                    <Text style={styles.value}>{shortHandle(req.summary.handle)}</Text>
+                                    <Text style={styles.value}>{shortHandle(s.handle)}</Text>
                                 </RNView>
-                                {req.summary.measurement ? (
+                                {typeof s.policy_version === 'number' ? (
+                                    <RNView style={styles.row}>
+                                        <Text style={styles.label}>Policy version</Text>
+                                        <Text style={styles.value}>{s.policy_version}</Text>
+                                    </RNView>
+                                ) : null}
+                                {s.measurement ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>New measurement</Text>
-                                        <Text style={styles.mono}>{shortHex(req.summary.measurement)}</Text>
+                                        <Text style={styles.mono}>{shortHex(s.measurement)}</Text>
                                     </RNView>
                                 ) : null}
                                 <Pressable
@@ -277,6 +311,8 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     cardHighlighted: { borderWidth: 1, borderColor: '#34E89E' },
+    subject: { fontSize: 17, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
+    plain: { fontSize: 13, lineHeight: 19, color: '#475569', marginBottom: 12 },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',

@@ -29,6 +29,16 @@ export interface VaultApprovalSummary {
     operation: string; // "promote" | "export"
     handle: string;
     measurement: string; // profile_binding_digest (hex); empty for export
+    policy_version?: number;
+    // Advisory display context supplied by the initiator (the owner's CLI) to
+    // make the operation human-recognisable. NOT part of the vault_op binding —
+    // the enclave enforces only the operation tuple — so these are hints that
+    // help the user decide, not a security guarantee. The measurement digest
+    // remains the cryptographic truth.
+    app_name?: string;
+    version?: string; // e.g. "v1.2.3 · git:a1b2c3d · 23 Jun 2026"
+    source?: string;
+    key_type?: string; // export: the key kind (e.g. Aes256GcmKey)
 }
 
 export interface VaultApprovalRequest {

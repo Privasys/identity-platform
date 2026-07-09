@@ -894,13 +894,20 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	filteredAttrs := filterAttributesByScope(attrs, ac.Scope)
 
 	// Further restrict to the client's required_attributes whitelist (if set).
+	// The ceremonial holder_present disclosure is exempt, mirroring the
+	// authorize side: it is added per-request by acr_values=gov-presence (not
+	// registration-time), discloses no personal data, and IS the receipt the
+	// relying party paid the presence ceremony for.
 	client, _ := reg.Get(ac.ClientID)
 	if client != nil && len(client.RequiredAttributes) > 0 {
-		restricted := make(map[string]string, len(client.RequiredAttributes))
+		restricted := make(map[string]string, len(client.RequiredAttributes)+1)
 		for _, key := range client.RequiredAttributes {
 			if v, ok := filteredAttrs[key]; ok {
 				restricted[key] = v
 			}
+		}
+		if v, ok := filteredAttrs[presenceAttribute]; ok {
+			restricted[presenceAttribute] = v
 		}
 		filteredAttrs = restricted
 	}

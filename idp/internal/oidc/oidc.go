@@ -128,6 +128,56 @@ func looksLikeDisclosureToken(v string) bool {
 		strings.Count(v, ".") >= 2
 }
 
+// decodeDisclosure reads a disclosure token's `value` and whether it is a
+// charged FAILURE receipt (v0.6.0+: a signed token with a `failure` block that
+// the ceremony emits — and charges for — when a well-formed request did not
+// pass). Decodes the JWS payload WITHOUT verifying the signature: the acr
+// claim is only a hint; the relying party re-verifies the VC itself, so a
+// forged value at worst mislabels the caller's own token.
+func decodeDisclosure(v string) (value interface{}, isFailure bool, ok bool) {
+	if !looksLikeDisclosureToken(v) {
+		return nil, false, false
+	}
+	parts := strings.SplitN(strings.TrimSuffix(v, "~"), ".", 3)
+	if len(parts) < 2 {
+		return nil, false, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, false, false
+	}
+	var p struct {
+		Value   interface{}     `json:"value"`
+		Failure json.RawMessage `json:"failure"`
+	}
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return nil, false, false
+	}
+	return p.Value, len(p.Failure) > 0, true
+}
+
+// successfulGovDisclosure reports a disclosure that certified a fact (true OR
+// false) and is NOT a charged failure receipt — e.g. age_over_18:false for a
+// genuine under-18 holder counts, but a "commitment did not open" failure
+// receipt does not.
+func successfulGovDisclosure(v string) bool {
+	_, isFailure, ok := decodeDisclosure(v)
+	return ok && !isFailure
+}
+
+// presenceAffirmed reports that a holder_present disclosure certified presence
+// (value:true). A failure receipt (value:false) means the live check did not
+// pass, so presence was NOT established regardless of the token being validly
+// signed.
+func presenceAffirmed(v string) bool {
+	value, isFailure, ok := decodeDisclosure(v)
+	if !ok || isFailure {
+		return false
+	}
+	b, _ := value.(bool)
+	return b
+}
+
 // acrForCode computes the ACHIEVED authentication context class for a
 // completed ceremony, strongest first: "gov-presence" when a live
 // holder_present disclosure arrived (and no gov attribute arrived raw),
@@ -143,16 +193,21 @@ func acrForCode(ac *AuthCode, client *clients.Client) string {
 		}
 		if v, ok := ac.Attributes[key]; ok && v != "" {
 			if looksLikeDisclosureToken(v) {
-				govToken = true
+				// A charged failure receipt is signed but did not certify the
+				// fact — it must not lift the assurance tier.
+				if successfulGovDisclosure(v) {
+					govToken = true
+				}
 			} else {
 				govRaw = true
 			}
 		}
 	}
 	// Ceremonial: per-request (gov-presence), never scope-derived, so it is
-	// not in reqs. Only a genuine disclosure token counts as presence.
-	presence := looksLikeDisclosureToken(ac.Attributes[presenceAttribute])
-	if presence && !govRaw {
+	// not in reqs. gov-presence only when the live check AFFIRMED presence
+	// (value:true) — a failure receipt (value:false) is charged but does not
+	// establish presence.
+	if presenceAffirmed(ac.Attributes[presenceAttribute]) && !govRaw {
 		return "gov-presence"
 	}
 	if govToken && !govRaw {

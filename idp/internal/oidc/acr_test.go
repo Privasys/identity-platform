@@ -9,9 +9,14 @@ import (
 	"github.com/Privasys/idp/internal/clients"
 )
 
-// A structurally valid SD-JWT VC serialisation (JWS + '~'); signature
-// irrelevant — acrForCode only classifies the shape.
-const fakeDisclosure = "eyJhbGciOiJFUzI1NiJ9.eyJjbGFpbSI6ImFnZV9vdmVyXzE4In0.c2ln~"
+// SD-JWT VC serialisations (JWS + '~'); signature irrelevant — acrForCode
+// only decodes the (unverified) payload. Payload segments are base64url of:
+//   fakeDisclosure:        {"value":true}
+//   fakeDisclosureFalse:   {"value":false}                 (a factual "no")
+//   fakeFailureReceipt:    {"value":false,"failure":{"retryable":true}}
+const fakeDisclosure = "eyJhbGciOiJFUzI1NiJ9.eyJ2YWx1ZSI6dHJ1ZX0.c2ln~"
+const fakeDisclosureFalse = "eyJhbGciOiJFUzI1NiJ9.eyJ2YWx1ZSI6ZmFsc2V9.c2ln~"
+const fakeFailureReceipt = "eyJhbGciOiJFUzI1NiJ9.eyJ2YWx1ZSI6ZmFsc2UsImZhaWx1cmUiOnsicmV0cnlhYmxlIjp0cnVlfX0.c2ln~"
 
 func TestLooksLikeDisclosureToken(t *testing.T) {
 	if !looksLikeDisclosureToken(fakeDisclosure) {
@@ -54,6 +59,16 @@ func TestACRForCode(t *testing.T) {
 			map[string]string{"holder_present": "true"}, "wallet"},
 		{"presence + raw gov downgrades", "openid identity",
 			map[string]string{"holder_present": fakeDisclosure, "nationality": "GBR"}, "wallet"},
+		// v0.6.0 charged failure receipts must NOT lift the tier.
+		{"FAILED presence + real gov disclosures = gov-fresh, NOT gov-presence", "openid identity",
+			map[string]string{"age_over_18": fakeDisclosure, "nationality": fakeDisclosure,
+				"holder_present": fakeFailureReceipt}, "gov-fresh"},
+		{"failed presence alone = wallet", "openid identity",
+			map[string]string{"holder_present": fakeFailureReceipt}, "wallet"},
+		{"factual age_over_18:false still counts as gov-fresh", "openid identity",
+			map[string]string{"age_over_18": fakeDisclosureFalse}, "gov-fresh"},
+		{"a failed gov disclosure does not count", "openid identity",
+			map[string]string{"age_over_18": fakeFailureReceipt}, "wallet"},
 	}
 	for _, c := range cases {
 		ac := &AuthCode{Scope: c.scope, Attributes: c.attrs}

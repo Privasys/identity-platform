@@ -96,5 +96,45 @@ public class NativeRaTlsModule: Module {
                 }
             }
         }
+
+        // Method-generic RA-TLS request (GET, POST, PUT, DELETE, ...).
+        // An empty body sends no body (correct for GET/DELETE). Mirrors
+        // `post`, calling the ratls_request FFI with an explicit method.
+        AsyncFunction("request") { (method: String, host: String, port: Int, path: String, body: String, headersJson: String?, caCertPath: String?) -> String in
+            return await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let result = method.withCString { methodPtr in
+                        host.withCString { hostPtr in
+                            path.withCString { pathPtr in
+                                body.withCString { bodyPtr in
+                                    func call(_ caPtr: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>? {
+                                        if let headersJson {
+                                            return headersJson.withCString { hPtr in
+                                                ratls_request(methodPtr, hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr, hPtr)
+                                            }
+                                        }
+                                        return ratls_request(methodPtr, hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr, nil)
+                                    }
+                                    if let caPath = caCertPath {
+                                        return caPath.withCString { caPtr in call(caPtr) }
+                                    } else {
+                                        return call(nil)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    guard let result else {
+                        continuation.resume(returning: "{\"error\":\"FFI returned null\"}")
+                        return
+                    }
+
+                    let json = String(cString: result)
+                    ratls_free_string(result)
+                    continuation.resume(returning: json)
+                }
+            }
+        }
     }
 }

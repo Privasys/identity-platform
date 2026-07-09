@@ -2,7 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 
+import { useSettingsStore } from '@/stores/settings';
+
 export default function TabLayout() {
+    const driveEnabled = useSettingsStore((s) => s.driveEnabled);
     return (
         <Tabs
             screenOptions={{
@@ -37,6 +40,18 @@ export default function TabLayout() {
                     title: 'Profile',
                     tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                         <Ionicons name="person-circle" size={size} color={color} />
+                    )
+                }}
+            />
+            <Tabs.Screen
+                name="drive"
+                options={{
+                    title: 'Drive',
+                    // href:null hides the tab (and its route) until enabled in
+                    // Settings — the Drive integration is in progress.
+                    href: driveEnabled ? undefined : null,
+                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+                        <Ionicons name="folder" size={size} color={color} />
                     )
                 }}
             />

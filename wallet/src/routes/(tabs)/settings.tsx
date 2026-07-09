@@ -10,7 +10,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-native';
+import { StyleSheet, Pressable, Alert, ScrollView, Switch, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExternalLink } from '@/components/ExternalLink';
@@ -25,6 +25,8 @@ export default function SettingsScreen() {
     const router = useRouter();
     const { credentials } = useAuthStore();
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
+    const driveEnabled = useSettingsStore((s) => s.driveEnabled);
+    const setDriveEnabled = useSettingsStore((s) => s.setDriveEnabled);
     const pushToken = useExpoPushToken();
 
     return (
@@ -90,6 +92,20 @@ export default function SettingsScreen() {
                         </Pressable>
                     </>
                 ) : null}
+
+                {/* Experimental */}
+                <Text style={styles.sectionTitle}>Experimental</Text>
+                <RNView style={styles.toggleRow}>
+                    <RNView style={{ flex: 1 }}>
+                        <Text style={styles.toggleLabel}>Drive (preview)</Text>
+                        <Text style={styles.toggleHint}>Your confidential personal drive. In progress.</Text>
+                    </RNView>
+                    <Switch
+                        value={driveEnabled}
+                        onValueChange={setDriveEnabled}
+                        trackColor={{ true: '#34E89E', false: '#CBD5E1' }}
+                    />
+                </RNView>
 
                 {/* Logs */}
                 <Text style={styles.sectionTitle}>Logs</Text>
@@ -255,4 +271,16 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     logsButtonText: { flex: 1, fontSize: 15, fontWeight: '500', color: '#0F172A' },
+    toggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        marginBottom: 8,
+    },
+    toggleLabel: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
+    toggleHint: { fontSize: 12, color: '#64748B', marginTop: 2 },
 });

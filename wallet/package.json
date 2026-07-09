@@ -20,6 +20,7 @@
     "@expo/vector-icons": "^15.1.1",
     "@noble/hashes": "^2.0.1",
     "@noble/secp256k1": "^3.0.0",
+    "@privasys/drive-sdk": "^0.2.0",
     "@react-navigation/native": "7.2.1",
     "@sentry/react-native": "~7.11.0",
     "base64-js": "^1.5.1",

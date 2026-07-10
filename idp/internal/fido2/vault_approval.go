@@ -208,6 +208,24 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				errorJSON(w, http.StatusBadRequest, "measurement_digest required for promote")
 				return
 			}
+		case "app-recovery":
+			// An app-defined recovery approval (e.g. Privasys Drive
+			// recover_tenant): the app computes a digest over its recovery
+			// tuple and the approver's assertion binds it. handle carries the
+			// app-scoped operation URI (e.g. "app:<app-id>:recover:<rid>"),
+			// measurement_digest the recovery digest (hex). The verifying app
+			// recomputes the binding from its own record plus the token's
+			// nonce/exp, exactly as the vault does for promote. Cannot collide
+			// with promote/export: the handle namespace is disjoint from vault
+			// key handles.
+			if req.MeasurementDigest == "" {
+				errorJSON(w, http.StatusBadRequest, "measurement_digest (the recovery digest) required for app-recovery")
+				return
+			}
+			if !strings.HasPrefix(req.Handle, "app:") {
+				errorJSON(w, http.StatusBadRequest, "app-recovery handle must be an app: URI")
+				return
+			}
 		default:
 			errorJSON(w, http.StatusBadRequest, "unknown operation")
 			return

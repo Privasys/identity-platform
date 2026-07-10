@@ -55,7 +55,13 @@ env:
   # closed mid-request on /__privasys/session-bootstrap (wallet 1.2.16).
   # v0.4.9 adds the generic ratls_request FFI (arbitrary HTTP methods) the
   # Android native module + the Drive sealed-transport fetch link against.
-  RATLS_VERSION: v0.4.9
+  # v0.5.0 REQUIRES the TLS channel binder in challenge mode (folds the
+  # session channel binder into report_data — mitigates attestation relay/
+  # replay). The C FFI signature is unchanged (the binder is obtained from the
+  # client's own handshake key schedule internally), so no wallet code changes.
+  # A wallet on v0.5.0 rejects any enclave/vault that does not yet emit the
+  # binder, so it MUST ship alongside the coordinated enclave + vault rollout.
+  RATLS_VERSION: v0.5.0
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

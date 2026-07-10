@@ -25,9 +25,10 @@ import * as Crypto from 'expo-crypto';
 import { getAttestationServerToken } from '@/services/app-attest';
 import {
     inspectAttestation,
-    verifyAttestation,
+    attestEnclave,
     type AttestationResult
 } from '@/services/attestation';
+import { useSettingsStore } from '@/stores/settings';
 import { attributeLabel, setProfileValue } from '@/services/attributes';
 import { deriveAppSub } from '@/services/did';
 import { derToRawEcdsa } from '@/services/encauth';
@@ -266,14 +267,23 @@ export async function attestVerifier(): Promise<VerifierAttestation> {
     }
 
     const asToken = await getAttestationServerToken();
-    const verified = await verifyAttestation(v.origin, {
+    // Verify in the user's default mode (deterministic unless they opted into
+    // challenge) and always through the attestation service. Throws on a
+    // non-verified outcome so identity data is never sent to an enclave that
+    // could not prove itself.
+    const mode = useSettingsStore.getState().verificationMode;
+    const outcome = await attestEnclave(v.origin, {
         tee: inspected.tee_type ?? 'tdx',
-        attestation_server: ATTESTATION_SERVER,
-        attestation_server_token: asToken
+        mode,
+        attestationServer: ATTESTATION_SERVER,
+        attestationServerToken: asToken
     });
-    if (!verified.valid) {
-        throw new Error('verifier attestation did not verify against the attestation server');
+    if (outcome.status !== 'verified' || !outcome.result) {
+        throw new Error(
+            `verifier attestation ${outcome.status}${outcome.message ? `: ${outcome.message}` : ''}`
+        );
     }
+    const verified = outcome.result;
 
     // Rich display fields (cert, extensions) from inspect; authoritative validity,
     // measurements and image ref from the verified result.

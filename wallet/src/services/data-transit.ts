@@ -95,11 +95,14 @@ export async function buildPayload(
  * Deliver approved attributes directly to an enclave via RA-TLS.
  *
  * The RA-TLS channel provides:
- * - Encryption (TLS 1.3)
- * - Server attestation (enclave measurement verified)
- * - Integrity (TLS record MAC)
+ * - Encryption (TLS 1.3) and integrity (TLS record MAC)
+ * - A transport-level binding check: `post` fails closed unless the enclave's
+ *   certificate key is committed to a genuine quote via deterministic
+ *   report_data (see the native `check_report_data_deterministic`).
  *
- * No additional encryption layer needed — the native TLS handles it.
+ * This transport check is NOT a substitute for full attestation — measurement
+ * pinning and the attestation-service round-trip must already have happened at
+ * the consent gate (attestEnclave) before this is called.
  */
 export async function deliverDirect(
     approvedAttributes: string[],

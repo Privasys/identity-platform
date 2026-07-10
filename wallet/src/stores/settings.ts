@@ -4,14 +4,28 @@
 import * as SecureStore from '@/utils/storage';
 import { create } from 'zustand';
 
+/**
+ * How enclaves are verified by default.
+ *  - `deterministic` (default): report_data is bound to the certificate's
+ *    minute-truncated NotBefore. Cheap — the enclave can serve a stable cert.
+ *  - `challenge`: the wallet sends a fresh random nonce in the TLS ClientHello;
+ *    the enclave folds it plus the TLS channel binder into a fresh quote,
+ *    proving liveness and binding the attestation to this exact session.
+ * The attestation service is always consulted regardless of mode.
+ */
+export type VerificationMode = 'deterministic' | 'challenge';
+
 export interface SettingsState {
     /** Biometric grace period in seconds. 0 = always prompt. */
     gracePeriodSec: number;
     /** Show the (in-progress) Drive tab. Off by default. */
     driveEnabled: boolean;
+    /** Default enclave verification mode. Deterministic unless the user opts in. */
+    verificationMode: VerificationMode;
 
     setGracePeriod: (seconds: number) => void;
     setDriveEnabled: (enabled: boolean) => void;
+    setVerificationMode: (mode: VerificationMode) => void;
     hydrate: () => Promise<void>;
 }
 
@@ -24,13 +38,18 @@ function persist(get: () => SettingsState) {
     const s = get();
     SecureStore.setItemAsync(
         STORE_KEY,
-        JSON.stringify({ gracePeriodSec: s.gracePeriodSec, driveEnabled: s.driveEnabled })
+        JSON.stringify({
+            gracePeriodSec: s.gracePeriodSec,
+            driveEnabled: s.driveEnabled,
+            verificationMode: s.verificationMode,
+        })
     ).catch(console.error);
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     gracePeriodSec: 30,
     driveEnabled: false,
+    verificationMode: 'deterministic',
 
     setGracePeriod: (seconds) => {
         set({ gracePeriodSec: seconds });
@@ -39,6 +58,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     setDriveEnabled: (enabled) => {
         set({ driveEnabled: enabled });
+        persist(get);
+    },
+
+    setVerificationMode: (mode) => {
+        set({ verificationMode: mode });
         persist(get);
     },
 
@@ -52,6 +76,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             }
             if (typeof data.driveEnabled === 'boolean') {
                 set({ driveEnabled: data.driveEnabled });
+            }
+            if (data.verificationMode === 'deterministic' || data.verificationMode === 'challenge') {
+                set({ verificationMode: data.verificationMode });
             }
         } catch {
             // Corrupted — use defaults

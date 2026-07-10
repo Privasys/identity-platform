@@ -16,9 +16,11 @@
 
 import { PrivasysDrive, type DriveNode, type Tenant } from '@privasys/drive-sdk';
 
-import { inspectAttestation } from '@/services/attestation';
+import { getAttestationServerToken } from '@/services/app-attest';
+import { inspectAttestation, attestEnclave } from '@/services/attestation';
 import { appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
 import { getPlatformToken } from '@/services/platform-token';
+import { useSettingsStore } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
 const PLATFORM_API_BASE =
@@ -99,9 +101,7 @@ async function setup(): Promise<DriveSession | null> {
     if (!d) return null;
 
     // Inspect the RA-TLS cert: pin the published image digest and read the
-    // management app id (OID 3.6) the data-key grant is keyed by. inspect only
-    // reads the cert (no attestation-server round trip); a full verify() against
-    // as.privasys.org is a follow-up, mirroring kyc.ts attestVerifier.
+    // management app id (OID 3.6) the data-key grant is keyed by.
     const inspected = await inspectAttestation(d.origin);
     const appId = appIdFromOids(inspected.custom_oids);
     if (!appId) throw new Error('Drive enclave attestation is missing its app id (OID 3.6)');
@@ -112,6 +112,24 @@ async function setup(): Promise<DriveSession | null> {
         if (got !== d.imageDigest) {
             throw new Error('Drive enclave image digest does not match the published build');
         }
+    }
+
+    // Full verification through the attestation service, in the user's default
+    // mode (deterministic unless they opted into challenge), before any of the
+    // user's confidential data flows over the transport. The RA-TLS data plane
+    // additionally re-checks the deterministic report_data binding on every
+    // request, so a swapped certificate never goes unnoticed.
+    const asToken = await getAttestationServerToken();
+    const mode = useSettingsStore.getState().verificationMode;
+    const outcome = await attestEnclave(d.origin, {
+        tee: inspected.tee_type ?? 'tdx',
+        mode,
+        attestationServerToken: asToken
+    });
+    if (outcome.status !== 'verified') {
+        throw new Error(
+            `Drive enclave attestation ${outcome.status}${outcome.message ? `: ${outcome.message}` : ''}`
+        );
     }
 
     const token = await getPlatformToken();

@@ -39,8 +39,28 @@ export interface VerificationPolicy {
     attestation_server_token?: string;
 }
 
+/**
+ * Failure category returned by the native RA-TLS layer, so callers can pick the
+ * right recovery UX:
+ *  - `as_unreachable` — attestation service down/timeout/uninterpretable; no
+ *    clear verdict → offer the user "continue anyway".
+ *  - `quote_invalid` — the quote itself failed a local check (measurement,
+ *    report_data/binder, TEE, image profile) → a definite bad verdict.
+ *  - `as_rejected` — the attestation service returned a clear negative verdict.
+ *  - `connection` — could not reach/handshake the enclave → hard error, retry.
+ *  - `config` — bad policy/arguments → programming error.
+ */
+export type VerifyErrorKind =
+    | 'config'
+    | 'connection'
+    | 'quote_invalid'
+    | 'as_unreachable'
+    | 'as_rejected';
+
 export interface AttestationError {
     error: string;
+    /** Present on `verify` failures and on data-plane binding failures. */
+    kind?: VerifyErrorKind;
 }
 
 export interface PostResult {

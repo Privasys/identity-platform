@@ -19,7 +19,7 @@ import { StyleSheet, Pressable, ActivityIndicator, ScrollView, FlatList } from '
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
-import { inspectAttestation, verifyAttestation } from '@/services/attestation';
+import { inspectAttestation, attestEnclave } from '@/services/attestation';
 import { appIdFromOids } from '@/services/release-provenance';
 import { relaySessionToken } from '@/services/broker';
 import * as fido2 from '@/services/fido2';
@@ -64,6 +64,7 @@ export default function BatchConnectScreen() {
     const { addCredential, getCredentialForRp, checkUnlocked, setUnlocked } = useAuthStore();
     const { getApp, isAttestationMatch, addOrUpdate: addTrustedApp } = useTrustedAppsStore();
     const { gracePeriodSec } = useSettingsStore();
+    const verificationMode = useSettingsStore((s) => s.verificationMode);
 
     const [step, setStep] = useState<BatchStep>('verifying');
     const [error, setError] = useState<string | null>(null);
@@ -155,11 +156,18 @@ export default function BatchConnectScreen() {
                     return inspectResult;
                 }
                 const token = await getAsTokenLazy();
-                return verifyAttestation(app.rpId, {
+                // Verify in the user's default mode (deterministic unless they
+                // opted into challenge) and always through the attestation
+                // service. A non-verified outcome rejects this entry only.
+                const outcome = await attestEnclave(app.rpId, {
                     tee: inspectResult.tee_type ?? 'sgx',
-                    attestation_server: 'https://as.privasys.org',
-                    attestation_server_token: token,
+                    mode: verificationMode,
+                    attestationServerToken: token,
                 });
+                if (outcome.status !== 'verified' || !outcome.result) {
+                    throw new Error(`attestation ${outcome.status}: ${outcome.message ?? ''}`);
+                }
+                return outcome.result;
             }),
         );
 

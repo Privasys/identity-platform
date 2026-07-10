@@ -63,7 +63,13 @@ env:
   # binder, so it MUST ship alongside the coordinated enclave + vault rollout.
   # v0.6.0 bumps the rustls fork to privasys-v0.8.0 (mutual channel binding —
   # completes the client leg of mutual RA-TLS); mobile FFI unchanged, pin only.
-  RATLS_VERSION: v0.6.0
+  # v0.7.0 (rustls privasys-v0.8.1) adds two FFI features the wallet's
+  # verification UX needs: typed verify errors ({ error, kind }) so the app can
+  # tell an unreachable attestation service from a bad quote, and a deterministic
+  # report_data binding check on every ratls_request/ratls_post (the data plane
+  # is no longer blind to a swapped certificate). It also re-pins the live
+  # rustls tag (v0.8.0 was deleted in the rebase), so it is source-reproducible.
+  RATLS_VERSION: v0.7.0
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

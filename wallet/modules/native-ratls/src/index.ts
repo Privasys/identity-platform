@@ -3,9 +3,20 @@
 
 import { Platform } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
-import type { AttestationResult, AttestationError, VerificationPolicy, PostResult } from './NativeRaTls.types.js';
+import type { AttestationResult, AttestationError, VerificationPolicy, PostResult, VerifyErrorKind } from './NativeRaTls.types.js';
 
 const NativeRaTls = Platform.OS !== 'web' ? requireNativeModule('NativeRaTls') : null;
+
+/** An Error carrying the native RA-TLS failure category, so callers can branch
+ *  their recovery UX (continue-anyway vs show-the-problem). */
+export class RaTlsError extends Error {
+    kind?: VerifyErrorKind;
+    constructor(result: AttestationError) {
+        super(result.error);
+        this.name = 'RaTlsError';
+        this.kind = result.kind;
+    }
+}
 
 /**
  * Connect to an enclave and inspect its RA-TLS attestation certificate.
@@ -36,7 +47,7 @@ export async function inspect(
     const result: AttestationResult | AttestationError = JSON.parse(json);
     if ('error' in result) {
         console.error(`[RA-TLS] inspect error from native: ${result.error}`);
-        throw new Error(result.error);
+        throw new RaTlsError(result);
     }
     // Log whichever measurement is appropriate for the TEE family. TDX
     // exposes MRTD; SGX exposes MRENCLAVE. inspect() does parse the
@@ -75,7 +86,7 @@ export async function verify(
     const policyJson = JSON.stringify(policy);
     const json: string = await NativeRaTls.verify(host, port, caCertPath ?? null, policyJson);
     const result: AttestationResult | AttestationError = JSON.parse(json);
-    if ('error' in result) throw new Error(result.error);
+    if ('error' in result) throw new RaTlsError(result);
     return result;
 }
 
@@ -115,8 +126,8 @@ export async function post(
     console.log(`[RA-TLS] post raw response (${json.length} chars): ${json.substring(0, 500)}`);
     const result: PostResult | AttestationError = JSON.parse(json);
     if ('error' in result) {
-        console.error(`[RA-TLS] post error from native: ${result.error}`);
-        throw new Error(result.error);
+        console.error(`[RA-TLS] post error from native: ${result.error}${result.kind ? ` (${result.kind})` : ''}`);
+        throw new RaTlsError(result);
     }
     console.log(`[RA-TLS] post OK — status=${result.status}, body=${result.body.substring(0, 200)}`);
     return result;
@@ -154,7 +165,7 @@ export async function request(
         method, host, port, path, body, headersJson, caCertPath ?? null
     );
     const result: PostResult | AttestationError = JSON.parse(json);
-    if ('error' in result) throw new Error(result.error);
+    if ('error' in result) throw new RaTlsError(result);
     return result;
 }
 
@@ -214,4 +225,4 @@ export function makeRaTlsFetch(opts: {
     return adapter as unknown as typeof fetch;
 }
 
-export type { AttestationResult, AttestationError, VerificationPolicy, PostResult } from './NativeRaTls.types.js';
+export type { AttestationResult, AttestationError, VerificationPolicy, PostResult, VerifyErrorKind } from './NativeRaTls.types.js';

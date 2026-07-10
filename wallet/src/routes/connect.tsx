@@ -44,7 +44,7 @@ import { DataRequestConsent } from '@/components/DataRequestConsent';
 import { Text, View } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
-import { verifyAttestation, inspectAttestation } from '@/services/attestation';
+import { inspectAttestation, attestEnclave } from '@/services/attestation';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
 import { ensureDrive } from '@/services/drive';
 import { appIdFromOids } from '@/services/release-provenance';
@@ -73,7 +73,7 @@ import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
-import { AttestationView, type AttestationVerificationLevel } from '@/components/AttestationView';
+import { AttestationView, type AttestationVerificationLevel, type VerificationState } from '@/components/AttestationView';
 
 function appName(rpId: string): string {
     const dot = rpId.indexOf('.');
@@ -609,6 +609,7 @@ export default function ConnectScreen() {
     const { addCredential, removeCredential, getCredentialForRp, checkUnlocked, setUnlocked } = useAuthStore();
     const { getApp, isAttestationMatch, addOrUpdate: addTrustedApp } = useTrustedAppsStore();
     const { gracePeriodSec } = useSettingsStore();
+    const verificationMode = useSettingsStore((s) => s.verificationMode);
     const addRelaySession = useSessionsStore((s) => s.add);
     const profile = useProfileStore((s) => s.profile);
 
@@ -637,6 +638,13 @@ export default function ConnectScreen() {
     // round-trip from a cache hit (and so we never silently accept either
     // when the target turned out to be a non-enclave service).
     const [verificationLevel, setVerificationLevel] = useState<AttestationVerificationLevel | null>(null);
+    // The verification outcome (mode, challenged, and any failure) driving the
+    // AttestationView recovery UX. Null → legacy behaviour (attestation.valid).
+    const [verification, setVerification] = useState<VerificationState | null>(null);
+    const [challengeInFlight, setChallengeInFlight] = useState(false);
+    // The host actually attested, so the "Challenge this enclave" button can
+    // re-verify the same target in challenge mode.
+    const attestationTargetRef = useRef<string | null>(null);
     const hasStarted = useRef(false);
 
     // Attribute acquisition state — holds FIDO2 result while user provides missing profile data
@@ -813,41 +821,60 @@ export default function ConnectScreen() {
                     cacheAgeMs > REVERIFY_TTL_MS ||
                     sampledForReverify;
 
+                attestationTargetRef.current = attestationTarget;
                 let result: AttestationResult;
                 let level: AttestationVerificationLevel;
                 if (reverifyDue) {
-                    // Full verification through the attestation server. This is
-                    // mandatory on first connect to a given enclave and on
-                    // periodic refresh; if it fails we hard-fail the flow.
-                    try {
-                        const asToken = await getAttestationServerToken();
-                        const reason = !trustedApp
-                            ? 'first connect'
-                            : !cachedMatch
-                                ? 'cert measurements changed'
-                                : cacheAgeMs > REVERIFY_TTL_MS
-                                    ? `cache age ${Math.round(cacheAgeMs / 60000)}m exceeds TTL`
-                                    : 'random sample';
-                        console.log(`[CONNECT] AS verify (${reason})`);
-                        // Use whichever TEE family inspect() identified —
-                        // hard-coding 'sgx' here meant TDX containers (and
-                        // future SEV-SNP / NVIDIA-GPU enclaves) failed
-                        // verification with "expected SGX quote, found …".
-                        result = await verifyAttestation(attestationTarget, {
-                            tee: inspectResult.tee_type ?? 'sgx',
-                            attestation_server: 'https://as.privasys.org',
-                            attestation_server_token: asToken,
+                    // Full verification through the attestation service, in the
+                    // user's chosen mode (deterministic by default, or challenge
+                    // — a fresh nonce bound to this TLS session). Mandatory on
+                    // first connect and on periodic refresh.
+                    const asToken = await getAttestationServerToken();
+                    const reason = !trustedApp
+                        ? 'first connect'
+                        : !cachedMatch
+                            ? 'cert measurements changed'
+                            : cacheAgeMs > REVERIFY_TTL_MS
+                                ? `cache age ${Math.round(cacheAgeMs / 60000)}m exceeds TTL`
+                                : 'random sample';
+                    console.log(`[CONNECT] attest (${reason}) mode=${verificationMode}`);
+                    // Use whichever TEE family inspect() identified — hard-coding
+                    // 'sgx' meant TDX containers failed with "expected SGX quote".
+                    const outcome = await attestEnclave(attestationTarget, {
+                        tee: inspectResult.tee_type ?? 'sgx',
+                        mode: verificationMode,
+                        attestationServerToken: asToken,
+                    });
+                    if (outcome.status !== 'verified' || !outcome.result) {
+                        if (outcome.status === 'error') {
+                            // Could not reach/handshake the enclave — nothing to
+                            // proceed to. Hard-fail with a clear message.
+                            throw new Error(
+                                `Could not reach ${attestationTarget}: ${outcome.message ?? 'connection failed'}`
+                            );
+                        }
+                        // unreachable (service down) or invalid (bad verdict):
+                        // surface the recovery UX on the attestation screen —
+                        // continue-anyway vs an explicit override — rather than a
+                        // dead-end error. Show the inspected certificate.
+                        console.warn(
+                            `[CONNECT] attestation ${outcome.status} for ${attestationTarget}: ${outcome.message}`
+                        );
+                        setAttestation(inspectResult);
+                        attestationRef.current = inspectResult;
+                        setVerificationLevel(null);
+                        setVerification({
+                            status: outcome.status,
+                            mode: outcome.mode,
+                            challenged: outcome.challenged,
+                            message: outcome.message,
                         });
-                    } catch (verifyErr: any) {
-                        console.error(
-                            `[CONNECT] verify() failed for ${attestationTarget} — ` +
-                            `refusing to proceed without verified attestation: ${verifyErr.message}`
-                        );
-                        throw new Error(
-                            `Attestation verification unavailable for ${attestationTarget}: ${verifyErr.message}. ` +
-                            `Sign-in to an enclave service requires App Attest + as.privasys.org.`
-                        );
+                        setAttestationChanged(false);
+                        setStep('attestation');
+                        return;
                     }
+                    result = outcome.result;
+                    setVerification({ status: 'verified', mode: outcome.mode, challenged: outcome.challenged });
                     level = 'fresh-as-verified';
                 } else {
                     console.log(
@@ -856,6 +883,10 @@ export default function ConnectScreen() {
                     );
                     result = inspectResult;
                     level = 'cached-trusted';
+                    // Verified from cache — deterministic by nature; the challenge
+                    // button (deterministic mode) still lets the user demand a
+                    // fresh liveness proof.
+                    setVerification({ status: 'verified', mode: verificationMode, challenged: false });
                 }
 
                 const measurement = result.mrenclave ?? result.mrtd ?? '(none)';
@@ -917,8 +948,51 @@ export default function ConnectScreen() {
                 setStep('error');
             }
         },
-        [getApp, isAttestationMatch, addTrustedApp, getCredentialForRp, checkUnlocked, gracePeriodSec]
+        [getApp, isAttestationMatch, addTrustedApp, getCredentialForRp, checkUnlocked, gracePeriodSec, verificationMode]
     );
+
+    /**
+     * "Challenge this enclave" — force a fresh challenge-mode re-verification of
+     * the currently-shown enclave. Sends a brand-new random nonce so the enclave
+     * folds it plus the TLS channel binder into a fresh quote, proving liveness
+     * and binding the attestation to this exact session. Available from the
+     * approval screen when the default mode is deterministic.
+     */
+    const handleChallenge = useCallback(async () => {
+        const target = attestationTargetRef.current;
+        const att = attestationRef.current;
+        if (!target || !att) return;
+        setChallengeInFlight(true);
+        try {
+            const asToken = await getAttestationServerToken();
+            const outcome = await attestEnclave(target, {
+                tee: att.tee_type ?? 'sgx',
+                mode: 'challenge',
+                attestationServerToken: asToken,
+            });
+            if (outcome.status === 'verified' && outcome.result) {
+                setAttestation(outcome.result);
+                attestationRef.current = outcome.result;
+                setVerificationLevel('fresh-as-verified');
+                setVerification({ status: 'verified', mode: 'challenge', challenged: true });
+            } else if (outcome.status === 'error') {
+                // Lost the connection mid-challenge — keep the prior view, just
+                // tell the user it couldn't run.
+                Alert.alert('Challenge failed', outcome.message ?? 'Could not reach the enclave.');
+            } else {
+                // The challenge surfaced a problem (or the service was down):
+                // show the recovery UX inline.
+                setVerification({
+                    status: outcome.status,
+                    mode: outcome.mode,
+                    challenged: outcome.challenged,
+                    message: outcome.message,
+                });
+            }
+        } finally {
+            setChallengeInFlight(false);
+        }
+    }, []);
 
     /**
      * Consent gate for the sign-in flow. Before any register/authenticate
@@ -1335,15 +1409,21 @@ export default function ConnectScreen() {
     const attestExtraHost = async (host: string): Promise<AttestationResult> => {
         const inspected = await inspectAttestation(host);
         const asToken = await getAttestationServerToken();
-        const verified = await verifyAttestation(host, {
+        // Background flow: verify in the user's default mode (deterministic
+        // unless they opted into challenge) and always through the attestation
+        // service. No UI here — a non-verified outcome throws so the caller
+        // skips just this host.
+        const outcome = await attestEnclave(host, {
             tee: inspected.tee_type ?? 'sgx',
-            attestation_server: 'https://as.privasys.org',
-            attestation_server_token: asToken,
+            mode: verificationMode,
+            attestationServerToken: asToken,
         });
-        if (!verified.valid) throw new Error(`attestation did not verify for ${host}`);
+        if (outcome.status !== 'verified' || !outcome.result) {
+            throw new Error(`attestation ${outcome.status} for ${host}: ${outcome.message ?? ''}`);
+        }
         // Merge: inspect carries the rich OID-derived fields the voucher hashes,
         // verify carries the authoritative measurements/validity.
-        return { ...inspected, ...verified };
+        return { ...inspected, ...outcome.result };
     };
 
     /** Multi-app attestation: for every host in `extraAppHosts`, attest +
@@ -1890,8 +1970,11 @@ export default function ConnectScreen() {
                         displayName={appName(qr.rpId)}
                         isChanged={false}
                         verificationLevel={verificationLevel}
+                        verification={verification ?? undefined}
                         onApprove={handleApprove}
                         onReject={handleReject}
+                        onChallenge={handleChallenge}
+                        challengeInFlight={challengeInFlight}
                     />
                 )}
 
@@ -1903,8 +1986,11 @@ export default function ConnectScreen() {
                         isChanged={true}
                         diff={attestationDiff}
                         verificationLevel={verificationLevel}
+                        verification={verification ?? undefined}
                         onApprove={handleApprove}
                         onReject={handleReject}
+                        onChallenge={handleChallenge}
+                        challengeInFlight={challengeInFlight}
                     />
                 )}
 

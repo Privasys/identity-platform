@@ -9,12 +9,32 @@
  */
 
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View } from '@/components/Themed';
 import type { AttestationDiff } from '@/services/attestation-diff';
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
+
+/**
+ * The outcome of the enclave verification the screen is showing, so the view
+ * can render the right recovery UX:
+ *  - `verified`   — trusted; normal Approve/Reject.
+ *  - `unreachable`— the attestation service could not be reached (no verdict).
+ *    We offer a plain "Continue anyway", since this is an availability issue.
+ *  - `invalid`    — a definite bad verdict (bad quote, or the service rejected
+ *    it). We show the problem and bury the override in an "Advanced" section,
+ *    like a browser's invalid-certificate "proceed anyway".
+ *  - `error`      — could not reach/handshake the enclave; nothing to proceed to.
+ */
+export interface VerificationState {
+    status: 'verified' | 'unreachable' | 'invalid' | 'error';
+    mode: 'deterministic' | 'challenge';
+    /** True when a fresh nonce + TLS channel binder were folded in this run. */
+    challenged: boolean;
+    /** Human-readable problem, for the non-verified states. */
+    message?: string;
+}
 
 /**
  * Why we trust the current attestation.
@@ -47,8 +67,11 @@ export function AttestationView({
     isChanged,
     diff,
     verificationLevel,
+    verification,
     onApprove,
     onReject,
+    onChallenge,
+    challengeInFlight,
 }: {
     attestation: AttestationResult;
     rpId: string;
@@ -63,14 +86,41 @@ export function AttestationView({
      */
     diff?: AttestationDiff | null;
     verificationLevel: AttestationVerificationLevel | null;
+    /**
+     * The verification outcome, driving the status banner and recovery UX. When
+     * omitted the screen falls back to `attestation.valid` (legacy behaviour).
+     */
+    verification?: VerificationState;
     onApprove: () => void;
     onReject: () => void;
+    /** When provided (deterministic mode), shows a "Challenge this enclave"
+     *  button that forces a fresh challenge-mode re-verification. */
+    onChallenge?: () => void;
+    /** True while a challenge re-verification is in flight. */
+    challengeInFlight?: boolean;
 }) {
     const [detailsOpen, setDetailsOpen] = useState(false);
+    const [advancedOpen, setAdvancedOpen] = useState(false);
     const insets = useSafeAreaInsets();
     const appType = attestation.tee_type === 'sgx' ? 'WASM Application' : 'Container Application';
     const teeColor = attestation.tee_type === 'sgx' ? '#34E89E' : '#00BCF2';
     const changedTitle = (diff && CHANGED_TITLES[diff.kind]) || 'App Changed';
+
+    // Effective verification status. When no `verification` is supplied we keep
+    // the legacy behaviour driven by the parsed cert's `valid` flag.
+    const status: VerificationState['status'] =
+        verification?.status ?? (attestation.valid ? 'verified' : 'invalid');
+    const isVerified = status === 'verified';
+    const isUnreachable = status === 'unreachable';
+    const isInvalid = status === 'invalid' || status === 'error';
+    // The challenge button only makes sense in deterministic mode on a result we
+    // could actually verify — challenging an already-challenged or unverifiable
+    // enclave has nothing to add.
+    const showChallenge =
+        !!onChallenge &&
+        isVerified &&
+        !verification?.challenged &&
+        (verification?.mode ?? 'deterministic') === 'deterministic';
 
     return (
         <RNView style={{ flex: 1 }}>
@@ -93,18 +143,28 @@ export function AttestationView({
                 <View
                     style={[
                         styles.statusBanner,
-                        attestation.valid ? styles.statusBannerValid : styles.statusBannerInvalid,
+                        isVerified && styles.statusBannerValid,
+                        isUnreachable && styles.statusBannerUnknown,
+                        isInvalid && styles.statusBannerInvalid,
                     ]}
                 >
-                    <Text style={styles.statusIcon}>{attestation.valid ? '✓' : '✕'}</Text>
+                    <Text style={styles.statusIcon}>
+                        {isVerified ? '✓' : isUnreachable ? '?' : '✕'}
+                    </Text>
                     <View style={styles.statusInfo}>
                         <Text
                             style={[
                                 styles.statusTitle,
-                                attestation.valid ? styles.statusTitleValid : styles.statusTitleInvalid,
+                                isVerified && styles.statusTitleValid,
+                                isUnreachable && styles.statusTitleUnknown,
+                                isInvalid && styles.statusTitleInvalid,
                             ]}
                         >
-                            {attestation.valid ? 'Attestation Valid' : 'Attestation Invalid'}
+                            {isVerified
+                                ? 'Attestation Valid'
+                                : isUnreachable
+                                    ? 'Could Not Verify'
+                                    : 'Attestation Invalid'}
                         </Text>
                         <Text style={styles.statusDetail}>
                             {appType} · {attestation.tee_type?.toUpperCase()} enclave
@@ -114,6 +174,62 @@ export function AttestationView({
                         <Text style={styles.teeBadgeText}>{attestation.tee_type?.toUpperCase()}</Text>
                     </View>
                 </View>
+
+                {/* Unreachable — no verdict from the attestation service. This is
+                    an availability issue, so we offer a plain continue. */}
+                {isUnreachable && (
+                    <View style={styles.unknownBanner}>
+                        <Text style={styles.unknownText}>
+                            We couldn&apos;t verify this enclave&apos;s quote with the attestation
+                            service{verification?.message ? ` (${verification.message})` : ''}. You
+                            can continue anyway, or cancel and try again.
+                        </Text>
+                    </View>
+                )}
+
+                {/* Invalid — a definite bad verdict. Show the problem plainly. The
+                    override lives in the Advanced section below. */}
+                {isInvalid && (
+                    <View style={styles.problemBanner}>
+                        <Text style={styles.problemTitle}>⚠ This enclave failed verification</Text>
+                        {verification?.message ? (
+                            <Text style={styles.problemDetail} selectable>{verification.message}</Text>
+                        ) : null}
+                        <Text style={styles.problemHint}>
+                            Do not continue unless you understand and accept the risk.
+                        </Text>
+                    </View>
+                )}
+
+                {/* Liveness — the enclave answered a fresh challenge bound to this
+                    exact TLS session. */}
+                {verification?.challenged && (
+                    <View style={[styles.verifyBadge, styles.verifyBadgeChallenged]}>
+                        <Text style={styles.verifyBadgeIcon}>⚡</Text>
+                        <Text style={styles.verifyBadgeText}>
+                            Challenged just now — proven live and bound to this session
+                        </Text>
+                    </View>
+                )}
+
+                {/* Challenge-this-enclave — deterministic mode only. Lets the user
+                    demand a fresh liveness proof for this one connection. */}
+                {showChallenge && (
+                    <Pressable
+                        style={styles.challengeButton}
+                        onPress={onChallenge}
+                        disabled={challengeInFlight}
+                    >
+                        {challengeInFlight ? (
+                            <ActivityIndicator size="small" color="#0F766E" />
+                        ) : (
+                            <Text style={styles.challengeIcon}>⚡</Text>
+                        )}
+                        <Text style={styles.challengeText}>
+                            {challengeInFlight ? 'Challenging…' : 'Challenge this enclave'}
+                        </Text>
+                    </Pressable>
+                )}
 
                 {/* Verification-level badge — surfaces whether we just contacted
                     the attestation server or trusted a recent local cache. */}
@@ -247,17 +363,49 @@ export function AttestationView({
                 )}
             </ScrollView>
 
-            {/* Fixed bottom action buttons */}
+            {/* Fixed bottom action buttons. The proceed action adapts to the
+                verification status: a normal Approve when verified, a plain
+                Continue when the service was unreachable, and — when the verdict
+                is a definite failure — an override buried behind Advanced. */}
             <RNView style={[styles.bottomActions, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+                {isInvalid && (
+                    <>
+                        <Pressable
+                            style={styles.advancedToggle}
+                            onPress={() => setAdvancedOpen((o) => !o)}
+                        >
+                            <Text style={styles.advancedToggleText}>Advanced</Text>
+                            <Text style={styles.detailsToggleIcon}>{advancedOpen ? '▲' : '▼'}</Text>
+                        </Pressable>
+                        {advancedOpen && (
+                            <View style={styles.advancedBox}>
+                                <Text style={styles.advancedWarning}>
+                                    Verification failed. Continuing sends your request to an enclave
+                                    that could not prove its identity — its code and data may not be
+                                    what they claim. Only proceed if you understand the risk.
+                                </Text>
+                                <Pressable style={styles.dangerButton} onPress={onApprove}>
+                                    <Text style={styles.dangerButtonText}>Connect anyway</Text>
+                                </Pressable>
+                            </View>
+                        )}
+                    </>
+                )}
                 <View style={styles.buttonRow}>
                     <Pressable style={styles.rejectButton} onPress={onReject}>
-                        <Text style={styles.rejectButtonText}>Reject</Text>
+                        <Text style={styles.rejectButtonText}>{isInvalid ? 'Cancel' : 'Reject'}</Text>
                     </Pressable>
-                    <Pressable style={styles.approveButton} onPress={onApprove}>
-                        <Text style={styles.approveButtonText}>
-                            {isChanged ? (diff ? 'Approve Changes' : 'Trust Anyway') : 'Approve'}
-                        </Text>
-                    </Pressable>
+                    {isUnreachable ? (
+                        <Pressable style={styles.continueButton} onPress={onApprove}>
+                            <Text style={styles.approveButtonText}>Continue anyway</Text>
+                        </Pressable>
+                    ) : !isInvalid ? (
+                        <Pressable style={styles.approveButton} onPress={onApprove}>
+                            <Text style={styles.approveButtonText}>
+                                {isChanged ? (diff ? 'Approve Changes' : 'Trust Anyway') : 'Approve'}
+                            </Text>
+                        </Pressable>
+                    ) : null}
                 </View>
             </RNView>
         </RNView>
@@ -302,12 +450,34 @@ const styles = StyleSheet.create({
     statusBanner: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 16, marginBottom: 24, gap: 12 },
     statusBannerValid: { backgroundColor: '#E8FFF0' },
     statusBannerInvalid: { backgroundColor: '#FFF1F0' },
+    statusBannerUnknown: { backgroundColor: '#FEF9E7' },
     statusIcon: { fontSize: 28, fontWeight: '700' },
     statusInfo: { flex: 1, backgroundColor: 'transparent' },
     statusTitle: { fontSize: 16, fontWeight: '700' },
     statusTitleValid: { color: '#166534' },
     statusTitleInvalid: { color: '#991B1B' },
+    statusTitleUnknown: { color: '#92610A' },
     statusDetail: { fontSize: 13, color: '#64748B', marginTop: 2 },
+
+    // Unreachable (amber) — availability issue, plain continue.
+    unknownBanner: { backgroundColor: '#FEF9E7', borderRadius: 12, borderWidth: 1, borderColor: '#F6D680', padding: 14, marginBottom: 16 },
+    unknownText: { fontSize: 14, color: '#7A5B08', lineHeight: 20 },
+
+    // Invalid (red) — definite bad verdict, override buried in Advanced.
+    problemBanner: { backgroundColor: '#FFF1F0', borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5', padding: 14, marginBottom: 16, gap: 6 },
+    problemTitle: { fontSize: 15, fontWeight: '700', color: '#991B1B' },
+    problemDetail: { fontSize: 12, fontFamily: 'Inter', color: '#7F1D1D', lineHeight: 18 },
+    problemHint: { fontSize: 13, color: '#B91C1C', marginTop: 2 },
+
+    // Challenge affordances.
+    challengeButton: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+        paddingVertical: 12, borderRadius: 10, marginBottom: 16,
+        backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#5EEAD4',
+    },
+    challengeIcon: { fontSize: 15, color: '#0F766E' },
+    challengeText: { fontSize: 14, fontWeight: '600', color: '#0F766E' },
+    verifyBadgeChallenged: { backgroundColor: '#ECFEFF', borderWidth: 1, borderColor: '#22D3EE' },
     teeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
     teeBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
     verifyBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginBottom: 12, gap: 8 },
@@ -338,6 +508,23 @@ const styles = StyleSheet.create({
     buttonRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
     approveButton: { flex: 1, backgroundColor: '#34C759', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
     approveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+    continueButton: { flex: 1, backgroundColor: '#D99A00', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
     rejectButton: { flex: 1, backgroundColor: 'rgba(128,128,128,0.2)', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
     rejectButtonText: { fontSize: 17, fontWeight: '600' },
+
+    // Advanced (browser invalid-SSL style) override for a failed verdict.
+    advancedToggle: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+        paddingVertical: 10, marginBottom: 8,
+    },
+    advancedToggleText: { fontSize: 14, fontWeight: '500', color: '#94A3B8' },
+    advancedBox: {
+        backgroundColor: '#FFF1F0', borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5',
+        padding: 14, marginBottom: 12, gap: 12,
+    },
+    advancedWarning: { fontSize: 13, color: '#7F1D1D', lineHeight: 19 },
+    dangerButton: {
+        backgroundColor: '#DC2626', borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+    },
+    dangerButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

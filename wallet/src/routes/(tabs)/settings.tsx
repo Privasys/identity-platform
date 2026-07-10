@@ -27,6 +27,8 @@ export default function SettingsScreen() {
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
     const driveEnabled = useSettingsStore((s) => s.driveEnabled);
     const setDriveEnabled = useSettingsStore((s) => s.setDriveEnabled);
+    const verificationMode = useSettingsStore((s) => s.verificationMode);
+    const setVerificationMode = useSettingsStore((s) => s.setVerificationMode);
     const pushToken = useExpoPushToken();
 
     return (
@@ -59,6 +61,39 @@ export default function SettingsScreen() {
                                 ]}
                             >
                                 {sec === 0 ? 'Always' : `${sec}s`}
+                            </Text>
+                        </Pressable>
+                    ))}
+                </View>
+
+                {/* Enclave verification mode */}
+                <Text style={styles.sectionTitle}>Enclave Verification</Text>
+                <Text style={styles.sectionDescription}>
+                    Deterministic is fast and checks the enclave against the attestation service.
+                    Challenge additionally sends a fresh random number each time so the enclave
+                    proves it is live and bound to this exact session. You can always challenge a
+                    single enclave from its approval screen.
+                </Text>
+                <View style={styles.optionsRow}>
+                    {([
+                        { key: 'deterministic', label: 'Deterministic' },
+                        { key: 'challenge', label: 'Challenge' },
+                    ] as const).map((opt) => (
+                        <Pressable
+                            key={opt.key}
+                            style={[
+                                styles.optionButton,
+                                verificationMode === opt.key && styles.optionButtonActive
+                            ]}
+                            onPress={() => setVerificationMode(opt.key)}
+                        >
+                            <Text
+                                style={[
+                                    styles.optionText,
+                                    verificationMode === opt.key && styles.optionTextActive
+                                ]}
+                            >
+                                {opt.label}
                             </Text>
                         </Pressable>
                     ))}

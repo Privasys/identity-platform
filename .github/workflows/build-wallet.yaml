@@ -69,7 +69,10 @@ env:
   # report_data binding check on every ratls_request/ratls_post (the data plane
   # is no longer blind to a swapped certificate). It also re-pins the live
   # rustls tag (v0.8.0 was deleted in the rebase), so it is source-reproducible.
-  RATLS_VERSION: v0.7.0
+  # v0.7.1 fixes a v0.7.0 regression: the data-plane check must pass certs with
+  # no RA-TLS quote (non-enclave backends — the portal / IdP FIDO2 host, plain
+  # FIDO2 relying parties), only enforcing the binding when a quote is present.
+  RATLS_VERSION: v0.7.1
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

@@ -59,9 +59,11 @@ env:
   # session channel binder into report_data — mitigates attestation relay/
   # replay). The C FFI signature is unchanged (the binder is obtained from the
   # client's own handshake key schedule internally), so no wallet code changes.
-  # A wallet on v0.5.0 rejects any enclave/vault that does not yet emit the
+  # A wallet on v0.5.0+ rejects any enclave/vault that does not yet emit the
   # binder, so it MUST ship alongside the coordinated enclave + vault rollout.
-  RATLS_VERSION: v0.5.0
+  # v0.6.0 bumps the rustls fork to privasys-v0.8.0 (mutual channel binding —
+  # completes the client leg of mutual RA-TLS); mobile FFI unchanged, pin only.
+  RATLS_VERSION: v0.6.0
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

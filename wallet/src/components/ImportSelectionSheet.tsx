@@ -9,9 +9,10 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Switch, View as RNView } from 'react-native';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { attributeLabel } from '@/services/attributes';
 import type { ProfileAttribute } from '@/stores/profile';
 
@@ -32,6 +33,8 @@ export function ImportSelectionSheet({
     onCancel: () => void;
     busy?: boolean;
 }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const count = attributes.filter((a) => selected.has(a.key)).length;
     return (
         <RNView style={styles.card}>
@@ -49,7 +52,7 @@ export function ImportSelectionSheet({
                             <Image source={{ uri: attr.value }} style={styles.avatar} />
                         ) : (
                             <RNView style={styles.iconCircle}>
-                                <Ionicons name={iconFor(attr.key)} size={16} color="#64748B" />
+                                <Ionicons name={iconFor(attr.key)} size={16} color={p.textSecondary} />
                             </RNView>
                         )}
                         <RNView style={styles.rowInfo}>
@@ -94,28 +97,28 @@ function iconFor(key: string): keyof typeof Ionicons.glyphMap {
     }
 }
 
-const styles = StyleSheet.create({
-    card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginTop: 8 },
-    title: { fontSize: 17, fontWeight: '700', color: '#0F172A' },
-    subtitle: { fontSize: 13, color: '#64748B', lineHeight: 19, marginTop: 4, marginBottom: 12 },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    card: { backgroundColor: p.card, borderRadius: 16, padding: 16, marginTop: 8 },
+    title: { fontSize: 17, fontWeight: '700', color: p.textPrimary },
+    subtitle: { fontSize: 13, color: p.textSecondary, lineHeight: 19, marginTop: 4, marginBottom: 12 },
     row: {
         flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10,
-        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F0',
+        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border,
     },
     iconCircle: {
-        width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9',
+        width: 32, height: 32, borderRadius: 16, backgroundColor: p.cardAlt,
         alignItems: 'center', justifyContent: 'center',
     },
-    avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9' },
+    avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: p.cardAlt },
     rowInfo: { flex: 1 },
-    rowLabel: { fontSize: 15, fontWeight: '500', color: '#0F172A' },
-    rowValue: { fontSize: 12, color: '#94A3B8', marginTop: 1 },
+    rowLabel: { fontSize: 15, fontWeight: '500', color: p.textPrimary },
+    rowValue: { fontSize: 12, color: p.textMuted, marginTop: 1 },
     confirm: {
-        backgroundColor: '#00BCF2', borderRadius: 12, paddingVertical: 14,
+        backgroundColor: p.blue, borderRadius: 12, paddingVertical: 14,
         alignItems: 'center', marginTop: 16,
     },
     confirmDisabled: { opacity: 0.5 },
     confirmText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
     cancel: { paddingVertical: 12, alignItems: 'center' },
-    cancelText: { color: '#64748B', fontSize: 14 },
+    cancelText: { color: p.textSecondary, fontSize: 14 },
 });

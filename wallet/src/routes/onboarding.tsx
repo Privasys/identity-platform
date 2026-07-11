@@ -13,7 +13,7 @@ import { useRouter, Stack } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Pressable, ActivityIndicator, View as RNView, TextInput, ScrollView } from 'react-native';
 
-import { Text, Image } from '@/components/Themed';
+import { Text, Image, usePalette } from '@/components/Themed';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { linkProviderViaIdP } from '@/services/identity';
 import { getDeviceLocale } from '@/services/device-locale';
@@ -35,6 +35,7 @@ const PROVIDER_BUTTONS = [
 
 export default function OnboardingScreen() {
     const router = useRouter();
+    const p = usePalette();
     const setOnboarded = useAuthStore((s) => s.setOnboarded);
     const createProfile = useProfileStore((s) => s.createProfile);
     const [step, setStep] = useState<Step>('welcome');
@@ -207,7 +208,7 @@ export default function OnboardingScreen() {
         <>
             <Stack.Screen options={{ headerShown: false }} />
             <LinearGradient
-                colors={['#34E89E', '#00BCF2']}
+                colors={[p.green, p.blue]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.gradient}

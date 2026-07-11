@@ -18,7 +18,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -30,7 +30,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { BIP39_WORDLIST, BIP39_WORDSET } from '@/services/bip39-wordlist';
 import { register as fido2Register } from '@/services/fido2';
 import {
@@ -85,6 +85,8 @@ type FlowStep = 'enter-code' | 'waiting' | 'approved' | 'completed' | 'restored'
 export default function RecoverAccountScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
 
     const [step, setStep] = useState<FlowStep>('enter-code');
     const [codeInput, setCodeInput] = useState('');
@@ -392,7 +394,7 @@ export default function RecoverAccountScreen() {
                 {step === 'enter-code' && (
                     <>
                         <RNView style={styles.iconContainer}>
-                            <Ionicons name="key-outline" size={48} color="#00BCF2" />
+                            <Ionicons name="key-outline" size={48} color={p.blue} />
                         </RNView>
                         <Text style={styles.title}>Enter Recovery Code</Text>
                         <Text style={styles.subtitle}>
@@ -406,7 +408,7 @@ export default function RecoverAccountScreen() {
                                 value={codeInput}
                                 onChangeText={setCodeInput}
                                 placeholder="word1 word2 word3 ... word24"
-                                placeholderTextColor="#94A3B8"
+                                placeholderTextColor={p.textMuted}
                                 autoCapitalize="none"
                                 autoCorrect={false}
                                 autoFocus
@@ -472,7 +474,7 @@ export default function RecoverAccountScreen() {
                 {step === 'waiting' && recoveryState && (
                     <>
                         <RNView style={styles.iconContainer}>
-                            <ActivityIndicator color="#00BCF2" size="large" />
+                            <ActivityIndicator color={p.blue} size="large" />
                         </RNView>
                         <Text style={styles.title}>Waiting for Guardians</Text>
                         <Text style={styles.subtitle}>
@@ -505,7 +507,7 @@ export default function RecoverAccountScreen() {
                         </RNView>
 
                         <Pressable style={styles.secondaryButton} onPress={handleCancel}>
-                            <Text style={[styles.secondaryButtonText, { color: '#DC2626' }]}>Cancel Recovery</Text>
+                            <Text style={[styles.secondaryButtonText, { color: p.danger }]}>Cancel Recovery</Text>
                         </Pressable>
                     </>
                 )}
@@ -514,7 +516,7 @@ export default function RecoverAccountScreen() {
                 {step === 'approved' && recoveryState && (
                     <>
                         <RNView style={styles.iconContainer}>
-                            <Ionicons name="checkmark-circle" size={48} color="#34E89E" />
+                            <Ionicons name="checkmark-circle" size={48} color={p.green} />
                         </RNView>
                         <Text style={styles.title}>Recovery Approved</Text>
                         <Text style={styles.subtitle}>
@@ -543,7 +545,7 @@ export default function RecoverAccountScreen() {
                 {step === 'completed' && (
                     <>
                         <RNView style={styles.iconContainer}>
-                            <Ionicons name="shield-checkmark" size={48} color="#34E89E" />
+                            <Ionicons name="shield-checkmark" size={48} color={p.green} />
                         </RNView>
                         <Text style={styles.title}>Account Recovered</Text>
                         <Text style={styles.subtitle}>
@@ -570,7 +572,7 @@ export default function RecoverAccountScreen() {
                 {step === 'restored' && (
                     <>
                         <RNView style={styles.iconContainer}>
-                            <Ionicons name="checkmark-circle" size={48} color="#34E89E" />
+                            <Ionicons name="checkmark-circle" size={48} color={p.green} />
                         </RNView>
                         <Text style={styles.title}>Device Restored</Text>
                         <Text style={styles.subtitle}>
@@ -614,8 +616,8 @@ export default function RecoverAccountScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -642,13 +644,13 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 22,
         fontWeight: '700',
-        color: '#0F172A',
+        color: p.textPrimary,
         textAlign: 'center',
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 15,
-        color: '#64748B',
+        color: p.textSecondary,
         textAlign: 'center',
         lineHeight: 22,
         marginBottom: 24,
@@ -656,7 +658,7 @@ const styles = StyleSheet.create({
     },
 
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
@@ -664,18 +666,18 @@ const styles = StyleSheet.create({
     fieldLabel: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: p.textMuted,
         marginBottom: 6,
         textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
     input: {
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderRadius: 10,
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 16,
-        color: '#0F172A',
+        color: p.textPrimary,
         marginBottom: 12,
         fontFamily: 'Inter',
         letterSpacing: 1,
@@ -691,40 +693,40 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 6,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: p.border,
     },
     wordChipValid: {
-        backgroundColor: '#E8FFF0',
-        borderColor: '#34D399',
+        backgroundColor: p.successBg,
+        borderColor: p.successBorder,
     },
     wordChipInvalid: {
-        backgroundColor: '#FFF1F0',
-        borderColor: '#FCA5A5',
+        backgroundColor: p.dangerBg,
+        borderColor: p.dangerBorder,
     },
     wordChipText: {
         fontSize: 12,
         fontFamily: 'Inter',
-        color: '#0F172A',
+        color: p.textPrimary,
     },
     wordChipTextInvalid: {
-        color: '#991B1B',
+        color: p.dangerText,
         fontWeight: '600',
     },
     wordCount: {
         fontSize: 12,
-        color: '#94A3B8',
+        color: p.textMuted,
         marginBottom: 12,
         textAlign: 'right',
     },
     wordCountComplete: {
-        color: '#0F766E',
+        color: p.infoText,
         fontWeight: '600',
     },
 
     primaryButton: {
-        backgroundColor: '#00BCF2',
+        backgroundColor: p.blue,
         borderRadius: 10,
         paddingVertical: 14,
         alignItems: 'center' as const,
@@ -753,29 +755,29 @@ const styles = StyleSheet.create({
     },
     progressLabel: {
         fontSize: 14,
-        color: '#64748B',
+        color: p.textSecondary,
         fontWeight: '500',
     },
     progressValue: {
         fontSize: 16,
-        color: '#0F172A',
+        color: p.textPrimary,
         fontWeight: '700',
     },
     progressBar: {
         height: 8,
-        backgroundColor: '#E2E8F0',
+        backgroundColor: p.border,
         borderRadius: 4,
         overflow: 'hidden',
         marginBottom: 12,
     },
     progressFill: {
         height: '100%',
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         borderRadius: 4,
     },
     expiresText: {
         fontSize: 12,
-        color: '#94A3B8',
+        color: p.textMuted,
         textAlign: 'center',
     },
 });

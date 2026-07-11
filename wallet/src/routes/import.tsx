@@ -9,13 +9,13 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 
 import { ConflictResolutionSheet, type AttributeConflict } from '@/components/ConflictResolutionSheet';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { SubPageHeader } from '@/components/SubPageHeader';
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { ATTRIBUTE_MAP } from '@/services/attributes';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { useProfileStore, type LinkedProvider, type ProfileAttribute } from '@/stores/profile';
@@ -28,6 +28,8 @@ const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function ImportDataScreen() {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const { profile, updateProfile, linkProvider, mergeAttribute, resolveConflict } = useProfileStore();
 
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
@@ -167,12 +169,12 @@ export default function ImportDataScreen() {
                                     onPress={() => startImport(key)}
                                     disabled={isLinking || linkingProvider !== null}
                                 >
-                                    <Ionicons name={PROVIDER_ICONS[key] ?? 'globe-outline'} size={22} color="#64748B" />
+                                    <Ionicons name={PROVIDER_ICONS[key] ?? 'globe-outline'} size={22} color={p.textSecondary} />
                                     <Text style={styles.providerName}>{config.displayName}</Text>
                                     {isLinking ? (
-                                        <ActivityIndicator size="small" color="#00BCF2" />
+                                        <ActivityIndicator size="small" color={p.blue} />
                                     ) : (
-                                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                                     )}
                                 </Pressable>
                             );
@@ -184,14 +186,14 @@ export default function ImportDataScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     content: { padding: 20 },
-    sectionTitle: { fontSize: 15, fontWeight: '600', color: '#0F172A', marginBottom: 4 },
-    sectionSub: { fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 12 },
+    sectionTitle: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 4 },
+    sectionSub: { fontSize: 13, color: p.textSecondary, lineHeight: 18, marginBottom: 12 },
     providerRow: {
-        flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF',
+        flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: p.card,
         borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16, marginBottom: 8,
     },
-    providerName: { flex: 1, fontSize: 15, fontWeight: '500', color: '#0F172A' },
+    providerName: { flex: 1, fontSize: 15, fontWeight: '500', color: p.textPrimary },
 });

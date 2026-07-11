@@ -13,7 +13,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -26,7 +26,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import {
     getRecoveryPhraseStatus,
     regenerateRecoveryPhrase,
@@ -55,6 +55,8 @@ type InviteMethod = 'email' | 'qr';
 export default function AccountRecoveryScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const profile = useProfileStore((s) => s.profile);
     const privasysId = useAuthStore((s) => s.privasysId);
 
@@ -321,7 +323,7 @@ export default function AccountRecoveryScreen() {
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00BCF2" />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={p.blue} />}
             >
                 {notConfigured && (
                     <RNView style={styles.card}>
@@ -377,7 +379,7 @@ export default function AccountRecoveryScreen() {
                                 <Ionicons
                                     name={phraseStatus.has_phrase ? 'checkmark-circle' : 'alert-circle-outline'}
                                     size={20}
-                                    color={phraseStatus.has_phrase ? '#34E89E' : '#F59E0B'}
+                                    color={phraseStatus.has_phrase ? p.green : '#F59E0B'}
                                 />
                                 <Text style={styles.statusText}>
                                     {phraseStatus.has_phrase ? 'Recovery phrase configured' : 'No recovery phrase configured'}
@@ -385,7 +387,7 @@ export default function AccountRecoveryScreen() {
                             </RNView>
                         ) : (
                             <RNView style={styles.statusRow}>
-                                <Ionicons name="alert-circle-outline" size={20} color="#94A3B8" />
+                                <Ionicons name="alert-circle-outline" size={20} color={p.textMuted} />
                                 <Text style={styles.statusText}>Recovery phrase not set up</Text>
                             </RNView>
                         )}
@@ -407,7 +409,7 @@ export default function AccountRecoveryScreen() {
                                 style={styles.secondaryButton}
                                 onPress={handleDeactivatePhrase}
                             >
-                                <Text style={[styles.secondaryButtonText, { color: '#DC2626', fontSize: 13 }]}>Deactivate Phrase (not recommended)</Text>
+                                <Text style={[styles.secondaryButtonText, { color: p.danger, fontSize: 13 }]}>Deactivate Phrase (not recommended)</Text>
                             </Pressable>
                         )}
                     </RNView>
@@ -426,15 +428,15 @@ export default function AccountRecoveryScreen() {
                         </Text>
                         {guardians.map((g) => (
                             <RNView key={g.guardian_id} style={styles.guardianRow}>
-                                <Ionicons name="person-outline" size={18} color="#64748B" />
+                                <Ionicons name="person-outline" size={18} color={p.textSecondary} />
                                 <RNView style={{ flex: 1 }}>
                                     <Text style={styles.guardianName}>{g.display_name || g.guardian_id.substring(0, 8) + '…'}</Text>
-                                    <Text style={[styles.guardianStatus, g.status === 'accepted' && { color: '#34E89E' }]}>
+                                    <Text style={[styles.guardianStatus, g.status === 'accepted' && { color: p.green }]}>
                                         {g.status}
                                     </Text>
                                 </RNView>
                                 <Pressable onPress={() => handleRemoveGuardian(g)} hitSlop={8}>
-                                    <Ionicons name="close-circle-outline" size={20} color="#94A3B8" />
+                                    <Ionicons name="close-circle-outline" size={20} color={p.textMuted} />
                                 </Pressable>
                             </RNView>
                         ))}
@@ -449,14 +451,14 @@ export default function AccountRecoveryScreen() {
                                 style={[styles.methodOption, inviteMethod === 'email' && styles.methodOptionActive]}
                                 onPress={() => setInviteMethod('email')}
                             >
-                                <Ionicons name="mail-outline" size={16} color={inviteMethod === 'email' ? '#00BCF2' : '#94A3B8'} />
+                                <Ionicons name="mail-outline" size={16} color={inviteMethod === 'email' ? p.blue : p.textMuted} />
                                 <Text style={[styles.methodText, inviteMethod === 'email' && styles.methodTextActive]}>Email</Text>
                             </Pressable>
                             <Pressable
                                 style={[styles.methodOption, inviteMethod === 'qr' && styles.methodOptionActive]}
                                 onPress={() => setInviteMethod('qr')}
                             >
-                                <Ionicons name="qr-code-outline" size={16} color={inviteMethod === 'qr' ? '#00BCF2' : '#94A3B8'} />
+                                <Ionicons name="qr-code-outline" size={16} color={inviteMethod === 'qr' ? p.blue : p.textMuted} />
                                 <Text style={[styles.methodText, inviteMethod === 'qr' && styles.methodTextActive]}>Scan QR</Text>
                             </Pressable>
                         </RNView>
@@ -469,7 +471,7 @@ export default function AccountRecoveryScreen() {
                                     value={guardianEmail}
                                     onChangeText={setGuardianEmail}
                                     placeholder="guardian@example.com"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={p.textMuted}
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                     autoFocus
@@ -480,7 +482,7 @@ export default function AccountRecoveryScreen() {
                                     value={thresholdInput}
                                     onChangeText={setThresholdInput}
                                     placeholder="1"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={p.textMuted}
                                     keyboardType="number-pad"
                                     maxLength={2}
                                 />
@@ -530,7 +532,7 @@ export default function AccountRecoveryScreen() {
                         onPress={() => setShowInviteForm(true)}
                         disabled={notConfigured}
                     >
-                        <Ionicons name="person-add-outline" size={18} color="#00BCF2" />
+                        <Ionicons name="person-add-outline" size={18} color={p.blue} />
                         <Text style={styles.outlineButtonText}>Add Guardian</Text>
                     </Pressable>
                 )}
@@ -543,14 +545,14 @@ export default function AccountRecoveryScreen() {
 
                 {devices.length === 0 ? (
                     <RNView style={styles.emptyCard}>
-                        <Ionicons name="phone-portrait-outline" size={28} color="#C7C7CC" />
+                        <Ionicons name="phone-portrait-outline" size={28} color={p.textMuted} />
                         <Text style={styles.emptyText}>No registered devices</Text>
                     </RNView>
                 ) : (
                     <RNView style={styles.card}>
                         {devices.map((d) => (
                             <RNView key={d.credential_id} style={styles.deviceRow}>
-                                <Ionicons name="phone-portrait-outline" size={18} color="#64748B" />
+                                <Ionicons name="phone-portrait-outline" size={18} color={p.textSecondary} />
                                 <RNView style={{ flex: 1 }}>
                                     <Text style={styles.deviceLabel}>
                                         Credential {d.credential_id.substring(0, 8)}…
@@ -560,7 +562,7 @@ export default function AccountRecoveryScreen() {
                                     </Text>
                                 </RNView>
                                 <Pressable onPress={() => handleRevokeDevice(d)} hitSlop={8}>
-                                    <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                                    <Ionicons name="trash-outline" size={18} color={p.danger} />
                                 </Pressable>
                             </RNView>
                         ))}
@@ -583,10 +585,10 @@ export default function AccountRecoveryScreen() {
                                 </Text>
                                 <RNView style={styles.formActions}>
                                     <Pressable
-                                        style={[styles.outlineButton, { flex: 0, borderColor: '#DC2626' }]}
+                                        style={[styles.outlineButton, { flex: 0, borderColor: p.danger }]}
                                         onPress={() => handleRespondInvite(inv, false)}
                                     >
-                                        <Text style={[styles.outlineButtonText, { color: '#DC2626' }]}>Decline</Text>
+                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>Decline</Text>
                                     </Pressable>
                                     <Pressable
                                         style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
@@ -606,10 +608,10 @@ export default function AccountRecoveryScreen() {
                                 </Text>
                                 <RNView style={styles.formActions}>
                                     <Pressable
-                                        style={[styles.outlineButton, { flex: 0, borderColor: '#DC2626' }]}
+                                        style={[styles.outlineButton, { flex: 0, borderColor: p.danger }]}
                                         onPress={() => handleApproveRecovery(req, false)}
                                     >
-                                        <Text style={[styles.outlineButtonText, { color: '#DC2626' }]}>Deny</Text>
+                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>Deny</Text>
                                     </Pressable>
                                     <Pressable
                                         style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
@@ -629,8 +631,8 @@ export default function AccountRecoveryScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -652,20 +654,20 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#94A3B8',
+        color: p.textMuted,
         letterSpacing: 0.8,
         marginTop: 24,
         marginBottom: 6,
     },
     sectionDescription: {
         fontSize: 13,
-        color: '#94A3B8',
+        color: p.textMuted,
         marginBottom: 12,
         lineHeight: 18,
     },
 
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 8,
@@ -674,7 +676,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 10,
-        backgroundColor: '#FFFBEB',
+        backgroundColor: p.warnBg,
         borderRadius: 12,
         padding: 14,
         marginBottom: 8,
@@ -682,36 +684,36 @@ const styles = StyleSheet.create({
     infoText: {
         flex: 1,
         fontSize: 13,
-        color: '#92400E',
+        color: p.warnText,
         lineHeight: 18,
     },
 
     fieldLabel: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: p.textMuted,
         marginBottom: 6,
         textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
     helperText: {
         fontSize: 13,
-        color: '#94A3B8',
+        color: p.textMuted,
         lineHeight: 18,
         marginBottom: 12,
     },
     input: {
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderRadius: 10,
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 16,
-        color: '#0F172A',
+        color: p.textPrimary,
         marginBottom: 12,
     },
 
     primaryButton: {
-        backgroundColor: '#00BCF2',
+        backgroundColor: p.blue,
         borderRadius: 10,
         paddingVertical: 12,
         alignItems: 'center' as const,
@@ -729,7 +731,7 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     secondaryButtonText: {
-        color: '#00BCF2',
+        color: p.blue,
         fontSize: 14,
         fontWeight: '500',
     },
@@ -739,18 +741,18 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
         borderWidth: 1,
-        borderColor: '#00BCF2',
+        borderColor: p.blue,
         borderRadius: 10,
         paddingVertical: 12,
         paddingHorizontal: 16,
     },
     outlineButtonText: {
-        color: '#00BCF2',
+        color: p.blue,
         fontSize: 15,
         fontWeight: '600',
     },
     cancelText: {
-        color: '#94A3B8',
+        color: p.textMuted,
         fontSize: 14,
         fontWeight: '500',
     },
@@ -775,21 +777,21 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 6,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: p.border,
         borderRadius: 8,
         paddingVertical: 10,
     },
     methodOptionActive: {
-        borderColor: '#00BCF2',
-        backgroundColor: '#F0FAFF',
+        borderColor: p.blue,
+        backgroundColor: p.cardAlt,
     },
     methodText: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#94A3B8',
+        color: p.textMuted,
     },
     methodTextActive: {
-        color: '#00BCF2',
+        color: p.blue,
     },
 
     // Status row (codes, etc.)
@@ -801,7 +803,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 14,
-        color: '#0F172A',
+        color: p.textPrimary,
         fontWeight: '500',
     },
 
@@ -813,7 +815,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     codeItem: {
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderRadius: 6,
         paddingVertical: 6,
         paddingHorizontal: 10,
@@ -821,7 +823,7 @@ const styles = StyleSheet.create({
     codeText: {
         fontSize: 13,
         fontFamily: 'Inter',
-        color: '#0F172A',
+        color: p.textPrimary,
         fontWeight: '500',
         letterSpacing: 0.5,
     },
@@ -833,16 +835,16 @@ const styles = StyleSheet.create({
         gap: 10,
         paddingVertical: 10,
         borderBottomWidth: 0.5,
-        borderBottomColor: '#F1F5F9',
+        borderBottomColor: p.border,
     },
     guardianName: {
         fontSize: 14,
-        color: '#0F172A',
+        color: p.textPrimary,
         fontWeight: '500',
     },
     guardianStatus: {
         fontSize: 12,
-        color: '#94A3B8',
+        color: p.textMuted,
         textTransform: 'capitalize',
     },
 
@@ -853,28 +855,28 @@ const styles = StyleSheet.create({
         gap: 10,
         paddingVertical: 10,
         borderBottomWidth: 0.5,
-        borderBottomColor: '#F1F5F9',
+        borderBottomColor: p.border,
     },
     deviceLabel: {
         fontSize: 14,
-        color: '#0F172A',
+        color: p.textPrimary,
         fontWeight: '500',
     },
     deviceDetail: {
         fontSize: 12,
-        color: '#94A3B8',
+        color: p.textMuted,
     },
 
     // Guardian duties
     dutyTitle: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#0F172A',
+        color: p.textPrimary,
         marginBottom: 4,
     },
     dutyDescription: {
         fontSize: 13,
-        color: '#64748B',
+        color: p.textSecondary,
         lineHeight: 18,
         marginBottom: 8,
     },
@@ -883,13 +885,13 @@ const styles = StyleSheet.create({
     emptyCard: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 24,
         gap: 8,
     },
     emptyText: {
         fontSize: 14,
-        color: '#C7C7CC',
+        color: p.textMuted,
     },
 });

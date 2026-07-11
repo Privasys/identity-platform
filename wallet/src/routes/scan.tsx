@@ -2,15 +2,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, CameraType, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text, View } from '@/components/Themed';
+import { Text, View, usePalette, type Palette } from '@/components/Themed';
 
 export default function TabScanScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const [facing] = useState<CameraType>('back');
     const [serviceUrl, setServiceUrl] = useState<string>();
     const [permission, requestPermission] = useCameraPermissions();
@@ -196,7 +198,7 @@ export default function TabScanScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (p: Palette) => StyleSheet.create({
     container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     closeButton: {
         position: 'absolute',
@@ -216,7 +218,7 @@ const styles = StyleSheet.create({
         textAlign: 'center'
     },
     cameraAskButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: p.action,
         borderRadius: 8,
         color: 'white',
         fontSize: 17,

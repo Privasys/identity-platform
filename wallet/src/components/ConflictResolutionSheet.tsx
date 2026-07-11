@@ -11,9 +11,10 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { useMemo } from 'react';
 import { StyleSheet, Pressable, View as RNView } from 'react-native';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import type { ProfileAttribute } from '@/stores/profile';
 
 export interface AttributeConflict {
@@ -40,11 +41,13 @@ export function ConflictResolutionSheet({
     total: number;
     onResolve: (choice: 'keep' | 'replace' | 'both') => void;
 }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const { existing, incoming, multiValued } = conflict;
     return (
         <RNView style={styles.card}>
             <RNView style={styles.headerRow}>
-                <Ionicons name="git-compare-outline" size={20} color="#F59E0B" />
+                <Ionicons name="git-compare-outline" size={20} color={p.warnText} />
                 <Text style={styles.title}>Conflicting {existing.label}</Text>
                 {total > 1 && <Text style={styles.counter}>{index + 1} of {total}</Text>}
             </RNView>
@@ -59,7 +62,7 @@ export function ConflictResolutionSheet({
                     <Text style={styles.optionValue}>{existing.value}</Text>
                     <Text style={styles.optionMeta}>Current {sourcesSummary(existing)}</Text>
                 </RNView>
-                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
             </Pressable>
 
             <Pressable style={styles.option} onPress={() => onResolve('replace')}>
@@ -67,12 +70,12 @@ export function ConflictResolutionSheet({
                     <Text style={styles.optionValue}>{incoming.value}</Text>
                     <Text style={styles.optionMeta}>New {sourcesSummary(incoming)}</Text>
                 </RNView>
-                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
             </Pressable>
 
             {multiValued && (
                 <Pressable style={[styles.option, styles.bothOption]} onPress={() => onResolve('both')}>
-                    <Ionicons name="albums-outline" size={18} color="#00BCF2" />
+                    <Ionicons name="albums-outline" size={18} color={p.blue} />
                     <Text style={styles.bothText}>Keep both</Text>
                 </Pressable>
             )}
@@ -80,19 +83,19 @@ export function ConflictResolutionSheet({
     );
 }
 
-const styles = StyleSheet.create({
-    card: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16 },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    card: { backgroundColor: p.card, borderRadius: 14, padding: 16 },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-    title: { flex: 1, fontSize: 16, fontWeight: '700', color: '#0F172A' },
-    counter: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
-    subtitle: { fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 14 },
+    title: { flex: 1, fontSize: 16, fontWeight: '700', color: p.textPrimary },
+    counter: { fontSize: 12, color: p.textMuted, fontWeight: '600' },
+    subtitle: { fontSize: 13, color: p.textSecondary, lineHeight: 18, marginBottom: 14 },
     option: {
         flexDirection: 'row', alignItems: 'center', gap: 10,
-        backgroundColor: '#F8FAFB', borderRadius: 12, padding: 14, marginBottom: 8,
-        borderWidth: 1, borderColor: '#E2E8F0',
+        backgroundColor: p.screenBg, borderRadius: 12, padding: 14, marginBottom: 8,
+        borderWidth: 1, borderColor: p.border,
     },
-    optionValue: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
-    optionMeta: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-    bothOption: { justifyContent: 'center', borderColor: '#BAE6FD', backgroundColor: '#F0F9FF' },
-    bothText: { fontSize: 15, fontWeight: '600', color: '#00BCF2' },
+    optionValue: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+    optionMeta: { fontSize: 12, color: p.textMuted, marginTop: 2 },
+    bothOption: { justifyContent: 'center', borderColor: p.infoBorder, backgroundColor: p.infoBg },
+    bothText: { fontSize: 15, fontWeight: '600', color: p.blue },
 });

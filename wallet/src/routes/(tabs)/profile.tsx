@@ -8,7 +8,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { getDeviceLocale } from '@/services/device-locale';
 import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { useAuthStore } from '@/stores/auth';
@@ -31,6 +31,8 @@ import { useTrustedAppsStore } from '@/stores/trusted-apps';
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const { profile, clearProfile } =
         useProfileStore();
     const { credentials, removeCredential } = useAuthStore();
@@ -66,7 +68,7 @@ export default function ProfileScreen() {
         return (
             <RNView style={[styles.screen, { paddingTop: insets.top }]}>
                 <RNView style={styles.emptyState}>
-                    <Ionicons name="person-circle-outline" size={64} color="#C7C7CC" />
+                    <Ionicons name="person-circle-outline" size={64} color={p.textMuted} />
                     <Text style={styles.emptyTitle}>No profile yet</Text>
                     <Text style={styles.emptyText}>
                         Set up your identity to manage your data, link accounts, and control what apps can see.
@@ -86,7 +88,7 @@ export default function ProfileScreen() {
                         style={styles.recoverButton}
                         onPress={() => router.push('/recover-account' as never)}
                     >
-                        <Ionicons name="key-outline" size={16} color="#00BCF2" />
+                        <Ionicons name="key-outline" size={16} color={p.blue} />
                         <Text style={styles.recoverButtonText}>Recover Existing Account</Text>
                     </Pressable>
                 </RNView>
@@ -146,17 +148,17 @@ export default function ProfileScreen() {
                 {/* DID */}
                 <Text style={styles.sectionTitle}>IDENTITY</Text>
                 <Pressable style={styles.didCard} onPress={handleCopyDid}>
-                    <Ionicons name="finger-print" size={20} color="#00BCF2" />
+                    <Ionicons name="finger-print" size={20} color={p.blue} />
                     <RNView style={{ flex: 1 }}>
                         <Text style={styles.didLabel}>Canonical DID</Text>
                         <Text style={styles.didText} numberOfLines={1}>
                             {profile.canonicalDid || 'Not generated'}
                         </Text>
                     </RNView>
-                    <Ionicons name="copy-outline" size={18} color="#94A3B8" />
+                    <Ionicons name="copy-outline" size={18} color={p.textMuted} />
                 </Pressable>
                 <RNView style={styles.didCard}>
-                    <Ionicons name="phone-portrait-outline" size={20} color="#64748B" />
+                    <Ionicons name="phone-portrait-outline" size={20} color={p.textSecondary} />
                     <RNView style={{ flex: 1 }}>
                         <Text style={styles.didLabel}>Device DID</Text>
                         <Text style={styles.didText} numberOfLines={1}>
@@ -180,7 +182,7 @@ export default function ProfileScreen() {
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="document-text-outline" size={20} color="#00BCF2" />
+                            <Ionicons name="document-text-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>Manage Attributes</Text>
@@ -190,7 +192,7 @@ export default function ProfileScreen() {
                                     : `${profile.attributes.length} attribute${profile.attributes.length !== 1 ? 's' : ''}`}
                             </Text>
                         </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
 
@@ -201,7 +203,7 @@ export default function ProfileScreen() {
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="shield-checkmark-outline" size={20} color="#00BCF2" />
+                            <Ionicons name="shield-checkmark-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>ID Verify & Import</Text>
@@ -209,7 +211,7 @@ export default function ProfileScreen() {
                                 Scan your passport or national ID for government-verified attributes
                             </Text>
                         </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
 
@@ -220,7 +222,7 @@ export default function ProfileScreen() {
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="cloud-download-outline" size={20} color="#00BCF2" />
+                            <Ionicons name="cloud-download-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>Import Data</Text>
@@ -228,7 +230,7 @@ export default function ProfileScreen() {
                                 Import from Google, LinkedIn, Microsoft or GitHub
                             </Text>
                         </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
 
@@ -239,7 +241,7 @@ export default function ProfileScreen() {
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="share-outline" size={20} color="#00BCF2" />
+                            <Ionicons name="share-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>Export Data</Text>
@@ -247,7 +249,7 @@ export default function ProfileScreen() {
                                 Choose what to export, or export everything as JSON
                             </Text>
                         </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
 
@@ -264,7 +266,7 @@ export default function ProfileScreen() {
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="time-outline" size={20} color="#00BCF2" />
+                            <Ionicons name="time-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>Consent History</Text>
@@ -274,7 +276,7 @@ export default function ProfileScreen() {
                                     : `${consentRecordCount} event${consentRecordCount !== 1 ? 's' : ''}`}
                             </Text>
                         </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
 
@@ -290,7 +292,7 @@ export default function ProfileScreen() {
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="shield-checkmark-outline" size={20} color="#00BCF2" />
+                            <Ionicons name="shield-checkmark-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>Recovery Settings</Text>
@@ -298,7 +300,7 @@ export default function ProfileScreen() {
                                 Backup codes, guardians & devices
                             </Text>
                         </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
 
@@ -308,7 +310,7 @@ export default function ProfileScreen() {
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="key-outline" size={20} color="#F59E0B" />
+                            <Ionicons name="key-outline" size={20} color={p.warnText} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>Recover Account</Text>
@@ -316,7 +318,7 @@ export default function ProfileScreen() {
                                 Lost access? Start recovery here
                             </Text>
                         </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
 
@@ -374,7 +376,7 @@ export default function ProfileScreen() {
                             );
                         }}
                     >
-                        <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                        <Ionicons name="trash-outline" size={18} color={p.danger} />
                         <Text style={styles.dangerButtonText}>Clear All Data</Text>
                     </Pressable>
                 </RNView>
@@ -383,10 +385,10 @@ export default function ProfileScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         paddingHorizontal: 24,
         paddingBottom: 24,
         borderBottomLeftRadius: 28,
@@ -407,10 +409,10 @@ const styles = StyleSheet.create({
         gap: 12,
         paddingHorizontal: 40
     },
-    emptyTitle: { fontSize: 20, fontWeight: '600', color: '#0F172A' },
-    emptyText: { fontSize: 15, color: '#64748B', textAlign: 'center', lineHeight: 22 },
+    emptyTitle: { fontSize: 20, fontWeight: '600', color: p.textPrimary },
+    emptyText: { fontSize: 15, color: p.textSecondary, textAlign: 'center', lineHeight: 22 },
     createProfileButton: {
-        backgroundColor: '#00BCF2',
+        backgroundColor: p.blue,
         borderRadius: 12,
         paddingVertical: 14,
         paddingHorizontal: 32,
@@ -431,14 +433,14 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     recoverButtonText: {
-        color: '#00BCF2',
+        color: p.blue,
         fontSize: 14,
         fontWeight: '500',
     },
 
     profileCard: {
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 16,
         padding: 24,
         marginBottom: 24
@@ -448,7 +450,7 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: '#00BCF2',
+        backgroundColor: p.blue,
         alignItems: 'center',
         justifyContent: 'center'
     },
@@ -462,20 +464,20 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#FFFFFF'
     },
-    profileName: { fontSize: 22, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
-    profileEmail: { fontSize: 15, color: '#64748B' },
+    profileName: { fontSize: 22, fontWeight: '700', color: p.textPrimary, marginBottom: 4 },
+    profileEmail: { fontSize: 15, color: p.textSecondary },
 
     sectionTitle: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#94A3B8',
+        color: p.textMuted,
         letterSpacing: 0.8,
         marginTop: 24,
         marginBottom: 8
     },
     sectionDescription: {
         fontSize: 13,
-        color: '#94A3B8',
+        color: p.textMuted,
         marginBottom: 12,
         lineHeight: 18
     },
@@ -484,7 +486,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 14,
         marginBottom: 8
@@ -492,7 +494,7 @@ const styles = StyleSheet.create({
     didLabel: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: p.textMuted,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
         marginBottom: 2
@@ -500,12 +502,12 @@ const styles = StyleSheet.create({
     didText: {
         fontSize: 12,
         fontFamily: 'Inter',
-        color: '#64748B',
+        color: p.textSecondary,
         lineHeight: 18
     },
     privacyNote: {
         fontSize: 12,
-        color: '#34C17B',
+        color: p.successText,
         marginTop: 4,
         marginBottom: 8,
         lineHeight: 16
@@ -516,21 +518,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: p.border,
         padding: 14,
         marginTop: 8,
     },
     exportButtonText: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#00BCF2',
+        color: p.blue,
     },
 
     metaCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16
     },
@@ -539,13 +541,13 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: 8,
         borderBottomWidth: 0.5,
-        borderBottomColor: '#F1F5F9'
+        borderBottomColor: p.cardAlt
     },
-    metaLabel: { fontSize: 14, color: '#64748B' },
-    metaValue: { fontSize: 14, fontWeight: '500', color: '#0F172A' },
+    metaLabel: { fontSize: 14, color: p.textSecondary },
+    metaValue: { fontSize: 14, fontWeight: '500', color: p.textPrimary },
 
     sharingCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 8
@@ -559,12 +561,12 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 10,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         alignItems: 'center',
         justifyContent: 'center'
     },
-    sharingLabel: { fontSize: 15, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
-    sharingDetail: { fontSize: 13, color: '#64748B' },
+    sharingLabel: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
+    sharingDetail: { fontSize: 13, color: p.textSecondary },
 
     dangerSection: {
         marginTop: 40,
@@ -575,19 +577,19 @@ const styles = StyleSheet.create({
     dangerDivider: {
         width: 40,
         height: 1,
-        backgroundColor: '#E2E8F0',
+        backgroundColor: p.border,
         marginBottom: 4,
     },
     dangerTitle: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: p.textMuted,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
     dangerDescription: {
         fontSize: 13,
-        color: '#94A3B8',
+        color: p.textMuted,
         textAlign: 'center',
         lineHeight: 18,
         maxWidth: 280,
@@ -601,7 +603,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 24,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: p.border,
     },
-    dangerButtonText: { color: '#DC2626', fontSize: 14, fontWeight: '500' },
+    dangerButtonText: { color: p.danger, fontSize: 14, fontWeight: '500' },
 });

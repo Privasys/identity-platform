@@ -10,11 +10,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { StyleSheet, Pressable, Alert, ScrollView, Switch, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExternalLink } from '@/components/ExternalLink';
-import { Text, View } from '@/components/Themed';
+import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
@@ -23,6 +24,8 @@ import { getLogs } from '@/utils/logs';
 export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const { credentials } = useAuthStore();
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
     const driveEnabled = useSettingsStore((s) => s.driveEnabled);
@@ -102,11 +105,11 @@ export default function SettingsScreen() {
                 {/* Registered Credentials → subpage */}
                 <Text style={styles.sectionTitle}>Registered Credentials</Text>
                 <Pressable style={styles.logsButton} onPress={() => router.push('/credentials' as never)}>
-                    <Ionicons name="key-outline" size={18} color="#0F172A" />
+                    <Ionicons name="key-outline" size={18} color={p.textPrimary} />
                     <Text style={styles.logsButtonText}>
                         Manage Credentials{credentials.length > 0 ? ` (${credentials.length})` : ''}
                     </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                    <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                 </Pressable>
 
                 {/* Push Token */}
@@ -123,7 +126,7 @@ export default function SettingsScreen() {
                             <Text style={styles.pushTokenText} numberOfLines={2}>
                                 {pushToken}
                             </Text>
-                            <Ionicons name="copy-outline" size={18} color="#64748B" />
+                            <Ionicons name="copy-outline" size={18} color={p.textSecondary} />
                         </Pressable>
                     </>
                 ) : null}
@@ -138,7 +141,7 @@ export default function SettingsScreen() {
                     <Switch
                         value={driveEnabled}
                         onValueChange={setDriveEnabled}
-                        trackColor={{ true: '#34E89E', false: '#CBD5E1' }}
+                        trackColor={{ true: p.green, false: p.border }}
                     />
                 </RNView>
 
@@ -149,9 +152,9 @@ export default function SettingsScreen() {
                     it when reporting issues. Currently {getLogs().length} entries.
                 </Text>
                 <Pressable style={styles.logsButton} onPress={() => router.push('/logs')}>
-                    <Ionicons name="document-text-outline" size={18} color="#0F172A" />
+                    <Ionicons name="document-text-outline" size={18} color={p.textPrimary} />
                     <Text style={styles.logsButtonText}>View Logs</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                    <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                 </Pressable>
 
                 {/* About — one tile: everything as key/value rows. */}
@@ -178,6 +181,8 @@ export default function SettingsScreen() {
 }
 
 function BuildInfoRow({ label, value }: { label: string; value?: string }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <View style={styles.buildInfoRow}>
             <Text style={styles.buildInfoLabel}>{label}</Text>
@@ -186,10 +191,10 @@ function BuildInfoRow({ label, value }: { label: string; value?: string }) {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         paddingHorizontal: 24,
         paddingBottom: 24,
         borderBottomLeftRadius: 28,
@@ -206,26 +211,26 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 17,
         fontWeight: '600',
-        color: '#0F172A',
+        color: p.textPrimary,
         marginTop: 24,
         marginBottom: 6
     },
     sectionDescription: {
         fontSize: 14,
-        color: '#64748B',
+        color: p.textSecondary,
         marginBottom: 14,
         lineHeight: 20
     },
     emptyCard: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 24,
         gap: 8,
         marginBottom: 8
     },
-    emptyText: { fontSize: 14, color: '#C7C7CC' },
+    emptyText: { fontSize: 14, color: p.textMuted },
 
     optionsRow: {
         flexDirection: 'row',
@@ -237,37 +242,37 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 10,
         borderRadius: 10,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E2E8F0'
+        borderColor: p.border
     },
     optionButtonActive: {
-        backgroundColor: '#007AFF',
-        borderColor: '#007AFF'
+        backgroundColor: p.action,
+        borderColor: p.action
     },
-    optionText: { fontSize: 15, fontWeight: '500', color: '#0F172A' },
+    optionText: { fontSize: 15, fontWeight: '500', color: p.textPrimary },
     optionTextActive: { color: '#fff' },
 
     credentialCard: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 8
     },
     credentialInfo: { flex: 1, backgroundColor: 'transparent' },
-    credentialRp: { fontSize: 15, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
-    credentialMeta: { fontSize: 12, color: '#64748B' },
-    removeButton: { color: '#FF3B30', fontSize: 14, fontWeight: '500' },
+    credentialRp: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
+    credentialMeta: { fontSize: 12, color: p.textSecondary },
+    removeButton: { color: p.danger, fontSize: 14, fontWeight: '500' },
 
     pushTokenCard: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderRadius: 12,
         padding: 14,
         marginBottom: 8
@@ -276,12 +281,12 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 12,
         fontFamily: 'SpaceMono',
-        color: '#64748B',
+        color: p.textSecondary,
         lineHeight: 18
     },
 
     buildInfoCard: {
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderRadius: 12,
         padding: 16,
         gap: 10
@@ -291,31 +296,31 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         backgroundColor: 'transparent'
     },
-    buildInfoLabel: { fontSize: 14, color: '#64748B' },
-    buildInfoValue: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
-    buildInfoLink: { fontSize: 14, fontWeight: '600', color: '#00BCF2' },
+    buildInfoLabel: { fontSize: 14, color: p.textSecondary },
+    buildInfoValue: { fontSize: 14, fontWeight: '600', color: p.textPrimary },
+    buildInfoLink: { fontSize: 14, fontWeight: '600', color: p.blue },
 
     logsButton: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         paddingHorizontal: 14,
         paddingVertical: 14,
         marginBottom: 8,
     },
-    logsButtonText: { flex: 1, fontSize: 15, fontWeight: '500', color: '#0F172A' },
+    logsButtonText: { flex: 1, fontSize: 15, fontWeight: '500', color: p.textPrimary },
     toggleRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         paddingHorizontal: 14,
         paddingVertical: 12,
         marginBottom: 8,
     },
-    toggleLabel: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
-    toggleHint: { fontSize: 12, color: '#64748B', marginTop: 2 },
+    toggleLabel: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+    toggleHint: { fontSize: 12, color: p.textSecondary, marginTop: 2 },
 });

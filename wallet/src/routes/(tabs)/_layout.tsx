@@ -2,19 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 
+import { usePalette } from '@/components/Themed';
 import { useSettingsStore } from '@/stores/settings';
 
 export default function TabLayout() {
+    const p = usePalette();
     const driveEnabled = useSettingsStore((s) => s.driveEnabled);
     return (
         <Tabs
             screenOptions={{
                 headerShown: false,
-                tabBarActiveTintColor: '#00BCF2',
-                tabBarInactiveTintColor: '#94A3B8',
+                tabBarActiveTintColor: p.blue,
+                tabBarInactiveTintColor: p.textMuted,
                 tabBarStyle: {
-                    backgroundColor: '#FFFFFF',
-                    borderTopColor: '#E2E8F0',
+                    backgroundColor: p.card,
+                    borderTopColor: p.border,
                     borderTopWidth: 0.5,
                     paddingTop: 4,
                     height: 88

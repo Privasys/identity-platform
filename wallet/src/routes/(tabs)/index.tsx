@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, ScrollView, Pressable, TextInput, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import {
     KIND_LABELS,
     serviceHosts,
@@ -150,6 +150,8 @@ export default function HomeScreen() {
     const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const [now, setNow] = useState(() => Date.now());
     const [query, setQuery] = useState('');
 
@@ -204,7 +206,7 @@ export default function HomeScreen() {
                         accessibilityLabel={`${pendingApprovals.length} pending vault approval${pendingApprovals.length !== 1 ? 's' : ''}`}
                     >
                         <RNView style={styles.approvalsIcon}>
-                            <Ionicons name="key" size={18} color="#0F766E" />
+                            <Ionicons name="key" size={18} color={p.infoText} />
                         </RNView>
                         <RNView style={styles.approvalsInfo}>
                             <Text style={styles.approvalsTitle}>
@@ -213,13 +215,13 @@ export default function HomeScreen() {
                             </Text>
                             <Text style={styles.approvalsMeta}>Tap to review and approve with your passkey</Text>
                         </RNView>
-                        <Ionicons name="chevron-forward" size={18} color="#0F766E" />
+                        <Ionicons name="chevron-forward" size={18} color={p.infoText} />
                     </Pressable>
                 )}
                 {rows.length === 0 ? (
                     <RNView style={styles.emptyState}>
                         <RNView style={styles.emptyIconContainer}>
-                            <Ionicons name="qr-code-outline" size={48} color="#00BCF2" />
+                            <Ionicons name="qr-code-outline" size={48} color={p.blue} />
                         </RNView>
                         <Text style={styles.emptyTitle}>Ready to connect</Text>
                         <Text style={styles.emptyText}>
@@ -238,13 +240,13 @@ export default function HomeScreen() {
                                 <Ionicons
                                     name="search"
                                     size={16}
-                                    color="#64748B"
+                                    color={p.textSecondary}
                                     style={styles.searchIcon}
                                 />
                                 <TextInput
                                     style={styles.searchInput}
                                     placeholder="Search sessions"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={p.textMuted}
                                     value={query}
                                     onChangeText={setQuery}
                                     autoCapitalize="none"
@@ -261,7 +263,7 @@ export default function HomeScreen() {
                                         <Ionicons
                                             name="close-circle"
                                             size={18}
-                                            color="#94A3B8"
+                                            color={p.textMuted}
                                         />
                                     </Pressable>
                                 )}
@@ -283,9 +285,9 @@ export default function HomeScreen() {
                                 const teeType = row.teeType;
                                 const iconBg =
                                     teeType === 'sgx'
-                                        ? '#34E89E'
+                                        ? p.green
                                         : teeType === 'tdx'
-                                            ? '#00BCF2'
+                                            ? p.blue
                                             : '#8B5CF6';
                                 const iconName: keyof typeof Ionicons.glyphMap =
                                     teeType === 'sgx'
@@ -330,7 +332,7 @@ export default function HomeScreen() {
                                             <Ionicons
                                                 name="chevron-forward"
                                                 size={18}
-                                                color="#C0C0C0"
+                                                color={p.textMuted}
                                             />
                                         )}
                                     </Pressable>
@@ -353,10 +355,10 @@ export default function HomeScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         paddingHorizontal: 24,
         paddingBottom: 32,
         borderBottomLeftRadius: 28,
@@ -394,8 +396,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center'
     },
     approvalsInfo: { flex: 1 },
-    approvalsTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
-    approvalsMeta: { fontSize: 12, color: '#0F766E', marginTop: 2 },
+    approvalsTitle: { fontSize: 15, fontWeight: '700', color: p.textPrimary },
+    approvalsMeta: { fontSize: 12, color: p.infoText, marginTop: 2 },
     emptyState: {
         flex: 1,
         alignItems: 'center',
@@ -415,13 +417,13 @@ const styles = StyleSheet.create({
     emptyTitle: {
         fontSize: 20,
         fontWeight: '600',
-        color: '#0F172A',
+        color: p.textPrimary,
         marginBottom: 8
     },
     emptyText: {
         fontSize: 15,
         textAlign: 'center',
-        color: '#64748B',
+        color: p.textSecondary,
         lineHeight: 22
     },
     list: { flex: 1 },
@@ -429,18 +431,18 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#64748B',
+        color: p.textSecondary,
         letterSpacing: 1,
         marginBottom: 12
     },
     serviceCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 16,
         padding: 16,
         marginBottom: 10,
-        shadowColor: '#0F172A',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,
@@ -449,12 +451,12 @@ const styles = StyleSheet.create({
     searchBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         paddingHorizontal: 12,
         height: 40,
         marginBottom: 16,
-        shadowColor: '#0F172A',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.04,
         shadowRadius: 4,
@@ -464,12 +466,12 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: 15,
-        color: '#0F172A',
+        color: p.textPrimary,
         paddingVertical: 0
     },
     noResults: {
         fontSize: 14,
-        color: '#64748B',
+        color: p.textSecondary,
         textAlign: 'center',
         paddingVertical: 24
     },
@@ -490,18 +492,18 @@ const styles = StyleSheet.create({
     serviceName: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#0F172A'
+        color: p.textPrimary
     },
     liveDot: {
         width: 7,
         height: 7,
         borderRadius: 4,
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         marginLeft: 8
     },
     serviceMeta: {
         fontSize: 12,
-        color: '#64748B'
+        color: p.textSecondary
     },
     scanFab: {
         position: 'absolute',
@@ -510,10 +512,10 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: '#00BCF2',
+        backgroundColor: p.blue,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#00BCF2',
+        shadowColor: p.blue,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.4,
         shadowRadius: 12,

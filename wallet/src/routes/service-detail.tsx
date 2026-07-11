@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Pressable, Alert, Linking, ScrollView, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { attributeLabel, ATTRIBUTE_MAP, getProfileValue } from '@/services/attributes';
 import * as fido2 from '@/services/fido2';
 import {
@@ -62,6 +62,8 @@ export default function ServiceDetailScreen() {
     const params = useLocalSearchParams<{ serviceKey?: string; rpId?: string }>();
     const serviceKey = params.serviceKey || params.rpId || '';
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
 
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
     const { removeCredential, credentials } = useAuthStore();
@@ -270,9 +272,9 @@ export default function ServiceDetailScreen() {
                                 {
                                     backgroundColor:
                                         teeType === 'sgx'
-                                            ? '#34E89E'
+                                            ? p.green
                                             : teeType === 'tdx'
-                                              ? '#00BCF2'
+                                              ? p.blue
                                               : '#8B5CF6'
                                 }
                             ]}
@@ -445,7 +447,7 @@ export default function ServiceDetailScreen() {
                             onPress={handleServerSignOut}
                             disabled={signingOut}
                         >
-                            <Ionicons name="log-out-outline" size={18} color="#0F766E" />
+                            <Ionicons name="log-out-outline" size={18} color={p.infoText} />
                             <Text style={styles.signOutButtonText}>
                                 {signingOut ? 'Signing out…' : 'Sign Out from Server'}
                             </Text>
@@ -458,7 +460,7 @@ export default function ServiceDetailScreen() {
                         onPress={handleRemove}
                         disabled={removing}
                     >
-                        <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+                        <Ionicons name="trash-outline" size={18} color={p.danger} />
                         <Text style={styles.removeButtonText}>Remove Service</Text>
                     </Pressable>
                 </ScrollView>
@@ -478,6 +480,8 @@ function TraceRow({
     expanded: boolean;
     onToggle: () => void;
 }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const shared = trace.sharedAttributes ?? [];
     const denied = trace.deniedAttributes ?? [];
     return (
@@ -496,7 +500,7 @@ function TraceRow({
                     <Ionicons
                         name={expanded ? 'chevron-up' : 'chevron-down'}
                         size={16}
-                        color="#94A3B8"
+                        color={p.textMuted}
                     />
                 </RNView>
             </Pressable>
@@ -542,7 +546,7 @@ function TraceRow({
                                     </RNView>
                                     {s.gov && (
                                         <RNView style={styles.verifiedBadge}>
-                                            <Ionicons name="shield-checkmark" size={12} color="#059669" />
+                                            <Ionicons name="shield-checkmark" size={12} color={p.infoText} />
                                             <Text style={styles.verifiedText}>Proof</Text>
                                         </RNView>
                                     )}
@@ -573,6 +577,8 @@ function TraceRow({
 }
 
 function SharedAttributeRow({ label, value, gov }: { label: string; value: string; gov: boolean }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <RNView style={styles.sharedRow}>
             <RNView style={styles.sharedInfo}>
@@ -583,7 +589,7 @@ function SharedAttributeRow({ label, value, gov }: { label: string; value: strin
             </RNView>
             {gov && (
                 <RNView style={styles.verifiedBadge}>
-                    <Ionicons name="shield-checkmark" size={12} color="#059669" />
+                    <Ionicons name="shield-checkmark" size={12} color={p.infoText} />
                     <Text style={styles.verifiedText}>Proof</Text>
                 </RNView>
             )}
@@ -603,25 +609,29 @@ function ReleaseLink({
     url: string;
     match?: boolean;
 }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <Pressable style={styles.detailRow} onPress={() => void Linking.openURL(url)}>
             <Text style={styles.detailLabel}>{label}</Text>
             <RNView style={styles.provValueWrap}>
                 {match === true ? (
-                    <Ionicons name="checkmark-circle" size={14} color="#059669" />
+                    <Ionicons name="checkmark-circle" size={14} color={p.infoText} />
                 ) : match === false ? (
-                    <Ionicons name="alert-circle" size={14} color="#DC2626" />
+                    <Ionicons name="alert-circle" size={14} color={p.danger} />
                 ) : null}
                 <Text style={styles.provLink} numberOfLines={1}>
                     {value}
                 </Text>
-                <Ionicons name="open-outline" size={13} color="#0F766E" />
+                <Ionicons name="open-outline" size={13} color={p.infoText} />
             </RNView>
         </Pressable>
     );
 }
 
 function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <RNView style={styles.detailRow}>
             <Text style={styles.detailLabel}>{label}</Text>
@@ -632,10 +642,10 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         paddingHorizontal: 16,
         paddingBottom: 16,
         flexDirection: 'row',
@@ -670,24 +680,24 @@ const styles = StyleSheet.create({
     serviceName: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#0F172A',
+        color: p.textPrimary,
         textAlign: 'center',
         marginBottom: 2
     },
     serviceOrigin: {
         fontSize: 12,
-        color: '#94A3B8',
+        color: p.textMuted,
         textAlign: 'center',
         fontFamily: 'Inter',
         marginBottom: 4
     },
-    serviceMeta: { fontSize: 13, color: '#64748B' },
+    serviceMeta: { fontSize: 13, color: p.textSecondary },
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 16,
         padding: 16,
         marginBottom: 24,
-        shadowColor: '#0F172A',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,
@@ -696,7 +706,7 @@ const styles = StyleSheet.create({
     cardTitle: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#64748B',
+        color: p.textSecondary,
         letterSpacing: 0.5,
         marginBottom: 12
     },
@@ -706,10 +716,10 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 12
     },
-    traceCount: { fontSize: 12, fontWeight: '700', color: '#94A3B8' },
+    traceCount: { fontSize: 12, fontWeight: '700', color: p.textMuted },
     traceRow: {
         borderTopWidth: 0.5,
-        borderTopColor: '#F1F5F9'
+        borderTopColor: p.cardAlt
     },
     traceHeader: {
         flexDirection: 'row',
@@ -718,26 +728,26 @@ const styles = StyleSheet.create({
         paddingVertical: 12
     },
     traceInfo: { flex: 1 },
-    traceKind: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
-    traceWhen: { fontSize: 12, color: '#94A3B8', marginTop: 1 },
+    traceKind: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+    traceWhen: { fontSize: 12, color: p.textMuted, marginTop: 1 },
     traceRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    traceShared: { fontSize: 12, fontWeight: '600', color: '#0F766E' },
+    traceShared: { fontSize: 12, fontWeight: '600', color: p.infoText },
     traceBody: { paddingBottom: 12 },
     traceAgent: {
         fontSize: 13,
-        color: '#B45309',
-        backgroundColor: '#FEF3C7',
+        color: p.warnText,
+        backgroundColor: p.warnBg,
         borderRadius: 8,
         paddingVertical: 8,
         paddingHorizontal: 10,
         marginBottom: 8
     },
-    traceDetail: { fontSize: 13, color: '#475569', marginBottom: 8 },
+    traceDetail: { fontSize: 13, color: p.textSecondary, marginBottom: 8 },
     sharedBlock: { marginTop: 8 },
     sharedBlockTitle: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#94A3B8',
+        color: p.textMuted,
         letterSpacing: 0.4,
         textTransform: 'uppercase',
         marginBottom: 4
@@ -747,7 +757,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: 'rgba(52, 232, 158, 0.12)',
+        backgroundColor: p.successBg,
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 10
@@ -756,12 +766,12 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#34E89E'
+        backgroundColor: p.green
     },
     sealedText: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#0F8A4A'
+        color: p.successText
     },
     sharedRow: {
         flexDirection: 'row',
@@ -769,65 +779,65 @@ const styles = StyleSheet.create({
         gap: 10,
         paddingVertical: 8,
         borderTopWidth: 0.5,
-        borderTopColor: '#F1F5F9'
+        borderTopColor: p.cardAlt
     },
     sharedInfo: { flex: 1 },
-    sharedLabel: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
-    sharedValue: { fontSize: 13, color: '#64748B', marginTop: 1 },
+    sharedLabel: { fontSize: 14, fontWeight: '600', color: p.textPrimary },
+    sharedValue: { fontSize: 13, color: p.textSecondary, marginTop: 1 },
     verifiedBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        backgroundColor: '#ECFDF5',
+        backgroundColor: p.infoBg,
         borderRadius: 8,
         paddingVertical: 4,
         paddingHorizontal: 8
     },
-    verifiedText: { fontSize: 11, fontWeight: '700', color: '#059669' },
+    verifiedText: { fontSize: 11, fontWeight: '700', color: p.infoText },
     detailRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         paddingVertical: 10,
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(0,0,0,0.06)'
+        borderBottomColor: p.border
     },
-    detailLabel: { fontSize: 13, color: '#64748B', flex: 1 },
-    detailValue: { fontSize: 13, color: '#0F172A', flex: 2, textAlign: 'right' },
+    detailLabel: { fontSize: 13, color: p.textSecondary, flex: 1 },
+    detailValue: { fontSize: 13, color: p.textPrimary, flex: 2, textAlign: 'right' },
     mono: { fontFamily: 'Inter' },
     provValueWrap: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 2, justifyContent: 'flex-end' },
-    provLink: { fontSize: 13, fontWeight: '600', color: '#0F766E', flexShrink: 1 },
-    provNote: { fontSize: 11, color: '#94A3B8', marginTop: 8 },
+    provLink: { fontSize: 13, fontWeight: '600', color: p.infoText, flexShrink: 1 },
+    provNote: { fontSize: 11, color: p.textMuted, marginTop: 8 },
     signOutButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         paddingVertical: 14,
         borderWidth: 1,
-        borderColor: '#0F766E',
+        borderColor: p.infoText,
         marginBottom: 12
     },
-    signOutButtonText: { fontSize: 16, fontWeight: '600', color: '#0F766E' },
+    signOutButtonText: { fontSize: 16, fontWeight: '600', color: p.infoText },
     removeButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         paddingVertical: 14,
         borderWidth: 1,
-        borderColor: '#FF3B30'
+        borderColor: p.danger
     },
     removeButtonDisabled: { opacity: 0.5 },
-    removeButtonText: { fontSize: 16, fontWeight: '600', color: '#FF3B30' },
-    notFound: { fontSize: 18, textAlign: 'center', marginTop: 100, color: '#64748B' },
+    removeButtonText: { fontSize: 16, fontWeight: '600', color: p.danger },
+    notFound: { fontSize: 18, textAlign: 'center', marginTop: 100, color: p.textSecondary },
     backButton: {
         alignSelf: 'center',
         marginTop: 20,
-        backgroundColor: '#007AFF',
+        backgroundColor: p.action,
         borderRadius: 12,
         paddingHorizontal: 24,
         paddingVertical: 12

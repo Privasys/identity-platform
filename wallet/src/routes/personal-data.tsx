@@ -14,7 +14,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -27,12 +27,14 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES } from '@/services/attributes';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
 export default function PersonalDataScreen() {
     const router = useRouter();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const { profile, updateProfile, setAttribute, updateAttributeValue, removeAttributeValue } = useProfileStore();
 
     const [addingAttribute, setAddingAttribute] = useState<string | null>(null);
@@ -137,7 +139,7 @@ export default function PersonalDataScreen() {
                 {/* Attribute cards */}
                 {profile.attributes.length === 0 ? (
                     <RNView style={styles.emptyCard}>
-                        <Ionicons name="document-text-outline" size={32} color="#C7C7CC" />
+                        <Ionicons name="document-text-outline" size={32} color={p.textMuted} />
                         <Text style={styles.emptyCardText}>
                             No attributes yet. Import from an account or add manually.
                         </Text>
@@ -178,7 +180,7 @@ export default function PersonalDataScreen() {
                             value={newAttrValue}
                             onChangeText={setNewAttrValue}
                             placeholder="Enter value..."
-                            placeholderTextColor="#94A3B8"
+                            placeholderTextColor={p.textMuted}
                             autoFocus
                             autoCapitalize={addingAttribute === 'email' ? 'none' : 'words'}
                             keyboardType={addingAttribute === 'email' ? 'email-address' : addingAttribute === 'phone_number' ? 'phone-pad' : 'default'}
@@ -205,7 +207,7 @@ export default function PersonalDataScreen() {
                                 style={styles.addAttrChip}
                                 onPress={() => handleAddAttribute(def.key)}
                             >
-                                <Ionicons name="add" size={14} color="#00BCF2" />
+                                <Ionicons name="add" size={14} color={p.blue} />
                                 <Text style={styles.addAttrChipText}>{def.label}</Text>
                             </Pressable>
                         ))}
@@ -214,7 +216,7 @@ export default function PersonalDataScreen() {
 
                 {/* Import — opens the dedicated Import Data subpage */}
                 <Pressable style={styles.importButton} onPress={() => router.push('/import' as never)}>
-                    <Ionicons name="cloud-download-outline" size={18} color="#00BCF2" />
+                    <Ionicons name="cloud-download-outline" size={18} color={p.blue} />
                     <Text style={styles.importButtonText}>Import data</Text>
                 </Pressable>
 
@@ -227,6 +229,8 @@ export default function PersonalDataScreen() {
 // ── Attribute card with provenance details ──────────────────────────────
 
 function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onRemove: () => void; onEdit: (newValue: string) => void }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const [expanded, setExpanded] = useState(false);
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(attr.value);
@@ -306,9 +310,9 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                             <Text style={styles.attributeLabel}>{attr.label}</Text>
                             {!editing && (
                                 expanded ? (
-                                    <Ionicons name="chevron-up" size={12} color="#94A3B8" />
+                                    <Ionicons name="chevron-up" size={12} color={p.textMuted} />
                                 ) : (
-                                    <Ionicons name="chevron-down" size={12} color="#94A3B8" />
+                                    <Ionicons name="chevron-down" size={12} color={p.textMuted} />
                                 )
                             )}
                         </RNView>
@@ -326,10 +330,10 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                                     returnKeyType="done"
                                 />
                                 <Pressable onPress={handleSaveEdit}>
-                                    <Ionicons name="checkmark-circle" size={24} color="#34E89E" />
+                                    <Ionicons name="checkmark-circle" size={24} color={p.green} />
                                 </Pressable>
                                 <Pressable onPress={() => setEditing(false)}>
-                                    <Ionicons name="close-circle" size={24} color="#94A3B8" />
+                                    <Ionicons name="close-circle" size={24} color={p.textMuted} />
                                 </Pressable>
                             </RNView>
                         ) : isImage && attr.value ? (
@@ -342,7 +346,7 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                                 <Text style={[styles.attributeValue, { flex: 1 }]} numberOfLines={2}>{attr.value}</Text>
                                 {!isImage && (
                                     <Pressable onPress={handleStartEdit} hitSlop={8}>
-                                        <Ionicons name="pencil-outline" size={16} color="#94A3B8" />
+                                        <Ionicons name="pencil-outline" size={16} color={p.textMuted} />
                                     </Pressable>
                                 )}
                             </RNView>
@@ -350,18 +354,18 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                         <RNView style={styles.attributeMeta}>
                             {attr.verified ? (
                                 <RNView style={styles.verifiedBadge}>
-                                    <Ionicons name="checkmark-circle" size={12} color="#34E89E" />
+                                    <Ionicons name="checkmark-circle" size={12} color={p.green} />
                                     <Text style={styles.verifiedText}>Verified</Text>
                                 </RNView>
                             ) : (
                                 <RNView style={styles.verifiedBadge}>
-                                    <Ionicons name="alert-circle-outline" size={12} color="#F59E0B" />
-                                    <Text style={[styles.verifiedText, { color: '#F59E0B' }]}>Unverified</Text>
+                                    <Ionicons name="alert-circle-outline" size={12} color={p.warnText} />
+                                    <Text style={[styles.verifiedText, { color: p.warnText }]}>Unverified</Text>
                                 </RNView>
                             )}
                             {confirmed ? (
                                 <RNView style={styles.confirmBadge}>
-                                    <Ionicons name="shield-checkmark" size={12} color="#00BCF2" />
+                                    <Ionicons name="shield-checkmark" size={12} color={p.blue} />
                                     <Text style={styles.confirmText}>
                                         Confirmed by {sources!.length} sources
                                     </Text>
@@ -438,15 +442,15 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingBottom: 14,
-        backgroundColor: '#0F172A',
+        backgroundColor: p.green,
     },
     backButton: { width: 32, alignItems: 'flex-start' },
     headerTitle: {
@@ -460,7 +464,7 @@ const styles = StyleSheet.create({
 
     sectionDescription: {
         fontSize: 13,
-        color: '#94A3B8',
+        color: p.textMuted,
         marginBottom: 12,
         lineHeight: 18,
     },
@@ -468,24 +472,24 @@ const styles = StyleSheet.create({
     emptyCard: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 24,
         gap: 8,
     },
-    emptyCardText: { fontSize: 14, color: '#C7C7CC', textAlign: 'center' },
+    emptyCardText: { fontSize: 14, color: p.textMuted, textAlign: 'center' },
 
     attributeRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 8,
     },
     attributeInfo: { flex: 1 },
-    attributeLabel: { fontSize: 12, fontWeight: '600', color: '#94A3B8', marginBottom: 2 },
-    attributeValue: { fontSize: 16, color: '#0F172A', marginBottom: 4 },
+    attributeLabel: { fontSize: 12, fontWeight: '600', color: p.textMuted, marginBottom: 2 },
+    attributeValue: { fontSize: 16, color: p.textPrimary, marginBottom: 4 },
     attributeAvatar: {
         width: 48,
         height: 48,
@@ -494,10 +498,10 @@ const styles = StyleSheet.create({
     },
     attributeMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    verifiedText: { fontSize: 11, color: '#34E89E', fontWeight: '600' },
-    sourceText: { fontSize: 11, color: '#94A3B8' },
+    verifiedText: { fontSize: 11, color: p.green, fontWeight: '600' },
+    sourceText: { fontSize: 11, color: p.textMuted },
     confirmBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    confirmText: { fontSize: 11, color: '#00BCF2', fontWeight: '600' },
+    confirmText: { fontSize: 11, color: p.blue, fontWeight: '600' },
 
     inlineEditRow: {
         flexDirection: 'row',
@@ -507,19 +511,19 @@ const styles = StyleSheet.create({
     },
     inlineEditInput: {
         flex: 1,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderRadius: 8,
         paddingHorizontal: 12,
         paddingVertical: 8,
         fontSize: 16,
-        color: '#0F172A',
+        color: p.textPrimary,
     },
 
     provenanceSection: {
         marginTop: 8,
         paddingTop: 8,
         borderTopWidth: 0.5,
-        borderTopColor: '#F1F5F9',
+        borderTopColor: p.cardAlt,
     },
     provenanceRow: {
         flexDirection: 'row',
@@ -529,16 +533,16 @@ const styles = StyleSheet.create({
     provenanceLabel: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: p.textMuted,
         textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
     provenanceValue: {
         fontSize: 12,
-        color: '#64748B',
+        color: p.textSecondary,
     },
     verificationCard: {
-        backgroundColor: '#F8FAFB',
+        backgroundColor: p.screenBg,
         borderRadius: 8,
         padding: 8,
         marginBottom: 4,
@@ -555,27 +559,27 @@ const styles = StyleSheet.create({
     },
     addAttrHint: {
         fontSize: 13,
-        color: '#94A3B8',
+        color: p.textMuted,
         fontWeight: '500',
     },
     addAttrChip: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 20,
         paddingVertical: 6,
         paddingHorizontal: 12,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: p.border,
     },
     addAttrChipText: {
         fontSize: 13,
-        color: '#00BCF2',
+        color: p.blue,
         fontWeight: '500',
     },
     addAttrCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 8,
@@ -583,16 +587,16 @@ const styles = StyleSheet.create({
     addAttrLabel: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: p.textMuted,
         marginBottom: 8,
     },
     addAttrInput: {
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderRadius: 8,
         paddingHorizontal: 12,
         paddingVertical: 10,
         fontSize: 16,
-        color: '#0F172A',
+        color: p.textPrimary,
         marginBottom: 12,
     },
     addAttrActions: {
@@ -603,11 +607,11 @@ const styles = StyleSheet.create({
     },
     addAttrCancel: {
         fontSize: 14,
-        color: '#94A3B8',
+        color: p.textMuted,
         fontWeight: '500',
     },
     addAttrSave: {
-        backgroundColor: '#00BCF2',
+        backgroundColor: p.blue,
         borderRadius: 8,
         paddingVertical: 8,
         paddingHorizontal: 20,
@@ -624,20 +628,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#00BCF2',
+        borderColor: p.blue,
         padding: 14,
         marginTop: 8,
     },
     importButtonText: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#00BCF2',
+        color: p.blue,
     },
     importPickerCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginTop: 8,
@@ -645,12 +649,12 @@ const styles = StyleSheet.create({
     importPickerTitle: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#0F172A',
+        color: p.textPrimary,
         marginBottom: 4,
     },
     importPickerSubtitle: {
         fontSize: 13,
-        color: '#94A3B8',
+        color: p.textMuted,
         marginBottom: 12,
         lineHeight: 18,
     },
@@ -658,13 +662,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 14,
-        backgroundColor: '#F8FAFB',
+        backgroundColor: p.screenBg,
         borderRadius: 12,
         padding: 14,
         marginBottom: 8,
     },
     providerInfo: { flex: 1 },
-    providerName: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
+    providerName: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
     importPickerCancel: {
         alignItems: 'center',
         paddingVertical: 10,
@@ -672,12 +676,12 @@ const styles = StyleSheet.create({
     },
     importPickerCancelText: {
         fontSize: 14,
-        color: '#94A3B8',
+        color: p.textMuted,
         fontWeight: '500',
     },
 
     swipeDeleteAction: {
-        backgroundColor: '#FF3B30',
+        backgroundColor: p.danger,
         justifyContent: 'center',
         alignItems: 'center',
         width: 80,

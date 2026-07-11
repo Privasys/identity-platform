@@ -13,16 +13,18 @@ import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter, Stack } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text, View } from '@/components/Themed';
+import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { buildLogExport, clearLogs, formatLogs, getLogs } from '@/utils/logs';
 
 export default function LogsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const [refreshKey, setRefreshKey] = useState(0);
     const entries = getLogs();
     const text = formatLogs(entries);
@@ -80,15 +82,15 @@ export default function LogsScreen() {
 
             <RNView style={styles.actionsRow}>
                 <Pressable style={styles.actionButton} onPress={onCopy}>
-                    <Ionicons name="copy-outline" size={16} color="#0F172A" />
+                    <Ionicons name="copy-outline" size={16} color={p.textPrimary} />
                     <Text style={styles.actionText}>Copy</Text>
                 </Pressable>
                 <Pressable style={styles.actionButton} onPress={onExport}>
-                    <Ionicons name="share-outline" size={16} color="#0F172A" />
+                    <Ionicons name="share-outline" size={16} color={p.textPrimary} />
                     <Text style={styles.actionText}>Export</Text>
                 </Pressable>
                 <Pressable style={[styles.actionButton, styles.actionButtonDanger]} onPress={onClear}>
-                    <Ionicons name="trash-outline" size={16} color="#FF3B30" />
+                    <Ionicons name="trash-outline" size={16} color={p.danger} />
                     <Text style={[styles.actionText, styles.actionTextDanger]}>Clear</Text>
                 </Pressable>
             </RNView>
@@ -100,7 +102,7 @@ export default function LogsScreen() {
             >
                 {entries.length === 0 ? (
                     <View style={styles.emptyCard}>
-                        <Ionicons name="document-text-outline" size={32} color="#C7C7CC" />
+                        <Ionicons name="document-text-outline" size={32} color={p.textMuted} />
                         <Text style={styles.emptyText}>No log entries yet</Text>
                     </View>
                 ) : (
@@ -113,10 +115,10 @@ export default function LogsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         paddingHorizontal: 24,
         paddingBottom: 20,
         borderBottomLeftRadius: 28,
@@ -139,28 +141,28 @@ const styles = StyleSheet.create({
         gap: 6,
         paddingVertical: 10,
         borderRadius: 10,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: p.border,
     },
-    actionButtonDanger: { borderColor: '#FECACA' },
-    actionText: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
-    actionTextDanger: { color: '#FF3B30' },
+    actionButtonDanger: { borderColor: p.dangerBorder },
+    actionText: { fontSize: 14, fontWeight: '600', color: p.textPrimary },
+    actionTextDanger: { color: p.danger },
     scroll: { flex: 1 },
     content: { padding: 16, paddingBottom: 40 },
     emptyCard: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 32,
         gap: 8,
     },
-    emptyText: { fontSize: 14, color: '#C7C7CC' },
+    emptyText: { fontSize: 14, color: p.textMuted },
     logText: {
         fontSize: 11,
         fontFamily: 'SpaceMono',
-        color: '#0F172A',
+        color: p.textPrimary,
         lineHeight: 16,
     },
 });

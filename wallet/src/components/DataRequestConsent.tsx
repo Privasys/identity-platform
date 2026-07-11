@@ -12,7 +12,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -21,7 +21,7 @@ import {
     View as RNView,
 } from 'react-native';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 
 export interface ConsentDataItem {
     key: string;
@@ -94,6 +94,8 @@ export function DataRequestConsent({
     actionsBottomInset?: number;
     contentTopInset?: number;
 }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const [showMeasurement, setShowMeasurement] = useState(false);
     const showDetails = !expandable || showMeasurement;
     return (
@@ -106,13 +108,13 @@ export function DataRequestConsent({
                 {/* App identity */}
                 <RNView style={styles.appCard}>
                     <RNView style={styles.appIcon}>
-                        <Ionicons name={appIcon} size={28} color="#FFFFFF" />
+                        <Ionicons name={appIcon} size={28} color={p.card} />
                     </RNView>
                     <Text style={styles.appName}>{appName}</Text>
                     <Text style={styles.appOrigin}>{origin}</Text>
                     {purpose ? (
                         <RNView style={styles.purposeContainer}>
-                            <Ionicons name="chatbubble-outline" size={14} color="#64748B" />
+                            <Ionicons name="chatbubble-outline" size={14} color={p.textSecondary} />
                             <Text style={styles.purposeText}>{purpose}</Text>
                         </RNView>
                     ) : null}
@@ -127,7 +129,7 @@ export function DataRequestConsent({
                     >
                         <RNView style={styles.attestationHeader}>
                             <RNView style={styles.attestationBadge}>
-                                <Ionicons name="shield-checkmark" size={16} color="#34E89E" />
+                                <Ionicons name="shield-checkmark" size={16} color={p.green} />
                                 <Text style={styles.attestationLabel}>
                                     Attested · {teeLabel(attestation.teeType)}
                                 </Text>
@@ -136,7 +138,7 @@ export function DataRequestConsent({
                                 <Ionicons
                                     name={showMeasurement ? 'chevron-up' : 'chevron-down'}
                                     size={18}
-                                    color="#94A3B8"
+                                    color={p.textMuted}
                                 />
                             ) : null}
                         </RNView>
@@ -168,7 +170,7 @@ export function DataRequestConsent({
                 {items.map((item) => (
                     <RNView key={item.key} style={styles.attributeRow}>
                         {item.toggle ? null : item.icon ? (
-                            <Ionicons name={item.icon} size={20} color="#0F172A" style={styles.itemIcon} />
+                            <Ionicons name={item.icon} size={20} color={p.textPrimary} style={styles.itemIcon} />
                         ) : null}
                         <RNView style={styles.attributeInfo}>
                             <Text style={styles.attributeLabel}>{item.label}</Text>
@@ -183,7 +185,7 @@ export function DataRequestConsent({
                                 value={item.toggle.value}
                                 onValueChange={item.toggle.onChange}
                                 disabled={item.toggle.disabled}
-                                trackColor={{ false: '#E2E8F0', true: '#34E89E' }}
+                                trackColor={{ false: p.border, true: p.green }}
                                 thumbColor="#FFFFFF"
                             />
                         ) : null}
@@ -202,7 +204,7 @@ export function DataRequestConsent({
                         <Switch
                             value={persistent.value}
                             onValueChange={persistent.onChange}
-                            trackColor={{ false: '#E2E8F0', true: '#00BCF2' }}
+                            trackColor={{ false: p.border, true: p.blue }}
                             thumbColor="#FFFFFF"
                         />
                     </RNView>
@@ -235,62 +237,62 @@ export function DataRequestConsent({
     );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (p: Palette) => StyleSheet.create({
     flex: { flex: 1 },
     scrollContent: { padding: 20 },
 
-    appCard: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 24, marginBottom: 12 },
+    appCard: { alignItems: 'center', backgroundColor: p.card, borderRadius: 16, padding: 24, marginBottom: 12 },
     appIcon: {
-        width: 56, height: 56, borderRadius: 28, backgroundColor: '#0F172A',
+        width: 56, height: 56, borderRadius: 28, backgroundColor: p.textPrimary,
         alignItems: 'center', justifyContent: 'center', marginBottom: 12,
     },
-    appName: { fontSize: 20, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
-    appOrigin: { fontSize: 13, color: '#64748B', marginBottom: 8 },
+    appName: { fontSize: 20, fontWeight: '700', color: p.textPrimary, marginBottom: 4 },
+    appOrigin: { fontSize: 13, color: p.textSecondary, marginBottom: 8 },
     purposeContainer: {
-        flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F1F5F9',
+        flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: p.cardAlt,
         borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12,
     },
-    purposeText: { fontSize: 13, color: '#64748B', flex: 1, lineHeight: 18 },
+    purposeText: { fontSize: 13, color: p.textSecondary, flex: 1, lineHeight: 18 },
 
-    attestationCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 20 },
+    attestationCard: { backgroundColor: p.card, borderRadius: 12, padding: 14, marginBottom: 20 },
     attestationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     attestationBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    attestationLabel: { fontSize: 14, fontWeight: '600', color: '#34E89E' },
-    measurementDetails: { marginTop: 12, paddingTop: 12, borderTopWidth: 0.5, borderTopColor: '#F1F5F9' },
-    measurementLabel: { fontSize: 11, fontWeight: '600', color: '#94A3B8', letterSpacing: 0.5, marginBottom: 4, marginTop: 8 },
-    measurementValue: { fontSize: 11, fontFamily: 'Inter', color: '#64748B', lineHeight: 16 },
+    attestationLabel: { fontSize: 14, fontWeight: '600', color: p.green },
+    measurementDetails: { marginTop: 12, paddingTop: 12, borderTopWidth: 0.5, borderTopColor: p.cardAlt },
+    measurementLabel: { fontSize: 11, fontWeight: '600', color: p.textMuted, letterSpacing: 0.5, marginBottom: 4, marginTop: 8 },
+    measurementValue: { fontSize: 11, fontFamily: 'Inter', color: p.textSecondary, lineHeight: 16 },
 
-    sectionTitle: { fontSize: 12, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.8, marginBottom: 6 },
-    sectionDescription: { fontSize: 13, color: '#94A3B8', marginBottom: 12, lineHeight: 18 },
+    sectionTitle: { fontSize: 12, fontWeight: '700', color: p.textMuted, letterSpacing: 0.8, marginBottom: 6 },
+    sectionDescription: { fontSize: 13, color: p.textMuted, marginBottom: 12, lineHeight: 18 },
 
     attributeRow: {
-        flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
+        flexDirection: 'row', alignItems: 'center', backgroundColor: p.card,
         borderRadius: 12, padding: 16, marginBottom: 8, gap: 12,
     },
     itemIcon: { width: 22 },
     attributeInfo: { flex: 1 },
-    attributeLabel: { fontSize: 15, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
-    attributeValue: { fontSize: 13, color: '#64748B' },
-    attributeMissing: { fontSize: 13, color: '#FF9500', fontStyle: 'italic' },
+    attributeLabel: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
+    attributeValue: { fontSize: 13, color: p.textSecondary },
+    attributeMissing: { fontSize: 13, color: p.warnText, fontStyle: 'italic' },
 
     persistentRow: {
-        flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
+        flexDirection: 'row', alignItems: 'center', backgroundColor: p.card,
         borderRadius: 12, padding: 16, marginTop: 16,
     },
     persistentInfo: { flex: 1, marginRight: 12 },
-    persistentLabel: { fontSize: 15, fontWeight: '600', color: '#0F172A', marginBottom: 4 },
-    persistentHint: { fontSize: 12, color: '#94A3B8', lineHeight: 17 },
+    persistentLabel: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 4 },
+    persistentHint: { fontSize: 12, color: p.textMuted, lineHeight: 17 },
 
-    note: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginTop: 16, lineHeight: 18 },
+    note: { fontSize: 13, color: p.textMuted, textAlign: 'center', marginTop: 16, lineHeight: 18 },
 
     actions: {
         flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16,
-        backgroundColor: '#FFFFFF', borderTopWidth: 0.5, borderTopColor: '#E2E8F0',
+        backgroundColor: p.card, borderTopWidth: 0.5, borderTopColor: p.border,
     },
-    denyButton: { flex: 1, height: 50, borderRadius: 14, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-    denyButtonText: { fontSize: 16, fontWeight: '700', color: '#64748B' },
+    denyButton: { flex: 1, height: 50, borderRadius: 14, backgroundColor: p.cardAlt, alignItems: 'center', justifyContent: 'center' },
+    denyButtonText: { fontSize: 16, fontWeight: '700', color: p.textSecondary },
     approveButton: {
-        flex: 2, height: 50, borderRadius: 14, backgroundColor: '#34E89E',
+        flex: 2, height: 50, borderRadius: 14, backgroundColor: p.green,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     },
     approveButtonText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },

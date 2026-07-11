@@ -10,11 +10,11 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { ensureDrive, type DriveNode } from '@/services/drive';
 
 function formatSize(bytes: number): string {
@@ -25,6 +25,8 @@ function formatSize(bytes: number): string {
 }
 
 export default function DriveScreen() {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const insets = useSafeAreaInsets();
     const [nodes, setNodes] = useState<DriveNode[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -63,10 +65,10 @@ export default function DriveScreen() {
 
             <RNView style={styles.content}>
                 {loading ? (
-                    <ActivityIndicator style={styles.spinner} size="large" color="#00BCF2" />
+                    <ActivityIndicator style={styles.spinner} size="large" color={p.blue} />
                 ) : error ? (
                     <RNView style={styles.emptyState}>
-                        <Ionicons name="cloud-offline-outline" size={44} color="#94A3B8" />
+                        <Ionicons name="cloud-offline-outline" size={44} color={p.textMuted} />
                         <Text style={styles.emptyText}>{error}</Text>
                         <Pressable style={styles.retry} onPress={() => void load()}>
                             <Text style={styles.retryText}>Try again</Text>
@@ -74,7 +76,7 @@ export default function DriveScreen() {
                     </RNView>
                 ) : nodes && nodes.length === 0 ? (
                     <RNView style={styles.emptyState}>
-                        <Ionicons name="folder-open-outline" size={44} color="#94A3B8" />
+                        <Ionicons name="folder-open-outline" size={44} color={p.textMuted} />
                         <Text style={styles.emptyText}>Your drive is empty.</Text>
                     </RNView>
                 ) : (
@@ -87,7 +89,7 @@ export default function DriveScreen() {
                                 <RNView
                                     style={[
                                         styles.icon,
-                                        { backgroundColor: n.kind === 'folder' ? '#00BCF2' : '#8B5CF6' }
+                                        { backgroundColor: n.kind === 'folder' ? p.blue : '#8B5CF6' }
                                     ]}
                                 >
                                     <Ionicons
@@ -113,10 +115,10 @@ export default function DriveScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         paddingHorizontal: 24,
         paddingBottom: 32,
         borderBottomLeftRadius: 28,
@@ -128,10 +130,10 @@ const styles = StyleSheet.create({
     spinner: { marginTop: 60 },
     list: { padding: 20, paddingTop: 24, paddingBottom: 96 },
     emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 12 },
-    emptyText: { fontSize: 15, textAlign: 'center', color: '#64748B', lineHeight: 22 },
+    emptyText: { fontSize: 15, textAlign: 'center', color: p.textSecondary, lineHeight: 22 },
     retry: {
         marginTop: 8,
-        backgroundColor: '#00BCF2',
+        backgroundColor: p.blue,
         borderRadius: 12,
         paddingHorizontal: 20,
         paddingVertical: 10
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
     card: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 16,
         padding: 16,
         marginBottom: 10,
@@ -159,6 +161,6 @@ const styles = StyleSheet.create({
         marginRight: 14
     },
     info: { flex: 1 },
-    name: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
-    meta: { fontSize: 12, color: '#64748B', marginTop: 2 }
+    name: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
+    meta: { fontSize: 12, color: p.textSecondary, marginTop: 2 }
 });

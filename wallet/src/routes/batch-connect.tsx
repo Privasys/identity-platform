@@ -15,10 +15,10 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import * as Crypto from 'expo-crypto';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { StyleSheet, Pressable, ActivityIndicator, ScrollView, FlatList } from 'react-native';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Alert, StyleSheet, Pressable, ActivityIndicator, ScrollView, FlatList } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
+import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, attestEnclave } from '@/services/attestation';
@@ -56,12 +56,18 @@ interface AppEntry {
     isChanged: boolean;
     status: 'pending' | 'verified' | 'failed' | 'authenticated' | 'relayed';
     error?: string;
+    /** A fresh challenge-mode verification succeeded for this entry. */
+    challenged?: boolean;
+    /** A challenge re-verification is in flight for this entry. */
+    challenging?: boolean;
 }
 
 export default function BatchConnectScreen() {
     const router = useRouter();
     const params = useLocalSearchParams<{ payload?: string }>();
     const pushToken = useExpoPushToken();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
 
     const { addCredential, getCredentialForRp, checkUnlocked, setUnlocked } = useAuthStore();
     const { getApp, isAttestationMatch, addOrUpdate: addTrustedApp } = useTrustedAppsStore();
@@ -365,6 +371,44 @@ export default function BatchConnectScreen() {
         router.replace('/(tabs)');
     };
 
+    /**
+     * Per-row "challenge this enclave": force a fresh challenge-mode
+     * re-verification of one entry (fresh random nonce + TLS channel binder)
+     * without re-running the whole batch. A definite failure marks the row
+     * failed so Approve All won't silently include it.
+     */
+    const handleChallengeApp = useCallback(async (rpId: string) => {
+        const patch = (fields: Partial<AppEntry>) =>
+            setApps((prev) => prev.map((a) => (a.rpId === rpId ? { ...a, ...fields } : a)));
+        patch({ challenging: true });
+        try {
+            const entry = apps.find((a) => a.rpId === rpId);
+            const token = await getAttestationServerToken();
+            const outcome = await attestEnclave(rpId, {
+                tee: entry?.attestation?.tee_type ?? 'sgx',
+                mode: 'challenge',
+                attestationServerToken: token,
+            });
+            if (outcome.status === 'verified' && outcome.result) {
+                patch({ attestation: outcome.result, challenged: true, challenging: false });
+            } else if (outcome.status === 'error' || outcome.status === 'unreachable') {
+                // No verdict — keep the row's prior state, just report.
+                patch({ challenging: false });
+                Alert.alert('Challenge failed', outcome.message ?? 'Could not verify the enclave.');
+            } else {
+                // Definite bad verdict: exclude from approval.
+                patch({
+                    challenging: false,
+                    status: 'failed',
+                    error: `Challenge failed: ${outcome.message ?? 'attestation invalid'}`,
+                });
+            }
+        } catch (e: any) {
+            patch({ challenging: false });
+            Alert.alert('Challenge failed', e?.message ?? 'Could not verify the enclave.');
+        }
+    }, [apps]);
+
     const renderAppItem = ({ item }: { item: AppEntry }) => (
         <View style={styles.appItem}>
             <View style={styles.appRow}>
@@ -381,9 +425,29 @@ export default function BatchConnectScreen() {
             </View>
             {item.error && <Text style={styles.appError}>{item.error}</Text>}
             {item.attestation && item.status === 'verified' && (
-                <Text style={styles.appDetail}>
-                    {item.attestation.tee_type?.toUpperCase()} — {item.attestation.valid ? 'Valid' : 'Invalid'}
-                </Text>
+                <View style={styles.appDetailRow}>
+                    <Text style={styles.appDetail}>
+                        {item.attestation.tee_type?.toUpperCase()} — {item.attestation.valid ? 'Valid' : 'Invalid'}
+                        {item.challenged ? '  ·  ⚡ Challenged' : ''}
+                    </Text>
+                    {/* Enclave rows only (non-enclave RPs have nothing to
+                        challenge); already-challenged rows have proven
+                        liveness for this session. */}
+                    {!!(item.attestation.mrenclave || item.attestation.mrtd) && !item.challenged && (
+                        <Pressable
+                            style={styles.challengeChip}
+                            onPress={() => handleChallengeApp(item.rpId)}
+                            disabled={item.challenging}
+                            hitSlop={8}
+                        >
+                            {item.challenging ? (
+                                <ActivityIndicator size="small" color={p.infoText} />
+                            ) : (
+                                <Text style={styles.challengeChipText}>⚡ Challenge</Text>
+                            )}
+                        </Pressable>
+                    )}
+                </View>
             )}
         </View>
     );
@@ -394,7 +458,7 @@ export default function BatchConnectScreen() {
             <View style={styles.container}>
                 {step === 'verifying' && (
                     <View style={styles.centered}>
-                        <ActivityIndicator size="large" color="#007AFF" />
+                        <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.statusText}>
                             Verifying {apps.length} enclaves...
                         </Text>
@@ -429,7 +493,7 @@ export default function BatchConnectScreen() {
 
                 {(step === 'biometric' || step === 'authenticating' || step === 'relaying') && (
                     <View style={styles.centered}>
-                        <ActivityIndicator size="large" color="#007AFF" />
+                        <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.statusText}>
                             {step === 'biometric' && 'Waiting for biometrics...'}
                             {step === 'authenticating' && 'Authenticating...'}
@@ -477,7 +541,7 @@ export default function BatchConnectScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (p: Palette) => StyleSheet.create({
     container: { flex: 1 },
     centered: {
         flex: 1,
@@ -489,17 +553,17 @@ const styles = StyleSheet.create({
     title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
     subtitle: { fontSize: 16, textAlign: 'center', opacity: 0.7, marginBottom: 20 },
     statusText: { fontSize: 16, marginTop: 16, opacity: 0.7, textAlign: 'center' },
-    checkmark: { fontSize: 64, color: '#34C759', marginBottom: 16 },
-    errorIcon: { fontSize: 64, color: '#FF3B30', marginBottom: 16 },
+    checkmark: { fontSize: 64, color: p.approve, marginBottom: 16 },
+    errorIcon: { fontSize: 64, color: p.danger, marginBottom: 16 },
     errorText: {
         fontSize: 14,
-        color: '#FF3B30',
+        color: p.danger,
         textAlign: 'center',
         marginBottom: 20,
     },
     appList: { width: '100%', marginBottom: 20 },
     appItem: {
-        backgroundColor: 'rgba(128,128,128,0.08)',
+        backgroundColor: p.cardAlt,
         borderRadius: 10,
         padding: 14,
         marginBottom: 8,
@@ -513,11 +577,27 @@ const styles = StyleSheet.create({
     appName: { fontSize: 15, fontWeight: '600', flex: 1 },
     appStatus: { fontSize: 13, opacity: 0.7, marginLeft: 8 },
     appDetail: { fontSize: 12, opacity: 0.5, marginTop: 4 },
-    appError: { fontSize: 12, color: '#FF3B30', marginTop: 4 },
+    appDetailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'transparent',
+    },
+    challengeChip: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        backgroundColor: p.infoBg,
+        borderWidth: 1,
+        borderColor: p.infoBorder,
+        marginTop: 4,
+    },
+    challengeChipText: { fontSize: 11, fontWeight: '600', color: p.infoText },
+    appError: { fontSize: 12, color: p.danger, marginTop: 4 },
     buttonRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
     approveButton: {
         flex: 1,
-        backgroundColor: '#34C759',
+        backgroundColor: p.approve,
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: 'center',
@@ -525,14 +605,14 @@ const styles = StyleSheet.create({
     approveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
     rejectButton: {
         flex: 1,
-        backgroundColor: 'rgba(128,128,128,0.2)',
+        backgroundColor: p.buttonNeutral,
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: 'center',
     },
     rejectButtonText: { fontSize: 17, fontWeight: '600' },
     secondaryButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: p.action,
         borderRadius: 12,
         paddingHorizontal: 32,
         paddingVertical: 14,

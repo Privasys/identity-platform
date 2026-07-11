@@ -4,6 +4,8 @@ import { ActivityIndicator, View, Text } from 'react-native';
 
 import { fetchDescriptor, DEFAULT_RELAY_HOST } from '@/services/descriptor';
 
+import { usePalette } from '@/components/Themed';
+
 /**
  * Universal link handler for QR deep links.
  *
@@ -28,6 +30,7 @@ export default function ScpRedirect() {
         r?: string;
     }>();
     const router = useRouter();
+    const palette = usePalette();
 
     // Short-form: fetch descriptor from relay, verify, then route
     const isShort = !!(v && s && h);
@@ -90,17 +93,17 @@ export default function ScpRedirect() {
         if (shortError) {
             return (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-                    <Text style={{ fontSize: 16, color: '#c00', textAlign: 'center', marginBottom: 12 }}>
+                    <Text style={{ fontSize: 16, color: palette.danger, textAlign: 'center', marginBottom: 12 }}>
                         Sign-in failed
                     </Text>
-                    <Text style={{ fontSize: 14, color: '#444', textAlign: 'center' }}>{shortError}</Text>
+                    <Text style={{ fontSize: 14, color: palette.textSecondary, textAlign: 'center' }}>{shortError}</Text>
                 </View>
             );
         }
         return (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator size="large" color="#007AFF" />
-                <Text style={{ marginTop: 16, color: '#666' }}>Loading sign-in request…</Text>
+                <ActivityIndicator size="large" color={palette.action} />
+                <Text style={{ marginTop: 16, color: palette.textSecondary }}>Loading sign-in request…</Text>
             </View>
         );
     }

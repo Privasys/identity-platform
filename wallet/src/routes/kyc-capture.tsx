@@ -16,14 +16,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View as NativeView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AttestationView } from '@/components/AttestationView';
 import { DataRequestConsent } from '@/components/DataRequestConsent';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
-import { Text, View } from '@/components/Themed';
+import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { getProfileValue, setProfileValue } from '@/services/attributes';
 import { appIdFromOids } from '@/services/release-provenance';
 import {
@@ -104,6 +104,8 @@ async function cropDocToFrame(
 export default function KycCaptureScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const [step, setStep] = useState<Step>('doctype');
     const [docType, setDocType] = useState<DocType>('passport');
     const [support, setSupport] = useState<Emrtd.EmrtdSupport | null>(null);
@@ -217,6 +219,26 @@ export default function KycCaptureScreen() {
             });
         return () => { cancelled = true; };
     }, [step, attRetry]);
+
+    /**
+     * "Challenge this enclave" on the Verify Enclave step: re-attest the
+     * verifier in challenge mode (fresh random nonce + TLS channel binder) so
+     * the holder gets a liveness proof bound to this exact session before any
+     * document data is captured. A failed challenge keeps the prior view.
+     */
+    const [challengeInFlight, setChallengeInFlight] = useState(false);
+    const handleChallengeVerifier = async () => {
+        setChallengeInFlight(true);
+        try {
+            const res = await attestVerifier('challenge');
+            setVerifierAtt(res);
+        } catch (e: any) {
+            console.warn('[KYC] challenge failed:', e?.message);
+            Alert.alert('Challenge failed', e?.message ?? 'Could not verify the enclave.');
+        } finally {
+            setChallengeInFlight(false);
+        }
+    };
 
     const close = () => {
         if (router.canGoBack()) router.back();
@@ -521,7 +543,7 @@ export default function KycCaptureScreen() {
         >
             <Stack.Screen options={{ orientation: step === 'capture' ? 'landscape' : 'portrait' }} />
             <Pressable style={[styles.close, { top: insets.top + 12 }]} onPress={close} hitSlop={12}>
-                <Ionicons name="close" size={26} color="#8E8E93" />
+                <Ionicons name="close" size={26} color={p.textMuted} />
             </Pressable>
 
             {step === 'doctype' && (
@@ -530,7 +552,7 @@ export default function KycCaptureScreen() {
                     contentContainerStyle={styles.padContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <Ionicons name="id-card-outline" size={40} color="#007AFF" />
+                    <Ionicons name="id-card-outline" size={40} color={p.action} />
                     <Text style={styles.title}>What are you verifying?</Text>
                     <Text style={styles.body}>
                         Pick the document with an NFC chip. We read it in a secure enclave, on device.
@@ -540,31 +562,31 @@ export default function KycCaptureScreen() {
                         style={styles.docOption}
                         onPress={() => { setDocType('passport'); setStep('consent'); }}
                     >
-                        <Ionicons name="airplane-outline" size={22} color="#007AFF" />
+                        <Ionicons name="airplane-outline" size={22} color={p.action} />
                         <View style={styles.docOptionBody}>
                             <Text style={styles.docOptionTitle}>Passport</Text>
                             <Text style={styles.docOptionSub}>Any country&apos;s biometric passport</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </Pressable>
 
                     <Pressable
                         style={styles.docOption}
                         onPress={() => { setDocType('id-card'); setStep('consent'); }}
                     >
-                        <Ionicons name="card-outline" size={22} color="#007AFF" />
+                        <Ionicons name="card-outline" size={22} color={p.action} />
                         <View style={styles.docOptionBody}>
                             <Text style={styles.docOptionTitle}>National ID card</Text>
                             <Text style={styles.docOptionSub}>Biometric (eMRTD) ID cards</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </Pressable>
 
                     <Text style={styles.note}>
                         Driving licences don&apos;t carry an NFC identity chip and can&apos;t be verified this way.
                     </Text>
                     {support && !support.supported && (
-                        <Text style={[styles.note, { color: '#F59E0B' }]}>
+                        <Text style={[styles.note, { color: p.warnText }]}>
                             NFC is unavailable on this device{support.reason ? ` (${support.reason})` : ''}, so the chip can&apos;t be read.
                         </Text>
                     )}
@@ -592,7 +614,7 @@ export default function KycCaptureScreen() {
             {step === 'attest' && (
                 attError ? (
                     <View style={styles.pad}>
-                        <Ionicons name="alert-circle" size={40} color="#DC2626" />
+                        <Ionicons name="alert-circle" size={40} color={p.danger} />
                         <Text style={styles.title}>Couldn&apos;t verify the enclave</Text>
                         <Text style={styles.body}>{attError}</Text>
                         <Pressable style={styles.primary} onPress={() => setAttRetry((n) => n + 1)}>
@@ -604,7 +626,7 @@ export default function KycCaptureScreen() {
                     </View>
                 ) : !verifierAtt ? (
                     <View style={styles.pad}>
-                        <ActivityIndicator size="large" color="#007AFF" />
+                        <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.body}>Verifying the enclave…</Text>
                     </View>
                 ) : (
@@ -614,8 +636,15 @@ export default function KycCaptureScreen() {
                         displayName={verifierAtt.displayName}
                         isChanged={false}
                         verificationLevel="fresh-as-verified"
+                        verification={{
+                            status: 'verified',
+                            mode: verifierAtt.mode,
+                            challenged: verifierAtt.challenged,
+                        }}
                         onApprove={openCapture}
                         onReject={close}
+                        onChallenge={handleChallengeVerifier}
+                        challengeInFlight={challengeInFlight}
                     />
                 )
             )}
@@ -700,7 +729,7 @@ export default function KycCaptureScreen() {
                 <View style={styles.pad}>
                     {!mrzReadDone ? (
                         <>
-                            <ActivityIndicator size="large" color="#007AFF" />
+                            <ActivityIndicator size="large" color={p.action} />
                             <Text style={styles.body}>Reading the photo page securely…</Text>
                             <Pressable style={styles.secondary} onPress={openCapture}>
                                 <Text style={styles.secondaryText}>Cancel</Text>
@@ -708,7 +737,7 @@ export default function KycCaptureScreen() {
                         </>
                     ) : (
                         <>
-                            <Ionicons name="phone-portrait-outline" size={40} color="#007AFF" />
+                            <Ionicons name="phone-portrait-outline" size={40} color={p.action} />
                             <Text style={styles.title}>Step 2 · Scan the chip</Text>
                             <Text style={styles.body}>
                                 Hold your {docLabel} flat against the top of your phone and keep it still. The chip
@@ -756,7 +785,7 @@ export default function KycCaptureScreen() {
 
             {step === 'verifying' && (
                 <View style={styles.pad}>
-                    <ActivityIndicator size="large" color="#007AFF" />
+                    <ActivityIndicator size="large" color={p.action} />
                     <Text style={styles.body}>Verifying your identity in the enclave…</Text>
                 </View>
             )}
@@ -767,7 +796,7 @@ export default function KycCaptureScreen() {
                     contentContainerStyle={styles.padContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <Ionicons name="shield-checkmark" size={40} color="#34C759" />
+                    <Ionicons name="shield-checkmark" size={40} color={p.approve} />
                     <Text style={styles.title}>Identity verified</Text>
                     <Text style={styles.body}>
                         Choose which government-verified details to add to your wallet.
@@ -785,7 +814,7 @@ export default function KycCaptureScreen() {
 
             {step === 'done' && (
                 <View style={styles.pad}>
-                    <Ionicons name="checkmark-circle" size={48} color="#34C759" />
+                    <Ionicons name="checkmark-circle" size={48} color={p.approve} />
                     <Text style={styles.title}>All set</Text>
                     <Text style={styles.body}>
                         Your selected government-verified attributes have been added to your wallet.
@@ -800,6 +829,8 @@ export default function KycCaptureScreen() {
 }
 
 function PassportPageGuide({ active }: { active: boolean }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const color = active ? '#34C759' : '#C7C7C7';
     const textLineWidths = ['88%', '95%', '82%', '92%', '76%', '96%', '85%'] as const;
 
@@ -834,6 +865,8 @@ function PassportPageGuide({ active }: { active: boolean }) {
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>{label}</Text>
@@ -842,29 +875,29 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     );
 }
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: p.screenBg },
     flex: { flex: 1 },
     pad: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 },
     padContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14, paddingTop: 72 },
     close: { position: 'absolute', right: 16, zIndex: 10, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-    title: { fontSize: 22, fontWeight: '700', textAlign: 'center', color: '#0F172A' },
-    body: { fontSize: 15, lineHeight: 22, textAlign: 'center', color: '#475569' },
-    note: { fontSize: 13, color: '#F59E0B', textAlign: 'center' },
-    orText: { fontSize: 13, color: '#94A3B8', textAlign: 'center' },
+    title: { fontSize: 22, fontWeight: '700', textAlign: 'center', color: p.textPrimary },
+    body: { fontSize: 15, lineHeight: 22, textAlign: 'center', color: p.textSecondary },
+    note: { fontSize: 13, color: p.warnText, textAlign: 'center' },
+    orText: { fontSize: 13, color: p.textMuted, textAlign: 'center' },
     input: {
-        width: '100%', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10,
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 14, paddingVertical: 14, fontSize: 16, color: '#0F172A',
+        width: '100%', borderWidth: 1, borderColor: p.border, borderRadius: 10,
+        backgroundColor: p.card,
+        paddingHorizontal: 14, paddingVertical: 14, fontSize: 16, color: p.textPrimary,
     },
     primary: {
-        flexDirection: 'row', backgroundColor: '#007AFF', borderRadius: 10, paddingVertical: 14,
+        flexDirection: 'row', backgroundColor: p.action, borderRadius: 10, paddingVertical: 14,
         paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch',
     },
     primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
     disabled: { opacity: 0.5 },
     secondary: { paddingVertical: 10, alignItems: 'center' },
-    secondaryText: { color: '#007AFF', fontSize: 15 },
+    secondaryText: { color: p.action, fontSize: 15 },
     camera: { flex: 1, width: '100%' },
     selfieOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, gap: 12, backgroundColor: 'rgba(0,0,0,0.55)' },
     selfieText: { color: '#FFFFFF', fontSize: 15, textAlign: 'center' },
@@ -913,20 +946,20 @@ const styles = StyleSheet.create({
     captureHintSub: { color: 'rgba(255,255,255,0.82)', fontSize: 13, textAlign: 'center' },
     docOption: {
         flexDirection: 'row', alignItems: 'center', gap: 14, alignSelf: 'stretch',
-        backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0',
+        backgroundColor: p.card, borderRadius: 12, borderWidth: 1, borderColor: p.border,
         padding: 16,
     },
     docOptionBody: { flex: 1 },
-    docOptionTitle: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
-    docOptionSub: { fontSize: 13, color: '#64748B', marginTop: 2 },
+    docOptionTitle: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
+    docOptionSub: { fontSize: 13, color: p.textSecondary, marginTop: 2 },
     summaryCard: {
-        alignSelf: 'stretch', backgroundColor: '#FFFFFF', borderRadius: 12,
-        borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 16, paddingVertical: 4,
+        alignSelf: 'stretch', backgroundColor: p.card, borderRadius: 12,
+        borderWidth: 1, borderColor: p.border, paddingHorizontal: 16, paddingVertical: 4,
     },
     summaryRow: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F1F5F9',
+        paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: p.border,
     },
-    summaryLabel: { fontSize: 14, color: '#64748B' },
-    summaryValue: { fontSize: 15, fontWeight: '600', color: '#0F172A', letterSpacing: 1 },
+    summaryLabel: { fontSize: 14, color: p.textSecondary },
+    summaryValue: { fontSize: 15, fontWeight: '600', color: p.textPrimary, letterSpacing: 1 },
 });

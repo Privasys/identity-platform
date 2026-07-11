@@ -239,6 +239,10 @@ export interface VerifierAttestation {
     displayName: string;
     /** Full attestation result to render in the shared AttestationView. */
     attestation: AttestationResult;
+    /** Verification mode actually used. */
+    mode: 'deterministic' | 'challenge';
+    /** True when a fresh nonce + TLS channel binder were folded in. */
+    challenged: boolean;
 }
 
 /**
@@ -250,7 +254,11 @@ export interface VerifierAttestation {
  * view shown at sign-in). Throws on a missing/mismatched digest or a failed
  * verification, so the wallet never trusts an unexpected enclave.
  */
-export async function attestVerifier(): Promise<VerifierAttestation> {
+export async function attestVerifier(
+    /** Force a mode (the screen's "Challenge this enclave" passes 'challenge');
+     *  defaults to the user's settings choice. */
+    forceMode?: 'deterministic' | 'challenge'
+): Promise<VerifierAttestation> {
     const v = await resolveVerifier();
     const inspected = await inspectAttestation(v.origin);
 
@@ -271,7 +279,7 @@ export async function attestVerifier(): Promise<VerifierAttestation> {
     // challenge) and always through the attestation service. Throws on a
     // non-verified outcome so identity data is never sent to an enclave that
     // could not prove itself.
-    const mode = useSettingsStore.getState().verificationMode;
+    const mode = forceMode ?? useSettingsStore.getState().verificationMode;
     const outcome = await attestEnclave(v.origin, {
         tee: inspected.tee_type ?? 'tdx',
         mode,
@@ -296,7 +304,13 @@ export async function attestVerifier(): Promise<VerifierAttestation> {
         quote_verification_status:
             verified.quote_verification_status ?? inspected.quote_verification_status
     };
-    return { origin: v.origin, displayName: VERIFIER_DISPLAY, attestation };
+    return {
+        origin: v.origin,
+        displayName: VERIFIER_DISPLAY,
+        attestation,
+        mode: outcome.mode,
+        challenged: outcome.challenged
+    };
 }
 
 /**

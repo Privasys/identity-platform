@@ -22,7 +22,7 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { attributeLabel } from '@/services/attributes';
 import { useConsentStore, type ConsentRecord, type StandingConsent, type ComputationReceipt } from '@/stores/consent';
 
@@ -30,11 +30,11 @@ import { useConsentStore, type ConsentRecord, type StandingConsent, type Computa
 const SEARCH_THRESHOLD = 10;
 
 /** Decision badge colours. */
-const DECISION_COLORS: Record<string, { bg: string; text: string }> = {
-    approved: { bg: '#ECFDF5', text: '#059669' },
-    denied: { bg: '#FEF2F2', text: '#DC2626' },
-    partial: { bg: '#FFFBEB', text: '#D97706' }
-};
+const makeDecisionColors = (p: Palette): Record<string, { bg: string; text: string }> => ({
+    approved: { bg: p.infoBg, text: p.infoText },
+    denied: { bg: p.dangerBg, text: p.dangerText },
+    partial: { bg: p.warnBg, text: p.warnText }
+});
 
 /** Format epoch seconds to readable date/time. */
 function formatDate(epoch: number): string {
@@ -73,6 +73,8 @@ function uniqueApps(records: ConsentRecord[]): { rpId: string; name: string }[] 
 export default function ConsentHistoryScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const { records, standingConsents, receipts, removeStandingConsent, removeRecord, clearRecords } =
         useConsentStore();
 
@@ -140,7 +142,7 @@ export default function ConsentHistoryScreen() {
             {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
                 <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                    <Ionicons name="chevron-back" size={24} color={p.card} />
                 </Pressable>
                 <Text style={styles.headerTitle}>Consent History</Text>
                 <RNView style={{ width: 32 }} />
@@ -216,11 +218,11 @@ export default function ConsentHistoryScreen() {
                         {(filterApp ? records.filter((r) => r.rpId === filterApp) : records).length >
                             SEARCH_THRESHOLD && (
                             <RNView style={styles.searchBox}>
-                                <Ionicons name="search" size={16} color="#94A3B8" />
+                                <Ionicons name="search" size={16} color={p.textMuted} />
                                 <TextInput
                                     style={styles.searchInput}
                                     placeholder="Search by app, attribute, or decision"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={p.textMuted}
                                     value={search}
                                     onChangeText={setSearch}
                                     autoCapitalize="none"
@@ -231,7 +233,7 @@ export default function ConsentHistoryScreen() {
                         )}
                         {filteredRecords.length === 0 ? (
                             <RNView style={styles.emptyState}>
-                                <Ionicons name="time-outline" size={48} color="#C7C7CC" />
+                                <Ionicons name="time-outline" size={48} color={p.textMuted} />
                                 <Text style={styles.emptyTitle}>
                                     {search.trim() ? 'No matching records' : 'No consent history'}
                                 </Text>
@@ -252,7 +254,7 @@ export default function ConsentHistoryScreen() {
                                     />
                                 ))}
                                 <Pressable style={styles.clearAllButton} onPress={handleClearHistory}>
-                                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                                    <Ionicons name="trash-outline" size={16} color={p.danger} />
                                     <Text style={styles.clearAllText}>Clear all history</Text>
                                 </Pressable>
                             </>
@@ -264,7 +266,7 @@ export default function ConsentHistoryScreen() {
                     <>
                         {standingConsents.length === 0 ? (
                             <RNView style={styles.emptyState}>
-                                <Ionicons name="repeat-outline" size={48} color="#C7C7CC" />
+                                <Ionicons name="repeat-outline" size={48} color={p.textMuted} />
                                 <Text style={styles.emptyTitle}>No auto-share rules</Text>
                                 <Text style={styles.emptyText}>
                                     When you approve "always share" for an app, it will appear here.
@@ -287,7 +289,7 @@ export default function ConsentHistoryScreen() {
                     <>
                         {filteredReceipts.length === 0 ? (
                             <RNView style={styles.emptyState}>
-                                <Ionicons name="receipt-outline" size={48} color="#C7C7CC" />
+                                <Ionicons name="receipt-outline" size={48} color={p.textMuted} />
                                 <Text style={styles.emptyTitle}>No receipts yet</Text>
                                 <Text style={styles.emptyText}>
                                     Computation receipts from enclaves will appear here after data processing.
@@ -315,6 +317,9 @@ function ConsentRecordCard({
     standingActive: boolean;
     onDelete: () => void;
 }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
+    const DECISION_COLORS = useMemo(() => makeDecisionColors(p), [p]);
     const [expanded, setExpanded] = useState(false);
     const colors = DECISION_COLORS[record.decision] ?? DECISION_COLORS.denied;
     // A swipe must not double as a tap: without this guard the release of a
@@ -361,7 +366,7 @@ function ConsentRecordCard({
             <RNView style={styles.recordSummary}>
                 {record.approvedAttributes.length > 0 && (
                     <RNView style={styles.attributeChips}>
-                        <Ionicons name="checkmark-circle" size={14} color="#34E89E" />
+                        <Ionicons name="checkmark-circle" size={14} color={p.green} />
                         <Text style={styles.chipText}>
                             {record.approvedAttributes.length} shared
                         </Text>
@@ -369,7 +374,7 @@ function ConsentRecordCard({
                 )}
                 {record.deniedAttributes.length > 0 && (
                     <RNView style={styles.attributeChips}>
-                        <Ionicons name="close-circle" size={14} color="#FF3B30" />
+                        <Ionicons name="close-circle" size={14} color={p.danger} />
                         <Text style={styles.chipText}>
                             {record.deniedAttributes.length} denied
                         </Text>
@@ -380,7 +385,7 @@ function ConsentRecordCard({
                         <Ionicons
                             name={standingActive ? 'repeat' : 'repeat-outline'}
                             size={14}
-                            color={standingActive ? '#00BCF2' : '#94A3B8'}
+                            color={standingActive ? p.blue : p.textMuted}
                         />
                         <Text style={[styles.chipText, !standingActive && styles.chipTextMuted]}>
                             {standingActive ? 'Auto-share' : 'Auto-share · revoked'}
@@ -429,6 +434,8 @@ function StandingConsentCard({
     appName: string;
     onRevoke: () => void;
 }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <RNView style={styles.standingCard}>
             <RNView style={styles.standingHeader}>
@@ -458,12 +465,14 @@ function StandingConsentCard({
 
 /** Computation receipt card. */
 function ReceiptCard({ receipt }: { receipt: ComputationReceipt }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const [expanded, setExpanded] = useState(false);
 
     return (
         <Pressable style={styles.receiptCard} onPress={() => setExpanded(!expanded)}>
             <RNView style={styles.receiptHeader}>
-                <Ionicons name="receipt-outline" size={20} color="#00BCF2" />
+                <Ionicons name="receipt-outline" size={20} color={p.blue} />
                 <RNView style={{ flex: 1 }}>
                     <Text style={styles.receiptId}>
                         {receipt.receiptId.slice(0, 12)}…
@@ -475,7 +484,7 @@ function ReceiptCard({ receipt }: { receipt: ComputationReceipt }) {
                 <Ionicons
                     name={expanded ? 'chevron-up' : 'chevron-down'}
                     size={18}
-                    color="#94A3B8"
+                    color={p.textMuted}
                 />
             </RNView>
 
@@ -500,8 +509,8 @@ function ReceiptCard({ receipt }: { receipt: ComputationReceipt }) {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
 
     header: {
         flexDirection: 'row',
@@ -509,27 +518,27 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingBottom: 16,
-        backgroundColor: '#0F172A'
+        backgroundColor: p.textPrimary
     },
     backButton: {
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.12)',
+        backgroundColor: p.buttonNeutral,
         alignItems: 'center',
         justifyContent: 'center'
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#FFFFFF'
+        color: p.card
     },
 
     tabBar: {
         flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderBottomWidth: 0.5,
-        borderBottomColor: '#E2E8F0'
+        borderBottomColor: p.border
     },
     tab: {
         flex: 1,
@@ -539,20 +548,20 @@ const styles = StyleSheet.create({
         borderBottomColor: 'transparent'
     },
     tabActive: {
-        borderBottomColor: '#00BCF2'
+        borderBottomColor: p.blue
     },
     tabText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#94A3B8'
+        color: p.textMuted
     },
     tabTextActive: {
-        color: '#00BCF2'
+        color: p.blue
     },
 
     filterContainer: {
         maxHeight: 48,
-        backgroundColor: '#FFFFFF'
+        backgroundColor: p.card
     },
     filterContent: {
         paddingHorizontal: 16,
@@ -564,18 +573,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: 16,
-        backgroundColor: '#F1F5F9'
+        backgroundColor: p.cardAlt
     },
     filterChipActive: {
-        backgroundColor: '#0F172A'
+        backgroundColor: p.textPrimary
     },
     filterChipText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#64748B'
+        color: p.textSecondary
     },
     filterChipTextActive: {
-        color: '#FFFFFF'
+        color: p.card
     },
 
     scrollView: { flex: 1 },
@@ -587,30 +596,30 @@ const styles = StyleSheet.create({
         paddingVertical: 60,
         gap: 12
     },
-    emptyTitle: { fontSize: 18, fontWeight: '600', color: '#0F172A' },
-    emptyText: { fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20 },
+    emptyTitle: { fontSize: 18, fontWeight: '600', color: p.textPrimary },
+    emptyText: { fontSize: 14, color: p.textMuted, textAlign: 'center', lineHeight: 20 },
 
     // Consent record card
     searchBox: {
         flexDirection: 'row', alignItems: 'center', gap: 8,
-        backgroundColor: '#FFFFFF', borderRadius: 12,
+        backgroundColor: p.card, borderRadius: 12,
         paddingHorizontal: 12, marginBottom: 12,
     },
-    searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: '#0F172A' },
+    searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: p.textPrimary },
     swipeDeleteWrap: { justifyContent: 'center', marginBottom: 10 },
     swipeDelete: {
-        backgroundColor: '#DC2626', justifyContent: 'center', alignItems: 'center',
+        backgroundColor: p.danger, justifyContent: 'center', alignItems: 'center',
         width: 84, height: 72, borderRadius: 12, gap: 2,
     },
     swipeDeleteText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-    chipTextMuted: { color: '#94A3B8', textDecorationLine: 'line-through' },
+    chipTextMuted: { color: p.textMuted, textDecorationLine: 'line-through' },
     clearAllButton: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
         paddingVertical: 14, marginTop: 8,
     },
-    clearAllText: { fontSize: 15, fontWeight: '600', color: '#DC2626' },
+    clearAllText: { fontSize: 15, fontWeight: '600', color: p.danger },
     recordCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 10
@@ -622,8 +631,8 @@ const styles = StyleSheet.create({
         marginBottom: 8
     },
     recordAppInfo: { flex: 1, marginRight: 12 },
-    recordAppName: { fontSize: 16, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
-    recordTime: { fontSize: 12, color: '#94A3B8' },
+    recordAppName: { fontSize: 16, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
+    recordTime: { fontSize: 12, color: p.textMuted },
     decisionBadge: {
         paddingHorizontal: 10,
         paddingVertical: 4,
@@ -644,37 +653,37 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 4
     },
-    chipText: { fontSize: 12, color: '#64748B' },
+    chipText: { fontSize: 12, color: p.textSecondary },
     recordDetails: {
         marginTop: 12,
         paddingTop: 12,
         borderTopWidth: 0.5,
-        borderTopColor: '#F1F5F9'
+        borderTopColor: p.cardAlt
     },
     detailLabel: {
         fontSize: 10,
         fontWeight: '700',
-        color: '#94A3B8',
+        color: p.textMuted,
         letterSpacing: 0.5,
         marginBottom: 4
     },
-    detailItem: { fontSize: 13, color: '#0F172A', marginBottom: 2 },
+    detailItem: { fontSize: 13, color: p.textPrimary, marginBottom: 2 },
     detailMono: {
         fontSize: 11,
         fontFamily: 'Inter',
-        color: '#64748B',
+        color: p.textSecondary,
         marginBottom: 8,
         lineHeight: 16
     },
     detailTimestamp: {
         fontSize: 11,
-        color: '#94A3B8',
+        color: p.textMuted,
         marginTop: 4
     },
 
     // Standing consent card
     standingCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 10
@@ -684,18 +693,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 10
     },
-    standingAppName: { fontSize: 16, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
-    standingDetail: { fontSize: 12, color: '#94A3B8' },
+    standingAppName: { fontSize: 16, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
+    standingDetail: { fontSize: 12, color: p.textMuted },
     revokeButton: {
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 8,
-        backgroundColor: '#FEF2F2'
+        backgroundColor: p.dangerBg
     },
     revokeButtonText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#DC2626'
+        color: p.dangerText
     },
     standingAttributes: {
         flexDirection: 'row',
@@ -704,7 +713,7 @@ const styles = StyleSheet.create({
         marginBottom: 10
     },
     standingChip: {
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderRadius: 8,
         paddingHorizontal: 10,
         paddingVertical: 4
@@ -712,17 +721,17 @@ const styles = StyleSheet.create({
     standingChipText: {
         fontSize: 12,
         fontWeight: '500',
-        color: '#64748B'
+        color: p.textSecondary
     },
     standingMeasurement: {
         fontSize: 11,
-        color: '#94A3B8',
+        color: p.textMuted,
         fontStyle: 'italic'
     },
 
     // Receipt card
     receiptCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 10
@@ -732,12 +741,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 12
     },
-    receiptId: { fontSize: 14, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
-    receiptTime: { fontSize: 12, color: '#94A3B8' },
+    receiptId: { fontSize: 14, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
+    receiptTime: { fontSize: 12, color: p.textMuted },
     receiptDetails: {
         marginTop: 12,
         paddingTop: 12,
         borderTopWidth: 0.5,
-        borderTopColor: '#F1F5F9'
+        borderTopColor: p.cardAlt
     }
 });

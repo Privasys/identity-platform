@@ -8,12 +8,12 @@
  * KYC identity-verifier flow) present the *same* familiar verification step.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExternalLink } from '@/components/ExternalLink';
-import { Text, View } from '@/components/Themed';
+import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import type { AttestationDiff } from '@/services/attestation-diff';
 import type { OsRelease, WorkloadRelease } from '@/services/release-provenance';
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
@@ -111,8 +111,10 @@ export function AttestationView({
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const appType = attestation.tee_type === 'sgx' ? 'WASM Application' : 'Container Application';
-    const teeColor = attestation.tee_type === 'sgx' ? '#34E89E' : '#00BCF2';
+    const teeColor = attestation.tee_type === 'sgx' ? p.green : p.blue;
     const changedTitle = (diff && CHANGED_TITLES[diff.kind]) || 'App Changed';
 
     // Effective verification status. When no `verification` is supplied we keep
@@ -148,7 +150,7 @@ export function AttestationView({
         // sit on a themed (white) view, and the fixed bottom bar below shares
         // this exact colour — without this the bar reads as an off-white patch
         // between the buttons and around their border radius.
-        <RNView style={{ flex: 1, backgroundColor: SCREEN_BG }}>
+        <RNView style={{ flex: 1, backgroundColor: p.screenBg }}>
             <ScrollView contentContainerStyle={[styles.attestationContainer, { paddingBottom: 100 + insets.bottom }]}>
                 {isChanged && (
                     <View style={styles.warningBanner}>
@@ -238,7 +240,7 @@ export function AttestationView({
                         disabled={challengeInFlight}
                     >
                         {challengeInFlight ? (
-                            <ActivityIndicator size="small" color="#0F766E" />
+                            <ActivityIndicator size="small" color={p.infoText} />
                         ) : (
                             <Text style={styles.challengeIcon}>⚡</Text>
                         )}
@@ -448,6 +450,8 @@ export function AttestationView({
 }
 
 function AttestationRow({ label, value }: { label: string; value?: string }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     if (!value) return null;
     return (
         <View style={styles.attestationRow}>
@@ -464,92 +468,89 @@ export function truncateHex(hex: string): string {
     return `${hex.slice(0, 8)}…${hex.slice(-8)}`;
 }
 
-/** The wallet's standard screen background (matches settings/profile/home). */
-const SCREEN_BG = '#F8FAFB';
-
-const styles = StyleSheet.create({
+const makeStyles = (p: Palette) => StyleSheet.create({
     attestationContainer: { padding: 20, paddingTop: 80 },
     title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
     attestationAppName: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
-    attestationOrigin: { fontSize: 12, color: '#94A3B8', textAlign: 'center', fontFamily: 'Inter', marginBottom: 20 },
+    attestationOrigin: { fontSize: 12, color: p.textMuted, textAlign: 'center', fontFamily: 'Inter', marginBottom: 20 },
     detailsToggle: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14,
-        marginBottom: 8, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.04)', gap: 8,
+        marginBottom: 8, borderRadius: 10, backgroundColor: p.buttonNeutral, gap: 8,
     },
-    reviewPrompt: { fontSize: 14, color: '#334155', textAlign: 'center', lineHeight: 20, marginTop: 4, marginBottom: 16 },
-    detailsToggleText: { fontSize: 14, fontWeight: '500', color: '#64748B' },
-    detailsToggleIcon: { fontSize: 10, color: '#94A3B8' },
+    reviewPrompt: { fontSize: 14, color: p.textSecondary, textAlign: 'center', lineHeight: 20, marginTop: 4, marginBottom: 16 },
+    detailsToggleText: { fontSize: 14, fontWeight: '500', color: p.textSecondary },
+    detailsToggleIcon: { fontSize: 10, color: p.textMuted },
     bottomActions: {
         position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 16,
-        backgroundColor: SCREEN_BG, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.1)',
+        backgroundColor: p.screenBg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border,
     },
-    warningBanner: { backgroundColor: '#FFF3CD', borderRadius: 8, padding: 12, marginBottom: 16 },
-    warningText: { color: '#856404', fontSize: 14, textAlign: 'center' },
+    warningBanner: { backgroundColor: p.warnBg, borderRadius: 8, padding: 12, marginBottom: 16 },
+    warningText: { color: p.warnText, fontSize: 14, textAlign: 'center' },
     statusBanner: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 16, marginBottom: 24, gap: 12 },
-    statusBannerValid: { backgroundColor: '#E8FFF0' },
-    statusBannerInvalid: { backgroundColor: '#FFF1F0' },
-    statusBannerUnknown: { backgroundColor: '#FEF9E7' },
+    statusBannerValid: { backgroundColor: p.successBg },
+    statusBannerInvalid: { backgroundColor: p.dangerBg },
+    statusBannerUnknown: { backgroundColor: p.warnBg },
     statusIcon: { fontSize: 28, fontWeight: '700' },
     statusInfo: { flex: 1, backgroundColor: 'transparent' },
     statusTitle: { fontSize: 16, fontWeight: '700' },
-    statusTitleValid: { color: '#166534' },
-    statusTitleInvalid: { color: '#991B1B' },
-    statusTitleUnknown: { color: '#92610A' },
-    statusDetail: { fontSize: 13, color: '#64748B', marginTop: 2 },
-    statusProvenance: { fontSize: 12, color: '#0F766E', fontWeight: '500', marginTop: 4 },
+    statusTitleValid: { color: p.successText },
+    statusTitleInvalid: { color: p.dangerText },
+    statusTitleUnknown: { color: p.warnText },
+    statusDetail: { fontSize: 13, color: p.textSecondary, marginTop: 2 },
+    statusProvenance: { fontSize: 12, color: p.infoText, fontWeight: '500', marginTop: 4 },
 
     releaseRow: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingVertical: 10, backgroundColor: 'transparent',
     },
-    releaseLabel: { fontSize: 14, color: '#0F172A', flex: 1 },
-    releaseLink: { fontSize: 14, fontWeight: '600', color: '#00BCF2' },
+    releaseLabel: { fontSize: 14, color: p.textPrimary, flex: 1 },
+    releaseLink: { fontSize: 14, fontWeight: '600', color: p.blue },
 
     // Unreachable (amber) — availability issue, plain continue.
-    unknownBanner: { backgroundColor: '#FEF9E7', borderRadius: 12, borderWidth: 1, borderColor: '#F6D680', padding: 14, marginBottom: 16 },
-    unknownText: { fontSize: 14, color: '#7A5B08', lineHeight: 20 },
+    unknownBanner: { backgroundColor: p.warnBg, borderRadius: 12, borderWidth: 1, borderColor: p.warnBorder, padding: 14, marginBottom: 16 },
+    unknownText: { fontSize: 14, color: p.warnText, lineHeight: 20 },
 
     // Invalid (red) — definite bad verdict, override buried in Advanced.
-    problemBanner: { backgroundColor: '#FFF1F0', borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5', padding: 14, marginBottom: 16, gap: 6 },
-    problemTitle: { fontSize: 15, fontWeight: '700', color: '#991B1B' },
-    problemDetail: { fontSize: 12, fontFamily: 'Inter', color: '#7F1D1D', lineHeight: 18 },
-    problemHint: { fontSize: 13, color: '#B91C1C', marginTop: 2 },
+    problemBanner: { backgroundColor: p.dangerBg, borderRadius: 12, borderWidth: 1, borderColor: p.dangerBorder, padding: 14, marginBottom: 16, gap: 6 },
+    problemTitle: { fontSize: 15, fontWeight: '700', color: p.dangerText },
+    problemDetail: { fontSize: 12, fontFamily: 'Inter', color: p.dangerText, lineHeight: 18 },
+    problemHint: { fontSize: 13, color: p.dangerText, marginTop: 2 },
 
     // Challenge affordances.
     challengeButton: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
         paddingVertical: 12, borderRadius: 10, marginBottom: 16,
-        backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#5EEAD4',
+        backgroundColor: p.infoBg, borderWidth: 1, borderColor: p.infoBorder,
     },
-    challengeIcon: { fontSize: 15, color: '#0F766E' },
-    challengeText: { fontSize: 14, fontWeight: '600', color: '#0F766E' },
+    challengeIcon: { fontSize: 15, color: p.infoText },
+    challengeText: { fontSize: 14, fontWeight: '600', color: p.infoText },
     teeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
     teeBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
     sectionHeader: {
-        fontSize: 13, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase',
+        fontSize: 13, fontWeight: '600', color: p.textMuted, textTransform: 'uppercase',
         letterSpacing: 0.5, marginBottom: 8, marginTop: 4,
     },
-    attestationCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 16 },
+    attestationCard: { backgroundColor: p.card, borderRadius: 12, padding: 16, marginBottom: 16 },
     attestationRow: {
         flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8,
-        borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(128,128,128,0.3)', backgroundColor: 'transparent',
+        borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: p.border, backgroundColor: 'transparent',
     },
     attestationLabel: { fontSize: 13, opacity: 0.6, flex: 1 },
     attestationValue: { fontSize: 13, fontFamily: 'Inter', flex: 2, textAlign: 'right' },
     changeRow: {
         paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(128,128,128,0.3)', backgroundColor: 'transparent',
+        borderBottomColor: p.border, backgroundColor: 'transparent',
     },
     changeLabel: { fontSize: 13, fontWeight: '600', marginBottom: 4 },
     changeValues: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'transparent' },
-    changeOld: { fontSize: 12, fontFamily: 'Inter', color: '#94A3B8', textDecorationLine: 'line-through' },
-    changeArrow: { fontSize: 12, color: '#64748B' },
+    changeOld: { fontSize: 12, fontFamily: 'Inter', color: p.textMuted, textDecorationLine: 'line-through' },
+    changeArrow: { fontSize: 12, color: p.textSecondary },
     changeNew: { fontSize: 12, fontFamily: 'Inter', fontWeight: '600' },
     buttonRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-    approveButton: { flex: 1, backgroundColor: '#34C759', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+    approveButton: { flex: 1, backgroundColor: p.approve, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
     approveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
     continueButton: { flex: 1, backgroundColor: '#D99A00', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-    rejectButton: { flex: 1, backgroundColor: 'rgba(128,128,128,0.2)', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+    rejectButton: { flex: 1, backgroundColor: p.buttonNeutral, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
     rejectButtonText: { fontSize: 17, fontWeight: '600' },
 
     // Advanced (browser invalid-SSL style) override for a failed verdict.
@@ -557,14 +558,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
         paddingVertical: 10, marginBottom: 8,
     },
-    advancedToggleText: { fontSize: 14, fontWeight: '500', color: '#94A3B8' },
+    advancedToggleText: { fontSize: 14, fontWeight: '500', color: p.textMuted },
     advancedBox: {
-        backgroundColor: '#FFF1F0', borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5',
+        backgroundColor: p.dangerBg, borderRadius: 12, borderWidth: 1, borderColor: p.dangerBorder,
         padding: 14, marginBottom: 12, gap: 12,
     },
-    advancedWarning: { fontSize: 13, color: '#7F1D1D', lineHeight: 19 },
+    advancedWarning: { fontSize: 13, color: p.dangerText, lineHeight: 19 },
     dangerButton: {
-        backgroundColor: '#DC2626', borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+        backgroundColor: p.danger, borderRadius: 10, paddingVertical: 12, alignItems: 'center',
     },
     dangerButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

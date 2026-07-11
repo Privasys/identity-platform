@@ -10,13 +10,15 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 
 export function SubPageHeader({ title, right }: { title: string; right?: ReactNode }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const goBack = () => {
@@ -34,9 +36,9 @@ export function SubPageHeader({ title, right }: { title: string; right?: ReactNo
     );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (p: Palette) => StyleSheet.create({
     header: {
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         paddingHorizontal: 16,
         paddingBottom: 16,
         flexDirection: 'row',

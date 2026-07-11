@@ -9,15 +9,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react-native';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { attributeLabel, exportAttributesForAudit } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 
 export default function ExportDataScreen() {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const { profile } = useProfileStore();
     const attrs = profile?.attributes ?? [];
     const [selected, setSelected] = useState<Set<string>>(() => new Set(attrs.map((a) => a.key)));
@@ -95,23 +97,23 @@ export default function ExportDataScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     content: { padding: 20 },
-    intro: { fontSize: 14, color: '#64748B', lineHeight: 20, marginBottom: 16 },
-    empty: { fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 16 },
+    intro: { fontSize: 14, color: p.textSecondary, lineHeight: 20, marginBottom: 16 },
+    empty: { fontSize: 14, color: p.textMuted, textAlign: 'center', marginTop: 16 },
     row: {
-        flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF',
+        flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: p.card,
         borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 8,
     },
-    rowLabel: { fontSize: 15, fontWeight: '500', color: '#0F172A' },
-    rowValue: { fontSize: 12, color: '#94A3B8', marginTop: 1 },
+    rowLabel: { fontSize: 15, fontWeight: '500', color: p.textPrimary },
+    rowValue: { fontSize: 12, color: p.textMuted, marginTop: 1 },
     primary: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-        backgroundColor: '#00BCF2', borderRadius: 12, paddingVertical: 14, marginTop: 12,
+        backgroundColor: p.blue, borderRadius: 12, paddingVertical: 14, marginTop: 12,
     },
     primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
     disabled: { opacity: 0.5 },
     secondary: { paddingVertical: 12, alignItems: 'center' },
-    secondaryText: { color: '#00BCF2', fontSize: 14, fontWeight: '500' },
+    secondaryText: { color: p.blue, fontSize: 14, fontWeight: '500' },
 });

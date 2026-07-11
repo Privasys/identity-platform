@@ -18,7 +18,7 @@ import { StyleSheet, Pressable, View as RNView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DataRequestConsent, type ConsentDataItem } from '@/components/DataRequestConsent';
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { getAttributeValues, recordConsent } from '@/services/consent';
 import type { DataRequest } from '@/services/consent';
 import { deliverViaBroker } from '@/services/data-transit';
@@ -40,6 +40,8 @@ function attributeLabel(key: string): string {
 export default function ConsentRequestScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const params = useLocalSearchParams<{
         rpId: string;
         origin: string;
@@ -153,7 +155,7 @@ export default function ConsentRequestScreen() {
         <RNView style={styles.screen}>
             <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
                 <Pressable onPress={() => router.back()} style={styles.closeButton}>
-                    <Ionicons name="close" size={24} color="#FFFFFF" />
+                    <Ionicons name="close" size={24} color={p.card} />
                 </Pressable>
                 <Text style={styles.headerTitle}>Data Request</Text>
                 <RNView style={{ width: 32 }} />
@@ -184,27 +186,27 @@ export default function ConsentRequestScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingBottom: 16,
-        backgroundColor: '#0F172A'
+        backgroundColor: p.textPrimary
     },
     closeButton: {
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.12)',
+        backgroundColor: p.buttonNeutral,
         alignItems: 'center',
         justifyContent: 'center'
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#FFFFFF'
+        color: p.card
     }
 });

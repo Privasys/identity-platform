@@ -18,7 +18,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams, Stack, type Href } from 'expo-router';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     StyleSheet,
     Pressable,
@@ -44,7 +44,7 @@ import { base64urlToBytes } from '@/utils/encoding';
 import { buildErrorReport, REPORT_DESTINATION } from '@/utils/logs';
 
 import { DataRequestConsent } from '@/components/DataRequestConsent';
-import { Text, View } from '@/components/Themed';
+import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, attestEnclave } from '@/services/attestation';
@@ -600,6 +600,8 @@ interface QRPayload {
 export default function ConnectScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     const params = useLocalSearchParams<{
         payload?: string; // JSON-encoded QRPayload
         serviceUrl?: string; // Legacy fallback
@@ -2002,7 +2004,7 @@ export default function ConnectScreen() {
             <View style={styles.container}>
                 {step === 'verifying' && (
                     <View style={styles.centered}>
-                        <ActivityIndicator size="large" color="#007AFF" />
+                        <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.statusText}>Verifying server attestation...</Text>
                     </View>
                 )}
@@ -2023,7 +2025,7 @@ export default function ConnectScreen() {
                                 see the real endpoint before approving. */}
                             {qr.appHost && qr.appHost !== qr.rpId && (
                                 <View style={styles.confirmEndpointRow}>
-                                    <Ionicons name="lock-closed" size={12} color="#0F766E" />
+                                    <Ionicons name="lock-closed" size={12} color={p.infoText} />
                                     <Text style={styles.confirmEndpoint}>{qr.appHost}</Text>
                                 </View>
                             )}
@@ -2154,7 +2156,7 @@ export default function ConnectScreen() {
                                 ? `Sign in to ${qr?.rpId}`
                                 : 'Confirm with biometrics to continue'}
                         </Text>
-                        <ActivityIndicator size="large" color="#007AFF" />
+                        <ActivityIndicator size="large" color={p.action} />
                         <Pressable style={styles.cancelButton} onPress={handleReject}>
                             <Text style={styles.cancelButtonText}>Cancel</Text>
                         </Pressable>
@@ -2163,7 +2165,7 @@ export default function ConnectScreen() {
 
                 {step === 'authenticating' && (
                     <View style={styles.centered}>
-                        <ActivityIndicator size="large" color="#007AFF" />
+                        <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.statusText}>
                             {getCredentialForRp(qr?.rpId || '')
                                 ? 'Signing in...'
@@ -2190,7 +2192,7 @@ export default function ConnectScreen() {
 
                 {step === 'relaying' && (
                     <View style={styles.centered}>
-                        <ActivityIndicator size="large" color="#007AFF" />
+                        <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.statusText}>Sending to browser...</Text>
                     </View>
                 )}
@@ -2276,6 +2278,8 @@ function ReportErrorModal({
     onClose: () => void;
 }) {
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const reportStyles = useMemo(() => makeReportStyles(p), [p]);
     const report = visible ? buildErrorReport(errorMessage) : '';
 
     const onCopy = async () => {
@@ -2292,7 +2296,7 @@ function ReportErrorModal({
             <RNView style={[reportStyles.screen, { paddingTop: insets.top + 12 }]}>
                 <RNView style={reportStyles.header}>
                     <Pressable onPress={onClose} hitSlop={10}>
-                        <Ionicons name="close" size={24} color="#0F172A" />
+                        <Ionicons name="close" size={24} color={p.textPrimary} />
                     </Pressable>
                     <Text style={reportStyles.headerTitle}>Report Error</Text>
                     <RNView style={{ width: 24 }} />
@@ -2328,8 +2332,8 @@ function ReportErrorModal({
     );
 }
 
-const reportStyles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeReportStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -2337,33 +2341,33 @@ const reportStyles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 16,
     },
-    headerTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: p.textPrimary },
     destinationCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         marginHorizontal: 20,
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
     },
-    destinationLabel: { fontSize: 12, color: '#64748B', marginBottom: 4 },
-    destinationValue: { fontSize: 16, fontWeight: '600', color: '#0F172A', marginBottom: 8 },
-    destinationNote: { fontSize: 12, color: '#64748B', lineHeight: 18 },
+    destinationLabel: { fontSize: 12, color: p.textSecondary, marginBottom: 4 },
+    destinationValue: { fontSize: 16, fontWeight: '600', color: p.textPrimary, marginBottom: 8 },
+    destinationNote: { fontSize: 12, color: p.textSecondary, lineHeight: 18 },
     previewLabel: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#64748B',
+        color: p.textSecondary,
         paddingHorizontal: 20,
         marginBottom: 6,
     },
     previewScroll: {
         flex: 1,
         marginHorizontal: 20,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: p.border,
     },
-    previewText: { fontSize: 11, fontFamily: 'SpaceMono', color: '#0F172A', lineHeight: 16 },
+    previewText: { fontSize: 11, fontFamily: 'SpaceMono', color: p.textPrimary, lineHeight: 16 },
     actions: {
         flexDirection: 'row',
         gap: 12,
@@ -2374,12 +2378,12 @@ const reportStyles = StyleSheet.create({
         flex: 1,
         paddingVertical: 14,
         borderRadius: 12,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: p.border,
         alignItems: 'center',
     },
-    cancelButtonText: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
+    cancelButtonText: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
     copyButton: {
         flex: 1,
         flexDirection: 'row',
@@ -2388,7 +2392,7 @@ const reportStyles = StyleSheet.create({
         gap: 8,
         paddingVertical: 14,
         borderRadius: 12,
-        backgroundColor: '#007AFF',
+        backgroundColor: p.action,
     },
     copyButtonText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
 });
@@ -2424,6 +2428,9 @@ function AttributeAcquisitionView({
     onCancel: () => void;
 }) {
     const insets = useSafeAreaInsets();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
+    const acqStyles = useMemo(() => makeAcqStyles(p), [p]);
     const { updateProfile, setAttribute, createProfile } = useProfileStore();
     const profile = useProfileStore((s) => s.profile);
 
@@ -2575,7 +2582,7 @@ function AttributeAcquisitionView({
                     keyboardShouldPersistTaps="handled"
                 >
                     <RNView style={acqStyles.iconContainer}>
-                        <Ionicons name="person-add-outline" size={36} color="#007AFF" />
+                        <Ionicons name="person-add-outline" size={36} color={p.action} />
                     </RNView>
 
                     <Text style={styles.title}>Profile needed</Text>
@@ -2586,7 +2593,7 @@ function AttributeAcquisitionView({
 
                     {/* Data sharing notice */}
                     <RNView style={acqStyles.privacyNotice}>
-                        <Ionicons name="shield-outline" size={16} color="#F59E0B" />
+                        <Ionicons name="shield-outline" size={16} color={p.warnText} />
                         <Text style={acqStyles.privacyNoticeText}>
                             These attributes will be shared with{' '}
                             <Text style={acqStyles.bold}>{displayAppName}</Text>
@@ -2599,7 +2606,7 @@ function AttributeAcquisitionView({
                             style={acqStyles.privacyLink}
                             onPress={() => WebBrowser.openBrowserAsync(privacyPolicyUrl)}
                         >
-                            <Ionicons name="document-text-outline" size={14} color="#007AFF" />
+                            <Ionicons name="document-text-outline" size={14} color={p.action} />
                             <Text style={acqStyles.privacyLinkText}>Read privacy policy</Text>
                         </Pressable>
                     ) : null}
@@ -2616,7 +2623,7 @@ function AttributeAcquisitionView({
                                     <Ionicons
                                         name={isFilled ? 'checkmark-circle' : govVerified ? 'shield-checkmark-outline' : 'ellipse-outline'}
                                         size={20}
-                                        color={isFilled ? '#34C759' : govVerified ? '#F59E0B' : '#94A3B8'}
+                                        color={isFilled ? p.approve : govVerified ? p.warnText : p.textMuted}
                                     />
                                     <Text style={[acqStyles.attributeLabel, isFilled && acqStyles.attributeFilled]}>
                                         {attributeLabel(attr)}{suffix}
@@ -2634,7 +2641,7 @@ function AttributeAcquisitionView({
                     {requiredMissing.length === 0 ? (
                         /* Required attributes present — optional ones don't block */
                         <RNView style={acqStyles.readySection}>
-                            <Ionicons name="checkmark-circle" size={32} color="#34C759" />
+                            <Ionicons name="checkmark-circle" size={32} color={p.approve} />
                             <Text style={acqStyles.readyText}>All set! Tap continue to finish signing in.</Text>
                         </RNView>
                     ) : mode === 'choose' ? (
@@ -2651,7 +2658,7 @@ function AttributeAcquisitionView({
                                         <Text style={acqStyles.providerButtonText}>Verify with your ID</Text>
                                     </Pressable>
                                     <RNView style={acqStyles.privacyNotice}>
-                                        <Ionicons name="lock-closed-outline" size={16} color="#F59E0B" />
+                                        <Ionicons name="lock-closed-outline" size={16} color={p.warnText} />
                                         <Text style={acqStyles.privacyNoticeText}>
                                             A government-verified attribute is required. Your ID is checked in a
                                             secure enclave; the value stays on your device.
@@ -2700,7 +2707,7 @@ function AttributeAcquisitionView({
                                 style={acqStyles.manualButton}
                                 onPress={() => setMode('manual')}
                             >
-                                <Ionicons name="create-outline" size={18} color="#007AFF" />
+                                <Ionicons name="create-outline" size={18} color={p.action} />
                                 <Text style={acqStyles.manualButtonText}>Enter manually</Text>
                             </Pressable>
                         </>
@@ -2721,7 +2728,7 @@ function AttributeAcquisitionView({
                                         <RNView key={attr} style={acqStyles.inputContainer}>
                                             <Text style={acqStyles.inputLabel}>{label}</Text>
                                             <RNView style={acqStyles.privacyNotice}>
-                                                <Ionicons name="shield-checkmark-outline" size={16} color="#F59E0B" />
+                                                <Ionicons name="shield-checkmark-outline" size={16} color={p.warnText} />
                                                 <Text style={acqStyles.privacyNoticeText}>
                                                     Filled by verifying your ID document — not typed.
                                                 </Text>
@@ -2757,7 +2764,7 @@ function AttributeAcquisitionView({
                                             value={manualValues[attr] ?? ''}
                                             onChangeText={(v) => setManualValues((prev) => ({ ...prev, [attr]: v }))}
                                             placeholder={attr === 'email' ? 'you@example.com' : `Your ${label.toLowerCase()}`}
-                                            placeholderTextColor="#94A3B8"
+                                            placeholderTextColor={p.textMuted}
                                             keyboardType={attr === 'email' ? 'email-address' : 'default'}
                                             autoCapitalize={attr === 'email' ? 'none' : 'words'}
                                             autoComplete={attr === 'email' ? 'email' : attr === 'name' ? 'name' : 'off'}
@@ -2806,7 +2813,7 @@ function AttributeAcquisitionView({
                                     >
                                         <Text style={acqStyles.pickerRowText}>{opt.label}</Text>
                                         {manualValues.locale === opt.value && (
-                                            <Ionicons name="checkmark" size={20} color="#007AFF" />
+                                            <Ionicons name="checkmark" size={20} color={p.action} />
                                         )}
                                     </Pressable>
                                 ))}
@@ -2835,15 +2842,15 @@ function AttributeAcquisitionView({
     );
 }
 
-const acqStyles = StyleSheet.create({
+const makeAcqStyles = (p: Palette) => StyleSheet.create({
     container: { padding: 20, paddingTop: 80 },
-    pickerValue: { fontSize: 16, color: '#0F172A' },
-    pickerPlaceholder: { fontSize: 16, color: '#94A3B8' },
+    pickerValue: { fontSize: 16, color: p.textPrimary },
+    pickerPlaceholder: { fontSize: 16, color: p.textMuted },
     pickerBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-    pickerSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 16, paddingBottom: 32, maxHeight: '70%' },
-    pickerTitle: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginBottom: 12, color: '#0F172A' },
-    pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 24, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F0' },
-    pickerRowText: { fontSize: 16, color: '#0F172A' },
+    pickerSheet: { backgroundColor: p.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 16, paddingBottom: 32, maxHeight: '70%' },
+    pickerTitle: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginBottom: 12, color: p.textPrimary },
+    pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 24, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border },
+    pickerRowText: { fontSize: 16, color: p.textPrimary },
     iconContainer: {
         width: 72,
         height: 72,
@@ -2856,17 +2863,17 @@ const acqStyles = StyleSheet.create({
     },
     description: {
         fontSize: 15,
-        color: '#64748B',
+        color: p.textSecondary,
         textAlign: 'center',
         marginBottom: 24,
         lineHeight: 22,
     },
-    bold: { fontWeight: '600', color: '#1E293B' },
+    bold: { fontWeight: '600', color: p.textPrimary },
     privacyNotice: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 8,
-        backgroundColor: '#FFFBEB',
+        backgroundColor: p.warnBg,
         borderRadius: 10,
         padding: 12,
         marginBottom: 8,
@@ -2874,7 +2881,7 @@ const acqStyles = StyleSheet.create({
     privacyNoticeText: {
         flex: 1,
         fontSize: 13,
-        color: '#92400E',
+        color: p.warnText,
         lineHeight: 18,
     },
     privacyLink: {
@@ -2887,11 +2894,11 @@ const acqStyles = StyleSheet.create({
     },
     privacyLinkText: {
         fontSize: 13,
-        color: '#007AFF',
+        color: p.action,
         fontWeight: '500',
     },
     attributeList: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 24,
@@ -2902,13 +2909,13 @@ const acqStyles = StyleSheet.create({
         alignItems: 'center',
         gap: 10,
     },
-    attributeLabel: { fontSize: 15, color: '#334155', flex: 1 },
-    attributeFilled: { color: '#166534' },
-    attributeValue: { fontSize: 13, color: '#64748B', maxWidth: 160 },
+    attributeLabel: { fontSize: 15, color: p.textPrimary, flex: 1 },
+    attributeFilled: { color: p.successText },
+    attributeValue: { fontSize: 13, color: p.textSecondary, maxWidth: 160 },
     sectionTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#64748B',
+        color: p.textSecondary,
         marginBottom: 12,
         textAlign: 'center',
     },
@@ -2937,35 +2944,35 @@ const acqStyles = StyleSheet.create({
     dividerLine: {
         flex: 1,
         height: StyleSheet.hairlineWidth,
-        backgroundColor: '#CBD5E1',
+        backgroundColor: p.border,
     },
-    dividerText: { fontSize: 13, color: '#94A3B8' },
+    dividerText: { fontSize: 13, color: p.textMuted },
     manualButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#007AFF',
+        borderColor: p.action,
         borderRadius: 12,
         paddingVertical: 14,
         paddingHorizontal: 20,
         gap: 8,
     },
-    manualButtonText: { color: '#007AFF', fontSize: 16, fontWeight: '600' },
+    manualButtonText: { color: p.action, fontSize: 16, fontWeight: '600' },
     inputContainer: { marginBottom: 16 },
-    inputLabel: { fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 },
+    inputLabel: { fontSize: 13, fontWeight: '600', color: p.textSecondary, marginBottom: 6 },
     input: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 10,
         paddingHorizontal: 16,
         paddingVertical: 14,
         fontSize: 16,
-        color: '#1E293B',
+        color: p.textPrimary,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: p.border,
     },
     saveButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: p.action,
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: 'center',
@@ -2974,7 +2981,7 @@ const acqStyles = StyleSheet.create({
     saveButtonDisabled: { opacity: 0.4 },
     saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
     backLink: { alignItems: 'center', paddingVertical: 16 },
-    backLinkText: { fontSize: 14, color: '#007AFF' },
+    backLinkText: { fontSize: 14, color: p.action },
     readySection: {
         alignItems: 'center',
         gap: 8,
@@ -2982,7 +2989,7 @@ const acqStyles = StyleSheet.create({
     },
     readyText: {
         fontSize: 15,
-        color: '#166534',
+        color: p.successText,
         textAlign: 'center',
     },
     continueDisabled: { opacity: 0.4 },
@@ -2993,17 +3000,17 @@ const acqStyles = StyleSheet.create({
         right: 0,
         paddingHorizontal: 20,
         paddingTop: 16,
-        backgroundColor: '#F8FAFB',
+        backgroundColor: p.screenBg,
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: 'rgba(0,0,0,0.1)',
+        borderTopColor: p.border,
     },
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (p: Palette) => StyleSheet.create({
     // The wallet's standard screen background. The fixed bottom action bars on
     // this route use the same colour — hosting them on the themed (white)
     // default made each bar read as an off-white patch around the buttons.
-    container: { flex: 1, backgroundColor: '#F8FAFB' },
+    container: { flex: 1, backgroundColor: p.screenBg },
     centered: {
         flex: 1,
         alignItems: 'center',
@@ -3014,11 +3021,11 @@ const styles = StyleSheet.create({
     subtitle: { fontSize: 16, textAlign: 'center', opacity: 0.7, marginBottom: 20 },
     presenceNote: { fontSize: 13, textAlign: 'center', opacity: 0.55, marginBottom: 24, paddingHorizontal: 8 },
     statusText: { fontSize: 16, marginTop: 16, opacity: 0.7, textAlign: 'center' },
-    checkmark: { fontSize: 64, color: '#34C759', marginBottom: 16 },
-    errorIcon: { fontSize: 64, color: '#FF3B30', marginBottom: 16 },
+    checkmark: { fontSize: 64, color: p.approve, marginBottom: 16 },
+    errorIcon: { fontSize: 64, color: p.danger, marginBottom: 16 },
     errorText: {
         fontSize: 14,
-        color: '#FF3B30',
+        color: p.danger,
         textAlign: 'center',
         marginBottom: 20,
         paddingHorizontal: 20
@@ -3032,7 +3039,7 @@ const styles = StyleSheet.create({
     },
     attestationOrigin: {
         fontSize: 12,
-        color: '#94A3B8',
+        color: p.textMuted,
         textAlign: 'center',
         fontFamily: 'Inter',
         marginBottom: 20
@@ -3044,17 +3051,17 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         marginBottom: 8,
         borderRadius: 10,
-        backgroundColor: 'rgba(0,0,0,0.04)',
+        backgroundColor: p.buttonNeutral,
         gap: 8
     },
     detailsToggleText: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#64748B'
+        color: p.textSecondary
     },
     detailsToggleIcon: {
         fontSize: 10,
-        color: '#94A3B8'
+        color: p.textMuted
     },
     bottomActions: {
         position: 'absolute',
@@ -3063,17 +3070,17 @@ const styles = StyleSheet.create({
         right: 0,
         paddingHorizontal: 20,
         paddingTop: 16,
-        backgroundColor: '#F8FAFB',
+        backgroundColor: p.screenBg,
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: 'rgba(0,0,0,0.1)'
+        borderTopColor: p.border
     },
     warningBanner: {
-        backgroundColor: '#FFF3CD',
+        backgroundColor: p.warnBg,
         borderRadius: 8,
         padding: 12,
         marginBottom: 16
     },
-    warningText: { color: '#856404', fontSize: 14, textAlign: 'center' },
+    warningText: { color: p.warnText, fontSize: 14, textAlign: 'center' },
     statusBanner: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -3082,14 +3089,14 @@ const styles = StyleSheet.create({
         marginBottom: 24,
         gap: 12
     },
-    statusBannerValid: { backgroundColor: '#E8FFF0' },
-    statusBannerInvalid: { backgroundColor: '#FFF1F0' },
+    statusBannerValid: { backgroundColor: p.successBg },
+    statusBannerInvalid: { backgroundColor: p.dangerBg },
     statusIcon: { fontSize: 28, fontWeight: '700' },
     statusInfo: { flex: 1, backgroundColor: 'transparent' },
     statusTitle: { fontSize: 16, fontWeight: '700' },
-    statusTitleValid: { color: '#166534' },
-    statusTitleInvalid: { color: '#991B1B' },
-    statusDetail: { fontSize: 13, color: '#64748B', marginTop: 2 },
+    statusTitleValid: { color: p.successText },
+    statusTitleInvalid: { color: p.dangerText },
+    statusDetail: { fontSize: 13, color: p.textSecondary, marginTop: 2 },
     teeBadge: {
         paddingHorizontal: 10,
         paddingVertical: 4,
@@ -3105,21 +3112,21 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         gap: 8,
     },
-    verifyBadgeFresh: { backgroundColor: '#E8FFF0', borderWidth: 1, borderColor: '#34D399' },
-    verifyBadgeCached: { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1' },
-    verifyBadgeIcon: { fontSize: 14, fontWeight: '700', color: '#0F766E' },
-    verifyBadgeText: { fontSize: 13, fontWeight: '500', color: '#0F172A', flex: 1 },
+    verifyBadgeFresh: { backgroundColor: p.successBg, borderWidth: 1, borderColor: p.successBorder },
+    verifyBadgeCached: { backgroundColor: p.cardAlt, borderWidth: 1, borderColor: p.border },
+    verifyBadgeIcon: { fontSize: 14, fontWeight: '700', color: p.infoText },
+    verifyBadgeText: { fontSize: 13, fontWeight: '500', color: p.textPrimary, flex: 1 },
     sectionHeader: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: p.textMuted,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
         marginBottom: 8,
         marginTop: 4
     },
     attestationCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 16
@@ -3129,7 +3136,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: 8,
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(128,128,128,0.3)',
+        borderBottomColor: p.border,
         backgroundColor: 'transparent'
     },
     attestationLabel: { fontSize: 13, opacity: 0.6, flex: 1 },
@@ -3137,7 +3144,7 @@ const styles = StyleSheet.create({
     buttonRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
     approveButton: {
         flex: 1,
-        backgroundColor: '#34C759',
+        backgroundColor: p.approve,
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: 'center'
@@ -3145,14 +3152,14 @@ const styles = StyleSheet.create({
     approveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
     rejectButton: {
         flex: 1,
-        backgroundColor: 'rgba(128,128,128,0.2)',
+        backgroundColor: p.buttonNeutral,
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: 'center'
     },
     rejectButtonText: { fontSize: 17, fontWeight: '600' },
     secondaryButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: p.action,
         borderRadius: 12,
         paddingHorizontal: 32,
         paddingVertical: 14,
@@ -3166,13 +3173,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         alignItems: 'center'
     },
-    reportLinkText: { color: '#007AFF', fontSize: 15, fontWeight: '500' },
+    reportLinkText: { color: p.action, fontSize: 15, fontWeight: '500' },
     cancelButton: {
         marginTop: 24,
         paddingVertical: 12,
         paddingHorizontal: 24
     },
-    cancelButtonText: { fontSize: 16, color: '#8E8E93' },
+    cancelButtonText: { fontSize: 16, color: p.textMuted },
     selfieContainer: { flex: 1, backgroundColor: '#000' },
     selfieCamera: { flex: 1 },
     selfieOverlay: {
@@ -3189,7 +3196,7 @@ const styles = StyleSheet.create({
     selfieTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF' },
     selfieText: { fontSize: 14, color: '#E5E7EB', textAlign: 'center', lineHeight: 20 },
     selfieCaptureButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: p.action,
         borderRadius: 12,
         paddingVertical: 14,
         paddingHorizontal: 48,
@@ -3212,7 +3219,7 @@ const styles = StyleSheet.create({
         width: 72,
         height: 72,
         borderRadius: 20,
-        backgroundColor: '#007AFF',
+        backgroundColor: p.action,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 24
@@ -3225,14 +3232,14 @@ const styles = StyleSheet.create({
     confirmAppName: {
         fontSize: 20,
         fontWeight: '600',
-        color: '#1E293B',
+        color: p.textPrimary,
         textAlign: 'center',
         marginBottom: 4,
     },
     confirmDomain: {
         fontSize: 14,
         fontFamily: 'Inter',
-        color: '#94A3B8',
+        color: p.textMuted,
         textAlign: 'center',
         marginBottom: 12
     },
@@ -3240,7 +3247,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: 'rgba(15, 118, 110, 0.08)',
+        backgroundColor: p.infoBg,
         borderRadius: 8,
         paddingHorizontal: 10,
         paddingVertical: 6,
@@ -3249,12 +3256,12 @@ const styles = StyleSheet.create({
     confirmEndpoint: {
         fontSize: 13,
         fontFamily: 'Inter',
-        color: '#0F766E',
+        color: p.infoText,
         flexShrink: 1
     },
     confirmHint: {
         fontSize: 14,
-        color: '#94A3B8',
+        color: p.textMuted,
         textAlign: 'center',
         paddingHorizontal: 20
     },
@@ -3264,14 +3271,14 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 14,
         borderRadius: 10,
-        backgroundColor: 'rgba(234, 179, 8, 0.12)',
+        backgroundColor: p.warnBg,
         borderWidth: 1,
-        borderColor: 'rgba(234, 179, 8, 0.4)'
+        borderColor: p.warnBorder
     },
     confirmAgentText: {
         fontSize: 13,
         fontFamily: 'Inter',
-        color: '#EAB308',
+        color: p.warnText,
         textAlign: 'center'
     },
     confirmActions: {
@@ -3280,19 +3287,19 @@ const styles = StyleSheet.create({
     },
     confirmDenyButton: {
         flex: 1,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: p.cardAlt,
         borderRadius: 14,
         paddingVertical: 16,
         alignItems: 'center',
     },
     confirmDenyButtonText: {
-        color: '#64748B',
+        color: p.textSecondary,
         fontSize: 17,
         fontWeight: '600',
     },
     confirmApproveButton: {
         flex: 1,
-        backgroundColor: '#34C759',
+        backgroundColor: p.approve,
         borderRadius: 14,
         paddingVertical: 16,
         alignItems: 'center',
@@ -3303,7 +3310,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     confirmButton: {
-        backgroundColor: '#34C759',
+        backgroundColor: p.approve,
         borderRadius: 14,
         paddingVertical: 16,
         paddingHorizontal: 48,

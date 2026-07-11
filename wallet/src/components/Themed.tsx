@@ -6,9 +6,22 @@
 import { Image as DefaultImage } from 'expo-image';
 import { Text as DefaultText, View as DefaultView, Button as DefaultButton } from 'react-native';
 
-import Colors from '@/constants/colors';
+import Colors, { lightPalette, darkPalette, type Palette } from '@/constants/colors';
 
 import { useColorScheme } from './useColorScheme';
+
+/**
+ * The active semantic palette for the current colour scheme. Screens build
+ * their styles from these tokens instead of hardcoded hex values:
+ *
+ *   const p = usePalette();
+ *   const styles = useMemo(() => makeStyles(p), [p]);
+ */
+export function usePalette(): Palette {
+    return useColorScheme() === 'dark' ? darkPalette : lightPalette;
+}
+
+export type { Palette };
 
 type ThemeProps = { lightColor?: string; darkColor?: string };
 

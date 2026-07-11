@@ -16,7 +16,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -32,7 +32,7 @@ import {
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
-import { Text } from '@/components/Themed';
+import { Text, usePalette, type Palette } from '@/components/Themed';
 import { fetchReleaseProvenance, type ReleaseProvenance } from '@/services/release-provenance';
 import {
     approveVaultApproval,
@@ -63,6 +63,8 @@ function ReleaseLinkRow({
     value: string;
     url: string;
 }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <Pressable style={styles.row} onPress={() => void Linking.openURL(url)}>
             <Text style={styles.label}>{label}</Text>
@@ -70,8 +72,8 @@ function ReleaseLinkRow({
                 <Text style={styles.linkValue} numberOfLines={1}>
                     {value}
                 </Text>
-                <Ionicons name={icon} size={13} color="#0F766E" />
-                <Ionicons name="open-outline" size={13} color="#0F766E" />
+                <Ionicons name={icon} size={13} color={p.infoText} />
+                <Ionicons name="open-outline" size={13} color={p.infoText} />
             </RNView>
         </Pressable>
     );
@@ -87,6 +89,8 @@ function formatRemaining(expiresAtSec: number, nowMs: number): string {
 
 export default function VaultApprovalsScreen() {
     const params = useLocalSearchParams<{ vault_op?: string }>();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
 
     const pending = useVaultApprovalsStore((s) => s.pending);
     const loading = useVaultApprovalsStore((s) => s.loading);
@@ -208,7 +212,7 @@ export default function VaultApprovalsScreen() {
             <SubPageHeader title="Vault approvals" />
             <ScrollView
                 contentContainerStyle={styles.content}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#34E89E" />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={p.green} />}
             >
                 <Text style={styles.subtitle}>
                     Approve an operation you started from the CLI or portal. Each approval authorises exactly one
@@ -216,11 +220,11 @@ export default function VaultApprovalsScreen() {
                 </Text>
 
                 {loading && pending.length === 0 ? (
-                    <ActivityIndicator style={styles.spinner} color="#34E89E" />
+                    <ActivityIndicator style={styles.spinner} color={p.green} />
                 ) : pending.length === 0 ? (
                     <RNView style={styles.emptyCard}>
                         <RNView style={styles.emptyIcon}>
-                            <Ionicons name="checkmark-circle" size={30} color="#34E89E" />
+                            <Ionicons name="checkmark-circle" size={30} color={p.green} />
                         </RNView>
                         <Text style={styles.emptyTitle}>No pending approvals</Text>
                         <Text style={styles.emptyBody}>
@@ -241,7 +245,7 @@ export default function VaultApprovalsScreen() {
                                 <RNView style={styles.cardHeader}>
                                     <RNView style={styles.cardTitleWrap}>
                                         <RNView style={styles.cardIcon}>
-                                            <Ionicons name="key" size={16} color="#0F766E" />
+                                            <Ionicons name="key" size={16} color={p.infoText} />
                                         </RNView>
                                         <Text style={styles.cardTitle}>
                                             {s.operation === 'promote'
@@ -255,7 +259,7 @@ export default function VaultApprovalsScreen() {
                                         <Ionicons
                                             name="time-outline"
                                             size={12}
-                                            color={urgent ? '#B45309' : '#0F766E'}
+                                            color={urgent ? p.warnText : p.infoText}
                                         />
                                         <Text style={[styles.ttlText, urgent && styles.ttlTextUrgent]}>
                                             {remaining}
@@ -362,18 +366,18 @@ export default function VaultApprovalsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#F8FAFB' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p.screenBg },
     content: { padding: 16, paddingBottom: 40 },
-    subtitle: { fontSize: 13, lineHeight: 19, color: '#64748B', marginBottom: 16 },
+    subtitle: { fontSize: 13, lineHeight: 19, color: p.textSecondary, marginBottom: 16 },
     spinner: { marginTop: 40 },
     emptyCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 16,
         padding: 28,
         alignItems: 'center',
         gap: 10,
-        shadowColor: '#0F172A',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,
@@ -387,24 +391,24 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    emptyTitle: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
-    emptyBody: { fontSize: 13, lineHeight: 19, color: '#64748B', textAlign: 'center' },
+    emptyTitle: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
+    emptyBody: { fontSize: 13, lineHeight: 19, color: p.textSecondary, textAlign: 'center' },
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: p.card,
         borderRadius: 16,
         padding: 16,
         marginBottom: 14,
-        shadowColor: '#0F172A',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,
         elevation: 2,
     },
-    cardHighlighted: { borderWidth: 1, borderColor: '#34E89E' },
-    subject: { fontSize: 17, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
-    plain: { fontSize: 13, lineHeight: 19, color: '#475569', marginBottom: 12 },
+    cardHighlighted: { borderWidth: 1, borderColor: p.green },
+    subject: { fontSize: 17, fontWeight: '700', color: p.textPrimary, marginBottom: 4 },
+    plain: { fontSize: 13, lineHeight: 19, color: p.textSecondary, marginBottom: 12 },
     linkValueWrap: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
-    linkValue: { fontSize: 14, fontWeight: '600', color: '#0F766E', flexShrink: 1 },
+    linkValue: { fontSize: 14, fontWeight: '600', color: p.infoText, flexShrink: 1 },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -420,7 +424,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    cardTitle: { fontSize: 15, fontWeight: '600', color: '#0F172A', flexShrink: 1 },
+    cardTitle: { fontSize: 15, fontWeight: '600', color: p.textPrimary, flexShrink: 1 },
     ttlPill: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -430,17 +434,17 @@ const styles = StyleSheet.create({
         paddingVertical: 3,
         borderRadius: 10,
     },
-    ttlPillUrgent: { backgroundColor: '#FEF3C7' },
-    ttlText: { fontSize: 12, fontWeight: '600', color: '#0F766E' },
-    ttlTextUrgent: { color: '#B45309' },
+    ttlPillUrgent: { backgroundColor: p.warnBg },
+    ttlText: { fontSize: 12, fontWeight: '600', color: p.infoText },
+    ttlTextUrgent: { color: p.warnText },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    label: { fontSize: 13, color: '#64748B' },
-    value: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
-    mono: { fontSize: 12, color: '#334155', fontFamily: 'monospace' },
+    label: { fontSize: 13, color: p.textSecondary },
+    value: { fontSize: 14, fontWeight: '600', color: p.textPrimary },
+    mono: { fontSize: 12, color: p.textSecondary, fontFamily: 'monospace' },
     approveBtn: {
         flexDirection: 'row',
         gap: 8,
-        backgroundColor: '#34E89E',
+        backgroundColor: p.green,
         borderRadius: 12,
         paddingVertical: 13,
         alignItems: 'center',

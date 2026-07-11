@@ -47,7 +47,7 @@ import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, attestEnclave } from '@/services/attestation';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
 import { ensureDrive } from '@/services/drive';
-import { appIdFromOids } from '@/services/release-provenance';
+import { appIdFromOids, fetchRunningAppReleases, type OsRelease, type WorkloadRelease } from '@/services/release-provenance';
 import { relaySessionToken } from '@/services/broker';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
@@ -642,6 +642,9 @@ export default function ConnectScreen() {
     // AttestationView recovery UX. Null → legacy behaviour (attestation.valid).
     const [verification, setVerification] = useState<VerificationState | null>(null);
     const [challengeInFlight, setChallengeInFlight] = useState(false);
+    // Published-release links (best-effort, from mgmt release provenance) so the
+    // approval screens can link to the reviewable code behind the measurements.
+    const [releases, setReleases] = useState<{ workload?: WorkloadRelease; os?: OsRelease } | null>(null);
     // The host actually attested, so the "Challenge this enclave" button can
     // re-verify the same target in challenge mode.
     const attestationTargetRef = useRef<string | null>(null);
@@ -717,6 +720,8 @@ export default function ConnectScreen() {
     const startFlow = useCallback(
         async (payload: QRPayload) => {
             setStep('verifying');
+            setReleases(null);
+            setVerification(null);
             // The relying-party app the user is actually signing into is
             // `payload.rpId` (e.g. `lightpanda.apps-test.privasys.org`).
             // `payload.origin` is the FIDO2 ceremony host (the IdP at
@@ -799,6 +804,19 @@ export default function ConnectScreen() {
                     // First time — register (FIDO2 handles biometric via NativeKeys)
                     await ensureConsentRef.current(payload, () => doRegister(payload));
                     return;
+                }
+
+                // Published-release links for the approval screens (best-effort,
+                // in parallel with verification). The app id is in the cert's
+                // OID 3.6 whatever the verify outcome, so the user can review
+                // the code even when deciding on a changed or failed enclave.
+                const relAppId = appIdFromOids(inspectResult.custom_oids);
+                if (relAppId) {
+                    void fetchRunningAppReleases(relAppId).then((r) => {
+                        if (r && (r.workload_release?.url || r.os_release?.url)) {
+                            setReleases({ workload: r.workload_release, os: r.os_release });
+                        }
+                    });
                 }
 
                 // Step 2b — enclave path. Decide between cached trust and a
@@ -1198,39 +1216,59 @@ export default function ConnectScreen() {
         const credential = getCredentialForRp(qr.rpId);
         if (!credential) return;
 
-        // Consent first — the disclosure step is gated by what it approves.
-        await ensureConsentThen(qr, async () => {
-            // Go directly to FIDO2 — NativeKeys.sign() handles biometric.
-            await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
-        });
+        try {
+            // Consent first — the disclosure step is gated by what it approves.
+            await ensureConsentThen(qr, async () => {
+                // Go directly to FIDO2 — NativeKeys.sign() handles biometric.
+                await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
+            });
+        } catch (e: any) {
+            console.error('[CONNECT] confirm FAILED:', e?.message, e);
+            setError(`Sign-in failed: ${e?.message ?? e}`);
+            setStep('error');
+        }
     }, [qr, ensureConsentThen]);
 
     const handleApprove = useCallback(async () => {
-        if (!qr || !attestation) return;
-
-        // Voucher-only: extend the live session to this enclave (one biometric,
-        // no sign-in). Handled separately — no WebAuthn registration/relay.
-        if (qr.mode === 'voucher-only') {
-            await doVoucherOnly(qr);
+        // Never die silently: an async onPress that rejects (or an early
+        // return) is invisible in RN — the tap just "does nothing". Log the
+        // entry and route ANY failure to the error screen.
+        if (!qr || !attestation) {
+            console.warn(
+                `[CONNECT] approve pressed without state (qr=${!!qr}, attestation=${!!attestation}) — ignoring`
+            );
             return;
         }
-
-        // Consent first — the disclosure step is gated by what it approves.
-        await ensureConsentThen(qr, async () => {
-            // If attestation changed, the enclave has a new KV store and our
-            // old credential no longer exists server-side.  Remove it and
-            // re-register so the user gets a fresh credential.
-            const credential = getCredentialForRp(qr.rpId);
-            if (credential && attestationChanged) {
-                console.log('[CONNECT] attestation changed — removing old credential and re-registering');
-                removeCredential(credential.credentialId);
-                await doRegister(qr);
-            } else if (credential) {
-                await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
-            } else {
-                await doRegister(qr);
+        console.log(`[CONNECT] approve pressed (mode=${qr.mode ?? 'standard'}, changed=${attestationChanged})`);
+        try {
+            // Voucher-only: extend the live session to this enclave (one biometric,
+            // no sign-in). Handled separately — no WebAuthn registration/relay.
+            if (qr.mode === 'voucher-only') {
+                await doVoucherOnly(qr);
+                return;
             }
-        });
+
+            // Consent first — the disclosure step is gated by what it approves.
+            await ensureConsentThen(qr, async () => {
+                // If attestation changed, the enclave has a new KV store and our
+                // old credential no longer exists server-side.  Remove it and
+                // re-register so the user gets a fresh credential.
+                const credential = getCredentialForRp(qr.rpId);
+                if (credential && attestationChanged) {
+                    console.log('[CONNECT] attestation changed — removing old credential and re-registering');
+                    removeCredential(credential.credentialId);
+                    await doRegister(qr);
+                } else if (credential) {
+                    await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
+                } else {
+                    await doRegister(qr);
+                }
+            });
+        } catch (e: any) {
+            console.error('[CONNECT] approve FAILED:', e?.message, e);
+            setError(`Approval failed: ${e?.message ?? e}`);
+            setStep('error');
+        }
     }, [qr, attestation, attestationChanged, ensureConsentThen]);
 
     /** Build the wallet-side session-relay argument from the QR payload
@@ -1288,18 +1326,23 @@ export default function ConnectScreen() {
      *  The browser's poll then sees the new voucher and resumes the sealed
      *  session silently. */
     const doVoucherOnly = async (payload: QRPayload) => {
+        // Every early guard must also switch to the error step — setError alone
+        // leaves the approval screen up and the tap looks dead.
         const att = attestationRef.current ?? attestation;
         if (!att) {
             setError('No verified attestation for this app.');
+            setStep('error');
             return;
         }
         if (!payload.appHost || !payload.clientId || !payload.sdkPub || !payload.sid) {
             setError('Malformed approval request (missing appHost/clientId/sdkPub/sid).');
+            setStep('error');
             return;
         }
         const credential = getCredentialForRp(payload.rpId);
         if (!credential) {
             setError(`No credential for ${payload.rpId}. Sign in first, then add the tool.`);
+            setStep('error');
             return;
         }
         setStep('authenticating');
@@ -1971,6 +2014,7 @@ export default function ConnectScreen() {
                         isChanged={false}
                         verificationLevel={verificationLevel}
                         verification={verification ?? undefined}
+                        releases={releases}
                         onApprove={handleApprove}
                         onReject={handleReject}
                         onChallenge={handleChallenge}
@@ -1987,6 +2031,7 @@ export default function ConnectScreen() {
                         diff={attestationDiff}
                         verificationLevel={verificationLevel}
                         verification={verification ?? undefined}
+                        releases={releases}
                         onApprove={handleApprove}
                         onReject={handleReject}
                         onChallenge={handleChallenge}

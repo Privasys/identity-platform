@@ -43,11 +43,11 @@ export interface AttestationDiff {
 
 const SUMMARIES: Record<AttestationChangeKind, string> = {
     'app-update':
-        'The application was updated by its developer. The platform hosting it is unchanged.',
+        'This app’s code has changed since you last verified it, usually a routine update by its developer. The secure enclave it runs in is the same.',
     'platform-update':
-        'The platform hosting this application was upgraded. The application itself is unchanged.',
+        'The secure enclave running this app has been upgraded. The app’s own code is the same as when you last verified it.',
     'app-and-platform-update':
-        'Both the application and the platform hosting it have changed.',
+        'Both this app’s code and the secure enclave running it have changed since you last verified it.',
 };
 
 function changed(previous?: string, current?: string): boolean {

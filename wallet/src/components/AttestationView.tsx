@@ -12,8 +12,10 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ExternalLink } from '@/components/ExternalLink';
 import { Text, View } from '@/components/Themed';
 import type { AttestationDiff } from '@/services/attestation-diff';
+import type { OsRelease, WorkloadRelease } from '@/services/release-provenance';
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
 
 /**
@@ -68,6 +70,7 @@ export function AttestationView({
     diff,
     verificationLevel,
     verification,
+    releases,
     onApprove,
     onReject,
     onChallenge,
@@ -91,6 +94,12 @@ export function AttestationView({
      * omitted the screen falls back to `attestation.valid` (legacy behaviour).
      */
     verification?: VerificationState;
+    /**
+     * Published-release links (mgmt release provenance) so the user can review
+     * the actual code behind the measurements before approving — the app's
+     * GitHub release and, for platform changes, the enclave-OS release.
+     */
+    releases?: { workload?: WorkloadRelease; os?: OsRelease } | null;
     onApprove: () => void;
     onReject: () => void;
     /** When provided (deterministic mode), shows a "Challenge this enclave"
@@ -121,6 +130,18 @@ export function AttestationView({
         isVerified &&
         !verification?.challenged &&
         (verification?.mode ?? 'deterministic') === 'deterministic';
+
+    // How the current trust was established, folded into the status banner (a
+    // separate badge just repeated "Attestation Valid" in different words).
+    const provenanceLine = !isVerified
+        ? null
+        : verification?.challenged
+            ? '⚡ Challenged just now and bound to this session'
+            : verificationLevel === 'fresh-as-verified'
+                ? 'Verified just now by as.privasys.org'
+                : verificationLevel === 'cached-trusted'
+                    ? 'Trusted from a recent verification on this device'
+                    : null;
 
     return (
         <RNView style={{ flex: 1 }}>
@@ -169,6 +190,9 @@ export function AttestationView({
                         <Text style={styles.statusDetail}>
                             {appType} · {attestation.tee_type?.toUpperCase()} enclave
                         </Text>
+                        {provenanceLine && (
+                            <Text style={styles.statusProvenance}>{provenanceLine}</Text>
+                        )}
                     </View>
                     <View style={[styles.teeBadge, { backgroundColor: teeColor }]}>
                         <Text style={styles.teeBadgeText}>{attestation.tee_type?.toUpperCase()}</Text>
@@ -201,17 +225,6 @@ export function AttestationView({
                     </View>
                 )}
 
-                {/* Liveness — the enclave answered a fresh challenge bound to this
-                    exact TLS session. */}
-                {verification?.challenged && (
-                    <View style={[styles.verifyBadge, styles.verifyBadgeChallenged]}>
-                        <Text style={styles.verifyBadgeIcon}>⚡</Text>
-                        <Text style={styles.verifyBadgeText}>
-                            Challenged just now — proven live and bound to this session
-                        </Text>
-                    </View>
-                )}
-
                 {/* Challenge-this-enclave — deterministic mode only. Lets the user
                     demand a fresh liveness proof for this one connection. */}
                 {showChallenge && (
@@ -229,21 +242,6 @@ export function AttestationView({
                             {challengeInFlight ? 'Challenging…' : 'Challenge this enclave'}
                         </Text>
                     </Pressable>
-                )}
-
-                {/* Verification-level badge — surfaces whether we just contacted
-                    the attestation server or trusted a recent local cache. */}
-                {verificationLevel === 'fresh-as-verified' && (
-                    <View style={[styles.verifyBadge, styles.verifyBadgeFresh]}>
-                        <Text style={styles.verifyBadgeIcon}>✓</Text>
-                        <Text style={styles.verifyBadgeText}>Verified just now by as.privasys.org</Text>
-                    </View>
-                )}
-                {verificationLevel === 'cached-trusted' && (
-                    <View style={[styles.verifyBadge, styles.verifyBadgeCached]}>
-                        <Text style={styles.verifyBadgeIcon}>↻</Text>
-                        <Text style={styles.verifyBadgeText}>Trusted from a recent verification on this device</Text>
-                    </View>
                 )}
 
                 {/* What changed — always visible on the changed step, so the
@@ -267,6 +265,39 @@ export function AttestationView({
                                     </View>
                                 </View>
                             ))}
+                        </View>
+                    </>
+                )}
+
+                {/* Published release — the human-reviewable code behind the
+                    measurements. On a change this is how the user actually
+                    inspects what they are being asked to approve. */}
+                {(releases?.workload?.url || releases?.os?.url) && (
+                    <>
+                        <Text style={styles.sectionHeader}>Published Release</Text>
+                        <View style={styles.attestationCard}>
+                            {releases?.workload?.url && (
+                                <ExternalLink href={releases.workload.url}>
+                                    <View style={styles.releaseRow}>
+                                        <Text style={styles.releaseLabel}>
+                                            Review the app code
+                                            {releases.workload.label ? ` (${releases.workload.label})` : ''}
+                                        </Text>
+                                        <Text style={styles.releaseLink}>GitHub ↗</Text>
+                                    </View>
+                                </ExternalLink>
+                            )}
+                            {releases?.os?.url && (
+                                <ExternalLink href={releases.os.url}>
+                                    <View style={styles.releaseRow}>
+                                        <Text style={styles.releaseLabel}>
+                                            Review the enclave platform
+                                            {releases.os.tag ? ` (${releases.os.tag})` : ''}
+                                        </Text>
+                                        <Text style={styles.releaseLink}>GitHub ↗</Text>
+                                    </View>
+                                </ExternalLink>
+                            )}
                         </View>
                     </>
                 )}
@@ -458,6 +489,14 @@ const styles = StyleSheet.create({
     statusTitleInvalid: { color: '#991B1B' },
     statusTitleUnknown: { color: '#92610A' },
     statusDetail: { fontSize: 13, color: '#64748B', marginTop: 2 },
+    statusProvenance: { fontSize: 12, color: '#0F766E', fontWeight: '500', marginTop: 4 },
+
+    releaseRow: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingVertical: 10, backgroundColor: 'transparent',
+    },
+    releaseLabel: { fontSize: 14, color: '#0F172A', flex: 1 },
+    releaseLink: { fontSize: 14, fontWeight: '600', color: '#00BCF2' },
 
     // Unreachable (amber) — availability issue, plain continue.
     unknownBanner: { backgroundColor: '#FEF9E7', borderRadius: 12, borderWidth: 1, borderColor: '#F6D680', padding: 14, marginBottom: 16 },
@@ -477,14 +516,8 @@ const styles = StyleSheet.create({
     },
     challengeIcon: { fontSize: 15, color: '#0F766E' },
     challengeText: { fontSize: 14, fontWeight: '600', color: '#0F766E' },
-    verifyBadgeChallenged: { backgroundColor: '#ECFEFF', borderWidth: 1, borderColor: '#22D3EE' },
     teeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
     teeBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
-    verifyBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginBottom: 12, gap: 8 },
-    verifyBadgeFresh: { backgroundColor: '#E8FFF0', borderWidth: 1, borderColor: '#34D399' },
-    verifyBadgeCached: { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1' },
-    verifyBadgeIcon: { fontSize: 14, fontWeight: '700', color: '#0F766E' },
-    verifyBadgeText: { fontSize: 13, fontWeight: '500', color: '#0F172A', flex: 1 },
     sectionHeader: {
         fontSize: 13, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase',
         letterSpacing: 0.5, marginBottom: 8, marginTop: 4,

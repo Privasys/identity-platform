@@ -812,7 +812,7 @@ export default function ConnectScreen() {
                 // the code even when deciding on a changed or failed enclave.
                 const relAppId = appIdFromOids(inspectResult.custom_oids);
                 if (relAppId) {
-                    void fetchRunningAppReleases(relAppId).then((r) => {
+                    void fetchRunningAppReleases(relAppId, attestationTarget).then((r) => {
                         if (r && (r.workload_release?.url || r.os_release?.url)) {
                             setReleases({ workload: r.workload_release, os: r.os_release });
                         }
@@ -1250,11 +1250,21 @@ export default function ConnectScreen() {
 
             // Consent first — the disclosure step is gated by what it approves.
             await ensureConsentThen(qr, async () => {
-                // If attestation changed, the enclave has a new KV store and our
-                // old credential no longer exists server-side.  Remove it and
-                // re-register so the user gets a fresh credential.
+                // If attestation changed AND the RP *is* the enclave app
+                // (enclave-as-RP: the credential lives in the enclave's sealed
+                // KV), the new KV means our old credential no longer exists
+                // server-side — remove it and re-register.
+                //
+                // Never do this for IdP-brokered ceremonies (rpId = the IdP,
+                // e.g. privasys.id, with a separate appHost): the credential
+                // lives at the IdP and survives app redeploys, and re-register
+                // would mint a NEW pairwise userHandle — a brand-new identity
+                // that silently orphans everything keyed to the old sub
+                // (tenants, vault keys, billing). A changed app enclave only
+                // needs the user's approval, then a normal authenticate.
+                const rpIsEnclave = !qr.appHost || qr.appHost === qr.rpId;
                 const credential = getCredentialForRp(qr.rpId);
-                if (credential && attestationChanged) {
+                if (credential && attestationChanged && rpIsEnclave) {
                     console.log('[CONNECT] attestation changed — removing old credential and re-registering');
                     removeCredential(credential.credentialId);
                     await doRegister(qr);
@@ -2955,7 +2965,10 @@ const acqStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
+    // The wallet's standard screen background. The fixed bottom action bars on
+    // this route use the same colour — hosting them on the themed (white)
+    // default made each bar read as an off-white patch around the buttons.
+    container: { flex: 1, backgroundColor: '#F8FAFB' },
     centered: {
         flex: 1,
         alignItems: 'center',

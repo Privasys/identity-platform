@@ -144,7 +144,11 @@ export function AttestationView({
                     : null;
 
     return (
-        <RNView style={{ flex: 1 }}>
+        // Paint the standard screen background ourselves: the hosting route may
+        // sit on a themed (white) view, and the fixed bottom bar below shares
+        // this exact colour — without this the bar reads as an off-white patch
+        // between the buttons and around their border radius.
+        <RNView style={{ flex: 1, backgroundColor: SCREEN_BG }}>
             <ScrollView contentContainerStyle={[styles.attestationContainer, { paddingBottom: 100 + insets.bottom }]}>
                 {isChanged && (
                     <View style={styles.warningBanner}>
@@ -460,6 +464,9 @@ export function truncateHex(hex: string): string {
     return `${hex.slice(0, 8)}…${hex.slice(-8)}`;
 }
 
+/** The wallet's standard screen background (matches settings/profile/home). */
+const SCREEN_BG = '#F8FAFB';
+
 const styles = StyleSheet.create({
     attestationContainer: { padding: 20, paddingTop: 80 },
     title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
@@ -474,7 +481,7 @@ const styles = StyleSheet.create({
     detailsToggleIcon: { fontSize: 10, color: '#94A3B8' },
     bottomActions: {
         position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 16,
-        backgroundColor: '#F8FAFB', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.1)',
+        backgroundColor: SCREEN_BG, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.1)',
     },
     warningBanner: { backgroundColor: '#FFF3CD', borderRadius: 8, padding: 12, marginBottom: 16 },
     warningText: { color: '#856404', fontSize: 14, textAlign: 'center' },

@@ -22,8 +22,27 @@
  * hardware-rooted anchor remains the attested quote / the vault binding.
  */
 
-const PLATFORM_API_BASE =
-    process.env.EXPO_PUBLIC_PLATFORM_API_URL ?? 'https://api-test.developer.privasys.org';
+const PROD_API_BASE = 'https://api.developer.privasys.org';
+const DEV_API_BASE = 'https://api-test.developer.privasys.org';
+const DEFAULT_API_BASE = process.env.EXPO_PUBLIC_PLATFORM_API_URL ?? DEV_API_BASE;
+
+/**
+ * Ordered control-plane candidates for an app. The wallet build pins ONE
+ * platform API via EXPO_PUBLIC_PLATFORM_API_URL, but a production wallet is
+ * routinely shown dev apps (…apps-test.privasys.org) and vice versa — and an
+ * app id only exists on its own control plane, so asking the wrong one 404s
+ * and the release card silently vanished. Prefer the base implied by the app
+ * host, then fall back through the known environments; a wrong base costs one
+ * fast 404, nothing else.
+ */
+function apiBasesForHost(appHost?: string): string[] {
+    const preferred = appHost?.endsWith('.apps-test.privasys.org')
+        ? DEV_API_BASE
+        : appHost?.endsWith('.apps.privasys.org')
+            ? PROD_API_BASE
+            : DEFAULT_API_BASE;
+    return [...new Set([preferred, DEFAULT_API_BASE, PROD_API_BASE, DEV_API_BASE])];
+}
 
 /** The published container package/release the code was built from. */
 export interface WorkloadRelease {
@@ -85,6 +104,15 @@ async function getJSON<T>(url: string): Promise<T | null> {
     }
 }
 
+/** GET `path` from the first control-plane candidate that answers. */
+async function getJSONFirst<T>(path: string, appHost?: string): Promise<T | null> {
+    for (const base of apiBasesForHost(appHost)) {
+        const result = await getJSON<T>(`${base}${path}`);
+        if (result) return result;
+    }
+    return null;
+}
+
 /**
  * Resolve the published release + code-diff for a specific app version. Public;
  * no enclave needs to be running. Pass `digest` (the target OID 3.2 hex) to also
@@ -94,12 +122,14 @@ async function getJSON<T>(url: string): Promise<T | null> {
 export async function fetchReleaseProvenance(
     appId: string,
     versionId: string,
-    digest?: string
+    digest?: string,
+    appHost?: string
 ): Promise<ReleaseProvenance | null> {
     if (!appId || !versionId) return null;
     const q = digest ? `?digest=${encodeURIComponent(digest)}` : '';
-    return getJSON<ReleaseProvenance>(
-        `${PLATFORM_API_BASE}/api/v1/apps/${encodeURIComponent(appId)}/versions/${encodeURIComponent(versionId)}/release-provenance${q}`
+    return getJSONFirst<ReleaseProvenance>(
+        `/api/v1/apps/${encodeURIComponent(appId)}/versions/${encodeURIComponent(versionId)}/release-provenance${q}`,
+        appHost
     );
 }
 
@@ -109,11 +139,13 @@ export async function fetchReleaseProvenance(
  * management app id we know (OID 3.6). Returns null on failure.
  */
 export async function fetchRunningAppReleases(
-    appId: string
+    appId: string,
+    appHost?: string
 ): Promise<{ os_release?: OsRelease; workload_release?: WorkloadRelease } | null> {
     if (!appId) return null;
-    const data = await getJSON<{ os_release?: OsRelease; workload_release?: WorkloadRelease }>(
-        `${PLATFORM_API_BASE}/api/v1/apps/${encodeURIComponent(appId)}/attest`
+    const data = await getJSONFirst<{ os_release?: OsRelease; workload_release?: WorkloadRelease }>(
+        `/api/v1/apps/${encodeURIComponent(appId)}/attest`,
+        appHost
     );
     if (!data) return null;
     return { os_release: data.os_release, workload_release: data.workload_release };

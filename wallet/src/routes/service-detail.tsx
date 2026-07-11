@@ -130,13 +130,13 @@ export default function ServiceDetailScreen() {
             return;
         }
         let cancelled = false;
-        void fetchRunningAppReleases(runningAppId).then((r) => {
+        void fetchRunningAppReleases(runningAppId, primaryHost).then((r) => {
             if (!cancelled && r) setReleases({ os: r.os_release, workload: r.workload_release });
         });
         return () => {
             cancelled = true;
         };
-    }, [runningAppId]);
+    }, [runningAppId, primaryHost]);
 
     // Server-side sign-out: revoke every IdP session issued to THIS app
     // (client_id-keyed rows), so its tokens stop working immediately — the

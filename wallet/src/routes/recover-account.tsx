@@ -45,7 +45,11 @@ import { useProfileStore } from '@/stores/profile';
 import * as Storage from '@/utils/storage';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
-const RECOVERY_STATE_KEY = '@privasys/recovery-state';
+// SecureStore keys allow only [A-Za-z0-9._-]. The previous value
+// ('@privasys/recovery-state') was rejected by iOS at write time, which made
+// EVERY successful /recovery/begin crash right after the server had already
+// consumed the phrase — the reason recovery never completed for anyone.
+const RECOVERY_STATE_KEY = 'privasys.recovery-state';
 
 /**
  * Validate the BIP39 checksum of a 24-word phrase: the final 8 bits of the
@@ -165,6 +169,25 @@ export default function RecoverAccountScreen() {
         if (tokens.length <= 1) return { phrase: raw.trim(), words: tokens.length };
         return { phrase: tokens.join(' '), words: tokens.length };
     };
+
+    /**
+     * Live per-word feedback while the phrase is typed. Each completed word is
+     * checked against the BIP39 wordlist immediately; the word still being
+     * typed (no separator after it yet) stays neutral while it is a valid
+     * prefix of some wordlist word, and only turns red once no completion
+     * exists. Catches transcription errors at the word they happen instead of
+     * at submit time.
+     */
+    const typedWords = codeInput.toLowerCase().match(/[a-z]+/g) ?? [];
+    const inputEndsMidWord = /[a-z]$/i.test(codeInput);
+    const wordStates = typedWords.map((w, i) => {
+        if (BIP39_WORDSET.has(w)) return { w, state: 'valid' as const };
+        const isLastAndTyping = i === typedWords.length - 1 && inputEndsMidWord;
+        if (isLastAndTyping && BIP39_WORDLIST.some((x) => x.startsWith(w))) {
+            return { w, state: 'typing' as const };
+        }
+        return { w, state: 'invalid' as const };
+    });
 
     const handleSubmitCode = async () => {
         if (!codeInput.trim()) return;
@@ -389,6 +412,47 @@ export default function RecoverAccountScreen() {
                                 autoFocus
                                 multiline
                             />
+                            {/* Live word-by-word validation: green = recovery
+                                word, red = not one (check your transcription),
+                                grey = still being typed. */}
+                            {wordStates.length > 0 && (
+                                <>
+                                    <RNView style={styles.wordChips}>
+                                        {wordStates.map(({ w, state }, i) => (
+                                            <RNView
+                                                key={`${i}-${w}`}
+                                                style={[
+                                                    styles.wordChip,
+                                                    state === 'valid' && styles.wordChipValid,
+                                                    state === 'invalid' && styles.wordChipInvalid,
+                                                ]}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.wordChipText,
+                                                        state === 'invalid' && styles.wordChipTextInvalid,
+                                                    ]}
+                                                >
+                                                    {i + 1}. {w}
+                                                </Text>
+                                            </RNView>
+                                        ))}
+                                    </RNView>
+                                    <Text
+                                        style={[
+                                            styles.wordCount,
+                                            wordStates.length === 24 &&
+                                                wordStates.every((s) => s.state === 'valid') &&
+                                                styles.wordCountComplete,
+                                        ]}
+                                    >
+                                        {wordStates.length} / 24 words
+                                        {wordStates.some((s) => s.state === 'invalid')
+                                            ? ' · fix the red words'
+                                            : ''}
+                                    </Text>
+                                </>
+                            )}
                             <Pressable
                                 style={[styles.primaryButton, (submitting || !codeInput.trim()) && { opacity: 0.6 }]}
                                 onPress={handleSubmitCode}
@@ -615,6 +679,48 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         fontFamily: 'Inter',
         letterSpacing: 1,
+    },
+
+    wordChips: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 8,
+    },
+    wordChip: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    wordChipValid: {
+        backgroundColor: '#E8FFF0',
+        borderColor: '#34D399',
+    },
+    wordChipInvalid: {
+        backgroundColor: '#FFF1F0',
+        borderColor: '#FCA5A5',
+    },
+    wordChipText: {
+        fontSize: 12,
+        fontFamily: 'Inter',
+        color: '#0F172A',
+    },
+    wordChipTextInvalid: {
+        color: '#991B1B',
+        fontWeight: '600',
+    },
+    wordCount: {
+        fontSize: 12,
+        color: '#94A3B8',
+        marginBottom: 12,
+        textAlign: 'right',
+    },
+    wordCountComplete: {
+        color: '#0F766E',
+        fontWeight: '600',
     },
 
     primaryButton: {

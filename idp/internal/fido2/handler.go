@@ -338,6 +338,40 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		userID = generateUserID()
 	}
 
+	// Takeover gate: a caller-supplied userHandle pointing at an EXISTING
+	// account is only accepted right after a completed recovery for that
+	// account. Without this, anyone who learns a user_id (it appears in every
+	// id_token an RP receives) could register their own credential on the
+	// account — including credential-less accounts that still hold roles.
+	// Brand-new user ids (no row yet) register freely, as before.
+	if req.UserHandle != "" {
+		var exists int
+		if err := h.db.QueryRow(
+			"SELECT COUNT(*) FROM users WHERE user_id = ?", userID,
+		).Scan(&exists); err != nil {
+			log.Printf("fido2/register/begin: existence check failed: %v", err)
+			errorJSON(w, http.StatusInternalServerError, "database error")
+			return
+		}
+		if exists > 0 {
+			var recovered int
+			if err := h.db.QueryRow(
+				`SELECT COUNT(*) FROM recovery_requests
+				 WHERE user_id = ? AND status = 'completed' AND expires_at > ?`,
+				userID, time.Now(),
+			).Scan(&recovered); err != nil {
+				log.Printf("fido2/register/begin: recovery check failed: %v", err)
+				errorJSON(w, http.StatusInternalServerError, "database error")
+				return
+			}
+			if recovered == 0 {
+				log.Printf("fido2/register/begin: refused registration for existing user %s… (no completed recovery)", userID[:min(8, len(userID))])
+				errorJSON(w, http.StatusForbidden, "registration for an existing account requires account recovery")
+				return
+			}
+		}
+	}
+
 	// Ensure user exists in DB.
 	_, err := h.db.Exec(`
 		INSERT INTO users (user_id) VALUES (?)

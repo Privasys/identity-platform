@@ -607,8 +607,12 @@ func (db *DB) VerifyRecoveryCode(userID, codeHash string) (bool, error) {
 	return n == 1, nil
 }
 
-// FindUserByRecoveryCode checks a code hash against all users' unused codes.
-// Returns user_id and consumes the code if found.
+// FindUserByRecoveryCode checks a code hash against all users' unused codes
+// and returns the matching user_id. It does NOT consume the code: consumption
+// happens at recovery COMPLETION (CompleteRecovery deletes all of the user's
+// codes). Consuming at begin meant any client-side failure after a successful
+// begin — or an abandoned/expired request — permanently burnt the single-use
+// phrase and locked the user out with the phrase in hand.
 func (db *DB) FindUserByRecoveryCode(codeHash string) (string, error) {
 	var userID string
 	err := db.QueryRow(
@@ -618,9 +622,6 @@ func (db *DB) FindUserByRecoveryCode(codeHash string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid recovery code")
 	}
-	// Consume the code.
-	db.Exec("UPDATE recovery_codes SET used_at = ? WHERE user_id = ? AND code_hash = ?",
-		time.Now(), userID, codeHash)
 	return userID, nil
 }
 

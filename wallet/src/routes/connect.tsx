@@ -36,6 +36,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+import * as Crypto from 'expo-crypto';
+import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { base64urlToBytes } from '@/utils/encoding';
 import { buildErrorReport, REPORT_DESTINATION } from '@/utils/logs';
@@ -1265,9 +1268,12 @@ export default function ConnectScreen() {
                 const rpIsEnclave = !qr.appHost || qr.appHost === qr.rpId;
                 const credential = getCredentialForRp(qr.rpId);
                 if (credential && attestationChanged && rpIsEnclave) {
-                    console.log('[CONNECT] attestation changed — removing old credential and re-registering');
-                    removeCredential(credential.credentialId);
-                    await doRegister(qr);
+                    // Two-phase swap: the old credential (and its hardware key)
+                    // is removed only AFTER the replacement registration fully
+                    // succeeds — a failed re-register must never leave the user
+                    // with no credential and a destroyed key.
+                    console.log('[CONNECT] attestation changed — re-registering, old credential retired on success');
+                    await doRegister(qr, { credentialId: credential.credentialId, keyAlias: credential.keyAlias });
                 } else if (credential) {
                     await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
                 } else {
@@ -1543,11 +1549,22 @@ export default function ConnectScreen() {
         }
     };
 
-    const doRegister = async (payload: QRPayload) => {
+    /**
+     * Register a fresh credential for the payload's RP. The hardware key gets a
+     * UNIQUE per-credential alias — never the shared `fido2-<rpId>` name — so a
+     * re-registration can never overwrite (and irreversibly destroy) the
+     * private key of an existing credential. When `replace` is given, the
+     * superseded credential and its key are retired only AFTER the new
+     * registration fully succeeds and is persisted (two-phase swap).
+     */
+    const doRegister = async (
+        payload: QRPayload,
+        replace?: { credentialId: string; keyAlias: string },
+    ) => {
         setStep('authenticating');
         console.log(`[CONNECT] doRegister — origin=${payload.origin}, rpId=${payload.rpId}`);
         try {
-            const keyAlias = `fido2-${payload.rpId}`;
+            const keyAlias = `fido2-${payload.rpId}-${bytesToHex(Crypto.getRandomBytes(4))}`;
             const currentProfile = useProfileStore.getState().profile;
             // Build session-relay binding (mirror of doAuthenticate). Without
             // this, first-time users get a vanilla passkey and no sealed
@@ -1610,6 +1627,24 @@ export default function ConnectScreen() {
 
             // Relay succeeded — now persist locally.
             persistCredentialAndTrust(payload, result.credentialId, keyAlias, result.userHandle, result.userName, result.serverRpId);
+
+            // Two-phase swap, phase 2: the replacement is registered and
+            // persisted, so the superseded credential can be retired. Its
+            // hardware key is deleted only if no other credential references
+            // the alias (legacy shared `fido2-<rpId>` aliases may).
+            if (replace && replace.credentialId !== result.credentialId) {
+                removeCredential(replace.credentialId);
+                const aliasStillUsed = useAuthStore
+                    .getState()
+                    .credentials.some((c) => c.keyAlias === replace.keyAlias);
+                if (!aliasStillUsed && replace.keyAlias !== keyAlias) {
+                    try {
+                        await NativeKeys.deleteKey(replace.keyAlias);
+                    } catch (e: any) {
+                        console.warn('[CONNECT] superseded key cleanup failed:', e?.message);
+                    }
+                }
+            }
 
             // Register the push token under THIS pairwise identity's session so
             // the IdP can push vault approvals for keys this identity owns. The

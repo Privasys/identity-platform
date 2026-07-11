@@ -11,6 +11,8 @@
  * 5. Relay all session tokens to browser via broker
  */
 
+import { bytesToHex } from '@noble/hashes/utils.js';
+import * as Crypto from 'expo-crypto';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -262,7 +264,10 @@ export default function BatchConnectScreen() {
                     );
                     sessionToken = result.sessionToken;
                 } else {
-                    const keyAlias = `fido2-${app.rpId}`;
+                    // Unique per-credential hardware-key alias — a shared
+                    // `fido2-<rpId>` alias lets a later re-registration destroy
+                    // this credential's private key by overwrite.
+                    const keyAlias = `fido2-${app.rpId}-${bytesToHex(Crypto.getRandomBytes(4))}`;
                     const result = await fido2.register(app.rpId, keyAlias, app.sessionId);
                     sessionToken = result.sessionToken;
 

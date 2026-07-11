@@ -14,6 +14,9 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -28,6 +31,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
+import { BIP39_WORDLIST, BIP39_WORDSET } from '@/services/bip39-wordlist';
+import { register as fido2Register } from '@/services/fido2';
 import {
     beginRecovery,
     getRecoveryStatus,
@@ -35,9 +40,32 @@ import {
     type RecoveryBeginResult,
     type RecoveryStatusResult,
 } from '@/services/recovery-api';
+import { useAuthStore } from '@/stores/auth';
+import { useProfileStore } from '@/stores/profile';
 import * as Storage from '@/utils/storage';
+import * as NativeKeys from '../../modules/native-keys/src/index';
 
 const RECOVERY_STATE_KEY = '@privasys/recovery-state';
+
+/**
+ * Validate the BIP39 checksum of a 24-word phrase: the final 8 bits of the
+ * 264-bit word-index string must equal the first byte of SHA-256 over the
+ * 256-bit entropy. A mistyped word that is still in the wordlist slips past
+ * the dictionary check but fails this with 255/256 probability.
+ */
+function bip39ChecksumValid(words: string[]): boolean {
+    if (words.length !== 24) return false;
+    const indices = words.map((w) => BIP39_WORDLIST.indexOf(w));
+    if (indices.some((i) => i < 0)) return false;
+    let bits = '';
+    for (const i of indices) bits += i.toString(2).padStart(11, '0');
+    const entropy = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) {
+        entropy[i] = parseInt(bits.slice(i * 8, (i + 1) * 8), 2);
+    }
+    const expected = sha256(entropy)[0].toString(2).padStart(8, '0');
+    return bits.slice(256) === expected;
+}
 
 interface RecoveryState {
     requestId: string;
@@ -48,7 +76,7 @@ interface RecoveryState {
     expiresAt: string;
 }
 
-type FlowStep = 'enter-code' | 'waiting' | 'approved' | 'completed' | 'expired';
+type FlowStep = 'enter-code' | 'waiting' | 'approved' | 'completed' | 'restored' | 'expired';
 
 export default function RecoverAccountScreen() {
     const insets = useSafeAreaInsets();
@@ -58,6 +86,7 @@ export default function RecoverAccountScreen() {
     const [codeInput, setCodeInput] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [completing, setCompleting] = useState(false);
+    const [registering, setRegistering] = useState(false);
     const [recoveryState, setRecoveryState] = useState<RecoveryState | null>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -150,6 +179,41 @@ export default function RecoverAccountScreen() {
             );
             return;
         }
+        if (words === 24) {
+            const list = phrase.split(' ');
+            // Dictionary check: every word must be a BIP39 word. Report the
+            // exact positions so the user can fix their transcription.
+            const unknown = list
+                .map((w, i) => ({ w, i }))
+                .filter(({ w }) => !BIP39_WORDSET.has(w));
+            if (unknown.length > 0) {
+                Alert.alert(
+                    'Check Your Phrase',
+                    'These are not recovery words — check your transcription: ' +
+                    unknown.map(({ w, i }) => `#${i + 1} “${w}”`).join(', ')
+                );
+                return;
+            }
+            // Checksum check: catches a valid-but-wrong word (e.g. "brave" for
+            // "bravo") that the dictionary check cannot. Server-generated
+            // phrases always carry a valid checksum, so allow an explicit
+            // override only for unusual manually-created phrases.
+            if (!bip39ChecksumValid(list)) {
+                Alert.alert(
+                    'Possible Typo',
+                    'The phrase does not pass its built-in consistency check — one or more words are likely mistyped. Double-check against your written copy.',
+                    [
+                        { text: 'Let me fix it', style: 'cancel' },
+                        { text: 'Submit anyway', style: 'destructive', onPress: () => void submitPhrase(phrase) },
+                    ]
+                );
+                return;
+            }
+        }
+        await submitPhrase(phrase);
+    };
+
+    const submitPhrase = async (phrase: string) => {
         setSubmitting(true);
         try {
             // BIP39 24-word phrase has 256 bits of entropy — no device
@@ -192,6 +256,71 @@ export default function RecoverAccountScreen() {
             Alert.alert('Error', e.message || 'Failed to complete recovery.');
         } finally {
             setCompleting(false);
+        }
+    };
+
+    /**
+     * The recovery last mile: bind THIS device to the recovered account.
+     * `complete` revoked the account's old credentials server-side; register a
+     * fresh FIDO2 credential with the recovered user id as the userHandle so
+     * the IdP attaches it to the same `user_id` (roles, app ownerships and
+     * recovery settings all follow it). Two-phase swap: the new credential is
+     * created under its own unique hardware-key alias and persisted BEFORE any
+     * previous privasys.id credential is removed — a failure at any point
+     * leaves the existing credential untouched.
+     */
+    const handleRegisterRecovered = async () => {
+        if (!recoveryState) return;
+        setRegistering(true);
+        try {
+            const keyAlias = `fido2-privasys.id-${bytesToHex(Crypto.getRandomBytes(4))}`;
+            const profile = useProfileStore.getState().profile;
+            const result = await fido2Register(
+                'privasys.id',
+                keyAlias,
+                '', // no browser ceremony to relay
+                profile?.displayName,
+                recoveryState.userId,
+            );
+
+            const auth = useAuthStore.getState();
+            const old = auth.getCredentialForRp('privasys.id');
+            auth.addCredential({
+                credentialId: result.credentialId,
+                rpId: 'privasys.id',
+                origin: 'privasys.id',
+                keyAlias,
+                userHandle: result.userHandle,
+                userName: result.userName,
+                registeredAt: Math.floor(Date.now() / 1000),
+                serverRpId: result.serverRpId,
+            });
+            // Only now retire the superseded credential (the rotated identity).
+            if (old && old.credentialId !== result.credentialId) {
+                auth.removeCredential(old.credentialId);
+                const aliasStillUsed = useAuthStore
+                    .getState()
+                    .credentials.some((c) => c.keyAlias === old.keyAlias);
+                if (!aliasStillUsed && old.keyAlias !== keyAlias) {
+                    try {
+                        await NativeKeys.deleteKey(old.keyAlias);
+                    } catch (e: any) {
+                        console.warn('[recover-account] old key cleanup failed:', e?.message);
+                    }
+                }
+            }
+
+            await Storage.deleteItemAsync(RECOVERY_STATE_KEY);
+            setStep('restored');
+        } catch (e: any) {
+            console.error('[recover-account] recovered registration failed:', e?.message, e);
+            Alert.alert(
+                'Registration Failed',
+                `Could not register this device to the recovered account: ${e?.message ?? e}. ` +
+                'Your existing sign-ins are unchanged — you can retry.'
+            );
+        } finally {
+            setRegistering(false);
         }
     };
 
@@ -343,7 +472,10 @@ export default function RecoverAccountScreen() {
                     </>
                 )}
 
-                {/* Step 4: Completed */}
+                {/* Step 4: Completed — the account is unlocked server-side; now
+                    bind THIS device to it. Without this step the recovery is
+                    incomplete: the old credentials were just revoked and
+                    nothing signs for the account yet. */}
                 {step === 'completed' && (
                     <>
                         <RNView style={styles.iconContainer}>
@@ -351,8 +483,36 @@ export default function RecoverAccountScreen() {
                         </RNView>
                         <Text style={styles.title}>Account Recovered</Text>
                         <Text style={styles.subtitle}>
-                            Your account has been recovered. You can now register a new passkey
-                            to secure your account.
+                            One step left: register this device to the recovered account. This
+                            creates a new passkey bound to your recovered identity — your roles
+                            and app ownerships come back with it.
+                        </Text>
+
+                        <Pressable
+                            style={[styles.primaryButton, registering && { opacity: 0.6 }]}
+                            onPress={handleRegisterRecovered}
+                            disabled={registering}
+                        >
+                            {registering ? (
+                                <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.primaryButtonText}>Register This Device</Text>
+                            )}
+                        </Pressable>
+                    </>
+                )}
+
+                {/* Step 5: Restored — device bound to the recovered account. */}
+                {step === 'restored' && (
+                    <>
+                        <RNView style={styles.iconContainer}>
+                            <Ionicons name="checkmark-circle" size={48} color="#34E89E" />
+                        </RNView>
+                        <Text style={styles.title}>Device Restored</Text>
+                        <Text style={styles.subtitle}>
+                            This device now signs in as your recovered account. Consider
+                            generating a fresh recovery phrase in Settings → Account Recovery —
+                            recovery phrases are single-use.
                         </Text>
 
                         <Pressable style={styles.primaryButton} onPress={handleDismiss}>

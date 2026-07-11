@@ -122,13 +122,39 @@ export default function RecoverAccountScreen() {
         }
     }, [step, recoveryState?.requestId]);
 
+    /**
+     * Normalise the typed phrase to the canonical form the IdP hashes: 24
+     * lowercase words separated by single spaces. Users paste/type phrases
+     * with hyphens, commas, newlines or numbering — the server only splits on
+     * whitespace, so anything else fails as "invalid phrase" even when every
+     * word is right. BIP39 words are pure a-z, so any non-letter is a
+     * separator. A single-token input is passed through untouched (legacy
+     * recovery codes are not word phrases).
+     */
+    const normalizePhrase = (raw: string): { phrase: string; words: number } => {
+        const tokens = raw.toLowerCase().match(/[a-z]+/g) ?? [];
+        if (tokens.length <= 1) return { phrase: raw.trim(), words: tokens.length };
+        return { phrase: tokens.join(' '), words: tokens.length };
+    };
+
     const handleSubmitCode = async () => {
         if (!codeInput.trim()) return;
+        const { phrase, words } = normalizePhrase(codeInput);
+        // A word phrase must be exactly 24 words — catch miscounts locally
+        // with a specific message instead of a generic server rejection.
+        if (words > 1 && words !== 24) {
+            Alert.alert(
+                'Check Your Phrase',
+                `A recovery phrase has 24 words, but ${words} ${words === 1 ? 'was' : 'were'} entered. ` +
+                'Separate the words with spaces and check none are missing or duplicated.'
+            );
+            return;
+        }
         setSubmitting(true);
         try {
             // BIP39 24-word phrase has 256 bits of entropy — no device
             // attestation, no rate limiting required.
-            const res: RecoveryBeginResult = await beginRecovery(codeInput.trim());
+            const res: RecoveryBeginResult = await beginRecovery(phrase);
             const state: RecoveryState = {
                 requestId: res.request_id,
                 userId: res.user_id,

@@ -927,6 +927,20 @@ export class AuthUI {
         // the brand content and dismissal (AuthFrame.cancel()).
         const inline = this.cfg.presentation === 'inline';
 
+        // Progress steps earn their place only once the ceremony is actually
+        // underway. While merely waiting on the user (push tile, QR code)
+        // all but the first step are inert, and the tile/QR already says
+        // what is happening — showing four dormant bullets above it reads
+        // as clutter. The brand panel's copy of the steps (modal desktop)
+        // keeps its always-on behaviour.
+        const stepsUnderway = !['push-waiting', 'qr-scanning'].includes(this.state);
+
+        // Inline mode has no brand panel to carry context, so flow states
+        // get a heading of their own above the progress/tile.
+        const inlineHeading = inline && !isIdle && this.state !== 'success' && this.state !== 'error'
+            ? (this.method === 'passkey' ? 'Sign in with a passkey' : 'Connecting you to Privasys ID')
+            : null;
+
         const page = el('div', { className: 'page' },
             // Close button
             inline ? null : el('button', { className: 'btn-close', html: ICON_CLOSE, onClick: () => this.handleCancel() }),
@@ -945,10 +959,11 @@ export class AuthUI {
                     el('span', { html: ICON_ARROW_LEFT }),
                     'Back',
                 ) : null,
+                inlineHeading ? el('h2', { className: 'auth-panel-heading' }, inlineHeading) : null,
                 // Shown when the brand panel carries no progress steps:
                 // always in inline mode, and on the mobile breakpoint (where
                 // the brand panel collapses to a compact header).
-                this.isFlowState() ? el('div', { className: 'mobile-progress-header' }, this.renderBrandProgress()) : null,
+                (this.isFlowState() && stepsUnderway) ? el('div', { className: 'mobile-progress-header' }, this.renderBrandProgress()) : null,
                 content,
             ),
             // Footer spans both columns

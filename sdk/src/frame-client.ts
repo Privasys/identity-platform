@@ -129,9 +129,21 @@ export interface AuthFrameConfig {
     /**
      * Mount the auth iframe inside this element instead of as a full-screen
      * modal overlay.  The iframe fills the container (width/height: 100%).
-     * The container should have explicit dimensions.
+     * The container should have explicit dimensions (min-height 560px).
+     *
+     * Passing a container implies `presentation: 'inline'` — the hosted
+     * auth page drops its own brand panel and close button and renders a
+     * single compact column sized for the container. The host page owns
+     * dismissal via {@link AuthFrame.cancel}.
      */
     container?: HTMLElement;
+    /**
+     * Presentation mode of the hosted auth page. Defaults to `'inline'`
+     * when a `container` is set, `'modal'` otherwise. Set explicitly only
+     * to override that inference (e.g. a full-screen container that should
+     * still show the modal chrome).
+     */
+    presentation?: 'modal' | 'inline';
     /**
      * Sealed session-relay opt-in. When set, the auth iframe negotiates an
      * end-to-end ECDH session with the enclave at `appHost` during the
@@ -292,6 +304,8 @@ export class AuthFrame {
     private sessionInFlight: Promise<{ token: string; rpId: string; authenticatedAt: number } | null> | null = null;
     private _onSessionExpired?: (rpId: string) => void;
     private _onSessionRenewed?: (rpId: string, accessToken?: string) => void;
+    // Tears down the in-flight signIn() ceremony (set while one is active).
+    private cancelSignIn: (() => void) | null = null;
     // Sealed session-relay state.
     private sealedIframe: HTMLIFrameElement | null = null;
     private sealedHandler: ((e: MessageEvent) => void) | null = null;
@@ -326,6 +340,17 @@ export class AuthFrame {
     /** Register a callback for when the session is silently renewed. */
     set onSessionRenewed(cb: ((rpId: string, accessToken?: string) => void) | undefined) {
         this._onSessionRenewed = cb;
+    }
+
+    /**
+     * Cancel an in-flight {@link signIn} ceremony. The pending promise
+     * rejects with "Authentication cancelled" and the auth iframe is
+     * removed. Intended for inline embeds (`container` set), where the
+     * hosted page renders no close button and dismissal belongs to the
+     * host page. No-op when no ceremony is in flight.
+     */
+    cancel(): void {
+        this.cancelSignIn?.();
     }
 
     /**
@@ -409,6 +434,7 @@ export class AuthFrame {
             // can route through the iframe-resident PrivasysSession. Without
             // session-relay we tear everything down on result.
             const finishSignIn = (result: SignInResult) => {
+                this.cancelSignIn = null;
                 if (wantsSealed) {
                     stopOverlay();
                     // Hide the iframe but leave it parented to <body> with
@@ -428,6 +454,16 @@ export class AuthFrame {
                 stopOverlay();
                 window.removeEventListener('message', handler);
                 iframe.remove();
+                this.cancelSignIn = null;
+            };
+
+            // Host-page-initiated cancel (inline embeds have no close
+            // button). Removing the iframe tears down the ceremony —
+            // broker WebSocket included; the IdP session expires by TTL,
+            // exactly as when the user dismisses the modal's X.
+            this.cancelSignIn = () => {
+                cleanup();
+                reject(new Error('Authentication cancelled'));
             };
 
             const handler = (e: MessageEvent) => {
@@ -444,12 +480,15 @@ export class AuthFrame {
                 if (!data || typeof data.type !== 'string') return;
 
                 switch (data.type) {
-                    case 'privasys:ready':
+                    case 'privasys:ready': {
+                        const presentation = this.config.presentation
+                            ?? (this.container ? 'inline' : 'modal');
                         iframe.contentWindow!.postMessage(
-                            { type: 'privasys:init', config: this.config },
+                            { type: 'privasys:init', config: { ...this.config, presentation } },
                             this.authOrigin,
                         );
                         break;
+                    }
 
                     case 'privasys:result': {
                         const result = data.result as SignInResult;

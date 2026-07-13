@@ -26,6 +26,12 @@ export interface AuthUIConfig {
     timeout?: number;
     /** Custom element to mount the overlay into (default: document.body). */
     container?: HTMLElement;
+    /** Presentation mode. `'modal'` (default) renders the full-page chrome:
+     *  brand panel, close button, spanning footer. `'inline'` renders a
+     *  single compact column without brand panel or close button, sized to
+     *  fit an adopter-provided container (min-height 560px) — the embedding
+     *  page owns the surrounding content and dismissal. */
+    presentation?: 'modal' | 'inline';
     /** Push token from a previous session. When present the UI will offer
      *  to send a push notification instead of showing a QR code. */
     pushToken?: string;
@@ -264,6 +270,28 @@ const MODAL_CSS = /* css */ `
     .btn-hint { display: none; }
     .footer { padding: 16px 24px; }
 }
+
+/* Inline presentation — embedded in an adopter-provided container. The
+   embedding page owns the surrounding chrome (brand content, dismissal),
+   so render a single compact column that fits the documented 560px
+   min-height container without scrolling. Brand panel and close button
+   are not rendered in this mode (see AuthUI.render). */
+:host(.inline) .page {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    min-height: 100%;
+}
+:host(.inline) .auth-panel {
+    padding: 24px 28px;
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    justify-content: center;
+}
+:host(.inline) .mobile-progress-header { display: flex; }
+:host(.inline) .btn-back { margin-bottom: 16px; }
+:host(.inline) .btn-hint { display: none; }
+:host(.inline) .footer { padding: 12px 24px; }
 
 /* Provider buttons */
 .btn-provider + .btn-provider { margin-top: 10px; }
@@ -816,6 +844,7 @@ export class AuthUI {
     private mount(): void {
         this.host = document.createElement('div');
         this.host.setAttribute('data-privasys-auth', '');
+        if (this.cfg.presentation === 'inline') this.host.classList.add('inline');
         this.shadow = this.host.attachShadow({ mode: 'closed' });
 
         const style = document.createElement('style');
@@ -894,11 +923,15 @@ export class AuthUI {
                 content = this.renderIdle();
         }
 
+        // Inline embeds get no chrome of their own: the embedding page owns
+        // the brand content and dismissal (AuthFrame.cancel()).
+        const inline = this.cfg.presentation === 'inline';
+
         const page = el('div', { className: 'page' },
             // Close button
-            el('button', { className: 'btn-close', html: ICON_CLOSE, onClick: () => this.handleCancel() }),
+            inline ? null : el('button', { className: 'btn-close', html: ICON_CLOSE, onClick: () => this.handleCancel() }),
             // Left: brand panel
-            el('div', { className: 'brand-panel' },
+            inline ? null : el('div', { className: 'brand-panel' },
                 el('div', { className: 'brand-panel-header' },
                     el('div', { className: 'brand-panel-logo', html: ICON_LOGO }),
                     el('div', { className: 'brand-panel-name' }, 'Privasys'),
@@ -912,7 +945,9 @@ export class AuthUI {
                     el('span', { html: ICON_ARROW_LEFT }),
                     'Back',
                 ) : null,
-                // Mobile-only: show progress steps inline (brand panel is compact on mobile)
+                // Shown when the brand panel carries no progress steps:
+                // always in inline mode, and on the mobile breakpoint (where
+                // the brand panel collapses to a compact header).
                 this.isFlowState() ? el('div', { className: 'mobile-progress-header' }, this.renderBrandProgress()) : null,
                 content,
             ),

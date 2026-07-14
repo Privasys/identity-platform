@@ -174,8 +174,9 @@ export interface AuthFrameConfig {
      * Content for the gate's left panel in `'page'` presentation. Plain
      * strings only — rendered as text and length-capped by the hosted
      * page (title 120, description 600, up to 5 bullets of 200 chars).
+     * `logoUrl` (https only) shows your logo above the title.
      */
-    pitch?: { title?: string; description?: string; bullets?: string[] };
+    pitch?: { title?: string; description?: string; bullets?: string[]; logoUrl?: string };
     /**
      * Which sign-in methods the ceremony offers. Defaults to all
      * available. A site that already showed its own identity chooser

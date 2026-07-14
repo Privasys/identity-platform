@@ -42,8 +42,9 @@ export interface AuthUIConfig {
     methods?: readonly ('wallet' | 'passkey' | 'social')[];
     /** App-provided content for the left panel in `'page'` presentation.
      *  Plain strings only (rendered as text, SDK-styled); sanitised and
-     *  length-capped by the frame host. */
-    pitch?: { title?: string; description?: string; bullets?: string[] };
+     *  length-capped by the frame host. `logoUrl` (https only) renders the
+     *  consumer's logo above the title. */
+    pitch?: { title?: string; description?: string; bullets?: string[]; logoUrl?: string };
     /** Approve-only flow: re-verify an already-signed-in session against a
      *  changed enclave via a one-tap wallet push. When set, `signIn()`
      *  renders the approval waiting UI and delegates the push + sealed
@@ -322,6 +323,35 @@ const MODAL_CSS = /* css */ `
 /* Page presentation — the SDK renders the whole gate, with the adopter's
    pitch content (constrained plain strings) in the left panel. */
 :host(.page-mode) .mobile-progress-header { display: flex; }
+:host(.page-mode) .page { grid-template-rows: auto 1fr auto; }
+.gate-header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    border-bottom: 1px solid #E2E8F0;
+    font-size: 13px;
+    color: #64748B;
+}
+.gate-header-logo { width: 22px; height: 22px; flex-shrink: 0; }
+.gate-header-logo svg { width: 100%; height: 100%; display: block; }
+.gate-header-brand {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #0F172A;
+}
+.gate-header-request { margin-left: auto; text-align: right; }
+.gate-header-request strong { color: #0F172A; font-weight: 600; }
+.pitch-logo {
+    display: block;
+    height: 44px;
+    width: auto;
+    max-width: 220px;
+    object-fit: contain;
+    margin-bottom: 20px;
+}
 .pitch-title {
     font-size: 30px;
     font-weight: 600;
@@ -366,13 +396,18 @@ const MODAL_CSS = /* css */ `
 .pitch-check svg { width: 12px; height: 12px; }
 @media (max-width: 768px) {
     /* Compact brand header on mobile hides the pitch body, same as the
-       generic brand description. */
+       generic brand description; the gate header carries identity. */
     .pitch-body { display: none; }
+    :host(.page-mode) .page { grid-template-rows: auto auto 1fr auto; }
+    .gate-header { flex-wrap: wrap; padding: 12px 16px; }
 }
 @media (prefers-color-scheme: dark) {
     .pitch-title { color: #F1F5F9; }
     .pitch-desc { color: #94A3B8; }
     .pitch-bullet { color: #E2E8F0; }
+    .gate-header { border-color: rgba(255,255,255,0.08); color: #64748B; }
+    .gate-header-brand { color: #F1F5F9; }
+    .gate-header-request strong { color: #E2E8F0; }
 }
 
 /* Provider buttons */
@@ -1072,39 +1107,54 @@ export class AuthUI {
             ? (this.method === 'passkey' ? 'Sign in with a passkey' : 'Connecting you to Privasys ID')
             : null;
 
-        // Left panel content: the adopter's pitch (page mode, SDK-styled)
-        // or the generic Privasys brand copy.
+        // Left panel content: the adopter's pitch (page mode — that panel is
+        // then the CONSUMER's space: their logo/content, no Privasys header,
+        // no progress steps; Privasys identity lives in the gate header) or
+        // the generic Privasys brand copy.
         const pitch = this.cfg.pitch;
+        const pitchOwned = isPage && !!pitch;
         const leftPanel = inline ? null : el('div', { className: 'brand-panel' },
-            el('div', { className: 'brand-panel-header' },
+            pitchOwned ? null : el('div', { className: 'brand-panel-header' },
                 el('div', { className: 'brand-panel-logo', html: ICON_LOGO }),
                 el('div', { className: 'brand-panel-name' }, 'Privasys'),
             ),
-            (isPage && pitch) ? el('div', { className: 'pitch-body' },
-                pitch.title ? el('h1', { className: 'pitch-title' }, pitch.title) : null,
-                pitch.description ? el('p', { className: 'pitch-desc' }, pitch.description) : null,
-                pitch.bullets?.length ? el('ul', { className: 'pitch-bullets' },
-                    ...pitch.bullets.map((b) => el('li', { className: 'pitch-bullet' },
+            pitchOwned ? el('div', { className: 'pitch-body' },
+                pitch!.logoUrl ? el('img', { className: 'pitch-logo', src: pitch!.logoUrl, alt: '' }) : null,
+                pitch!.title ? el('h1', { className: 'pitch-title' }, pitch!.title) : null,
+                pitch!.description ? el('p', { className: 'pitch-desc' }, pitch!.description) : null,
+                pitch!.bullets?.length ? el('ul', { className: 'pitch-bullets' },
+                    ...pitch!.bullets.map((b) => el('li', { className: 'pitch-bullet' },
                         el('span', { className: 'pitch-check', html: ICON_PITCH_CHECK }),
                         b,
                     )),
                 ) : null,
             ) : (brandDesc ? el('p', { className: 'brand-panel-desc', html: brandDesc }) : null),
-            this.isFlowState() ? this.renderBrandProgress() : null,
+            (this.isFlowState() && !pitchOwned) ? this.renderBrandProgress() : null,
         );
 
         const page = el('div', { className: 'page' },
+            // Page mode: full-width header — the authenticator's identity
+            // plus which app is requesting authentication.
+            isPage ? el('div', { className: 'gate-header' },
+                el('div', { className: 'gate-header-logo', html: ICON_LOGO }),
+                el('span', { className: 'gate-header-brand' }, 'Privasys ID'),
+                el('span', { className: 'gate-header-request' },
+                    el('strong', null, displayName),
+                    ' wants to authenticate you',
+                ),
+            ) : null,
             // Close button — modal overlays only (a page is not dismissable
             // from inside; adopters cancel via AuthFrame.cancel()).
             (inline || isPage) ? null : el('button', { className: 'btn-close', html: ICON_CLOSE, onClick: () => this.handleCancel() }),
             leftPanel,
             // Right: auth panel
             el('div', { className: `auth-panel${isIdle ? '' : ' auth-panel--centered'}` },
-                // No Back on success, on the screen an auto-started flow
-                // began at (idle was never shown; alternatives are inline),
-                // or anywhere in the approve-only flow (no idle menu exists
-                // there — "Sign in another way" is the escape hatch).
-                (!isIdle && this.state !== 'success' && !this.cfg.approveFlow
+                // No Back on success or error (Try again covers it), on the
+                // screen an auto-started flow began at (idle was never
+                // shown; alternatives are inline), or anywhere in the
+                // approve-only flow (no idle menu exists there — "Sign in
+                // another way" is the escape hatch).
+                (!isIdle && this.state !== 'success' && this.state !== 'error' && !this.cfg.approveFlow
                     && !(this.autoStarted && this.state === this.autoFirstScreen))
                     ? el('button', { className: 'btn-back', onClick: () => this.goBack() },
                         el('span', { html: ICON_ARROW_LEFT }),

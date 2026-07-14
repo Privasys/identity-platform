@@ -118,12 +118,15 @@ function sanitisePitch(raw: unknown): AuthUIConfig['pitch'] {
             .filter((b): b is string => !!b)
             .slice(0, 5)
         : undefined;
+    const logoUrl = str(r.logoUrl, 300);
     const pitch = {
         title: str(r.title, 120),
         description: str(r.description, 600),
         bullets: bullets?.length ? bullets : undefined,
+        // Consumer logo: https URLs only (rendered as a plain <img>).
+        logoUrl: logoUrl?.startsWith('https://') ? logoUrl : undefined,
     };
-    return (pitch.title || pitch.description || pitch.bullets) ? pitch : undefined;
+    return (pitch.title || pitch.description || pitch.bullets || pitch.logoUrl) ? pitch : undefined;
 }
 
 const KNOWN_METHODS = ['wallet', 'passkey', 'social'] as const;

@@ -775,6 +775,10 @@ export class AuthUI {
     private sessionRelay: SessionRelayBinding | undefined;
     private method: 'wallet' | 'passkey' = 'wallet';
     private qrPayload = '';
+    // True when signIn() skipped idle and went straight to push — the
+    // ceremony's FIRST screen is then push-waiting and Back has nowhere
+    // meaningful to go (its alternatives are offered inline).
+    private autoStarted = false;
 
     constructor(config: AuthUIConfig) {
         this.cfg = {
@@ -808,10 +812,12 @@ export class AuthUI {
             this.attributes = undefined;
             this.sessionRelay = undefined;
             this.qrPayload = '';
+            this.autoStarted = false;
             this.mount();
 
             // If returning user (push token available), skip idle and send push immediately
             if (this.cfg.pushToken) {
+                this.autoStarted = true;
                 this.startPush();
             } else {
                 this.render();
@@ -931,9 +937,11 @@ export class AuthUI {
         // underway. While merely waiting on the user (push tile, QR code)
         // all but the first step are inert, and the tile/QR already says
         // what is happening — showing four dormant bullets above it reads
-        // as clutter. The brand panel's copy of the steps (modal desktop)
-        // keeps its always-on behaviour.
-        const stepsUnderway = !['push-waiting', 'qr-scanning'].includes(this.state);
+        // as clutter. On success the outcome is the message, not the path
+        // that led there — renderSuccess shows a single tile instead. The
+        // brand panel's copy of the steps (modal desktop) keeps its
+        // always-on behaviour.
+        const stepsUnderway = !['push-waiting', 'qr-scanning', 'success'].includes(this.state);
 
         // Inline mode has no brand panel to carry context, so flow states
         // get a heading of their own above the progress/tile.
@@ -955,10 +963,14 @@ export class AuthUI {
             ),
             // Right: auth panel
             el('div', { className: `auth-panel${isIdle ? '' : ' auth-panel--centered'}` },
-                (!isIdle && this.state !== 'success') ? el('button', { className: 'btn-back', onClick: () => this.goBack() },
-                    el('span', { html: ICON_ARROW_LEFT }),
-                    'Back',
-                ) : null,
+                // No Back on success, nor on an auto-started push screen —
+                // there the ceremony BEGAN at push-waiting (idle was never
+                // shown) and its alternatives are offered inline.
+                (!isIdle && this.state !== 'success' && !(this.state === 'push-waiting' && this.autoStarted))
+                    ? el('button', { className: 'btn-back', onClick: () => this.goBack() },
+                        el('span', { html: ICON_ARROW_LEFT }),
+                        'Back',
+                    ) : null,
                 inlineHeading ? el('h2', { className: 'auth-panel-heading' }, inlineHeading) : null,
                 // Shown when the brand panel carries no progress steps:
                 // always in inline mode, and on the mobile breakpoint (where
@@ -1208,7 +1220,11 @@ export class AuthUI {
     }
 
     private renderSuccess(): HTMLElement {
-        const showTrust = !!this.pushToken && !this.cfg.deviceTrusted;
+        // Never ask "Trust this device?" when the sign-in itself was a push
+        // approval (cfg.pushToken) — the device already behaves as trusted,
+        // so the question is contradictory. Only first-time wallet auth
+        // (QR) on an untrusted device earns the prompt.
+        const showTrust = !!this.pushToken && !this.cfg.deviceTrusted && !this.cfg.pushToken;
         const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
         const hasAttestation = this.method === 'wallet' && this.attestation?.valid;
         const methodDetail = this.method === 'passkey'
@@ -1216,6 +1232,13 @@ export class AuthUI {
             : (hasAttestation ? 'Attestation verified' : null);
 
         return el('div', null,
+            // The outcome as a single tile (the progress steps are hidden
+            // on success — see stepsUnderway in render()).
+            el('div', { className: 'success-icon', html: ICON_CHECK_CIRCLE }),
+            el('div', { className: 'success-title' }, `Authenticated via ${methodLabel}`),
+            methodDetail ? el('div', { className: 'success-method' },
+                el('span', { className: 'method-badge' }, methodDetail),
+            ) : null,
             showTrust ? el('div', { style: 'width: 100%;' },
                 el('p', { style: 'font-size: 14px; font-weight: 500; margin-bottom: 6px;' },
                     'Trust this device?',
@@ -1369,10 +1392,14 @@ export class AuthUI {
         this.state = 'success';
         this.render();
 
-        // Wallet auth with untrusted device: wait for the user to answer the trust prompt.
-        // Already trusted / passkey / no push token: auto-close after a brief delay.
-        if (!this.pushToken || this.cfg.deviceTrusted) {
-            setTimeout(() => this.finishWithTrust(false), 1200);
+        // First-time wallet auth (QR) on an untrusted device: wait for the
+        // user to answer the trust prompt. Everything else auto-closes: no
+        // push token, already trusted, or the ceremony itself ran over a
+        // push notification (cfg.pushToken) — the latter counts as trust,
+        // so the device hint is (re)saved.
+        const viaPush = !!this.cfg.pushToken;
+        if (!this.pushToken || this.cfg.deviceTrusted || viaPush) {
+            setTimeout(() => this.finishWithTrust(viaPush || !!this.cfg.deviceTrusted), 1200);
         }
     }
 

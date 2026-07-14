@@ -58,7 +58,7 @@ import {
 } from '@/services/dependency-consent';
 import { relaySessionToken } from '@/services/broker';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
-import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
+import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { issueEncAuthForSignIn } from '@/services/encauth';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
@@ -2495,6 +2495,11 @@ function AttributeAcquisitionView({
         profileCreated.current = true;
         (async () => {
             try {
+                // Guarantee the device signing key exists before deriving the
+                // DID — on a fresh install the user may reach sign-in without
+                // having run first-run profile setup, and there is no longer a
+                // standalone onboarding screen to have created it.
+                await ensureDeviceKey();
                 const did = await generateDid();
                 const pairwiseSeed = await generatePairwiseSeed();
                 const canonicalDid = await generateCanonicalDid(pairwiseSeed);

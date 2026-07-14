@@ -7,6 +7,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
@@ -22,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { getDeviceLocale } from '@/services/device-locale';
-import { generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
+import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -39,10 +40,50 @@ export default function ProfileScreen() {
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
     const consentRecordCount = useConsentStore((s) => s.records.length);
 
-    const [creatingProfile, setCreatingProfile] = useState(false);
-    const handleCreateProfile = async () => {
-        setCreatingProfile(true);
+    const setOnboarded = useAuthStore((s) => s.setOnboarded);
+    // First-run setup progress: 0 = not started, then one tick per milestone
+    // (Face ID confirmed → key created → identity ready).
+    const [setupBusy, setSetupBusy] = useState(false);
+    const [setupDone, setSetupDone] = useState(0);
+
+    /**
+     * First-run wallet setup: confirm the user's biometrics, create the
+     * hardware-backed device key (the one that signs the DID and all KYC / WIA
+     * proofs), then derive the identity and the local profile. This is the only
+     * guaranteed key-creation point now that the standalone onboarding screen is
+     * gone, so it runs here and, lazily, on the sign-in path.
+     */
+    const handleSetup = async () => {
+        setSetupBusy(true);
+        setSetupDone(0);
         try {
+            // 1 — Confirm biometrics exist, are enrolled, and actually work.
+            const hasHardware = await LocalAuthentication.hasHardwareAsync();
+            const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
+            if (!enrolled) {
+                Alert.alert(
+                    'Set up Face ID first',
+                    'Turn on Face ID, Touch ID or a device passcode in your phone settings, then come back and try again.'
+                );
+                setSetupBusy(false);
+                return;
+            }
+            const auth = await LocalAuthentication.authenticateAsync({
+                promptMessage: 'Set up your Privasys wallet',
+                fallbackLabel: 'Use Passcode',
+                cancelLabel: 'Cancel'
+            });
+            if (!auth.success) {
+                setSetupBusy(false);
+                return;
+            }
+            setSetupDone(1);
+
+            // 2 — Create the biometric-gated signing key inside secure hardware.
+            await ensureDeviceKey();
+            setSetupDone(2);
+
+            // 3 — Derive the identity and create the on-device profile.
             const did = await generateDid();
             const pairwiseSeed = await generatePairwiseSeed();
             const canonicalDid = await generateCanonicalDid(pairwiseSeed);
@@ -57,41 +98,97 @@ export default function ProfileScreen() {
                 linkedProviders: [],
                 attributes: []
             });
+            setOnboarded();
+            setSetupDone(3);
+            // profile is now set → the screen re-renders to the normal profile view.
         } catch (e: any) {
-            Alert.alert('Error', `Failed to create profile: ${e.message}`);
-        } finally {
-            setCreatingProfile(false);
+            Alert.alert(
+                'Setup failed',
+                `We couldn't finish setting up your wallet: ${e.message}. Please try again.`
+            );
+            setSetupBusy(false);
+            setSetupDone(0);
         }
     };
 
     if (!profile) {
+        const setupItems = [
+            {
+                icon: 'scan-outline' as const,
+                title: 'Only you can unlock it',
+                body: 'Face ID or your device passcode guards your wallet, so no one else can use it.'
+            },
+            {
+                icon: 'hardware-chip-outline' as const,
+                title: 'A key in secure hardware',
+                body: "Created inside your phone's secure chip. It never leaves your device, and we never see it."
+            },
+            {
+                icon: 'finger-print-outline' as const,
+                title: 'Your private identity',
+                body: 'Controlled only by you. No account and no password on our servers.'
+            }
+        ];
         return (
             <RNView style={[styles.screen, { paddingTop: insets.top }]}>
-                <RNView style={styles.emptyState}>
-                    <Ionicons name="person-circle-outline" size={64} color={p.textMuted} />
-                    <Text style={styles.emptyTitle}>No profile yet</Text>
-                    <Text style={styles.emptyText}>
-                        Set up your identity to manage your data, link accounts, and control what apps can see.
-                    </Text>
+                <ScrollView contentContainerStyle={styles.setupScroll} showsVerticalScrollIndicator={false}>
+                    <RNView style={styles.setupHeader}>
+                        <Ionicons name="shield-checkmark-outline" size={56} color={p.green} />
+                        <Text style={styles.setupTitle}>Set up your wallet</Text>
+                        <Text style={styles.setupLede}>
+                            It takes a few seconds, and everything is created here on your phone.
+                            There is no account and no password.
+                        </Text>
+                    </RNView>
+
+                    {/* What this creates — each row ticks green as that step completes. */}
+                    <RNView style={styles.setupCard}>
+                        {setupItems.map((it, i) => {
+                            const done = i < setupDone;
+                            const active = setupBusy && i === setupDone;
+                            return (
+                                <RNView key={it.title} style={styles.setupRow}>
+                                    <RNView style={[styles.setupBubble, done && styles.setupBubbleDone]}>
+                                        {done ? (
+                                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                                        ) : active ? (
+                                            <ActivityIndicator size="small" color={p.green} />
+                                        ) : (
+                                            <Ionicons name={it.icon} size={16} color={p.textMuted} />
+                                        )}
+                                    </RNView>
+                                    <RNView style={styles.setupRowText}>
+                                        <Text style={styles.setupRowTitle}>{it.title}</Text>
+                                        <Text style={styles.setupRowBody}>{it.body}</Text>
+                                    </RNView>
+                                </RNView>
+                            );
+                        })}
+                    </RNView>
+
                     <Pressable
-                        style={styles.createProfileButton}
-                        onPress={handleCreateProfile}
-                        disabled={creatingProfile}
+                        style={[styles.createProfileButton, styles.setupButton, setupBusy && { opacity: 0.6 }]}
+                        onPress={handleSetup}
+                        disabled={setupBusy}
                     >
-                        {creatingProfile ? (
+                        {setupBusy ? (
                             <ActivityIndicator color="#FFFFFF" size="small" />
                         ) : (
-                            <Text style={styles.createProfileButtonText}>Set Up Profile</Text>
+                            <>
+                                <Ionicons name="scan" size={18} color="#FFFFFF" />
+                                <Text style={styles.createProfileButtonText}>Set up with Face ID</Text>
+                            </>
                         )}
                     </Pressable>
+
                     <Pressable
                         style={styles.recoverButton}
                         onPress={() => router.push('/recover-account' as never)}
                     >
                         <Ionicons name="key-outline" size={16} color={p.blue} />
-                        <Text style={styles.recoverButtonText}>Recover Existing Account</Text>
+                        <Text style={styles.recoverButtonText}>Recover an existing account</Text>
                     </Pressable>
-                </RNView>
+                </ScrollView>
             </RNView>
         );
     }
@@ -411,6 +508,55 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     emptyTitle: { fontSize: 20, fontWeight: '600', color: p.textPrimary },
     emptyText: { fontSize: 15, color: p.textSecondary, textAlign: 'center', lineHeight: 22 },
+
+    setupScroll: {
+        flexGrow: 1,
+        justifyContent: 'center',
+        paddingHorizontal: 28,
+        paddingVertical: 32,
+        gap: 24
+    },
+    setupHeader: { alignItems: 'center', gap: 12 },
+    setupTitle: { fontSize: 24, fontWeight: '700', color: p.textPrimary, letterSpacing: -0.3 },
+    setupLede: {
+        fontSize: 15,
+        color: p.textSecondary,
+        textAlign: 'center',
+        lineHeight: 22,
+        maxWidth: 340
+    },
+    setupCard: {
+        backgroundColor: p.card,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: p.border,
+        padding: 18,
+        gap: 16
+    },
+    setupRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+    setupBubble: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: p.cardAlt,
+        borderWidth: 1,
+        borderColor: p.border,
+        marginTop: 1
+    },
+    setupBubbleDone: { backgroundColor: p.green, borderColor: p.green },
+    setupRowText: { flex: 1, gap: 2 },
+    setupRowTitle: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+    setupRowBody: { fontSize: 13.5, color: p.textSecondary, lineHeight: 19 },
+    setupButton: {
+        flexDirection: 'row',
+        gap: 8,
+        justifyContent: 'center',
+        alignSelf: 'stretch',
+        marginTop: 4
+    },
+
     createProfileButton: {
         backgroundColor: p.blue,
         borderRadius: 12,

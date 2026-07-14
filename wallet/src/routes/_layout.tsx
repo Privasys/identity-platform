@@ -89,7 +89,7 @@ export default function RootLayout() {
         ...FontAwesome.font
     });
 
-    const isOnboarded = useAuthStore((s) => s.isOnboarded);
+    const hasProfile = useProfileStore((s) => s.profile != null);
     const [storesReady, setStoresReady] = useState(false);
     const [showSplashAnim, setShowSplashAnim] = useState(true);
 
@@ -129,7 +129,7 @@ export default function RootLayout() {
 
     return (
         <>
-            <RootLayoutNav isOnboarded={isOnboarded} />
+            <RootLayoutNav hasProfile={hasProfile} />
             {showSplashAnim && (
                 <SplashAnimation
                     onComplete={onSplashComplete}
@@ -145,15 +145,19 @@ function KeepAwake() {
     return null;
 }
 
-function RootLayoutNav({ isOnboarded }: { isOnboarded: boolean }) {
+function RootLayoutNav({ hasProfile }: { hasProfile: boolean }) {
     const colorScheme = useColorScheme();
     const router = useRouter();
 
+    // No identity yet (fresh install, or after Settings → Clear All Data) →
+    // send the user to the Profile tab, whose empty state runs the first-run
+    // setup (biometric + device key + identity). Replaces the old redirect to
+    // the standalone gradient onboarding screen, which has been removed.
     useEffect(() => {
-        if (!isOnboarded) {
-            router.replace('/onboarding');
+        if (!hasProfile) {
+            router.replace('/(tabs)/profile');
         }
-    }, [isOnboarded]);
+    }, [hasProfile]);
 
     return (
         <>

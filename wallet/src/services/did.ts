@@ -90,6 +90,22 @@ function base58btcEncode(bytes: Uint8Array): string {
  *
  * The 'z' prefix indicates base58btc multibase encoding.
  */
+/**
+ * Ensure the device's default signing key exists in secure hardware.
+ *
+ * Idempotent: creates the biometric-gated `privasys-wallet-default` key on the
+ * first call and returns immediately if it already exists. This key signs the
+ * device DID and the holder proofs used by KYC and Wallet Instance Attestation,
+ * so it MUST exist before `generateDid()` (or those flows) run. Since the
+ * gradient onboarding screen was removed, this is the single guaranteed point
+ * of key creation — called from first-run profile setup and from the sign-in
+ * path that lazily creates a profile.
+ */
+export async function ensureDeviceKey(keyId: string = DEFAULT_KEY_ID): Promise<void> {
+    if (await NativeKeys.keyExists(keyId)) return;
+    await NativeKeys.generateKey(keyId, true);
+}
+
 export async function generateDid(keyId: string = DEFAULT_KEY_ID): Promise<string> {
     const keyInfo = await NativeKeys.getPublicKey(keyId);
     const pubkeyBytes = base64urlToBytes(keyInfo.publicKey);

@@ -1226,19 +1226,13 @@ export class AuthUI {
         // (QR) on an untrusted device earns the prompt.
         const showTrust = !!this.pushToken && !this.cfg.deviceTrusted && !this.cfg.pushToken;
         const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
-        const hasAttestation = this.method === 'wallet' && this.attestation?.valid;
-        const methodDetail = this.method === 'passkey'
-            ? 'This device'
-            : (hasAttestation ? 'Attestation verified' : null);
 
         return el('div', null,
             // The outcome as a single tile (the progress steps are hidden
-            // on success — see stepsUnderway in render()).
+            // on success — see stepsUnderway in render()). No attestation
+            // badge: the user already saw the verification in the wallet.
             el('div', { className: 'success-icon', html: ICON_CHECK_CIRCLE }),
             el('div', { className: 'success-title' }, `Authenticated via ${methodLabel}`),
-            methodDetail ? el('div', { className: 'success-method' },
-                el('span', { className: 'method-badge' }, methodDetail),
-            ) : null,
             showTrust ? el('div', { style: 'width: 100%;' },
                 el('p', { style: 'font-size: 14px; font-weight: 500; margin-bottom: 6px;' },
                     'Trust this device?',

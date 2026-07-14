@@ -187,6 +187,14 @@ export interface AuthFrameConfig {
      */
     methods?: readonly ('wallet' | 'passkey' | 'social')[];
     /**
+     * Your app's identity for the gate header (`'page'` presentation):
+     * your logo (https only) and display name lead the header, with
+     * "Secured by Privasys ID" as the trust seal and a Close control
+     * that rejects `connect()` with code 'cancelled'. `displayName`
+     * defaults to a prettified `appName`.
+     */
+    app?: { logoUrl?: string; displayName?: string };
+    /**
      * Sealed session-relay opt-in. When set, the auth iframe negotiates an
      * end-to-end ECDH session with the enclave at `appHost` during the
      * wallet ceremony. After `signIn()` resolves, call {@link AuthFrame.session}

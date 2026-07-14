@@ -129,6 +129,18 @@ function sanitisePitch(raw: unknown): AuthUIConfig['pitch'] {
     return (pitch.title || pitch.description || pitch.bullets || pitch.logoUrl) ? pitch : undefined;
 }
 
+function sanitiseApp(raw: unknown): AuthUIConfig['app'] {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const r = raw as Record<string, unknown>;
+    const logoUrl = typeof r.logoUrl === 'string' && r.logoUrl.startsWith('https://')
+        ? r.logoUrl.slice(0, 300)
+        : undefined;
+    const displayName = typeof r.displayName === 'string' && r.displayName.trim()
+        ? r.displayName.trim().slice(0, 60)
+        : undefined;
+    return (logoUrl || displayName) ? { logoUrl, displayName } : undefined;
+}
+
 const KNOWN_METHODS = ['wallet', 'passkey', 'social'] as const;
 function sanitiseMethods(raw: unknown): AuthUIConfig['methods'] {
     if (!Array.isArray(raw)) return undefined;
@@ -745,6 +757,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const presentation = sanitisePresentation(config.presentation);
         const pitch = sanitisePitch(config.pitch);
         const methods = sanitiseMethods(config.methods);
+        const app = sanitiseApp(config.app);
 
         // Connect-mode approve: an existing wallet session whose sealed
         // voucher the enclave refused (measurement change) or that has no
@@ -765,6 +778,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     appName: config.appName,
                     rpId,
                     presentation,
+                    app,
                     pitch,
                     approveFlow: {
                         appLabel,
@@ -994,6 +1008,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     sessionRelay: sessionRelayUI,
                     // Sanitised copies override the raw postMessage values.
                     presentation,
+                    app,
                     pitch,
                     methods,
                     approveFlow: undefined,
@@ -1119,6 +1134,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             deviceTrusted,
             sessionRelay: sessionRelayUI,
             presentation,
+            app,
             pitch,
             methods,
             approveFlow: undefined,

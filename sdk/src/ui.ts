@@ -45,6 +45,12 @@ export interface AuthUIConfig {
      *  length-capped by the frame host. `logoUrl` (https only) renders the
      *  consumer's logo above the title. */
     pitch?: { title?: string; description?: string; bullets?: string[]; logoUrl?: string };
+    /** App identity for the templated gate header (`'page'` presentation):
+     *  the app's logo and display name lead the header, with "Secured by
+     *  Privasys ID" as the trust seal and a Close control on the right.
+     *  `displayName` defaults to a prettified `appName`; `logoUrl` (https
+     *  only, sanitised by the frame host) falls back to the Privasys mark. */
+    app?: { logoUrl?: string; displayName?: string };
     /** Approve-only flow: re-verify an already-signed-in session against a
      *  changed enclave via a one-tap wallet push. When set, `signIn()`
      *  renders the approval waiting UI and delegates the push + sealed
@@ -336,14 +342,52 @@ const MODAL_CSS = /* css */ `
 }
 .gate-header-logo { width: 22px; height: 22px; flex-shrink: 0; }
 .gate-header-logo svg { width: 100%; height: 100%; display: block; }
+.gate-header-applogo {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    object-fit: contain;
+}
 .gate-header-brand {
     font-size: 14px;
     font-weight: 600;
     letter-spacing: -0.01em;
     color: #0F172A;
 }
-.gate-header-request { margin-left: auto; text-align: right; }
-.gate-header-request strong { color: #0F172A; font-weight: 600; }
+.gate-seal {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #64748B;
+}
+.gate-seal-logo { width: 15px; height: 15px; flex-shrink: 0; }
+.gate-seal-logo svg { width: 100%; height: 100%; display: block; }
+.gate-seal-text strong { color: #0F172A; font-weight: 600; }
+.gate-close {
+    margin-left: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid #E2E8F0;
+    border-radius: 999px;
+    padding: 5px 13px;
+    font-family: inherit;
+    font-size: 12px;
+    color: #475569;
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.gate-close:hover { background: #F1F5F9; border-color: #CBD5E1; }
+.gate-close-x { font-size: 11px; color: #94A3B8; }
+.gate-request {
+    font-size: 13px;
+    color: #64748B;
+    text-align: center;
+    margin-bottom: 10px;
+}
+.gate-request strong { color: #0F172A; font-weight: 600; }
 .pitch-logo {
     display: block;
     height: 44px;
@@ -399,7 +443,9 @@ const MODAL_CSS = /* css */ `
        generic brand description; the gate header carries identity. */
     .pitch-body { display: none; }
     :host(.page-mode) .page { grid-template-rows: auto auto 1fr auto; }
-    .gate-header { flex-wrap: wrap; padding: 12px 16px; }
+    .gate-header { padding: 12px 16px; }
+    /* Narrow screens: the seal collapses to the Privasys mark alone. */
+    .gate-seal-text { display: none; }
 }
 @media (prefers-color-scheme: dark) {
     .pitch-title { color: #F1F5F9; }
@@ -407,7 +453,11 @@ const MODAL_CSS = /* css */ `
     .pitch-bullet { color: #E2E8F0; }
     .gate-header { border-color: rgba(255,255,255,0.08); color: #64748B; }
     .gate-header-brand { color: #F1F5F9; }
-    .gate-header-request strong { color: #E2E8F0; }
+    .gate-seal-text strong { color: #E2E8F0; }
+    .gate-close { border-color: rgba(255,255,255,0.12); color: #94A3B8; }
+    .gate-close:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
+    .gate-request { color: #64748B; }
+    .gate-request strong { color: #E2E8F0; }
 }
 
 /* Provider buttons */
@@ -1132,15 +1182,28 @@ export class AuthUI {
             (this.isFlowState() && !pitchOwned) ? this.renderBrandProgress() : null,
         );
 
+        // Page mode: the templated gate header is APP-LED — the consumer's
+        // logo and name lead, "Secured by Privasys ID" is the trust seal,
+        // and Close hands control back to the app (connect() rejects with
+        // 'cancelled'). The request statement lives above the ceremony.
+        const appDisplay = this.cfg.app?.displayName || displayName;
+
         const page = el('div', { className: 'page' },
-            // Page mode: full-width header — the authenticator's identity
-            // plus which app is requesting authentication.
             isPage ? el('div', { className: 'gate-header' },
-                el('div', { className: 'gate-header-logo', html: ICON_LOGO }),
-                el('span', { className: 'gate-header-brand' }, 'Privasys ID'),
-                el('span', { className: 'gate-header-request' },
-                    el('strong', null, displayName),
-                    ' wants to authenticate you',
+                this.cfg.app?.logoUrl
+                    ? el('img', { className: 'gate-header-applogo', src: this.cfg.app.logoUrl, alt: '' })
+                    : el('div', { className: 'gate-header-logo', html: ICON_LOGO }),
+                el('span', { className: 'gate-header-brand' }, appDisplay),
+                el('span', { className: 'gate-seal' },
+                    el('span', { className: 'gate-seal-logo', html: ICON_LOGO }),
+                    el('span', { className: 'gate-seal-text' },
+                        'Secured by ',
+                        el('strong', null, 'Privasys ID'),
+                    ),
+                ),
+                el('button', { className: 'gate-close', onClick: () => this.handleCancel() },
+                    el('span', { className: 'gate-close-x' }, '✕'),
+                    'Close',
                 ),
             ) : null,
             // Close button — modal overlays only (a page is not dismissable
@@ -1160,6 +1223,13 @@ export class AuthUI {
                         el('span', { html: ICON_ARROW_LEFT }),
                         'Back',
                     ) : null,
+                // Page mode: the request statement sits right above the
+                // ceremony heading — where the user is already looking —
+                // answering WHY this screen is shown.
+                (isPage && flowHeading) ? el('p', { className: 'gate-request' },
+                    el('strong', null, appDisplay),
+                    ' wants to authenticate you',
+                ) : null,
                 flowHeading ? el('h2', { className: 'auth-panel-heading' }, flowHeading) : null,
                 // Shown when the brand panel carries no progress steps:
                 // always in inline mode, and on the mobile breakpoint (where

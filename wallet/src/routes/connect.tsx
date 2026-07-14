@@ -51,6 +51,11 @@ import { inspectAttestation, attestEnclave } from '@/services/attestation';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
 import { ensureDrive } from '@/services/drive';
 import { appIdFromOids, fetchRunningAppReleases, type OsRelease, type WorkloadRelease } from '@/services/release-provenance';
+import {
+    recordDeclaredDependencies,
+    resolveDependencyConsent,
+    type DependencyConsentItem,
+} from '@/services/dependency-consent';
 import { relaySessionToken } from '@/services/broker';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
@@ -650,6 +655,10 @@ export default function ConnectScreen() {
     // Published-release links (best-effort, from mgmt release provenance) so the
     // approval screens can link to the reviewable code behind the measurements.
     const [releases, setReleases] = useState<{ workload?: WorkloadRelease; os?: OsRelease } | null>(null);
+    // Attested cross-enclave dependencies this enclave declares (OID 6.1),
+    // classified against the approval cache + resolved to published-build
+    // provenance, for the approval screen.
+    const [dependencyItems, setDependencyItems] = useState<DependencyConsentItem[]>([]);
     // The host actually attested, so the "Challenge this enclave" button can
     // re-verify the same target in challenge mode.
     const attestationTargetRef = useRef<string | null>(null);
@@ -823,6 +832,14 @@ export default function ConnectScreen() {
                         }
                     });
                 }
+
+                // Attested dependencies this enclave declares — for the approval
+                // screen (best-effort, in parallel). Decoded + classified against
+                // the approval cache + gated on published-build provenance.
+                setDependencyItems([]);
+                void resolveDependencyConsent(inspectResult.custom_oids, attestationTarget)
+                    .then(setDependencyItems)
+                    .catch(() => setDependencyItems([]));
 
                 // Step 2b — enclave path. Decide between cached trust and a
                 // fresh attestation-server round-trip based on REVERIFY_TTL_MS
@@ -1280,6 +1297,14 @@ export default function ConnectScreen() {
                     await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
                 } else {
                     await doRegister(qr);
+                }
+                // Approving this enclave also approves the attested cross-enclave
+                // dependencies it declares (OID 6.1), cached by (app-id, identity)
+                // with this app as provenance and reused wherever they recur.
+                try {
+                    recordDeclaredDependencies(attestation.custom_oids, 'approved', qr.rpId);
+                } catch (depErr) {
+                    console.warn('[CONNECT] recording dependency approvals failed (non-fatal):', depErr);
                 }
             });
         } catch (e: any) {
@@ -2062,6 +2087,13 @@ export default function ConnectScreen() {
                         verificationLevel={verificationLevel}
                         verification={verification ?? undefined}
                         releases={releases}
+                        dependencies={dependencyItems.map((d) => ({
+                            name: d.provenance.name,
+                            label: d.provenance.label,
+                            url: d.provenance.url,
+                            status: d.status,
+                            published: d.provenance.published,
+                        }))}
                         onApprove={handleApprove}
                         onReject={handleReject}
                         onChallenge={handleChallenge}
@@ -2079,6 +2111,13 @@ export default function ConnectScreen() {
                         verificationLevel={verificationLevel}
                         verification={verification ?? undefined}
                         releases={releases}
+                        dependencies={dependencyItems.map((d) => ({
+                            name: d.provenance.name,
+                            label: d.provenance.label,
+                            url: d.provenance.url,
+                            status: d.status,
+                            published: d.provenance.published,
+                        }))}
                         onApprove={handleApprove}
                         onReject={handleReject}
                         onChallenge={handleChallenge}

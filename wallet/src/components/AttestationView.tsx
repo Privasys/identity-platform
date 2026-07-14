@@ -71,6 +71,7 @@ export function AttestationView({
     verificationLevel,
     verification,
     releases,
+    dependencies,
     onApprove,
     onReject,
     onChallenge,
@@ -100,6 +101,13 @@ export function AttestationView({
      * GitHub release and, for platform changes, the enclave-OS release.
      */
     releases?: { workload?: WorkloadRelease; os?: OsRelease } | null;
+    /**
+     * Attested cross-enclave dependencies this app declares (OID 6.1). Shown so
+     * the user sees what the app pulls in before approving. `published` is the
+     * transparency-log gate; `status` reflects the approval cache
+     * (approved/denied/new).
+     */
+    dependencies?: Array<{ name: string; label?: string; url?: string; status: string; published: boolean }>;
     onApprove: () => void;
     onReject: () => void;
     /** When provided (deterministic mode), shows a "Challenge this enclave"
@@ -304,6 +312,44 @@ export function AttestationView({
                                     </View>
                                 </ExternalLink>
                             )}
+                        </View>
+                    </>
+                )}
+
+                {/* Attested cross-enclave dependencies — what this app pulls in.
+                    Approving the app also approves these (cached and reused);
+                    "verify" flags a build not resolvable to a published release. */}
+                {dependencies && dependencies.length > 0 && (
+                    <>
+                        <Text style={styles.sectionHeader}>Depends on</Text>
+                        <View style={styles.attestationCard}>
+                            {dependencies.map((d, i) => {
+                                const badge = !d.published
+                                    ? 'verify'
+                                    : d.status === 'approved'
+                                      ? 'approved'
+                                      : d.status === 'denied'
+                                        ? 'denied before'
+                                        : 'new';
+                                const row = (
+                                    <View style={styles.releaseRow}>
+                                        <Text style={styles.releaseLabel}>
+                                            {d.name}
+                                            {d.label ? ` (${d.label})` : ''}
+                                        </Text>
+                                        <Text style={styles.releaseLink}>
+                                            {d.url ? `${badge} ↗` : badge}
+                                        </Text>
+                                    </View>
+                                );
+                                return d.url ? (
+                                    <ExternalLink key={i} href={d.url}>
+                                        {row}
+                                    </ExternalLink>
+                                ) : (
+                                    <View key={i}>{row}</View>
+                                );
+                            })}
                         </View>
                     </>
                 )}

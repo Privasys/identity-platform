@@ -89,6 +89,30 @@ export interface AttributeDisclosure {
  * cover the requested gov-verified attributes (IdP `402 insufficient_credits`).
  * The user was never prompted; top up the account and retry.
  */
+/** Typed failure from {@link AuthFrame.connect}. */
+export class ConnectError extends Error {
+    /** 'cancelled' — the user dismissed the ceremony; 'timeout' — the
+     *  approval/ceremony was not completed in time; 'failed' — anything
+     *  else (transport, enclave unavailable, IdP error). */
+    readonly code: 'cancelled' | 'timeout' | 'failed';
+    constructor(code: 'cancelled' | 'timeout' | 'failed', message: string) {
+        super(message);
+        this.name = 'ConnectError';
+        this.code = code;
+    }
+}
+
+/** Successful outcome of {@link AuthFrame.connect}. */
+export interface ConnectResult {
+    /** JWT access token for the session (existing or freshly minted). */
+    accessToken: string;
+    /** Sealed transport proxy — null when `sessionRelay` is not configured. */
+    session: SealedSession | null;
+    /** Full ceremony result when an interactive sign-in ran; absent when
+     *  the session was restored silently (no UI was shown). */
+    result?: SignInResult;
+}
+
 export class InsufficientCreditsError extends Error {
     readonly code = 'insufficient_credits';
     constructor(message?: string) {
@@ -139,11 +163,28 @@ export interface AuthFrameConfig {
     container?: HTMLElement;
     /**
      * Presentation mode of the hosted auth page. Defaults to `'inline'`
-     * when a `container` is set, `'modal'` otherwise. Set explicitly only
-     * to override that inference (e.g. a full-screen container that should
-     * still show the modal chrome).
+     * when a `container` is set, `'modal'` otherwise. Set explicitly to
+     * override that inference. `'page'` makes the SDK render the WHOLE
+     * gate — the two-column layout with your `pitch` content, SDK-styled,
+     * in the left panel — filling the container (or the viewport when no
+     * container is given).
      */
-    presentation?: 'modal' | 'inline';
+    presentation?: 'modal' | 'inline' | 'page';
+    /**
+     * Content for the gate's left panel in `'page'` presentation. Plain
+     * strings only — rendered as text and length-capped by the hosted
+     * page (title 120, description 600, up to 5 bullets of 200 chars).
+     */
+    pitch?: { title?: string; description?: string; bullets?: string[] };
+    /**
+     * Which sign-in methods the ceremony offers. Defaults to all
+     * available. A site that already showed its own identity chooser
+     * (e.g. "Connect with Privasys" next to "Connect with Google")
+     * passes `['wallet']`: the menu screen is skipped and the wallet
+     * flow starts immediately (push when the device is trusted, QR
+     * otherwise).
+     */
+    methods?: readonly ('wallet' | 'passkey' | 'social')[];
     /**
      * Sealed session-relay opt-in. When set, the auth iframe negotiates an
      * end-to-end ECDH session with the enclave at `appHost` during the
@@ -306,6 +347,9 @@ export class AuthFrame {
     private _onSessionRenewed?: (rpId: string, accessToken?: string) => void;
     // Tears down the in-flight signIn() ceremony (set while one is active).
     private cancelSignIn: (() => void) | null = null;
+    // connect()'s hint for the frame host: run the approve-only flow (with
+    // the resume-rejection reason) before falling back to the ceremony.
+    private connectHint: { mode: 'approve'; reason: string | null } | null = null;
     // Sealed session-relay state.
     private sealedIframe: HTMLIFrameElement | null = null;
     private sealedHandler: ((e: MessageEvent) => void) | null = null;
@@ -351,6 +395,78 @@ export class AuthFrame {
      */
     cancel(): void {
         this.cancelSignIn?.();
+    }
+
+    /**
+     * One-call session acquisition — the API adopters should use instead
+     * of hand-rolling restore/approval/sign-in logic. In order:
+     *
+     *   1. Silent restore: an existing OIDC session (cross-site SSO) plus,
+     *      when `sessionRelay` is configured, the sealed session resumed
+     *      from the stored EncAuth voucher. No UI is shown.
+     *   2. Re-approval: the session exists but the enclave refused (its
+     *      measurement changed after a redeploy) or lost the voucher — the
+     *      gate renders the one-tap wallet approval, falling back to the
+     *      full ceremony if it can't complete.
+     *   3. Full sign-in ceremony.
+     *
+     * The gate renders per `presentation`/`pitch`/`methods` config.
+     * Resolves with the access token and (when `sessionRelay` is set) the
+     * live {@link SealedSession}; rejects with a {@link ConnectError}
+     * (`cancelled` | `timeout` | `failed`). To retry after a failure, call
+     * `connect()` again.
+     */
+    async connect(): Promise<ConnectResult> {
+        const appHost = this.config.sessionRelay?.appHost;
+        this.connectHint = null;
+
+        // 1. Silent restore.
+        const existing = await this.getSession().catch(() => null);
+        if (existing?.token) {
+            if (!appHost) {
+                return { accessToken: existing.token, session: null };
+            }
+            try {
+                const sealed = await this.resumeSession();
+                return { accessToken: existing.token, session: sealed };
+            } catch (err) {
+                const msg = (err as Error).message ?? '';
+                if (msg.startsWith('rejected') || msg.startsWith('no-voucher')) {
+                    // 2. Interactive re-approval (the gate falls back to the
+                    // full ceremony internally when it can't complete).
+                    const colon = msg.indexOf(':');
+                    this.connectHint = {
+                        mode: 'approve',
+                        reason: colon > 0 ? msg.slice(colon + 1) : null,
+                    };
+                } else {
+                    // Transient transport failure (enclave down/booting) — a
+                    // ceremony would not help; the caller retries connect().
+                    throw new ConnectError('failed', msg || 'sealed resume failed');
+                }
+            }
+        }
+
+        // 3. Interactive gate (approve-first when hinted, else ceremony).
+        try {
+            const result = await this.signIn();
+            const session = this.config.sessionRelay
+                ? await this.session().catch(() => null)
+                : null;
+            const accessToken = result.accessToken ?? result.sessionToken;
+            return { accessToken, session, result };
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg === 'Authentication cancelled') {
+                throw new ConnectError('cancelled', msg);
+            }
+            if (/timeout|timed out/i.test(msg)) {
+                throw new ConnectError('timeout', msg);
+            }
+            throw new ConnectError('failed', msg);
+        } finally {
+            this.connectHint = null;
+        }
     }
 
     /**
@@ -484,7 +600,14 @@ export class AuthFrame {
                         const presentation = this.config.presentation
                             ?? (this.container ? 'inline' : 'modal');
                         iframe.contentWindow!.postMessage(
-                            { type: 'privasys:init', config: { ...this.config, presentation } },
+                            {
+                                type: 'privasys:init',
+                                config: {
+                                    ...this.config,
+                                    presentation,
+                                    ...(this.connectHint ? { connect: this.connectHint } : {}),
+                                },
+                            },
                             this.authOrigin,
                         );
                         break;

@@ -30,8 +30,33 @@ export interface AuthUIConfig {
      *  brand panel, close button, spanning footer. `'inline'` renders a
      *  single compact column without brand panel or close button, sized to
      *  fit an adopter-provided container (min-height 560px) — the embedding
-     *  page owns the surrounding content and dismissal. */
-    presentation?: 'modal' | 'inline';
+     *  page owns the surrounding content and dismissal. `'page'` renders
+     *  the whole gate: the two-column layout with the adopter's `pitch`
+     *  content (SDK-styled) in the left panel and no close button. */
+    presentation?: 'modal' | 'inline' | 'page';
+    /** Which sign-in methods to offer. Defaults to all available. A site
+     *  that already showed its own identity chooser (e.g. "Connect with
+     *  Privasys" next to "Connect with Google") passes `['wallet']` — the
+     *  menu screen is skipped and the wallet flow starts immediately
+     *  (push when the device is trusted, QR otherwise). */
+    methods?: readonly ('wallet' | 'passkey' | 'social')[];
+    /** App-provided content for the left panel in `'page'` presentation.
+     *  Plain strings only (rendered as text, SDK-styled); sanitised and
+     *  length-capped by the frame host. */
+    pitch?: { title?: string; description?: string; bullets?: string[] };
+    /** Approve-only flow: re-verify an already-signed-in session against a
+     *  changed enclave via a one-tap wallet push. When set, `signIn()`
+     *  renders the approval waiting UI and delegates the push + sealed
+     *  resume to `run()`. On success the ceremony resolves with an empty
+     *  token payload (the frame host posts the real result); on failure the
+     *  user can retry or fall back ("Sign in another way" rejects with
+     *  `approve-fallback` so the host runs the full ceremony). */
+    approveFlow?: {
+        appLabel: string;
+        /** Why re-approval is needed: 'workload-changed' | 'enc-changed' | null. */
+        reason?: string | null;
+        run: () => Promise<void>;
+    };
     /** Push token from a previous session. When present the UI will offer
      *  to send a push notification instead of showing a QR code. */
     pushToken?: string;
@@ -106,6 +131,7 @@ type UIState =
     | 'qr-scanning'
     | 'wallet-connected'
     | 'authenticating'
+    | 'approve-waiting'
     | 'passkey-requesting'
     | 'passkey-ceremony'
     | 'passkey-verifying'
@@ -292,6 +318,62 @@ const MODAL_CSS = /* css */ `
 :host(.inline) .btn-back { margin-bottom: 16px; }
 :host(.inline) .btn-hint { display: none; }
 :host(.inline) .footer { padding: 12px 24px; }
+
+/* Page presentation — the SDK renders the whole gate, with the adopter's
+   pitch content (constrained plain strings) in the left panel. */
+:host(.page-mode) .mobile-progress-header { display: flex; }
+.pitch-title {
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #0F172A;
+    margin-bottom: 16px;
+}
+.pitch-desc {
+    font-size: 15px;
+    color: #64748B;
+    line-height: 1.65;
+    margin-bottom: 24px;
+    max-width: 420px;
+}
+.pitch-bullets {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 440px;
+}
+.pitch-bullet {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 14px;
+    color: #0F172A;
+    line-height: 1.5;
+}
+.pitch-check {
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #00BCF2;
+    color: #fff;
+}
+.pitch-check svg { width: 12px; height: 12px; }
+@media (max-width: 768px) {
+    /* Compact brand header on mobile hides the pitch body, same as the
+       generic brand description. */
+    .pitch-body { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+    .pitch-title { color: #F1F5F9; }
+    .pitch-desc { color: #94A3B8; }
+    .pitch-bullet { color: #E2E8F0; }
+}
 
 /* Provider buttons */
 .btn-provider + .btn-provider { margin-top: 10px; }
@@ -696,6 +778,7 @@ const ICON_SHIELD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const ICON_LOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>`;
 const ICON_FINGERPRINT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 018 4"/><path d="M5 19.5C5.5 18 6 15 6 12c0-3.3 2.7-6 6-6 1.8 0 3.4.8 4.5 2"/><path d="M12 10a2 2 0 00-2 2c0 4.4-1.2 8-2.5 10"/><path d="M8.5 22c0-3 .5-5.5 1-8"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.5 19.5c0-1.5.5-4 .5-7.5 0-1.7-.8-3.2-2-4.3"/><path d="M22 16.92c-.3-.6-.5-1.3-.5-2.92 0-2.5-1.2-4.8-3-6.3"/></svg>`;
 const ICON_ARROW_LEFT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>`;
+const ICON_PITCH_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -775,10 +858,11 @@ export class AuthUI {
     private sessionRelay: SessionRelayBinding | undefined;
     private method: 'wallet' | 'passkey' = 'wallet';
     private qrPayload = '';
-    // True when signIn() skipped idle and went straight to push — the
-    // ceremony's FIRST screen is then push-waiting and Back has nowhere
-    // meaningful to go (its alternatives are offered inline).
+    // True when signIn() skipped idle and went straight into a flow — the
+    // ceremony's FIRST screen is then `autoFirstScreen` and Back has
+    // nowhere meaningful to go (its alternatives are offered inline).
     private autoStarted = false;
+    private autoFirstScreen: UIState | null = null;
 
     constructor(config: AuthUIConfig) {
         this.cfg = {
@@ -791,6 +875,22 @@ export class AuthUI {
     /** The RP ID used for authentication. */
     get rpId(): string {
         return this.cfg.rpId ?? this.cfg.appName;
+    }
+
+    /** Whether a sign-in method is offered (methods config; default all). */
+    private allowed(m: 'wallet' | 'passkey' | 'social'): boolean {
+        return !this.cfg.methods || this.cfg.methods.includes(m);
+    }
+
+    /** The single offered method, when the idle menu would have exactly one
+     *  option — used to skip the menu and start that flow directly. */
+    private singleOption(): 'wallet' | 'passkey' | null {
+        const wallet = this.allowed('wallet');
+        const passkey = this.allowed('passkey') && WebAuthnClient.isSupported();
+        const social = this.allowed('social') ? (this.cfg.socialProviders?.length ?? 0) : 0;
+        if (wallet && !passkey && social === 0) return 'wallet';
+        if (!wallet && passkey && social === 0) return 'passkey';
+        return null;
     }
 
     /**
@@ -813,12 +913,25 @@ export class AuthUI {
             this.sessionRelay = undefined;
             this.qrPayload = '';
             this.autoStarted = false;
+            this.autoFirstScreen = null;
             this.mount();
 
-            // If returning user (push token available), skip idle and send push immediately
-            if (this.cfg.pushToken) {
+            if (this.cfg.approveFlow) {
+                // Re-verification of an existing session: approval push only.
                 this.autoStarted = true;
+                this.autoFirstScreen = 'approve-waiting';
+                this.startApprove();
+            } else if (this.cfg.pushToken && this.allowed('wallet')) {
+                // Returning user (push token available): skip idle, push.
+                this.autoStarted = true;
+                this.autoFirstScreen = 'push-waiting';
                 this.startPush();
+            } else if (this.singleOption() === 'wallet') {
+                // The site's own chooser already picked Privasys (methods:
+                // ['wallet'] with no push token) — go straight to the QR.
+                this.autoStarted = true;
+                this.autoFirstScreen = 'qr-scanning';
+                this.startWallet();
             } else {
                 this.render();
             }
@@ -851,6 +964,7 @@ export class AuthUI {
         this.host = document.createElement('div');
         this.host.setAttribute('data-privasys-auth', '');
         if (this.cfg.presentation === 'inline') this.host.classList.add('inline');
+        else if (this.cfg.presentation === 'page') this.host.classList.add('page-mode');
         this.shadow = this.host.attachShadow({ mode: 'closed' });
 
         const style = document.createElement('style');
@@ -881,6 +995,9 @@ export class AuthUI {
                 break;
             case 'push-waiting':
                 brandDesc = 'Check your phone \u2014 tap the notification from Privasys ID to approve this sign-in.';
+                break;
+            case 'approve-waiting':
+                brandDesc = 'Check your phone \u2014 approve the connection to continue.';
                 break;
             case 'wallet-connected':
             case 'authenticating':
@@ -914,6 +1031,9 @@ export class AuthUI {
             case 'authenticating':
                 content = this.renderWalletProgress();
                 break;
+            case 'approve-waiting':
+                content = this.renderApproveWaiting();
+                break;
             case 'passkey-requesting':
             case 'passkey-ceremony':
             case 'passkey-verifying':
@@ -930,48 +1050,67 @@ export class AuthUI {
         }
 
         // Inline embeds get no chrome of their own: the embedding page owns
-        // the brand content and dismissal (AuthFrame.cancel()).
-        const inline = this.cfg.presentation === 'inline';
+        // the brand content and dismissal (AuthFrame.cancel()). Page mode
+        // renders the whole gate — pitch panel left, no close button.
+        const presentation = this.cfg.presentation ?? 'modal';
+        const inline = presentation === 'inline';
+        const isPage = presentation === 'page';
 
         // Progress steps earn their place only once the ceremony is actually
-        // underway. While merely waiting on the user (push tile, QR code)
-        // all but the first step are inert, and the tile/QR already says
-        // what is happening — showing four dormant bullets above it reads
-        // as clutter. On success the outcome is the message, not the path
-        // that led there — renderSuccess shows a single tile instead. The
-        // brand panel's copy of the steps (modal desktop) keeps its
-        // always-on behaviour.
-        const stepsUnderway = !['push-waiting', 'qr-scanning', 'success'].includes(this.state);
+        // underway. While merely waiting on the user (push tile, QR code,
+        // approval tile) all but the first step are inert, and the tile/QR
+        // already says what is happening — showing four dormant bullets
+        // above it reads as clutter. On success the outcome is the message,
+        // not the path that led there — renderSuccess shows a single tile
+        // instead. The brand panel's copy of the steps (modal desktop)
+        // keeps its always-on behaviour.
+        const stepsUnderway = !['push-waiting', 'qr-scanning', 'approve-waiting', 'success'].includes(this.state);
 
-        // Inline mode has no brand panel to carry context, so flow states
-        // get a heading of their own above the progress/tile.
-        const inlineHeading = inline && !isIdle && this.state !== 'success' && this.state !== 'error'
+        // Without a generic brand panel to carry context (inline and page
+        // modes), flow states get a heading of their own above the tile.
+        const flowHeading = (inline || isPage) && !isIdle && this.state !== 'success' && this.state !== 'error'
             ? (this.method === 'passkey' ? 'Sign in with a passkey' : 'Connecting you to Privasys ID')
             : null;
 
-        const page = el('div', { className: 'page' },
-            // Close button
-            inline ? null : el('button', { className: 'btn-close', html: ICON_CLOSE, onClick: () => this.handleCancel() }),
-            // Left: brand panel
-            inline ? null : el('div', { className: 'brand-panel' },
-                el('div', { className: 'brand-panel-header' },
-                    el('div', { className: 'brand-panel-logo', html: ICON_LOGO }),
-                    el('div', { className: 'brand-panel-name' }, 'Privasys'),
-                ),
-                brandDesc ? el('p', { className: 'brand-panel-desc', html: brandDesc }) : null,
-                this.isFlowState() ? this.renderBrandProgress() : null,
+        // Left panel content: the adopter's pitch (page mode, SDK-styled)
+        // or the generic Privasys brand copy.
+        const pitch = this.cfg.pitch;
+        const leftPanel = inline ? null : el('div', { className: 'brand-panel' },
+            el('div', { className: 'brand-panel-header' },
+                el('div', { className: 'brand-panel-logo', html: ICON_LOGO }),
+                el('div', { className: 'brand-panel-name' }, 'Privasys'),
             ),
+            (isPage && pitch) ? el('div', { className: 'pitch-body' },
+                pitch.title ? el('h1', { className: 'pitch-title' }, pitch.title) : null,
+                pitch.description ? el('p', { className: 'pitch-desc' }, pitch.description) : null,
+                pitch.bullets?.length ? el('ul', { className: 'pitch-bullets' },
+                    ...pitch.bullets.map((b) => el('li', { className: 'pitch-bullet' },
+                        el('span', { className: 'pitch-check', html: ICON_PITCH_CHECK }),
+                        b,
+                    )),
+                ) : null,
+            ) : (brandDesc ? el('p', { className: 'brand-panel-desc', html: brandDesc }) : null),
+            this.isFlowState() ? this.renderBrandProgress() : null,
+        );
+
+        const page = el('div', { className: 'page' },
+            // Close button — modal overlays only (a page is not dismissable
+            // from inside; adopters cancel via AuthFrame.cancel()).
+            (inline || isPage) ? null : el('button', { className: 'btn-close', html: ICON_CLOSE, onClick: () => this.handleCancel() }),
+            leftPanel,
             // Right: auth panel
             el('div', { className: `auth-panel${isIdle ? '' : ' auth-panel--centered'}` },
-                // No Back on success, nor on an auto-started push screen —
-                // there the ceremony BEGAN at push-waiting (idle was never
-                // shown) and its alternatives are offered inline.
-                (!isIdle && this.state !== 'success' && !(this.state === 'push-waiting' && this.autoStarted))
+                // No Back on success, on the screen an auto-started flow
+                // began at (idle was never shown; alternatives are inline),
+                // or anywhere in the approve-only flow (no idle menu exists
+                // there — "Sign in another way" is the escape hatch).
+                (!isIdle && this.state !== 'success' && !this.cfg.approveFlow
+                    && !(this.autoStarted && this.state === this.autoFirstScreen))
                     ? el('button', { className: 'btn-back', onClick: () => this.goBack() },
                         el('span', { html: ICON_ARROW_LEFT }),
                         'Back',
                     ) : null,
-                inlineHeading ? el('h2', { className: 'auth-panel-heading' }, inlineHeading) : null,
+                flowHeading ? el('h2', { className: 'auth-panel-heading' }, flowHeading) : null,
                 // Shown when the brand panel carries no progress steps:
                 // always in inline mode, and on the mobile breakpoint (where
                 // the brand panel collapses to a compact header).
@@ -1002,9 +1141,10 @@ export class AuthUI {
     // ---- state-specific views ----
 
     private renderIdle(): HTMLElement {
-        const hasWebAuthn = WebAuthnClient.isSupported();
-        const hasPush = !!this.cfg.pushToken;
-        const socialProviders = this.cfg.socialProviders ?? [];
+        const hasWebAuthn = WebAuthnClient.isSupported() && this.allowed('passkey');
+        const hasPush = !!this.cfg.pushToken && this.allowed('wallet');
+        const socialProviders = this.allowed('social') ? (this.cfg.socialProviders ?? []) : [];
+        const hasWallet = this.allowed('wallet');
         const displayName = this.cfg.appName
             .replace(/[-_]/g, ' ')
             .replace(/\b\w/g, c => c.toUpperCase());
@@ -1023,12 +1163,14 @@ export class AuthUI {
         }
 
         // Primary wallet/QR button — Privasys logo in the button
-        buttons.push(
-            el('button', { className: `btn-provider ${hasPush ? '' : 'primary'}`, onClick: () => this.startWallet() },
-                el('span', { html: ICON_LOGO }),
-                el('span', { className: 'btn-label' }, hasPush ? 'Scan QR code instead' : 'Continue with Privasys ID'),
-            ),
-        );
+        if (hasWallet) {
+            buttons.push(
+                el('button', { className: `btn-provider ${hasPush ? '' : 'primary'}`, onClick: () => this.startWallet() },
+                    el('span', { html: ICON_LOGO }),
+                    el('span', { className: 'btn-label' }, hasPush ? 'Scan QR code instead' : 'Continue with Privasys ID'),
+                ),
+            );
+        }
 
         // Divider before alternative methods
         const hasAlternatives = hasWebAuthn || socialProviders.length > 0;
@@ -1100,7 +1242,7 @@ export class AuthUI {
     }
 
     private renderPushWaiting(): HTMLElement {
-        const hasWebAuthn = WebAuthnClient.isSupported();
+        const hasWebAuthn = WebAuthnClient.isSupported() && this.allowed('passkey');
         return el('div', null,
             el('p', { className: 'btn-provider', style: 'margin-bottom: 20px; max-width: none; text-align: center;' },
                 'Check your phone \u2014 tap the notification to approve this connection.',
@@ -1116,6 +1258,56 @@ export class AuthUI {
                     el('span', { className: 'btn-label' }, 'Passkey'),
                 ) : null,
             ),
+        );
+    }
+
+    /** Approve-only flow: waiting for the one-tap wallet re-verification. */
+    private renderApproveWaiting(): HTMLElement {
+        const flow = this.cfg.approveFlow!;
+        const why = flow.reason === 'workload-changed'
+            ? `${flow.appLabel} was updated since you last verified it.`
+            : flow.reason === 'enc-changed'
+                ? `The platform hosting ${flow.appLabel} changed since you last verified it.`
+                : `A fresh approval is needed to open a sealed channel to ${flow.appLabel}.`;
+        return el('div', null,
+            el('p', { className: 'scan-hint', style: 'margin-bottom: 16px; max-width: none; text-align: center;' }, why),
+            el('p', { className: 'btn-provider', style: 'margin-bottom: 20px; max-width: none; text-align: center;' },
+                `Check your phone \u2014 approve ${flow.appLabel} to continue.`,
+            ),
+            el('button', {
+                className: 'link-btn',
+                style: 'font-size: 13px; display: block; text-align: center; width: 100%;',
+                onClick: () => this.finishApproveFallback(),
+            }, 'Sign in another way'),
+        );
+    }
+
+    /** Leave the approve-only flow: reject so the host runs the full ceremony. */
+    private finishApproveFallback(): void {
+        this.cleanup();
+        this.close();
+        this.reject?.(new Error('approve-fallback'));
+        this.resolve = null;
+        this.reject = null;
+    }
+
+    private startApprove(): void {
+        const flow = this.cfg.approveFlow!;
+        this.method = 'wallet';
+        this.state = 'approve-waiting';
+        this.render();
+        flow.run().then(
+            () => {
+                // The host owns the real result payload; complete() shows the
+                // success tile and auto-closes (no trust prompt \u2014 the session
+                // already exists and arrived via push).
+                this.complete();
+            },
+            (err: unknown) => {
+                this.state = 'error';
+                this.errorMsg = (err as Error)?.message ?? 'Approval failed';
+                this.render();
+            },
         );
     }
 
@@ -1137,7 +1329,7 @@ export class AuthUI {
 
     /** Whether the current state is an in-progress or completed flow state. */
     private isFlowState(): boolean {
-        return ['push-waiting', 'qr-scanning', 'wallet-connected', 'authenticating',
+        return ['push-waiting', 'qr-scanning', 'wallet-connected', 'authenticating', 'approve-waiting',
                 'passkey-requesting', 'passkey-ceremony', 'passkey-verifying', 'success'].includes(this.state);
     }
 
@@ -1145,6 +1337,26 @@ export class AuthUI {
     private renderBrandProgress(): HTMLElement {
         const isSuccess = this.state === 'success';
         const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
+
+        // Approve-only flow: its own 3-step shape (no QR/notification steps).
+        if (this.cfg.approveFlow) {
+            return el('div', { className: 'brand-progress' },
+                el('div', { className: 'steps' },
+                    el('div', { className: 'step done' },
+                        el('span', { className: 'step-icon' }, '✓'),
+                        'Approval requested',
+                    ),
+                    el('div', { className: `step ${isSuccess ? 'done' : 'active'}` },
+                        el('span', { className: 'step-icon' }, isSuccess ? '✓' : '•'),
+                        'Approved on your phone',
+                    ),
+                    el('div', { className: `step ${isSuccess ? 'done' : ''}` },
+                        el('span', { className: 'step-icon' }, isSuccess ? '✓' : '•'),
+                        'Sealed channel established',
+                    ),
+                ),
+            );
+        }
         const hasAttestation = this.method === 'wallet' && this.attestation?.valid;
         const methodDetail = this.method === 'passkey'
             ? 'This device'
@@ -1232,7 +1444,8 @@ export class AuthUI {
             // on success — see stepsUnderway in render()). No attestation
             // badge: the user already saw the verification in the wallet.
             el('div', { className: 'success-icon', html: ICON_CHECK_CIRCLE }),
-            el('div', { className: 'success-title' }, `Authenticated via ${methodLabel}`),
+            el('div', { className: 'success-title' },
+                this.cfg.approveFlow ? 'Approved on Privasys ID' : `Authenticated via ${methodLabel}`),
             showTrust ? el('div', { style: 'width: 100%;' },
                 el('p', { style: 'font-size: 14px; font-weight: 500; margin-bottom: 6px;' },
                     'Trust this device?',
@@ -1256,6 +1469,27 @@ export class AuthUI {
     }
 
     private renderError(): HTMLElement {
+        // Approve-only flow: retry re-sends the push; there is no idle menu
+        // to return to (this instance has no ceremony wiring), so the escape
+        // hatch hands control back to the host for a full sign-in.
+        if (this.cfg.approveFlow) {
+            return el('div', null,
+                el('div', { className: 'error-icon', html: ICON_X_CIRCLE }),
+                el('div', { className: 'error-title' }, 'Approval not completed'),
+                el('div', { className: 'error-msg' }, this.errorMsg || 'The approval was not completed in time.'),
+                el('button', { className: 'btn-retry', onClick: () => {
+                    this.errorMsg = '';
+                    this.startApprove();
+                } },
+                    'Try again',
+                ),
+                el('button', {
+                    className: 'link-btn',
+                    style: 'margin-top: 12px; font-size: 13px; display: block; text-align: center; width: 100%;',
+                    onClick: () => this.finishApproveFallback(),
+                }, 'Sign in another way'),
+            );
+        }
         return el('div', null,
             el('div', { className: 'error-icon', html: ICON_X_CIRCLE }),
             el('div', { className: 'error-title' }, 'Authentication failed'),

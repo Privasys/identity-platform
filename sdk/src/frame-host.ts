@@ -100,6 +100,133 @@ function makeGetEncAuth(rpId: string, host: string): () => Promise<EncAuthEnvelo
     };
 }
 
+// ── Adopter-config sanitisers ────────────────────────────────────────────
+//
+// `pitch` and `methods` arrive from the adopter page via postMessage and
+// are rendered inside this trusted origin, so they are strictly schema-
+// checked: plain strings only (AuthUI renders them as text nodes), capped
+// lengths, and a closed method vocabulary.
+
+function sanitisePitch(raw: unknown): AuthUIConfig['pitch'] {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const r = raw as Record<string, unknown>;
+    const str = (v: unknown, max: number): string | undefined =>
+        typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined;
+    const bullets = Array.isArray(r.bullets)
+        ? r.bullets
+            .map((b) => str(b, 200))
+            .filter((b): b is string => !!b)
+            .slice(0, 5)
+        : undefined;
+    const pitch = {
+        title: str(r.title, 120),
+        description: str(r.description, 600),
+        bullets: bullets?.length ? bullets : undefined,
+    };
+    return (pitch.title || pitch.description || pitch.bullets) ? pitch : undefined;
+}
+
+const KNOWN_METHODS = ['wallet', 'passkey', 'social'] as const;
+function sanitiseMethods(raw: unknown): AuthUIConfig['methods'] {
+    if (!Array.isArray(raw)) return undefined;
+    const out = KNOWN_METHODS.filter((m) => raw.includes(m));
+    return out.length ? out : undefined;
+}
+
+function sanitisePresentation(raw: unknown): AuthUIConfig['presentation'] {
+    return raw === 'inline' || raw === 'page' || raw === 'modal' ? raw : undefined;
+}
+
+// ── Voucher push (one-tap wallet approval for an additional/changed app) ──
+//
+// Triggers a `voucher-only` wallet push via the broker and polls the IdP
+// until a NEW EncAuth voucher for `appHost` lands. Throws with 'no-session',
+// 'no-push', 'timeout' or a transport message. Shared by the parent-facing
+// `privasys:voucher-request` RPC and the connect-mode approve flow.
+async function requestVoucherPush(opts: {
+    rpId: string;
+    appName: string;
+    appHost: string;
+    clientId?: string;
+}): Promise<void> {
+    const session = sessions.get(opts.rpId);
+    if (!session?.token) throw new Error('no-session');
+    if (!session.pushToken || !session.brokerUrl) throw new Error('no-push');
+    const sid = jwtClaim(session.token, 'sid');
+    if (!sid) throw new Error('no-session');
+    const appHost = opts.appHost.trim();
+    if (!appHost) throw new Error('appHost required');
+
+    // Snapshot the existing voucher (if any) so we can tell a NEWLY issued
+    // one apart — a stale voucher the enclave already refused would
+    // otherwise satisfy the poll instantly and change nothing.
+    const encauthURL =
+        `${globalThis.location.origin}/sessions/${encodeURIComponent(sid)}/encauth` +
+        `?host=${encodeURIComponent(appHost)}`;
+    const fetchEnvelope = async (): Promise<string | null> => {
+        // no-store: see makeGetEncAuth — a poisoned cache entry for this URL
+        // would blind the new-voucher poll permanently.
+        const r = await fetch(encauthURL, {
+            headers: { Authorization: `Bearer ${session.token}` },
+            cache: 'no-store',
+        });
+        if (!r.ok) return null;
+        const body = await r.json().catch(() => null);
+        return body ? JSON.stringify(body) : null;
+    };
+    const before = await fetchEnvelope();
+
+    // A throwaway SDK keypair the wallet uses to complete the enclave
+    // bootstrap and READ its enc_pub (which the voucher binds). The browser
+    // mints its own fresh keypair when it later resumes the sealed session,
+    // so this pub is discarded after enc_pub is read.
+    const { sdkPubB64 } = await generateSdkKeyPair();
+
+    // Trigger the wallet push via the broker (same endpoint the
+    // returning-user sign-in uses), mode "voucher-only".
+    const brokerBase = String(session.brokerUrl)
+        .replace('wss://', 'https://')
+        .replace('ws://', 'http://')
+        .replace(/\/relay\/?$/, '');
+    const notifyResp = await fetch(`${brokerBase}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            pushToken: session.pushToken,
+            // The broker requires a sessionId; the voucher flow has no WS
+            // relay, so this is just a correlation id.
+            sessionId: `voucher-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            rpId: opts.rpId,
+            appName: opts.appName || opts.rpId,
+            // Bare host, NOT the full origin: the wallet uses this value
+            // directly as the FIDO2 fetch host and separately prefixes
+            // `https://` for clientDataJSON. Sending the scheme-prefixed
+            // origin makes the wallet resolve host "https" and the
+            // /fido2/authenticate call fails DNS.
+            origin: globalThis.location.hostname,
+            brokerUrl: session.brokerUrl,
+            mode: 'voucher-only',
+            appHost,
+            sdkPub: sdkPubB64,
+            // The exact IdP session the voucher must land on (the one this
+            // poll reads) so the wallet writes to the same row.
+            sid,
+            ...(opts.clientId ? { clientId: opts.clientId } : {}),
+        }),
+    });
+    if (!notifyResp.ok) throw new Error(`push failed: ${notifyResp.status}`);
+
+    // Poll until a NEW voucher for this host lands (the wallet POSTs it to
+    // /sessions/encauth). Human-scale deadline.
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2_500));
+        const now = await fetchEnvelope();
+        if (now && now !== before) return;
+    }
+    throw new Error('timeout');
+}
+
 async function generateSdkKeyPair(): Promise<{ keyPair: CryptoKeyPair; sdkPubB64: string }> {
     const keyPair = (await crypto.subtle.generateKey(
         { name: 'ECDH', namedCurve: 'P-256' },
@@ -599,6 +726,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             clientId?: string;
             scope?: string | string[];
             sessionRelay?: { appHost: string; extraAppHosts?: string[] };
+            connect?: { mode?: string; reason?: string | null };
         } = data.config;
         const parentOrigin = e.origin;
 
@@ -608,6 +736,102 @@ window.addEventListener('message', async (e: MessageEvent) => {
             activeUI = null;
         }
         pendingHandshake = null;
+
+        // Adopter-supplied UI config, strictly sanitised (rendered in this
+        // trusted origin). Used by every AuthUI constructed below.
+        const presentation = sanitisePresentation(config.presentation);
+        const pitch = sanitisePitch(config.pitch);
+        const methods = sanitiseMethods(config.methods);
+
+        // Connect-mode approve: an existing wallet session whose sealed
+        // voucher the enclave refused (measurement change) or that has no
+        // voucher for this app yet. One-tap wallet push re-verification,
+        // rendered by AuthUI. Falls through to the full ceremony when it
+        // cannot complete (no wallet push, timeout, or the user chose
+        // "Sign in another way").
+        if (config.connect?.mode === 'approve' && config.sessionRelay?.appHost) {
+            const rpId = config.rpId || config.appName;
+            const appHost = config.sessionRelay.appHost;
+            const session = sessions.get(rpId);
+            if (session?.token && session.pushToken && session.brokerUrl) {
+                const appLabel = (config.appName || rpId)
+                    .replace(/[-_]/g, ' ')
+                    .replace(/\b\w/g, (c) => c.toUpperCase());
+                const approveUI = new AuthUI({
+                    apiBase: globalThis.location.origin,
+                    appName: config.appName,
+                    rpId,
+                    presentation,
+                    pitch,
+                    approveFlow: {
+                        appLabel,
+                        reason: config.connect.reason ?? null,
+                        run: async () => {
+                            await requestVoucherPush({
+                                rpId,
+                                appName: config.appName,
+                                appHost,
+                                clientId: config.clientId,
+                            });
+                            // Resume the sealed session from the fresh
+                            // voucher and adopt it as this iframe's active
+                            // sealed transport.
+                            const getEncAuth = makeGetEncAuth(rpId, appHost);
+                            const result = await PrivasysSession.resume({ host: appHost, getEncAuth });
+                            if ('error' in result) {
+                                throw new Error(result.reason
+                                    ? `${result.error}:${result.reason}`
+                                    : String(result.error));
+                            }
+                            activeSession = {
+                                appHost,
+                                sessionId: result.session.sessionId,
+                                expiresAt: 0,
+                                session: result.session,
+                            };
+                        },
+                    },
+                });
+                activeUI = approveUI;
+                try {
+                    await approveUI.signIn();
+                    // Sealed transport now lives in THIS iframe; hand the
+                    // parent the proxy handle and the result (existing token).
+                    window.parent.postMessage({
+                        type: 'privasys:session:ready',
+                        sessionId: activeSession!.sessionId,
+                        appHost,
+                        expiresAt: 0,
+                    }, parentOrigin);
+                    const result: SignInResult = {
+                        sessionToken: session.token,
+                        method: 'wallet',
+                        sessionId: activeSession!.sessionId,
+                        sessionRelay: {
+                            sessionId: activeSession!.sessionId,
+                            encPub: '',
+                            expiresAt: 0,
+                        },
+                    };
+                    window.parent.postMessage({
+                        type: 'privasys:result',
+                        result: { ...result, accessToken: session.token },
+                    }, parentOrigin);
+                    activeUI = null;
+                    return;
+                } catch (err) {
+                    activeUI = null;
+                    const msg = err instanceof Error ? err.message : '';
+                    if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
+                        window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
+                        return;
+                    }
+                    // 'approve-fallback' or a hard failure — run the full
+                    // ceremony below in this same iframe.
+                }
+            }
+            // No wallet-push-capable session → full ceremony below.
+        }
 
         // If the parent opted into session-relay, generate the SDK keypair
         // up-front and hand the public half to the AuthUI so the QR / push
@@ -688,15 +912,18 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     }
                 } catch { /* older IdP or plain profile flow — nothing to thread */ }
 
-                // 3. Fetch available social providers.
+                // 3. Fetch available social providers (skipped entirely when
+                //    the adopter's methods config excludes social sign-in).
                 let socialProviders: string[] = [];
-                try {
-                    const provResp = await fetch(`${idpBase}/auth/social/providers`);
-                    if (provResp.ok) {
-                        const provData = await provResp.json();
-                        socialProviders = provData.providers ?? [];
-                    }
-                } catch { /* social not available, that's fine */ }
+                if (!methods || methods.includes('social')) {
+                    try {
+                        const provResp = await fetch(`${idpBase}/auth/social/providers`);
+                        if (provResp.ok) {
+                            const provData = await provResp.json();
+                            socialProviders = provData.providers ?? [];
+                        }
+                    } catch { /* social not available, that's fine */ }
+                }
 
                 // 4. Launch AuthUI with the OIDC session_id so QR/passkey link
                 //    to the OIDC session. Use the iframe origin as apiBase for
@@ -762,6 +989,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     attributeRequirements,
                     disclosureVouchers,
                     sessionRelay: sessionRelayUI,
+                    // Sanitised copies override the raw postMessage values.
+                    presentation,
+                    pitch,
+                    methods,
+                    approveFlow: undefined,
                 });
 
                 const uiResult: SignInResult = await activeUI.signIn();
@@ -878,7 +1110,16 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // Non-OIDC mode (original flow): opaque session token from enclave.
         const pushToken = sessions.findPushToken();
         const deviceTrusted = !!sessions.getDeviceHint();
-        activeUI = new AuthUI({ ...config, pushToken, deviceTrusted, sessionRelay: sessionRelayUI });
+        activeUI = new AuthUI({
+            ...config,
+            pushToken,
+            deviceTrusted,
+            sessionRelay: sessionRelayUI,
+            presentation,
+            pitch,
+            methods,
+            approveFlow: undefined,
+        });
 
         try {
             const result: SignInResult = await activeUI.signIn();
@@ -1029,102 +1270,14 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 { type: 'privasys:voucher-request:response', id, ...payload },
                 e.origin,
             );
-        const session = sessions.get(data.rpId);
-        if (!session?.token) {
-            reply({ error: 'no-session' });
-            return;
-        }
-        if (!session.pushToken || !session.brokerUrl) {
-            // Session was not established through the wallet (social or
-            // plain passkey) — there is no phone to push to.
-            reply({ error: 'no-push' });
-            return;
-        }
-        const sid = jwtClaim(session.token, 'sid');
-        if (!sid) {
-            reply({ error: 'no-session' });
-            return;
-        }
-        const appHost = String(data.appHost || '').trim();
-        if (!appHost) {
-            reply({ error: 'appHost required' });
-            return;
-        }
         try {
-            // Snapshot the existing voucher (if any) so we can tell a NEWLY
-            // issued one apart — a stale voucher the enclave already refused
-            // would otherwise satisfy the poll instantly and change nothing.
-            const encauthURL =
-                `${globalThis.location.origin}/sessions/${encodeURIComponent(sid)}/encauth` +
-                `?host=${encodeURIComponent(appHost)}`;
-            const fetchEnvelope = async (): Promise<string | null> => {
-                // no-store: see makeGetEncAuth — a poisoned cache entry for
-                // this URL would blind the new-voucher poll permanently.
-                const r = await fetch(encauthURL, {
-                    headers: { Authorization: `Bearer ${session.token}` },
-                    cache: 'no-store',
-                });
-                if (!r.ok) return null;
-                const body = await r.json().catch(() => null);
-                return body ? JSON.stringify(body) : null;
-            };
-            const before = await fetchEnvelope();
-
-            // A throwaway SDK keypair the wallet uses to complete the enclave
-            // bootstrap and READ its enc_pub (which the voucher binds). The
-            // browser mints its own fresh keypair when it later resumes the
-            // sealed session, so this pub is discarded after enc_pub is read.
-            const { sdkPubB64 } = await generateSdkKeyPair();
-
-            // Trigger the wallet push via the broker (same endpoint the
-            // returning-user sign-in uses), mode "voucher-only".
-            const brokerBase = String(session.brokerUrl)
-                .replace('wss://', 'https://')
-                .replace('ws://', 'http://')
-                .replace(/\/relay\/?$/, '');
-            const notifyResp = await fetch(`${brokerBase}/notify`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    pushToken: session.pushToken,
-                    // The broker requires a sessionId; the voucher flow has
-                    // no WS relay, so this is just a correlation id.
-                    sessionId: `voucher-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                    rpId: data.rpId,
-                    appName: String(data.appName || data.rpId),
-                    // Bare host, NOT the full origin: the wallet uses this
-                    // value directly as the FIDO2 fetch host and separately
-                    // prefixes `https://` for clientDataJSON. Sending the
-                    // scheme-prefixed origin makes the wallet resolve host
-                    // "https" and the /fido2/authenticate call fails DNS.
-                    origin: globalThis.location.hostname,
-                    brokerUrl: session.brokerUrl,
-                    mode: 'voucher-only',
-                    appHost,
-                    sdkPub: sdkPubB64,
-                    // The exact IdP session the voucher must land on (the one
-                    // this poll reads) so the wallet writes to the same row.
-                    sid,
-                    ...(data.clientId ? { clientId: String(data.clientId) } : {}),
-                }),
+            await requestVoucherPush({
+                rpId: String(data.rpId || ''),
+                appName: String(data.appName || data.rpId || ''),
+                appHost: String(data.appHost || ''),
+                clientId: data.clientId ? String(data.clientId) : undefined,
             });
-            if (!notifyResp.ok) {
-                reply({ error: `push failed: ${notifyResp.status}` });
-                return;
-            }
-
-            // Poll until a NEW voucher for this host lands (the wallet
-            // POSTs it to /sessions/encauth). Human-scale deadline.
-            const deadline = Date.now() + 120_000;
-            while (Date.now() < deadline) {
-                await new Promise((r) => setTimeout(r, 2_500));
-                const now = await fetchEnvelope();
-                if (now && now !== before) {
-                    reply({ ok: true });
-                    return;
-                }
-            }
-            reply({ error: 'timeout' });
+            reply({ ok: true });
         } catch (err) {
             reply({ error: (err as Error).message });
         }

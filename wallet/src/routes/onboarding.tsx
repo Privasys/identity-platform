@@ -227,7 +227,7 @@ export default function OnboardingScreen() {
                             <Text style={styles.title}>Welcome to Privasys Wallet</Text>
                             <Text style={styles.subtitle}>
                                 Your identity, verified by hardware.{'\n'}
-                                No passwords. No trust required.
+                                No passwords, no operator to trust.
                             </Text>
                             <Pressable
                                 style={({ pressed }) => [

@@ -136,26 +136,32 @@ jobs:
               echo \"\$ADMIN_TOKEN\" | sudo tee \"\$ADMIN_TOKEN_FILE\" >/dev/null
               sudo chmod 600 \"\$ADMIN_TOKEN_FILE\"
 
-              # Preserve the full IDP_* env set from the currently-running
-              # container so we don't accidentally drop OAuth client secrets,
-              # extra RP origins, mail-sender config, etc. on each deploy.
-              # If there's no running container yet (very first deploy via
-              # this workflow), fall back to /etc/privasys/idp.env from the
-              # legacy systemd-binary deployment.
+              # Build the env set from two layers so a value can never be
+              # silently dropped and stay dropped:
+              #   1. BASE  = /etc/privasys/idp.env, the on-disk secret superset
+              #      (OAuth client IDs/secrets, extra RP origins, mail config).
+              #   2. OVERLAY = the currently-running container's env, appended
+              #      AFTER the base so rotated tokens / runtime additions win on
+              #      any key collision (docker --env-file: last occurrence wins).
+              # Previously this used idp.env ONLY when no container existed, so
+              # once a container came up missing the OAuth vars every later
+              # deploy preserved the empty set and never re-read the file. Always
+              # unioning the on-disk base makes a transient loss self-heal.
               ENV_FILE=\$(mktemp)
-              if sudo docker inspect idp >/dev/null 2>&1; then
-                sudo docker inspect idp --format \
-                  '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-                  | grep -E '^(IDP_|VAULT_TOKEN=|GOOGLE_|GITHUB_|MICROSOFT_|LINKEDIN_|AZURE_)' \
-                  > \"\$ENV_FILE\" || true
-              elif sudo test -r /etc/privasys/idp.env; then
+              if sudo test -r /etc/privasys/idp.env; then
                 # idp.env may have shell-style quoting; strip surrounding
                 # double quotes from values so docker --env-file accepts them.
                 sudo sed -E 's/^([A-Z_]+)=\"(.*)\"$/\\1=\\2/' /etc/privasys/idp.env \
                   | grep -E '^(IDP_|VAULT_TOKEN=|GOOGLE_|GITHUB_|MICROSOFT_|LINKEDIN_|AZURE_)' \
-                  > \"\$ENV_FILE\" || true
+                  >> \"\$ENV_FILE\" || true
               fi
-              echo \"Preserving \$(wc -l < \"\$ENV_FILE\") env vars from previous deployment.\"
+              if sudo docker inspect idp >/dev/null 2>&1; then
+                sudo docker inspect idp --format \
+                  '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+                  | grep -E '^(IDP_|VAULT_TOKEN=|GOOGLE_|GITHUB_|MICROSOFT_|LINKEDIN_|AZURE_)' \
+                  >> \"\$ENV_FILE\" || true
+              fi
+              echo \"Prepared \$(wc -l < \"\$ENV_FILE\") env vars (idp.env base + running-container overlay).\"
 
               echo 'Stopping previous container (if any)...'
               sudo docker stop idp 2>/dev/null || true

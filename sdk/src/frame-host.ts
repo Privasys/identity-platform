@@ -757,16 +757,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const presentation = sanitisePresentation(config.presentation);
         const pitch = sanitisePitch(config.pitch);
         const app = sanitiseApp(config.app);
-        // Sealed-transport invariant: only the WALLET ceremony can attest
-        // the enclave and mint the EncAuth voucher a sealed session resumes
-        // from. Social and passkey sign-ins produce a valid OIDC session
-        // but structurally CANNOT open the sealed channel — offering them
-        // for a session-relay app is a guaranteed dead end (the app can
-        // never reach its enclave). Default to wallet-only whenever
-        // sessionRelay is configured; an explicit methods config from the
-        // adopter still wins.
-        const methods = sanitiseMethods(config.methods)
-            ?? (config.sessionRelay?.appHost ? ['wallet' as const] : undefined);
+        // The adopter's explicit choice of methods; when absent, the
+        // OIDC path below additionally filters methods by ATTRIBUTE
+        // capability (a method that cannot deliver what the app marked
+        // as essential is hidden). Signing in without the wallet is a
+        // supported, deliberately degraded mode (no attestation
+        // verification) — never blanket-blocked.
+        const methods = sanitiseMethods(config.methods);
 
         // Connect-mode approve: an existing wallet session whose sealed
         // voucher the enclave refused (measurement change) or that has no
@@ -938,10 +935,34 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     }
                 } catch { /* older IdP or plain profile flow — nothing to thread */ }
 
+                // Attribute-capability filtering (only when the adopter did
+                // not choose methods explicitly): hide methods that cannot
+                // deliver what the app marked as ESSENTIAL.
+                //   - Passkey provides no attributes at all — hidden when
+                //     anything is essential (e.g. a share link requiring a
+                //     verified email).
+                //   - Social can deliver provider-verified standard
+                //     attributes (email, name) but not gov-assurance
+                //     disclosures — hidden only when an essential attribute
+                //     needs 'gov' (wallet-only by design).
+                //   - The wallet delivers everything.
+                // With no essential attributes every method stays, including
+                // the passkey-then-verify-profile flow further below.
+                let effectiveMethods = methods;
+                if (!effectiveMethods && attributeRequirements) {
+                    const essential = Object.values(attributeRequirements)
+                        .filter((r) => r?.essential);
+                    if (essential.some((r) => r.assurance === 'gov')) {
+                        effectiveMethods = ['wallet'];
+                    } else if (essential.length > 0) {
+                        effectiveMethods = ['wallet', 'social'];
+                    }
+                }
+
                 // 3. Fetch available social providers (skipped entirely when
-                //    the adopter's methods config excludes social sign-in).
+                //    the effective methods exclude social sign-in).
                 let socialProviders: string[] = [];
-                if (!methods || methods.includes('social')) {
+                if (!effectiveMethods || effectiveMethods.includes('social')) {
                     try {
                         const provResp = await fetch(`${idpBase}/auth/social/providers`);
                         if (provResp.ok) {
@@ -1019,7 +1040,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     presentation,
                     app,
                     pitch,
-                    methods,
+                    methods: effectiveMethods,
                     approveFlow: undefined,
                 });
 

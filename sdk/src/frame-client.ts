@@ -621,18 +621,17 @@ export class AuthFrame {
                     case 'privasys:ready': {
                         const presentation = this.config.presentation
                             ?? (this.container ? 'inline' : 'modal');
-                        // Sealed-transport invariant (mirrored by the frame
-                        // host): only the wallet can open the sealed channel,
-                        // so session-relay ceremonies default to wallet-only.
-                        const methods = this.config.methods
-                            ?? (this.config.sessionRelay?.appHost ? ['wallet' as const] : undefined);
+                        // Methods pass through as configured; when absent the
+                        // frame host filters them by attribute capability
+                        // (essential attributes hide methods that cannot
+                        // deliver them). Wallet-less sign-in is a supported,
+                        // deliberately degraded mode — never blanket-blocked.
                         iframe.contentWindow!.postMessage(
                             {
                                 type: 'privasys:init',
                                 config: {
                                     ...this.config,
                                     presentation,
-                                    ...(methods ? { methods } : {}),
                                     ...(this.connectHint ? { connect: this.connectHint } : {}),
                                 },
                             },

@@ -459,12 +459,25 @@ export class AuthFrame {
         // 3. Interactive gate (approve-first when hinted, else ceremony).
         try {
             const result = await this.signIn();
-            const session = this.config.sessionRelay
+            // Only await the sealed proxy when the ceremony actually bound
+            // one — session() otherwise waits forever (there is nothing to
+            // resolve it) and would park connect() indefinitely.
+            const session = (this.config.sessionRelay && result.sessionRelay)
                 ? await this.session().catch(() => null)
                 : null;
+            if (this.config.sessionRelay && !session) {
+                // The ceremony completed via a method that cannot open the
+                // sealed channel (social/passkey — possible only when the
+                // adopter explicitly overrode methods). Fail loudly: a
+                // token without the sealed transport is useless to a
+                // session-relay app and reads as a silent dead end.
+                throw new ConnectError('failed',
+                    'This app requires the Privasys Wallet: the sign-in method used cannot open a sealed channel to it.');
+            }
             const accessToken = result.accessToken ?? result.sessionToken;
             return { accessToken, session, result };
         } catch (err) {
+            if (err instanceof ConnectError) throw err;
             const msg = err instanceof Error ? err.message : String(err);
             if (msg === 'Authentication cancelled') {
                 throw new ConnectError('cancelled', msg);
@@ -608,12 +621,18 @@ export class AuthFrame {
                     case 'privasys:ready': {
                         const presentation = this.config.presentation
                             ?? (this.container ? 'inline' : 'modal');
+                        // Sealed-transport invariant (mirrored by the frame
+                        // host): only the wallet can open the sealed channel,
+                        // so session-relay ceremonies default to wallet-only.
+                        const methods = this.config.methods
+                            ?? (this.config.sessionRelay?.appHost ? ['wallet' as const] : undefined);
                         iframe.contentWindow!.postMessage(
                             {
                                 type: 'privasys:init',
                                 config: {
                                     ...this.config,
                                     presentation,
+                                    ...(methods ? { methods } : {}),
                                     ...(this.connectHint ? { connect: this.connectHint } : {}),
                                 },
                             },

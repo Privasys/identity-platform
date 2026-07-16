@@ -756,8 +756,17 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // trusted origin). Used by every AuthUI constructed below.
         const presentation = sanitisePresentation(config.presentation);
         const pitch = sanitisePitch(config.pitch);
-        const methods = sanitiseMethods(config.methods);
         const app = sanitiseApp(config.app);
+        // Sealed-transport invariant: only the WALLET ceremony can attest
+        // the enclave and mint the EncAuth voucher a sealed session resumes
+        // from. Social and passkey sign-ins produce a valid OIDC session
+        // but structurally CANNOT open the sealed channel — offering them
+        // for a session-relay app is a guaranteed dead end (the app can
+        // never reach its enclave). Default to wallet-only whenever
+        // sessionRelay is configured; an explicit methods config from the
+        // adopter still wins.
+        const methods = sanitiseMethods(config.methods)
+            ?? (config.sessionRelay?.appHost ? ['wallet' as const] : undefined);
 
         // Connect-mode approve: an existing wallet session whose sealed
         // voucher the enclave refused (measurement change) or that has no

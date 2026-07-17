@@ -951,6 +951,22 @@ export default function ConnectScreen() {
 
                 if (cachedMatch) {
                     setIsTrusted(true);
+                    // Voucher-only re-approvals have their OWN ceremony (FIDO2 →
+                    // enclave bootstrap → EncAuth voucher upload). This trusted
+                    // fast path used to fall through to a plain doAuthenticate,
+                    // which completed FIDO2 and then dropped the voucher on the
+                    // floor — the browser polls the IdP for a voucher that never
+                    // arrives (observed 2026-07-17 after an OS image swap: only
+                    // the RTMRs changed, so cachedMatch stayed true and every
+                    // re-approval push landed here).
+                    if (payload.mode === 'voucher-only') {
+                        if (isFromPush && !checkUnlocked()) {
+                            setStep('confirm');
+                            return;
+                        }
+                        await doVoucherOnly(payload);
+                        return;
+                    }
                     const credential = getCredentialForRp(payload.rpId);
                     if (credential) {
                         if (isFromPush && !checkUnlocked()) {
@@ -1235,6 +1251,15 @@ export default function ConnectScreen() {
 
     const handleConfirm = useCallback(async () => {
         if (!qr) return;
+        // Voucher-only approvals never run the plain authenticate — they
+        // have their own ceremony (doVoucherOnly: FIDO2 → enclave bootstrap
+        // → EncAuth voucher upload; it routes its own errors to the error
+        // step). No consent gate: extending a live session discloses
+        // nothing new.
+        if (qr.mode === 'voucher-only') {
+            await doVoucherOnly(qr);
+            return;
+        }
         const credential = getCredentialForRp(qr.rpId);
         if (!credential) return;
 

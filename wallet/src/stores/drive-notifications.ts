@@ -63,6 +63,23 @@ interface DriveNotificationsState {
     addDecision: (d: Omit<ShareDecision, 'receivedAt'>) => void;
     /** Record the local approve/deny outcome on a request. */
     markDecided: (requestId: string, decision: 'approved' | 'denied') => void;
+    /**
+     * Reconcile with the drive's own request list (the source of truth):
+     * requests the wallet never saw a sealed payload for are added (sub
+     * only — the referential decorates when it can), and requests
+     * decided elsewhere (web UI, another device) get their outcome.
+     */
+    syncServer: (
+        tenantId: string,
+        rows: {
+            id: string;
+            node_id: string;
+            node_name: string;
+            requester_sub: string;
+            scope: string[];
+            status: 'pending' | 'approved' | 'denied';
+        }[]
+    ) => void;
     /** Decorate a raw sub from the drive with known attributes. */
     lookup: (sub: string) => KnownSubject | undefined;
     /** Pending (undecided) requests, newest first. */
@@ -125,6 +142,40 @@ export const useDriveNotificationsStore = create<DriveNotificationsState>((set, 
         set((s) => ({
             requests: s.requests.map((r) => (r.requestId === requestId ? { ...r, decision } : r)),
         }));
+        persist(get());
+    },
+
+    syncServer: (tenantId, rows) => {
+        const now = Math.floor(Date.now() / 1000);
+        set((s) => {
+            const byId = new Map(s.requests.map((r) => [r.requestId, r]));
+            let changed = false;
+            for (const row of rows) {
+                const decision =
+                    row.status === 'approved' ? ('approved' as const)
+                    : row.status === 'denied' ? ('denied' as const)
+                    : undefined;
+                const existing = byId.get(row.id);
+                if (!existing) {
+                    byId.set(row.id, {
+                        requestId: row.id,
+                        tenantId,
+                        nodeId: row.node_id,
+                        nodeName: row.node_name,
+                        requesterSub: row.requester_sub,
+                        scope: row.scope?.length ? row.scope : ['read'],
+                        receivedAt: now,
+                        decision,
+                    });
+                    changed = true;
+                } else if (decision && existing.decision !== decision) {
+                    byId.set(row.id, { ...existing, decision });
+                    changed = true;
+                }
+            }
+            if (!changed) return s;
+            return { requests: [...byId.values()] };
+        });
         persist(get());
     },
 

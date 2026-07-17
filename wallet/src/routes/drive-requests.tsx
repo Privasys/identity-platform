@@ -23,6 +23,7 @@ import {
     ActivityIndicator,
     Alert,
     Pressable,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     View as RNView,
@@ -30,7 +31,7 @@ import {
 
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { decideShareRequest } from '@/services/drive';
+import { decideShareRequest, listShareRequests } from '@/services/drive';
 import {
     useDriveNotificationsStore,
     type ShareRequest,
@@ -62,11 +63,36 @@ export default function DriveRequestsScreen() {
     const styles = makeStyles(palette);
     const store = useDriveNotificationsStore();
     const [busy, setBusy] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [syncNote, setSyncNote] = useState<string | null>(null);
+
+    // The drive's own request list is the source of truth: pushes whose
+    // sealed payload never arrived (older wallet, key registered after
+    // send) still appear, and decisions made elsewhere reconcile in.
+    const syncFromDrive = useCallback(async () => {
+        try {
+            const { tenantId, requests } = await listShareRequests();
+            useDriveNotificationsStore.getState().syncServer(tenantId, requests);
+            setSyncNote(null);
+        } catch (e) {
+            // Local pushes still render; say why the list may be stale.
+            setSyncNote(e instanceof Error ? e.message : 'Could not reach your drive.');
+        }
+    }, []);
 
     useEffect(() => {
-        void store.hydrate();
+        void (async () => {
+            await store.hydrate();
+            await syncFromDrive();
+        })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await syncFromDrive();
+        setRefreshing(false);
+    }, [syncFromDrive]);
 
     const pending = store.pendingRequests();
     const handled = store.requests.filter((r) => r.decision);
@@ -98,7 +124,18 @@ export default function DriveRequestsScreen() {
     return (
         <RNView style={styles.container}>
             <SubPageHeader title="Drive requests" />
-            <ScrollView contentContainerStyle={styles.scroll}>
+            <ScrollView
+                contentContainerStyle={styles.scroll}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
+            >
+                {syncNote && (
+                    <RNView style={styles.syncNote}>
+                        <Ionicons name="cloud-offline-outline" size={16} color={palette.warnText} />
+                        <Text style={styles.syncNoteText}>
+                            Showing what this device knows; the drive could not be reached. Pull to retry.
+                        </Text>
+                    </RNView>
+                )}
                 <Text style={styles.sectionTitle}>Awaiting your decision</Text>
                 {pending.length === 0 && (
                     <RNView style={styles.emptyCard}>
@@ -246,6 +283,18 @@ function makeStyles(palette: Palette) {
             borderRadius: 12,
             padding: 16,
         },
+        syncNote: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            backgroundColor: palette.warnBg,
+            borderColor: palette.warnBorder,
+            borderWidth: 1,
+            borderRadius: 10,
+            padding: 10,
+            marginTop: 12,
+        },
+        syncNoteText: { flex: 1, fontSize: 12, color: palette.warnText },
         emptyText: { color: palette.textMuted, fontSize: 14 },
         card: {
             backgroundColor: palette.card,

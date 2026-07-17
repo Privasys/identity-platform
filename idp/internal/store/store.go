@@ -310,6 +310,34 @@ func migrate(db *sql.DB) error {
 		}
 	}
 
+	// Migration: wallet notification-sealing key alongside the push token.
+	// App notifications seal their payload to this X25519 public key so no
+	// content transits third-party push infrastructure in the clear.
+	var hasEncPub bool
+	ptRows, err := db.Query("PRAGMA table_info(push_tokens)")
+	if err != nil {
+		return err
+	}
+	defer ptRows.Close()
+	for ptRows.Next() {
+		var cid int
+		var colName, ctype string
+		var notnull int
+		var dfltValue *string
+		var pk int
+		if err := ptRows.Scan(&cid, &colName, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if colName == "enc_pub" {
+			hasEncPub = true
+		}
+	}
+	if !hasEncPub {
+		if _, err := db.Exec("ALTER TABLE push_tokens ADD COLUMN enc_pub TEXT NOT NULL DEFAULT ''"); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -329,6 +357,27 @@ func (db *DB) GetPushToken(userID string) string {
 	var token string
 	db.QueryRow("SELECT push_token FROM push_tokens WHERE user_id = ?", userID).Scan(&token)
 	return token
+}
+
+// UpsertPushTarget stores the push token plus the wallet's X25519
+// notification-sealing public key (base64url raw 32 bytes; empty keeps
+// any previously registered key).
+func (db *DB) UpsertPushTarget(userID, pushToken, encPub string) error {
+	_, err := db.Exec(`
+		INSERT INTO push_tokens (user_id, push_token, enc_pub, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(user_id) DO UPDATE SET
+			push_token = excluded.push_token,
+			enc_pub = CASE WHEN excluded.enc_pub = '' THEN push_tokens.enc_pub ELSE excluded.enc_pub END,
+			updated_at = CURRENT_TIMESTAMP
+	`, userID, pushToken, encPub)
+	return err
+}
+
+// GetPushTarget returns the push token and sealing key for a user
+// (either may be empty).
+func (db *DB) GetPushTarget(userID string) (token, encPub string) {
+	db.QueryRow("SELECT push_token, enc_pub FROM push_tokens WHERE user_id = ?", userID).Scan(&token, &encPub)
+	return token, encPub
 }
 
 // Metrics holds aggregate usage statistics (no PII).

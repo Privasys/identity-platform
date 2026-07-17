@@ -617,8 +617,10 @@ func (h *Handler) HandleRevokeDevice(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"revoked"}`))
 }
 
-// HandleRegisterPushToken stores the wallet's Expo push token for this user.
-// POST /push-token  { "push_token": "ExponentPushToken[...]" }
+// HandleRegisterPushToken stores the wallet's Expo push token for this
+// user, plus (optionally) the wallet's X25519 notification-sealing
+// public key so app notifications can carry a sealed payload.
+// POST /push-token  { "push_token": "ExponentPushToken[...]", "enc_pub": "<base64url 32B>" }
 func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request) {
 	userID := h.authenticateBearer(w, r)
 	if userID == "" {
@@ -627,13 +629,14 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 
 	var req struct {
 		PushToken string `json:"push_token"`
+		EncPub    string `json:"enc_pub"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PushToken == "" {
 		http.Error(w, `{"error":"push_token is required"}`, http.StatusBadRequest)
 		return
 	}
 
-	if err := h.db.UpsertPushToken(userID, req.PushToken); err != nil {
+	if err := h.db.UpsertPushTarget(userID, req.PushToken, req.EncPub); err != nil {
 		log.Printf("[push-token] upsert failed for %s: %v", userID, err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return

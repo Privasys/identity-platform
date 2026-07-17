@@ -307,6 +307,9 @@ func main() {
 
 	// Admin: metrics and role management.
 	mux.HandleFunc("GET /admin/metrics", admin.HandleGetMetrics(db, cfg.AdminToken))
+	// App-initiated wallet notifications (mgmt forwards on behalf of an
+	// attested confidential app; payload sealed to the wallet's key).
+	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken))
 	mux.HandleFunc("POST /admin/roles", admin.HandleGrantRole(db, cfg.AdminToken))
 	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
 	mux.HandleFunc("GET /admin/roles", admin.HandleListRoles(db, cfg.AdminToken))

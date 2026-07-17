@@ -23,8 +23,15 @@ import { getPlatformToken } from '@/services/platform-token';
 import { useSettingsStore } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
+// Drive is a DEV-ONLY preview: the only instance (drive-demo) lives on the
+// test platform, and no prod Drive is provisioned yet. So the Drive service
+// pins its OWN platform base to api-test regardless of the wallet's
+// configured platform — a production wallet build bakes
+// EXPO_PUBLIC_PLATFORM_API_URL = api.developer.privasys.org (prod), where
+// drive-demo does not exist ("app not found"). Override this once a prod
+// Drive instance exists.
 const PLATFORM_API_BASE =
-    process.env.EXPO_PUBLIC_PLATFORM_API_URL ?? 'https://api-test.developer.privasys.org';
+    process.env.EXPO_PUBLIC_DRIVE_PLATFORM_API_URL ?? 'https://api-test.developer.privasys.org';
 
 /** Store name of the Drive app to resolve. Dev is `drive-demo`; override
  *  per build for a differently-named prod instance. */

@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { DEFAULT_RELAY_HOST, fetchDescriptor } from '../services/descriptor';
+import { ensureNotifySealKey, openSealedNotification } from '../services/notify-seal';
 import { getPrivasysAccount } from '../services/privasys-id';
 import { registerPushTokenWithIdp } from '../services/vault-approval-api';
+import { useDriveNotificationsStore } from '../stores/drive-notifications';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 
 let _notificationsSetup = false;
@@ -106,10 +108,51 @@ function relayHostFrom(brokerUrl: unknown): string {
     }
 }
 
+/** File a drive share notification into the store: unseal the payload,
+ *  update the attribute referential and the request/decision inboxes.
+ *  Returns true when `data` was a drive notification (handled). */
+async function fileDriveNotification(data: Record<string, unknown>): Promise<boolean> {
+    const type = data?.type;
+    if (type !== 'share-request' && type !== 'share-decision') return false;
+    const sealed = typeof data.sealed === 'string' ? data.sealed : '';
+    if (!sealed) return true; // unsealed generic push: nothing to file
+    const payload = await openSealedNotification(sealed, String(type));
+    if (!payload) return true;
+    const store = useDriveNotificationsStore.getState();
+    await store.hydrate();
+    if (type === 'share-request') {
+        store.addRequest(
+            {
+                requestId: String(payload.request_id ?? ''),
+                tenantId: String(payload.tenant_id ?? ''),
+                nodeId: String(payload.node_id ?? ''),
+                nodeName: String(payload.node_name ?? ''),
+                requesterSub: String(payload.requester_sub ?? ''),
+                scope: Array.isArray(payload.scope) ? payload.scope.map(String) : ['read'],
+            },
+            (payload.attributes as Record<string, string>) ?? {},
+            typeof data.app_id === 'string' ? data.app_id : undefined
+        );
+    } else {
+        store.addDecision({
+            requestId: String(payload.request_id ?? ''),
+            nodeName: String(payload.node_name ?? ''),
+            status: payload.status === 'approved' ? 'approved' : 'denied',
+        });
+    }
+    return true;
+}
+
 /** Route an inbound notification to the right screen by its `type`. Vault
- *  approvals go to the Vault approvals screen; everything else runs through the
- *  auth/voucher connect flow. */
+ *  approvals go to the Vault approvals screen; drive share notifications file
+ *  into the drive-notifications store and open the requests screen; everything
+ *  else runs through the auth/voucher connect flow. */
 async function dispatchPush(data: Record<string, unknown>, router: Router): Promise<void> {
+    if (data?.type === 'share-request' || data?.type === 'share-decision') {
+        await fileDriveNotification(data);
+        router.push({ pathname: '/drive-requests', params: { source: 'push' } });
+        return;
+    }
     if (data?.type === 'vault-approval') {
         const vaultOp = String(data.vault_op ?? '');
         // Remember the capability so the Home banner + the screen list it even
@@ -173,6 +216,13 @@ async function sweepPresentedApprovals(): Promise<void> {
             if (data?.type === 'vault-approval' && data.vault_op) {
                 store.remember(String(data.vault_op));
             }
+            // Drive share notifications carry their sealed payload in the
+            // notification itself: filing from the tray means the request
+            // (and its attributes) are visible as soon as the wallet opens,
+            // tap or no tap.
+            if (data?.type === 'share-request' || data?.type === 'share-decision') {
+                void fileDriveNotification(data);
+            }
         }
     } catch (e) {
         console.warn('[notifications] sweep presented approvals failed', e);
@@ -180,12 +230,20 @@ async function sweepPresentedApprovals(): Promise<void> {
 }
 
 /** Register the Expo push token with the IdP when a privasys.id session exists,
- *  so the IdP can push vault approvals keyed by the owner sub. Best-effort. */
+ *  so the IdP can push vault approvals keyed by the owner sub. Also registers
+ *  the device's notification-sealing public key so app notifications (drive
+ *  share requests) can carry sealed payloads. Best-effort. */
 async function maybeRegisterPushToken(token: string): Promise<void> {
     const account = getPrivasysAccount();
     if (!account?.sessionToken) return;
     try {
-        await registerPushTokenWithIdp(account.sessionToken, token);
+        let encPub = '';
+        try {
+            encPub = await ensureNotifySealKey();
+        } catch (e) {
+            console.warn('[notifications] sealing key unavailable; registering token alone', e);
+        }
+        await registerPushTokenWithIdp(account.sessionToken, token, encPub);
     } catch (e) {
         console.warn('[notifications] register push token with IdP failed', e);
     }

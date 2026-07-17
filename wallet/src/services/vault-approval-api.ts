@@ -121,14 +121,21 @@ export async function approveVaultApproval(req: VaultApprovalRequest, credential
  * session, so every pairwise identity that owns vault keys can be pushed —
  * without the IdP learning any pairwise linkage it doesn't already have.
  */
-export async function registerPushTokenWithIdp(walletSessionToken: string, expoPushToken: string): Promise<void> {
+export async function registerPushTokenWithIdp(
+    walletSessionToken: string,
+    expoPushToken: string,
+    encPub = ''
+): Promise<void> {
     const res = await fetch(`${IDP_BASE}/push-token`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer wallet:${walletSessionToken}`,
         },
-        body: JSON.stringify({ push_token: expoPushToken }),
+        // enc_pub is the device's X25519 notification-sealing key; the
+        // IdP seals app-notification payloads to it (empty keeps any
+        // previously registered key).
+        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub }),
     });
     if (!res.ok) {
         throw new Error(`register push token failed (${res.status})`);

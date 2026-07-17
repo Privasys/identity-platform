@@ -146,6 +146,33 @@ async function setup(): Promise<DriveSession | null> {
     return session;
 }
 
+/**
+ * Approve or deny a restricted-link access request on the user's drive.
+ * Runs over the attested RA-TLS transport with the platform bearer (the
+ * owner's sub is what authorises the decision on the enclave).
+ */
+export async function decideShareRequest(
+    tenantId: string,
+    requestId: string,
+    decision: 'approve' | 'deny'
+): Promise<void> {
+    const s = await ensureDrive();
+    if (!s) throw new Error('Drive is unavailable');
+    const token = await getPlatformToken();
+    const raFetch = makeRaTlsFetch({ enclaveHost: s.origin, platformFetch: fetch });
+    const res = await raFetch(
+        `https://${s.origin}/v1/tenants/${encodeURIComponent(tenantId)}/link-requests/${encodeURIComponent(requestId)}/${decision}`,
+        {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+        }
+    );
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`decision failed (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`);
+    }
+}
+
 /** Drop the cached drive session (e.g. on sign-out). */
 export function clearDrive(): void {
     session = null;

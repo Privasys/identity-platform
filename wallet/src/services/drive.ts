@@ -26,35 +26,60 @@ import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 const PLATFORM_API_BASE =
     process.env.EXPO_PUBLIC_PLATFORM_API_URL ?? 'https://api-test.developer.privasys.org';
 
-/** Store name of the Drive app to resolve. */
-const DRIVE_APP_NAME = process.env.EXPO_PUBLIC_DRIVE_APP ?? 'container-app-drive';
+/** Store name of the Drive app to resolve. Dev is `drive-demo`; override
+ *  per build for a differently-named prod instance. */
+const DRIVE_APP_NAME = process.env.EXPO_PUBLIC_DRIVE_APP ?? 'drive-demo';
 
 /** Fallback Drive coordinates, mirroring the identity-verifier pattern
  *  (kyc.ts resolveVerifier): used until the app resolves from the store,
  *  and whenever the resolve API is unreachable — the resolved hostname +
  *  attested digest win when available. Keep the digest pinned to the
  *  live test deployment's image (OID 3.2) so the fallback attests the
- *  current enclave. drive v0.1.19: share-link tools + wallet
- *  notifications + access metrics. Both overridable per build. */
+ *  current enclave. drive v0.1.22: chat conversations + Memory + graph.
+ *  All overridable per build. */
 const FALLBACK_DRIVE_ORIGIN =
     process.env.EXPO_PUBLIC_DRIVE_ORIGIN ?? 'drive-demo.apps-test.privasys.org';
 const FALLBACK_DRIVE_IMAGE_DIGEST =
     process.env.EXPO_PUBLIC_DRIVE_DIGEST ??
-    'd3e2d25af394afa530ddb9fd16406d952ebb8a4cb90947cd90d152bc1de71a49';
+    'fcb068763a21e4e41934bd6554353026b3a96b51ba1cc9ab031f74f99b73e558';
+/** The drive-demo app id (management UUID). The data-key grant is keyed
+ *  by it. The standing app cert does NOT carry the app-id OID (3.6 lives
+ *  on manager-minted identity leaves), so the id comes from the resolve
+ *  API; this is the fallback for the offline path. */
+const FALLBACK_DRIVE_APP_ID =
+    process.env.EXPO_PUBLIC_DRIVE_APP_ID ?? '914b1e13-4e8f-4417-9d8c-eddf580f515b';
 
 interface ResolvedDrive {
     origin: string;
     imageOid: string;
     imageDigest: string;
+    appId: string;
 }
 
 let resolved: ResolvedDrive | null = null;
 
-/** Resolve the Drive enclave host + the published image digest to pin,
- *  falling back to the build defaults when the app is not yet in the
- *  store or the platform is unreachable (hardcoded + fallback, same as
- *  the identity verifier). Never returns null: the fallback pins the
- *  known-good deployment and attestation still gates the connection. */
+/** Parse the app id (management UUID) out of a resolve response. The
+ *  endpoint returns it inside `attest_url` (/api/v1/apps/<uuid>/attest)
+ *  when a dedicated field is absent. Returns '' when not derivable. */
+function appIdFromResolve(j: { app_id?: string; attest_url?: string }): string {
+    if (j.app_id) return j.app_id;
+    const m = /\/apps\/([0-9a-fA-F-]{36})\//.exec(j.attest_url ?? '');
+    return m ? m[1] : '';
+}
+
+/** Compare app ids that may differ in form: OID 3.6 carries the
+ *  hex-no-dashes UUID, the resolve API the dashed one. */
+function sameAppId(a: string, b: string): boolean {
+    const norm = (s: string) => s.replace(/-/g, '').toLowerCase();
+    return norm(a) === norm(b);
+}
+
+/** Resolve the Drive enclave host, the published image digest to pin,
+ *  and the management app id, falling back to the build defaults when
+ *  the app is not yet in the store or the platform is unreachable
+ *  (hardcoded + fallback, same as the identity verifier). Never returns
+ *  null: the fallback pins the known-good deployment and attestation
+ *  still gates the connection. */
 async function resolveDrive(): Promise<ResolvedDrive> {
     if (resolved) return resolved;
     try {
@@ -66,12 +91,16 @@ async function resolveDrive(): Promise<ResolvedDrive> {
                 hostname?: string;
                 image_oid?: string;
                 image_digest?: string;
+                app_id?: string;
+                attest_url?: string;
             };
-            if (j.hostname && j.image_digest) {
+            const appId = appIdFromResolve(j);
+            if (j.hostname && j.image_digest && appId) {
                 resolved = {
                     origin: j.hostname,
                     imageOid: j.image_oid || OID_WORKLOAD_IMAGE_DIGEST,
-                    imageDigest: j.image_digest.toLowerCase()
+                    imageDigest: j.image_digest.toLowerCase(),
+                    appId
                 };
                 return resolved;
             }
@@ -82,7 +111,8 @@ async function resolveDrive(): Promise<ResolvedDrive> {
     resolved = {
         origin: FALLBACK_DRIVE_ORIGIN,
         imageOid: OID_WORKLOAD_IMAGE_DIGEST,
-        imageDigest: FALLBACK_DRIVE_IMAGE_DIGEST.toLowerCase()
+        imageDigest: FALLBACK_DRIVE_IMAGE_DIGEST.toLowerCase(),
+        appId: FALLBACK_DRIVE_APP_ID
     };
     return resolved;
 }
@@ -120,11 +150,13 @@ export function currentDrive(): DriveSession | null {
 async function setup(): Promise<DriveSession | null> {
     const d = await resolveDrive();
 
-    // Inspect the RA-TLS cert: pin the published image digest and read the
-    // management app id (OID 3.6) the data-key grant is keyed by.
+    // Inspect the RA-TLS cert: pin the published image DIGEST (OID 3.2) —
+    // this is the attested proof of WHICH CODE is running and is the real
+    // security binding. The app id (used only to key the data-key grant)
+    // comes from the resolve API: the standing app cert does not carry the
+    // app-id OID (3.6 lives on manager-minted identity leaves). If a leaf
+    // ever does present 3.6, cross-check it, but never require it.
     const inspected = await inspectAttestation(d.origin);
-    const appId = appIdFromOids(inspected.custom_oids);
-    if (!appId) throw new Error('Drive enclave attestation is missing its app id (OID 3.6)');
     if (d.imageDigest) {
         const got = inspected.custom_oids
             ?.find((o) => o.oid === d.imageOid)
@@ -133,6 +165,12 @@ async function setup(): Promise<DriveSession | null> {
             throw new Error('Drive enclave image digest does not match the published build');
         }
     }
+    const certAppId = appIdFromOids(inspected.custom_oids);
+    if (certAppId && d.appId && !sameAppId(certAppId, d.appId)) {
+        throw new Error('Drive enclave app id does not match the resolved app');
+    }
+    const appId = d.appId;
+    if (!appId) throw new Error('Drive app id could not be resolved');
 
     // Full verification through the attestation service, in the user's default
     // mode (deterministic unless they opted into challenge), before any of the

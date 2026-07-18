@@ -51,6 +51,14 @@ export interface AuthUIConfig {
      *  `displayName` defaults to a prettified `appName`; `logoUrl` (https
      *  only, sanitised by the frame host) falls back to the Privasys mark. */
     app?: { logoUrl?: string; displayName?: string };
+    /** Checks whether the OIDC session completed server-side (the IdP's
+     *  poll endpoint). Supplied by the frame host in OIDC mode. This is
+     *  the same-device recovery path: when the user switches to the
+     *  wallet app, the page is backgrounded and the broker WebSocket can
+     *  die — the wallet's relay then lands in the void. The watcher polls
+     *  this (and fires on visibilitychange) so the ceremony completes
+     *  from the IdP's state instead of stranding on a dead socket. */
+    checkComplete?: () => Promise<boolean>;
     /** Approve-only flow: re-verify an already-signed-in session against a
      *  changed enclave via a one-tap wallet push. When set, `signIn()`
      *  renders the approval waiting UI and delegates the push + sealed
@@ -126,6 +134,12 @@ export interface SignInResult {
     trustDevice?: boolean;
     /** Session-relay binding from the wallet (set only in session-relay mode). */
     sessionRelay?: SessionRelayBinding;
+    /** True when the ceremony completed via the IdP status poll rather
+     *  than the broker relay (same-device flow: the relay died during
+     *  the app switch). The frame host then fetches the auth code from
+     *  the poll endpoint and recovers the sealed binding from the
+     *  wallet's EncAuth voucher. */
+    completedViaPoll?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -477,6 +491,8 @@ const MODAL_CSS = /* css */ `
     font-family: inherit;
     font-size: 14px;
     color: #0F172A;
+    text-decoration: none; /* also rendered as an <a> (wallet handoff) */
+    box-sizing: border-box;
 }
 .btn-provider:hover {
     background: #F8FAFC;
@@ -888,6 +904,28 @@ function el(tag: string, attrs?: Record<string, any> | null, ...children: (Node 
     return e;
 }
 
+/** True on phones/tablets, where the wallet lives on THIS device and the
+ *  QR is un-scannable (you cannot point a phone at its own screen). The
+ *  ceremony then offers a direct wallet handoff instead. iPadOS 13+
+ *  masquerades as macOS, hence the touch-point check. */
+function isMobileDevice(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    if (/iPhone|iPod|iPad|Windows Phone/i.test(ua)) return true;
+    if (/Android/i.test(ua)) return true;
+    return /Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1;
+}
+
+/** The wallet deep link as a custom-scheme URL. The QR payload is the
+ *  universal link (https://privasys.id/scp?...), but iOS SUPPRESSES
+ *  universal links on same-domain navigations — and this code runs in
+ *  the privasys.id iframe, so the target IS same-domain. The custom
+ *  scheme opens the app unconditionally (same fix as the IdP's /device
+ *  page). The /scp route parses identical query params either way. */
+function walletSchemeUrl(qrPayload: string): string {
+    return qrPayload.replace(/^https:\/\/privasys\.id\//, 'privasys-wallet://');
+}
+
 function renderQRSvg(payload: string): string {
     try {
         const qr = qrcode(0, 'M');
@@ -948,6 +986,12 @@ export class AuthUI {
     // nowhere meaningful to go (its alternatives are offered inline).
     private autoStarted = false;
     private autoFirstScreen: UIState | null = null;
+    // Mobile handoff: whether the user expanded the QR ("scan with another
+    // device") instead of using the Open-in-Wallet button.
+    private showQrOnMobile = false;
+    // Completion watcher (same-device recovery, see cfg.checkComplete).
+    private completeWatch: { timer: ReturnType<typeof setInterval>; onVis: () => void } | null = null;
+    private viaPoll = false;
 
     constructor(config: AuthUIConfig) {
         this.cfg = {
@@ -999,6 +1043,8 @@ export class AuthUI {
             this.qrPayload = '';
             this.autoStarted = false;
             this.autoFirstScreen = null;
+            this.showQrOnMobile = false;
+            this.viaPoll = false;
             this.mount();
 
             if (this.cfg.approveFlow) {
@@ -1284,10 +1330,11 @@ export class AuthUI {
 
         // Primary wallet/QR button — Privasys logo in the button
         if (hasWallet) {
+            const altLabel = isMobileDevice() ? 'Open in Privasys Wallet instead' : 'Scan QR code instead';
             buttons.push(
                 el('button', { className: `btn-provider ${hasPush ? '' : 'primary'}`, onClick: () => this.startWallet() },
                     el('span', { html: ICON_LOGO }),
-                    el('span', { className: 'btn-label' }, hasPush ? 'Scan QR code instead' : 'Continue with Privasys ID'),
+                    el('span', { className: 'btn-label' }, hasPush ? altLabel : 'Continue with Privasys ID'),
                 ),
             );
         }
@@ -1350,6 +1397,34 @@ export class AuthUI {
         // 409 conflicts (one PUT per state transition).
         const payload = this.qrPayload;
 
+        // Same-device handoff: on a phone the QR is un-scannable (the
+        // wallet lives on THIS device), so the primary action opens the
+        // wallet directly via the custom scheme. The QR stays available
+        // behind a toggle for the cross-device case. Completion arrives
+        // via the broker relay when it survives the app switch, or the
+        // IdP status poll when it does not (startCompleteWatch).
+        if (isMobileDevice() && !this.showQrOnMobile) {
+            return el('div', null,
+                el('a', {
+                    className: 'btn-provider primary',
+                    href: walletSchemeUrl(payload),
+                    style: 'margin-bottom: 4px;',
+                },
+                    el('span', { html: ICON_LOGO }),
+                    el('span', { className: 'btn-label' }, 'Open in Privasys Wallet'),
+                ),
+                el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin-top: 12px;' },
+                    'Approve there, then come back to this tab.',
+                ),
+                el('div', { className: 'divider' }, el('span', null, 'or')),
+                el('button', {
+                    className: 'link-btn',
+                    style: 'font-size: 13px; display: block; text-align: center; width: 100%;',
+                    onClick: () => { this.showQrOnMobile = true; this.render(); },
+                }, 'Scan the QR code with another device'),
+            );
+        }
+
         return el('div', null,
             el('div', { className: 'qr-section' },
                 el('div', { className: 'qr-frame', html: renderQRSvg(payload) }),
@@ -1371,7 +1446,8 @@ export class AuthUI {
             el('div', { className: 'alt-actions' },
                 el('button', { className: 'btn-provider', onClick: () => { this.cleanup(); this.startWallet(); } },
                     el('span', { html: ICON_LOGO }),
-                    el('span', { className: 'btn-label' }, 'Scan QR code instead'),
+                    el('span', { className: 'btn-label' },
+                        isMobileDevice() ? 'Open in Privasys Wallet instead' : 'Scan QR code instead'),
                 ),
                 hasWebAuthn ? el('button', { className: 'btn-provider', onClick: () => { this.cleanup(); this.startPasskey(this.getWebAuthnClient().sessions.hasPasskeyHint() ? 'authenticate' : 'register'); } },
                     el('span', { html: ICON_PASSKEY }),
@@ -1631,6 +1707,7 @@ export class AuthUI {
         const client = this.getRelayClient();
         this.state = 'push-waiting';
         this.render();
+        this.startCompleteWatch();
 
         // Pass the OIDC session_id through to the broker so the wallet uses
         // it as `?session_id=` on /fido2/authenticate/begin. That is what the
@@ -1663,6 +1740,7 @@ export class AuthUI {
         this.qrPayload = payload;
         this.state = 'qr-scanning';
         this.render();
+        this.startCompleteWatch();
 
         client.waitForResult(sessionId).then(
             (result) => {
@@ -1761,6 +1839,7 @@ export class AuthUI {
             attributes: this.attributes,
             trustDevice: trust,
             sessionRelay: this.sessionRelay,
+            ...(this.viaPoll ? { completedViaPoll: true } : {}),
         };
         this.close();
         this.resolve?.(result);
@@ -1777,10 +1856,54 @@ export class AuthUI {
     }
 
     private cleanup(): void {
+        this.stopCompleteWatch();
         if (this.relayClient) {
             this.relayClient.destroy();
             this.relayClient = null;
         }
+    }
+
+    // ---- same-device completion watcher ----
+
+    /** Poll the IdP session status while a wallet flow is pending, so the
+     *  ceremony completes even when the broker relay died during the
+     *  same-device app switch. Fires immediately on tab re-focus. */
+    private startCompleteWatch(): void {
+        if (!this.cfg.checkComplete || this.completeWatch) return;
+        let inFlight = false;
+        const check = async (): Promise<void> => {
+            if (inFlight) return;
+            if (!['qr-scanning', 'push-waiting', 'wallet-connected', 'authenticating'].includes(this.state)) return;
+            inFlight = true;
+            try {
+                if (await this.cfg.checkComplete!()) {
+                    this.stopCompleteWatch();
+                    // The relay may be dead; the IdP session is the truth.
+                    // Tear the relay down and complete from server state.
+                    if (this.relayClient) {
+                        this.relayClient.destroy();
+                        this.relayClient = null;
+                    }
+                    this.method = 'wallet';
+                    this.viaPoll = true;
+                    this.complete();
+                }
+            } catch { /* transient poll failure — next tick retries */ }
+            finally { inFlight = false; }
+        };
+        const timer = setInterval(() => void check(), 3000);
+        const onVis = (): void => {
+            if (document.visibilityState === 'visible') void check();
+        };
+        document.addEventListener('visibilitychange', onVis);
+        this.completeWatch = { timer, onVis };
+    }
+
+    private stopCompleteWatch(): void {
+        if (!this.completeWatch) return;
+        clearInterval(this.completeWatch.timer);
+        document.removeEventListener('visibilitychange', this.completeWatch.onVis);
+        this.completeWatch = null;
     }
 
     // ---- client accessors ----

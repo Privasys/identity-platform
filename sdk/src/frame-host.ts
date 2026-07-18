@@ -1036,6 +1036,17 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     attributeRequirements,
                     disclosureVouchers,
                     sessionRelay: sessionRelayUI,
+                    // Same-device recovery: the AuthUI polls this while a
+                    // wallet flow is pending, so the ceremony completes
+                    // from IdP state when the broker relay died during the
+                    // app switch (page backgrounded → WS gone → the
+                    // wallet's relay message lands in the void).
+                    checkComplete: async () => {
+                        const r = await fetch(pollUrl, { cache: 'no-store' });
+                        if (!r.ok) return false;
+                        const d = await r.json().catch(() => null);
+                        return !!(d && d.authenticated);
+                    },
                     // Sanitised copies override the raw postMessage values.
                     presentation,
                     app,
@@ -1086,6 +1097,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         );
                     }
                     code = await pollSessionStatus(pollUrl);
+                } else if (uiResult.completedViaPoll) {
+                    // Same-device wallet flow: the relay died during the app
+                    // switch, the ceremony completed via the IdP status
+                    // poll. The wallet already linked the FIDO2 assertion
+                    // and patched attributes onto the auth code server-side.
+                    code = await pollSessionStatus(pollUrl);
                 } else {
                     // Wallet: pass profile from relay. Social: auth code
                     // already exists with profile (the popup callback created it).
@@ -1123,6 +1140,41 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 // RPC works once the auth result lands.
                 if (uiResult.sessionRelay) {
                     await installSessionRelay(uiResult.sessionRelay, parentOrigin);
+                } else if (uiResult.completedViaPoll && config.sessionRelay?.appHost) {
+                    // Same-device recovery of the sealed binding: the
+                    // wallet's {session_id, enc_pub} relay never arrived
+                    // (dead socket), but the wallet uploaded an EncAuth
+                    // voucher during its ceremony — resume from it. The
+                    // upload can lag the FIDO2 completion by a few seconds,
+                    // so retry briefly on no-voucher. Best-effort: a sealed
+                    // app's connect() surfaces the failure if it stays out.
+                    const appHost = config.sessionRelay.appHost;
+                    const getEncAuth = makeGetEncAuth(rpId, appHost);
+                    for (let attempt = 0; attempt < 5; attempt++) {
+                        const res = await PrivasysSession.resume({ host: appHost, getEncAuth });
+                        if (!('error' in res)) {
+                            activeSession = {
+                                appHost,
+                                sessionId: res.session.sessionId,
+                                expiresAt: 0,
+                                session: res.session,
+                            };
+                            uiResult.sessionRelay = {
+                                sessionId: res.session.sessionId,
+                                encPub: '',
+                                expiresAt: 0,
+                            };
+                            window.parent.postMessage({
+                                type: 'privasys:session:ready',
+                                sessionId: res.session.sessionId,
+                                appHost,
+                                expiresAt: 0,
+                            }, parentOrigin);
+                            break;
+                        }
+                        if (res.error !== 'no-voucher') break; // rejected/unavailable — don't spin
+                        await new Promise((r) => setTimeout(r, 2000));
+                    }
                 }
 
                 // 7. Send result to parent with the access_token.

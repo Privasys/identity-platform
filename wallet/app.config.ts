@@ -118,9 +118,18 @@ export default (context: ConfigContext): ExpoConfig => {
                     'A0000002471001', // eMRTD LDS1 (ICAO 9303 passport application)
                     'A0000002472001', // eMRTD LDS2
                 ],
-                // Google OAuth requires the reversed client ID as a registered URL scheme
-                // so iOS can route the redirect back to the app after authentication.
+                // A manual CFBundleURLTypes REPLACES the one Expo generates
+                // from the top-level `scheme` — it does not merge. Without
+                // the app scheme listed here, privasys-wallet:// has NO
+                // handler in the built app and every same-device handoff
+                // (auth SDK 'Open in Privasys Wallet', the IdP /device
+                // page) dies with Safari's "address is invalid". Regressed
+                // 2026-04-17 when the Google entry was added.
                 CFBundleURLTypes: [
+                    { CFBundleURLSchemes: [config.scheme] },
+                    // Google OAuth requires the reversed client ID as a
+                    // registered URL scheme so iOS can route the redirect
+                    // back to the app after authentication.
                     ...(process.env.EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID_IOS
                         ? [{
                             CFBundleURLSchemes: [

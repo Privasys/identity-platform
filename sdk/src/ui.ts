@@ -412,6 +412,7 @@ const MODAL_CSS = /* css */ `
     margin-bottom: 10px;
 }
 .gate-request strong { color: #0F172A; font-weight: 600; }
+.hint-warn { color: #B45309; }
 .pitch-logo {
     display: block;
     height: 44px;
@@ -482,6 +483,7 @@ const MODAL_CSS = /* css */ `
     .gate-close:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
     .gate-request { color: #64748B; }
     .gate-request strong { color: #E2E8F0; }
+    .hint-warn { color: #FBBF24; }
 }
 
 /* Provider buttons */
@@ -844,6 +846,10 @@ const MODAL_CSS = /* css */ `
     }
     .btn-provider.primary svg { color: #0F172A; }
     .btn-provider.primary .btn-hint { color: rgba(15,23,42,0.5); }
+    /* Primary buttons invert in dark mode (light pill) — the label MUST
+       invert with them or it is light-on-light and unreadable (observed
+       on the mobile wallet handoff). */
+    .btn-provider.primary .btn-label { color: #0F172A; }
     .btn-hint { color: #64748B; }
     .btn-label { color: #E2E8F0; }
     .divider { color: #475569; }
@@ -1443,7 +1449,7 @@ export class AuthUI {
                     el('span', { className: 'btn-label' }, 'Open in Privasys Wallet'),
                 ),
                 this.walletOpenFailed
-                    ? el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin-top: 12px; color: #B45309;' },
+                    ? el('p', { className: 'scan-hint hint-warn', style: 'max-width: none; text-align: center; margin-top: 12px;' },
                         'The wallet did not open. Install it first, or scan the QR code with another device.',
                     )
                     : el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin-top: 12px;' },

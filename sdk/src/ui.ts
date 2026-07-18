@@ -989,6 +989,9 @@ export class AuthUI {
     // Mobile handoff: whether the user expanded the QR ("scan with another
     // device") instead of using the Open-in-Wallet button.
     private showQrOnMobile = false;
+    // Set when the wallet handoff visibly failed (page never lost focus
+    // after the tap — the app is most likely not installed).
+    private walletOpenFailed = false;
     // Completion watcher (same-device recovery, see cfg.checkComplete).
     private completeWatch: { timer: ReturnType<typeof setInterval>; onVis: () => void } | null = null;
     private viaPoll = false;
@@ -1044,6 +1047,7 @@ export class AuthUI {
             this.autoStarted = false;
             this.autoFirstScreen = null;
             this.showQrOnMobile = false;
+            this.walletOpenFailed = false;
             this.viaPoll = false;
             this.mount();
 
@@ -1400,23 +1404,42 @@ export class AuthUI {
         // Same-device handoff: on a phone the QR is un-scannable (the
         // wallet lives on THIS device), so the primary action opens the
         // wallet directly via the custom scheme. The QR stays available
-        // behind a toggle for the cross-device case. Completion arrives
-        // via the broker relay when it survives the app switch, or the
-        // IdP status poll when it does not (startCompleteWatch).
+        // behind a toggle for the cross-device case, and an install link
+        // covers users without the wallet. Completion arrives via the
+        // broker relay when it survives the app switch, or the IdP
+        // status poll when it does not (startCompleteWatch).
         if (isMobileDevice() && !this.showQrOnMobile) {
             return el('div', null,
                 el('a', {
                     className: 'btn-provider primary',
                     href: walletSchemeUrl(payload),
+                    // MUST be a top-level navigation: WebKit silently blocks
+                    // custom-scheme navigations of the iframe itself, which
+                    // makes the tap "do nothing". A user-activated _top
+                    // navigation from a cross-origin iframe is allowed and
+                    // performs the app switch.
+                    target: '_top',
                     style: 'margin-bottom: 4px;',
+                    onClick: () => this.watchWalletOpen(),
                 },
                     el('span', { html: ICON_LOGO }),
                     el('span', { className: 'btn-label' }, 'Open in Privasys Wallet'),
                 ),
-                el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin-top: 12px;' },
-                    'Approve there, then come back to this tab.',
-                ),
+                this.walletOpenFailed
+                    ? el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin-top: 12px; color: #B45309;' },
+                        'The wallet did not open. Install it first, or scan the QR code with another device.',
+                    )
+                    : el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin-top: 12px;' },
+                        'Approve there, then come back to this tab.',
+                    ),
                 el('div', { className: 'divider' }, el('span', null, 'or')),
+                el('a', {
+                    className: 'link-btn',
+                    href: 'https://privasys.id/',
+                    target: '_blank',
+                    rel: 'noreferrer',
+                    style: 'font-size: 13px; display: block; text-align: center; width: 100%; margin-bottom: 10px;',
+                }, 'Don’t have the app? Get the Privasys Wallet'),
                 el('button', {
                     className: 'link-btn',
                     style: 'font-size: 13px; display: block; text-align: center; width: 100%;',
@@ -1904,6 +1927,21 @@ export class AuthUI {
         clearInterval(this.completeWatch.timer);
         document.removeEventListener('visibilitychange', this.completeWatch.onVis);
         this.completeWatch = null;
+    }
+
+    /** After the handoff tap: if the page is still visible shortly after,
+     *  the app switch did not happen — the wallet is most likely not
+     *  installed. Surface the install/cross-device paths prominently. */
+    private watchWalletOpen(): void {
+        setTimeout(() => {
+            if (document.visibilityState === 'visible'
+                && this.state === 'qr-scanning'
+                && !this.showQrOnMobile
+                && !this.walletOpenFailed) {
+                this.walletOpenFailed = true;
+                this.render();
+            }
+        }, 2000);
     }
 
     // ---- client accessors ----

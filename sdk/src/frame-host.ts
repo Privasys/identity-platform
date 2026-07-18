@@ -742,8 +742,19 @@ window.addEventListener('message', async (e: MessageEvent) => {
             scope?: string | string[];
             sessionRelay?: { appHost: string; extraAppHosts?: string[] };
             connect?: { mode?: string; reason?: string | null };
+            caps?: string[];
         } = data.config;
         const parentOrigin = e.origin;
+
+        // Wallet handoff via the parent page (mobile): only when the frame
+        // client declared it handles `privasys:navigate` — older bundled
+        // clients ignore unknown messages and the tap would go dead.
+        const parentCaps = Array.isArray(config.caps) ? config.caps : [];
+        const onNavigate = parentCaps.includes('parent-navigate')
+            ? (url: string): void => {
+                window.parent.postMessage({ type: 'privasys:navigate', url }, parentOrigin);
+            }
+            : undefined;
 
         // Tear down any previous UI / session-relay handshake.
         if (activeUI) {
@@ -1052,6 +1063,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     app,
                     pitch,
                     methods: effectiveMethods,
+                    onNavigate,
                     approveFlow: undefined,
                 });
 
@@ -1219,6 +1231,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             app,
             pitch,
             methods,
+            onNavigate,
             approveFlow: undefined,
         });
 

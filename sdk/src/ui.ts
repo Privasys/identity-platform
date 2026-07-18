@@ -51,6 +51,16 @@ export interface AuthUIConfig {
      *  `displayName` defaults to a prettified `appName`; `logoUrl` (https
      *  only, sanitised by the frame host) falls back to the Privasys mark. */
     app?: { logoUrl?: string; displayName?: string };
+    /** Performs the wallet-handoff navigation via the ADOPTER page
+     *  (frame host posts `privasys:navigate` to the parent). WebKit
+     *  blocks custom-scheme navigations initiated by cross-origin
+     *  iframes — even with target=_top it surfaces Safari's "address is
+     *  invalid" alert with the app installed. The parent page is
+     *  top-level and first-party (the working /device-page context), and
+     *  the tap's transient user activation propagates to ancestors.
+     *  Present only when the frame client is new enough to handle the
+     *  message; older clients fall back to the direct _top anchor. */
+    onNavigate?: (url: string) => void;
     /** Checks whether the OIDC session completed server-side (the IdP's
      *  poll endpoint). Supplied by the frame host in OIDC mode. This is
      *  the same-device recovery path: when the user switches to the
@@ -1413,14 +1423,21 @@ export class AuthUI {
                 el('a', {
                     className: 'btn-provider primary',
                     href: walletSchemeUrl(payload),
-                    // MUST be a top-level navigation: WebKit silently blocks
-                    // custom-scheme navigations of the iframe itself, which
-                    // makes the tap "do nothing". A user-activated _top
-                    // navigation from a cross-origin iframe is allowed and
-                    // performs the app switch.
+                    // Fallback for OLD frame clients only: _top at least
+                    // reaches iOS. New clients bounce through the parent
+                    // page instead (see onNavigate) — WebKit blocks
+                    // cross-origin-iframe-initiated custom-scheme
+                    // navigations with Safari's "address is invalid"
+                    // alert even when the app is installed.
                     target: '_top',
                     style: 'margin-bottom: 4px;',
-                    onClick: () => this.watchWalletOpen(),
+                    onClick: (e: Event) => {
+                        this.watchWalletOpen();
+                        if (this.cfg.onNavigate) {
+                            e.preventDefault();
+                            this.cfg.onNavigate(walletSchemeUrl(payload));
+                        }
+                    },
                 },
                     el('span', { html: ICON_LOGO }),
                     el('span', { className: 'btn-label' }, 'Open in Privasys Wallet'),

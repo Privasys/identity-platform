@@ -632,6 +632,9 @@ export class AuthFrame {
                                 config: {
                                     ...this.config,
                                     presentation,
+                                    // Capabilities this client handles; the host
+                                    // only uses features the client declared.
+                                    caps: ['parent-navigate'],
                                     ...(this.connectHint ? { connect: this.connectHint } : {}),
                                 },
                             },
@@ -645,6 +648,23 @@ export class AuthFrame {
                         const disclosures = extractDisclosures(result.accessToken);
                         if (disclosures) result.disclosures = disclosures;
                         finishSignIn(result);
+                        break;
+                    }
+
+                    case 'privasys:navigate': {
+                        // Mobile wallet handoff: the custom-scheme navigation
+                        // must be TOP-LEVEL and FIRST-PARTY. WebKit blocks
+                        // custom-scheme navigations initiated by cross-origin
+                        // iframes (Safari shows "address is invalid" even
+                        // with the app installed), so the adopter page — this
+                        // window — performs it. The tap in the iframe grants
+                        // transient user activation to ancestors, and an
+                        // external-protocol navigation does not unload the
+                        // page, so the ceremony keeps running.
+                        const url = String(data.url || '');
+                        if (/^privasys-wallet(-dev|-preview)?:\/\//.test(url)) {
+                            window.location.href = url;
+                        }
                         break;
                     }
 

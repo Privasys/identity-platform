@@ -75,7 +75,14 @@ env:
   # v0.7.2 adds OID 3.6 (workload app id) + 6.1 (dependency set) to the client's
   # known-OID set, so custom_oids surfaces the Drive enclave's app id (the leaf
   # already carried it; the older client silently dropped it).
-  RATLS_VERSION: v0.7.2
+  # v0.7.3 fixes cert inspection on confidential-GPU enclaves (tdx-gpu, e.g.
+  # confidential-ai): the leaf carries BOTH a TDX quote and NVIDIA GPU evidence
+  # (OID 5.1), and the last-wins extension walk let the opaque GPU evidence
+  # overwrite the TDX quote — stripping mrtd, so the wallet's session-relay
+  # gate reported "did not present an attested certificate". The TEE quote now
+  # wins regardless of extension order. REQUIRED for chat/Drive sealed sessions
+  # against any GPU-CC enclave.
+  RATLS_VERSION: v0.7.3
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

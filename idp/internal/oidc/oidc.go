@@ -238,7 +238,7 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 			"sub", "name", "given_name", "family_name", "email", "email_verified",
 			"picture", "locale", "phone_number", "acr",
 			"attestation_level", "auth_time", "iss", "aud", "exp", "iat",
-			"roles",
+			"roles", "wallet",
 		},
 	}
 
@@ -283,6 +283,15 @@ type AuthCode struct {
 	// verbatim into the issued ID token under the `session` and `att_*`
 	// top-level claims by the token endpoint, then GC'd. Optional.
 	SessionRelay map[string]interface{}
+
+	// WalletVerified is set true only when this code was minted from a genuine
+	// Privasys-wallet WebAuthn ceremony (the fido2 register/authenticate paths).
+	// It drives a non-identifying `wallet` class marker on the access token so
+	// an attested app runtime can recognise a wallet caller for a
+	// `free_for:["wallet"]` API-fee exemption (x-privasys.price) WITHOUT
+	// learning or linking the pairwise identity. A constant shared by all wallet
+	// users, it carries no per-user data. Social/browser logins never set it.
+	WalletVerified bool
 }
 
 // CodeStore manages short-lived authorization codes.
@@ -1014,6 +1023,18 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 		log.Printf("token: ID token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
 		return
+	}
+
+	// Wallet-class marker (x-privasys.price free_for:["wallet"]): a genuine
+	// wallet WebAuthn ceremony stamps a constant, non-identifying `wallet=true`
+	// claim so an attested runtime can grant the wallet fee exemption without
+	// learning the pairwise identity. Carried on the access token only (it is a
+	// resource-server authorisation signal, not an ID-token profile claim).
+	if ac.WalletVerified {
+		if filteredAttrs == nil {
+			filteredAttrs = map[string]string{}
+		}
+		filteredAttrs["wallet"] = "true"
 	}
 
 	// Issue access token (with roles and profile).

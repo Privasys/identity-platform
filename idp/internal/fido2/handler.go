@@ -533,6 +533,9 @@ func (h *Handler) CompleteRegistration(
 					CodeChallengeMethod: session.CodeChallengeMethod,
 					AuthTime:            time.Now(),
 					SessionRelay:        relay,
+					// This code is minted from a genuine wallet WebAuthn
+					// ceremony → stamp the non-identifying wallet-class marker.
+					WalletVerified: true,
 				})
 				sessionStore.Complete(entry.sessionID, userID, authCode)
 			}
@@ -784,6 +787,8 @@ func (h *Handler) CompleteAuthentication(
 					CodeChallengeMethod: session.CodeChallengeMethod,
 					AuthTime:            time.Now(),
 					SessionRelay:        relay,
+					// Genuine wallet WebAuthn authentication → wallet-class marker.
+					WalletVerified: true,
 				})
 				sessionStore.Complete(entry.sessionID, userID, authCode)
 			}

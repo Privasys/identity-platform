@@ -124,6 +124,12 @@ func init() {
 // /referential/<name>.json (e.g. name="locale"). The IdP serves these verbatim
 // so the wallet/SDK fetch the single source instead of bundling their own copy.
 func ReferentialFile(name string) ([]byte, bool) {
+	// The canonical attribute referential itself is servable too, so clients
+	// (the portal's relying-party registration, SDKs) can build attribute
+	// pickers from the single source instead of bundling a copy.
+	if name == "canonical-attributes" {
+		return rawJSON, true
+	}
 	b, err := referentialFS.ReadFile("referential/" + name + ".json")
 	if err != nil {
 		return nil, false

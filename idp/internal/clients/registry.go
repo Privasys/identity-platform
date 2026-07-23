@@ -83,6 +83,59 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 	}, nil
 }
 
+// ResolveByRPID resolves a billable relying party's rp_id to its linked
+// management-service billing account. Used by the API-fee sponsor path
+// (x-privasys.price payer:"sponsor"): a priced tool names a request field
+// carrying an rp_id, which the platform maps to the funded account that pays.
+// Returns an error when no billable client claims that rp_id.
+func (reg *Registry) ResolveByRPID(rpID string) (*Client, error) {
+	if rpID == "" {
+		return nil, fmt.Errorf("rp_id required")
+	}
+	var clientID, billingAccountID string
+	var billableRP int
+	err := reg.db.QueryRow(
+		"SELECT client_id, billable_rp, billing_account_id FROM clients WHERE rp_id = ? AND billable_rp = 1 AND billing_account_id <> ''",
+		rpID,
+	).Scan(&clientID, &billableRP, &billingAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("no billable relying party for rp_id %q: %w", rpID, err)
+	}
+	return &Client{
+		ClientID:         clientID,
+		BillableRP:       billableRP != 0,
+		BillingAccountID: billingAccountID,
+		RPID:             rpID,
+	}, nil
+}
+
+// HandleResolveRP handles GET /internal/clients/resolve-rp?rp_id=... — resolve a
+// relying party's rp_id to its funded billing account. Gated by the shared
+// internal mgmt token (the same one the reserve path uses), NOT the admin
+// token: the management-service calls this to price an API-fee sponsor call.
+func HandleResolveRP(reg *Registry, mgmtToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if mgmtToken != "" {
+			auth := r.Header.Get("Authorization")
+			if len(auth) < 8 || auth[7:] != mgmtToken {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+		}
+		rpID := r.URL.Query().Get("rp_id")
+		client, err := reg.ResolveByRPID(rpID)
+		if err != nil {
+			http.Error(w, `{"error":"unknown or unfunded relying party"}`, http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"rp_id":              client.RPID,
+			"billing_account_id": client.BillingAccountID,
+		})
+	}
+}
+
 // SetBilling marks a client as a billable relying party and links the
 // management-service billing account + RP id (used by the voucher-mint path).
 // rpID defaults to the client_id when empty. Returns the updated client.

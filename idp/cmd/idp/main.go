@@ -304,6 +304,9 @@ func main() {
 	// Flag a client as a billable relying party + link its billing account
 	// (the attribute-marketplace consumer side).
 	mux.HandleFunc("POST /clients/{id}/billing", clients.HandleSetBilling(clientReg, cfg.AdminToken))
+	// Internal: resolve a relying party's rp_id to its funded billing account
+	// for the API-fee sponsor path (x-privasys.price). Shared mgmt-token gated.
+	mux.HandleFunc("GET /internal/clients/resolve-rp", clients.HandleResolveRP(clientReg, cfg.IdpMgmtToken))
 
 	// Admin: metrics and role management.
 	mux.HandleFunc("GET /admin/metrics", admin.HandleGetMetrics(db, cfg.AdminToken))

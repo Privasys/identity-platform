@@ -49,7 +49,6 @@ import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, attestEnclave } from '@/services/attestation';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
-import { ensureDrive } from '@/services/drive';
 import { appIdFromOids, fetchRunningAppReleases, type OsRelease, type WorkloadRelease } from '@/services/release-provenance';
 import {
     recordDeclaredDependencies,
@@ -1747,14 +1746,6 @@ export default function ConnectScreen() {
             // ceremony (back-to-back, under the one biometric grace window).
             void issueExtraAppVouchers(payload, keyAlias, result, traceId);
 
-            // Warm the personal drive after login so the Drive tab is instant.
-            // Gated behind the (in-progress) driveEnabled setting; best-effort.
-            if (useSettingsStore.getState().driveEnabled) {
-                void ensureDrive().catch((e) =>
-                    console.warn('[CONNECT] drive setup skipped:', e?.message ?? e),
-                );
-            }
-
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
 
@@ -1895,14 +1886,6 @@ export default function ConnectScreen() {
             // Multi-app attestation: seal any extra enclave hosts in the same
             // ceremony (back-to-back, under the one biometric grace window).
             void issueExtraAppVouchers(payload, keyAlias, result, traceId);
-
-            // Warm the personal drive after login so the Drive tab is instant.
-            // Gated behind the (in-progress) driveEnabled setting; best-effort.
-            if (useSettingsStore.getState().driveEnabled) {
-                void ensureDrive().catch((e) =>
-                    console.warn('[CONNECT] drive setup skipped:', e?.message ?? e),
-                );
-            }
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);

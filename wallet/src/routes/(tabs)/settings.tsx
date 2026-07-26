@@ -11,7 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { StyleSheet, Pressable, Alert, ScrollView, Switch, View as RNView } from 'react-native';
+import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExternalLink } from '@/components/ExternalLink';
@@ -28,8 +28,6 @@ export default function SettingsScreen() {
     const styles = useMemo(() => makeStyles(p), [p]);
     const { credentials } = useAuthStore();
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
-    const driveEnabled = useSettingsStore((s) => s.driveEnabled);
-    const setDriveEnabled = useSettingsStore((s) => s.setDriveEnabled);
     const verificationMode = useSettingsStore((s) => s.verificationMode);
     const setVerificationMode = useSettingsStore((s) => s.setVerificationMode);
     const pushToken = useExpoPushToken();
@@ -130,20 +128,6 @@ export default function SettingsScreen() {
                         </Pressable>
                     </>
                 ) : null}
-
-                {/* Experimental */}
-                <Text style={styles.sectionTitle}>Experimental</Text>
-                <RNView style={styles.toggleRow}>
-                    <RNView style={{ flex: 1 }}>
-                        <Text style={styles.toggleLabel}>Drive (preview)</Text>
-                        <Text style={styles.toggleHint}>Your confidential personal drive. In progress.</Text>
-                    </RNView>
-                    <Switch
-                        value={driveEnabled}
-                        onValueChange={setDriveEnabled}
-                        trackColor={{ true: p.green, false: p.border }}
-                    />
-                </RNView>
 
                 {/* Logs */}
                 <Text style={styles.sectionTitle}>Logs</Text>

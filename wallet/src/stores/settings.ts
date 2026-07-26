@@ -18,13 +18,10 @@ export type VerificationMode = 'deterministic' | 'challenge';
 export interface SettingsState {
     /** Biometric grace period in seconds. 0 = always prompt. */
     gracePeriodSec: number;
-    /** Show the (in-progress) Drive tab. Off by default. */
-    driveEnabled: boolean;
     /** Default enclave verification mode. Deterministic unless the user opts in. */
     verificationMode: VerificationMode;
 
     setGracePeriod: (seconds: number) => void;
-    setDriveEnabled: (enabled: boolean) => void;
     setVerificationMode: (mode: VerificationMode) => void;
     hydrate: () => Promise<void>;
 }
@@ -40,7 +37,6 @@ function persist(get: () => SettingsState) {
         STORE_KEY,
         JSON.stringify({
             gracePeriodSec: s.gracePeriodSec,
-            driveEnabled: s.driveEnabled,
             verificationMode: s.verificationMode,
         })
     ).catch(console.error);
@@ -48,16 +44,10 @@ function persist(get: () => SettingsState) {
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     gracePeriodSec: 30,
-    driveEnabled: false,
     verificationMode: 'deterministic',
 
     setGracePeriod: (seconds) => {
         set({ gracePeriodSec: seconds });
-        persist(get);
-    },
-
-    setDriveEnabled: (enabled) => {
-        set({ driveEnabled: enabled });
         persist(get);
     },
 
@@ -73,9 +63,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             const data = JSON.parse(raw);
             if (typeof data.gracePeriodSec === 'number' && GRACE_OPTIONS.includes(data.gracePeriodSec)) {
                 set({ gracePeriodSec: data.gracePeriodSec });
-            }
-            if (typeof data.driveEnabled === 'boolean') {
-                set({ driveEnabled: data.driveEnabled });
             }
             if (data.verificationMode === 'deterministic' || data.verificationMode === 'challenge') {
                 set({ verificationMode: data.verificationMode });

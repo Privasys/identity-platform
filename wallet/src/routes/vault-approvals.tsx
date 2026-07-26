@@ -196,8 +196,10 @@ export default function VaultApprovalsScreen() {
                               ? `Approved a key export for ${req.summary.handle}`
                               : `Approved a vault operation on ${req.summary.handle}`
                 });
+                // Approved: the request drops off the pending list, which is the
+                // confirmation. No success popup — the biometric prompt was the
+                // deliberate action, and the terminal continues on its own.
                 forget(req.vault_op);
-                Alert.alert('Approved', 'The operation is authorised. Your terminal will continue automatically.');
             } catch (e: any) {
                 Alert.alert('Approval failed', e?.message ?? 'Could not complete the approval.');
             } finally {

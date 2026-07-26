@@ -11,30 +11,32 @@
  * platform at+jwt, and runs the one-call setupPersonalDrive (ensure tenant +
  * fetch data-key grant from mgmt + provision the tenant MEK on the enclave).
  *
- * Gated behind useSettingsStore.driveEnabled while the tab is in progress.
+ * The user approves the Drive enclave on first connect (the shared
+ * AttestationView, driven from the Drive tab) and re-approves if its
+ * attestation changes, mirroring the ID-check verifier flow.
  */
 
 import { PrivasysDrive, type DriveNode, type Tenant } from '@privasys/drive-sdk';
 
 import { getAttestationServerToken } from '@/services/app-attest';
-import { inspectAttestation, attestEnclave } from '@/services/attestation';
+import { inspectAttestation, attestEnclave, type AttestationResult } from '@/services/attestation';
 import { appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
 import { getPlatformToken } from '@/services/platform-token';
-import { useSettingsStore } from '@/stores/settings';
+import { useSettingsStore, type VerificationMode } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
-// Drive is a DEV-ONLY preview: the only instance (drive-demo) lives on the
-// test platform, and no prod Drive is provisioned yet. So the Drive service
-// pins its OWN platform base to api-test regardless of the wallet's
-// configured platform — a production wallet build bakes
-// EXPO_PUBLIC_PLATFORM_API_URL = api.developer.privasys.org (prod), where
-// drive-demo does not exist ("app not found"). Override this once a prod
-// Drive instance exists.
+// The management/control-plane base for Drive resolve + the data-key grant.
+// Follows the build's platform (a production wallet bakes
+// EXPO_PUBLIC_PLATFORM_API_URL = api.developer.privasys.org, where the prod
+// `privasys-drive` app lives). EXPO_PUBLIC_DRIVE_PLATFORM_API_URL is an
+// optional per-build override for pointing Drive at a different control plane.
 const PLATFORM_API_BASE =
-    process.env.EXPO_PUBLIC_DRIVE_PLATFORM_API_URL ?? 'https://api-test.developer.privasys.org';
+    process.env.EXPO_PUBLIC_DRIVE_PLATFORM_API_URL ??
+    process.env.EXPO_PUBLIC_PLATFORM_API_URL ??
+    'https://api-test.developer.privasys.org';
 
-/** Store name of the Drive app to resolve. Dev is `drive-demo`; override
- *  per build for a differently-named prod instance. */
+/** Store name of the Drive app to resolve. Prod build sets `privasys-drive`
+ *  (eas.json); dev defaults to `drive-demo`. */
 const DRIVE_APP_NAME = process.env.EXPO_PUBLIC_DRIVE_APP ?? 'drive-demo';
 
 /** Fallback Drive coordinates, mirroring the identity-verifier pattern
@@ -97,6 +99,75 @@ async function resolveDrive(): Promise<ResolvedDrive> {
     return resolved;
 }
 
+/** The attested Drive enclave, for the approval screen (before connecting). */
+export interface DriveAttestation {
+    origin: string;
+    displayName: string;
+    /** Full attestation to render in the shared AttestationView. */
+    attestation: AttestationResult;
+    /** Management app id (OID 3.6) the data-key grant is keyed by. */
+    appId: string;
+    /** Verification mode actually used. */
+    mode: VerificationMode;
+    /** True when a fresh nonce + TLS channel binder were folded in. */
+    challenged: boolean;
+}
+
+const DRIVE_DISPLAY = 'Privasys Drive';
+
+// The verified attestation from the most recent attestDrive() this session, so
+// setup() (the connect) reuses it instead of attesting the enclave a second time.
+let lastAttest: { origin: string; appId: string } | null = null;
+
+/**
+ * Resolve + inspect + attest the Drive enclave and return the result for the
+ * approval screen, WITHOUT connecting. Mirrors kyc.ts attestVerifier: pins the
+ * published image digest (OID 3.2), reads the management app id (OID 3.6) off
+ * the attested leaf, and verifies through the attestation service in the user's
+ * mode (or a forced `challenge` when they tap "Challenge this enclave"). Throws
+ * on a missing/mismatched digest or a failed verification.
+ */
+export async function attestDrive(forceMode?: VerificationMode): Promise<DriveAttestation> {
+    const d = await resolveDrive();
+    const inspected = await inspectAttestation(d.origin);
+    const appId = appIdFromOids(inspected.custom_oids);
+    if (!appId) throw new Error('Drive enclave attestation is missing its app id (OID 3.6)');
+    if (d.imageDigest) {
+        const got = inspected.custom_oids
+            ?.find((o) => o.oid === d.imageOid)
+            ?.value_hex?.toLowerCase();
+        if (got !== d.imageDigest) {
+            throw new Error('Drive enclave image digest does not match the published build');
+        }
+    }
+
+    const asToken = await getAttestationServerToken();
+    const mode = forceMode ?? useSettingsStore.getState().verificationMode;
+    const outcome = await attestEnclave(d.origin, {
+        tee: inspected.tee_type ?? 'tdx',
+        mode,
+        attestationServerToken: asToken
+    });
+    if (outcome.status !== 'verified' || !outcome.result) {
+        throw new Error(
+            `Drive enclave attestation ${outcome.status}${outcome.message ? `: ${outcome.message}` : ''}`
+        );
+    }
+
+    // Rich display fields (cert, extensions) from inspect; authoritative
+    // measurements and validity from the verified result.
+    const attestation: AttestationResult = { ...inspected, ...outcome.result };
+    lastAttest = { origin: d.origin, appId };
+    return {
+        origin: d.origin,
+        displayName: DRIVE_DISPLAY,
+        attestation,
+        appId,
+        mode: outcome.mode,
+        challenged: outcome.challenged
+    };
+}
+
 /** A connected drive + the caller's personal tenant, cached for the session. */
 export interface DriveSession {
     drive: PrivasysDrive;
@@ -130,40 +201,16 @@ export function currentDrive(): DriveSession | null {
 async function setup(): Promise<DriveSession | null> {
     const d = await resolveDrive();
 
-    // Inspect the RA-TLS cert: pin the published image digest (OID 3.2) and
-    // read the management app id (OID 3.6) the data-key grant is keyed by.
-    // Both are stamped by the measured manager on the standing serving cert,
-    // so the id is attested — the resolve API is only used for discovery,
-    // never trusted for identity.
-    const inspected = await inspectAttestation(d.origin);
-    const appId = appIdFromOids(inspected.custom_oids);
-    if (!appId) throw new Error('Drive enclave attestation is missing its app id (OID 3.6)');
-    if (d.imageDigest) {
-        const got = inspected.custom_oids
-            ?.find((o) => o.oid === d.imageOid)
-            ?.value_hex?.toLowerCase();
-        if (got !== d.imageDigest) {
-            throw new Error('Drive enclave image digest does not match the published build');
-        }
-    }
-
-    // Full verification through the attestation service, in the user's default
-    // mode (deterministic unless they opted into challenge), before any of the
-    // user's confidential data flows over the transport. The RA-TLS data plane
-    // additionally re-checks the deterministic report_data binding on every
-    // request, so a swapped certificate never goes unnoticed.
-    const asToken = await getAttestationServerToken();
-    const mode = useSettingsStore.getState().verificationMode;
-    const outcome = await attestEnclave(d.origin, {
-        tee: inspected.tee_type ?? 'tdx',
-        mode,
-        attestationServerToken: asToken
-    });
-    if (outcome.status !== 'verified') {
-        throw new Error(
-            `Drive enclave attestation ${outcome.status}${outcome.message ? `: ${outcome.message}` : ''}`
-        );
-    }
+    // Attestation is the gate. Reuse the result from a recent attestDrive()
+    // (the Drive tab's approval screen ran it, so the user has just approved);
+    // otherwise attest now, so any non-UI caller is still fully verified before
+    // the user's confidential data flows over the transport. The RA-TLS data
+    // plane additionally re-checks the deterministic report_data binding on
+    // every request, so a swapped certificate never goes unnoticed.
+    const appId =
+        lastAttest && lastAttest.origin === d.origin
+            ? lastAttest.appId
+            : (await attestDrive()).appId;
 
     const token = await getPlatformToken();
     const drive = PrivasysDrive.connect({

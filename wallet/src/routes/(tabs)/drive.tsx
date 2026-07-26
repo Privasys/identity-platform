@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -25,9 +26,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AttestationView } from '@/components/AttestationView';
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { ensureDrive, type DriveNode } from '@/services/drive';
+import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
+import { attestDrive, ensureDrive, type DriveAttestation, type DriveNode } from '@/services/drive';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
+import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 function formatSize(bytes: number): string {
     if (!bytes) return '';
@@ -55,7 +59,95 @@ export default function DriveScreen() {
         (s) => s.requests.filter((r) => !r.decision).length
     );
 
+    // Approval gate (mirrors the ID-check verifier): the user approves the Drive
+    // enclave on first connect and re-approves if its attestation changes.
+    //   preparing → attest + trusted-app check
+    //   approve   → show AttestationView (new enclave, or a changed one)
+    //   ready     → approved (or already trusted + unchanged) → browse
+    //   blocked   → attestation failed, or the user declined
+    type Phase = 'preparing' | 'approve' | 'ready' | 'blocked';
+    const [phase, setPhase] = useState<Phase>('preparing');
+    const [att, setAtt] = useState<DriveAttestation | null>(null);
+    const [attError, setAttError] = useState<string | null>(null);
+    const [isChanged, setIsChanged] = useState(false);
+    const [diff, setDiff] = useState<AttestationDiff | null>(null);
+    const [challengeInFlight, setChallengeInFlight] = useState(false);
+    const { getApp, isAttestationMatch, addOrUpdate: addTrustedApp } = useTrustedAppsStore();
+
     const folder = path.length > 0 ? path[path.length - 1] : null;
+
+    /** Record the approved Drive enclave so we don't re-prompt until it changes. */
+    const rememberDrive = useCallback(
+        (a: DriveAttestation) => {
+            addTrustedApp({
+                rpId: a.origin,
+                origin: a.origin,
+                appName: a.displayName,
+                mrenclave: a.attestation.mrenclave,
+                mrtd: a.attestation.mrtd,
+                codeHash: a.attestation.workload_code_hash,
+                configRoot: a.attestation.workload_config_merkle_root,
+                teeType: a.attestation.tee_type ?? 'tdx',
+                lastVerified: Math.floor(Date.now() / 1000),
+                credentialId: ''
+            });
+        },
+        [addTrustedApp]
+    );
+
+    /** Attest the Drive enclave and decide whether the user must approve it. */
+    const prepare = useCallback(async () => {
+        setPhase('preparing');
+        setAttError(null);
+        try {
+            const a = await attestDrive();
+            const measurements = {
+                mrenclave: a.attestation.mrenclave,
+                mrtd: a.attestation.mrtd,
+                codeHash: a.attestation.workload_code_hash,
+                configRoot: a.attestation.workload_config_merkle_root
+            };
+            const trusted = getApp(a.origin);
+            if (trusted && isAttestationMatch(a.origin, measurements)) {
+                // Already approved on this device and unchanged: refresh + go.
+                rememberDrive(a);
+                setPhase('ready');
+            } else {
+                setIsChanged(!!trusted);
+                setDiff(trusted ? diffTrustedAttestation(trusted, a.attestation) : null);
+                setAtt(a);
+                setPhase('approve');
+            }
+        } catch (e) {
+            setAttError(e instanceof Error ? e.message : 'Could not verify your drive.');
+            setPhase('blocked');
+        }
+    }, [getApp, isAttestationMatch, rememberDrive]);
+
+    const handleApproveDrive = useCallback(() => {
+        if (!att) return;
+        rememberDrive(att);
+        setAtt(null);
+        setPhase('ready');
+    }, [att, rememberDrive]);
+
+    const handleRejectDrive = useCallback(() => {
+        setAtt(null);
+        setAttError('You declined to trust the Drive enclave. Approve it to use Drive.');
+        setPhase('blocked');
+    }, []);
+
+    /** "Challenge this enclave": re-attest in challenge mode with a fresh nonce. */
+    const handleChallengeDrive = useCallback(async () => {
+        setChallengeInFlight(true);
+        try {
+            setAtt(await attestDrive('challenge'));
+        } catch (e) {
+            Alert.alert('Challenge failed', e instanceof Error ? e.message : 'Could not verify the enclave.');
+        } finally {
+            setChallengeInFlight(false);
+        }
+    }, []);
 
     const load = useCallback(async (target: Crumb | null, asRefresh = false) => {
         if (asRefresh) setRefreshing(true);
@@ -82,12 +174,20 @@ export default function DriveScreen() {
         }
     }, []);
 
+    // Run the approval gate once on mount.
     useEffect(() => {
-        void load(folder);
+        void prepare();
         // Hydrate the notifications store so the bell badge is live.
         void useDriveNotificationsStore.getState().hydrate();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [folder?.id]);
+    }, []);
+
+    // Browse only after the enclave is approved (or already trusted).
+    useEffect(() => {
+        if (phase !== 'ready') return;
+        void load(folder);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, folder?.id]);
 
     const openFolder = (n: DriveNode) => {
         setPath((cur) => [...cur, { id: n.id, name: n.name }]);
@@ -95,6 +195,26 @@ export default function DriveScreen() {
     const goBack = () => {
         setPath((cur) => cur.slice(0, -1));
     };
+
+    // Approval / re-approval screen for the Drive enclave (full-screen, same
+    // shared view as sign-in and ID check).
+    if (phase === 'approve' && att) {
+        return (
+            <AttestationView
+                attestation={att.attestation}
+                rpId={att.origin}
+                displayName={att.displayName}
+                isChanged={isChanged}
+                diff={diff}
+                verificationLevel="fresh-as-verified"
+                verification={{ status: 'verified', mode: att.mode, challenged: att.challenged }}
+                onApprove={handleApproveDrive}
+                onReject={handleRejectDrive}
+                onChallenge={handleChallengeDrive}
+                challengeInFlight={challengeInFlight}
+            />
+        );
+    }
 
     return (
         <RNView style={styles.screen}>
@@ -136,8 +256,16 @@ export default function DriveScreen() {
             )}
 
             <RNView style={styles.content}>
-                {loading ? (
+                {phase === 'preparing' || (phase === 'ready' && loading) ? (
                     <ActivityIndicator style={styles.spinner} size="large" color={p.blue} />
+                ) : phase === 'blocked' ? (
+                    <RNView style={styles.emptyState}>
+                        <Ionicons name="lock-closed-outline" size={44} color={p.textMuted} />
+                        <Text style={styles.emptyText}>{attError ?? 'Drive could not be verified.'}</Text>
+                        <Pressable style={styles.retry} onPress={() => void prepare()}>
+                            <Text style={styles.retryText}>Try again</Text>
+                        </Pressable>
+                    </RNView>
                 ) : error ? (
                     <RNView style={styles.emptyState}>
                         <Ionicons name="cloud-offline-outline" size={44} color={p.textMuted} />

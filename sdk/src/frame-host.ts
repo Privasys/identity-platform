@@ -100,6 +100,42 @@ function makeGetEncAuth(rpId: string, host: string): () => Promise<EncAuthEnvelo
     };
 }
 
+// ── Same-device sealed-binding recovery ──────────────────────────────────
+//
+// After a same-device wallet ceremony the browser is BACKGROUNDED while the
+// user is in the wallet app, and the voucher the sealed binding needs is
+// uploaded around the moment they switch back. iOS suspends timers in a
+// backgrounded tab, so a short burst of immediate retries is spent on an
+// upload that does not exist yet — leaving the sealed session anonymous.
+// The enclave only asserts X-Privasys-Sub for a voucher-backed bootstrap
+// (sessionrelay.go), so the app then answers 401 "authentication required"
+// even though the JWT session is perfectly good.
+
+/** Total budget for picking up the wallet's EncAuth voucher after a
+ *  same-device ceremony. Generous: it must span the app switch back. */
+const SAME_DEVICE_VOUCHER_WINDOW_MS = 90_000;
+
+/** Resolve once the document is foregrounded, or after a short poll cap so
+ *  we still retry if `visibilitychange` never fires. Never resolves later
+ *  than `deadline`. */
+function waitForForeground(deadline: number): Promise<void> {
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+        const finish = () => {
+            document.removeEventListener('visibilitychange', onVisibility);
+            clearTimeout(timer);
+            resolve();
+        };
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') finish();
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+        const timer = setTimeout(finish, Math.max(0, Math.min(5_000, deadline - Date.now())));
+    });
+}
+
 // ── Adopter-config sanitisers ────────────────────────────────────────────
 //
 // `pitch` and `methods` arrive from the adopter page via postMessage and
@@ -1156,13 +1192,23 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     // Same-device recovery of the sealed binding: the
                     // wallet's {session_id, enc_pub} relay never arrived
                     // (dead socket), but the wallet uploaded an EncAuth
-                    // voucher during its ceremony — resume from it. The
-                    // upload can lag the FIDO2 completion by a few seconds,
-                    // so retry briefly on no-voucher. Best-effort: a sealed
-                    // app's connect() surfaces the failure if it stays out.
+                    // voucher during its ceremony — resume from it.
+                    //
+                    // Keep trying across the switch BACK to the browser
+                    // (see SAME_DEVICE_VOUCHER_WINDOW_MS): the previous
+                    // 5x2s burst ran while the tab was still backgrounded,
+                    // where iOS suspends timers and the voucher has not
+                    // been uploaded yet, so it routinely expired and left
+                    // the sealed session anonymous — the app then 401s
+                    // with "authentication required".
                     const appHost = config.sessionRelay.appHost;
                     const getEncAuth = makeGetEncAuth(rpId, appHost);
-                    for (let attempt = 0; attempt < 5; attempt++) {
+                    const voucherDeadline = Date.now() + SAME_DEVICE_VOUCHER_WINDOW_MS;
+                    let voucherBackoff = 1_000;
+                    while (Date.now() < voucherDeadline) {
+                        // Only spend attempts while the page is actually in
+                        // the foreground; that is when the upload lands.
+                        await waitForForeground(voucherDeadline);
                         const res = await PrivasysSession.resume({ host: appHost, getEncAuth });
                         if (!('error' in res)) {
                             activeSession = {
@@ -1184,8 +1230,15 @@ window.addEventListener('message', async (e: MessageEvent) => {
                             }, parentOrigin);
                             break;
                         }
-                        if (res.error !== 'no-voucher') break; // rejected/unavailable — don't spin
-                        await new Promise((r) => setTimeout(r, 2000));
+                        // 'rejected' is an outright refusal (measurement or
+                        // workload changed) — retrying cannot help. Both
+                        // 'no-voucher' (not uploaded yet) and 'unavailable'
+                        // (transport blip while the app switch is in flight)
+                        // are transient here, so keep going until the budget
+                        // runs out.
+                        if (res.error === 'rejected') break;
+                        await new Promise((r) => setTimeout(r, voucherBackoff));
+                        voucherBackoff = Math.min(voucherBackoff * 1.5, 5_000);
                     }
                 }
 

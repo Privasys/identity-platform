@@ -152,6 +152,8 @@ export default function BatchConnectScreen() {
                     isAttestationMatch(app.rpId, {
                         mrenclave: inspectResult.mrenclave,
                         mrtd: inspectResult.mrtd,
+                        rtmr1: inspectResult.rtmr1,
+                        rtmr2: inspectResult.rtmr2,
                         codeHash: inspectResult.workload_code_hash,
                         configRoot: inspectResult.workload_config_merkle_root,
                     });
@@ -191,6 +193,8 @@ export default function BatchConnectScreen() {
                 ? isAttestationMatch(entry.rpId, {
                       mrenclave: attestation.mrenclave,
                       mrtd: attestation.mrtd,
+                      rtmr1: attestation.rtmr1,
+                      rtmr2: attestation.rtmr2,
                       codeHash: attestation.workload_code_hash,
                       configRoot: attestation.workload_config_merkle_root,
                   })
@@ -306,6 +310,8 @@ export default function BatchConnectScreen() {
                             origin: app.rpId,
                             mrenclave: app.attestation.mrenclave,
                             mrtd: app.attestation.mrtd,
+                            rtmr1: app.attestation.rtmr1,
+                            rtmr2: app.attestation.rtmr2,
                             codeHash: app.attestation.workload_code_hash,
                             configRoot: app.attestation.workload_config_merkle_root,
                             teeType: app.attestation.tee_type || 'sgx',

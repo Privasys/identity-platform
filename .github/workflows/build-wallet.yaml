@@ -87,7 +87,13 @@ env:
   # DT_NEEDED and the on-device loader failed (UnsatisfiedLinkError) — ALL RA-TLS
   # attestation was broken on Android (Drive, ID Check, sign-in). iOS was fine
   # (static .a, no runtime lookup). Android-only; iOS binary is byte-identical.
-  RATLS_VERSION: v0.7.4
+  # v0.7.5 surfaces TDX RTMR1/RTMR2 in the AttestationResult so the wallet can
+  # persist + diff the FULL platform-runtime fingerprint the session-relay
+  # enc_pub is pinned to (mgmt hashes MRTD|RTMR1|RTMR2). Without it a platform
+  # roll that moves only the RTMRs (kernel/initrd) rotates the sealed session
+  # silently; with it, that rotation surfaces as a "platform upgraded, re-approve"
+  # ceremony. Additive JSON fields; iOS + Android both rebuilt.
+  RATLS_VERSION: v0.7.5
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

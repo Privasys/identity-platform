@@ -46,7 +46,7 @@ describe('diffTrustedAttestation', () => {
         expect(diff?.changes).toEqual([
             { field: 'code', label: 'Application code', previous: B, current: D },
         ]);
-        expect(diff?.summary).toMatch(/updated by its developer/);
+        expect(diff?.summary).toMatch(/routine update by its developer/);
     });
 
     it('classifies a config-only change as app-update', () => {
@@ -61,7 +61,7 @@ describe('diffTrustedAttestation', () => {
         expect(diff?.changes).toEqual([
             { field: 'platform', label: 'Platform (MRTD)', previous: A, current: D },
         ]);
-        expect(diff?.summary).toMatch(/platform hosting this application was upgraded/);
+        expect(diff?.summary).toMatch(/secure enclave running this app has been upgraded/);
     });
 
     it('classifies platform + code changes as app-and-platform-update', () => {
@@ -90,6 +90,28 @@ describe('diffTrustedAttestation', () => {
             'Platform (MRENCLAVE)',
             'Platform (MRTD)',
         ]);
+    });
+
+    it('classifies an RTMR-only change as platform-update (kernel/initrd roll)', () => {
+        // A platform upgrade that moves only the runtime registers still
+        // rotates the session-relay enc_pub, so it must read as a platform
+        // change the user re-approves.
+        const diff = diffTrustedAttestation(
+            trustedTdx({ rtmr1: A, rtmr2: B }),
+            attTdx({ rtmr1: D, rtmr2: B })
+        );
+        expect(diff?.kind).toBe('platform-update');
+        expect(diff?.changes).toEqual([
+            { field: 'platform', label: 'Platform (RTMR1)', previous: A, current: D },
+        ]);
+    });
+
+    it('does NOT surface RTMRs for a legacy record that never recorded them', () => {
+        // Trust row predating RTMR tracking (rtmr1/rtmr2 undefined): a fresh
+        // attestation carrying RTMRs is us STARTING to track them, not a real
+        // platform change — must not fabricate a platform-update.
+        const diff = diffTrustedAttestation(trustedTdx(), attTdx({ rtmr1: D, rtmr2: C }));
+        expect(diff).toBeNull();
     });
 
     it('treats a previously unrecorded field that is now present as a change', () => {

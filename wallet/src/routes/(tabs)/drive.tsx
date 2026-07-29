@@ -85,6 +85,8 @@ export default function DriveScreen() {
                 appName: a.displayName,
                 mrenclave: a.attestation.mrenclave,
                 mrtd: a.attestation.mrtd,
+                rtmr1: a.attestation.rtmr1,
+                rtmr2: a.attestation.rtmr2,
                 codeHash: a.attestation.workload_code_hash,
                 configRoot: a.attestation.workload_config_merkle_root,
                 teeType: a.attestation.tee_type ?? 'tdx',
@@ -104,6 +106,8 @@ export default function DriveScreen() {
             const measurements = {
                 mrenclave: a.attestation.mrenclave,
                 mrtd: a.attestation.mrtd,
+                rtmr1: a.attestation.rtmr1,
+                rtmr2: a.attestation.rtmr2,
                 codeHash: a.attestation.workload_code_hash,
                 configRoot: a.attestation.workload_config_merkle_root
             };

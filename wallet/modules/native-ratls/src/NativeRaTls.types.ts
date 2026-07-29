@@ -7,6 +7,15 @@ export interface AttestationResult {
     mrenclave?: string;
     mrsigner?: string;
     mrtd?: string;
+    // TDX runtime measurement registers 1 and 2. With MRTD these are the
+    // platform-runtime fingerprint the session-relay enc_pub is pinned to
+    // (management-service hashes MRTD|RTMR1|RTMR2), so a platform roll that
+    // moves ONLY the RTMRs — a routine kernel/initrd bump — still rotates the
+    // sealed session. The wallet persists + diffs them so that rotation
+    // surfaces as a "platform upgraded, re-approve" ceremony rather than a
+    // silent session failure. Present only for TDX quotes.
+    rtmr1?: string;
+    rtmr2?: string;
 
     // Platform / VM-wide OIDs (.65230.1.x, .65230.2.x).
     config_merkle_root?: string;

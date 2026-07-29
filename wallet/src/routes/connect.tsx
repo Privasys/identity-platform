@@ -850,6 +850,14 @@ export default function ConnectScreen() {
                     isAttestationMatch(trustKey, {
                         mrenclave: inspectResult.mrenclave,
                         mrtd: inspectResult.mrtd,
+                        // Include the runtime measurement registers so a
+                        // platform upgrade that moves ONLY the RTMRs (a
+                        // kernel/initrd bump that rotates the session-relay
+                        // enc_pub while MRTD is unchanged) breaks the cached
+                        // match and routes to the platform-changed approval,
+                        // instead of silently fast-pathing onto a dead session.
+                        rtmr1: inspectResult.rtmr1,
+                        rtmr2: inspectResult.rtmr2,
                         codeHash: inspectResult.workload_code_hash,
                         configRoot: inspectResult.workload_config_merkle_root,
                     });
@@ -1449,6 +1457,8 @@ export default function ConnectScreen() {
                 appName: payload.appName ?? payload.appHost,
                 mrenclave: att.mrenclave,
                 mrtd: att.mrtd,
+                rtmr1: att.rtmr1,
+                rtmr2: att.rtmr2,
                 codeHash: att.workload_code_hash,
                 configRoot: att.workload_config_merkle_root,
                 teeType: att.tee_type || 'sgx',
@@ -1579,6 +1589,8 @@ export default function ConnectScreen() {
                     appName: payload.appName,
                     mrenclave: att.mrenclave,
                     mrtd: att.mrtd,
+                    rtmr1: att.rtmr1,
+                    rtmr2: att.rtmr2,
                     codeHash: att.workload_code_hash,
                     configRoot: att.workload_config_merkle_root,
                     teeType: att.tee_type || 'sgx',
@@ -1944,6 +1956,8 @@ export default function ConnectScreen() {
                 appName: payload.appName,
                 mrenclave: attestation.mrenclave,
                 mrtd: attestation.mrtd,
+                rtmr1: attestation.rtmr1,
+                rtmr2: attestation.rtmr2,
                 codeHash: attestation.workload_code_hash,
                 configRoot: attestation.workload_config_merkle_root,
                 teeType: attestation.tee_type || 'sgx',

@@ -52,7 +52,11 @@ function buildRows(
 ): SessionRow[] {
     const live = sessions.filter((s) => s.expiresAt > now);
     const sessionByHost = new Map<string, RelaySession>();
-    for (const s of live) sessionByHost.set(s.rpId, s);
+    const sessionById = new Map<string, RelaySession>();
+    for (const s of live) {
+        sessionByHost.set(s.rpId, s);
+        sessionById.set(s.sessionId, s);
+    }
 
     // Group traces per app.
     const byService = new Map<string, SessionTrace[]>();
@@ -72,15 +76,28 @@ function buildRows(
         const hosts = serviceHosts(list);
         for (const h of hosts) coveredHosts.add(h);
         coveredNames.add(latest.displayName ?? appName(key));
-        // A live sealed session belongs to this card when it is keyed by any
-        // host this app's ceremonies touched.
+        // Attach the live sealed session. Prefer the exact relay session id the
+        // ceremony recorded on the trace: an IdP-brokered app keys its card by
+        // the OIDC client_id while the relay session is keyed by rpId, so host
+        // matching alone misses it and the session would orphan into a second,
+        // duplicate row. Fall back to host matching for older traces with no id.
         let session: RelaySession | undefined;
-        for (const h of hosts) {
-            const s = sessionByHost.get(h);
+        for (const t of list) {
+            const s = t.sessionId ? sessionById.get(t.sessionId) : undefined;
             if (s) {
                 session = s;
                 coveredSessions.add(s.sessionId);
                 break;
+            }
+        }
+        if (!session) {
+            for (const h of hosts) {
+                const s = sessionByHost.get(h);
+                if (s) {
+                    session = s;
+                    coveredSessions.add(s.sessionId);
+                    break;
+                }
             }
         }
         const att = list.find((t) => t.attestations?.length)?.attestations?.[0];

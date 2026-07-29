@@ -1,10 +1,45 @@
 import { useLocalSearchParams, useRouter, Redirect } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, View, Text, Pressable } from 'react-native';
 
 import { fetchDescriptor, DEFAULT_RELAY_HOST } from '@/services/descriptor';
 
 import { usePalette } from '@/components/Themed';
+
+/**
+ * Turn a raw descriptor-fetch error into a plain-language message. The most
+ * common case by far is an expired QR: sign-in codes live for only a few
+ * minutes on the relay, so a code scanned late (or re-scanned) 404s.
+ */
+function friendlyError(raw: string): { title: string; body: string; canRescan: boolean } {
+    const m = raw.toLowerCase();
+    if (m.includes('not found') || m.includes('404')) {
+        return {
+            title: 'This sign-in code has expired',
+            body: 'Sign-in QR codes are only valid for a few minutes. Refresh the page on your computer to show a new code, then scan it.',
+            canRescan: true,
+        };
+    }
+    if (m.includes('hash mismatch')) {
+        return {
+            title: "This sign-in code couldn't be trusted",
+            body: "The sign-in details didn't match the QR code, so the wallet stopped for your safety. Refresh the page and scan the new code. If this keeps happening, do not continue.",
+            canRescan: true,
+        };
+    }
+    if (m.includes('not supported') || m.includes('version')) {
+        return {
+            title: 'Update your wallet',
+            body: 'This sign-in request needs a newer version of the Privasys wallet. Update the app, then scan again.',
+            canRescan: false,
+        };
+    }
+    return {
+        title: 'Sign-in failed',
+        body: "The wallet couldn't load this sign-in request. Refresh the page and scan the new code.",
+        canRescan: true,
+    };
+}
 
 /**
  * Universal link handler for QR deep links.
@@ -91,12 +126,43 @@ export default function ScpRedirect() {
 
     if (isShort) {
         if (shortError) {
+            const { title, body, canRescan } = friendlyError(shortError);
             return (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-                    <Text style={{ fontSize: 16, color: palette.danger, textAlign: 'center', marginBottom: 12 }}>
-                        Sign-in failed
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: palette.danger, textAlign: 'center', marginBottom: 12 }}>
+                        {title}
                     </Text>
-                    <Text style={{ fontSize: 14, color: palette.textSecondary, textAlign: 'center' }}>{shortError}</Text>
+                    <Text style={{ fontSize: 15, color: palette.textSecondary, textAlign: 'center', lineHeight: 21, marginBottom: 28 }}>
+                        {body}
+                    </Text>
+                    {canRescan && (
+                        <Pressable
+                            onPress={() => router.replace('/scan')}
+                            style={{
+                                backgroundColor: palette.action,
+                                paddingVertical: 14,
+                                paddingHorizontal: 32,
+                                borderRadius: 12,
+                                alignSelf: 'stretch',
+                                alignItems: 'center',
+                                marginBottom: 12,
+                            }}
+                        >
+                            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>Scan again</Text>
+                        </Pressable>
+                    )}
+                    <Pressable
+                        onPress={() => router.replace('/(tabs)')}
+                        style={{
+                            paddingVertical: 14,
+                            paddingHorizontal: 32,
+                            borderRadius: 12,
+                            alignSelf: 'stretch',
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text style={{ color: palette.textSecondary, fontSize: 16, fontWeight: '500' }}>Back to wallet</Text>
+                    </Pressable>
                 </View>
             );
         }

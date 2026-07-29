@@ -30,6 +30,13 @@ const BROKER_BASE = 'https://relay.privasys.org';
  * (the underlying Secure Enclave key is gone — typically after an app
  * reinstall, since the Keychain entry survives but App Attest keys do
  * not). We wipe state and retry the full flow exactly once.
+ *
+ * Non-fatal: if a token still cannot be obtained (a device with no Play
+ * services / cloud project — e.g. a debug build on an emulator or a de-Googled
+ * phone — or a transient broker error), we return an empty string rather than
+ * throwing. attestEnclave then treats the attestation service as unavailable,
+ * and the connect flow offers the user the existing "continue anyway" recovery
+ * UX — the same path as a network-unreachable service — instead of dead-ending.
  */
 export async function getAttestationServerToken(): Promise<string> {
     try {
@@ -37,10 +44,23 @@ export async function getAttestationServerToken(): Promise<string> {
     } catch (err: any) {
         if (isStaleKeyError(err)) {
             await AppAttest.reset();
-            return await runAttestationFlow();
+            try {
+                return await runAttestationFlow();
+            } catch (retryErr: any) {
+                return degradeToNoToken(retryErr);
+            }
         }
-        throw err;
+        return degradeToNoToken(err);
     }
+}
+
+/** Log why the attestation-service token is unavailable and degrade to none. */
+function degradeToNoToken(err: any): string {
+    console.warn(
+        `[app-attest] no attestation-service token (${err?.message ?? err}); ` +
+        'the attestation service will be treated as unavailable'
+    );
+    return '';
 }
 
 function isStaleKeyError(err: any): boolean {

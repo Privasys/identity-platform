@@ -104,15 +104,29 @@ export interface AttestOptions {
  *
  * Deterministic mode binds report_data to the certificate's NotBefore;
  * challenge mode sends a fresh random nonce so the enclave folds it plus the
- * TLS channel binder into a fresh quote. The attestation service is always
- * consulted.
+ * TLS channel binder into a fresh quote. The attestation service is consulted
+ * whenever we hold its bearer; without one we report it unavailable (below).
  */
 export async function attestEnclave(
     origin: string,
     opts: AttestOptions
 ): Promise<AttestationOutcome> {
-    const { host, port } = splitOrigin(origin);
     const challenged = opts.mode === 'challenge';
+    // No bearer → we cannot get the attestation service's verdict. Report it as
+    // unavailable so the connect flow shows the "continue anyway" recovery UX
+    // (identical to a network-unreachable service), rather than sending an empty
+    // bearer the service would simply reject. In production the token is present;
+    // getAttestationServerToken degrades to '' only when the device genuinely
+    // cannot attest (e.g. a debug build on an emulator).
+    if (!opts.attestationServerToken) {
+        return {
+            status: 'unreachable',
+            mode: opts.mode,
+            challenged,
+            message: 'The attestation service is unavailable (no App Attest / Play Integrity token).',
+        };
+    }
+    const { host, port } = splitOrigin(origin);
     const policy: VerificationPolicy = {
         tee: opts.tee,
         report_data_mode: opts.mode,

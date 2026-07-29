@@ -119,11 +119,12 @@ export async function attestEnclave(
     // getAttestationServerToken degrades to '' only when the device genuinely
     // cannot attest (e.g. a debug build on an emulator).
     if (!opts.attestationServerToken) {
+        // Short phrase — AttestationView renders it as "...service (<message>)."
         return {
             status: 'unreachable',
             mode: opts.mode,
             challenged,
-            message: 'The attestation service is unavailable (no App Attest / Play Integrity token).',
+            message: 'no App Attest or Play Integrity token available',
         };
     }
     const { host, port } = splitOrigin(origin);

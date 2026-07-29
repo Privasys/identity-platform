@@ -10,9 +10,51 @@
 
 import { bytesToBase64url as base64urlEncode, base64urlToBytes as base64urlDecode } from '@/utils/encoding';
 import { sha256 } from '@noble/hashes/sha2.js';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { Platform } from 'react-native';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
+
+// A strong biometric keeps the time-bound signing key usable for 30s (see
+// NativeKeys.generateKey). Skip re-prompting within this shorter window so ONE
+// prompt covers a ceremony's burst of signatures — including a batch sign-in
+// that prompts once up front and then runs many fido2 ceremonies.
+const SIGNING_GATE_GRACE_MS = 25_000;
+let lastSigningGateAt = 0;
+
+/**
+ * Record that a strong biometric was just shown for signing, so the next
+ * {@link gateAndroidSignature} within the grace window is skipped. Call after a
+ * flow shows its own strong OS biometric ahead of a batch of fido2 ceremonies.
+ */
+export function markSigningGate(): void {
+    lastSigningGateAt = Date.now();
+}
+
+/**
+ * Gate a hardware signature with the OS biometric on Android.
+ *
+ * The signing key is time-bound (NativeKeys.generateKey): a recent strong
+ * biometric unlocks it, and the hardware signature does NOT prompt on its own.
+ * So we must show the OS biometric before signing — one prompt covers the whole
+ * ceremony via the key's validity window (and the grace above avoids a second
+ * prompt in a burst). iOS is a no-op: the Secure Enclave prompts on the
+ * signature itself and its own reuse window covers the burst. Throws if the
+ * user cancels, so the ceremony fails cleanly rather than hitting a
+ * KEY_USER_NOT_AUTHENTICATED deep in the signature.
+ */
+async function gateAndroidSignature(reason: string): Promise<void> {
+    if (Platform.OS !== 'android') return;
+    if (Date.now() - lastSigningGateAt < SIGNING_GATE_GRACE_MS) return;
+    const res = await LocalAuthentication.authenticateAsync({
+        promptMessage: reason,
+        biometricsSecurityLevel: 'strong',
+        cancelLabel: 'Cancel',
+    });
+    if (!res.success) throw new Error('Biometric authentication was cancelled');
+    markSigningGate();
+}
 
 // ── Wire types matching the WebAuthn specification ──────────────────────
 // Server returns standard PublicKeyCredentialCreationOptions / RequestOptions.
@@ -270,7 +312,10 @@ export async function register(
     const clientDataHash = sha256(clientDataBytes);
     const signedData = concat([authData, clientDataHash]);
     const signedDataB64 = base64urlEncode(signedData);
-    const sigResult = await NativeKeys.sign(keyAlias, signedDataB64);
+    await gateAndroidSignature('Confirm sign-in');
+    // Signature is not carried in a fmt:"none" attestation, but signing here
+    // gates the ceremony behind the biometric and proves the new key is usable.
+    await NativeKeys.sign(keyAlias, signedDataB64);
 
     // 6. Build attestation object CBOR: { "fmt": "none", "attStmt": {}, "authData": <bytes> }
     const attestationObject = buildAttestationObject(authData);
@@ -411,6 +456,7 @@ export async function authenticate(
     const clientDataHash = sha256(clientDataBytes);
     const signedData = concat([authData, clientDataHash]);
     const signedDataB64 = base64urlEncode(signedData);
+    await gateAndroidSignature('Confirm sign-in');
     const sigResult = await NativeKeys.sign(keyAlias, signedDataB64);
 
     // 5. Complete authentication — send standard WebAuthn assertion response

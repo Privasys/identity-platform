@@ -22,6 +22,14 @@ class NativeKeysModule : Module() {
         KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
     }
 
+    companion object {
+        // Seconds a strong biometric keeps a signing key usable after the OS
+        // prompt. Time-bound (not per-use) so one biometric shown by the signing
+        // flow covers the burst of signatures in a ceremony — mirroring the iOS
+        // Secure Enclave reuse window. Long enough for one connect ceremony.
+        private const val AUTH_VALIDITY_SECONDS = 30
+    }
+
     override fun definition() = ModuleDefinition {
         Name("NativeKeys")
 
@@ -71,11 +79,25 @@ class NativeKeysModule : Module() {
         }
 
         if (requireBiometric) {
+            // Time-bound, NOT per-use: a strong biometric authenticated within
+            // AUTH_VALIDITY_SECONDS unlocks the key, so a single OS biometric
+            // shown by the signing flow (fido2 register/authenticate, vault
+            // approval) covers the whole ceremony. A per-use key (timeout 0)
+            // would instead demand a CryptoObject-bound BiometricPrompt on every
+            // signature — which the flows do not do, giving KEY_USER_NOT_AUTHENTICATED.
             paramBuilder.setUserAuthenticationRequired(true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // Strong biometric OR device credential: mirrors the OS prompts
+                // (which allow a passcode fallback), so either unlocks the key.
+                // If StrongBox rejects this combination the catch below retries
+                // on the TEE, which is still hardware-backed.
                 paramBuilder.setUserAuthenticationParameters(
-                    0, KeyProperties.AUTH_BIOMETRIC_STRONG
+                    AUTH_VALIDITY_SECONDS,
+                    KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL
                 )
+            } else {
+                @Suppress("DEPRECATION")
+                paramBuilder.setUserAuthenticationValidityDurationSeconds(AUTH_VALIDITY_SECONDS)
             }
         }
 

@@ -170,6 +170,9 @@ export default function VaultApprovalsScreen() {
                     : (
                           await LocalAuthentication.authenticateAsync({
                               promptMessage: 'Approve vault operation',
+                              // Strong: must satisfy the time-bound AUTH_BIOMETRIC_STRONG
+                              // signing key so the ensuing signature is authorised.
+                              biometricsSecurityLevel: 'strong',
                               cancelLabel: 'Cancel',
                           })
                       ).success;

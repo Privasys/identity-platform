@@ -232,6 +232,10 @@ export default function BatchConnectScreen() {
 
         const result = await LocalAuthentication.authenticateAsync({
             promptMessage: `Sign in to ${appNames}`,
+            // Strong so this one biometric unlocks the time-bound signing key for
+            // the whole batch; markSigningGate then suppresses a re-prompt inside
+            // each per-app fido2 ceremony below.
+            biometricsSecurityLevel: 'strong',
             fallbackLabel: 'Use Passcode',
             cancelLabel: 'Cancel',
             disableDeviceFallback: false,
@@ -242,6 +246,7 @@ export default function BatchConnectScreen() {
             setStep('error');
             return;
         }
+        fido2.markSigningGate();
 
         if (gracePeriodSec > 0) {
             setUnlocked(gracePeriodSec * 1000);

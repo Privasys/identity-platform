@@ -1196,39 +1196,71 @@ export class AuthFrame {
      * hand-rolling resume/approval logic:
      *
      *   1. try the silent voucher resume (`resumeSession`);
-     *   2. if there is NO voucher yet, ask the user's wallet to issue one
-     *      via a push approval (`requestAppVoucher` — one biometric tap on
-     *      the phone, no sign-out, no redirect), then resume again.
+     *   2. if the enclave has no usable voucher for this session — there is
+     *      none yet (`no-voucher`), or it refused the current one
+     *      (`rejected:<reason>`) — ask the user's wallet to issue a fresh one
+     *      via a push approval (`requestAppVoucher` — one biometric tap on the
+     *      phone, no sign-out, no redirect), then resume again.
      *
-     * A `rejected` resume (the enclave's identity or measurement changed)
-     * is NOT auto-recovered — it needs a fresh verification ceremony, so it
-     * is rethrown for the app to route to sign-in. Other rejections:
-     * `no-push` (session not wallet-backed), `timeout` (approval not
-     * granted / wallet app too old), `no-session`.
+     * A `rejected` resume is recoverable through the SAME push, because a
+     * `voucher-only` push IS a verification ceremony: the wallet re-attests
+     * the enclave, shows the user exactly what changed, and — on their
+     * approval — mints a fresh voucher bound to the CURRENT enc_pub. The
+     * reject reasons the wallet turns into a review-and-approve screen:
+     *   - `enc-changed`      the hosting PLATFORM was upgraded (a new OS roll
+     *                        rotates the session-relay enc_pub, which is
+     *                        pinned to the platform measurement — see the
+     *                        enclave launcher's resolveSessionRelayKey). This
+     *                        is the common, benign case a platform roll
+     *                        produces; it MUST be a one-tap re-approval, never
+     *                        a forced sign-out or a wallet forget/re-add.
+     *   - `workload-changed` the app's own code/config changed.
+     *   - `voucher-expired` / `voucher-invalid` the voucher lapsed; nothing
+     *                        changed on the enclave, so the fresh mint just
+     *                        works (the wallet may not even prompt).
+     * We attempt the push exactly ONCE; if the second resume still fails it
+     * rethrows so the app can route to a full sign-in. Non-recoverable resume
+     * failures — `no-push` (session not wallet-backed), `no-session` — are
+     * rethrown without a push. `timeout` on the push means the user did not
+     * approve (or the wallet app predates voucher-only pushes).
      */
     async ensureAppSession(opts?: {
         /** Set false to disable the push-approval fallback (resume only). */
         pushApproval?: boolean;
-        /** Fired when the flow starts waiting on the phone approval. */
-        onAwaitingApproval?: () => void;
+        /**
+         * Fired when the flow starts waiting on the phone approval. `reason`
+         * distinguishes a first-time approval (`'no-voucher'`) from a
+         * re-approval the enclave forced (`'enc-changed'` = platform upgraded,
+         * `'workload-changed'` = app updated, …) so the app can show the right
+         * copy ("approve the upgraded platform" vs "approve on your phone").
+         */
+        onAwaitingApproval?: (info: { reason: string | null }) => void;
     }): Promise<SealedSession> {
         const appHost = this.config.sessionRelay?.appHost;
         if (!appHost) {
             throw new Error('AuthFrame: ensureAppSession() requires sessionRelay config');
         }
+        let reason: string | null = null;
         try {
             return await this.resumeSession();
         } catch (err) {
             const msg = (err as Error).message ?? '';
-            // Only a missing voucher is recoverable with a push approval.
-            if ((opts?.pushApproval ?? true) === false || !msg.includes('no-voucher')) {
+            // Recoverable via a wallet push re-approval: a missing voucher, or
+            // any enclave rejection of the current one (the push re-mints).
+            // A non-recoverable failure (no-push/no-session/network) rethrows.
+            const recoverable = msg.includes('no-voucher') || msg.startsWith('rejected');
+            if ((opts?.pushApproval ?? true) === false || !recoverable) {
                 throw err;
             }
+            const colon = msg.indexOf(':');
+            reason = msg.startsWith('rejected')
+                ? (colon > 0 ? msg.slice(colon + 1) : 'rejected')
+                : 'no-voucher';
         }
         // Mount the persistent session iframe (idempotent) so the voucher
         // RPC has a live channel, then request + resume.
         await this.getSession();
-        opts?.onAwaitingApproval?.();
+        opts?.onAwaitingApproval?.({ reason });
         await this.requestAppVoucher(appHost);
         return this.resumeSession();
     }

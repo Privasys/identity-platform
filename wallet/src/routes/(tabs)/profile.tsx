@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -18,10 +18,16 @@ import {
     Alert,
     ActivityIndicator,
     Image,
+    Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import {
+    biometricLabel,
+    titleiseBiometric,
+    DEFAULT_BIOMETRIC_LABEL,
+} from '@/services/biometrics';
 import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { useAuthStore } from '@/stores/auth';
@@ -42,9 +48,21 @@ export default function ProfileScreen() {
 
     const setOnboarded = useAuthStore((s) => s.setOnboarded);
     // First-run setup progress: 0 = not started, then one tick per milestone
-    // (Face ID confirmed → key created → identity ready).
+    // (biometric confirmed → key created → identity ready).
     const [setupBusy, setSetupBusy] = useState(false);
     const [setupDone, setSetupDone] = useState(0);
+    // Platform-appropriate name for the device unlock ("Face ID", "fingerprint",
+    // ...), so Android fingerprint users are never told to "Set up Face ID".
+    const [bioLabel, setBioLabel] = useState(DEFAULT_BIOMETRIC_LABEL);
+    useEffect(() => {
+        let alive = true;
+        void biometricLabel().then((l) => {
+            if (alive) setBioLabel(l);
+        });
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     /**
      * First-run wallet setup: confirm the user's biometrics, create the
@@ -62,8 +80,8 @@ export default function ProfileScreen() {
             const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
             if (!enrolled) {
                 Alert.alert(
-                    'Set up Face ID first',
-                    'Turn on Face ID, Touch ID or a device passcode in your phone settings, then come back and try again.'
+                    `Set up ${bioLabel} first`,
+                    `Turn on ${bioLabel} or a device ${Platform.OS === 'ios' ? 'passcode' : 'PIN, pattern or password'} in your phone settings, then come back and try again.`
                 );
                 setSetupBusy(false);
                 return;
@@ -116,7 +134,7 @@ export default function ProfileScreen() {
             {
                 icon: 'scan-outline' as const,
                 title: 'Only you can unlock it',
-                body: 'Face ID or your device passcode guards your wallet, so no one else can use it.'
+                body: `${titleiseBiometric(bioLabel)} or your device ${Platform.OS === 'ios' ? 'passcode' : 'screen lock'} guards your wallet, so no one else can use it.`
             },
             {
                 icon: 'hardware-chip-outline' as const,
@@ -176,7 +194,7 @@ export default function ProfileScreen() {
                         ) : (
                             <>
                                 <Ionicons name="scan" size={18} color="#FFFFFF" />
-                                <Text style={styles.createProfileButtonText}>Set up with Face ID</Text>
+                                <Text style={styles.createProfileButtonText}>Set up with {bioLabel}</Text>
                             </>
                         )}
                     </Pressable>

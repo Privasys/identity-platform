@@ -23,11 +23,14 @@ class NativeKeysModule : Module() {
     }
 
     companion object {
-        // Seconds a strong biometric keeps a signing key usable after the OS
-        // prompt. Time-bound (not per-use) so one biometric shown by the signing
-        // flow covers the burst of signatures in a ceremony — mirroring the iOS
-        // Secure Enclave reuse window. Long enough for one connect ceremony.
-        private const val AUTH_VALIDITY_SECONDS = 30
+        // Cryptographic unlock window for a signing key after a strong biometric.
+        // This is the hardware layer that BACKS the JS "Biometric Grace Period"
+        // (settings.gracePeriodSec): it MUST be >= the largest grace option
+        // (GRACE_OPTIONS max = 60s) so the key is still unlocked whenever the JS
+        // gate decides to skip re-prompting. The margin above 60 covers the
+        // biometric→signature delay. Not user-facing — it is the enforcement
+        // ceiling, distinct from the user's re-prompt cadence.
+        private const val AUTH_VALIDITY_SECONDS = 75
     }
 
     override fun definition() = ModuleDefinition {

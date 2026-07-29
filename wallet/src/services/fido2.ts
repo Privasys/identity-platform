@@ -15,12 +15,13 @@ import { Platform } from 'react-native';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
+import { useSettingsStore } from '@/stores/settings';
 
-// A strong biometric keeps the time-bound signing key usable for 30s (see
-// NativeKeys.generateKey). Skip re-prompting within this shorter window so ONE
-// prompt covers a ceremony's burst of signatures — including a batch sign-in
-// that prompts once up front and then runs many fido2 ceremonies.
-const SIGNING_GATE_GRACE_MS = 25_000;
+// Timestamp of the last actual strong signing biometric — which is what unlocks
+// the time-bound AndroidKeyStore key. We track this specifically (not the auth
+// store's isUnlocked flag, which is re-extended at each ceremony's end WITHOUT a
+// fresh biometric) so the skip window never outlives the hardware key's real
+// unlock, which would resurface KEY_USER_NOT_AUTHENTICATED.
 let lastSigningGateAt = 0;
 
 /**
@@ -38,15 +39,18 @@ export function markSigningGate(): void {
  * The signing key is time-bound (NativeKeys.generateKey): a recent strong
  * biometric unlocks it, and the hardware signature does NOT prompt on its own.
  * So we must show the OS biometric before signing — one prompt covers the whole
- * ceremony via the key's validity window (and the grace above avoids a second
- * prompt in a burst). iOS is a no-op: the Secure Enclave prompts on the
- * signature itself and its own reuse window covers the burst. Throws if the
- * user cancels, so the ceremony fails cleanly rather than hitting a
- * KEY_USER_NOT_AUTHENTICATED deep in the signature.
+ * ceremony. Re-prompting is skipped within the user's Biometric Grace Period
+ * (settings.gracePeriodSec; 0 = "Always" → prompt every time), the same window
+ * the rest of the wallet honours. The native key's validity window is kept ≥
+ * the max grace so the key stays unlocked for the whole window. iOS is a no-op:
+ * the Secure Enclave prompts on the signature itself and its own reuse window
+ * covers the burst. Throws if the user cancels, so the ceremony fails cleanly
+ * rather than hitting a KEY_USER_NOT_AUTHENTICATED deep in the signature.
  */
 async function gateAndroidSignature(reason: string): Promise<void> {
     if (Platform.OS !== 'android') return;
-    if (Date.now() - lastSigningGateAt < SIGNING_GATE_GRACE_MS) return;
+    const graceMs = useSettingsStore.getState().gracePeriodSec * 1000;
+    if (graceMs > 0 && Date.now() - lastSigningGateAt < graceMs) return;
     const res = await LocalAuthentication.authenticateAsync({
         promptMessage: reason,
         biometricsSecurityLevel: 'strong',

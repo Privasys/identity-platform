@@ -236,6 +236,11 @@ async function sweepPresentedApprovals(): Promise<void> {
 async function maybeRegisterPushToken(token: string): Promise<void> {
     const account = getPrivasysAccount();
     if (!account?.sessionToken) return;
+    // Only register with a session that is still valid. A cold start often holds
+    // a stored-but-expired privasys.id session; posting it to the IdP just 401s
+    // (register push token failed (401)). The token re-registers on the next
+    // sign-in (connect flow) with a fresh session, so skipping here is safe.
+    if (!account.sessionExpiresAt || Date.now() >= account.sessionExpiresAt) return;
     try {
         let encPub = '';
         try {

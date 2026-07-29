@@ -23,17 +23,22 @@ class AppAttestModule : Module() {
     override fun definition() = ModuleDefinition {
         Name("AppAttest")
 
-        AsyncFunction("getState") {
+        // Every function takes the optional `scope` the JS wrapper + the iOS
+        // module accept (a key namespace for App Attest). Android uses Play
+        // Integrity, which has no per-scope key, so scope is ignored here — but
+        // the parameter MUST exist or the Expo bridge rejects the call with an
+        // arity mismatch ("Received 1 arguments, but 0 was expected").
+        AsyncFunction("getState") { _scope: String? ->
             // Play Integrity is available on all Google Play devices.
             """{"supported":true,"keyId":null,"attested":false}"""
         }
 
-        AsyncFunction("generateKey") {
+        AsyncFunction("generateKey") { _scope: String? ->
             // No persistent key needed for Play Integrity — return a placeholder.
             "play-integrity"
         }
 
-        AsyncFunction("attestKey") { challengeBase64: String ->
+        AsyncFunction("attestKey") { challengeBase64: String, _scope: String? ->
             runBlocking(Dispatchers.IO) {
                 val context = appContext.reactContext
                     ?: throw Exception("React context not available")
@@ -45,7 +50,7 @@ class AppAttestModule : Module() {
             }
         }
 
-        AsyncFunction("generateAssertion") { clientDataHashBase64: String ->
+        AsyncFunction("generateAssertion") { clientDataHashBase64: String, _scope: String? ->
             runBlocking(Dispatchers.IO) {
                 val context = appContext.reactContext
                     ?: throw Exception("React context not available")
@@ -55,7 +60,7 @@ class AppAttestModule : Module() {
         }
 
         // No-op on Android — Play Integrity has no persistent key state.
-        AsyncFunction("reset") {
+        AsyncFunction("reset") { _scope: String? ->
         }
     }
 

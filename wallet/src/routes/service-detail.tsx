@@ -225,11 +225,31 @@ export default function ServiceDetailScreen() {
                         // with OTHER apps (every IdP-brokered client rides the
                         // privasys.id rpId + one credential) — only remove them
                         // when no other app still uses them.
+                        //
+                        // The shared IdP credential is NEVER removable from an
+                        // app card, categorically. The sharedness probe below
+                        // cannot protect it: serviceHosts() deliberately omits
+                        // the shared rpId (so unrelated cards don't merge), so
+                        // for that credential the "no other app uses it" test
+                        // always passes — which is how removing one app's card
+                        // deleted the account's only platform credential and
+                        // the next sign-in silently re-registered a brand-new
+                        // identity (2026-07-30, the admin account). It is the
+                        // account's owner credential for vault approvals; if it
+                        // ever needs removing, that is an explicit identity
+                        // operation, not a side effect of disconnecting an app.
+                        const sharedIdpRp = new URL(
+                            process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id'
+                        ).hostname;
                         const otherTraces = useServiceSessionsStore
                             .getState()
                             .traces.filter((t) => t.serviceKey !== serviceKey);
                         const otherHosts = serviceHosts(otherTraces);
-                        if (credential && !otherHosts.has(credential.rpId)) {
+                        if (
+                            credential &&
+                            credential.rpId !== sharedIdpRp &&
+                            !otherHosts.has(credential.rpId)
+                        ) {
                             removeCredential(credential.credentialId);
                         }
                         if (app && !otherHosts.has(app.rpId)) {

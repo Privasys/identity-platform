@@ -18,7 +18,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -27,6 +27,8 @@ import {
     TextInput,
     Alert,
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -38,7 +40,6 @@ import {
     getRecoveryStatus,
     completeRecovery,
     type RecoveryBeginResult,
-    type RecoveryStatusResult,
 } from '@/services/recovery-api';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
@@ -384,6 +385,13 @@ export default function RecoverAccountScreen() {
                 <RNView style={{ width: 32 }} />
             </RNView>
 
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                // Offset the custom header so the keyboard shrinks the scroll
+                // area correctly and the primary button scrolls into view.
+                keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 50 : 0}
+            >
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -612,6 +620,7 @@ export default function RecoverAccountScreen() {
 
                 <RNView style={{ height: 40 }} />
             </ScrollView>
+            </KeyboardAvoidingView>
         </RNView>
     );
 }

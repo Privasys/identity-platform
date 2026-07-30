@@ -90,7 +90,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     },
 
     getCredentialForRp: (rpId) => {
-        return get().credentials.find((c) => c.rpId === rpId);
+        // One rpId can carry credentials for MULTIPLE accounts (the shared
+        // privasys.id RP after an account recovery registers a second
+        // account's credential). Array order means oldest-wins — exactly
+        // wrong after a recovery, where the newest registration is the
+        // account the user just deliberately bound to this device
+        // (2026-07-30: a stale entry shadowed the freshly recovered admin
+        // credential and every sign-in landed on the wrong account). Prefer
+        // the newest; the full answer for multi-account RPs is an account
+        // chooser in the ceremony.
+        return [...get().credentials]
+            .filter((c) => c.rpId === rpId)
+            .sort((a, b) => (b.registeredAt ?? 0) - (a.registeredAt ?? 0))[0];
     },
 
     getCredentialById: (credentialId) => {

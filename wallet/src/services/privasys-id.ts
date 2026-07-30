@@ -129,3 +129,17 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
 export function getPrivasysAccount(): PrivasysIdAccount | null {
     return useAuthStore.getState().privasysId;
 }
+
+/**
+ * The canonical meta-account's IdP user id (the userHandle its credential was
+ * registered under), derived from the on-device pairwise seed. Lets flows that
+ * touch a recovered/registered identity decide whether it IS the canonical
+ * account — which lives in the dedicated `privasysId` slot — or a pairwise
+ * one, which lives in `credentials[]`. Returns null when the profile is not
+ * initialised.
+ */
+export async function canonicalUserHandle(): Promise<string | null> {
+    const profile = useProfileStore.getState().profile;
+    if (!profile?.pairwiseSeed) return null;
+    return b64url(await deriveCanonicalUserId(profile.pairwiseSeed));
+}

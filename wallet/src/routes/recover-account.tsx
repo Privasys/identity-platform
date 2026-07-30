@@ -35,6 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { BIP39_WORDLIST, BIP39_WORDSET } from '@/services/bip39-wordlist';
 import { register as fido2Register } from '@/services/fido2';
+import { canonicalUserHandle } from '@/services/privasys-id';
 import {
     beginRecovery,
     getRecoveryStatus,
@@ -309,35 +310,83 @@ export default function RecoverAccountScreen() {
                 recoveryState.userId,
             );
 
+            // Two accounts share the privasys.id rpId on this device: the
+            // CANONICAL meta-account (lives in the dedicated `privasysId`
+            // slot) and the pairwise platform identity (lives in
+            // `credentials[]`). Which store the fresh credential belongs in —
+            // and which previous credential it supersedes — follows from WHICH
+            // account was recovered, never from the rpId alone: keying the
+            // swap on rpId let recovering one account delete the other's
+            // credential, and the unconditional slot write pointed the
+            // meta-account at whatever identity was recovered last
+            // (2026-07-30, the admin account incident).
             const auth = useAuthStore.getState();
-            const old = auth.getCredentialForRp('privasys.id');
-            auth.addCredential({
-                credentialId: result.credentialId,
-                rpId: 'privasys.id',
-                origin: 'privasys.id',
-                keyAlias,
-                userHandle: result.userHandle,
-                userName: result.userName,
-                registeredAt: Math.floor(Date.now() / 1000),
-                serverRpId: result.serverRpId,
-            });
-            // Point the canonical privasys.id account at the NEW credential too,
-            // not just the credentials list. Without this, ensurePrivasysSession
-            // keeps authenticating with the rotated-away credentialId, which the
-            // server no longer has — so later actions (e.g. reconfiguring the
-            // recovery phrase) fall to the discoverable path and 404
-            // "no credentials found for user".
-            auth.setPrivasysId({
-                userId: recoveryState.userId,
-                credentialId: result.credentialId,
-                keyAlias,
-                sessionToken: result.sessionToken ?? '',
-                // Cache the fresh session when we got one; otherwise force a
-                // re-auth (which now uses the correct credentialId).
-                sessionExpiresAt: result.sessionToken ? Date.now() + 25 * 60 * 1000 : 0,
-            });
-            // Only now retire the superseded credential (the rotated identity).
-            if (old && old.credentialId !== result.credentialId) {
+            const canonicalHandle = await canonicalUserHandle();
+            const isCanonical =
+                canonicalHandle !== null && recoveryState.userId === canonicalHandle;
+            // The superseded credential is the one registered to the SAME
+            // account (matched by userHandle) — plus, for the canonical
+            // account, any stray copy that ended up in credentials[] while
+            // this flow was slot-unaware.
+            const superseded = auth.credentials.filter(
+                (c) =>
+                    c.rpId === 'privasys.id' &&
+                    c.credentialId !== result.credentialId &&
+                    c.userHandle === recoveryState.userId,
+            );
+
+            if (isCanonical) {
+                // Canonical account → the slot is its home; never credentials[].
+                auth.setPrivasysId({
+                    userId: recoveryState.userId,
+                    credentialId: result.credentialId,
+                    keyAlias,
+                    sessionToken: result.sessionToken ?? '',
+                    // Cache the fresh session when we got one; otherwise force a
+                    // re-auth (which now uses the correct credentialId).
+                    sessionExpiresAt: result.sessionToken ? Date.now() + 25 * 60 * 1000 : 0,
+                });
+            } else {
+                auth.addCredential({
+                    credentialId: result.credentialId,
+                    rpId: 'privasys.id',
+                    origin: 'privasys.id',
+                    keyAlias,
+                    userHandle: result.userHandle,
+                    userName: result.userName,
+                    registeredAt: Math.floor(Date.now() / 1000),
+                    serverRpId: result.serverRpId,
+                });
+                // Adopt any canonical-account credential that ended up in
+                // credentials[] (from the slot-unaware era) back into its
+                // slot. In credentials[] it SHADOWS the pairwise platform
+                // credential — getCredentialForRp('privasys.id') is
+                // first-match, so sign-ins would ride the canonical account
+                // and the portal would show an empty account. The hardware
+                // key moves with the entry; nothing is deleted.
+                if (canonicalHandle) {
+                    const strayCanonical = auth.credentials.find(
+                        (c) =>
+                            c.rpId === 'privasys.id' &&
+                            c.userHandle === canonicalHandle &&
+                            c.credentialId !== result.credentialId,
+                    );
+                    if (strayCanonical) {
+                        auth.setPrivasysId({
+                            userId: canonicalHandle,
+                            credentialId: strayCanonical.credentialId,
+                            keyAlias: strayCanonical.keyAlias,
+                            sessionToken: '',
+                            sessionExpiresAt: 0,
+                        });
+                        auth.removeCredential(strayCanonical.credentialId);
+                    }
+                }
+            }
+
+            // Only now retire the superseded credential(s) of THIS account
+            // (two-phase swap: the new one is persisted first).
+            for (const old of superseded) {
                 auth.removeCredential(old.credentialId);
                 const aliasStillUsed = useAuthStore
                     .getState()

@@ -36,6 +36,7 @@ import { Text, usePalette, type Palette } from '@/components/Themed';
 import { fetchReleaseProvenance, type ReleaseProvenance } from '@/services/release-provenance';
 import {
     approveVaultApproval,
+    describeApprovalMismatch,
     resolveApprovalCredential,
     type VaultApprovalRequest,
 } from '@/services/vault-approval-api';
@@ -153,7 +154,10 @@ export default function VaultApprovalsScreen() {
             if (!credential) {
                 Alert.alert(
                     'Wrong device or identity',
-                    'This request targets a credential this device does not hold. Approve it from the device you used to register with the platform.',
+                    'This request targets a credential this device does not hold. ' +
+                        'Approve it from the device that holds it, or re-register this ' +
+                        'device to the account (Settings → Recovery).\n\n' +
+                        describeApprovalMismatch(req),
                 );
                 return;
             }

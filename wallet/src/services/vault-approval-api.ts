@@ -90,6 +90,32 @@ export function resolveApprovalCredential(req: VaultApprovalRequest): Credential
 }
 
 /**
+ * Evidence for the "Wrong device or identity" alert: which credential id(s)
+ * the request targets vs what this device actually holds. A bare "wrong
+ * device" claim is undiagnosable after the fact (2026-07-30: a prod promote
+ * was refused on the owner's only device and the alert carried nothing to
+ * reason from) — with the two id lists side by side, one screenshot tells
+ * whether the store is missing the credential, holds a rotated successor, or
+ * was empty. Short prefixes only: credential ids are public identifiers, but
+ * there is no reason to fill the screen.
+ */
+export function describeApprovalMismatch(req: VaultApprovalRequest): string {
+    const short = (s: string) => (s && s.length > 12 ? `${s.slice(0, 10)}…` : s || '(empty)');
+    const requested = (req.options.publicKey.allowCredentials ?? []).map((c) => short(c.id));
+    const { credentials, privasysId } = useAuthStore.getState();
+    const held = credentials.map(
+        (c) => `${short(c.credentialId)} · ${c.rpId} · ${c.registeredAt ? new Date(c.registeredAt * 1000).toISOString().slice(0, 10) : '?'}`,
+    );
+    if (privasysId?.credentialId) {
+        held.push(`${short(privasysId.credentialId)} · privasys.id meta-account`);
+    }
+    return (
+        `Requested credential: ${requested.join(', ') || '(none listed)'}\n` +
+        `Held on this device (${held.length}):\n${held.map((h) => `  ${h}`).join('\n') || '  (none)'}`
+    );
+}
+
+/**
  * Approve: sign the operation-bound challenge with the resolved pairwise
  * credential (biometric-gated natively in NativeKeys.sign) and post the
  * assertion to /complete. The IdP verifies it against the owner's registered

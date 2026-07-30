@@ -53,14 +53,15 @@ const KYC_STORE_KEY = 'privasys.kyc.records';
 
 /** Platform (management-service) API base. The wallet resolves the verifier app
  *  by name from the app store, so its origin + pinned image digest are NOT baked
- *  into the build. Defaults to the test platform (matching the dev verifier
- *  fallback below); set EXPO_PUBLIC_PLATFORM_API_URL for prod. */
+ *  into the build. Defaults to the prod platform — the only live verifier
+ *  deployment (the old test app is gone); override per build if a test
+ *  deployment returns. */
 const PLATFORM_API_BASE =
-    process.env.EXPO_PUBLIC_PLATFORM_API_URL ?? 'https://api-test.developer.privasys.org';
+    process.env.EXPO_PUBLIC_PLATFORM_API_URL ?? 'https://api.developer.privasys.org';
 
 /** Store name of the identity-verifier app to resolve. */
 const VERIFIER_APP_NAME =
-    process.env.EXPO_PUBLIC_KYC_VERIFIER_APP ?? 'container-app-identity-verifier';
+    process.env.EXPO_PUBLIC_KYC_VERIFIER_APP ?? 'privasys-identity-verifier';
 
 /** Attestation extension carrying the workload image digest (org.privasys,
  *  1.3.6.1.4.1.65230.3.2). Pinning this is what makes "send my passport to the
@@ -69,18 +70,19 @@ const VERIFIER_APP_NAME =
 const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.3.2';
 
 /** Fallback verifier coordinates, used only until the app is resolvable from the
- *  store (then the resolved hostname + attested digest win). Defaults are the dev
- *  TDX deployment; both overridable per build.
- *  container-app-identity-verifier v0.3.11: fail-closed biometrics — verify-identity
- *  denies on a face mismatch; liveness PAD (MiniFASNetV2) enforced. Keep this pinned
- *  to the live test deployment's image digest (OID 3.2) so the fallback attests the
- *  current enclave when the resolve API is unreachable. */
+ *  store (then the resolved hostname + attested digest win). The old dev/test
+ *  deployment (container-app-identity-verifier.apps-test.privasys.org) is gone —
+ *  the prod app is the only live verifier, so the unset-env defaults point there;
+ *  both overridable per build.
+ *  Verifier v0.6.2: binary master-list configure; fail-closed biometrics since
+ *  v0.3.11. Keep this pinned to the live deployment's image digest (OID 3.2) so
+ *  the fallback attests the current enclave when the resolve API is unreachable. */
 const FALLBACK_VERIFIER_ORIGIN =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_ORIGIN ??
-    'container-app-identity-verifier.apps-test.privasys.org';
+    'privasys-identity-verifier.apps.privasys.org';
 const FALLBACK_VERIFIER_IMAGE_DIGEST =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_DIGEST ??
-    'aa922a94d6f8ef6765c2e930ae31bf63025c69958da6bfbe078d221bde1fa01f';
+    '8f8f55930c8e3f8a016fff5f179cdde419e6dbf0a1905fb4b7151c34589d988c';
 
 const ATTESTATION_SERVER = 'https://as.privasys.org';
 const VERIFIER_DISPLAY = 'Privasys identity verifier';

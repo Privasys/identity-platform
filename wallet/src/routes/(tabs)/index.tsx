@@ -337,12 +337,13 @@ export default function HomeScreen() {
                                             style={[styles.serviceIcon, { backgroundColor: iconBg }]}
                                         >
                                             <Ionicons name={iconName} size={18} color="#FFFFFF" />
+                                            {/* Live-session badge on the icon corner — a fixed
+                                                spot that stays put no matter how long (or how many
+                                                lines) the service name wraps to. */}
+                                            {row.session && <RNView style={styles.liveDot} />}
                                         </RNView>
                                         <RNView style={styles.serviceInfo}>
-                                            <RNView style={styles.serviceNameRow}>
-                                                <Text style={styles.serviceName}>{row.name}</Text>
-                                                {row.session && <RNView style={styles.liveDot} />}
-                                            </RNView>
+                                            <Text style={styles.serviceName}>{row.name}</Text>
                                             <Text style={styles.serviceMeta}>{meta}</Text>
                                         </RNView>
                                         {onPress && (
@@ -501,22 +502,24 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         marginRight: 14
     },
     serviceInfo: { flex: 1 },
-    serviceNameRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 2
-    },
     serviceName: {
+        marginBottom: 2,
         fontSize: 16,
         fontWeight: '600',
         color: p.textPrimary
     },
     liveDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 4,
+        position: 'absolute',
+        top: -3,
+        right: -3,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
         backgroundColor: p.green,
-        marginLeft: 8
+        // Ring in the card colour so the dot reads as a floating badge
+        // over the (green/blue/purple) icon.
+        borderWidth: 3,
+        borderColor: p.card
     },
     serviceMeta: {
         fontSize: 12,

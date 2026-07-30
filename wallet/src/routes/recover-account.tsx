@@ -94,9 +94,11 @@ export default function RecoverAccountScreen() {
     const [codeInput, setCodeInput] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [completing, setCompleting] = useState(false);
+    const [completeError, setCompleteError] = useState(false);
     const [registering, setRegistering] = useState(false);
     const [recoveryState, setRecoveryState] = useState<RecoveryState | null>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const autoCompletedRef = useRef(false);
 
     // Load persisted recovery state on mount.
     useEffect(() => {
@@ -273,6 +275,7 @@ export default function RecoverAccountScreen() {
     const handleComplete = async () => {
         if (!recoveryState) return;
         setCompleting(true);
+        setCompleteError(false);
         try {
             await completeRecovery(recoveryState.requestId);
             const newState = { ...recoveryState, status: 'completed' };
@@ -281,10 +284,27 @@ export default function RecoverAccountScreen() {
             setStep('completed');
         } catch (e: any) {
             Alert.alert('Error', e.message || 'Failed to complete recovery.');
+            setCompleteError(true);
         } finally {
             setCompleting(false);
         }
     };
+
+    // Auto-finalise once the approvals are in: completeRecovery is a server call
+    // with no biometric, so there is no reason to make the user tap through it.
+    // The next step (register) stays an explicit tap because it prompts
+    // biometrics. Runs once per entry into 'approved'; on failure the screen
+    // shows a Retry (completeError) rather than re-firing on every render.
+    useEffect(() => {
+        if (step === 'approved' && recoveryState && !autoCompletedRef.current) {
+            autoCompletedRef.current = true;
+            void handleComplete();
+        }
+        if (step !== 'approved') autoCompletedRef.current = false;
+        // handleComplete closes over stable setters + recoveryState; the ref
+        // guards against re-entry, so step is the only meaningful trigger.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step, recoveryState?.requestId]);
 
     /**
      * The recovery last mile: bind THIS device to the recovered account.
@@ -592,21 +612,28 @@ export default function RecoverAccountScreen() {
                         </RNView>
                         <Text style={styles.title}>Recovery Approved</Text>
                         <Text style={styles.subtitle}>
-                            All required approvals have been received. Tap below to complete recovery
-                            and re-register your device.
+                            All required approvals have been received. Finalising your recovery,
+                            then you can re-register this device.
                         </Text>
 
-                        <Pressable
-                            style={[styles.primaryButton, completing && { opacity: 0.6 }]}
-                            onPress={handleComplete}
-                            disabled={completing}
-                        >
-                            {completing ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                            ) : (
-                                <Text style={styles.primaryButtonText}>Complete Recovery</Text>
-                            )}
-                        </Pressable>
+                        {completeError ? (
+                            <Pressable
+                                style={[styles.primaryButton, completing && { opacity: 0.6 }]}
+                                onPress={handleComplete}
+                                disabled={completing}
+                            >
+                                {completing ? (
+                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                ) : (
+                                    <Text style={styles.primaryButtonText}>Retry</Text>
+                                )}
+                            </Pressable>
+                        ) : (
+                            <RNView style={styles.finalisingRow}>
+                                <ActivityIndicator color={p.blue} size="small" />
+                                <Text style={styles.finalisingText}>Finalising your recovery…</Text>
+                            </RNView>
+                        )}
                     </>
                 )}
 
@@ -808,6 +835,17 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '600',
+    },
+    finalisingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginTop: 8,
+    },
+    finalisingText: {
+        color: p.textSecondary,
+        fontSize: 15,
     },
     secondaryButton: {
         alignItems: 'center' as const,

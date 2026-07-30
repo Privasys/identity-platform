@@ -321,6 +321,21 @@ export default function RecoverAccountScreen() {
                 registeredAt: Math.floor(Date.now() / 1000),
                 serverRpId: result.serverRpId,
             });
+            // Point the canonical privasys.id account at the NEW credential too,
+            // not just the credentials list. Without this, ensurePrivasysSession
+            // keeps authenticating with the rotated-away credentialId, which the
+            // server no longer has — so later actions (e.g. reconfiguring the
+            // recovery phrase) fall to the discoverable path and 404
+            // "no credentials found for user".
+            auth.setPrivasysId({
+                userId: recoveryState.userId,
+                credentialId: result.credentialId,
+                keyAlias,
+                sessionToken: result.sessionToken ?? '',
+                // Cache the fresh session when we got one; otherwise force a
+                // re-auth (which now uses the correct credentialId).
+                sessionExpiresAt: result.sessionToken ? Date.now() + 25 * 60 * 1000 : 0,
+            });
             // Only now retire the superseded credential (the rotated identity).
             if (old && old.credentialId !== result.credentialId) {
                 auth.removeCredential(old.credentialId);

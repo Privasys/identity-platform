@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, Pressable, TextInput, View as RNView } from 'react-native';
+import { StyleSheet, ScrollView, Pressable, TextInput, View as RNView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
@@ -163,6 +163,7 @@ export default function HomeScreen() {
     const traces = useServiceSessionsStore((s) => s.traces);
     const sessions = useSessionsStore((s) => s.sessions);
     const pruneExpired = useSessionsStore((s) => s.pruneExpired);
+    const removeRelaySession = useSessionsStore((s) => s.remove);
     const pendingApprovals = useVaultApprovalsStore((s) => s.pending);
     const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
     const insets = useSafeAreaInsets();
@@ -180,6 +181,24 @@ export default function HomeScreen() {
         }, 1000);
         return () => clearInterval(id);
     }, [pruneExpired]);
+
+    // End an orphaned live sealed session — one with no trace or credential
+    // behind it (so it has no service-detail page). Without this the row can
+    // only clear itself when its TTL expires, which the user cannot hurry.
+    const endOrphanSession = (session: RelaySession) => {
+        Alert.alert(
+            'End session',
+            `End the sealed session for ${session.appName ?? appName(session.rpId)}? Anything using it will need to reconnect.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'End session',
+                    style: 'destructive',
+                    onPress: () => removeRelaySession(session.sessionId)
+                }
+            ]
+        );
+    };
 
     // Keep the pending-approvals banner live: fetch on mount and every 20s so
     // the count reflects approvals that arrived (tray sweep) or expired.
@@ -325,7 +344,9 @@ export default function HomeScreen() {
                                                 pathname: '/service-detail',
                                                 params: { serviceKey: row.key }
                                             })
-                                        : undefined;
+                                        : row.session
+                                            ? () => endOrphanSession(row.session!)
+                                            : undefined;
                                 return (
                                     <Pressable
                                         key={row.key}
@@ -348,7 +369,11 @@ export default function HomeScreen() {
                                         </RNView>
                                         {onPress && (
                                             <Ionicons
-                                                name="chevron-forward"
+                                                name={
+                                                    row.trace || row.app
+                                                        ? 'chevron-forward'
+                                                        : 'close-circle-outline'
+                                                }
                                                 size={18}
                                                 color={p.textMuted}
                                             />

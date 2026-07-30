@@ -68,6 +68,7 @@ export default function ServiceDetailScreen() {
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
     const { removeCredential, credentials } = useAuthStore();
     const sessions = useSessionsStore((s) => s.sessions);
+    const removeRelaySession = useSessionsStore((s) => s.remove);
     const allTraces = useServiceSessionsStore((s) => s.traces);
     const removeService = useServiceSessionsStore((s) => s.removeService);
 
@@ -209,6 +210,17 @@ export default function ServiceDetailScreen() {
                         // Drop this app's trail + standing consent.
                         removeService(serviceKey);
                         useConsentStore.getState().removeStandingConsent(serviceKey);
+                        // End any live sealed session this app bootstrapped, so
+                        // "Remove" actually disconnects instead of leaving the
+                        // relay session up (and the card standing) until its TTL.
+                        const relaySessionIds = new Set(
+                            traces.map((t) => t.sessionId).filter((v): v is string => !!v)
+                        );
+                        for (const s of sessions) {
+                            if (relaySessionIds.has(s.sessionId) || hosts.has(s.rpId)) {
+                                removeRelaySession(s.sessionId);
+                            }
+                        }
                         // The passkey credential and the trust row can be shared
                         // with OTHER apps (every IdP-brokered client rides the
                         // privasys.id rpId + one credential) — only remove them

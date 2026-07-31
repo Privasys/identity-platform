@@ -1056,24 +1056,28 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	// Filter attributes to only those the relying party asked for.
 	filteredAttrs := filterAttributesRequested(attrs, ac.Scope, ac.NamedAttributes)
 
-	// Further restrict to the client's required_attributes whitelist (if set).
+	// Further restrict to the client's required_attributes whitelist, which is
+	// mandatory: a client that names nothing receives nothing, so an old row with
+	// an empty whitelist cannot keep collecting the scope-derived set here after
+	// /authorize stopped asking the wallet for it.
+	//
 	// The ceremonial holder_present disclosure is exempt, mirroring the
 	// authorize side: it is added per-request by acr_values=gov-presence (not
 	// registration-time), discloses no personal data, and IS the receipt the
 	// relying party paid the presence ceremony for.
 	client, _ := reg.Get(ac.ClientID)
-	if client != nil && len(client.RequiredAttributes) > 0 {
-		restricted := make(map[string]string, len(client.RequiredAttributes)+1)
+	restricted := make(map[string]string, 1)
+	if client != nil {
 		for _, key := range client.RequiredAttributes {
 			if v, ok := filteredAttrs[key]; ok {
 				restricted[key] = v
 			}
 		}
-		if v, ok := filteredAttrs[presenceAttribute]; ok {
-			restricted[presenceAttribute] = v
-		}
-		filteredAttrs = restricted
 	}
+	if v, ok := filteredAttrs[presenceAttribute]; ok {
+		restricted[presenceAttribute] = v
+	}
+	filteredAttrs = restricted
 
 	// Get user roles, filtered to the requested audience namespace.
 	// The access token audience is the resource-server trust domain
@@ -1566,13 +1570,20 @@ func parseAttributesParam(raw string) []string {
 	return out
 }
 
-// whitelistedAttributes returns the client's required_attributes as a set, or
-// nil when it declares none. nil and empty are NOT the same thing here: a client
-// with no whitelist may ask for anything, while one that declares a whitelist is
-// held to it even for keys it named on the request.
+// whitelistedAttributes returns the client's required_attributes as a set.
+//
+// A client that declares none reaches nothing: the whitelist is the declaration
+// that a relying party consumes attributes at all, so its absence is a request
+// for none of them rather than permission for every key its scope happens to
+// reach. Registration refuses an empty list (see validateRequiredAttributes), so
+// this is the runtime half of one rule — it catches a row that predates the rule
+// and would otherwise be served the scope-derived set forever.
+//
+// "sub" is always present: it is OpenID Connect's subject identifier, not an
+// attribute the referential prices or the wallet discloses.
 func whitelistedAttributes(client *clients.Client) map[string]bool {
-	if client == nil || len(client.RequiredAttributes) == 0 {
-		return nil
+	if client == nil {
+		return map[string]bool{"sub": true}
 	}
 	allowed := make(map[string]bool, len(client.RequiredAttributes)+1)
 	for _, a := range client.RequiredAttributes {
@@ -1636,16 +1647,13 @@ func requestedAttributes(scope string, named []string, client *clients.Client) [
 		requested = append(requested, attr.Key)
 	}
 
-	if allowed != nil {
-		filtered := requested[:0]
-		for _, a := range requested {
-			if allowed[a] {
-				filtered = append(filtered, a)
-			}
+	filtered := requested[:0]
+	for _, a := range requested {
+		if allowed[a] {
+			filtered = append(filtered, a)
 		}
-		requested = filtered
 	}
-	return requested
+	return filtered
 }
 
 // AttributeRequirement tells the wallet what a relying party needs for one
@@ -1657,9 +1665,9 @@ type AttributeRequirement struct {
 }
 
 // attributeRequirements returns per-attribute requirements for the request.
-// Essential = the client's required_attributes whitelist, or the email+name
-// identity baseline when the client declares none (so the wallet has a
-// consistent essential set without its own heuristic). Assurance = "gov" for a
+// Essential = the client's required_attributes whitelist, which is the only
+// statement of what a relying party needs; a client that declares none requests
+// nothing, so there is nothing here to mark essential. Assurance = "gov" for a
 // government-backed key (only the identity-verifier enclave can certify one),
 // else "any". Additive to the payload: older wallets ignore it.
 //
@@ -1669,13 +1677,10 @@ type AttributeRequirement struct {
 // way for a scope to downgrade what a relying party asked for.
 func attributeRequirements(scope string, named []string, client *clients.Client) map[string]AttributeRequirement {
 	essential := map[string]bool{}
-	if client != nil && len(client.RequiredAttributes) > 0 {
+	if client != nil {
 		for _, a := range client.RequiredAttributes {
 			essential[a] = true
 		}
-	} else {
-		essential["email"] = true
-		essential["name"] = true
 	}
 
 	out := map[string]AttributeRequirement{}

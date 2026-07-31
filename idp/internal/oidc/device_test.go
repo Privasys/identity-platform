@@ -42,7 +42,7 @@ func newDeviceTestEnv(t *testing.T) (*clients.Registry, *store.DB, *tokens.Issue
 
 	reg := clients.NewRegistry(db)
 	if _, err := reg.RegisterWithID("privasys-cli", "Privasys CLI",
-		[]string{"https://privasys.id/device"}, "", nil); err != nil {
+		[]string{"https://privasys.id/device"}, "", []string{"email", "name"}); err != nil {
 		t.Fatalf("register client: %v", err)
 	}
 	return reg, db, iss

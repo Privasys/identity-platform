@@ -20,26 +20,45 @@ func TestAttributeRequirements(t *testing.T) {
 		t.Errorf("email assurance = %q, want any", req["email"].Assurance)
 	}
 
-	// No whitelist: falls back to the email+name baseline; extras optional.
-	open := attributeRequirements("openid email profile", nil, &clients.Client{})
-	if !open["email"].Essential || !open["name"].Essential {
-		t.Errorf("email/name should be essential by default: %+v", open)
-	}
-	if open["given_name"].Essential {
-		t.Errorf("given_name should be optional by default")
+	// A key the scope reaches but the whitelist does not name is not requested
+	// at all, so there is no "optional extra" tier: the whitelist is the request.
+	if _, ok := req["given_name"]; ok {
+		t.Errorf("given_name rode in on the profile scope past the whitelist: %+v", req)
 	}
 
 	// identity scope → gov assurance on the KYC attributes. birthdate and
 	// nationality are no longer among them: the bare spelling is the
 	// self-asserted half of a pair now.
-	id := attributeRequirements("openid identity", nil, &clients.Client{})
+	id := attributeRequirements("openid identity", nil,
+		&clients.Client{RequiredAttributes: []string{"age_over_18", "age_over_21"}})
 	for _, k := range []string{"age_over_18", "age_over_21"} {
 		if id[k].Assurance != "gov" {
 			t.Errorf("%s assurance = %q, want gov", k, id[k].Assurance)
 		}
-		if id[k].Essential {
-			t.Errorf("%s should be optional when not in the whitelist", k)
+		if !id[k].Essential {
+			t.Errorf("%s: a whitelisted attribute is essential", k)
 		}
+	}
+}
+
+// Naming attributes is how a relying party declares it consumes any, so a client
+// that names none receives none — never everything its runtime scope reaches.
+// Registration refuses such a client outright; this is the runtime half, which
+// has to hold for a row that predates the rule.
+func TestClientWithoutAWhitelistReceivesNothing(t *testing.T) {
+	for _, scope := range []string{"openid email profile", "openid identity", "openid"} {
+		got := requestedAttributes(scope, nil, &clients.Client{})
+		if len(got) != 1 || got[0] != "sub" {
+			t.Errorf("scope %q without a whitelist = %v, want [sub]", scope, got)
+		}
+		if reqs := attributeRequirements(scope, nil, &clients.Client{}); len(reqs) != 0 {
+			t.Errorf("scope %q without a whitelist required %+v", scope, reqs)
+		}
+	}
+	// Nor can naming a key on the request stand in for the registration.
+	got := requestedAttributes("openid identity", []string{"birthdate_id", "email"}, &clients.Client{})
+	if len(got) != 1 || got[0] != "sub" {
+		t.Errorf("named attributes without a whitelist = %v, want [sub]", got)
 	}
 }
 
@@ -86,11 +105,12 @@ func TestNamedAttributesCannotEscapeTheWhitelist(t *testing.T) {
 	}
 }
 
-// A client with no whitelist may name what it likes — that is the whole point of
-// the per-attribute path for a dynamically registered relying party — but it only
-// gets what it actually named.
+// Naming a key on the request is how a client reaches a request-only attribute
+// its whitelist admits: no spelling of the scope carries one. It still gets only
+// what it actually named, so a whitelist is a menu rather than an order.
 func TestNamedAttributesReachRequestOnlyKeys(t *testing.T) {
-	got := requestedAttributes("openid email", []string{"birthdate_id"}, &clients.Client{})
+	cli := &clients.Client{RequiredAttributes: []string{"email", "birthdate_id", "nationality_id"}}
+	got := requestedAttributes("openid email", []string{"birthdate_id"}, cli)
 	found := false
 	for _, k := range got {
 		if k == "birthdate_id" {
@@ -120,11 +140,14 @@ func TestParseAttributesParam(t *testing.T) {
 }
 
 // The failure mode that was found and defused once already: a relying party that
-// declares no whitelist and asks for `identity` must get the identity baseline it
-// has always got, and NOT the newly billable attributes. Reintroducing this is a
+// whitelists the free identity baseline and asks for `identity` must get exactly
+// that baseline, and NOT the newly billable attributes. Reintroducing this is a
 // silent charge for something nobody requested.
-func TestIdentityScopeWithoutWhitelistPullsNoRequestOnlyAttribute(t *testing.T) {
-	open := requestedAttributes("openid identity", nil, &clients.Client{})
+func TestIdentityScopePullsNoRequestOnlyAttribute(t *testing.T) {
+	baseline := &clients.Client{RequiredAttributes: []string{
+		"birthdate", "nationality", "age_over_18", "age_over_21", "document_number",
+	}}
+	open := requestedAttributes("openid identity", nil, baseline)
 	got := map[string]bool{}
 	for _, k := range open {
 		got[k] = true
@@ -152,7 +175,7 @@ func TestIdentityScopeWithoutWhitelistPullsNoRequestOnlyAttribute(t *testing.T) 
 	}
 	// The baseline now reserves only the two age insights: the passport readings
 	// of a birth date and a nationality moved to keys a client must name.
-	reqs := attributeRequirements("openid identity", nil, &clients.Client{})
+	reqs := attributeRequirements("openid identity", nil, baseline)
 	keys := reservableMarketplaceKeys(reqs)
 	want := []string{"privasys:age_over_18", "privasys:age_over_21"}
 	if len(keys) != len(want) {
@@ -165,12 +188,13 @@ func TestIdentityScopeWithoutWhitelistPullsNoRequestOnlyAttribute(t *testing.T) 
 	}
 }
 
-// An ordinary profile-scope request must return exactly what it always did, for
-// clients with a whitelist and without. Adding a government-backed twin is only a
-// new capability if nothing about the old key moved.
+// An ordinary profile-scope request must return exactly what it always did.
+// Adding a government-backed twin is only a new capability if nothing about the
+// old key moved: same keys, same order, all still free and self-asserted.
 func TestProfileScopeRequestIsUnchanged(t *testing.T) {
-	open := requestedAttributes("openid email profile", nil, &clients.Client{})
 	want := []string{"sub", "email", "name", "given_name", "family_name", "nickname", "picture", "locale"}
+	cli := &clients.Client{RequiredAttributes: want[1:]}
+	open := requestedAttributes("openid email profile", nil, cli)
 	if len(open) != len(want) {
 		t.Fatalf("profile request = %v, want %v", open, want)
 	}
@@ -178,6 +202,9 @@ func TestProfileScopeRequestIsUnchanged(t *testing.T) {
 		if open[i] != k {
 			t.Fatalf("profile request = %v, want %v", open, want)
 		}
+	}
+	if keys := reservableMarketplaceKeys(attributeRequirements("openid email profile", nil, cli)); len(keys) != 0 {
+		t.Errorf("a profile request reserved %v; every profile key is free", keys)
 	}
 }
 

@@ -36,16 +36,25 @@ func TestRegister_RejectsNonCanonicalRequiredAttributes(t *testing.T) {
 	}
 }
 
-// Canonical keys and an empty/nil whitelist are accepted.
-func TestRegister_AcceptsCanonicalAndEmpty(t *testing.T) {
+// Canonical keys are accepted, and naming none is refused: the whitelist is how
+// a relying party declares what it consumes, so registering without one asks for
+// nothing. Accepting it would leave a client that can never sign anyone in,
+// silently, at the point where the mistake is still cheap to say out loud.
+func TestRegister_AcceptsCanonicalAndRequiresAWhitelist(t *testing.T) {
 	reg := newTestRegistry(t)
 
 	if _, err := reg.RegisterWithID("privasys-cli", "Privasys CLI", []string{"https://privasys.id/device"}, "", []string{"email", "name"}); err != nil {
 		t.Fatalf("RegisterWithID with canonical attrs: %v", err)
 	}
 
-	if _, err := reg.Register("Open App", []string{"https://app/cb"}, "", nil); err != nil {
-		t.Fatalf("Register with nil whitelist: %v", err)
+	if _, err := reg.Register("Open App", []string{"https://app/cb"}, "", nil); err == nil {
+		t.Fatal("Register accepted a nil whitelist; want error")
+	}
+	if _, err := reg.Register("Open App", []string{"https://app/cb"}, "", []string{}); err == nil {
+		t.Fatal("Register accepted an empty whitelist; want error")
+	}
+	if _, err := reg.RegisterWithID("open-id", "Open App", []string{"https://app/cb"}, "", nil); err == nil {
+		t.Fatal("RegisterWithID accepted a nil whitelist; want error")
 	}
 }
 
@@ -54,7 +63,7 @@ func TestRegister_AcceptsCanonicalAndEmpty(t *testing.T) {
 // Get round-trips the new columns.
 func TestSetBilling(t *testing.T) {
 	reg := newTestRegistry(t)
-	c, err := reg.Register("Acme RP", []string{"https://acme/cb"}, "", nil)
+	c, err := reg.Register("Acme RP", []string{"https://acme/cb"}, "", []string{"email", "name"})
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}

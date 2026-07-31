@@ -33,7 +33,10 @@ func TestLooksLikeDisclosureToken(t *testing.T) {
 // least one gov-assured attribute arrived as an enclave-signed disclosure
 // token and none arrived raw — everything else is the interactive baseline.
 func TestACRForCode(t *testing.T) {
-	cli := &clients.Client{}
+	// The whitelist is mandatory and is a ceiling on every request, so a client
+	// that names nothing reaches nothing and every case below would collapse to
+	// the interactive baseline for the wrong reason.
+	cli := &clients.Client{RequiredAttributes: []string{"email", "age_over_18", "nationality", "nationality_id"}}
 
 	// nationality_id has to be NAMED to be part of the request at all: it is the
 	// government-backed half of a pair and therefore request-only. A raw value

@@ -24,7 +24,7 @@ type Client struct {
 	ClientSecret       string   `json:"client_secret,omitempty"` // only returned on registration
 	RedirectURIs       []string `json:"redirect_uris"`
 	Confidential       bool     `json:"confidential"`                  // true if client has a secret
-	RequiredAttributes []string `json:"required_attributes,omitempty"` // per-app attribute whitelist; empty = all scope-derived
+	RequiredAttributes []string `json:"required_attributes,omitempty"` // per-app attribute whitelist; mandatory, and a ceiling on every request
 	// Billable relying party: this client is the paying consumer of attributes.
 	// At voucher mint, BillingAccountID (a management-service account UUID) is
 	// charged and RPID is stamped into the voucher + disclosure audience.
@@ -160,13 +160,18 @@ func (reg *Registry) SetBilling(clientID string, billable bool, billingAccountID
 	return reg.Get(clientID)
 }
 
-// validateRequiredAttributes rejects any attribute key that is not in the
-// canonical referential (shared/canonical-attributes.json). An empty/nil list
-// is allowed and means "all scope-derived attributes". This guarantees a client
-// can only ever request attributes that exist in the golden referential —
-// requesting anything outside it is refused at registration, not silently
-// dropped at /authorize.
+// validateRequiredAttributes rejects a registration that names no attribute, or
+// one that is not in the canonical referential (shared/canonical-attributes.json).
+//
+// The whitelist is how a relying party declares what it consumes, so there is no
+// such thing as attribute usage without one: a client that names nothing is
+// asking for nothing, never for everything its runtime scope happens to reach.
+// Requesting a key outside the referential is refused here, at registration,
+// rather than silently dropped at /authorize.
 func validateRequiredAttributes(requiredAttributes []string) error {
+	if len(requiredAttributes) == 0 {
+		return fmt.Errorf("required_attributes must name at least one attribute")
+	}
 	for _, a := range requiredAttributes {
 		if !attributes.Keys[a] {
 			return fmt.Errorf("unknown required attribute %q: not in the canonical referential", a)

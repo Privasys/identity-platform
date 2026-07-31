@@ -38,10 +38,10 @@ var govIDSpelling = map[string]string{
 // hand an identity-scope client a self-asserted birth date where a passport used
 // to answer, which is a security regression rather than a pricing change.
 //
-// Clients that declare NO whitelist cannot be migrated from stored data. They
-// take the scope-derived set, and whether that ever included a government-backed
-// birth date depends on the scope they send at runtime, which is not recorded
-// here. They are logged for a human to decide, never guessed at.
+// Clients that declare NO whitelist need no migration: naming attributes is now
+// mandatory (see validateRequiredAttributes), so such a row requests nothing and
+// there is no assurance to preserve. They are logged because that is a change in
+// what they receive, and only re-registering with a whitelist restores it.
 func migrateAttributeAssuranceSplit(db *sql.DB) error {
 	return applyOnce(db, "clients_gov_id_spelling_split", func(tx *sql.Tx) error {
 		for bare, gov := range govIDSpelling {
@@ -95,9 +95,8 @@ func migrateAttributeAssuranceSplit(db *sql.DB) error {
 		}
 		if len(unscoped) > 0 {
 			sort.Strings(unscoped)
-			log.Printf("attribute split: %d client(s) declare no required_attributes and take the scope-derived set; "+
-				"an identity-scope request now yields a SELF-ASSERTED birthdate/nationality for them, and only their "+
-				"operator can say whether they meant the government-backed one: %s",
+			log.Printf("attribute split: %d client(s) declare no required_attributes and now receive NO attributes; "+
+				"naming them is mandatory, so each must be re-registered with the whitelist it needs: %s",
 				len(unscoped), strings.Join(unscoped, ", "))
 		}
 		return nil

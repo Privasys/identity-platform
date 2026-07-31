@@ -463,8 +463,23 @@ export default function ProfileScreen() {
                     <RNView style={styles.dangerDivider} />
                     <Text style={styles.dangerTitle}>Danger Zone</Text>
                     <Text style={styles.dangerDescription}>
-                        This will remove your profile, credentials, trusted apps, and all local data.
-                        You will need to re-register with each service.
+                        Registered credentials are the keys this device holds for your
+                        accounts. Removing one can permanently lock you out of that
+                        account — signing in again creates a new, empty identity, and
+                        only account recovery brings the old one back.
+                    </Text>
+                    <Pressable
+                        style={styles.dangerButton}
+                        onPress={() => router.push('/credentials' as never)}
+                    >
+                        <Ionicons name="key-outline" size={18} color={p.danger} />
+                        <Text style={styles.dangerButtonText}>
+                            Registered credentials{credentials.length > 0 ? ` (${credentials.length})` : ''}
+                        </Text>
+                    </Pressable>
+                    <Text style={[styles.dangerDescription, { marginTop: 16 }]}>
+                        Clearing all data removes your profile, credentials, trusted
+                        apps, and everything else stored on this device.
                     </Text>
                     <Pressable
                         style={styles.dangerButton}

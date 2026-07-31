@@ -141,11 +141,37 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (!raw) return;
         try {
             const data = JSON.parse(raw);
+            let credentials: Credential[] = data.credentials ?? [];
+            let privasysId: PrivasysIdAccount | null = data.privasysId ?? null;
+            // Normalise: the meta-account's credential lives in the privasysId
+            // slot, never in credentials[]. Slot-unaware flows (pre-2026-07-30
+            // recovery) left meta credentials in the list, where they shadow
+            // the platform credential and show up as a confusing duplicate
+            // privasys.id row. Match on the slot's own recorded userId (not a
+            // derived value — profile seeds differ across installs): a list
+            // entry for the same account supersedes the slot's stale pointer,
+            // so adopt it and drop the list copy. Hardware keys are untouched.
+            if (privasysId?.userId) {
+                const stray = credentials.find(
+                    (c) => c.userHandle === privasysId!.userId && c.credentialId !== privasysId!.credentialId,
+                );
+                if (stray) {
+                    privasysId = {
+                        ...privasysId,
+                        credentialId: stray.credentialId,
+                        keyAlias: stray.keyAlias,
+                        sessionToken: '',
+                        sessionExpiresAt: 0,
+                    };
+                    credentials = credentials.filter((c) => c.credentialId !== stray.credentialId);
+                }
+            }
             set({
                 isOnboarded: data.isOnboarded ?? false,
-                credentials: data.credentials ?? [],
-                privasysId: data.privasysId ?? null,
+                credentials,
+                privasysId,
             });
+            persist(get());
         } catch {
             // Corrupted data — start fresh
         }

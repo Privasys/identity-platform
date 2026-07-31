@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExternalLink } from '@/components/ExternalLink';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
-import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { getLogs } from '@/utils/logs';
 
@@ -26,7 +25,6 @@ export default function SettingsScreen() {
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
-    const { credentials } = useAuthStore();
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
     const verificationMode = useSettingsStore((s) => s.verificationMode);
     const setVerificationMode = useSettingsStore((s) => s.setVerificationMode);
@@ -100,15 +98,10 @@ export default function SettingsScreen() {
                     ))}
                 </View>
 
-                {/* Registered Credentials → subpage */}
-                <Text style={styles.sectionTitle}>Registered Credentials</Text>
-                <Pressable style={styles.logsButton} onPress={() => router.push('/credentials' as never)}>
-                    <Ionicons name="key-outline" size={18} color={p.textPrimary} />
-                    <Text style={styles.logsButtonText}>
-                        Manage Credentials{credentials.length > 0 ? ` (${credentials.length})` : ''}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-                </Pressable>
+                {/* Registered credentials moved to Profile → Danger Zone:
+                    removing one can permanently lock an account (re-registering
+                    mints a NEW identity; the old one needs recovery), which is
+                    account surgery, not a setting. */}
 
                 {/* Push Token */}
                 {pushToken ? (

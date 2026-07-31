@@ -76,6 +76,29 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
     if (existing) {
         let credId = existing.credentialId;
         let keyAlias = existing.keyAlias;
+        let userId = existing.userId;
+        // The slot's userId has historically been stored in two forms: the
+        // raw 32-hex canonical id (early builds kept the local fallback) and
+        // its base64url userHandle encoding (what the IdP echoes back).
+        // credentials[] records the b64url userHandle, so a same-account
+        // match must accept either form or the repair below never fires.
+        const slotHandles = new Set([existing.userId, b64url(existing.userId)]);
+        const sameAccount = (c: { rpId: string; userHandle?: string }) =>
+            c.rpId === 'privasys.id' && !!c.userHandle && slotHandles.has(c.userHandle);
+        const adoptIntoSlot = (adopt: (typeof store.credentials)[number]) => {
+            credId = adopt.credentialId;
+            keyAlias = adopt.keyAlias;
+            userId = adopt.userHandle ?? existing.userId;
+            store.setPrivasysId({
+                ...existing,
+                userId,
+                credentialId: credId,
+                keyAlias,
+                sessionToken: '',
+                sessionExpiresAt: 0,
+            });
+            store.removeCredential(adopt.credentialId);
+        };
         // Self-heal an empty slot credentialId (left by a slot-unaware recovery):
         // authenticating with no credentialId sends the IdP down its discoverable
         // path, which 404s "no credentials found for user" — the confusing error
@@ -83,19 +106,14 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
         // account's credential from credentials[] (matched by userHandle) if one
         // is there; otherwise fail with a clear, actionable message.
         if (!credId) {
-            const adopt = store.credentials.find(
-                (c) => c.rpId === 'privasys.id' && c.userHandle === existing.userId,
-            );
+            const adopt = store.credentials.find(sameAccount);
             if (!adopt) {
                 throw new Error(
                     'This device has no privasys.id credential for your account. ' +
                     'Recover your account or sign in again to re-register this device.',
                 );
             }
-            credId = adopt.credentialId;
-            keyAlias = adopt.keyAlias;
-            store.setPrivasysId({ ...existing, credentialId: credId, keyAlias });
-            store.removeCredential(adopt.credentialId);
+            adoptIntoSlot(adopt);
         }
         const authenticate = (cid: string, alias: string) =>
             fido2Authenticate(
@@ -116,29 +134,31 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
             // re-register automatically.
             const stale = String(e?.message ?? e).includes('no credentials found');
             const adopt = stale
-                ? store.credentials.find(
-                      (c) =>
-                          c.rpId === 'privasys.id' &&
-                          c.userHandle === existing.userId &&
-                          c.credentialId !== credId,
-                  )
+                ? store.credentials.find((c) => sameAccount(c) && c.credentialId !== credId)
                 : undefined;
-            if (!adopt) throw e;
-            credId = adopt.credentialId;
-            keyAlias = adopt.keyAlias;
-            store.setPrivasysId({
-                ...existing,
-                credentialId: credId,
-                keyAlias,
-                sessionToken: '',
-                sessionExpiresAt: 0,
-            });
-            store.removeCredential(adopt.credentialId);
+            if (!adopt) {
+                if (stale) {
+                    // Nothing adoptable — surface the device state so the
+                    // mismatch is diagnosable from the error alone.
+                    const held = store.credentials
+                        .filter((c) => c.rpId === 'privasys.id')
+                        .map((c) => `${c.credentialId.slice(0, 8)}…@${(c.userHandle ?? 'no-handle').slice(0, 8)}…`)
+                        .join(', ') || 'none';
+                    throw new Error(
+                        `The server has no credential ${credId.slice(0, 8)}… for account ` +
+                        `${existing.userId.slice(0, 8)}… and this device holds no other credential ` +
+                        `for that account (privasys.id credentials held: ${held}). ` +
+                        'Recover your account to re-register this device.',
+                    );
+                }
+                throw e;
+            }
+            adoptIntoSlot(adopt);
             result = await authenticate(credId, keyAlias);
         }
         if (!result.sessionToken) throw new Error('No sessionToken from authenticate');
         store.setPrivasysSession(result.sessionToken, SESSION_TTL_MS);
-        return { sessionToken: result.sessionToken, userId: existing.userId };
+        return { sessionToken: result.sessionToken, userId };
     }
 
     // First-time registration — bind the FIDO2 credential to the canonical

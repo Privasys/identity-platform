@@ -850,6 +850,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         marginBottom: 12,
     },
     statusText: {
+        flex: 1,
         fontSize: 14,
         color: p.textPrimary,
         fontWeight: '500',

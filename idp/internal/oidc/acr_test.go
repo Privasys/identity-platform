@@ -35,43 +35,53 @@ func TestLooksLikeDisclosureToken(t *testing.T) {
 func TestACRForCode(t *testing.T) {
 	cli := &clients.Client{}
 
+	// nationality_id has to be NAMED to be part of the request at all: it is the
+	// government-backed half of a pair and therefore request-only. A raw value
+	// under the bare `nationality` is a date the holder typed, and it must not
+	// downgrade anything, which is why these cases moved off it.
+	const govNationality = "nationality_id"
+	named := []string{govNationality}
+
 	cases := []struct {
 		name  string
 		scope string
+		named []string
 		attrs map[string]string
 		want  string
 	}{
-		{"no identity scope", "openid email", map[string]string{"email": "a@b.c"}, "wallet"},
-		{"identity scope, nothing disclosed", "openid identity", map[string]string{}, "wallet"},
-		{"gov attr as disclosure token", "openid identity",
+		{"no identity scope", "openid email", nil, map[string]string{"email": "a@b.c"}, "wallet"},
+		{"identity scope, nothing disclosed", "openid identity", nil, map[string]string{}, "wallet"},
+		{"gov attr as disclosure token", "openid identity", nil,
 			map[string]string{"age_over_18": fakeDisclosure}, "gov-fresh"},
-		{"gov attr arrived raw", "openid identity",
+		{"gov attr arrived raw", "openid identity", nil,
 			map[string]string{"age_over_18": "true"}, "wallet"},
-		{"mixed token + raw downgrades", "openid identity",
-			map[string]string{"age_over_18": fakeDisclosure, "nationality": "GBR"}, "wallet"},
-		{"two disclosure tokens", "openid identity",
-			map[string]string{"age_over_18": fakeDisclosure, "nationality": fakeDisclosure}, "gov-fresh"},
-		{"presence disclosure tops the ladder", "openid identity",
+		{"mixed token + raw downgrades", "openid identity", named,
+			map[string]string{"age_over_18": fakeDisclosure, govNationality: "GBR"}, "wallet"},
+		{"two disclosure tokens", "openid identity", named,
+			map[string]string{"age_over_18": fakeDisclosure, govNationality: fakeDisclosure}, "gov-fresh"},
+		{"a self-asserted value alongside a token is not a downgrade", "openid identity", nil,
+			map[string]string{"age_over_18": fakeDisclosure, "nationality": "GBR"}, "gov-fresh"},
+		{"presence disclosure tops the ladder", "openid identity", nil,
 			map[string]string{"age_over_18": fakeDisclosure, "holder_present": fakeDisclosure}, "gov-presence"},
-		{"presence alone", "openid identity",
+		{"presence alone", "openid identity", nil,
 			map[string]string{"holder_present": fakeDisclosure}, "gov-presence"},
-		{"raw presence never counts", "openid identity",
+		{"raw presence never counts", "openid identity", nil,
 			map[string]string{"holder_present": "true"}, "wallet"},
-		{"presence + raw gov downgrades", "openid identity",
-			map[string]string{"holder_present": fakeDisclosure, "nationality": "GBR"}, "wallet"},
+		{"presence + raw gov downgrades", "openid identity", named,
+			map[string]string{"holder_present": fakeDisclosure, govNationality: "GBR"}, "wallet"},
 		// v0.6.0 charged failure receipts must NOT lift the tier.
-		{"FAILED presence + real gov disclosures = gov-fresh, NOT gov-presence", "openid identity",
-			map[string]string{"age_over_18": fakeDisclosure, "nationality": fakeDisclosure,
+		{"FAILED presence + real gov disclosures = gov-fresh, NOT gov-presence", "openid identity", named,
+			map[string]string{"age_over_18": fakeDisclosure, govNationality: fakeDisclosure,
 				"holder_present": fakeFailureReceipt}, "gov-fresh"},
-		{"failed presence alone = wallet", "openid identity",
+		{"failed presence alone = wallet", "openid identity", nil,
 			map[string]string{"holder_present": fakeFailureReceipt}, "wallet"},
-		{"factual age_over_18:false still counts as gov-fresh", "openid identity",
+		{"factual age_over_18:false still counts as gov-fresh", "openid identity", nil,
 			map[string]string{"age_over_18": fakeDisclosureFalse}, "gov-fresh"},
-		{"a failed gov disclosure does not count", "openid identity",
+		{"a failed gov disclosure does not count", "openid identity", nil,
 			map[string]string{"age_over_18": fakeFailureReceipt}, "wallet"},
 	}
 	for _, c := range cases {
-		ac := &AuthCode{Scope: c.scope, Attributes: c.attrs}
+		ac := &AuthCode{Scope: c.scope, NamedAttributes: c.named, Attributes: c.attrs}
 		if got := acrForCode(ac, cli); got != c.want {
 			t.Errorf("%s: acr = %q, want %q", c.name, got, c.want)
 		}

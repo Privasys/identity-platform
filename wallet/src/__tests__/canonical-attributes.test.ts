@@ -15,8 +15,10 @@ import { join } from 'path';
 
 import {
     ATTRIBUTE_MAP, CANONICAL_ATTRIBUTES, CANONICAL_KEYS, GOV_VERIFIED, SELF_ASSERTED,
-    attributeAssurance, certifiedFieldFor, disclosesAsToken, isDerived, marketplaceKeyFor
+    attributeAssurance, certifiedFieldFor, disclosesAsToken, govValueKey, isDerived,
+    marketplaceKeyFor
 } from '@/services/attributes';
+import type { ProfileAttribute, UserProfile } from '@/stores/profile';
 
 const BUNDLED = join(__dirname, '..', 'shared', 'canonical-attributes.json');
 const SOURCE = join(__dirname, '..', '..', '..', 'shared', 'canonical-attributes.json');
@@ -42,18 +44,32 @@ describe('canonical attribute referential', () => {
             'age_band',
             'age_over_18',
             'age_over_21',
-            'birthdate',
             'birthdate_id',
+            'doc_expiry',
             'document_valid',
             'family_name_id',
             'given_name_id',
-            'nationality',
             'nationality_id',
+            'personal_number',
+            'picture_id',
+            'place_of_birth',
         ]);
         for (const a of paid) {
             expect(attributeAssurance(a.key)).toBe(GOV_VERIFIED);
             expect(a.marketplace!.key).toBe(`privasys:${certifiedFieldFor(a.key)}`);
             expect(a.marketplace!.billable).toBe(true);
+            // Pricing a key means making it request-only in the same change. A
+            // priced key left on a scope-derived set charges every identity
+            // request for a disclosure nobody asked for, which is how
+            // doc_expiry, place_of_birth and personal_number would have started
+            // billing the moment migration 076 seeded their rows.
+            //
+            // age_over_18/21 are the exception, and only because they predate
+            // the rule: they ARE the identity baseline, priced and scope-reachable
+            // since the marketplace shipped, and making them request-only now
+            // would drop them from every client that has ever asked for identity.
+            const baseline = a.key === 'age_over_18' || a.key === 'age_over_21';
+            expect(ATTRIBUTE_MAP[a.key].requestOnly ?? false).toBe(!baseline);
         }
     });
 
@@ -62,10 +78,7 @@ describe('canonical attribute referential', () => {
         // reservation fails the whole authorization as an unknown attribute, so
         // an attribute the enclave certifies but the registry has not priced
         // must stay unnamed here until a migration seeds its row.
-        for (const key of [
-            'document_number', 'document_type', 'issuing_state', 'sex',
-            'doc_expiry', 'place_of_birth', 'personal_number', 'picture_id',
-        ]) {
+        for (const key of ['document_number', 'document_type', 'issuing_state', 'sex']) {
             expect(CANONICAL_KEYS.has(key)).toBe(true);
             expect(ATTRIBUTE_MAP[key].scope).toBe('identity');
             expect(ATTRIBUTE_MAP[key].marketplace).toBeUndefined();
@@ -94,18 +107,28 @@ describe('canonical attribute referential', () => {
         }
     });
 
-    it('adds a government-backed twin for the dual attributes', () => {
-        // birthdate and nationality predate the convention and were minted
-        // government-backed, so they stay exactly as they are for already
-        // registered clients while the `_id` spelling becomes the one to name.
+    it('splits the two keys that were minted government-backed', () => {
+        // birthdate and nationality predate the convention. They are dual now:
+        // the bare key is the self-asserted reading, free, and still reachable
+        // from the identity scope it has always been in, while the passport
+        // reading moved to the `_id` spelling. This is a BREAKING change for a
+        // client that named the bare key, which is why it ships with the
+        // migrations that rewrite a registered whitelist.
         for (const key of ['birthdate', 'nationality']) {
             const twin = `${key}_id`;
-            expect(ATTRIBUTE_MAP[key].supersededBy).toBe(twin);
+            expect(ATTRIBUTE_MAP[key].govKey).toBe(twin);
+            expect(ATTRIBUTE_MAP[key].supersededBy).toBeUndefined();
+            expect(attributeAssurance(key)).toBe(SELF_ASSERTED);
+            expect(ATTRIBUTE_MAP[key].scope).toBe('identity');
             expect(ATTRIBUTE_MAP[key].requestOnly).toBeUndefined();
+            expect(ATTRIBUTE_MAP[key].marketplace).toBeUndefined();
+
             expect(CANONICAL_KEYS.has(twin)).toBe(true);
+            expect(attributeAssurance(twin)).toBe(GOV_VERIFIED);
             expect(ATTRIBUTE_MAP[twin].requestOnly).toBe(true);
-            // One disclosure under two names, so one registry row and one charge.
-            expect(marketplaceKeyFor(twin)).toBe(marketplaceKeyFor(key));
+            // The twin keeps the row the bare key was sold under, so a voucher
+            // or a share link naming privasys:birthdate buys what it always did.
+            expect(marketplaceKeyFor(twin)).toBe(`privasys:${key}`);
         }
     });
 
@@ -120,15 +143,19 @@ describe('canonical attribute referential', () => {
         expect(certifiedFieldFor('doc_expiry')).toBe('doc_expiry');
     });
 
-    it('marks the ID portrait as a value the enclave will not re-certify', () => {
-        // The verifier commits to DG2 so a fresh selfie can be matched against
-        // it. Until the marketplace prices the disclosure there is no voucher to
-        // authorise a fresh certification, so the wallet relays its stored copy.
-        // Claiming a token here would make every request for the ID photo fail
-        // silently, which is exactly what it used to do.
-        expect(disclosesAsToken('picture_id')).toBe(false);
+    it('certifies the ID portrait like any other document field', () => {
+        // The portrait was relayed from the wallet's own copy while the enclave
+        // had no commitment it could re-open for a disclosure. identity-verifier
+        // v0.6.3 gave picture_id its own salted commitment and migration 076
+        // priced it, so the wallet calls prove_field and the relying party gets a
+        // fresh signature rather than a stored photo.
+        //
+        // Both halves had to be true before this flipped: relaying carries gov
+        // provenance and no signature, and charging for one would sell an enclave
+        // signature nobody produced.
+        expect(disclosesAsToken('picture_id')).toBe(true);
         expect(disclosesAsToken('given_name_id')).toBe(true);
-        expect(ATTRIBUTE_MAP['picture_id'].marketplace).toBeUndefined();
+        expect(marketplaceKeyFor('picture_id')).toBe('privasys:picture_id');
     });
 
     it('marks the derived insights as having no stored value', () => {
@@ -140,6 +167,27 @@ describe('canonical attribute referential', () => {
             expect(ATTRIBUTE_MAP[key].requestOnly).toBe(true);
         }
         expect(isDerived('age_over_18')).toBe(false);
+    });
+
+    it('answers a request for the new spelling from a profile holding the old one', () => {
+        // The holder-side half of the split. A wallet that verified a passport
+        // before birthdate gained a twin stored the value under the bare key, and
+        // that profile is deliberately not migrated: refusing the disclosure
+        // would ask the holder to re-scan a document already certified.
+        const attr = (over: Partial<ProfileAttribute>): ProfileAttribute => ({
+            key: 'x', label: 'X', value: 'v', source: 'manual', verified: false, ...over
+        });
+        const profile = {
+            attributes: [
+                attr({ key: 'birthdate', value: '1980-01-01', source: 'document', verified: true }),
+                attr({ key: 'given_name', value: 'Bertrand' })
+            ]
+        } as unknown as UserProfile;
+
+        expect(govValueKey(profile, 'birthdate_id')).toBe('birthdate');
+        // And the safety of that fallback: a name the holder typed is not a name
+        // a passport certifies, however similar the two keys look.
+        expect(govValueKey(profile, 'given_name_id')).toBeUndefined();
     });
 
     it('knows every document attribute the chip read writes', () => {

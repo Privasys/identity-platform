@@ -63,7 +63,8 @@ export interface CanonicalAttribute {
     assurance?: string;
     /** The government-backed twin of a self-asserted key. */
     govKey?: string;
-    /** The `_id` spelling that replaces a key minted before the convention. */
+    /** The spelling that replaces a genuinely retired key. Unset on every key
+     *  today: the two that predated the `_id` convention became pairs instead. */
     supersededBy?: string;
     /** Never reached by a scope: the relying party must name it. */
     requestOnly?: boolean;
@@ -150,6 +151,12 @@ export function attributePairs(): { self: CanonicalAttribute; gov: CanonicalAttr
  * A key marked `supersededBy` still resolves and must never be removed, but
  * putting both spellings in a picker asks a developer to choose between two
  * names for one disclosure. They are hidden here and remain reachable by key.
+ *
+ * No key carries the marker today. `birthdate` and `nationality` did, as the two
+ * that predated the `_id` convention, until they were split into pairs: a pair is
+ * a CHOICE a picker should show (a birth date the holder typed is cheaper than
+ * one a passport certifies), where a supersession is a spelling nobody should
+ * have to pick between.
  */
 export function requestableAttributes(
     all: CanonicalAttribute[] = CANONICAL_ATTRIBUTES,

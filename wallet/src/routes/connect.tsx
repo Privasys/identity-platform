@@ -2839,7 +2839,7 @@ function AttributeAcquisitionView({
                             {missingAttributes.map((attr) => {
                                 if (!stillMissing.includes(attr)) return null;
                                 const label = attributeLabel(attr);
-                                // Gov-assurance attributes (birthdate, nationality,
+                                // Gov-assurance attributes (birthdate_id, nationality_id,
                                 // age_over_*) are produced only by an enclave-backed
                                 // identity verification — never hand-typed. The NFC +
                                 // biometric capture flow (Phase 2) fills these; until it

@@ -40,10 +40,11 @@
  * that nothing can keep honest.
  *
  * What a scope CANNOT do is worth stating. Every government-backed `_id`
- * attribute is request-only, so `identity` reaches the document baseline
- * (`birthdate`, `nationality`, `age_over_18`, `age_over_21` and the chip fields)
- * and nothing else. To ask for a passport-certified name, name
- * `given_name_id` in {@link AuthFrameConfig.attributes}. A gov disclosure
+ * attribute is request-only, and so is every attribute the marketplace prices, so
+ * `identity` reaches the free baseline (`age_over_18`, `age_over_21`, the
+ * self-asserted `birthdate` and `nationality`, and the unpriced chip fields) and
+ * nothing else. To ask for a passport-certified name or birth date, name
+ * `given_name_id` or `birthdate_id` in {@link AuthFrameConfig.attributes}. A gov disclosure
  * arrives as an enclave-signed SD-JWT VC, surfaced in
  * {@link SignInResult.disclosures}; a priced one requires the client to be
  * registered billable, and sign-in rejects with

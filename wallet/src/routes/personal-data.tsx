@@ -112,8 +112,9 @@ export default function PersonalDataScreen() {
     // (stable sort). Unlisted keys fall to the end.
     const ATTR_ORDER = [
         'name', 'given_name', 'given_name_id', 'family_name', 'family_name_id',
-        'nickname', 'picture', 'email', 'phone_number',
-        'birthdate', 'age_over_18', 'age_over_21', 'sex', 'nationality',
+        'nickname', 'picture', 'picture_id', 'email', 'phone_number',
+        'birthdate', 'birthdate_id', 'age_over_18', 'age_over_21', 'sex',
+        'nationality', 'nationality_id',
         'place_of_birth', 'document_type', 'document_number', 'doc_expiry',
         'issuing_state', 'personal_number', 'locale',
     ];

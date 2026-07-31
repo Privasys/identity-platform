@@ -483,8 +483,13 @@ export async function verifyIdentity(
 // reading of this attribute live", so the mapping is read rather than restated:
 // a second hand-maintained copy of that fact is how the disclosure and the
 // stored value drift apart. Keys with no self-asserted twin to protect
-// (birthdate, document_number, ...) have no govKey and keep their own name,
-// which is also why an existing profile needs no migration.
+// (document_number, sex, ...) have no govKey and keep their own name.
+//
+// birthdate and nationality gained a twin after profiles already held them under
+// the bare key. Those profiles are not migrated and do not need to be: govValueKey
+// answers a request for `birthdate_id` from a stored `birthdate` when that value
+// is document-sourced, so the holder is never asked to re-scan a passport the
+// wallet has already certified.
 const govStoreKey = (field: string): string => ATTRIBUTE_MAP[field]?.govKey ?? field;
 
 function govRecord(record: KycRecord, evidence: string): VerificationRecord {

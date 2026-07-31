@@ -69,15 +69,18 @@ type Attribute struct {
 	// (given_name -> given_name_id). It is the whole of the pairing convention:
 	// adding a pair is a twin key plus this pointer.
 	GovKey string `json:"govKey,omitempty"`
-	// SupersededBy names the '_id' spelling that replaces a key minted before the
-	// convention existed. The old key keeps working verbatim — a registration, a
-	// stored share link and a signed voucher all name it — so this is a hint to
-	// pickers and new integrators, never a redirect.
+	// SupersededBy names the spelling that replaces a genuinely retired key. It
+	// is a hint to pickers and new integrators, never a redirect: the old key
+	// keeps working verbatim, because a registration, a stored share link and a
+	// signed voucher all name it. No key carries it — the two that did became
+	// pairs instead, which is the better answer whenever both readings still mean
+	// something.
 	SupersededBy string `json:"supersededBy,omitempty"`
 	// RequestOnly keeps a key out of every scope-derived set: the relying party
-	// must name it, in its required_attributes whitelist or in the per-request
-	// `attributes` parameter. It is the fail-closed half of the model and is set
-	// on every '_id' key, so a client that asks for `identity` and nothing else
+	// must name it, in its required_attributes whitelist (within the scope that
+	// would have carried it) or in the per-request `attributes` parameter. It is
+	// the fail-closed half of the model and is set on every '_id' key and every
+	// priced key, so a client that asks for `identity` and nothing else
 	// never acquires a billable disclosure it did not name.
 	RequestOnly bool `json:"requestOnly,omitempty"`
 	// CertifiedField is the identity-verifier field prove_field opens for this

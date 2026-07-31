@@ -74,24 +74,25 @@ func TestMarketplaceKeysNameTheCertifiedField(t *testing.T) {
 }
 
 // The set the marketplace prices, pinned. These keys are seeded by
-// management-service migrations 055/056 in a repository with no build-time link
-// to this one, so the only way a divergence gets noticed is a deliberate edit
-// here. Adding a canonical attribute to the marketplace means adding its registry
-// row in the same change — and where two canonical keys share a row (birthdate
-// and birthdate_id are one disclosure under two spellings) that is deliberate,
-// which is why reservableMarketplaceKeys deduplicates.
+// management-service migrations 055/056/076 in a repository with no build-time
+// link to this one, so the only way a divergence gets noticed is a deliberate
+// edit here. Adding a canonical attribute to the marketplace means adding its
+// registry row in the same change, and in that order: a reservation naming a key
+// with no row fails the whole authorization.
 func TestMarketplaceIssuableSetIsPinned(t *testing.T) {
 	want := map[string]string{
-		"birthdate":      "privasys:birthdate",
-		"nationality":    "privasys:nationality",
-		"age_over_18":    "privasys:age_over_18",
-		"age_over_21":    "privasys:age_over_21",
-		"age_band":       "privasys:age_band",
-		"document_valid": "privasys:document_valid",
-		"given_name_id":  "privasys:given_name",
-		"family_name_id": "privasys:family_name",
-		"birthdate_id":   "privasys:birthdate",
-		"nationality_id": "privasys:nationality",
+		"age_over_18":     "privasys:age_over_18",
+		"age_over_21":     "privasys:age_over_21",
+		"age_band":        "privasys:age_band",
+		"document_valid":  "privasys:document_valid",
+		"given_name_id":   "privasys:given_name",
+		"family_name_id":  "privasys:family_name",
+		"birthdate_id":    "privasys:birthdate",
+		"nationality_id":  "privasys:nationality",
+		"doc_expiry":      "privasys:doc_expiry",
+		"place_of_birth":  "privasys:place_of_birth",
+		"personal_number": "privasys:personal_number",
+		"picture_id":      "privasys:picture_id",
 	}
 	got := map[string]string{}
 	for _, a := range All {
@@ -130,6 +131,50 @@ func TestSelfAssertedKeysAreFree(t *testing.T) {
 	}
 }
 
+// Pricing a key means making it request-only in the same change. A priced key on
+// a scope-derived set charges every identity request for a disclosure nobody
+// asked for, and a relying party out of credits gets a 402 instead of a sign-in.
+//
+// age_over_18/21 are exempt only because they predate the rule: they ARE the
+// identity baseline, priced and scope-reachable since the marketplace shipped,
+// and making them request-only now would drop them from every client that has
+// ever asked for the identity scope.
+func TestPricedKeysAreRequestOnly(t *testing.T) {
+	baseline := map[string]bool{"age_over_18": true, "age_over_21": true}
+	for _, a := range All {
+		if a.Marketplace == nil || baseline[a.Key] {
+			continue
+		}
+		if !a.RequestOnly {
+			t.Errorf("%s is priced as %q but rides a scope; a client would be charged for naming nothing",
+				a.Key, a.Marketplace.Key)
+		}
+	}
+}
+
+// The DG2 portrait is a certified disclosure now, not a relayed copy.
+// identity-verifier v0.6.3 commits to it under its own salt, so prove_field
+// opens it and meters privasys:picture_id, and migration 076 seeded that row;
+// until both were true the wallet relayed its stored photo and there was no
+// enclave signature to sell.
+func TestPortraitDisclosesAsACertifiedToken(t *testing.T) {
+	a, ok := ByKey["picture_id"]
+	if !ok {
+		t.Fatal("picture_id missing from the referential")
+	}
+	if a.Disclosure == "raw" {
+		t.Error("picture_id: a raw key relays the wallet's copy and can never be billed")
+	}
+	// The enclave meters the field name it was handed; picture_id already IS
+	// that name, so there is no certifiedField to translate.
+	if got := a.CertifiedFieldName(); got != "picture_id" {
+		t.Errorf("picture_id: certified field = %q, want picture_id", got)
+	}
+	if mk, ok := MarketplaceKey("picture_id"); !ok || mk != "privasys:picture_id" {
+		t.Errorf("MarketplaceKey(picture_id) = %q, %v", mk, ok)
+	}
+}
+
 // The pairing convention: a self-asserted key names its government-backed twin,
 // the twin exists, is gov-verified, carries the '_id' suffix and is request-only.
 // Request-only is the fail-closed half — a relying party that asks for `identity`
@@ -159,8 +204,9 @@ func TestGovTwinsArePairedAndRequestOnly(t *testing.T) {
 			t.Errorf("%s: twin %s must be request-only", a.Key, twin.Key)
 		}
 	}
-	if pairs != 3 {
-		t.Errorf("found %d self-asserted keys with a gov twin, want 3 (given_name, family_name, picture)", pairs)
+	if pairs != 5 {
+		t.Errorf("found %d self-asserted keys with a gov twin, want 5 "+
+			"(given_name, family_name, picture, birthdate, nationality)", pairs)
 	}
 
 	// Every '_id' key must be request-only, including the ones with no
@@ -173,11 +219,15 @@ func TestGovTwinsArePairedAndRequestOnly(t *testing.T) {
 }
 
 // birthdate and nationality predate the '_id' convention and were minted
-// government-backed. They stay exactly as they are — same scope, same assurance,
-// same price — because a registered client's required_attributes, a stored share
-// link and a signed voucher all name them verbatim. supersededBy is a hint to new
-// integrators, never a redirect.
-func TestSupersededKeysAreUnchanged(t *testing.T) {
+// government-backed. They are now dual like every other pair, which is a
+// BREAKING change and the reason this test is specific rather than generic:
+// every clause is a way the split could be got wrong.
+//
+// The bare key keeps its scope and stays scope-reachable — making a shipped
+// scope-reachable key request-only would drop it from every existing identity
+// client — but it is self-asserted now, and therefore free. The passport reading
+// moved to the '_id' twin.
+func TestNewlyDualKeysAreSplitNotRetired(t *testing.T) {
 	for key, want := range map[string]string{
 		"birthdate":   "birthdate_id",
 		"nationality": "nationality_id",
@@ -186,20 +236,24 @@ func TestSupersededKeysAreUnchanged(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s missing from the referential", key)
 		}
-		if a.SupersededBy != want {
-			t.Errorf("%s: supersededBy = %q, want %q", key, a.SupersededBy, want)
+		if a.GovKey != want {
+			t.Errorf("%s: govKey = %q, want %q", key, a.GovKey, want)
 		}
-		if a.Scope != "identity" || !a.IsGovVerified() {
-			t.Errorf("%s: scope=%q gov=%v, want identity/true", key, a.Scope, a.IsGovVerified())
+		if a.SupersededBy != "" {
+			t.Errorf("%s: a dual key is not superseded by its twin; a picker must offer both", key)
+		}
+		if a.Scope != "identity" || a.IsGovVerified() {
+			t.Errorf("%s: scope=%q gov=%v, want identity/false", key, a.Scope, a.IsGovVerified())
 		}
 		if a.RequestOnly {
 			t.Errorf("%s: making a shipped scope-reachable key request-only would drop it from every existing identity client", key)
 		}
-		if mk, ok := MarketplaceKey(key); !ok || mk != "privasys:"+key {
-			t.Errorf("%s: marketplace key = %q (%v), want privasys:%s", key, mk, ok, key)
+		if mk, ok := MarketplaceKey(key); ok {
+			t.Errorf("%s: the self-asserted half of a pair still prices as %q", key, mk)
 		}
-		// The twin resolves to the SAME registry row: one disclosure, two
-		// spellings, one charge.
+		// The twin keeps the registry row the bare key was sold under, so every
+		// signed voucher and stored share link naming privasys:birthdate still
+		// buys exactly the disclosure it always bought.
 		if mk, _ := MarketplaceKey(want); mk != "privasys:"+key {
 			t.Errorf("%s: marketplace key = %q, want privasys:%s", want, mk, key)
 		}
@@ -280,13 +334,12 @@ func TestCertifiedFieldsRouteToTheEnclaveSpelling(t *testing.T) {
 // MarketplaceKey must refuse the identity attributes the marketplace does not
 // price. Reserving one fails the whole authorization as an unknown attribute, so
 // "not issuable" has to be distinguishable from "issuable under its own name".
-// doc_expiry, place_of_birth, personal_number and picture_id are certified by the
-// enclave but have no registry row: until a migration seeds one they must stay
-// unpriced here rather than be namespaced on the hope that a row exists.
+// These four are certified by the enclave and returned alongside a priced
+// insight, but no migration has seeded a row for them: they must stay unpriced
+// here rather than be namespaced on the hope that a row exists.
 func TestMarketplaceKeyRefusesUnpricedIdentityFields(t *testing.T) {
 	for _, key := range []string{
 		"document_number", "document_type", "issuing_state", "sex",
-		"doc_expiry", "place_of_birth", "personal_number", "picture_id",
 	} {
 		a, ok := ByKey[key]
 		if !ok {

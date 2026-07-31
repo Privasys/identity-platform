@@ -46,8 +46,8 @@ const DOC_PAGE_RATIO = 1.42;
 // stored — NOT disclosable profile attributes, so they are defined here (local to
 // the capture flow) rather than in the shared canonical-attributes referential,
 // which models stored/disclosed attributes (with scope + assurance). The verifier
-// turns these into the gov-assured *output* attributes (birthdate, nationality,
-// age_over_18, …) that the user picks in the post-verify "select" step; those
+// turns these into the gov-assured *output* attributes (birthdate_id,
+// nationality_id, age_over_18, …) that the user picks in the "select" step; those
 // outputs ARE in the referential. `doc` is the document noun (passport / ID card).
 const KYC_INPUT_ITEMS: { key: string; icon: keyof typeof Ionicons.glyphMap; label: (doc: string) => string }[] = [
     { key: 'doc_page', icon: 'camera-outline', label: (doc) => `Your ${doc}'s photo page` },

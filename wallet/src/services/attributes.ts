@@ -81,9 +81,9 @@ export interface AttributeDefinition {
      */
     govKey?: string;
     /**
-     * The `_id` spelling that replaces a key minted before the convention
-     * existed. The old key keeps working verbatim, so this is a hint to pickers
-     * and new integrators, never a redirect.
+     * The spelling that replaces a genuinely retired key: a hint to pickers and
+     * new integrators, never a redirect, since the old key keeps working
+     * verbatim. No key carries it — the two that did became pairs instead.
      */
     supersededBy?: string;
     /** Never pulled in by a scope: the relying party must name it. Resolved by

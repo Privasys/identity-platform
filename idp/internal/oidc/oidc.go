@@ -1583,6 +1583,25 @@ func whitelistedAttributes(client *clients.Client) map[string]bool {
 	return allowed
 }
 
+// namedByRegistration reports whether a client's required_attributes whitelist
+// names a request-only key on this request.
+//
+// A whitelist is the registration-time half of naming, and without it the
+// per-attribute model has no answer for a client that cannot change its request:
+// migrating such a client's `birthdate` to `birthdate_id` would otherwise move it
+// from a government-verified disclosure to nothing at all, which is a worse
+// answer than the downgrade the migration exists to prevent.
+//
+// The scope still has to admit the key, which is what keeps this strictly weaker
+// than the `attributes` parameter. A client that whitelisted a passport key but
+// asks for `openid email` is not charged for a disclosure this request cannot
+// carry, and a migrated client sees exactly what it saw before: the identity
+// scope, the same one disclosure, the same one charge.
+func namedByRegistration(attr attributes.Attribute, scope string, allowed map[string]bool) bool {
+	return attr.RequestOnly && allowed[attr.Key] &&
+		attr.Scope != "" && strings.Contains(scope, attr.Scope)
+}
+
 // requestedAttributes derives the attribute keys a relying party needs: the
 // scope-derived set, plus the keys it named on the request, then intersected
 // with the client's required_attributes whitelist (when set). "sub" is always
@@ -1592,10 +1611,12 @@ func whitelistedAttributes(client *clients.Client) map[string]bool {
 //
 // The two paths are deliberately not equivalent. A scope is coarse and historic:
 // `identity` still yields exactly the identity baseline it always has. A named
-// key is precise, and it is the ONLY way to reach a request-only key — every
+// key is precise, and naming is the only way to reach a request-only key — every
 // government-backed `_id` attribute is one, so no client is ever charged for a
 // passport disclosure it did not spell out. The whitelist still wins over both:
 // a registration is a ceiling, not a starting point.
+//
+// A whitelist entry is one of the two ways of naming (see namedByRegistration).
 func requestedAttributes(scope string, named []string, client *clients.Client) []string {
 	allowed := whitelistedAttributes(client)
 
@@ -1609,7 +1630,7 @@ func requestedAttributes(scope string, named []string, client *clients.Client) [
 		requested = append(requested, "sub")
 	}
 	for _, attr := range attributes.All {
-		if !attr.InScope(scope) && !inRequest[attr.Key] {
+		if !attr.InScope(scope) && !inRequest[attr.Key] && !namedByRegistration(attr, scope, allowed) {
 			continue
 		}
 		requested = append(requested, attr.Key)
@@ -1679,10 +1700,11 @@ func attributeRequirements(scope string, named []string, client *clients.Client)
 // certified by the same ceremony but have no registry row, and reserving one
 // fails the whole authorization as an unknown attribute.
 //
-// Deduplication is load-bearing, not tidiness: a key and its legacy spelling
-// resolve to the same registry row (birthdate_id and birthdate are both
-// privasys:birthdate), and a client naming both would otherwise be charged
-// twice for one disclosure.
+// Deduplication is defensive: nothing in the referential maps two canonical keys
+// onto one registry row today, and while a pair shares a row in spirit only the
+// government-backed half is priced. It stays because the referential is free to
+// point two keys at one row and the failure would be a relying party charged
+// twice for a single disclosure.
 func reservableMarketplaceKeys(reqs map[string]AttributeRequirement) []string {
 	seen := map[string]bool{}
 	var keys []string

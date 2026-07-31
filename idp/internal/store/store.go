@@ -270,6 +270,13 @@ func migrate(db *sql.DB) error {
 		}
 	}
 
+	// Migration: rewrite whitelists naming a key whose bare spelling stopped
+	// meaning "government verified" (see attribute_split.go). Data, not schema,
+	// so it runs exactly once.
+	if err := migrateAttributeAssuranceSplit(db); err != nil {
+		return err
+	}
+
 	// Migration: backfill users rows for existing service accounts so that
 	// FK constraints (roles, etc.) work uniformly for all principal types.
 	_, err = db.Exec(`

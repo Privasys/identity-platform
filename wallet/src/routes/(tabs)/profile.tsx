@@ -212,13 +212,21 @@ export default function ProfileScreen() {
         );
     }
 
-    const handleCopyDid = () => {
-        const didToCopy = profile.canonicalDid || profile.did;
-        if (didToCopy) {
-            Clipboard.setStringAsync(didToCopy);
-            Alert.alert('Copied', 'DID copied to clipboard.');
-        }
+    const handleCopy = (label: string, value?: string) => {
+        if (!value) return;
+        Clipboard.setStringAsync(value);
+        Alert.alert('Copied', `${label} copied to clipboard.`);
     };
+
+    // The Privasys Account id is the IdP user id of the canonical account:
+    // base64url of the 32-hex-char userId carried in the canonical DID
+    // (did:web:privasys.id:users:<userId>). Same derivation as
+    // ensurePrivasysSession, so what's shown here matches what the IdP,
+    // recovery settings and support tooling call the account.
+    const canonicalUserId = profile.canonicalDid?.split(':').pop() ?? '';
+    const privasysAccountId = canonicalUserId
+        ? btoa(canonicalUserId).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+        : '';
 
     return (
         <RNView style={styles.screen}>
@@ -263,7 +271,10 @@ export default function ProfileScreen() {
 
                 {/* DID */}
                 <Text style={styles.sectionTitle}>IDENTITY</Text>
-                <Pressable style={styles.didCard} onPress={handleCopyDid}>
+                <Pressable
+                    style={styles.didCard}
+                    onPress={() => handleCopy('Canonical DID', profile.canonicalDid || profile.did)}
+                >
                     <Ionicons name="finger-print" size={20} color={p.blue} />
                     <RNView style={{ flex: 1 }}>
                         <Text style={styles.didLabel}>Canonical DID</Text>
@@ -273,7 +284,23 @@ export default function ProfileScreen() {
                     </RNView>
                     <Ionicons name="copy-outline" size={18} color={p.textMuted} />
                 </Pressable>
-                <RNView style={styles.didCard}>
+                <Pressable
+                    style={styles.didCard}
+                    onPress={() => handleCopy('Privasys Account', privasysAccountId)}
+                >
+                    <Ionicons name="person-circle-outline" size={20} color={p.blue} />
+                    <RNView style={{ flex: 1 }}>
+                        <Text style={styles.didLabel}>Privasys Account</Text>
+                        <Text style={styles.didText} numberOfLines={1}>
+                            {privasysAccountId || 'Not generated'}
+                        </Text>
+                    </RNView>
+                    <Ionicons name="copy-outline" size={18} color={p.textMuted} />
+                </Pressable>
+                <Pressable
+                    style={styles.didCard}
+                    onPress={() => handleCopy('Device DID', profile.did)}
+                >
                     <Ionicons name="phone-portrait-outline" size={20} color={p.textSecondary} />
                     <RNView style={{ flex: 1 }}>
                         <Text style={styles.didLabel}>Device DID</Text>
@@ -281,7 +308,8 @@ export default function ProfileScreen() {
                             {profile.did || 'Not generated'}
                         </Text>
                     </RNView>
-                </RNView>
+                    <Ionicons name="copy-outline" size={18} color={p.textMuted} />
+                </Pressable>
                 <Text style={styles.privacyNote}>
                     Apps receive a unique derived ID — they cannot track you across services.
                 </Text>

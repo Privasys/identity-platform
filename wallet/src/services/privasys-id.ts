@@ -97,13 +97,45 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
             store.setPrivasysId({ ...existing, credentialId: credId, keyAlias });
             store.removeCredential(adopt.credentialId);
         }
-        const result = await fido2Authenticate(
-            PRIVASYS_ORIGIN,
-            keyAlias,
-            credId,
-            '', // no browser session relay
-            PRIVASYS_ORIGIN,
-        );
+        const authenticate = (cid: string, alias: string) =>
+            fido2Authenticate(
+                PRIVASYS_ORIGIN,
+                alias,
+                cid,
+                '', // no browser session relay
+                PRIVASYS_ORIGIN,
+            );
+        let result;
+        try {
+            result = await authenticate(credId, keyAlias);
+        } catch (e: any) {
+            // The server no longer knows the slot's credential (a recovery
+            // revoked it). If credentials[] holds another credential for the
+            // SAME account (matched by userHandle), the slot pointer is just
+            // stale — repoint it and retry once. Local repair only; never
+            // re-register automatically.
+            const stale = String(e?.message ?? e).includes('no credentials found');
+            const adopt = stale
+                ? store.credentials.find(
+                      (c) =>
+                          c.rpId === 'privasys.id' &&
+                          c.userHandle === existing.userId &&
+                          c.credentialId !== credId,
+                  )
+                : undefined;
+            if (!adopt) throw e;
+            credId = adopt.credentialId;
+            keyAlias = adopt.keyAlias;
+            store.setPrivasysId({
+                ...existing,
+                credentialId: credId,
+                keyAlias,
+                sessionToken: '',
+                sessionExpiresAt: 0,
+            });
+            store.removeCredential(adopt.credentialId);
+            result = await authenticate(credId, keyAlias);
+        }
         if (!result.sessionToken) throw new Error('No sessionToken from authenticate');
         store.setPrivasysSession(result.sessionToken, SESSION_TTL_MS);
         return { sessionToken: result.sessionToken, userId: existing.userId };

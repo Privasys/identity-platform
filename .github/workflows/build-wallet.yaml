@@ -93,7 +93,12 @@ env:
   # roll that moves only the RTMRs (kernel/initrd) rotates the sealed session
   # silently; with it, that rotation surfaces as a "platform upgraded, re-approve"
   # ceremony. Additive JSON fields; iOS + Android both rebuilt.
-  RATLS_VERSION: v0.7.5
+  # v0.7.6 decodes chunked transfer coding in the HTTP response parser. The
+  # client read bodies from Content-Length alone; Go's http server chunks any
+  # response over its 2 KiB buffer, so bigger bodies (the first was Drive's
+  # ~2.1 KiB root listing) arrived as status 200 with an EMPTY body — the
+  # "empty Drive tab" bug. Affects every RA-TLS response over ~2 KiB.
+  RATLS_VERSION: v0.7.6
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

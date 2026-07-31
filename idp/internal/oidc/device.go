@@ -286,7 +286,8 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 
 		// Reserve the relying party's credits for any paid (gov) attributes and
 		// carry the disclosure vouchers to the wallet in the same payload.
-		vouchers, mintErr := mintDisclosureVouchers(r.Context(), minter, client, attributeRequirements)
+		vouchers, mintErr := mintDisclosureVouchers(r.Context(), minter, client, attributeRequirements,
+			strings.TrimSpace(r.FormValue("billing_grant")))
 		if mintErr == voucher.ErrInsufficient {
 			errorResponse(w, http.StatusPaymentRequired, "insufficient_credits",
 				"The relying party has insufficient credits for the requested attributes")

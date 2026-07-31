@@ -58,7 +58,7 @@ func TestMint(t *testing.T) {
 		t.Fatal("minter should be enabled")
 	}
 	vs, err := m.Mint(context.Background(), "11111111-1111-1111-1111-111111111111", "acme.example",
-		[]string{"privasys:age_over", "privasys:document_valid", "acme-dna:brca1_status"}, 30*time.Minute)
+		[]string{"privasys:age_over", "privasys:document_valid", "acme-dna:brca1_status"}, 30*time.Minute, "", "")
 	if err != nil {
 		t.Fatalf("Mint: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestMintInsufficient(t *testing.T) {
 	}))
 	defer srv.Close()
 	m := NewMinter(testIssuer(t), srv.URL, "t")
-	_, err := m.Mint(context.Background(), "11111111-1111-1111-1111-111111111111", "rp", []string{"privasys:age_over"}, time.Minute)
+	_, err := m.Mint(context.Background(), "11111111-1111-1111-1111-111111111111", "rp", []string{"privasys:age_over"}, time.Minute, "", "")
 	if err != ErrInsufficient {
 		t.Fatalf("expected ErrInsufficient, got %v", err)
 	}
@@ -95,7 +95,7 @@ func TestMintInsufficient(t *testing.T) {
 // without the marketplace configured).
 func TestMintDisabled(t *testing.T) {
 	m := NewMinter(testIssuer(t), "", "")
-	vs, err := m.Mint(context.Background(), "acc", "rp", []string{"privasys:age_over"}, time.Minute)
+	vs, err := m.Mint(context.Background(), "acc", "rp", []string{"privasys:age_over"}, time.Minute, "", "")
 	if err != nil || vs != nil {
 		t.Fatalf("disabled minter should no-op, got (%v, %v)", vs, err)
 	}

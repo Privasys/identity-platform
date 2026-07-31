@@ -78,7 +78,11 @@ func (m *Minter) Enabled() bool { return m.mgmtURL != "" && m.mgmtTok != "" }
 // enclave checks it against the request). reservationTTL controls how long the
 // hold survives (long enough to outlive first-time capture). Returns nil when
 // minting is disabled or no attributes were requested.
-func (m *Minter) Mint(ctx context.Context, rpAccountID, rpID string, attributes []string, reservationTTL time.Duration) ([]MintedVoucher, error) {
+// billingGrant, when non-empty, redirects the charge from the relying party
+// to the user who issued that grant ("the person asking pays", for
+// peer-to-peer sharing). The management-service validates its scope, ceiling
+// and single use; the IdP only carries it.
+func (m *Minter) Mint(ctx context.Context, rpAccountID, rpID string, attributes []string, reservationTTL time.Duration, billingGrant, clientID string) ([]MintedVoucher, error) {
 	if !m.Enabled() || len(attributes) == 0 {
 		return nil, nil
 	}
@@ -86,11 +90,16 @@ func (m *Minter) Mint(ctx context.Context, rpAccountID, rpID string, attributes 
 	if ttlSecs <= 0 {
 		ttlSecs = 1800
 	}
-	reqBody, _ := json.Marshal(map[string]any{
+	body := map[string]any{
 		"rp_account_id": rpAccountID,
 		"attributes":    attributes,
 		"ttl_seconds":   ttlSecs,
-	})
+	}
+	if billingGrant != "" {
+		body["billing_grant"] = billingGrant
+		body["client_id"] = clientID
+	}
+	reqBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		m.mgmtURL+"/api/v1/internal/attribute-vouchers/reserve", bytes.NewReader(reqBody))
 	if err != nil {

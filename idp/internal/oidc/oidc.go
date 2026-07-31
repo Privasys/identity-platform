@@ -653,7 +653,8 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		// Reserve the relying party's credits for any paid (gov) attributes and
 		// carry the resulting disclosure vouchers to the wallet, which relays
 		// them to the issuing enclave.
-		vouchers, err := mintDisclosureVouchers(r.Context(), minter, client, attributeRequirements)
+		vouchers, err := mintDisclosureVouchers(r.Context(), minter, client, attributeRequirements,
+			strings.TrimSpace(r.URL.Query().Get("billing_grant")))
 		if err == voucher.ErrInsufficient {
 			errorResponse(w, http.StatusPaymentRequired, "insufficient_credits",
 				"The relying party has insufficient credits for the requested attributes")
@@ -1579,7 +1580,7 @@ const disclosureReservationTTL = 30 * time.Minute
 // through the Privasys identity-verifier, hence the `privasys:` marketplace
 // namespace); everything else discloses free and returns (nil, nil). A returned
 // voucher.ErrInsufficient means the RP cannot pay — the caller answers 402.
-func mintDisclosureVouchers(ctx context.Context, m *voucher.Minter, client *clients.Client, reqs map[string]AttributeRequirement) ([]voucher.MintedVoucher, error) {
+func mintDisclosureVouchers(ctx context.Context, m *voucher.Minter, client *clients.Client, reqs map[string]AttributeRequirement, billingGrant string) ([]voucher.MintedVoucher, error) {
 	if m == nil || !m.Enabled() || client == nil || !client.BillableRP || client.BillingAccountID == "" {
 		return nil, nil
 	}
@@ -1597,7 +1598,7 @@ func mintDisclosureVouchers(ctx context.Context, m *voucher.Minter, client *clie
 	if rpID == "" {
 		rpID = client.ClientID
 	}
-	return m.Mint(ctx, client.BillingAccountID, rpID, keys, disclosureReservationTTL)
+	return m.Mint(ctx, client.BillingAccountID, rpID, keys, disclosureReservationTTL, billingGrant, client.ClientID)
 }
 
 // filterAttributesByScope returns only the attributes allowed by the OIDC scope,

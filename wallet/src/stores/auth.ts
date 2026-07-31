@@ -35,6 +35,13 @@ export interface AuthState {
     unlockExpiresAt: number;
     /** The wallet's own privasys.id meta-account (for recovery management). */
     privasysId: PrivasysIdAccount | null;
+    /** Whether the user has confirmed saving their CURRENT recovery phrase.
+     *  False on a fresh wallet, whenever a phrase is (re)generated (until the
+     *  user confirms), and whenever a flow invalidates the phrase (account
+     *  recovery, deactivation). Drives the persistent "save your recovery
+     *  phrase" nudge — the server only knows has_phrase, not whether the human
+     *  ever wrote it down. */
+    recoveryPhraseSaved: boolean;
 
     // Actions
     setOnboarded: () => void;
@@ -46,6 +53,7 @@ export interface AuthState {
     checkUnlocked: () => boolean;
     setPrivasysId: (account: PrivasysIdAccount | null) => void;
     setPrivasysSession: (sessionToken: string, ttlMs: number) => void;
+    setRecoveryPhraseSaved: (saved: boolean) => void;
     hydrate: () => Promise<void>;
 }
 
@@ -71,6 +79,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     isUnlocked: false,
     unlockExpiresAt: 0,
     privasysId: null,
+    recoveryPhraseSaved: false,
 
     setOnboarded: () => {
         set({ isOnboarded: true });
@@ -136,6 +145,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         persist(get());
     },
 
+    setRecoveryPhraseSaved: (saved) => {
+        set({ recoveryPhraseSaved: saved });
+        persist(get());
+    },
+
     hydrate: async () => {
         const raw = await SecureStore.getItemAsync(STORE_KEY);
         if (!raw) return;
@@ -170,6 +184,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 isOnboarded: data.isOnboarded ?? false,
                 credentials,
                 privasysId,
+                recoveryPhraseSaved: data.recoveryPhraseSaved ?? false,
             });
             persist(get());
         } catch {
@@ -183,6 +198,7 @@ function persist(state: AuthState) {
         isOnboarded: state.isOnboarded,
         credentials: state.credentials,
         privasysId: state.privasysId,
+        recoveryPhraseSaved: state.recoveryPhraseSaved,
     };
     SecureStore.setItemAsync(STORE_KEY, JSON.stringify(data)).catch(console.error);
 }

@@ -59,6 +59,9 @@ export default function AccountRecoveryScreen() {
     const styles = useMemo(() => makeStyles(p), [p]);
     const profile = useProfileStore((s) => s.profile);
     const privasysId = useAuthStore((s) => s.privasysId);
+    const credentialsList = useAuthStore((s) => s.credentials);
+    const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
+    const setRecoveryPhraseSaved = useAuthStore((s) => s.setRecoveryPhraseSaved);
 
     // Wallet session token for management calls. The legacy `accessToken`
     // string is now `wallet:<sessionToken>` so that the same `Bearer ...`
@@ -66,6 +69,15 @@ export default function AccountRecoveryScreen() {
     const accessToken = privasysId?.sessionToken ? `wallet:${privasysId.sessionToken}` : '';
     const walletSessionToken = privasysId?.sessionToken ?? '';
     const userId = privasysId?.userId ?? '';
+    // Credential ids this device holds for privasys.id (the canonical slot plus
+    // any privasys.id entries in credentials[]), so the device list can mark
+    // "This device" instead of an anonymous "Credential 3a4b…".
+    const myCredentialIds = new Set<string>(
+        [
+            privasysId?.credentialId,
+            ...credentialsList.filter((c) => c.rpId === 'privasys.id').map((c) => c.credentialId),
+        ].filter((v): v is string => !!v),
+    );
 
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -141,6 +153,7 @@ export default function AccountRecoveryScreen() {
             const result = await ensurePrivasysSession(profile?.displayName);
             // First registration returns the recovery phrase exactly once
             if (result.recoveryPhrase) {
+                setRecoveryPhraseSaved(false);
                 setNewPhrase(result.recoveryPhrase);
                 setPhraseStatus({ has_phrase: true });
             }
@@ -170,6 +183,9 @@ export default function AccountRecoveryScreen() {
                             // Refresh session if needed
                             const sess = await ensurePrivasysSession(profile?.displayName);
                             const res = await regenerateRecoveryPhrase(sess.sessionToken);
+                            // A brand-new phrase is shown but not yet written
+                            // down — un-confirm until the user taps "I've saved".
+                            setRecoveryPhraseSaved(false);
                             setNewPhrase(res.phrase);
                             setPhraseStatus({ has_phrase: true });
                         } catch (e: any) {
@@ -198,6 +214,7 @@ export default function AccountRecoveryScreen() {
                         try {
                             const sess = await ensurePrivasysSession(profile?.displayName);
                             await deleteRecoveryPhrase(sess.sessionToken);
+                            setRecoveryPhraseSaved(false);
                             setPhraseStatus({ has_phrase: false });
                             Alert.alert('Deactivated', 'Recovery phrase deleted. You can regenerate one at any time.');
                         } catch (e: any) {
@@ -366,29 +383,46 @@ export default function AccountRecoveryScreen() {
                             ))}
                         </RNView>
                         <Pressable
-                            style={styles.secondaryButton}
-                            onPress={() => setNewPhrase(null)}
+                            style={styles.primaryButton}
+                            onPress={() => {
+                                // Confirmed: this is the one place the human tells
+                                // us they wrote it down. Persist it so the nudge
+                                // stops until the phrase is next (re)generated or
+                                // invalidated.
+                                setRecoveryPhraseSaved(true);
+                                setNewPhrase(null);
+                            }}
                         >
-                            <Text style={styles.secondaryButtonText}>I've saved my phrase</Text>
+                            <Text style={styles.primaryButtonText}>I've saved my phrase</Text>
                         </Pressable>
                     </RNView>
                 ) : (
                     <RNView style={styles.card}>
-                        {phraseStatus ? (
+                        {/* Honest, three-state status. has_phrase is only what
+                            the SERVER knows; recoveryPhraseSaved is whether THIS
+                            device confirmed the human wrote it down. After a
+                            recovery the server deletes the phrase (has_phrase
+                            false) and the flag is cleared, so both paths nudge. */}
+                        {recoveryPhraseSaved && phraseStatus?.has_phrase ? (
                             <RNView style={styles.statusRow}>
-                                <Ionicons
-                                    name={phraseStatus.has_phrase ? 'checkmark-circle' : 'alert-circle-outline'}
-                                    size={20}
-                                    color={phraseStatus.has_phrase ? p.green : '#F59E0B'}
-                                />
+                                <Ionicons name="checkmark-circle" size={20} color={p.green} />
+                                <Text style={styles.statusText}>Recovery phrase saved</Text>
+                            </RNView>
+                        ) : phraseStatus?.has_phrase ? (
+                            <RNView style={styles.statusRow}>
+                                <Ionicons name="warning-outline" size={20} color="#F59E0B" />
                                 <Text style={styles.statusText}>
-                                    {phraseStatus.has_phrase ? 'Recovery phrase configured' : 'No recovery phrase configured'}
+                                    You have a recovery phrase, but it isn&apos;t saved on this device.
+                                    Generate a fresh one and write it down.
                                 </Text>
                             </RNView>
                         ) : (
                             <RNView style={styles.statusRow}>
-                                <Ionicons name="alert-circle-outline" size={20} color={p.textMuted} />
-                                <Text style={styles.statusText}>Recovery phrase not set up</Text>
+                                <Ionicons name="alert-circle-outline" size={20} color="#F59E0B" />
+                                <Text style={styles.statusText}>
+                                    No recovery phrase yet. Generate one and write it down so you can
+                                    recover your account.
+                                </Text>
                             </RNView>
                         )}
                         <Pressable
@@ -550,22 +584,36 @@ export default function AccountRecoveryScreen() {
                     </RNView>
                 ) : (
                     <RNView style={styles.card}>
-                        {devices.map((d) => (
+                        {devices.map((d) => {
+                            const isThisDevice = myCredentialIds.has(d.credential_id);
+                            return (
                             <RNView key={d.credential_id} style={styles.deviceRow}>
-                                <Ionicons name="phone-portrait-outline" size={18} color={p.textSecondary} />
+                                <Ionicons name="phone-portrait-outline" size={18} color={isThisDevice ? p.green : p.textSecondary} />
                                 <RNView style={{ flex: 1 }}>
-                                    <Text style={styles.deviceLabel}>
-                                        Credential {d.credential_id.substring(0, 8)}…
-                                    </Text>
+                                    <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Text style={styles.deviceLabel}>
+                                            {isThisDevice ? 'This device' : `Credential ${d.credential_id.substring(0, 8)}…`}
+                                        </Text>
+                                        {isThisDevice && (
+                                            <RNView style={styles.thisDeviceBadge}>
+                                                <Text style={styles.thisDeviceBadgeText}>Current</Text>
+                                            </RNView>
+                                        )}
+                                    </RNView>
                                     <Text style={styles.deviceDetail}>
                                         Sign count: {d.sign_count} · Registered: {new Date(d.created_at).toLocaleDateString()}
                                     </Text>
                                 </RNView>
-                                <Pressable onPress={() => handleRevokeDevice(d)} hitSlop={8}>
-                                    <Ionicons name="trash-outline" size={18} color={p.danger} />
-                                </Pressable>
+                                {/* Never let the user revoke the device they are on — it would
+                                    lock them out. Other devices stay revocable. */}
+                                {!isThisDevice && (
+                                    <Pressable onPress={() => handleRevokeDevice(d)} hitSlop={8}>
+                                        <Ionicons name="trash-outline" size={18} color={p.danger} />
+                                    </Pressable>
+                                )}
                             </RNView>
-                        ))}
+                            );
+                        })}
                     </RNView>
                 )}
 
@@ -861,6 +909,17 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         fontSize: 14,
         color: p.textPrimary,
         fontWeight: '500',
+    },
+    thisDeviceBadge: {
+        backgroundColor: p.green,
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+    },
+    thisDeviceBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
     },
     deviceDetail: {
         fontSize: 12,

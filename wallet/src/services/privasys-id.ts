@@ -74,10 +74,33 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
     }
 
     if (existing) {
+        let credId = existing.credentialId;
+        let keyAlias = existing.keyAlias;
+        // Self-heal an empty slot credentialId (left by a slot-unaware recovery):
+        // authenticating with no credentialId sends the IdP down its discoverable
+        // path, which 404s "no credentials found for user" — the confusing error
+        // users hit when reconfiguring the phrase after recovery. Adopt the
+        // account's credential from credentials[] (matched by userHandle) if one
+        // is there; otherwise fail with a clear, actionable message.
+        if (!credId) {
+            const adopt = store.credentials.find(
+                (c) => c.rpId === 'privasys.id' && c.userHandle === existing.userId,
+            );
+            if (!adopt) {
+                throw new Error(
+                    'This device has no privasys.id credential for your account. ' +
+                    'Recover your account or sign in again to re-register this device.',
+                );
+            }
+            credId = adopt.credentialId;
+            keyAlias = adopt.keyAlias;
+            store.setPrivasysId({ ...existing, credentialId: credId, keyAlias });
+            store.removeCredential(adopt.credentialId);
+        }
         const result = await fido2Authenticate(
             PRIVASYS_ORIGIN,
-            existing.keyAlias,
-            existing.credentialId,
+            keyAlias,
+            credId,
             '', // no browser session relay
             PRIVASYS_ORIGIN,
         );

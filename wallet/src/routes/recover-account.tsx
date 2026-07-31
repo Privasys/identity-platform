@@ -278,6 +278,10 @@ export default function RecoverAccountScreen() {
         setCompleteError(false);
         try {
             await completeRecovery(recoveryState.requestId);
+            // Recovery deletes the account's recovery codes server-side, so the
+            // old phrase is dead. Clear the "saved" flag → the nudge re-appears
+            // until the user generates and writes down a fresh phrase.
+            useAuthStore.getState().setRecoveryPhraseSaved(false);
             const newState = { ...recoveryState, status: 'completed' };
             setRecoveryState(newState);
             await Storage.setItemAsync(RECOVERY_STATE_KEY, JSON.stringify(newState));

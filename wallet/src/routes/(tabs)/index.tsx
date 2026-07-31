@@ -11,6 +11,8 @@ import {
     type SessionTrace,
     useServiceSessionsStore
 } from '@/stores/service-sessions';
+import { useAuthStore } from '@/stores/auth';
+import { useProfileStore } from '@/stores/profile';
 import { useSessionsStore, type RelaySession } from '@/stores/sessions';
 import { useTrustedAppsStore, type TrustedApp } from '@/stores/trusted-apps';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
@@ -165,6 +167,8 @@ export default function HomeScreen() {
     const pruneExpired = useSessionsStore((s) => s.pruneExpired);
     const removeRelaySession = useSessionsStore((s) => s.remove);
     const pendingApprovals = useVaultApprovalsStore((s) => s.pending);
+    const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
+    const hasProfile = useProfileStore((s) => !!s.profile);
     const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -235,6 +239,27 @@ export default function HomeScreen() {
 
             {/* Content */}
             <RNView style={styles.content}>
+                {/* Persistent nudge: keep inviting the user to save a recovery
+                    phrase until they confirm it. Reset by any flow that
+                    invalidates the phrase (recovery, regenerate, deactivate). */}
+                {hasProfile && !recoveryPhraseSaved && (
+                    <Pressable
+                        style={styles.approvalsBanner}
+                        onPress={() => router.push('/account-recovery')}
+                        accessibilityLabel="Save your recovery phrase"
+                    >
+                        <RNView style={[styles.approvalsIcon, { backgroundColor: '#FDE68A' }]}>
+                            <Ionicons name="key-outline" size={18} color="#B45309" />
+                        </RNView>
+                        <RNView style={styles.approvalsInfo}>
+                            <Text style={styles.approvalsTitle}>Save your recovery phrase</Text>
+                            <Text style={styles.approvalsMeta}>
+                                Write it down so you can recover your account if you lose this device
+                            </Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </Pressable>
+                )}
                 {pendingApprovals.length > 0 && (
                     <Pressable
                         style={styles.approvalsBanner}

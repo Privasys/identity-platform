@@ -43,6 +43,7 @@ export default function ProfileScreen() {
     const { profile, clearProfile } =
         useProfileStore();
     const { credentials, removeCredential } = useAuthStore();
+    const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
     const consentRecordCount = useConsentStore((s) => s.records.length);
 
@@ -407,12 +408,23 @@ export default function ProfileScreen() {
                 >
                     <RNView style={styles.sharingRow}>
                         <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="shield-checkmark-outline" size={20} color={p.blue} />
+                            <Ionicons
+                                name={recoveryPhraseSaved ? 'shield-checkmark-outline' : 'warning-outline'}
+                                size={20}
+                                color={recoveryPhraseSaved ? p.blue : '#F59E0B'}
+                            />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
                             <Text style={styles.sharingLabel}>Recovery Settings</Text>
-                            <Text style={styles.sharingDetail}>
-                                Backup codes, guardians & devices
+                            <Text
+                                style={[
+                                    styles.sharingDetail,
+                                    !recoveryPhraseSaved && { color: '#B45309', fontWeight: '600' },
+                                ]}
+                            >
+                                {recoveryPhraseSaved
+                                    ? 'Backup codes, guardians & devices'
+                                    : 'Save your recovery phrase'}
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />

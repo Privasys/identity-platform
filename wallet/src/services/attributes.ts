@@ -67,6 +67,26 @@ export interface AttributeDefinition {
      * rather than raising a conflict. See profile.mergeAttribute.
      */
     multiValued?: boolean;
+    /**
+     * Set only for attributes the attribute marketplace issues as a paid
+     * disclosure. Absent means free. The wallet does not spend the grant itself
+     * (the relying party's voucher does), but it is what lets a consent screen
+     * say which of the requested attributes the RP is paying for.
+     */
+    marketplace?: AttributeMarketplace;
+}
+
+/**
+ * The registry-facing half of an attribute. `key` is the `<namespace>:<name>`
+ * spelling the voucher and the billing grant use; a bare name is refused at
+ * reservation time, so the two are not interchangeable. `assurance` repeats the
+ * registry's vocabulary ('gov_verified'), not the none/provider/gov ladder.
+ * Price is deliberately absent — the control plane owns it and may reprice.
+ */
+export interface AttributeMarketplace {
+    key: string;
+    assurance: string;
+    billable: boolean;
 }
 
 // Map JSON profileField strings to the typed union.
@@ -91,6 +111,7 @@ export const CANONICAL_ATTRIBUTES: AttributeDefinition[] = canonicalDoc.attribut
     deviceSourced: (a as { deviceSourced?: boolean }).deviceSourced,
     identityVerifiable: (a as { identityVerifiable?: boolean }).identityVerifiable,
     multiValued: (a as { multiValued?: boolean }).multiValued,
+    marketplace: (a as { marketplace?: AttributeMarketplace }).marketplace,
 }));
 
 /** Lookup table keyed by canonical attribute key. */

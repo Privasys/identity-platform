@@ -115,6 +115,21 @@ jobs:
       - name: Type-check
         working-directory: wallet
         run: bunx tsc --noEmit
+      # The wallet bundles its own copy of the canonical referential (EAS builds
+      # see only the wallet directory), kept current by a manual `sync-shared`.
+      # Re-run it here so a forgotten sync fails the build instead of shipping a
+      # wallet that requests attributes the IdP does not know.
+      - name: Re-sync the shared referential
+        working-directory: wallet
+        run: bun run sync-shared
+      - name: Fail if the bundled copy was stale
+        run: git diff --exit-code -- wallet/src/shared
+      # Scoped to the referential suite on purpose: fido2/integration currently
+      # fail to load under jest's react-native transform, so a blanket run would
+      # gate every wallet release on an unrelated pre-existing break.
+      - name: Test the referential
+        working-directory: wallet
+        run: bunx jest --ci --watchAll=false src/__tests__/canonical-attributes.test.ts
       - name: Type-check SDK
         working-directory: sdk
         run: |

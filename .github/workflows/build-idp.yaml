@@ -13,7 +13,29 @@ permissions:
   packages: write
 
 jobs:
+  # The IdP embeds a COPY of shared/canonical-attributes.json (Go's embed cannot
+  # reach outside the package) and the Dockerfile never re-generates it, so
+  # whatever is committed is what ships. That copy once shipped eleven
+  # attributes stale. Gate the release on the copy being reproducible from the
+  # source rather than trusting the generate step to be remembered.
+  referential:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: idp/go.mod
+      - name: Regenerate the embedded referential
+        working-directory: idp
+        run: go generate ./...
+      - name: Fail if the embedded copy was stale
+        run: git diff --exit-code -- idp/internal/attributes
+      - name: Test the referential
+        working-directory: idp
+        run: go test ./internal/attributes/...
+
   build-and-push:
+    needs: [referential]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

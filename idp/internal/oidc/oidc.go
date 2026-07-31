@@ -1576,9 +1576,8 @@ const disclosureReservationTTL = 30 * time.Minute
 // mintDisclosureVouchers reserves the relying party's credits for the
 // gov-assurance attributes it is requesting and returns the signed vouchers to
 // thread into the wallet payload. It fires only for a billable relying party
-// with a configured minter, and only for gov attributes (today reachable solely
-// through the Privasys identity-verifier, hence the `privasys:` marketplace
-// namespace); everything else discloses free and returns (nil, nil). A returned
+// with a configured minter, and only for gov attributes the marketplace actually
+// prices; everything else discloses free and returns (nil, nil). A returned
 // voucher.ErrInsufficient means the RP cannot pay — the caller answers 402.
 func mintDisclosureVouchers(ctx context.Context, m *voucher.Minter, client *clients.Client, reqs map[string]AttributeRequirement, billingGrant string) ([]voucher.MintedVoucher, error) {
 	if m == nil || !m.Enabled() || client == nil || !client.BillableRP || client.BillingAccountID == "" {
@@ -1586,8 +1585,15 @@ func mintDisclosureVouchers(ctx context.Context, m *voucher.Minter, client *clie
 	}
 	var keys []string
 	for key, req := range reqs {
-		if req.Assurance == "gov" {
-			keys = append(keys, "privasys:"+key)
+		if req.Assurance != "gov" {
+			continue
+		}
+		// Only what the referential says the marketplace issues. The identity
+		// scope also carries the raw document fields the verifier reads off the
+		// chip, which are certified by the same ceremony but have no registry
+		// row; reserving one would fail the whole authorization as unknown.
+		if mk, ok := attributes.MarketplaceKey(key); ok {
+			keys = append(keys, mk)
 		}
 	}
 	if len(keys) == 0 {

@@ -5,6 +5,11 @@
 // JSON file (shared/canonical-attributes.json). The file is copied into this
 // package directory for Go's embed directive (which doesn't support .. paths).
 // Run `go generate ./...` after modifying the shared file.
+//
+// The copy silently went eleven attributes stale once already, so
+// TestEmbeddedCopyMatchesShared byte-compares it against the shared original on
+// every `go test`. Forgetting the generate step is a build failure, not a
+// production surprise.
 package attributes
 
 import (
@@ -16,7 +21,10 @@ import (
 )
 
 //go:generate cp ../../../shared/canonical-attributes.json canonical-attributes.json
-//go:generate cp -r ../../../shared/referential referential
+
+// Copies the CONTENTS: `cp -r src dst` nests src inside dst once dst exists, so
+// the plain form silently built referential/referential/ on every re-run.
+//go:generate cp -r ../../../shared/referential/. referential/
 
 //go:embed canonical-attributes.json
 var rawJSON []byte
@@ -46,6 +54,31 @@ type Attribute struct {
 	// the identity-verifier enclave (passport/ID + biometric). Carried under the
 	// request-gated 'identity' scope (see the identity-verifier (KYC) design).
 	IdentityVerifiable bool `json:"identityVerifiable,omitempty"`
+	// MultiValued marks an attribute the wallet may hold more than once (several
+	// emails). Only the wallet acts on it — on import a differing value is added
+	// alongside rather than flagged as a conflict — but it is decoded here so the
+	// served referential and this struct describe the same document.
+	MultiValued bool `json:"multiValued,omitempty"`
+	// Marketplace is set only for attributes the attribute marketplace can issue
+	// as a paid disclosure. Nil means free: a profile field, or an identity field
+	// the verifier returns alongside a priced insight without pricing separately.
+	Marketplace *Marketplace `json:"marketplace,omitempty"`
+}
+
+// Marketplace is the registry-facing half of an attribute: how the marketplace
+// spells it and what it charges for. Price is deliberately absent — the registry
+// (management-service migrations 055/056) owns it and may reprice at any time.
+type Marketplace struct {
+	// Key is the '<namespace>:<name>' form. A reservation resolves attributes by
+	// namespace and refuses a bare name, and a billing grant must name the same
+	// spelling or `covers` rejects it, so this is not cosmetic.
+	Key string `json:"key"`
+	// Assurance repeats the registry's own vocabulary ("gov_verified"), not the
+	// none/provider/gov ladder, because it is compared against values returned by
+	// the control plane.
+	Assurance string `json:"assurance"`
+	// Billable reports whether a disclosure carries a charge at all.
+	Billable bool `json:"billable"`
 }
 
 // ValueOption is one entry in an enumerated attribute's value set.
@@ -118,6 +151,21 @@ func init() {
 	for _, v := range ValueSet("locale") {
 		localeByLower[strings.ToLower(v.Value)] = v.Value
 	}
+}
+
+// MarketplaceKey returns the namespaced key the marketplace prices a canonical
+// attribute under, and whether it is issuable there at all.
+//
+// Callers must not synthesise "privasys:"+key instead: the identity scope also
+// carries document fields (document_number, place_of_birth, ...) that the
+// verifier returns alongside a priced insight but that have no registry row, and
+// naming one in a reservation fails the whole request as an unknown attribute.
+func MarketplaceKey(key string) (string, bool) {
+	a, ok := ByKey[key]
+	if !ok || a.Marketplace == nil {
+		return "", false
+	}
+	return a.Marketplace.Key, true
 }
 
 // ReferentialFile returns the raw bytes of an enumerated value set served at

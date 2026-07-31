@@ -780,6 +780,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             connect?: { mode?: string; reason?: string | null };
             caps?: string[];
             billingGrant?: string;
+            attributes?: readonly string[];
         } = data.config;
         const parentOrigin = e.origin;
 
@@ -953,6 +954,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 // owns its scope, ceiling and single use.
                 if (config.billingGrant) {
                     authorizeUrl.searchParams.set('billing_grant', config.billingGrant);
+                }
+                // Attributes named one by one, alongside the scope. A scope is a
+                // coarse bundle and cannot reach a government-backed `_id` key at
+                // all, so for those this is the request.
+                if (config.attributes?.length) {
+                    authorizeUrl.searchParams.set('attributes', config.attributes.join(' '));
                 }
                 const authResp = await fetch(authorizeUrl.toString(), {
                     headers: { Accept: 'application/json' },

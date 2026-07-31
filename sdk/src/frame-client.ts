@@ -33,24 +33,22 @@
 /**
  * Supported OIDC scope tokens.
  *
- * These must stay in sync with:
- *   - IdP discovery (`scopes_supported` in oidc.go HandleDiscovery)
- *   - IdP scope→attribute mapping (`filterAttributesByScope` in oidc.go)
- *   - Wallet canonical attributes (`CANONICAL_ATTRIBUTES` in attributes.ts)
+ * A scope is a coarse bundle kept for clients that predate the per-attribute
+ * path. The attribute each one reaches is not restated here: it is the `scope`
+ * field of the canonical referential, which this SDK ships (`CANONICAL_ATTRIBUTES`
+ * in ./attributes) and the IdP serves, and a table in a comment is a fourth copy
+ * that nothing can keep honest.
  *
- * | Scope            | Attributes granted                                      |
- * |------------------|---------------------------------------------------------|
- * | `openid`         | `sub` (always implied)                                  |
- * | `email`          | `email`, `email_verified`                               |
- * | `profile`        | `name`, `given_name`, `family_name`, `picture`, `locale`|
- * | `phone`          | `phone_number`                                          |
- * | `identity`       | Gov-verified document claims (`age_over_18`,            |
- * |                  | `age_over_21`, `nationality`, `birthdate`, …) — each    |
- * |                  | arrives as an enclave-signed SD-JWT VC, surfaced in     |
- * |                  | {@link SignInResult.disclosures}. Requires the client   |
- * |                  | to be registered billable; sign-in rejects with         |
- * |                  | {@link InsufficientCreditsError} when out of credits.   |
- * | `offline_access` | Issues a refresh token (no attributes)                  |
+ * What a scope CANNOT do is worth stating. Every government-backed `_id`
+ * attribute is request-only, so `identity` reaches the document baseline
+ * (`birthdate`, `nationality`, `age_over_18`, `age_over_21` and the chip fields)
+ * and nothing else. To ask for a passport-certified name, name
+ * `given_name_id` in {@link AuthFrameConfig.attributes}. A gov disclosure
+ * arrives as an enclave-signed SD-JWT VC, surfaced in
+ * {@link SignInResult.disclosures}; a priced one requires the client to be
+ * registered billable, and sign-in rejects with
+ * {@link InsufficientCreditsError} when the account is out of credits.
+ * `offline_access` issues a refresh token and no attributes.
  */
 export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'identity' | 'offline_access';
 
@@ -158,6 +156,22 @@ export interface AuthFrameConfig {
      * @see {@link PrivasysScope} for the full list of supported scope tokens.
      */
     scope?: readonly PrivasysScope[];
+    /**
+     * Canonical attribute keys to request BY NAME, alongside whatever the scope
+     * reaches. This is the per-attribute path, and for a government-backed key
+     * it is the only path: every `_id` attribute is request-only, so no spelling
+     * of the scope will produce one. Feed it from an
+     * {@link AttributePicker} selection, or from the keys your client registered
+     * in its required_attributes whitelist, which still caps what any of this
+     * can reach.
+     *
+     * A key this IdP does not know is dropped rather than rejected, so naming an
+     * attribute newer than the deployed IdP costs an absent claim, not a failed
+     * sign-in.
+     *
+     * @example ['given_name_id', 'birthdate_id']
+     */
+    attributes?: readonly string[];
     /** URL to the app's privacy policy. Shown to the user when sharing attributes. */
     privacyPolicyUrl?: string;
     /**

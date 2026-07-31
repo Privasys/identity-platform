@@ -42,6 +42,7 @@ import * as SecureStore from '@/utils/storage';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
+import { walletCallHeaders } from './wallet-call';
 import { ensureWia, getValidWia } from './wia';
 
 /** Hardware-bound holder key; the IVR binds to it and prove_* requests are
@@ -359,7 +360,15 @@ async function postToVerifier<T>(path: string, body: unknown, voucher?: string):
     // A paid disclosure carries the relying party's voucher on a header the
     // enclave runtime verifies (and meters) before the verifier app sees the
     // request. Free proofs (a self-audience check) carry none.
-    const headers = voucher ? { 'X-Privasys-Voucher': voucher } : undefined;
+    //
+    // Every call also carries the wallet-originated call proof (WIA +
+    // holder-key signature bound to this method and path), which is what
+    // makes a free_for:["wallet"] endpoint free for calls the wallet app
+    // makes itself. Omitted silently when this device has no WIA yet: the
+    // call still goes through, it is simply not exempt.
+    const headers: Record<string, string> = voucher ? { 'X-Privasys-Voucher': voucher } : {};
+    const proof = await walletCallHeaders('POST', path);
+    if (proof) Object.assign(headers, proof);
     let res: { status: number; body: string };
     try {
         res = await NativeRaTls.post(host, port, path, JSON.stringify(finalBody), headers);

@@ -29,7 +29,9 @@ import {
     type AttestationResult
 } from '@/services/attestation';
 import { useSettingsStore } from '@/stores/settings';
-import { attributeLabel, setProfileValue } from '@/services/attributes';
+import {
+    ATTRIBUTE_MAP, attributeLabel, certifiedFieldFor, marketplaceKeyFor, setProfileValue
+} from '@/services/attributes';
 import { deriveAppSub } from '@/services/did';
 import { derToRawEcdsa } from '@/services/encauth';
 import { useProfileStore, type ProfileAttribute, type VerificationRecord } from '@/stores/profile';
@@ -476,10 +478,14 @@ export async function verifyIdentity(
 // overwrite the holder's preferred everyday name (e.g. "Bertrand" vs the
 // passport's legal "BERTRAND FRANCOIS"). The wallet then *asks* whether to adopt
 // the ID name (see kyc-capture). Other fields store under their own key.
-const GOV_STORE_KEY: Record<string, string> = {
-    given_name: 'given_name_id',
-    family_name: 'family_name_id'
-};
+//
+// `govKey` is the referential's own answer to "where does the government-backed
+// reading of this attribute live", so the mapping is read rather than restated:
+// a second hand-maintained copy of that fact is how the disclosure and the
+// stored value drift apart. Keys with no self-asserted twin to protect
+// (birthdate, document_number, ...) have no govKey and keep their own name,
+// which is also why an existing profile needs no migration.
+const govStoreKey = (field: string): string => ATTRIBUTE_MAP[field]?.govKey ?? field;
 
 function govRecord(record: KycRecord, evidence: string): VerificationRecord {
     return {
@@ -513,7 +519,7 @@ export function govAttributeCandidates(
 
     for (const key of DOCUMENT_ATTRIBUTE_KEYS) {
         const value = record.fields[key];
-        if (value) push(GOV_STORE_KEY[key] ?? key, value);
+        if (value) push(govStoreKey(key), value);
     }
     // age_over_N: privacy-preserving boolean derived from the gov-verified DOB.
     const birthdate = record.fields.birthdate;
@@ -757,9 +763,12 @@ export interface DisclosureVoucher {
 }
 
 /** The marketplace attribute key a requested gov attribute discloses as, in the
- *  provider-namespaced form the voucher authorises (mirrors the verifier). */
+ *  provider-namespaced form the voucher authorises. Read off the referential, so
+ *  an attribute sold by a third-party provider keeps ITS namespace instead of
+ *  being mislabelled `privasys:`, and an `_id` key resolves to the field the
+ *  enclave actually meters. */
 export function marketplaceKey(key: string): string {
-    return `privasys:${key}`;
+    return marketplaceKeyFor(key);
 }
 
 /** Pick the voucher that authorises `key` (its `claims` cover the marketplace
@@ -775,10 +784,15 @@ export function voucherForAttribute(
 
 /**
  * Produce the right disclosure token for a requested gov-assurance attribute.
- * `age_over_N` → prove_age_over; `age_band` → prove_age_band; any certified
- * field (birthdate, nationality, given_name, family_name) → prove_field. When
- * the relying party's `disclosureVouchers` cover the attribute, the matching
- * voucher rides the request so the enclave meters the paid disclosure.
+ * `age_over_N` → prove_age_over; `age_band` → prove_age_band; `document_valid`
+ * → prove_document_valid; any certified field (birthdate, nationality,
+ * given_name, family_name) → prove_field. When the relying party's
+ * `disclosureVouchers` cover the attribute, the matching voucher rides the
+ * request so the enclave meters the paid disclosure.
+ *
+ * The referential decides which enclave field a key opens: a request for
+ * `given_name_id` is a request for the passport's `given_name` commitment, and
+ * prove_field would reject the `_id` spelling as an uncertified field.
  */
 export async function discloseAttribute(
     rpId: string,
@@ -790,12 +804,13 @@ export async function discloseAttribute(
     const ageOver = /^age_over_(\d+)$/.exec(key);
     if (ageOver) return proveAgeOver(rpId, Number(ageOver[1]), nonce, voucher);
     if (key === 'age_band') return proveAgeBand(rpId, undefined, nonce, voucher);
+    if (key === 'document_valid') return proveDocumentValid(rpId, nonce, voucher);
     if (key === 'holder_present') {
         // Presence needs a live selfie ceremony — the connect flow captures it
         // and calls provePresence directly; it can never resolve as a field.
         throw new Error('holder_present requires a live selfie — use provePresence');
     }
-    return proveField(rpId, key, nonce, voucher);
+    return proveField(rpId, certifiedFieldFor(key), nonce, voucher);
 }
 
 // ── Sealed persistence ──────────────────────────────────────────────────────

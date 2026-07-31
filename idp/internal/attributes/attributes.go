@@ -59,24 +59,64 @@ type Attribute struct {
 	// alongside rather than flagged as a conflict — but it is decoded here so the
 	// served referential and this struct describe the same document.
 	MultiValued bool `json:"multiValued,omitempty"`
-	// Marketplace is set only for attributes the attribute marketplace can issue
-	// as a paid disclosure. Nil means free: a profile field, or an identity field
-	// the verifier returns alongside a priced insight without pricing separately.
+	// Assurance is this key's own level in the registry's vocabulary. Empty means
+	// GovVerified for an identity-scope key and SelfAsserted otherwise; the
+	// referential still states it on every identity key so a future gov attribute
+	// outside that scope cannot arrive silently under-assured. Read it through
+	// AssuranceLevel, never directly.
+	Assurance string `json:"assurance,omitempty"`
+	// GovKey names the government-backed twin of a self-asserted key
+	// (given_name -> given_name_id). It is the whole of the pairing convention:
+	// adding a pair is a twin key plus this pointer.
+	GovKey string `json:"govKey,omitempty"`
+	// SupersededBy names the '_id' spelling that replaces a key minted before the
+	// convention existed. The old key keeps working verbatim — a registration, a
+	// stored share link and a signed voucher all name it — so this is a hint to
+	// pickers and new integrators, never a redirect.
+	SupersededBy string `json:"supersededBy,omitempty"`
+	// RequestOnly keeps a key out of every scope-derived set: the relying party
+	// must name it, in its required_attributes whitelist or in the per-request
+	// `attributes` parameter. It is the fail-closed half of the model and is set
+	// on every '_id' key, so a client that asks for `identity` and nothing else
+	// never acquires a billable disclosure it did not name.
+	RequestOnly bool `json:"requestOnly,omitempty"`
+	// CertifiedField is the identity-verifier field prove_field opens for this
+	// key, when it differs from the key. The wallet's storage spelling
+	// (given_name_id) is not a field the enclave certified, and asking for it by
+	// that name is rejected as uncertified.
+	CertifiedField string `json:"certifiedField,omitempty"`
+	// Disclosure is "token" (the default for a gov key: an enclave-signed SD-JWT
+	// VC from commit-and-prove) or "raw" where the enclave deliberately will not
+	// re-certify the value (the DG2 portrait). A raw key is never billable.
+	Disclosure string `json:"disclosure,omitempty"`
+	// Derived marks a key with no stored value: the enclave computes it from the
+	// identity receipt at disclosure time (document_valid, age_band). Its absence
+	// from a profile is not a missing attribute.
+	Derived bool `json:"derived,omitempty"`
+	// Marketplace is set only for attributes the marketplace can issue as a paid
+	// disclosure. Nil means free: a profile field, or an identity field the
+	// verifier returns alongside a priced insight without pricing separately.
 	Marketplace *Marketplace `json:"marketplace,omitempty"`
 }
 
+// Assurance vocabulary. These repeat the registry's own values (the `assurance`
+// column of the `attributes` table), not the none/provider/gov ladder, because
+// they are compared against what the control plane returns.
+const (
+	SelfAsserted = "self_asserted"
+	GovVerified  = "gov_verified"
+)
+
 // Marketplace is the registry-facing half of an attribute: how the marketplace
-// spells it and what it charges for. Price is deliberately absent — the registry
+// spells it and whether it charges. Price is deliberately absent — the registry
 // (management-service migrations 055/056) owns it and may reprice at any time.
 type Marketplace struct {
 	// Key is the '<namespace>:<name>' form. A reservation resolves attributes by
 	// namespace and refuses a bare name, and a billing grant must name the same
-	// spelling or `covers` rejects it, so this is not cosmetic.
+	// spelling or `covers` rejects it, so this is not cosmetic. It is not
+	// "privasys:"+Key of the attribute either: the registry names the field the
+	// ENCLAVE meters, so given_name_id is sold as privasys:given_name.
 	Key string `json:"key"`
-	// Assurance repeats the registry's own vocabulary ("gov_verified"), not the
-	// none/provider/gov ladder, because it is compared against values returned by
-	// the control plane.
-	Assurance string `json:"assurance"`
 	// Billable reports whether a disclosure carries a charge at all.
 	Billable bool `json:"billable"`
 }
@@ -153,16 +193,62 @@ func init() {
 	}
 }
 
+// AssuranceLevel is the attribute's own assurance in the registry's vocabulary.
+//
+// The referential states it explicitly on every gov key; the fallback exists so
+// an older copy of the document, which had no field at all, still reads the
+// identity scope as government-backed rather than silently self-asserted.
+func (a Attribute) AssuranceLevel() string {
+	if a.Assurance != "" {
+		return a.Assurance
+	}
+	if a.Scope == "identity" {
+		// Only the identity-verifier enclave can put a value in the identity
+		// scope, so there is no self-asserted reading of one.
+		return GovVerified
+	}
+	return SelfAsserted
+}
+
+// IsGovVerified reports whether disclosing this key means disclosing something a
+// government document evidenced.
+func (a Attribute) IsGovVerified() bool { return a.AssuranceLevel() == GovVerified }
+
+// CertifiedFieldName is the identity-verifier field prove_field opens for this
+// key. It differs from the key exactly where a gov key carries an '_id' suffix
+// the enclave never saw: the passport commitment is 'given_name', and asking for
+// 'given_name_id' is rejected as an uncertified field.
+func (a Attribute) CertifiedFieldName() string {
+	if a.CertifiedField != "" {
+		return a.CertifiedField
+	}
+	return a.Key
+}
+
+// InScope reports whether a scope-derived attribute set contains this key.
+//
+// Request-only keys are excluded by construction: they are reachable only when
+// the relying party names them, which is the per-attribute request path (see
+// requestedAttributes in the oidc package). The substring test on the scope
+// string is the historical behaviour of /authorize, kept verbatim so the
+// requested set and the filter that trims the wallet's answer never disagree.
+func (a Attribute) InScope(scope string) bool {
+	return !a.RequestOnly && a.Scope != "" && strings.Contains(scope, a.Scope)
+}
+
 // MarketplaceKey returns the namespaced key the marketplace prices a canonical
 // attribute under, and whether it is issuable there at all.
 //
-// Callers must not synthesise "privasys:"+key instead: the identity scope also
-// carries document fields (document_number, place_of_birth, ...) that the
-// verifier returns alongside a priced insight but that have no registry row, and
-// naming one in a reservation fails the whole request as an unknown attribute.
+// Callers must not synthesise "privasys:"+key instead, for two separate reasons.
+// The identity scope carries document fields (document_number, place_of_birth,
+// ...) that the verifier returns alongside a priced insight but that have no
+// registry row, and naming one in a reservation fails the whole request as an
+// unknown attribute. And an '_id' key is sold under the field the ENCLAVE
+// meters, so given_name_id reserves privasys:given_name, not privasys:
+// given_name_id, which nothing has ever seeded.
 func MarketplaceKey(key string) (string, bool) {
 	a, ok := ByKey[key]
-	if !ok || a.Marketplace == nil {
+	if !ok || a.Marketplace == nil || a.Marketplace.Key == "" || !a.Marketplace.Billable {
 		return "", false
 	}
 	return a.Marketplace.Key, true

@@ -27,6 +27,23 @@ export type {
     SealedSession,
     SealedStreamResponse,
 } from './frame-client';
+export {
+    ATTRIBUTE_MAP,
+    CANONICAL_ATTRIBUTES,
+    CANONICAL_KEYS,
+    GOV_VERIFIED,
+    SELF_ASSERTED,
+    assuranceOf,
+    attributePairs,
+    fetchAttributeReferential,
+    isBillable,
+    isGovVerified,
+    marketplaceKeyOf,
+    requestableAttributes,
+} from './attributes';
+export type { AttributeMarketplace, CanonicalAttribute } from './attributes';
+export { AttributePicker, assuranceLabel, attributeBadge, attributeLabel } from './attributes-ui';
+export type { AttributeAssuranceBadge, AttributePickerConfig } from './attributes-ui';
 export { PrivasysSession } from './enclave-session';
 export type {
     EncAuthRejectReason,

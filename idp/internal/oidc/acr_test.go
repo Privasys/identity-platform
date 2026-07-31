@@ -95,14 +95,14 @@ func TestACRSupported(t *testing.T) {
 // ONLY as a disclosure token under the identity scope — a raw value or a
 // non-identity scope must drop it.
 func TestPresenceTokenFilter(t *testing.T) {
-	got := filterAttributesByScope(map[string]string{"holder_present": fakeDisclosure}, "openid identity")
+	got := filterAttributesRequested(map[string]string{"holder_present": fakeDisclosure}, "openid identity", nil)
 	if got["holder_present"] != fakeDisclosure {
 		t.Error("presence disclosure should pass under identity scope")
 	}
-	if filterAttributesByScope(map[string]string{"holder_present": "true"}, "openid identity") != nil {
+	if filterAttributesRequested(map[string]string{"holder_present": "true"}, "openid identity", nil) != nil {
 		t.Error("raw presence value must be dropped")
 	}
-	if filterAttributesByScope(map[string]string{"holder_present": fakeDisclosure}, "openid email") != nil {
+	if filterAttributesRequested(map[string]string{"holder_present": fakeDisclosure}, "openid email", nil) != nil {
 		t.Error("presence must be dropped without the identity scope")
 	}
 }

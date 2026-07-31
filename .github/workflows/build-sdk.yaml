@@ -8,10 +8,12 @@ on:
     branches: [main]
     paths:
       - 'sdk/**'
+      - 'shared/canonical-attributes.json'
       - '.github/workflows/build-sdk.yaml'
   pull_request:
     paths:
       - 'sdk/**'
+      - 'shared/canonical-attributes.json'
 
 jobs:
   build:
@@ -26,6 +28,20 @@ jobs:
       - name: Install dependencies
         working-directory: sdk
         run: npm ci
+
+      # The SDK ships the canonical attribute list as its integration surface, so
+      # it bundles a copy: an npm package cannot reach outside its own directory,
+      # and a package that fetched the list at import time would be useless to a
+      # picker that has to render before the network answers. `sync-shared` keeps
+      # the copy current and this re-runs it, so a forgotten sync is a red build
+      # rather than an SDK offering attributes the IdP has never heard of. The
+      # IdP's own copy of this file went eleven attributes stale exactly that way.
+      - name: Re-sync the shared referential
+        working-directory: sdk
+        run: npm run sync-shared
+
+      - name: Fail if the bundled copy was stale
+        run: git diff --exit-code -- sdk/src/shared
 
       - name: Type-check
         working-directory: sdk

@@ -11,6 +11,8 @@ import {
 } from 'react';
 import { PrivasysAuth } from './client';
 import type { AuthConfig, AuthEvents, AuthResult, AuthState } from './types';
+import { AttributePicker, attributeBadge, type AttributePickerConfig } from './attributes-ui';
+import type { CanonicalAttribute } from './attributes';
 
 // ---------------------------------------------------------------------------
 // Hook: usePrivasysAuth
@@ -202,4 +204,69 @@ export function PrivasysLoginButton(props: PrivasysLoginButtonProps): ReactNode 
                 style: { color: 'orange' },
             }, 'Timed out — try again'),
     );
+}
+
+// ---------------------------------------------------------------------------
+// Attribute UI
+// ---------------------------------------------------------------------------
+
+/**
+ * The attribute picker as a React component.
+ *
+ * The picker itself is plain DOM in a closed shadow root (see attributes-ui.ts),
+ * so this is a mount point rather than a reimplementation: two renderings of the
+ * same trust markers would eventually disagree, and the one a user is looking at
+ * would be whichever framework their vendor happened to pick.
+ */
+export function PrivasysAttributePicker(
+    props: Omit<AttributePickerConfig, 'container'> & { className?: string },
+): ReactNode {
+    const mount = useRef<HTMLDivElement | null>(null);
+    const picker = useRef<AttributePicker | null>(null);
+    const { className, onChange, selected, attributes, only, showKeys } = props;
+
+    // onChange is re-created by most callers on every render; holding it in a ref
+    // keeps the picker from being torn down and rebuilt underneath the user's
+    // click, which loses focus and scroll position.
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+
+    useEffect(() => {
+        if (!mount.current) return;
+        picker.current = new AttributePicker({
+            container: mount.current,
+            selected,
+            attributes,
+            only,
+            showKeys,
+            onChange: (keys) => onChangeRef.current?.(keys),
+        });
+        return () => {
+            picker.current?.destroy();
+            picker.current = null;
+        };
+        // `selected` is the INITIAL selection; use the ref's setSelection to
+        // drive it from outside, or the picker would reset mid-interaction.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [attributes, only, showKeys]);
+
+    return createElement('div', { ref: mount, className });
+}
+
+/** One attribute's assurance badge as a React component. */
+export function PrivasysAttributeBadge(
+    props: { attribute: CanonicalAttribute | string; showPaid?: boolean; className?: string },
+): ReactNode {
+    const mount = useRef<HTMLSpanElement | null>(null);
+    const { attribute, showPaid, className } = props;
+
+    useEffect(() => {
+        const host = mount.current;
+        if (!host) return;
+        const el = attributeBadge(attribute, { showPaid });
+        host.appendChild(el);
+        return () => el.remove();
+    }, [attribute, showPaid]);
+
+    return createElement('span', { ref: mount, className });
 }

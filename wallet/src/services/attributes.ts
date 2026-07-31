@@ -68,24 +68,62 @@ export interface AttributeDefinition {
      */
     multiValued?: boolean;
     /**
-     * Set only for attributes the attribute marketplace issues as a paid
-     * disclosure. Absent means free. The wallet does not spend the grant itself
-     * (the relying party's voucher does), but it is what lets a consent screen
-     * say which of the requested attributes the RP is paying for.
+     * This key's own assurance in the registry's vocabulary. Absent means
+     * `gov_verified` for an identity-scope key and `self_asserted` otherwise;
+     * read it through `attributeAssurance`, never directly.
+     */
+    assurance?: string;
+    /**
+     * The government-backed twin of a self-asserted key (`given_name` ->
+     * `given_name_id`). The two are separate attributes with separate prices,
+     * which is exactly what lets a relying party ask for a first name without
+     * demanding a passport.
+     */
+    govKey?: string;
+    /**
+     * The `_id` spelling that replaces a key minted before the convention
+     * existed. The old key keeps working verbatim, so this is a hint to pickers
+     * and new integrators, never a redirect.
+     */
+    supersededBy?: string;
+    /** Never pulled in by a scope: the relying party must name it. Resolved by
+     *  the IdP; the wallet only displays the consequence. */
+    requestOnly?: boolean;
+    /** The identity-verifier field `prove_field` opens for this key, when it
+     *  differs from the key. */
+    certifiedField?: string;
+    /** 'token' (the default for a gov key: an enclave-signed SD-JWT VC from
+     *  commit-and-prove) or 'raw' where the enclave deliberately will not
+     *  re-certify the value. */
+    disclosure?: 'token' | 'raw';
+    /** No stored value: the enclave computes it from the identity receipt at
+     *  disclosure time, so its absence from the profile is not a gap to fill. */
+    derived?: boolean;
+    /**
+     * Set only for attributes the marketplace issues as a paid disclosure.
+     * Absent means free. The wallet does not spend the grant itself (the relying
+     * party's voucher does), but it is what lets a consent screen say which of
+     * the requested attributes the RP is paying for.
      */
     marketplace?: AttributeMarketplace;
 }
 
+/** Registry assurance vocabulary (the `assurance` column of the marketplace's
+ *  `attributes` table), not the none/provider/gov ladder — these values are
+ *  compared against what the control plane returns. */
+export const SELF_ASSERTED = 'self_asserted';
+export const GOV_VERIFIED = 'gov_verified';
+
 /**
  * The registry-facing half of an attribute. `key` is the `<namespace>:<name>`
  * spelling the voucher and the billing grant use; a bare name is refused at
- * reservation time, so the two are not interchangeable. `assurance` repeats the
- * registry's vocabulary ('gov_verified'), not the none/provider/gov ladder.
+ * reservation time, so the two are not interchangeable. It is not
+ * `privasys:` + the canonical key either: the registry names the field the
+ * ENCLAVE meters, so `given_name_id` is sold as `privasys:given_name`.
  * Price is deliberately absent — the control plane owns it and may reprice.
  */
 export interface AttributeMarketplace {
     key: string;
-    assurance: string;
     billable: boolean;
 }
 
@@ -111,6 +149,13 @@ export const CANONICAL_ATTRIBUTES: AttributeDefinition[] = canonicalDoc.attribut
     deviceSourced: (a as { deviceSourced?: boolean }).deviceSourced,
     identityVerifiable: (a as { identityVerifiable?: boolean }).identityVerifiable,
     multiValued: (a as { multiValued?: boolean }).multiValued,
+    assurance: (a as { assurance?: string }).assurance,
+    govKey: (a as { govKey?: string }).govKey,
+    supersededBy: (a as { supersededBy?: string }).supersededBy,
+    requestOnly: (a as { requestOnly?: boolean }).requestOnly,
+    certifiedField: (a as { certifiedField?: string }).certifiedField,
+    disclosure: (a as { disclosure?: 'token' | 'raw' }).disclosure,
+    derived: (a as { derived?: boolean }).derived,
     marketplace: (a as { marketplace?: AttributeMarketplace }).marketplace,
 }));
 
@@ -132,6 +177,82 @@ const CEREMONIAL_LABELS: Record<string, string> = {
 /** Human-friendly label for a canonical attribute key. */
 export function attributeLabel(key: string): string {
     return ATTRIBUTE_MAP[key]?.label ?? CEREMONIAL_LABELS[key] ?? key;
+}
+
+// ── Assurance ───────────────────────────────────────────────────────────
+//
+// Assurance is a property of the KEY. `given_name` is what the holder typed and
+// `given_name_id` is what their passport says: two attributes, two prices, and
+// nothing left for a request to disambiguate. The IdP still tells the wallet
+// what it needs per attribute in `attributeRequirements[key].assurance`
+// ('gov' | 'any'); the wallet honours that answer and never re-decides it, since
+// re-deciding from the device is how a relying party's requirement would get
+// silently downgraded.
+
+/** This key's assurance in the registry's vocabulary. The scope fallback is for
+ *  an older copy of the referential, which carried no field at all: reading an
+ *  identity attribute as self-asserted would badge a passport disclosure as
+ *  something the holder typed. */
+export function attributeAssurance(key: string): string {
+    const def = ATTRIBUTE_MAP[key];
+    if (!def) return SELF_ASSERTED;
+    if (def.assurance) return def.assurance;
+    return def.scope === 'identity' ? GOV_VERIFIED : SELF_ASSERTED;
+}
+
+/** Whether disclosing this key means disclosing something a government document
+ *  evidenced. */
+export function isGovVerified(key: string): boolean {
+    return attributeAssurance(key) === GOV_VERIFIED;
+}
+
+/**
+ * The identity-verifier field `prove_field` opens for a key.
+ *
+ * It differs from the key exactly where a gov key carries the `_id` suffix the
+ * enclave never saw: the passport commitment is `given_name`, and asking for
+ * `given_name_id` is rejected as an uncertified field. That rejection is what
+ * used to make a gov-verified first name 400 and be silently dropped.
+ */
+export function certifiedFieldFor(key: string): string {
+    return ATTRIBUTE_MAP[key]?.certifiedField ?? key;
+}
+
+/**
+ * Whether a gov key is answered by an enclave-signed disclosure at all.
+ *
+ * The DG2 portrait is the exception the referential marks `disclosure: 'raw'`:
+ * the identity-verifier commits to it so a fresh selfie can be matched against
+ * it, and until the marketplace prices the disclosure there is no voucher to
+ * authorise a fresh certification. A relying party that asks for the ID photo
+ * gets the wallet's stored copy — gov PROVENANCE, no fresh enclave signature —
+ * and is never billed, because there is no metered enclave work. Without this
+ * the wallet would call prove_field and drop the attribute on the rejection,
+ * which is exactly what it did.
+ */
+export function disclosesAsToken(key: string): boolean {
+    return ATTRIBUTE_MAP[key]?.disclosure !== 'raw';
+}
+
+/** Whether the enclave computes this key from the identity receipt rather than
+ *  the wallet storing it. A derived key is never a gap in the profile, and the
+ *  holder must never be prompted for one. */
+export function isDerived(key: string): boolean {
+    return ATTRIBUTE_MAP[key]?.derived === true;
+}
+
+/**
+ * The marketplace attribute key a requested attribute discloses as, in the
+ * provider-namespaced form the relying party's voucher authorises.
+ *
+ * Read off the referential, never rebuilt as `privasys:${key}`: the namespace
+ * belongs to whichever provider sells the attribute, and an `_id` key is sold
+ * under the field the enclave meters (`given_name_id` -> `privasys:given_name`).
+ * Only the ceremonial keys deliberately absent from the referential
+ * (holder_present) fall back to the platform's own namespace.
+ */
+export function marketplaceKeyFor(key: string): string {
+    return ATTRIBUTE_MAP[key]?.marketplace?.key ?? `privasys:${key}`;
 }
 
 // ── Profile ↔ canonical mapping ─────────────────────────────────────────
@@ -173,6 +294,30 @@ export function getProfileAssurance(
         }
     }
     return best;
+}
+
+/**
+ * The profile key holding a government-assured value for `key`, or undefined
+ * when the holder has none.
+ *
+ * Usually the key itself. The fallback exists because a document value was
+ * imported under the enclave's own field name before the `_id` spelling did:
+ * a wallet that verified a passport last year holds `birthdate`, and a request
+ * for `birthdate_id` is the same disclosure under the newer name, so refusing it
+ * would ask the holder to re-scan a document the wallet has already certified.
+ *
+ * The assurance check on the fallback is the whole safety of it. `given_name_id`
+ * also falls back to `given_name`, which is exactly the self-asserted value a
+ * relying party asking for a passport name must never receive — and it is
+ * rejected here, because a manually typed name is not document-sourced.
+ */
+export function govValueKey(profile: UserProfile, key: string): string | undefined {
+    if (getProfileValue(profile, key) && getProfileAssurance(profile, key) === 'gov') return key;
+    const alt = ATTRIBUTE_MAP[key]?.certifiedField;
+    if (alt && alt !== key && getProfileValue(profile, alt) && getProfileAssurance(profile, alt) === 'gov') {
+        return alt;
+    }
+    return undefined;
 }
 
 /**

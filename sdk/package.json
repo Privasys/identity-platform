@@ -1,6 +1,6 @@
 {
     "name": "@privasys/auth",
-    "version": "0.7.10",
+    "version": "0.8.0",
     "description": "Browser SDK for Privasys Wallet authentication — QR code, push notification, and session management.",
     "license": "AGPL-3.0-only",
     "type": "module",
@@ -35,7 +35,8 @@
         "./frame-client": "./dist/privasys-auth-client.iife.js"
     },
     "scripts": {
-        "build": "tsc && npm run build:iife && npm run build:frame-host && npm run build:frame-client",
+        "sync-shared": "cp ../shared/canonical-attributes.json src/shared/canonical-attributes.json",
+        "build": "npm run sync-shared && tsc && npm run build:iife && npm run build:frame-host && npm run build:frame-client",
         "build:iife": "esbuild src/iife.ts --bundle --format=iife --global-name=Privasys --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth.iife.js",
         "build:frame-host": "esbuild src/frame-host.ts --bundle --format=iife --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth-frame.iife.js",
         "build:frame-client": "esbuild src/frame-client.ts --bundle --format=iife --global-name=Privasys --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth-client.iife.js",

@@ -62,7 +62,7 @@ import { issueEncAuthForSignIn } from '@/services/encauth';
 import { ensureWia } from '@/services/wia';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
-import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, getProfileAssurance, getProfileValue, setProfileValue } from '@/services/attributes';
+import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, govValueKey, isDerived, setProfileValue } from '@/services/attributes';
 import { discloseAttribute, provePresence, voucherForAttribute } from '@/services/kyc';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
@@ -192,9 +192,14 @@ async function resolveRequestedAttributes(
             }
             continue;
         }
-        const value = getProfileValue(profile, attr);
-        if (value) {
-            if (assuranceFor(attr, payload.attributeRequirements) === 'gov') {
+        const gov = assuranceFor(attr, payload.attributeRequirements) === 'gov';
+        // A derived insight has no stored value at all — the enclave computes it
+        // from the receipt — so its absence must not route this to the
+        // self-asserted branch.
+        const govKey = gov ? govValueKey(profile, attr) : undefined;
+        const value = getProfileValue(profile, govKey ?? attr);
+        if (gov && (govKey || isDerived(attr))) {
+            if (disclosesAsToken(attr)) {
                 // Gov claims are presented as enclave-signed, audience-bound
                 // disclosure tokens (commit-and-prove), never the raw value.
                 try {
@@ -203,9 +208,19 @@ async function resolveRequestedAttributes(
                     // Never fall back to the raw gov value; omit on failure.
                     console.warn(`[CONNECT] disclosure for ${attr} failed: ${e?.message}`);
                 }
-            } else {
+            } else if (value) {
+                // The enclave commits to the DG2 portrait but the marketplace
+                // does not price its disclosure, so there is no voucher to
+                // authorise a fresh certification. The only honest answer is the
+                // wallet's stored copy: gov provenance, no fresh signature.
+                // Sending it raw is not a fallback here — it is the disclosure.
                 attrs[attr] = value;
             }
+        } else if (!gov && value) {
+            // A gov requirement is never satisfied by a self-asserted value:
+            // omitting it lets the relying party see the absence, where sending
+            // it would answer a question it did not ask.
+            attrs[attr] = value;
         } else if (ATTRIBUTE_MAP[attr]?.deviceSourced) {
             // Device-sourceable (e.g. locale) — read from the OS so we never have
             // to ask the user for it.
@@ -333,11 +348,21 @@ function getMissingAttributes(
         if (attr === 'sub') continue;
         if (!CANONICAL_KEYS.has(attr)) continue;
         const needsGov = assuranceFor(attr, payload.attributeRequirements) === 'gov';
-        const value = profile ? getProfileValue(profile, attr) : undefined;
-        if (value) {
-            // Present — but a 'gov' requirement is only satisfied by a
-            // gov-assured (document-verified) value, never a provider/manual one.
-            if (!needsGov || getProfileAssurance(profile!, attr) === 'gov') continue;
+        // A derived insight (document_valid, age_band) has no stored value by
+        // construction — the enclave computes it from the identity receipt at
+        // disclosure time. Asking the holder to supply one would be asking them
+        // to type an answer only their passport can give.
+        if (isDerived(attr)) continue;
+        // A 'gov' requirement is only satisfied by a document-verified value,
+        // never a provider or manually typed one — govValueKey enforces that and
+        // returns undefined when the holder has nothing that qualifies.
+        if (needsGov) {
+            if (profile && govValueKey(profile, attr)) continue;
+            missing.push(attr);
+            continue;
+        }
+        if (profile && getProfileValue(profile, attr)) {
+            continue;
         } else if (ATTRIBUTE_MAP[attr]?.deviceSourced && getDeviceAttribute(attr)) {
             // Device-sourceable attributes are never "missing" if the OS can
             // supply them (e.g. locale from expo-localization).
@@ -510,8 +535,15 @@ function buildConsentPlan(
                     label: attributeLabel(key),
                     essential: isEssential(key, reqs),
                     gov: assuranceFor(key, reqs) === 'gov',
+                    // Same resolution the disclosure step uses, or the consent
+                    // screen would offer a gov first name the wallet then cannot
+                    // find (it is stored as `given_name_id`) and hide a derived
+                    // insight it can in fact produce.
                     hasValue:
-                        !!(profile && getProfileValue(profile, key)) ||
+                        isDerived(key) ||
+                        !!(profile && (assuranceFor(key, reqs) === 'gov'
+                            ? govValueKey(profile, key)
+                            : getProfileValue(profile, key))) ||
                         !!ATTRIBUTE_MAP[key]?.deviceSourced,
                 })
         .filter((i) => i.hasValue || i.essential);
@@ -2568,11 +2600,11 @@ function AttributeAcquisitionView({
     // Check if all missing attributes are now present in the profile (a 'gov'
     // requirement is only met by a gov-assured value, not a provider/manual one).
     const stillMissing = missingAttributes.filter((attr) => {
-        if (!profile || !getProfileValue(profile, attr)) return true;
+        if (!profile) return true;
         if (assuranceFor(attr, attributeRequirements) === 'gov') {
-            return getProfileAssurance(profile, attr) !== 'gov';
+            return !govValueKey(profile, attr);
         }
-        return false;
+        return !getProfileValue(profile, attr);
     });
     // Essential attributes (per the IdP's attributeRequirements, or the
     // email+name fallback) block Continue; the rest are optional.

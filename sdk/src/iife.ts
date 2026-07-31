@@ -18,3 +18,9 @@ export { WebAuthnClient } from './webauthn';
 export { AuthUI } from './ui';
 export { generateQRPayload, generateBatchQRPayload, generateSessionId } from './qr';
 export { SessionManager } from './session';
+export {
+    ATTRIBUTE_MAP, CANONICAL_ATTRIBUTES, CANONICAL_KEYS,
+    assuranceOf, attributePairs, fetchAttributeReferential,
+    isBillable, isGovVerified, marketplaceKeyOf, requestableAttributes,
+} from './attributes';
+export { AttributePicker, assuranceLabel, attributeBadge, attributeLabel } from './attributes-ui';

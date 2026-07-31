@@ -62,6 +62,13 @@ var acrValuesSupported = []string{"wallet", "gov-fresh", "gov-presence"}
 // identity-scope request); the wallet runs a live selfie ceremony for it.
 const presenceAttribute = "holder_present"
 
+// presenceMarketplaceKey is how the registry spells the ceremony (seeded by
+// management-service migration 056). It is hard-coded here, and only here,
+// because presenceAttribute is deliberately absent from the referential that
+// would otherwise carry the binding: a reservation still has to name the
+// registry's exact spelling or the whole authorization fails as unknown.
+const presenceMarketplaceKey = "privasys:" + presenceAttribute
+
 func acrRequested(acrValues, v string) bool {
 	for _, s := range strings.Fields(acrValues) {
 		if s == v {
@@ -185,7 +192,7 @@ func presenceAffirmed(v string) bool {
 // disclosure token and none arrived raw, otherwise "wallet". Computed from
 // what actually happened, never from what was requested.
 func acrForCode(ac *AuthCode, client *clients.Client) string {
-	reqs := attributeRequirementsForScope(ac.Scope, client)
+	reqs := attributeRequirements(ac.Scope, ac.NamedAttributes, client)
 	govToken, govRaw := false, false
 	for key, req := range reqs {
 		if req.Assurance != "gov" {
@@ -234,12 +241,14 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		"token_endpoint_auth_methods_supported": []string{"none", "client_secret_post", "client_secret_basic"},
 		"code_challenge_methods_supported":      []string{"S256"},
 		"acr_values_supported":                  acrValuesSupported,
-		"claims_supported": []string{
-			"sub", "name", "given_name", "family_name", "email", "email_verified",
-			"picture", "locale", "phone_number", "acr",
-			"attestation_level", "auth_time", "iss", "aud", "exp", "iat",
-			"roles", "wallet",
-		},
+		"claims_supported":                      claimsSupported(),
+		// The per-attribute request path. A scope is a coarse bundle and cannot
+		// name a government-backed `_id` key at all, so advertise both the
+		// parameter and where to read the key list from — an integrator that
+		// discovers only `scopes_supported` would conclude the platform sells
+		// nothing it cannot spell as a scope.
+		"privasys_attributes_parameter_supported": true,
+		"privasys_attributes_referential":         issuerURL + "/referential/canonical-attributes.json",
 	}
 
 	body, _ := json.MarshalIndent(doc, "", "  ")
@@ -249,6 +258,22 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		w.Write(body)
 	}
+}
+
+// claimsSupported is every canonical attribute key plus the protocol claims the
+// IdP adds itself. Built from the referential rather than restated: the
+// hand-written list this replaces had gone stale by ten identity attributes, and
+// a discovery document that under-reports what the IdP issues is how an
+// integrator concludes an attribute does not exist.
+func claimsSupported() []string {
+	out := []string{"sub"}
+	for _, a := range attributes.All {
+		out = append(out, a.Key)
+	}
+	// email_verified rides alongside email rather than being an attribute of its
+	// own; the rest are protocol, not profile.
+	return append(out, "email_verified", "acr", "attestation_level", "auth_time",
+		"iss", "aud", "exp", "iat", "roles", "wallet")
 }
 
 // --- Authorization Code Store ---
@@ -272,6 +297,13 @@ type AuthCode struct {
 	// arrived on this code (see acrForCode) — a request is intent, not
 	// a promise.
 	ACRValues string
+
+	// NamedAttributes carries the canonical keys the relying party asked for by
+	// name (the `attributes` parameter). It has to survive onto the code because
+	// the token endpoint filters what the wallet returned, and a request-only key
+	// is invisible to a scope: without this a disclosure the client paid for
+	// would be dropped one step before the ID token.
+	NamedAttributes []string
 
 	// Transient profile attributes — sourced from social IdP or wallet relay,
 	// carried in-memory through the auth code, embedded in the JWT, then GC'd.
@@ -411,6 +443,10 @@ type AuthSession struct {
 	// ACRValues from the /authorize request (space-separated, validated
 	// against acrValuesSupported). Threaded onto the auth code.
 	ACRValues string
+
+	// NamedAttributes from the /authorize `attributes` parameter (canonical keys
+	// only, unknown ones already dropped). Threaded onto the auth code.
+	NamedAttributes []string
 
 	// Set when the wallet completes FIDO2 authentication.
 	Authenticated bool
@@ -606,6 +642,12 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 			}
 		}
 
+		// The per-attribute request path. Unlike acr_values this is NOT a hard
+		// error on an unknown key: it is the parameter a relying party fills
+		// from a referential it fetched itself, so it may legitimately name a
+		// key newer than this build.
+		namedAttributes := parseAttributesParam(q.Get("attributes"))
+
 		// Generate session ID.
 		sessionID := generateID()
 
@@ -617,6 +659,7 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 			State:               state,
 			Nonce:               nonce,
 			ACRValues:           acrValues,
+			NamedAttributes:     namedAttributes,
 			CodeChallenge:       codeChallenge,
 			CodeChallengeMethod: codeChallengeMethod,
 			CreatedAt:           time.Now(),
@@ -636,24 +679,23 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 			"brokerUrl": "wss://relay.privasys.org/relay",
 		}
 
-		// Tell the wallet which attributes the relying party needs,
-		// derived from the requested OIDC scope, then filtered by the
-		// client's required_attributes whitelist (if set).
-		requestedAttributes := requestedAttributesForScope(scope, client)
-		attributeRequirements := attributeRequirementsForScope(scope, client)
+		// Tell the wallet which attributes the relying party needs: the ones its
+		// OIDC scope reaches plus the ones it named outright, then filtered by
+		// the client's required_attributes whitelist (if set).
+		requested := requestedAttributes(scope, namedAttributes, client)
+		reqs := attributeRequirements(scope, namedAttributes, client)
 
-		requestedAttributes, attributeRequirements =
-			applyPresenceACR(acrValues, requestedAttributes, attributeRequirements)
+		requested, reqs = applyPresenceACR(acrValues, requested, reqs)
 
-		if len(requestedAttributes) > 0 {
-			qrPayload["requestedAttributes"] = requestedAttributes
-			qrPayload["attributeRequirements"] = attributeRequirements
+		if len(requested) > 0 {
+			qrPayload["requestedAttributes"] = requested
+			qrPayload["attributeRequirements"] = reqs
 		}
 
 		// Reserve the relying party's credits for any paid (gov) attributes and
 		// carry the resulting disclosure vouchers to the wallet, which relays
 		// them to the issuing enclave.
-		vouchers, err := mintDisclosureVouchers(r.Context(), minter, client, attributeRequirements,
+		vouchers, err := mintDisclosureVouchers(r.Context(), minter, client, reqs,
 			strings.TrimSpace(r.URL.Query().Get("billing_grant")))
 		if err == voucher.ErrInsufficient {
 			errorResponse(w, http.StatusPaymentRequired, "insufficient_credits",
@@ -680,9 +722,9 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 			"poll_url":   issuerURL + "/session/status?session_id=" + sessionID,
 			"expires_in": 300,
 		}
-		if len(requestedAttributes) > 0 {
-			resp["requested_attributes"] = requestedAttributes
-			resp["attribute_requirements"] = attributeRequirements
+		if len(requested) > 0 {
+			resp["requested_attributes"] = requested
+			resp["attribute_requirements"] = reqs
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
@@ -792,6 +834,7 @@ func HandleSessionComplete(codes *CodeStore, sessions *SessionStore) http.Handle
 			Scope:               session.Scope,
 			Nonce:               session.Nonce,
 			ACRValues:           session.ACRValues,
+			NamedAttributes:     session.NamedAttributes,
 			CodeChallenge:       session.CodeChallenge,
 			CodeChallengeMethod: session.CodeChallengeMethod,
 			AuthTime:            time.Now(),
@@ -1010,8 +1053,8 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 		attrs = make(map[string]string)
 	}
 
-	// Filter attributes to only those allowed by the requested scope.
-	filteredAttrs := filterAttributesByScope(attrs, ac.Scope)
+	// Filter attributes to only those the relying party asked for.
+	filteredAttrs := filterAttributesRequested(attrs, ac.Scope, ac.NamedAttributes)
 
 	// Further restrict to the client's required_attributes whitelist (if set).
 	// The ceremonial holder_present disclosure is exempt, mirroring the
@@ -1184,7 +1227,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	}
 
 	// No user profile is stored server-side — refresh tokens only carry roles.
-	filteredRefreshAttrs := filterAttributesByScope(nil, scope)
+	filteredRefreshAttrs := filterAttributesRequested(nil, scope, nil)
 
 	// RFC 6749 §6: clients MAY request a narrower scope on refresh. We
 	// support this so the chat UI can mint a per-call token bound to a
@@ -1494,29 +1537,85 @@ func filterRolesByAudience(roles []string, audience string) []string {
 	return out
 }
 
-// requestedAttributesForScope derives the attribute keys a relying party needs
-// from the requested OIDC scope, then intersects with the client's
-// required_attributes whitelist (when set). "sub" is always included for an
-// openid request. Shared by /authorize and /device_authorization so the wallet
-// sees one consistent list regardless of entry point.
-func requestedAttributesForScope(scope string, client *clients.Client) []string {
+// parseAttributesParam reads the per-request `attributes` parameter: the
+// per-attribute request path, and the model going forward.
+//
+// A relying party names canonical keys directly (space- or comma-separated)
+// instead of hoping a coarse scope happens to contain what it wants. This is the
+// only way to reach a request-only key such as `given_name_id`, and it is
+// additive: the scope-derived set a client has always received is unchanged, so
+// nothing an already-registered client sees moves.
+//
+// Unknown keys are dropped rather than rejected. The alternative is a hard error
+// on a parameter a relying party may well populate from a newer referential than
+// the one this IdP embeds, and a sign-in that fails outright is a worse answer
+// than a sign-in missing an attribute the client can see is absent.
+func parseAttributesParam(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, k := range strings.FieldsFunc(raw, func(r rune) bool { return r == ' ' || r == ',' || r == '+' }) {
+		if !attributes.Keys[k] || seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, k)
+	}
+	return out
+}
+
+// whitelistedAttributes returns the client's required_attributes as a set, or
+// nil when it declares none. nil and empty are NOT the same thing here: a client
+// with no whitelist may ask for anything, while one that declares a whitelist is
+// held to it even for keys it named on the request.
+func whitelistedAttributes(client *clients.Client) map[string]bool {
+	if client == nil || len(client.RequiredAttributes) == 0 {
+		return nil
+	}
+	allowed := make(map[string]bool, len(client.RequiredAttributes)+1)
+	for _, a := range client.RequiredAttributes {
+		allowed[a] = true
+	}
+	// Always keep "sub" (required by OpenID Connect).
+	allowed["sub"] = true
+	return allowed
+}
+
+// requestedAttributes derives the attribute keys a relying party needs: the
+// scope-derived set, plus the keys it named on the request, then intersected
+// with the client's required_attributes whitelist (when set). "sub" is always
+// included for an openid request. Shared by /authorize and
+// /device_authorization so the wallet sees one consistent list regardless of
+// entry point.
+//
+// The two paths are deliberately not equivalent. A scope is coarse and historic:
+// `identity` still yields exactly the identity baseline it always has. A named
+// key is precise, and it is the ONLY way to reach a request-only key — every
+// government-backed `_id` attribute is one, so no client is ever charged for a
+// passport disclosure it did not spell out. The whitelist still wins over both:
+// a registration is a ceiling, not a starting point.
+func requestedAttributes(scope string, named []string, client *clients.Client) []string {
+	allowed := whitelistedAttributes(client)
+
+	inRequest := make(map[string]bool, len(named))
+	for _, k := range named {
+		inRequest[k] = true
+	}
+
 	var requested []string
 	if strings.Contains(scope, "openid") {
 		requested = append(requested, "sub")
 	}
 	for _, attr := range attributes.All {
-		if strings.Contains(scope, attr.Scope) {
-			requested = append(requested, attr.Key)
+		if !attr.InScope(scope) && !inRequest[attr.Key] {
+			continue
 		}
+		requested = append(requested, attr.Key)
 	}
 
-	if client != nil && len(client.RequiredAttributes) > 0 {
-		allowed := make(map[string]bool, len(client.RequiredAttributes))
-		for _, a := range client.RequiredAttributes {
-			allowed[a] = true
-		}
-		// Always keep "sub" (required by OpenID Connect).
-		allowed["sub"] = true
+	if allowed != nil {
 		filtered := requested[:0]
 		for _, a := range requested {
 			if allowed[a] {
@@ -1536,13 +1635,18 @@ type AttributeRequirement struct {
 	Assurance string `json:"assurance"` // "gov" | "any"
 }
 
-// attributeRequirementsForScope returns per-attribute requirements for the
-// requested scope. Essential = the client's required_attributes whitelist, or
-// the email+name identity baseline when the client declares none (so the wallet
-// has a consistent essential set without its own heuristic). Assurance = "gov"
-// for identity-scoped attributes (only the identity-verifier enclave can certify
-// them), else "any". Additive to the payload: older wallets ignore it.
-func attributeRequirementsForScope(scope string, client *clients.Client) map[string]AttributeRequirement {
+// attributeRequirements returns per-attribute requirements for the request.
+// Essential = the client's required_attributes whitelist, or the email+name
+// identity baseline when the client declares none (so the wallet has a
+// consistent essential set without its own heuristic). Assurance = "gov" for a
+// government-backed key (only the identity-verifier enclave can certify one),
+// else "any". Additive to the payload: older wallets ignore it.
+//
+// Assurance is read off the KEY, which is the point of the `_id` convention:
+// `given_name` is the holder's own profile value and `given_name_id` is the
+// passport one, so there is nothing left for a request to disambiguate and no
+// way for a scope to downgrade what a relying party asked for.
+func attributeRequirements(scope string, named []string, client *clients.Client) map[string]AttributeRequirement {
 	essential := map[string]bool{}
 	if client != nil && len(client.RequiredAttributes) > 0 {
 		for _, a := range client.RequiredAttributes {
@@ -1554,17 +1658,58 @@ func attributeRequirementsForScope(scope string, client *clients.Client) map[str
 	}
 
 	out := map[string]AttributeRequirement{}
-	for _, key := range requestedAttributesForScope(scope, client) {
+	for _, key := range requestedAttributes(scope, named, client) {
 		if key == "sub" {
 			continue
 		}
 		assurance := "any"
-		if attr, ok := attributes.ByKey[key]; ok && attr.Scope == "identity" {
+		if attr, ok := attributes.ByKey[key]; ok && attr.IsGovVerified() {
 			assurance = "gov"
 		}
 		out[key] = AttributeRequirement{Essential: essential[key], Assurance: assurance}
 	}
 	return out
+}
+
+// reservableMarketplaceKeys picks the namespaced keys a set of requirements
+// would reserve credits for, deduplicated and in a stable order.
+//
+// Everything the referential does not price is dropped — the identity scope also
+// carries the raw document fields the verifier reads off the chip, which are
+// certified by the same ceremony but have no registry row, and reserving one
+// fails the whole authorization as an unknown attribute.
+//
+// Deduplication is load-bearing, not tidiness: a key and its legacy spelling
+// resolve to the same registry row (birthdate_id and birthdate are both
+// privasys:birthdate), and a client naming both would otherwise be charged
+// twice for one disclosure.
+func reservableMarketplaceKeys(reqs map[string]AttributeRequirement) []string {
+	seen := map[string]bool{}
+	var keys []string
+	add := func(k string) {
+		if !seen[k] {
+			seen[k] = true
+			keys = append(keys, k)
+		}
+	}
+	for key, req := range reqs {
+		if req.Assurance != "gov" {
+			continue
+		}
+		if key == presenceAttribute {
+			// Ceremonial and deliberately non-canonical, so the referential
+			// cannot price it — but migration 056 does seed its registry row,
+			// and a gov-presence ceremony that reserved nothing would run the
+			// live biometric check for free.
+			add(presenceMarketplaceKey)
+			continue
+		}
+		if mk, ok := attributes.MarketplaceKey(key); ok {
+			add(mk)
+		}
+	}
+	sort.Strings(keys) // stable request for deterministic grouping/tests
+	return keys
 }
 
 // disclosureReservationTTL is how long a per-attribute credit hold survives. It
@@ -1583,23 +1728,10 @@ func mintDisclosureVouchers(ctx context.Context, m *voucher.Minter, client *clie
 	if m == nil || !m.Enabled() || client == nil || !client.BillableRP || client.BillingAccountID == "" {
 		return nil, nil
 	}
-	var keys []string
-	for key, req := range reqs {
-		if req.Assurance != "gov" {
-			continue
-		}
-		// Only what the referential says the marketplace issues. The identity
-		// scope also carries the raw document fields the verifier reads off the
-		// chip, which are certified by the same ceremony but have no registry
-		// row; reserving one would fail the whole authorization as unknown.
-		if mk, ok := attributes.MarketplaceKey(key); ok {
-			keys = append(keys, mk)
-		}
-	}
+	keys := reservableMarketplaceKeys(reqs)
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	sort.Strings(keys) // stable request for deterministic grouping/tests
 	rpID := client.RPID
 	if rpID == "" {
 		rpID = client.ClientID
@@ -1607,11 +1739,20 @@ func mintDisclosureVouchers(ctx context.Context, m *voucher.Minter, client *clie
 	return m.Mint(ctx, client.BillingAccountID, rpID, keys, disclosureReservationTTL, billingGrant, client.ClientID)
 }
 
-// filterAttributesByScope returns only the attributes allowed by the OIDC scope,
-// using the shared canonical attribute definitions.
-func filterAttributesByScope(attrs map[string]string, scope string) map[string]string {
+// filterAttributesRequested returns only the attributes the relying party
+// actually asked for: those its scope reaches, plus the keys it named on the
+// request. Uses the shared canonical attribute definitions.
+//
+// `named` has to come along or every request-only key would be dropped here
+// after the wallet went to the trouble of disclosing it — a `given_name_id` the
+// client spelled out is exactly as requested as an `email` its scope implied.
+func filterAttributesRequested(attrs map[string]string, scope string, named []string) map[string]string {
 	if len(attrs) == 0 {
 		return nil
+	}
+	inRequest := make(map[string]bool, len(named))
+	for _, k := range named {
+		inRequest[k] = true
 	}
 	out := make(map[string]string)
 	for k, v := range attrs {
@@ -1625,9 +1766,10 @@ func filterAttributesByScope(attrs map[string]string, scope string) map[string]s
 			continue
 		}
 		if attr, ok := attributes.ByKey[k]; ok {
-			// Known canonical attribute — check if its scope is requested.
+			// Known canonical attribute — allowed when its scope was requested
+			// or the relying party named it.
 			// Special case: email is also allowed under profile scope.
-			if strings.Contains(scope, attr.Scope) || (k == "email" && strings.Contains(scope, "profile")) {
+			if attr.InScope(scope) || inRequest[k] || (k == "email" && strings.Contains(scope, "profile")) {
 				out[k] = v
 			}
 		} else {

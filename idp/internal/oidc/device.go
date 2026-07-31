@@ -242,6 +242,9 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 			return
 		}
 
+		// Per-attribute request path, same semantics as /authorize.
+		namedAttributes := parseAttributesParam(r.FormValue("attributes"))
+
 		now := time.Now()
 
 		// Create the AuthSession the wallet (or verification page) completes.
@@ -254,6 +257,7 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 			RedirectURI:         "",
 			Scope:               scope,
 			ACRValues:           acrValues,
+			NamedAttributes:     namedAttributes,
 			CodeChallenge:       codeChallenge,
 			CodeChallengeMethod: codeChallengeMethod,
 			CreatedAt:           now,
@@ -275,18 +279,17 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 		if agentName != "" {
 			qrPayload["requestedBy"] = agentName
 		}
-		requestedAttributes := requestedAttributesForScope(scope, client)
-		attributeRequirements := attributeRequirementsForScope(scope, client)
-		requestedAttributes, attributeRequirements =
-			applyPresenceACR(acrValues, requestedAttributes, attributeRequirements)
-		if len(requestedAttributes) > 0 {
-			qrPayload["requestedAttributes"] = requestedAttributes
-			qrPayload["attributeRequirements"] = attributeRequirements
+		requested := requestedAttributes(scope, namedAttributes, client)
+		reqs := attributeRequirements(scope, namedAttributes, client)
+		requested, reqs = applyPresenceACR(acrValues, requested, reqs)
+		if len(requested) > 0 {
+			qrPayload["requestedAttributes"] = requested
+			qrPayload["attributeRequirements"] = reqs
 		}
 
 		// Reserve the relying party's credits for any paid (gov) attributes and
 		// carry the disclosure vouchers to the wallet in the same payload.
-		vouchers, mintErr := mintDisclosureVouchers(r.Context(), minter, client, attributeRequirements,
+		vouchers, mintErr := mintDisclosureVouchers(r.Context(), minter, client, reqs,
 			strings.TrimSpace(r.FormValue("billing_grant")))
 		if mintErr == voucher.ErrInsufficient {
 			errorResponse(w, http.StatusPaymentRequired, "insufficient_credits",
@@ -330,9 +333,9 @@ func HandleDeviceAuthorization(reg *clients.Registry, sessions *SessionStore, de
 			"interval":                  defaultDeviceInterval,
 			"qr_payload":                universalLink,
 		}
-		if len(requestedAttributes) > 0 {
-			resp["requested_attributes"] = requestedAttributes
-			resp["attribute_requirements"] = attributeRequirements
+		if len(requested) > 0 {
+			resp["requested_attributes"] = requested
+			resp["attribute_requirements"] = reqs
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -454,6 +457,7 @@ func HandleDeviceApprove(issuer *tokens.Issuer, devices *DeviceStore, sessions *
 				UserID:              sub,
 				Scope:               session.Scope,
 				ACRValues:           session.ACRValues,
+				NamedAttributes:     session.NamedAttributes,
 				CodeChallenge:       session.CodeChallenge,
 				CodeChallengeMethod: session.CodeChallengeMethod,
 				AuthTime:            time.Now(),

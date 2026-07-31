@@ -59,6 +59,7 @@ import { relaySessionToken } from '@/services/broker';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { issueEncAuthForSignIn } from '@/services/encauth';
+import { assertWalletSession } from '@/services/session-assert';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, getProfileAssurance, getProfileValue, setProfileValue } from '@/services/attributes';
@@ -285,6 +286,19 @@ async function patchSessionAttributes(
     } catch (e: any) {
         console.warn('[CONNECT] session attribute patch failed:', e?.message);
     }
+}
+
+/**
+ * Mark the pending IdP session wallet-asserted (WIA + holder-key PoP) so the
+ * tokens it mints carry the non-identifying `wallet` class — the API-fee
+ * exemption that keeps wallet-driven identity verification free. IdP-brokered
+ * payloads only; fire-and-forget (a failure costs the exemption, never the
+ * sign-in). Runs right after the ceremony so the extra hardware signature
+ * rides the keystore's biometric grace window.
+ */
+function maybeAssertWalletSession(payload: QRPayload): void {
+    if (!payload.sessionId || !payload.origin?.includes('privasys.id')) return;
+    void assertWalletSession(payload.sessionId);
 }
 
 /**
@@ -1687,6 +1701,7 @@ export default function ConnectScreen() {
             // reach the issued tokens. The IdP's patch branch is idempotent,
             // so double delivery via the SDK path is harmless.
             await patchSessionAttributes(payload, attributes);
+            maybeAssertWalletSession(payload);
 
             // Relay succeeded — now persist locally.
             persistCredentialAndTrust(payload, result.credentialId, keyAlias, result.userHandle, result.userName, result.serverRpId);
@@ -1823,6 +1838,7 @@ export default function ConnectScreen() {
 
             // Device-flow attribute delivery (see patchSessionAttributes).
             await patchSessionAttributes(payload, attributes);
+            maybeAssertWalletSession(payload);
 
             // Keep the IdP's push target fresh for this pairwise identity
             // (vault approvals for keys it owns). Best-effort.
@@ -2013,6 +2029,7 @@ export default function ConnectScreen() {
 
             // Device-flow attribute delivery (see patchSessionAttributes).
             await patchSessionAttributes(pending.payload, attributes);
+            maybeAssertWalletSession(pending.payload);
 
             // For registration, persist the credential now
             if (pending.credential) {

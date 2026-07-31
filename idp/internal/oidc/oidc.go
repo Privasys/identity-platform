@@ -284,13 +284,16 @@ type AuthCode struct {
 	// top-level claims by the token endpoint, then GC'd. Optional.
 	SessionRelay map[string]interface{}
 
-	// WalletVerified is set true only when this code was minted from a genuine
-	// Privasys-wallet WebAuthn ceremony (the fido2 register/authenticate paths).
-	// It drives a non-identifying `wallet` class marker on the access token so
-	// an attested app runtime can recognise a wallet caller for a
-	// `free_for:["wallet"]` API-fee exemption (x-privasys.price) WITHOUT
-	// learning or linking the pairwise identity. A constant shared by all wallet
-	// users, it carries no per-user data. Social/browser logins never set it.
+	// WalletVerified is set true only when the pending session this code was
+	// minted from was WALLET-ASSERTED: an enrolled, attested wallet instance
+	// proved possession of its WIA-bound holder key over the session id
+	// (POST /session/assert-wallet). It drives a non-identifying `wallet`
+	// class marker on the access token so an attested app runtime can
+	// recognise a wallet caller for a `free_for:["wallet"]` API-fee
+	// exemption (x-privasys.price) WITHOUT learning or linking the pairwise
+	// identity. A constant shared by all wallet users, it carries no
+	// per-user data. Social logins, browser passkeys and forged
+	// /session/complete calls never set it — WebAuthn alone is not a wallet.
 	WalletVerified bool
 }
 
@@ -365,6 +368,20 @@ func (cs *CodeStore) UpdateAttributes(code string, attrs map[string]string) {
 	}
 }
 
+// MarkWalletVerified patches the wallet-class marker onto an existing
+// authorization code. Used when the wallet's assert (see
+// SessionStore.MarkWalletAsserted) arrives after the code was already
+// minted. A consumed or expired code is silently ignored: the token was (or
+// will be) issued without the class, which only costs the caller the fee
+// exemption, never grants it.
+func (cs *CodeStore) MarkWalletVerified(code string) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	if ac, ok := cs.codes[code]; ok {
+		ac.WalletVerified = true
+	}
+}
+
 func (cs *CodeStore) cleanup() {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -399,6 +416,16 @@ type AuthSession struct {
 	Authenticated bool
 	UserID        string
 	AuthCode      string // The authorization code to deliver to the browser.
+
+	// WalletAsserted is set by POST /session/assert-wallet after an enrolled
+	// wallet instance proved possession of its WIA-bound holder key over this
+	// session id. It is the ONLY source of the auth code's WalletVerified
+	// class marker: WebAuthn alone never grants it (a browser passkey is not
+	// a wallet), and nothing client-declared on /session/complete can mint
+	// it. WalletAssertedKey is a non-identifying thumbprint of the asserting
+	// instance's holder key, for audit logs only.
+	WalletAsserted    bool
+	WalletAssertedKey string
 }
 
 // SessionStore manages pending authorization sessions.
@@ -435,6 +462,27 @@ func (ss *SessionStore) Get(id string) (*AuthSession, bool) {
 		return nil, false
 	}
 	return s, true
+}
+
+// MarkWalletAsserted marks a pending session wallet-asserted (see
+// AuthSession.WalletAsserted). When the session has already completed, the
+// existing auth code is returned so the caller can patch the class onto it
+// (the assert lost the race with completion); otherwise completedCode is
+// empty and the code minted later inherits the flag. ok is false for an
+// unknown or expired session.
+func (ss *SessionStore) MarkWalletAsserted(sessionID, instanceKey string) (completedCode string, ok bool) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	s, found := ss.sessions[sessionID]
+	if !found || time.Now().After(s.ExpiresAt) {
+		return "", false
+	}
+	s.WalletAsserted = true
+	s.WalletAssertedKey = instanceKey
+	if s.Authenticated {
+		return s.AuthCode, true
+	}
+	return "", true
 }
 
 // Complete marks a session as authenticated and stores the auth code.
@@ -747,6 +795,13 @@ func HandleSessionComplete(codes *CodeStore, sessions *SessionStore) http.Handle
 			CodeChallengeMethod: session.CodeChallengeMethod,
 			AuthTime:            time.Now(),
 			Attributes:          req.Attributes,
+			// Wallet class only when an enrolled wallet instance asserted
+			// this session over /session/assert-wallet (WIA + holder-key
+			// PoP). This is the wallet-PUSH completion path, so the flag is
+			// what fixes "truest wallet users pay": the wallet asserts
+			// during approval and the code minted here inherits it. Social
+			// logins and forged /session/complete calls never set it.
+			WalletVerified: session.WalletAsserted,
 		})
 		sessions.Complete(req.SessionID, userID, authCode)
 

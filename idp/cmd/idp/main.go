@@ -229,6 +229,24 @@ func main() {
 
 	// Session complete — frame-host calls this after relay/social auth.
 	mux.HandleFunc("POST /session/complete", oidc.HandleSessionComplete(codeStore, sessionStore))
+	// Wallet-asserted session completion: the wallet app proves possession of
+	// its WIA-bound holder key over the pending session id, which is the ONLY
+	// way a token gains the non-identifying `wallet` class (the
+	// free_for:["wallet"] API-fee exemption). Handles both orders of the race
+	// with completion: a pending session is marked, an already-completed one
+	// has its auth code patched.
+	mux.HandleFunc("POST /session/assert-wallet", wiaHandler.HandleAssertSession(
+		func(sessionID, instanceKey string) wia.AssertOutcome {
+			code, ok := sessionStore.MarkWalletAsserted(sessionID, instanceKey)
+			if !ok {
+				return wia.AssertSessionNotFound
+			}
+			if code != "" {
+				codeStore.MarkWalletVerified(code)
+				return wia.AssertPatchedCompletedCode
+			}
+			return wia.AssertMarked
+		}))
 
 	// Social IdP federation.
 	socialProviders := social.NewProviders()

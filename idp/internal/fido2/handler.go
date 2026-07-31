@@ -533,9 +533,13 @@ func (h *Handler) CompleteRegistration(
 					CodeChallengeMethod: session.CodeChallengeMethod,
 					AuthTime:            time.Now(),
 					SessionRelay:        relay,
-					// This code is minted from a genuine wallet WebAuthn
-					// ceremony → stamp the non-identifying wallet-class marker.
-					WalletVerified: true,
+					// Wallet class only when an enrolled wallet instance
+					// asserted this session (WIA + holder-key PoP over
+					// /session/assert-wallet). A WebAuthn ceremony alone
+					// proves a passkey, not the wallet app — the previous
+					// unconditional stamp let ANY browser passkey mint the
+					// class and dodge wallet-exempt API fees.
+					WalletVerified: session.WalletAsserted,
 				})
 				sessionStore.Complete(entry.sessionID, userID, authCode)
 			}
@@ -787,8 +791,10 @@ func (h *Handler) CompleteAuthentication(
 					CodeChallengeMethod: session.CodeChallengeMethod,
 					AuthTime:            time.Now(),
 					SessionRelay:        relay,
-					// Genuine wallet WebAuthn authentication → wallet-class marker.
-					WalletVerified: true,
+					// Wallet class only via the wallet's own assert (see the
+					// registration-path comment): WebAuthn alone never
+					// grants it.
+					WalletVerified: session.WalletAsserted,
 				})
 				sessionStore.Complete(entry.sessionID, userID, authCode)
 			}

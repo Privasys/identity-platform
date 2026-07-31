@@ -584,10 +584,13 @@ export default function AccountRecoveryScreen() {
                     </RNView>
                 ) : (
                     <RNView style={styles.card}>
-                        {devices.map((d) => {
+                        {devices.map((d, i) => {
                             const isThisDevice = myCredentialIds.has(d.credential_id);
                             return (
-                            <RNView key={d.credential_id} style={styles.deviceRow}>
+                            <RNView
+                                key={d.credential_id}
+                                style={[styles.deviceRow, i === devices.length - 1 && styles.deviceRowLast]}
+                            >
                                 <Ionicons name="phone-portrait-outline" size={18} color={isThisDevice ? p.green : p.textSecondary} />
                                 <RNView style={{ flex: 1 }}>
                                     <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -905,6 +908,9 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         paddingVertical: 10,
         borderBottomWidth: 0.5,
         borderBottomColor: p.border,
+    },
+    deviceRowLast: {
+        borderBottomWidth: 0,
     },
     deviceLabel: {
         fontSize: 14,

@@ -122,6 +122,16 @@ export class InsufficientCreditsError extends Error {
 }
 
 export interface AuthFrameConfig {
+    /**
+     * Opaque billing grant, forwarded to /authorize. It redirects the cost of
+     * any paid attribute disclosure this sign-in triggers from this app's
+     * owner to the user who issued the grant, so the person requiring the
+     * proof pays for it rather than the app. Mint one per recipient via the
+     * platform's attribute-billing-grants endpoint: a grant is single-use and
+     * bound to one client. Omit it and the app's own account pays, which is
+     * the right default for a business relying party.
+     */
+    billingGrant?: string;
     /** Management service API base URL. */
     apiBase: string;
     /** App name or UUID as registered on the platform. */

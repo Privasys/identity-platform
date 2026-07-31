@@ -779,6 +779,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             sessionRelay?: { appHost: string; extraAppHosts?: string[] };
             connect?: { mode?: string; reason?: string | null };
             caps?: string[];
+            billingGrant?: string;
         } = data.config;
         const parentOrigin = e.origin;
 
@@ -945,6 +946,14 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 const scopeStr = Array.isArray(config.scope) ? config.scope.join(' ') : (config.scope || 'openid offline_access');
                 authorizeUrl.searchParams.set('scope', scopeStr);
                 authorizeUrl.searchParams.set('response_mode', 'json');
+                // A billing grant redirects the cost of any paid attribute
+                // disclosure from this app's owner to the user who issued the
+                // grant, so the person requiring the proof pays for it (a
+                // Drive sharer, for instance). Opaque here: the control plane
+                // owns its scope, ceiling and single use.
+                if (config.billingGrant) {
+                    authorizeUrl.searchParams.set('billing_grant', config.billingGrant);
+                }
                 const authResp = await fetch(authorizeUrl.toString(), {
                     headers: { Accept: 'application/json' },
                 });

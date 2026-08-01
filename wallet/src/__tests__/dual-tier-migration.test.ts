@@ -1,7 +1,7 @@
 // Copyright (c) Privasys. All rights reserved.
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { assertableCertifiedValue, migrateDualTierAssurance } from '@/services/attributes';
+import { migrateDualTierAssurance, selfAssertedValue } from '@/services/attributes';
 import type { ProfileAttribute, UserProfile } from '@/stores/profile';
 
 function profileWith(attributes: ProfileAttribute[]): UserProfile {
@@ -69,29 +69,35 @@ describe('dual-tier assurance migration', () => {
     });
 });
 
-describe('asserting a certified value under the free key', () => {
-    it('offers the certified twin when the self-asserted key is empty', () => {
+describe('answering a self-asserted request', () => {
+    it('answers from the certified reading when the free key is empty', () => {
+        // The value, never the credential — so the relying party gets an
+        // accurate date and no proof of it.
         const p = profileWith([attr('birthdate_id', '1980-01-01', 'document')]);
-        expect(assertableCertifiedValue(p, 'birthdate')).toBe('1980-01-01');
+        expect(selfAssertedValue(p, 'birthdate')).toBe('1980-01-01');
     });
 
-    it('offers nothing when the holder already typed one', () => {
+    it('prefers what the holder actually stored under the free key', () => {
         const p = profileWith([
             attr('birthdate', '1979-05-05', 'manual'),
             attr('birthdate_id', '1980-01-01', 'document')
         ]);
-        expect(assertableCertifiedValue(p, 'birthdate')).toBeUndefined();
+        expect(selfAssertedValue(p, 'birthdate')).toBe('1979-05-05');
     });
 
-    it('offers nothing when the twin is not document-sourced', () => {
-        // A provider-supplied value is not a certification, so there is
-        // nothing here the holder can vouch for on that basis.
+    it('does not answer from a twin that was never certified', () => {
+        // A provider-supplied value is not a document reading, so it is not
+        // the certified twin this fallback exists for.
         const p = profileWith([attr('birthdate_id', '1980-01-01', 'provider')]);
-        expect(assertableCertifiedValue(p, 'birthdate')).toBeUndefined();
+        expect(selfAssertedValue(p, 'birthdate')).toBeUndefined();
     });
 
-    it('offers nothing for a key with no twin', () => {
+    it('returns a stored value as-is for a key with no twin', () => {
         const p = profileWith([attr('document_number', 'X123', 'document')]);
-        expect(assertableCertifiedValue(p, 'document_number')).toBeUndefined();
+        expect(selfAssertedValue(p, 'document_number')).toBe('X123');
+    });
+
+    it('has nothing to answer with when neither key holds anything', () => {
+        expect(selfAssertedValue(profileWith([]), 'birthdate')).toBeUndefined();
     });
 });

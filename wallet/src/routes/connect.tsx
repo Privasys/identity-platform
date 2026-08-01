@@ -62,7 +62,7 @@ import { issueEncAuthForSignIn } from '@/services/encauth';
 import { ensureWia } from '@/services/wia';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
-import { assertableCertifiedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, govValueKey, isDerived, setProfileValue } from '@/services/attributes';
+import { selfAssertedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, govValueKey, isDerived, setProfileValue } from '@/services/attributes';
 import { discloseAttribute, provePresence, voucherForAttribute } from '@/services/kyc';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
@@ -197,7 +197,11 @@ async function resolveRequestedAttributes(
         // from the receipt — so its absence must not route this to the
         // self-asserted branch.
         const govKey = gov ? govValueKey(profile, attr) : undefined;
-        const value = getProfileValue(profile, govKey ?? attr);
+        // A self-asserted request falls back to the reading the holder already
+        // certified — the value, never the credential. See selfAssertedValue.
+        const value = gov
+            ? getProfileValue(profile, govKey ?? attr)
+            : selfAssertedValue(profile, attr);
         if (gov && (govKey || isDerived(attr))) {
             if (disclosesAsToken(attr)) {
                 // Gov claims are presented as enclave-signed, audience-bound
@@ -543,7 +547,7 @@ function buildConsentPlan(
                         isDerived(key) ||
                         !!(profile && (assuranceFor(key, reqs) === 'gov'
                             ? govValueKey(profile, key)
-                            : getProfileValue(profile, key))) ||
+                            : selfAssertedValue(profile, key))) ||
                         !!ATTRIBUTE_MAP[key]?.deviceSourced,
                 })
         .filter((i) => i.hasValue || i.essential);
@@ -2690,23 +2694,6 @@ function AttributeAcquisitionView({
         }
     };
 
-    // Self-asserted keys the holder could answer from a value they have already
-    // certified — a free `birthdate` when the wallet holds a passport
-    // `birthdate_id`. Offered rather than filled: asserting it is the holder's
-    // decision, and what travels carries no proof.
-    const assertable = profile
-        ? stillMissing
-              .map((attr) => ({ attr, value: assertableCertifiedValue(profile, attr) }))
-              .filter((x): x is { attr: string; value: string } => !!x.value)
-        : [];
-
-    /** Assert a certified value under its self-asserted key. Stored as
-     *  'manual' on purpose: the source is the holder, so no verification
-     *  record travels and the migration will not pull it back to the
-     *  government key. */
-    const handleAssertCertified = (attr: string, value: string) => {
-        setProfileValue(useProfileStore.getState(), attr, value, 'manual');
-    };
 
     const displayAppName = appNameProp || appName(rpId);
     // Save is enabled once the essential, typeable fields are filled. Optional
@@ -2804,30 +2791,6 @@ function AttributeAcquisitionView({
                             );
                         })}
                     </RNView>
-
-                    {/* You already proved this — assert it without retyping.
-                        The value goes as holder-asserted: accurate, unproven.
-                        A relying party that needs the proof asks for the
-                        verified attribute instead, and pays for it. */}
-                    {assertable.length > 0 && (
-                        <RNView style={acqStyles.assertBlock}>
-                            {assertable.map(({ attr, value }) => (
-                                <Pressable
-                                    key={attr}
-                                    style={acqStyles.assertButton}
-                                    onPress={() => handleAssertCertified(attr, value)}
-                                >
-                                    <Ionicons name="shield-checkmark" size={18} color={p.approve} />
-                                    <Text style={acqStyles.assertText}>
-                                        Use my verified {attributeLabel(attr).toLowerCase()} ({value})
-                                    </Text>
-                                </Pressable>
-                            ))}
-                            <Text style={acqStyles.assertNote}>
-                                Shares the value only — this app receives no proof of it.
-                            </Text>
-                        </RNView>
-                    )}
 
                     {requiredMissing.length === 0 ? (
                         /* Required attributes present — optional ones don't block */
@@ -3173,30 +3136,6 @@ const makeAcqStyles = (p: Palette) => StyleSheet.create({
     saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
     backLink: { alignItems: 'center', paddingVertical: 16 },
     backLinkText: { fontSize: 14, color: p.action },
-    assertBlock: {
-        gap: 6,
-        marginBottom: 14,
-    },
-    assertButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: p.approve,
-    },
-    assertText: {
-        flex: 1,
-        fontSize: 14,
-        color: p.textPrimary,
-    },
-    assertNote: {
-        fontSize: 12,
-        color: p.textMuted,
-        paddingHorizontal: 2,
-    },
     readySection: {
         alignItems: 'center',
         gap: 8,

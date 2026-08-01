@@ -67,8 +67,8 @@ let resolved: ResolvedDrive | null = null;
  *  known-good deployment and attestation still gates the connection.
  *  The management app id is NOT taken from here — it is read off the
  *  attested RA-TLS leaf (OID 3.6) in setup(). */
-async function resolveDrive(): Promise<ResolvedDrive> {
-    if (resolved) return resolved;
+async function resolveDrive(force = false): Promise<ResolvedDrive> {
+    if (resolved && !force) return resolved;
     try {
         const res = await fetch(
             `${PLATFORM_API_BASE}/api/v1/apps/by-name/${encodeURIComponent(DRIVE_APP_NAME)}/resolve`
@@ -128,16 +128,23 @@ let lastAttest: { origin: string; appId: string } | null = null;
  * on a missing/mismatched digest or a failed verification.
  */
 export async function attestDrive(forceMode?: VerificationMode): Promise<DriveAttestation> {
-    const d = await resolveDrive();
+    let d = await resolveDrive();
     const inspected = await inspectAttestation(d.origin);
     const appId = appIdFromOids(inspected.custom_oids);
     if (!appId) throw new Error('Drive enclave attestation is missing its app id (OID 3.6)');
     if (d.imageDigest) {
-        const got = inspected.custom_oids
-            ?.find((o) => o.oid === d.imageOid)
-            ?.value_hex?.toLowerCase();
-        if (got !== d.imageDigest) {
-            throw new Error('Drive enclave image digest does not match the published build');
+        const digestOf = (r: ResolvedDrive) =>
+            inspected.custom_oids?.find((o) => o.oid === r.imageOid)?.value_hex?.toLowerCase();
+        if (digestOf(d) !== d.imageDigest) {
+            // The published digest is cached for the app session, so a Drive
+            // upgrade while the wallet stays open leaves us comparing against
+            // the PREVIOUS build — a mismatch that looks like a compromised
+            // enclave but is only a stale cache. Re-resolve once and re-check
+            // before refusing; a genuine mismatch still fails closed.
+            d = await resolveDrive(true);
+            if (digestOf(d) !== d.imageDigest) {
+                throw new Error('Drive enclave image digest does not match the published build');
+            }
         }
     }
 

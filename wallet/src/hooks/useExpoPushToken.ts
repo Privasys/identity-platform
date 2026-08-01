@@ -6,6 +6,7 @@ import { AppState, Platform } from 'react-native';
 import { DEFAULT_RELAY_HOST, fetchDescriptor } from '../services/descriptor';
 import { ensureNotifySealKey, openSealedNotification } from '../services/notify-seal';
 import { getPrivasysAccount } from '../services/privasys-id';
+import { fetchAttributeApproval } from '../services/attribute-approval-api';
 import { registerPushTokenWithIdp } from '../services/vault-approval-api';
 import { useDriveNotificationsStore } from '../stores/drive-notifications';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
@@ -29,7 +30,8 @@ async function getNotifications() {
                 const isAuthRequest =
                     data?.type === 'auth-request' ||
                     data?.type === 'voucher-request' ||
-                    data?.type === 'vault-approval';
+                    data?.type === 'vault-approval' ||
+                    data?.type === 'attribute-approval';
                 return {
                     shouldShowAlert: !isAuthRequest,
                     shouldPlaySound: !isAuthRequest,
@@ -163,6 +165,34 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
             pathname: '/vault-approvals',
             params: { vault_op: vaultOp, source: 'push' },
         });
+        return;
+    }
+    if (data?.type === 'attribute-approval') {
+        // Attribute step-up: a relying party the holder already signed into
+        // asked for MORE than the standing grant. The push carries only the
+        // capability; fetch the pending request (delta + the authorize
+        // descriptor) over TLS and run it through the connect consent flow.
+        // A dead capability (completed, or expired with its 5-minute
+        // authorize session — the browser fell back to a QR) is a no-op: no
+        // store, no banner; there is nothing left to act on.
+        const approval = String(data.approval ?? '');
+        if (!approval) return;
+        try {
+            const req = await fetchAttributeApproval(approval);
+            if (!req) return;
+            const payload = JSON.stringify({
+                ...req.payload,
+                mode: 'attribute-step-up',
+                sessionId: req.session_id,
+                clientId: req.client_id,
+                approval: req.approval,
+                addedAttributes: req.added,
+                approvalOptions: req.options,
+            });
+            router.push({ pathname: '/connect', params: { payload, source: 'push' } });
+        } catch (e) {
+            console.warn('[notifications] attribute-approval fetch failed', e);
+        }
         return;
     }
     const payload = authRequestPayload(data);

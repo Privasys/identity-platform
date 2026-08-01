@@ -38,6 +38,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import * as Crypto from 'expo-crypto';
+import * as LocalAuthentication from 'expo-local-authentication';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { base64urlToBytes } from '@/utils/encoding';
@@ -56,6 +57,12 @@ import {
     type DependencyConsentItem,
 } from '@/services/dependency-consent';
 import { relaySessionToken } from '@/services/broker';
+import {
+    completeAttributeApproval,
+    mergeStepUpConsent,
+    resolveStepUpCredential,
+    type StepUpAssertionOptions,
+} from '@/services/attribute-approval-api';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { issueEncAuthForSignIn } from '@/services/encauth';
@@ -631,8 +638,19 @@ interface QRPayload {
     /** 'session-relay' — bootstrap a sealed session + bind the JWT (sign-in).
      *  'voucher-only' — extend a LIVE session to `appHost` with one biometric:
      *  attest + issue an EncAuth voucher (no WebAuthn, no relay); `sid` is the
-     *  browser's session row to write to. 'standard' — plain passkey. */
-    mode?: 'session-relay' | 'voucher-only' | 'standard';
+     *  browser's session row to write to. 'standard' — plain passkey.
+     *  'attribute-step-up' — a pushed approval for a WIDENED attribute
+     *  request: consent on the delta + one bound signature; the browser's
+     *  authorize session completes via its own status poll (no relay). */
+    mode?: 'session-relay' | 'voucher-only' | 'standard' | 'attribute-step-up';
+    /** Step-up capability from the push (the /complete challenge param). */
+    approval?: string;
+    /** Step-up delta: the attribute keys this request ADDED over the standing
+     *  grant. The consent screen shows these and nothing else. */
+    addedAttributes?: string[];
+    /** Step-up WebAuthn assertion options fetched with the pending request;
+     *  the challenge commits to the session + client + exact requested set. */
+    approvalOptions?: StepUpAssertionOptions;
     /** IdP session id (from the browser's JWT) to write the voucher to.
      *  Required for mode==='voucher-only'. */
     sid?: string;
@@ -808,6 +826,20 @@ function ConnectFlow() {
             setStep('verifying');
             setReleases(null);
             setVerification(null);
+            // Attribute step-up (push): consent on the DELTA plus one bound
+            // signature. The ceremony host is the IdP (no enclave to attest)
+            // and the browser's authorize session completes via its own
+            // status poll, so none of the attestation / relay machinery
+            // below applies.
+            if (payload.mode === 'attribute-step-up') {
+                setVerificationLevel('non-enclave');
+                if (isFromPush && !checkUnlocked()) {
+                    setStep('confirm');
+                    return;
+                }
+                await startStepUp(payload);
+                return;
+            }
             // The relying-party app the user is actually signing into is
             // `payload.rpId` (e.g. `lightpanda.apps-test.privasys.org`).
             // `payload.origin` is the FIDO2 ceremony host (the IdP at
@@ -1263,13 +1295,27 @@ function ConnectFlow() {
         const denied = consentItems.filter((i) => !consentSelected.has(i.key)).map((i) => i.key);
         const now = Math.floor(Date.now() / 1000);
         const consent = useConsentStore.getState();
+        // A step-up consent covers only the DELTA the screen showed, but the
+        // stored grant is the whole set: writing the delta alone would
+        // silently revoke everything approved before. Merge with the prior
+        // decision (standing consent, else the latest record) for the
+        // standing write, the decided-set record, and the set that gates
+        // this ceremony's disclosures.
+        const isStepUp = qr.mode === 'attribute-step-up';
+        const priorLatest = isStepUp ? consent.getRecordsForApp(key)[0] : undefined;
+        const priorApproved = isStepUp
+            ? (consent.getStandingConsent(key, meas, codeHash)?.attributes ??
+                priorLatest?.approvedAttributes ?? [])
+            : [];
         consent.addRecord({
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
             rpId: key,
             origin: qr.rpId,
             appName: qr.appName,
-            requestedAttributes: consentItems.map((i) => i.key),
-            approvedAttributes: approved,
+            requestedAttributes: isStepUp
+                ? mergeStepUpConsent(priorLatest?.requestedAttributes, consentItems.map((i) => i.key))
+                : consentItems.map((i) => i.key),
+            approvedAttributes: isStepUp ? mergeStepUpConsent(priorApproved, approved) : approved,
             deniedAttributes: denied,
             decision: denied.length === 0 ? 'approved' : approved.length === 0 ? 'denied' : 'partial',
             persistent: consentRemember,
@@ -1282,13 +1328,15 @@ function ConnectFlow() {
         if (consentRemember) {
             consent.setStandingConsent({
                 rpId: key,
-                attributes: approved,
+                attributes: isStepUp ? mergeStepUpConsent(priorApproved, approved) : approved,
                 enclaveMeasurement: meas,
                 codeHash,
                 grantedAt: now,
             });
         }
-        approvedAttrsRef.current = new Set(approved);
+        approvedAttrsRef.current = isStepUp
+            ? new Set(mergeStepUpConsent(priorApproved, approved))
+            : new Set(approved);
         const cont = consentContinuation.current;
         consentContinuation.current = null;
         if (cont) await runWithPresence(approvedAttrsRef.current, cont);
@@ -1340,6 +1388,89 @@ function ConnectFlow() {
         if (cont) await cont();
     }, []);
 
+    /** Attribute step-up entry: gate the DELTA through the consent screen,
+     *  then sign the bound approval. Never a re-listing of the whole grant —
+     *  the holder decides on what CHANGED. */
+    const startStepUp = async (payload: QRPayload) => {
+        const currentProfile = useProfileStore.getState().profile;
+        const added = payload.addedAttributes ?? [];
+        // The consent plan is built from a view of the payload narrowed to
+        // the delta; requirements/vouchers stay so gov keys keep their badge
+        // and their disclosure path.
+        const deltaView: QRPayload = { ...payload, requestedAttributes: added };
+        const plan = buildConsentPlan(deltaView, currentProfile);
+        if (plan.length === 0) {
+            // Nothing the wallet can put on the screen means nothing it can
+            // honestly approve — an empty consent plan must never stand in
+            // for consent (the wallet-v1.3.68 rule). The browser falls back
+            // to its ceremony when this approval never completes.
+            setError(
+                'This service asks for data your wallet cannot provide, so there is nothing to approve. ' +
+                'Nothing was shared.',
+            );
+            setStep('error');
+            return;
+        }
+        await ensureConsentRef.current(deltaView, () => doStepUpApprove(payload));
+    };
+
+    /** Sign the request-bound approval and post it with the attribute values
+     *  for the FULL requested set (the IdP stores none between sessions). */
+    const doStepUpApprove = async (payload: QRPayload) => {
+        setStep('authenticating');
+        try {
+            const options = payload.approvalOptions;
+            if (!payload.approval || !options?.publicKey) {
+                throw new Error('Malformed approval payload');
+            }
+            const credential = resolveStepUpCredential(options);
+            if (!credential) {
+                throw new Error('This device does not hold the credential this approval targets.');
+            }
+            // One fresh biometric for the whole approval — same shape as the
+            // vault-approval screen: on iOS the signature itself is Face
+            // ID-gated, so authenticate the signing context here; on Android
+            // the strong-biometric prompt authorises the signing key.
+            const approvedBio =
+                Platform.OS === 'ios'
+                    ? await NativeKeys.authenticateForSigning('Approve sharing more data')
+                    : (
+                          await LocalAuthentication.authenticateAsync({
+                              promptMessage: 'Approve sharing more data',
+                              biometricsSecurityLevel: 'strong',
+                              cancelLabel: 'Cancel',
+                          })
+                      ).success;
+            if (!approvedBio) {
+                router.replace('/(tabs)');
+                return;
+            }
+            const currentProfile = useProfileStore.getState().profile;
+            // Values for the full requested set, gated by the merged approved
+            // set (prior grant + this delta decision).
+            const attributes = await resolveRequestedAttributes(
+                payload,
+                currentProfile,
+                approvedAttrsRef.current,
+                null,
+            );
+            await completeAttributeApproval(payload.approval, options, credential, attributes ?? {});
+            warmWalletAttestation();
+            recordCeremonyTrace(payload, {
+                channel: 'push',
+                sharedValues: attributes,
+                approved: approvedAttrsRef.current,
+            });
+            if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
+            setStep('done');
+            setTimeout(() => router.replace('/(tabs)'), 1500);
+        } catch (e: any) {
+            console.error('[CONNECT] step-up approval FAILED:', e?.message, e);
+            setError(`Approval failed: ${e?.message ?? e}`);
+            setStep('error');
+        }
+    };
+
     const handleConfirm = useCallback(async () => {
         if (!qr) return;
         // Voucher-only approvals never run the plain authenticate — they
@@ -1349,6 +1480,11 @@ function ConnectFlow() {
         // nothing new.
         if (qr.mode === 'voucher-only') {
             await doVoucherOnly(qr);
+            return;
+        }
+        // Attribute step-up runs its own consent (delta-scoped) + approval.
+        if (qr.mode === 'attribute-step-up') {
+            await startStepUp(qr);
             return;
         }
         const credential = getCredentialForRp(qr.rpId);
@@ -2239,8 +2375,12 @@ function ConnectFlow() {
                         <DataRequestConsent
                             appName={qr.appName || appName(qr.rpId)}
                             origin={qr.clientId || qr.rpId}
-                            sectionTitle="THIS SERVICE WILL RECEIVE"
-                            sectionDescription="Choose what to share. Items marked required are needed to sign in."
+                            sectionTitle={qr.mode === 'attribute-step-up'
+                                ? 'ADDITIONAL DATA REQUESTED'
+                                : 'THIS SERVICE WILL RECEIVE'}
+                            sectionDescription={qr.mode === 'attribute-step-up'
+                                ? 'You are already signed in. This service now asks for the items below on top of what you previously shared.'
+                                : 'Choose what to share. Items marked required are needed to sign in.'}
                             items={consentItems.map((i) => ({
                                 key: i.key,
                                 label: i.label,

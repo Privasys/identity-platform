@@ -342,6 +342,35 @@ export function govValueKey(profile: UserProfile, key: string): string | undefin
 }
 
 /**
+ * The certified value the holder could assert for a self-asserted key.
+ *
+ * After the dual-tier migration a wallet holds the passport reading under the
+ * government key and nothing under the bare one, so a relying party asking for
+ * the free `birthdate` makes the wallet ask the holder to type a date it
+ * already certified. That is correct — the free key means "a value the holder
+ * asserts" — and absurd as an experience.
+ *
+ * Offering the certified value for the holder to assert resolves both. What
+ * travels is the value alone, stored as holder-asserted with no verification
+ * records, so the relying party receives an accurate date carrying NO proof.
+ * Assurance is about proof, not accuracy: anyone who needs the passport behind
+ * it must still ask for the government key and pay for the disclosure.
+ *
+ * Returns undefined when the bare key already holds something (nothing to
+ * offer) or when there is no certified twin.
+ */
+export function assertableCertifiedValue(
+    profile: UserProfile,
+    key: string
+): string | undefined {
+    if (getProfileValue(profile, key)) return undefined;
+    const govKey = ATTRIBUTE_MAP[key]?.govKey;
+    if (!govKey) return undefined;
+    if (getProfileAssurance(profile, govKey) !== 'gov') return undefined;
+    return getProfileValue(profile, govKey);
+}
+
+/**
  * Move document-sourced values off the SELF-ASSERTED half of a dual-tier pair.
  *
  * Profiles verified before the split hold the passport reading under the bare

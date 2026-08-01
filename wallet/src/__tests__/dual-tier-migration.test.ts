@@ -1,7 +1,7 @@
 // Copyright (c) Privasys. All rights reserved.
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { migrateDualTierAssurance } from '@/services/attributes';
+import { assertableCertifiedValue, migrateDualTierAssurance } from '@/services/attributes';
 import type { ProfileAttribute, UserProfile } from '@/stores/profile';
 
 function profileWith(attributes: ProfileAttribute[]): UserProfile {
@@ -66,5 +66,32 @@ describe('dual-tier assurance migration', () => {
         );
         expect(out.moved).toEqual([]);
         expect(out.attributes.map((a) => a.key)).toEqual(['document_number']);
+    });
+});
+
+describe('asserting a certified value under the free key', () => {
+    it('offers the certified twin when the self-asserted key is empty', () => {
+        const p = profileWith([attr('birthdate_id', '1980-01-01', 'document')]);
+        expect(assertableCertifiedValue(p, 'birthdate')).toBe('1980-01-01');
+    });
+
+    it('offers nothing when the holder already typed one', () => {
+        const p = profileWith([
+            attr('birthdate', '1979-05-05', 'manual'),
+            attr('birthdate_id', '1980-01-01', 'document')
+        ]);
+        expect(assertableCertifiedValue(p, 'birthdate')).toBeUndefined();
+    });
+
+    it('offers nothing when the twin is not document-sourced', () => {
+        // A provider-supplied value is not a certification, so there is
+        // nothing here the holder can vouch for on that basis.
+        const p = profileWith([attr('birthdate_id', '1980-01-01', 'provider')]);
+        expect(assertableCertifiedValue(p, 'birthdate')).toBeUndefined();
+    });
+
+    it('offers nothing for a key with no twin', () => {
+        const p = profileWith([attr('document_number', 'X123', 'document')]);
+        expect(assertableCertifiedValue(p, 'document_number')).toBeUndefined();
     });
 });

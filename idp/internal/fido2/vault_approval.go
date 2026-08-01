@@ -145,6 +145,11 @@ func (h *Handler) VaultApprovalToken(iss *tokens.Issuer) http.HandlerFunc {
 // every client. See the vault promote-step-up design.
 const vaultApprovalDomain = "privasys-vault-approval/v1"
 
+// vaultApprovalMaxTTL bounds how long a pending approval (and the token it
+// yields) stays live. Long enough for a human to reach their phone, short
+// enough that an unnoticed request cannot linger.
+const vaultApprovalMaxTTL = int64(300)
+
 // computeVaultApprovalBinding hashes the canonical newline-joined operation
 // tuple. Inputs are rendered as UTF-8 strings so the digest is identical to the
 // vault's `vault_op_binding` (Rust) and any TS/Go client.
@@ -230,9 +235,17 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			errorJSON(w, http.StatusBadRequest, "unknown operation")
 			return
 		}
+		// Clamp, don't collapse: an over-long request used to fall back to
+		// the 120s default, so asking for MORE time silently gave you LESS
+		// — and the approval expired while the human walked to their phone.
+		// Saturate at the maximum instead; only an absent/invalid value
+		// takes the default.
 		ttl := req.TTLSeconds
-		if ttl <= 0 || ttl > 300 {
+		if ttl <= 0 {
 			ttl = 120
+		}
+		if ttl > vaultApprovalMaxTTL {
+			ttl = vaultApprovalMaxTTL
 		}
 		now := time.Now().Unix()
 		exp := now + ttl
@@ -293,6 +306,13 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			AppID:         req.Context.AppID,
 			VersionID:     req.Context.VersionID,
 		}, exp)
+		// Log the REQUEST as well as the completion. Only /complete used to
+		// log ("vault-approval issued"), which reads like a request being
+		// created — so an operator watching the log could not tell an
+		// approval that had succeeded from one that never arrived, and
+		// mistook successful approvals for failures (2026-08-01).
+		log.Printf("fido2: vault-approval requested by %s (op %s, vault_op %s…, ttl %ds)",
+			sub, req.Operation, vaultOp[:12], ttl)
 		writeJSON(w, options)
 	}
 }
@@ -327,7 +347,9 @@ func (h *Handler) VaultApprovalComplete(iss *tokens.Issuer, audience string) htt
 		// use. Direct callers (e2e software authenticator) still read the response.
 		h.vaultResults.put(m.vaultOp, m.sub, tok, m.exp)
 		h.vaultPending.remove(m.vaultOp)
-		log.Printf("fido2: vault-approval issued for %s (vault_op %s…)", m.sub, m.vaultOp[:12])
+		// "approved" — this fires only after a verified assertion, so it is
+		// the success line, and reads as one next to the /begin request log.
+		log.Printf("fido2: vault-approval APPROVED by %s (vault_op %s…) — token stashed", m.sub, m.vaultOp[:12])
 		writeJSON(w, map[string]interface{}{"access_token": tok, "expires_at": m.exp})
 	}
 }

@@ -103,6 +103,21 @@ export interface AuthSession {
     refreshToken?: string;
     /** OIDC client_id used for this session (needed for refresh_token grant). */
     clientId?: string;
+    /**
+     * The named attribute keys the /authorize request that minted this session
+     * carried (the raw `attributes` config, not the IdP-filtered grant).
+     * connect() compares the current config against these to detect a WIDENED
+     * request — a session minted for fewer attributes must not be silently
+     * restored. The raw request is the right comparison base: a key the IdP
+     * dropped (unknown, or outside the client whitelist) never appears in the
+     * granted set, so comparing against the grant would re-trigger the
+     * ceremony on every connect() for an attribute that can never arrive.
+     */
+    requestedAttributes?: string[];
+    /** The scope string the /authorize request that minted this session
+     *  carried. A scope token added since widens the reachable attribute set
+     *  the same way a named key does. */
+    scope?: string;
 }
 
 /** Events emitted by the auth client. */

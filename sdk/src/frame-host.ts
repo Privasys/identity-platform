@@ -321,6 +321,14 @@ const RENEW_RETRY_MS = [5_000, 30_000, 120_000];
 /** Backstop cadence; no-ops unless the token is inside the margin. */
 const RENEW_HEARTBEAT_MS = 60_000;
 
+/**
+ * How long the step-up approve gate waits for the holder to act on the
+ * pushed attribute approval before falling back to the full ceremony.
+ * Deliberately well inside the authorize session's 5-minute window so the
+ * fallback ceremony still has time to complete on the same session.
+ */
+const STEP_UP_APPROVAL_WINDOW_MS = 90_000;
+
 const renewalTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const renewalRetryCount = new Map<string, number>();
 /** rpIds this document renews, with the parent origin to notify. */
@@ -777,7 +785,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             clientId?: string;
             scope?: string | string[];
             sessionRelay?: { appHost: string; extraAppHosts?: string[] };
-            connect?: { mode?: string; reason?: string | null };
+            connect?: { mode?: string; reason?: string | null; added?: string[] };
             caps?: string[];
             billingGrant?: string;
             attributes?: readonly string[];
@@ -820,7 +828,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // rendered by AuthUI. Falls through to the full ceremony when it
         // cannot complete (no wallet push, timeout, or the user chose
         // "Sign in another way").
-        if (config.connect?.mode === 'approve' && config.sessionRelay?.appHost) {
+        // The voucher-approve short-circuit below RE-USES the stored access
+        // token, so it must never serve a widened attribute request — a
+        // widened set needs a freshly minted token, which only the OIDC
+        // ceremony (and its step-up push path) can produce.
+        if (config.connect?.mode === 'approve' && config.sessionRelay?.appHost
+            && config.connect.reason !== 'attributes-widened') {
             const rpId = config.rpId || config.appName;
             const appHost = config.sessionRelay.appHost;
             const session = sessions.get(rpId);
@@ -961,6 +974,23 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 if (config.attributes?.length) {
                     authorizeUrl.searchParams.set('attributes', config.attributes.join(' '));
                 }
+                // An existing session identifies the holder without a scan, so
+                // the IdP can push the DELTA of a widened request to their
+                // wallet for one-tap approval instead of forcing a full QR
+                // ceremony. The hint only says who to push to — it authorises
+                // nothing; everything the holder grants still flows through
+                // the wallet's own verification. Withheld for session-relay
+                // apps: their sealed binding needs the full wallet ceremony,
+                // so a push approval would ring the holder's phone for a flow
+                // the browser cannot use.
+                const priorSession = sessions.get(config.rpId || config.appName);
+                const stepUpEligible = !!(priorSession?.token
+                    && priorSession.clientId === clientId
+                    && !isTokenExpired(priorSession.token)
+                    && !config.sessionRelay?.appHost);
+                if (stepUpEligible) {
+                    authorizeUrl.searchParams.set('session_hint', priorSession!.token);
+                }
                 const authResp = await fetch(authorizeUrl.toString(), {
                     headers: { Accept: 'application/json' },
                 });
@@ -998,6 +1028,63 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     }
                 } catch { /* older IdP or plain profile flow — nothing to thread */ }
 
+                // Step-up push: the IdP resolved the session hint, found this
+                // request WIDER than what that session's holder last granted,
+                // and pushed the delta to their wallet. Render the one-tap
+                // approve gate and poll for completion. "Sign in another way"
+                // or an unanswered push falls back to the full ceremony below
+                // on the SAME authorize session — the unused push approval is
+                // single-use, session-bound, and dies with the session.
+                let code: string | null = null;
+                let uiResult: SignInResult | null = null;
+                const deviceTrusted = !!sessions.getDeviceHint();
+                const stepUp = (stepUpEligible ? authData.step_up : null) as
+                    { pushed?: boolean; added?: string[] } | null | undefined;
+                if (stepUp?.pushed) {
+                    const rpIdHint = config.rpId || config.appName;
+                    const appLabel = (config.appName || rpIdHint)
+                        .replace(/[-_]/g, ' ')
+                        .replace(/\b\w/g, (c) => c.toUpperCase());
+                    const approveUI = new AuthUI({
+                        apiBase: idpBase,
+                        appName: config.appName,
+                        rpId: rpIdHint,
+                        presentation,
+                        app,
+                        pitch,
+                        approveFlow: {
+                            appLabel,
+                            reason: 'attributes-widened',
+                            added: Array.isArray(stepUp.added) ? stepUp.added.map(String) : [],
+                            run: async () => {
+                                try {
+                                    code = await pollSessionStatus(pollUrl, STEP_UP_APPROVAL_WINDOW_MS);
+                                } catch {
+                                    // Push not acted on in time (notifications
+                                    // off, phone out of reach) — fall back to
+                                    // the ceremony while the authorize session
+                                    // still has most of its window left.
+                                    throw new Error('approve-fallback');
+                                }
+                            },
+                        },
+                    });
+                    activeUI = approveUI;
+                    try {
+                        await approveUI.signIn();
+                    } catch (err) {
+                        const msg = err instanceof Error ? err.message : '';
+                        if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
+                            window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
+                            return;
+                        }
+                        code = null; // 'approve-fallback' → full ceremony below
+                    } finally {
+                        if (activeUI === approveUI) activeUI = null;
+                    }
+                }
+
+                if (code === null) {
                 // Attribute-capability filtering (only when the adopter did
                 // not choose methods explicitly): hide methods that cannot
                 // deliver what the app marked as ESSENTIAL.
@@ -1039,7 +1126,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 //    to the OIDC session. Use the iframe origin as apiBase for
                 //    FIDO2 passkey calls (they go to the IdP, not the mgmt service).
                 const pushToken = sessions.findPushToken();
-                const deviceTrusted = !!sessions.getDeviceHint();
 
                 // Social auth handler: opens a popup to the IdP's social redirect,
                 // then waits for the callback page to postMessage back.
@@ -1119,7 +1205,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     approveFlow: undefined,
                 });
 
-                const uiResult: SignInResult = await activeUI.signIn();
+                uiResult = await activeUI.signIn();
 
                 // 5. Get the auth code:
                 //    - Passkey: the IdP's FIDO2 handler already marked the session
@@ -1130,7 +1216,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 //    - Wallet (relay): call /session/complete to bridge.
                 //    - Social: the popup callback already marked it complete, so
                 //      call /session/complete to get the code (it's idempotent).
-                let code: string;
                 if (uiResult.method === 'passkey') {
                     // Check if the relying party needs profile attributes that
                     // passkey auth alone cannot provide (email, name).
@@ -1176,25 +1261,33 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         uiResult.attributes,
                     );
                 }
+                } // end full ceremony (skipped when the step-up push completed)
 
                 // 5. Exchange code for JWT tokens.
                 const tokens = await exchangeCode(idpBase, code, clientId, codeVerifier);
 
                 // 6. Store session with JWT access_token and refresh_token.
+                // `requestedAttributes`/`scope` record the RAW request this
+                // session was minted for; connect() compares future configs
+                // against them to detect a widened request. A step-up push
+                // completion has no ceremony result, so the wallet push
+                // binding carries over from the prior session.
                 const rpId = config.rpId || config.appName;
                 const session: AuthSession = {
                     token: tokens.access_token,
                     rpId,
                     origin: config.apiBase,
                     authenticatedAt: Date.now(),
-                    pushToken: uiResult.pushToken,
-                    brokerUrl: config.brokerUrl || '',
+                    pushToken: uiResult?.pushToken ?? priorSession?.pushToken,
+                    brokerUrl: config.brokerUrl || priorSession?.brokerUrl || '',
                     refreshToken: tokens.refresh_token,
                     clientId,
+                    requestedAttributes: [...(config.attributes ?? [])],
+                    scope: scopeStr,
                 };
                 sessions.store(session);
                 if (session.pushToken && session.brokerUrl) {
-                    if (uiResult.trustDevice || deviceTrusted) {
+                    if (uiResult?.trustDevice || deviceTrusted) {
                         sessions.saveDeviceHint(session.pushToken, session.brokerUrl);
                     }
                 }
@@ -1202,9 +1295,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
                 // Install the sealed session so the parent's `frame.session()`
                 // RPC works once the auth result lands.
-                if (uiResult.sessionRelay) {
+                if (uiResult?.sessionRelay) {
                     await installSessionRelay(uiResult.sessionRelay, parentOrigin);
-                } else if (uiResult.completedViaPoll && config.sessionRelay?.appHost) {
+                } else if (uiResult?.completedViaPoll && config.sessionRelay?.appHost) {
                     // Same-device recovery of the sealed binding: the
                     // wallet's {session_id, enc_pub} relay never arrived
                     // (dead socket), but the wallet uploaded an EncAuth
@@ -1258,12 +1351,19 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     }
                 }
 
-                // 7. Send result to parent with the access_token.
+                // 7. Send result to parent with the access_token. A step-up
+                // push completion has no ceremony result — synthesise the
+                // wallet-shaped minimum (the parent reads accessToken).
+                const baseResult: SignInResult = uiResult ?? {
+                    sessionToken: tokens.access_token,
+                    method: 'wallet',
+                    sessionId: oidcSessionId,
+                };
                 window.parent.postMessage(
                     {
                         type: 'privasys:result',
                         result: {
-                            ...uiResult,
+                            ...baseResult,
                             accessToken: tokens.access_token,
                         },
                     },

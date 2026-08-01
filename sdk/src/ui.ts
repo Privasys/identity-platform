@@ -5,6 +5,8 @@ import type { AuthResult, AuthState, AttestationInfo, SessionRelayBinding } from
 import type { WebAuthnState } from './webauthn';
 import { PrivasysAuth } from './client';
 import { WebAuthnClient } from './webauthn';
+import { attributeLabel, assuranceLabel } from './attributes-ui';
+import { isGovVerified } from './attributes';
 import qrcode from 'qrcode-generator';
 
 // ---------------------------------------------------------------------------
@@ -78,8 +80,14 @@ export interface AuthUIConfig {
      *  `approve-fallback` so the host runs the full ceremony). */
     approveFlow?: {
         appLabel: string;
-        /** Why re-approval is needed: 'workload-changed' | 'enc-changed' | null. */
+        /** Why re-approval is needed:
+         *  'workload-changed' | 'enc-changed' | 'attributes-widened' | null. */
         reason?: string | null;
+        /** For 'attributes-widened': the attribute keys the request added,
+         *  so the waiting screen names exactly what changed. */
+        added?: string[];
+        /** May reject with `approve-fallback` to leave the approve flow and
+         *  have the host run the full ceremony. */
         run: () => Promise<void>;
     };
     /** Push token from a previous session. When present the UI will offer
@@ -1510,9 +1518,26 @@ export class AuthUI {
             ? `${flow.appLabel} was updated since you last verified it.`
             : flow.reason === 'enc-changed'
                 ? `The platform hosting ${flow.appLabel} changed since you last verified it.`
-                : `A fresh approval is needed to open a sealed channel to ${flow.appLabel}.`;
+                : flow.reason === 'attributes-widened'
+                    ? `${flow.appLabel} is asking for more of your data than you previously shared.`
+                    : `A fresh approval is needed to open a sealed channel to ${flow.appLabel}.`;
+        // For a widened request, name exactly what was ADDED \u2014 the holder
+        // decides on the difference, never on a re-listing of old grants.
+        const delta = flow.reason === 'attributes-widened' && flow.added?.length
+            ? el('div', { style: 'margin: 0 auto 16px; max-width: 320px; text-align: left;' },
+                ...flow.added.map((key) => el('div', {
+                    style: 'display: flex; justify-content: space-between; gap: 12px; ' +
+                        'padding: 6px 10px; border: 1px solid #E2E8F0; border-radius: 8px; ' +
+                        'margin-bottom: 6px; font-size: 13px;',
+                },
+                    el('span', { style: 'font-weight: 600;' }, attributeLabel(key)),
+                    el('span', { style: 'color: #64748B;' }, isGovVerified(key) ? assuranceLabel(key) : ''),
+                )),
+            )
+            : null;
         return el('div', null,
             el('p', { className: 'scan-hint', style: 'margin-bottom: 16px; max-width: none; text-align: center;' }, why),
+            delta,
             el('p', { className: 'btn-provider', style: 'margin-bottom: 20px; max-width: none; text-align: center;' },
                 `Check your phone \u2014 approve ${flow.appLabel} to continue.`,
             ),
@@ -1546,6 +1571,13 @@ export class AuthUI {
                 this.complete();
             },
             (err: unknown) => {
+                // run() may itself decide the approve flow cannot complete
+                // (e.g. the pushed approval was never acted on) \u2014 hand the
+                // host the fallback instead of a dead-end error tile.
+                if ((err as Error)?.message === 'approve-fallback') {
+                    this.finishApproveFallback();
+                    return;
+                }
                 this.state = 'error';
                 this.errorMsg = (err as Error)?.message ?? 'Approval failed';
                 this.render();
@@ -1582,6 +1614,9 @@ export class AuthUI {
 
         // Approve-only flow: its own 3-step shape (no QR/notification steps).
         if (this.cfg.approveFlow) {
+            const finalStep = this.cfg.approveFlow.reason === 'attributes-widened'
+                ? 'Session updated'
+                : 'Sealed channel established';
             return el('div', { className: 'brand-progress' },
                 el('div', { className: 'steps' },
                     el('div', { className: 'step done' },
@@ -1594,7 +1629,7 @@ export class AuthUI {
                     ),
                     el('div', { className: `step ${isSuccess ? 'done' : ''}` },
                         el('span', { className: 'step-icon' }, isSuccess ? '✓' : '•'),
-                        'Sealed channel established',
+                        finalStep,
                     ),
                 ),
             );

@@ -365,6 +365,19 @@ function extractDisclosures(accessToken?: string): AttributeDisclosure[] | undef
     return out.length ? out : undefined;
 }
 
+/**
+ * The session payload privasys.id hands back on a check-session query.
+ * `requestedAttributes`/`scope` record the request the session was minted
+ * for; absent on sessions stored by an older frame host.
+ */
+export interface RestoredSession {
+    token: string;
+    rpId: string;
+    authenticatedAt: number;
+    requestedAttributes?: string[];
+    scope?: string;
+}
+
 export class AuthFrame {
     private readonly authOrigin: string;
     private readonly config: Omit<AuthFrameConfig, 'authOrigin' | 'container'>;
@@ -375,15 +388,17 @@ export class AuthFrame {
     // Reused while sessionIframe is still attached so concurrent callers
     // (e.g. multiple attestation rows minting per-audience tokens) don't
     // tear down each other's iframe via destroySessionIframe().
-    private cachedSession: { token: string; rpId: string; authenticatedAt: number } | null = null;
-    private sessionInFlight: Promise<{ token: string; rpId: string; authenticatedAt: number } | null> | null = null;
+    private cachedSession: RestoredSession | null = null;
+    private sessionInFlight: Promise<RestoredSession | null> | null = null;
     private _onSessionExpired?: (rpId: string) => void;
     private _onSessionRenewed?: (rpId: string, accessToken?: string) => void;
     // Tears down the in-flight signIn() ceremony (set while one is active).
     private cancelSignIn: (() => void) | null = null;
     // connect()'s hint for the frame host: run the approve-only flow (with
     // the resume-rejection reason) before falling back to the ceremony.
-    private connectHint: { mode: 'approve'; reason: string | null } | null = null;
+    // `added` names the attribute keys / scope tokens a widened request
+    // introduced, so the approve screen can show exactly what changed.
+    private connectHint: { mode: 'approve'; reason: string | null; added?: string[] } | null = null;
     // Sealed session-relay state.
     private sealedIframe: HTMLIFrameElement | null = null;
     private sealedHandler: ((e: MessageEvent) => void) | null = null;
@@ -454,9 +469,19 @@ export class AuthFrame {
         const appHost = this.config.sessionRelay?.appHost;
         this.connectHint = null;
 
-        // 1. Silent restore.
+        // 1. Silent restore — only when the restored session covers what this
+        // configuration asks for. A session minted for a NARROWER request must
+        // not be silently returned: the newly asked-for attribute would simply
+        // never arrive, and nothing would report an error.
         const existing = await this.getSession().catch(() => null);
-        if (existing?.token) {
+        const added = existing?.token ? this.widenedBy(existing) : null;
+        if (existing?.token && added) {
+            // 2a. Widened request: run the approve gate instead of restoring.
+            // The host asks the IdP to push an approval for the delta to the
+            // holder's wallet, and falls back to the full ceremony when the
+            // push cannot complete.
+            this.connectHint = { mode: 'approve', reason: 'attributes-widened', added };
+        } else if (existing?.token) {
             if (!appHost) {
                 return { accessToken: existing.token, session: null };
             }
@@ -514,6 +539,51 @@ export class AuthFrame {
         } finally {
             this.connectHint = null;
         }
+    }
+
+    /**
+     * The attribute keys (and scope tokens) this configuration asks for
+     * beyond the request `existing` was minted for — the widening delta —
+     * or null when the session covers the request.
+     *
+     * The comparison base is the RAW request the session recorded (named
+     * keys + scope string), never the IdP-filtered grant: a key the IdP
+     * dropped (unknown to it, or outside the client's whitelist) never
+     * appears in any grant, so comparing against the grant would re-run
+     * the ceremony on every connect() for an attribute that can never
+     * arrive. Same raw config in, same verdict out — no loops.
+     */
+    private widenedBy(existing: RestoredSession): string[] | null {
+        const named = this.config.attributes ?? [];
+        if (existing.requestedAttributes) {
+            const prior = new Set(existing.requestedAttributes);
+            const widened: string[] = named.filter((k) => !prior.has(k));
+            // A scope token reaches a bundle of attributes, so a scope the
+            // prior request did not carry widens the set the same way a
+            // named key does. `openid` is always sent and never widens.
+            const priorScope = new Set((existing.scope ?? '').split(/\s+/).filter(Boolean));
+            if (priorScope.size) {
+                const scope = this.config.scope ?? ['openid', 'offline_access'];
+                for (const s of scope) {
+                    if (s !== 'openid' && !priorScope.has(s)) widened.push(s);
+                }
+            }
+            return widened.length ? widened : null;
+        }
+        // Session stored by an older frame host — no request recorded. Best
+        // effort on named keys only: a key with no claim in the token was
+        // either never requested or granted valueless; one ceremony records
+        // the request and ends the ambiguity, so this cannot loop. Scope-only
+        // requests are left alone (nothing to compare against).
+        if (!named.length) return null;
+        let claims: Record<string, unknown>;
+        try {
+            claims = b64uJson(existing.token.split('.')[1]);
+        } catch {
+            return null;
+        }
+        const widened = named.filter((k) => !(k in claims));
+        return widened.length ? widened : null;
     }
 
     /**
@@ -1009,7 +1079,7 @@ export class AuthFrame {
      * Uses a hidden iframe to query localStorage on the auth origin.
      * The iframe is kept alive so the frame-host can run renewal timers.
      */
-    getSession(): Promise<{ token: string; rpId: string; authenticatedAt: number } | null> {
+    getSession(): Promise<RestoredSession | null> {
         // Idempotent: if a session iframe is already attached AND we
         // have the cached payload from when it was set up, hand it
         // back directly. Tearing it down and recreating it would
@@ -1029,7 +1099,7 @@ export class AuthFrame {
         return p;
     }
 
-    private doGetSession(): Promise<{ token: string; rpId: string; authenticatedAt: number } | null> {
+    private doGetSession(): Promise<RestoredSession | null> {
         return new Promise((resolve) => {
             // Clean up any prior session iframe for this instance
             this.destroySessionIframe();

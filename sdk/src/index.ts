@@ -18,11 +18,13 @@ export type {
 export type { WebAuthnConfig, WebAuthnState, WebAuthnEvents } from './webauthn';
 export { generateQRPayload, generateBatchQRPayload, generateSessionId } from './qr';
 export { SessionManager } from './session';
-export { AuthFrame, InsufficientCreditsError } from './frame-client';
+export { AuthFrame, ConnectError, InsufficientCreditsError } from './frame-client';
 export type {
     AttributeDisclosure,
     AuthFrameConfig,
+    ConnectResult,
     PrivasysScope,
+    RestoredSession,
     SealedResponse,
     SealedSession,
     SealedStreamResponse,

@@ -79,14 +79,26 @@ type DeviceAuth struct {
 
 // touchPoll enforces the polling interval. It returns true when the caller
 // polled faster than Interval since the previous poll (RFC 8628 slow_down).
+//
+// Two properties matter more than strictness, learned the hard way
+// (2026-08-01: a CLI login sat on "Waiting for approval..." forever AFTER the
+// wallet approved):
+//   - Jitter tolerance: a client sleeping exactly Interval between polls
+//     lands marginally early now and then (network jitter, transparent HTTP
+//     retries). That must not count as misbehaviour.
+//   - No punishment spiral: the old code escalated Interval by +5s AND moved
+//     the anchor on every violation, so a fixed-interval client that was
+//     early ONCE stayed "too fast" forever — and since this check runs before
+//     the approval check, the client never saw its approval. A violation now
+//     leaves the anchor and Interval untouched: the next on-schedule poll has
+//     a double-length gap and passes. A genuinely tight loop still gets
+//     slow_down on every poll, which is all the throttle needs to achieve.
 func (d *DeviceAuth) touchPoll() (tooFast bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	now := time.Now()
-	if !d.lastPolledAt.IsZero() && now.Sub(d.lastPolledAt) < time.Duration(d.Interval)*time.Second {
-		// Bump the interval per RFC 8628 §3.5 so a misbehaving client backs off.
-		d.Interval += defaultDeviceInterval
-		d.lastPolledAt = now
+	minGap := time.Duration(d.Interval)*time.Second - time.Second // 1s jitter tolerance
+	if !d.lastPolledAt.IsZero() && now.Sub(d.lastPolledAt) < minGap {
 		return true
 	}
 	d.lastPolledAt = now

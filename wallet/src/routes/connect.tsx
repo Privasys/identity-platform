@@ -653,7 +653,24 @@ interface QRPayload {
     clientId?: string;
 }
 
+/**
+ * Route wrapper: remount the flow whenever the connection payload changes.
+ *
+ * A deep link / scan can deliver NEW params to an ALREADY-MOUNTED connect
+ * screen (expo-router updates params in place when the route matches an
+ * existing instance). The flow below is one-shot by design (hasStarted ref +
+ * dozens of ceremony state vars), so without this key it silently ignored the
+ * new payload and re-ran the PREVIOUS session — observed live 2026-08-01:
+ * three wallet approvals all completed the same stale IdP session while the
+ * CLI polled fresh device codes forever. Keying by payload resets the whole
+ * ceremony state atomically instead of hand-resetting each state var.
+ */
 export default function ConnectScreen() {
+    const routeParams = useLocalSearchParams<{ payload?: string; serviceUrl?: string }>();
+    return <ConnectFlow key={routeParams.payload ?? routeParams.serviceUrl ?? ''} />;
+}
+
+function ConnectFlow() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const p = usePalette();

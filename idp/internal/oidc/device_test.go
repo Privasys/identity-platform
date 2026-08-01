@@ -281,6 +281,42 @@ func TestDeviceCodeSlowDown(t *testing.T) {
 	}
 }
 
+// A violation must not poison the authorization: the anchor and interval stay
+// put, so the next on-schedule poll passes. The old behaviour (escalate +
+// re-anchor on every violation) made one marginally-early poll unrecoverable
+// for a fixed-interval client — it sat on authorization_pending forever, even
+// after the wallet approved (observed live 2026-08-01).
+func TestDeviceCodeSlowDownRecovers(t *testing.T) {
+	d := &DeviceAuth{Interval: 5}
+
+	if d.touchPoll() {
+		t.Fatal("first poll must pass")
+	}
+	// Marginally early (jitter): within the 1s tolerance → NOT a violation.
+	d.lastPolledAt = time.Now().Add(-4500 * time.Millisecond)
+	if d.touchPoll() {
+		t.Fatal("a poll 0.5s early is jitter, not misbehaviour")
+	}
+	// Genuinely early → slow_down, but the anchor must NOT move and the
+	// interval must NOT grow.
+	anchor := time.Now().Add(-1 * time.Second)
+	d.lastPolledAt = anchor
+	if !d.touchPoll() {
+		t.Fatal("a poll 4s early must slow_down")
+	}
+	if !d.lastPolledAt.Equal(anchor) {
+		t.Fatal("violation moved the anchor — one early poll becomes unrecoverable")
+	}
+	if d.Interval != 5 {
+		t.Fatalf("violation escalated the interval to %d — a fixed-interval client can never catch up", d.Interval)
+	}
+	// The next on-schedule poll (a full interval after the anchor) passes.
+	d.lastPolledAt = time.Now().Add(-5 * time.Second)
+	if d.touchPoll() {
+		t.Fatal("on-schedule poll after a violation must pass")
+	}
+}
+
 func TestDeviceVerificationPageApprove(t *testing.T) {
 	reg, db, iss := newDeviceTestEnv(t)
 	codes := NewCodeStore()

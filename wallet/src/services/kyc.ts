@@ -415,6 +415,26 @@ async function loadFillPlan(host: string, port: number): Promise<Record<string, 
     return plan;
 }
 
+/** When a POST dies mid-write (broken pipe), ask the app how it is doing with a
+ *  small GET so the user sees the refusal the socket swallowed. The probe path
+ *  is config-gated (NOT in the app's open path set): a frozen app answers 503,
+ *  a configured one 200 — which is exactly the distinction we need. */
+async function diagnoseInterruptedCall(host: string, port: number): Promise<string> {
+    try {
+        const res = await NativeRaTls.request('GET', host, port, '/trust-anchors/status', '');
+        if (res.status === 503) {
+            return 'The identity verifier is not yet configured (trust anchors pending). Try again shortly.';
+        }
+        if (res.status >= 200 && res.status < 300) {
+            // The app is up and configured; the upload itself was cut off.
+            return 'The connection to the identity verifier was interrupted while uploading. Check your network and try again.';
+        }
+        return `The identity verifier refused the request (HTTP ${res.status}). Try again shortly.`;
+    } catch {
+        return 'The identity verifier is unreachable. Check your network and try again shortly.';
+    }
+}
+
 /** Populate the credential fields the manifest marks for this endpoint. Values
  *  the caller already set are never overwritten. */
 async function fillCredentialFields(
@@ -491,15 +511,14 @@ async function postToVerifier<T>(path: string, body: unknown, voucher?: string):
     try {
         res = await NativeRaTls.post(host, port, path, JSON.stringify(finalBody), headers);
     } catch (e: any) {
-        // A frozen (unconfigured) verifier answers a large body (e.g. the selfie)
-        // with a 503 but closes before draining the request, so the client sees a
-        // broken pipe / connection reset rather than the 503. Surface the same
-        // actionable message instead of a raw socket error.
+        // Older verifiers refuse a large body (e.g. the selfie) without draining
+        // the request, so the refusal's status never reaches us — the socket
+        // just breaks mid-write. Probe with a bodyless GET to report the app's
+        // ACTUAL state instead of guessing (a broken pipe is not evidence of a
+        // configuration problem).
         const msg = String(e?.message ?? e);
         if (/broken pipe|connection reset|connection closed|os error 32|reset by peer/i.test(msg)) {
-            throw new Error(
-                'The identity verifier is unavailable or awaiting configuration (trust anchors). Try again shortly.'
-            );
+            throw new Error(await diagnoseInterruptedCall(host, port));
         }
         throw e;
     }

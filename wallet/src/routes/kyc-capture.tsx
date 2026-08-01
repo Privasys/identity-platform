@@ -32,6 +32,7 @@ import {
 } from '@/services/kyc';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
+import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
 type Step = 'doctype' | 'consent' | 'attest' | 'capture' | 'read' | 'selfie' | 'verifying' | 'select' | 'done';
@@ -99,6 +100,31 @@ async function cropDocToFrame(
         { compress: 0.9, base64: true, format: SaveFormat.JPEG },
     );
     return out.base64 ?? null;
+}
+
+/** The raw fields the trusted-apps store compares (same set as Drive/sign-in). */
+function verifierMeasurements(v: VerifierAttestation) {
+    return {
+        mrenclave: v.attestation.mrenclave,
+        mrtd: v.attestation.mrtd,
+        rtmr1: v.attestation.rtmr1,
+        rtmr2: v.attestation.rtmr2,
+        codeHash: v.attestation.workload_code_hash,
+        configRoot: v.attestation.workload_config_merkle_root
+    };
+}
+
+/** Record the approved verifier enclave so we don't re-prompt until it changes. */
+function rememberVerifier(v: VerifierAttestation) {
+    useTrustedAppsStore.getState().addOrUpdate({
+        rpId: v.origin,
+        origin: v.origin,
+        appName: v.displayName,
+        ...verifierMeasurements(v),
+        teeType: v.attestation.tee_type ?? 'tdx',
+        lastVerified: Math.floor(Date.now() / 1000),
+        credentialId: ''
+    });
 }
 
 export default function KycCaptureScreen() {
@@ -205,13 +231,31 @@ export default function KycCaptureScreen() {
     // Enclave verification page: attest the verifier and show the holder the same
     // "Verify Enclave" view they see at sign-in, before any document data is
     // captured. The digest pin + attestation are re-enforced again at send time.
+    //
+    // Approval is REMEMBERED (trusted-apps store, same as Drive and sign-in):
+    // once the user has approved this verifier on this device, an unchanged
+    // attestation goes straight to capture; the approve screen only reappears
+    // when a measurement actually changed (a genuine redeploy/upgrade).
+    const [attIsChanged, setAttIsChanged] = useState(false);
     useEffect(() => {
         if (step !== 'attest') return;
         let cancelled = false;
         setVerifierAtt(null);
         setAttError(null);
         attestVerifier()
-            .then((res) => { if (!cancelled) setVerifierAtt(res); })
+            .then((res) => {
+                if (cancelled) return;
+                const { getApp, isAttestationMatch } = useTrustedAppsStore.getState();
+                const trusted = getApp(res.origin);
+                if (trusted && isAttestationMatch(res.origin, verifierMeasurements(res))) {
+                    rememberVerifier(res); // refresh lastVerified
+                    setVerifierAtt(res);   // send-time + session-trace state still needs it
+                    void openCapture();
+                    return;
+                }
+                setAttIsChanged(!!trusted);
+                setVerifierAtt(res);
+            })
             .catch((e) => {
                 if (cancelled) return;
                 console.warn('[KYC] enclave attestation failed:', e?.message);
@@ -653,14 +697,17 @@ export default function KycCaptureScreen() {
                         attestation={verifierAtt.attestation}
                         rpId={verifierAtt.origin}
                         displayName={verifierAtt.displayName}
-                        isChanged={false}
+                        isChanged={attIsChanged}
                         verificationLevel="fresh-as-verified"
                         verification={{
                             status: 'verified',
                             mode: verifierAtt.mode,
                             challenged: verifierAtt.challenged,
                         }}
-                        onApprove={openCapture}
+                        onApprove={() => {
+                            rememberVerifier(verifierAtt);
+                            void openCapture();
+                        }}
                         onReject={close}
                         onChallenge={handleChallengeVerifier}
                         challengeInFlight={challengeInFlight}

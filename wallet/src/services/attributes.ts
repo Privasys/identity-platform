@@ -342,6 +342,60 @@ export function govValueKey(profile: UserProfile, key: string): string | undefin
 }
 
 /**
+ * Move document-sourced values off the SELF-ASSERTED half of a dual-tier pair.
+ *
+ * Profiles verified before the split hold the passport reading under the bare
+ * key: a wallet that scanned a passport last year has a gov-assured
+ * `birthdate`, and one that scanned it after has `birthdate_id`. A wallet that
+ * did both shows the holder the same date twice, each "certified by Privasys
+ * identity verifier", which is how this was found.
+ *
+ * Leaving it was judged harmless because govValueKey answers a `birthdate_id`
+ * request from a gov-assured `birthdate`. It is not harmless. The referential
+ * publishes `birthdate` as SELF-ASSERTED, so a relying party asking for the
+ * free key — believing it is getting a value the holder typed — receives a
+ * passport reading instead, discloses it for nothing, and the marketplace never
+ * sees the paid disclosure it should have been. The split exists precisely so
+ * those two are different attributes; a legacy profile quietly merges them
+ * again.
+ *
+ * So the value moves to the government key, and the bare key is left for what
+ * it now means: something the holder typed. Nothing is deleted that cannot be
+ * re-derived — the government key keeps the value, its provenance and its
+ * verification records. A bare key that is NOT document-sourced is untouched:
+ * a manually entered date is exactly what the self-asserted half is for.
+ */
+export function migrateDualTierAssurance(profile: UserProfile): {
+    moved: string[];
+    dropped: string[];
+    attributes: ProfileAttribute[];
+} {
+    const attrs = profile.attributes ?? [];
+    const moved: string[] = [];
+    const dropped: string[] = [];
+    const out: ProfileAttribute[] = [];
+
+    for (const attr of attrs) {
+        const govKey = ATTRIBUTE_MAP[attr.key]?.govKey;
+        const isDocument = attr.source === 'document';
+        if (!govKey || !isDocument) {
+            out.push(attr);
+            continue;
+        }
+        // The government key already holds this reading — the bare copy is a
+        // duplicate of it, and duplicates are what the holder is looking at.
+        const already = attrs.some((a) => a.key === govKey && a.value === attr.value);
+        if (already) {
+            dropped.push(attr.key);
+            continue;
+        }
+        out.push({ ...attr, key: govKey, label: attributeLabel(govKey) });
+        moved.push(attr.key);
+    }
+    return { moved, dropped, attributes: out };
+}
+
+/**
  * Write a canonical attribute to the profile store using the appropriate
  * method (top-level field update or attribute bag).
  */

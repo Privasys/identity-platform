@@ -4,6 +4,10 @@
 import * as SecureStore from '@/utils/storage';
 import { create } from 'zustand';
 
+// Runtime import is safe: attributes.ts takes only TYPES from this module, so
+// there is no import cycle at load time.
+import { migrateDualTierAssurance } from '@/services/attributes';
+
 /** A linked external identity provider used for profile seeding and recovery. */
 export interface LinkedProvider {
     /** Provider identifier: 'github' | 'google' | 'microsoft' | 'linkedin' | custom OIDC issuer URL. */
@@ -357,6 +361,19 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
             // initial-letter fallback shows; a re-import stores the remote URL.
             if (typeof data.avatarUri === 'string' && data.avatarUri.startsWith('file://')) {
                 data.avatarUri = '';
+            }
+            // Migration: a passport reading stored under the SELF-ASSERTED half
+            // of a dual-tier pair (profiles verified before the `_id` split)
+            // moves to the government key. Left alone it shows the holder the
+            // same certified value twice and lets a relying party receive a
+            // document reading under a key the referential publishes as
+            // self-asserted — free, and never metered.
+            const migrated = migrateDualTierAssurance(data);
+            if (migrated.moved.length > 0 || migrated.dropped.length > 0) {
+                data.attributes = migrated.attributes;
+                set({ profile: data });
+                persist(data);
+                return;
             }
             set({ profile: data });
         } catch {

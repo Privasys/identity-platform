@@ -50,6 +50,19 @@ class AppAttestModule : Module() {
             }
         }
 
+        // Mint a Play Integrity token with the given nonce, verbatim. The
+        // caller supplies a URL-safe base64 string (Play Integrity's required
+        // nonce alphabet); no decode/re-encode happens here. This is the WIA
+        // enrolment path — attestKey/generateAssertion keep their historical
+        // behaviour for the legacy attestation-broker flow.
+        AsyncFunction("integrityToken") { nonce: String ->
+            runBlocking(Dispatchers.IO) {
+                val context = appContext.reactContext
+                    ?: throw Exception("React context not available")
+                requestIntegrityToken(context, nonce)
+            }
+        }
+
         AsyncFunction("generateAssertion") { clientDataHashBase64: String, _scope: String? ->
             runBlocking(Dispatchers.IO) {
                 val context = appContext.reactContext

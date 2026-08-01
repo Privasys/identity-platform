@@ -21,7 +21,7 @@ import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 
 import { useAuthStore } from '@/stores/auth';
-import { base64urlToBytes } from '@/utils/encoding';
+import { base64urlToBytes, bytesToBase64url } from '@/utils/encoding';
 import * as SecureStore from '@/utils/storage';
 
 import * as AppAttest from '../../modules/app-attest/src/index';
@@ -177,26 +177,33 @@ async function acquireDeviceAttestation(
     holderPubB64url: string
 ): Promise<Record<string, unknown> | null> {
     try {
-        const clientDataHash = await clientDataHashB64(challengeB64url, holderPubB64url);
-
         const state = await AppAttest.getState(WIA_ATTEST_SCOPE);
         if (!state.supported) return null;
 
         if (Platform.OS === 'ios') {
             // Fresh key per enrolment → always a full attestation object.
+            //
+            // Pass the RAW client data (challenge ‖ holder_pub), NOT its hash:
+            // the native module SHA-256-hashes its input once before calling
+            // DCAppAttestService (App Attest takes a clientDataHash), so the
+            // nonce Apple certifies is SHA-256(authData ‖ SHA-256(clientData))
+            // — exactly what the IdP recomputes. A pre-hashed value here gets
+            // hashed a second time and enrolment fails with "nonce does not
+            // bind this challenge and holder key".
             await AppAttest.reset(WIA_ATTEST_SCOPE);
             const keyId = await AppAttest.generateKey(WIA_ATTEST_SCOPE);
-            const blob = await AppAttest.attestKey(clientDataHash, WIA_ATTEST_SCOPE);
+            const clientData = clientDataB64Std(challengeB64url, holderPubB64url);
+            const blob = await AppAttest.attestKey(clientData, WIA_ATTEST_SCOPE);
             return { key_id: keyId, attestation: blob };
         }
 
-        // Android: each Play Integrity token is freshly minted already.
-        if (!state.keyId) await AppAttest.generateKey();
-        const refreshed = await AppAttest.getState();
-        const blob = refreshed.attested
-            ? await AppAttest.generateAssertion(clientDataHash)
-            : await AppAttest.attestKey(clientDataHash);
-        // Android: the blob is a Play Integrity token bound to the client-data hash.
+        // Android: a Play Integrity token whose nonce is the client-data hash.
+        // Play Integrity requires a URL-safe base64 nonce string; integrityToken
+        // passes it through verbatim (the legacy attestKey path decoded the
+        // input and mangled raw hash bytes through UTF-8, so the mint always
+        // failed and the wallet silently stayed WIA-less).
+        const nonce = await clientDataHashB64url(challengeB64url, holderPubB64url);
+        const blob = await AppAttest.integrityToken(nonce);
         return { integrity_token: blob };
     } catch (e) {
         console.warn('[WIA] device attestation unavailable:', e instanceof Error ? e.message : e);
@@ -204,18 +211,30 @@ async function acquireDeviceAttestation(
     }
 }
 
-/** base64 (standard) of SHA-256(challenge_bytes ‖ holder_pub_bytes). */
-async function clientDataHashB64(
+/** base64 (standard) of the raw client data: challenge_bytes ‖ holder_pub_bytes. */
+function clientDataB64Std(challengeB64url: string, holderPubB64url: string): string {
+    return bytesToBase64Std(clientDataBytes(challengeB64url, holderPubB64url));
+}
+
+/** base64url (unpadded) of SHA-256(challenge_bytes ‖ holder_pub_bytes). */
+async function clientDataHashB64url(
     challengeB64url: string,
     holderPubB64url: string
 ): Promise<string> {
+    const digest = await Crypto.digest(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        clientDataBytes(challengeB64url, holderPubB64url)
+    );
+    return bytesToBase64url(new Uint8Array(digest));
+}
+
+function clientDataBytes(challengeB64url: string, holderPubB64url: string): Uint8Array<ArrayBuffer> {
     const a = base64urlToBytes(challengeB64url);
     const b = base64urlToBytes(holderPubB64url);
     const joined = new Uint8Array(a.length + b.length);
     joined.set(a, 0);
     joined.set(b, a.length);
-    const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, joined);
-    return bytesToBase64Std(new Uint8Array(digest));
+    return joined;
 }
 
 function bytesToBase64Std(bytes: Uint8Array): string {

@@ -55,6 +55,19 @@ export async function generateAssertion(clientDataHash: string, scope?: string):
 }
 
 /**
+ * Android only: mint a Play Integrity token bound to the given nonce.
+ * The nonce is passed to Play Integrity verbatim, so it must already be a
+ * URL-safe base64 string (Play rejects standard base64 '+'/'/'). Unlike
+ * attestKey, nothing is decoded, re-encoded or hashed on the native side.
+ */
+export async function integrityToken(nonce: string): Promise<string> {
+    if (Platform.OS !== 'android') {
+        throw new Error('integrityToken is Android-only (use attestKey on iOS)');
+    }
+    return NativeModule!.integrityToken(nonce);
+}
+
+/**
  * Wipe the cached keyId and attested flag. Use to recover from a stale
  * keyId in the Keychain whose underlying Secure Enclave key is gone
  * (Apple rejects with `DCError.invalidInput` / `error 2`), or to force a

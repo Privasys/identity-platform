@@ -77,15 +77,16 @@ const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.3.2';
  *  deployment (container-app-identity-verifier.apps-test.privasys.org) is gone —
  *  the prod app is the only live verifier, so the unset-env defaults point there;
  *  both overridable per build.
- *  Verifier v0.6.2: binary master-list configure; fail-closed biometrics since
- *  v0.3.11. Keep this pinned to the live deployment's image digest (OID 3.2) so
- *  the fallback attests the current enclave when the resolve API is unreachable. */
+ *  Verifier v0.6.3: certifies every importable government attribute, portrait
+ *  included; fail-closed biometrics since v0.3.11. Keep this pinned to the live
+ *  deployment's image digest (OID 3.2) so the fallback attests the current
+ *  enclave when the resolve API is unreachable. */
 const FALLBACK_VERIFIER_ORIGIN =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_ORIGIN ??
     'privasys-identity-verifier.apps.privasys.org';
 const FALLBACK_VERIFIER_IMAGE_DIGEST =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_DIGEST ??
-    '8f8f55930c8e3f8a016fff5f179cdde419e6dbf0a1905fb4b7151c34589d988c';
+    'c3be34907de11b13031d7dbe0b3a3122a45bcc304062c3d890ce7e81f1558123';
 
 const ATTESTATION_SERVER = 'https://as.privasys.org';
 const VERIFIER_DISPLAY = 'Privasys identity verifier';

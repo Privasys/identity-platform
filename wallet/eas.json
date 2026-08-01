@@ -30,7 +30,7 @@
                 "EXPO_PUBLIC_PLATFORM_API_URL": "https://api.developer.privasys.org",
                 "EXPO_PUBLIC_KYC_VERIFIER_APP": "privasys-identity-verifier",
                 "EXPO_PUBLIC_KYC_VERIFIER_ORIGIN": "privasys-identity-verifier.apps.privasys.org",
-                "EXPO_PUBLIC_KYC_VERIFIER_DIGEST": "8f8f55930c8e3f8a016fff5f179cdde419e6dbf0a1905fb4b7151c34589d988c",
+                "EXPO_PUBLIC_KYC_VERIFIER_DIGEST": "c3be34907de11b13031d7dbe0b3a3122a45bcc304062c3d890ce7e81f1558123",
                 "EXPO_PUBLIC_DRIVE_APP": "privasys-drive",
                 "EXPO_PUBLIC_DRIVE_ORIGIN": "privasys-drive.apps.privasys.org",
                 "EXPO_PUBLIC_DRIVE_DIGEST": "8d47008c46248a9503a754bafcd943e85e20006efaaf4eddbbd397fa3b604c73"

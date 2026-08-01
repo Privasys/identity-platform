@@ -213,17 +213,17 @@ export interface DocMrzFields {
  */
 export async function readDocumentMrz(docImageBase64: string): Promise<DocMrzFields> {
     await verifyVerifierEnclave();
-    // holder_pub rides along solely to bind the WIA's cnf.jwk — /read-mrz is
-    // WIA-gated like verify_identity from verifier v0.6.4 (the enclave OCR is
-    // wallet-only, not an open document-reading service). Harmless against
-    // older verifiers, which ignore both fields.
-    const holderPub = await getHolderPublicKey();
+    // /read-mrz is WIA-gated like verify_identity from verifier v0.6.5 (the
+    // enclave OCR is wallet-only, not an open document-reading service). The
+    // wia + holder_pub fields are filled from the app manifest's
+    // x-privasys.fill markers in postToVerifier, so this call site carries only
+    // its own payload.
     const resp = await postToVerifier<{
         document_number: string;
         date_of_birth: string;
         date_of_expiry: string;
         is_screenshot?: boolean | null;
-    }>('/read-mrz', { doc_image: docImageBase64, holder_pub: holderPub });
+    }>('/read-mrz', { doc_image: docImageBase64 });
     return {
         documentNumber: resp.document_number,
         dateOfBirth: resp.date_of_birth,
@@ -347,23 +347,95 @@ async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
     };
 }
 
+/** A tool's declared input fields, keyed by field name (the slice of the app
+ *  manifest this module needs). */
+interface ManifestTool {
+    endpoint?: string;
+    inputSchema?: {
+        properties?: Record<string, { 'x-privasys'?: { fill?: string } }>;
+    };
+}
+
+/** Endpoint path -> { field name -> fill marker }, derived once per session
+ *  from the app's own manifest. Empty when the app serves none (older image),
+ *  which selects the legacy hard-coded behaviour below. */
+let fillPlanCache: Record<string, Record<string, string>> | null = null;
+
+async function loadFillPlan(host: string, port: number): Promise<Record<string, Record<string, string>>> {
+    if (fillPlanCache) return fillPlanCache;
+    const plan: Record<string, Record<string, string>> = {};
+    try {
+        // Read the manifest from the app over RA-TLS, NOT from the control
+        // plane: a document telling the wallet which credential to attach must
+        // be as trustworthy as the code it describes. It is baked into the
+        // measured image, so the pinned digest covers it.
+        const res = await NativeRaTls.request('GET', host, port, '/.well-known/privasys-manifest', '');
+        if (res.status >= 200 && res.status < 300) {
+            const manifest = JSON.parse(res.body) as { tools?: ManifestTool[] };
+            for (const tool of manifest.tools ?? []) {
+                if (!tool.endpoint) continue;
+                const fields: Record<string, string> = {};
+                for (const [name, prop] of Object.entries(tool.inputSchema?.properties ?? {})) {
+                    const fill = prop?.['x-privasys']?.fill;
+                    if (fill) fields[name] = fill;
+                }
+                if (Object.keys(fields).length > 0) plan[tool.endpoint] = fields;
+            }
+        }
+    } catch {
+        // Older enclave or transport hiccup: fall through to the legacy set.
+    }
+    fillPlanCache = plan;
+    return plan;
+}
+
+/** Populate the credential fields the manifest marks for this endpoint. Values
+ *  the caller already set are never overwritten. */
+async function fillCredentialFields(
+    host: string,
+    port: number,
+    path: string,
+    body: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+    const plan = await loadFillPlan(host, port);
+    // Legacy fallback: the endpoints that were gated before x-privasys.fill
+    // existed. Only used when the app declares no fill markers at all.
+    const fields: Record<string, string> =
+        plan[path] ??
+        (Object.keys(plan).length === 0 &&
+        (path === '/read-mrz' || path === '/verify-identity' || path.startsWith('/prove/'))
+            ? { wia: 'wallet_instance_attestation' }
+            : {});
+
+    const out = { ...body };
+    for (const [name, marker] of Object.entries(fields)) {
+        if (out[name] !== undefined && out[name] !== '') continue;
+        if (marker === 'wallet_instance_attestation') {
+            // Omitted silently when this device has no cached WIA: a relaxed
+            // enclave still serves the call, a strict one refuses it clearly.
+            const wia = await getValidWia();
+            if (wia) out[name] = wia;
+        } else if (marker === 'holder_public_key') {
+            out[name] = await getHolderPublicKey();
+        }
+        // Unknown markers are ignored: the enclave gate is the authority and
+        // fails closed if something required was not filled.
+    }
+    return out;
+}
+
 async function postToVerifier<T>(path: string, body: unknown, voucher?: string): Promise<T> {
     const { origin } = await resolveVerifier();
     const url = new URL(`https://${origin}`);
     const host = url.hostname;
     const port = parseInt(url.port || '443', 10);
-    // Attach the (cached, non-prompting) Wallet Instance Attestation to the
-    // WIA-gated endpoints so the enclave can prove this is our wallet before
-    // doing free identity work. Omitted when none is cached — the enclave gate
-    // is fail-open during rollout (IDENTITY_VERIFIER_REQUIRE_WIA).
+    // Fill the platform-credential fields the app's own manifest asks for
+    // (x-privasys.fill), so an endpoint joining the WIA gate needs no wallet
+    // release. Falls back to the historical hard-coded set when the manifest
+    // is unavailable (older enclave, or the fetch failed).
     let finalBody = body;
-    if (
-        (path === '/read-mrz' || path === '/verify-identity' || path.startsWith('/prove/')) &&
-        body &&
-        typeof body === 'object'
-    ) {
-        const wia = await getValidWia();
-        if (wia) finalBody = { ...(body as Record<string, unknown>), wia };
+    if (body && typeof body === 'object') {
+        finalBody = await fillCredentialFields(host, port, path, body as Record<string, unknown>);
     }
     // A paid disclosure carries the relying party's voucher on a header the
     // enclave runtime verifies (and meters) before the verifier app sees the

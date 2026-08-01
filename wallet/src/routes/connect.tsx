@@ -372,7 +372,12 @@ function getMissingAttributes(
             missing.push(attr);
             continue;
         }
-        if (profile && getProfileValue(profile, attr)) {
+        // selfAssertedValue, not getProfileValue: a free key whose certified
+        // twin holds the reading is NOT missing. Asking the holder to type a
+        // date of birth the wallet certified minutes earlier is the whole
+        // reason this fallback exists — and this is the site that decides
+        // whether the acquisition screen appears at all.
+        if (profile && selfAssertedValue(profile, attr)) {
             continue;
         } else if (ATTRIBUTE_MAP[attr]?.deviceSourced && getDeviceAttribute(attr)) {
             // Device-sourceable attributes are never "missing" if the OS can
@@ -2776,7 +2781,10 @@ function AttributeAcquisitionView({
         if (assuranceFor(attr, attributeRequirements) === 'gov') {
             return !govValueKey(profile, attr);
         }
-        return !getProfileValue(profile, attr);
+        // Same resolution as getMissingAttributes, or an attribute answered by
+        // its certified twin would show as still outstanding on the very screen
+        // asking the holder to supply it.
+        return !selfAssertedValue(profile, attr);
     });
     // Essential attributes (per the IdP's attributeRequirements, or the
     // email+name fallback) block Continue; the rest are optional.

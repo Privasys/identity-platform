@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -138,6 +139,14 @@ func New(db *store.DB) (*Store, error) {
 	// workload digest at consumption).
 	if err := addColumnIfMissing(db, "session_encauth", "host",
 		`ALTER TABLE session_encauth ADD COLUMN host TEXT NOT NULL DEFAULT ''`); err != nil {
+		return nil, err
+	}
+	// Migration: the attribute set each grant covered (sorted canonical keys,
+	// comma-joined). /authorize reads it back to compute the delta of a
+	// widened request — the attribute step-up push. Empty = recorded by a
+	// build that predates the column, treated as "no record".
+	if err := addColumnIfMissing(db, "sessions", "granted_attrs",
+		`ALTER TABLE sessions ADD COLUMN granted_attrs TEXT NOT NULL DEFAULT ''`); err != nil {
 		return nil, err
 	}
 	s := &Store{db: db}
@@ -278,6 +287,37 @@ func (s *Store) FindOrCreateForApp(userID, clientID, deviceID string, ttl time.D
 	default:
 		return nil, err
 	}
+}
+
+// SetGrantedAttributes records the attribute keys the grant behind `sid`
+// covered — the effective requested set the holder decided on, not the
+// values that arrived, so an attribute the holder saw and declined (or has
+// no value for) does not re-prompt on every subsequent request.
+func (s *Store) SetGrantedAttributes(sid string, keys []string) error {
+	ks := append([]string(nil), keys...)
+	sort.Strings(ks)
+	_, err := s.db.Exec(`UPDATE sessions SET granted_attrs = ? WHERE sid = ?`,
+		strings.Join(ks, ","), sid)
+	return err
+}
+
+// GrantedAttributesForApp returns the attribute set recorded on the most
+// recently active live session for (userID, clientID), or ok=false when no
+// session carries a record (never signed in, or only under a build that
+// predates granted_attrs — both mean "no standing grant to widen").
+func (s *Store) GrantedAttributesForApp(userID, clientID string) (keys []string, ok bool) {
+	row := s.db.QueryRow(
+		`SELECT granted_attrs FROM sessions
+		  WHERE user_id = ? AND client_id = ?
+		    AND revoked_at IS NULL AND expires_at > ? AND granted_attrs != ''
+		  ORDER BY last_seen_at DESC LIMIT 1`,
+		userID, clientID, time.Now().UTC(),
+	)
+	var raw string
+	if err := row.Scan(&raw); err != nil {
+		return nil, false
+	}
+	return strings.Split(raw, ","), true
 }
 
 // Touch updates last_seen_at and (optionally) extends expires_at to

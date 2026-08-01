@@ -155,8 +155,16 @@ func main() {
 	mux.HandleFunc("GET /.well-known/oauth-authorization-server", discoveryHandler)
 	mux.HandleFunc("GET /jwks", issuer.HandleJWKS)
 
-	// Authorization endpoint.
-	mux.HandleFunc("GET /authorize", oidc.HandleAuthorize(clientReg, sessionStore, cfg.IssuerURL, voucherMinter))
+	// Authorization endpoint. The step-up arm lets a request carrying a
+	// session_hint push the delta of a widened attribute set to the holder's
+	// wallet instead of forcing a full QR ceremony.
+	mux.HandleFunc("GET /authorize", oidc.HandleAuthorize(clientReg, sessionStore, cfg.IssuerURL, voucherMinter,
+		&oidc.AttributeStepUp{
+			Issuer:        issuer,
+			WalletSession: fido2Handler.WalletSessionResolver(),
+			Sessions:      sessionsStore,
+			Push:          fido2Handler.AttributeApprovalPusher(),
+		}))
 
 	// Device authorization endpoint (RFC 8628) — CLI / agent auth backbone.
 	mux.HandleFunc("POST /device_authorization", oidc.HandleDeviceAuthorization(clientReg, sessionStore, deviceStore, cfg.IssuerURL, voucherMinter))
@@ -216,6 +224,12 @@ func main() {
 	mux.HandleFunc("GET /fido2/vault-approval/token", fido2Handler.VaultApprovalToken(issuer))
 	// The wallet lists its owner's pending approvals here (push arm of the flow).
 	mux.HandleFunc("GET /fido2/vault-approval/pending", fido2Handler.VaultApprovalPending(issuer))
+	// Attribute step-up (push arm): the wallet fetches the pending delta by
+	// capability and posts the signed assertion plus the attribute values;
+	// completion finishes the OIDC authorize session the browser is polling.
+	mux.HandleFunc("GET /fido2/attribute-approval/pending", fido2Handler.AttributeApprovalPending(issuer))
+	mux.HandleFunc("POST /fido2/attribute-approval/complete",
+		fido2Handler.AttributeApprovalComplete(codeStore, sessionStore))
 
 	// Vault key-creation grant (the key-creation-grants design): mints a
 	// single-call grant so a caller holding the material (an app TEE via the

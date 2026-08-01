@@ -15,6 +15,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -448,6 +449,14 @@ type AuthSession struct {
 	// only, unknown ones already dropped). Threaded onto the auth code.
 	NamedAttributes []string
 
+	// RequestedKeys is the effective requested attribute set /authorize
+	// resolved for this session (scope-derived + named, whitelist-capped,
+	// presence applied). A pushed step-up approval commits to the hash of
+	// exactly this set, and its completion re-derives the hash from here —
+	// an approval can never authorise a different request than the one the
+	// holder saw.
+	RequestedKeys []string
+
 	// Set when the wallet completes FIDO2 authentication.
 	Authenticated bool
 	UserID        string
@@ -535,6 +544,23 @@ func (ss *SessionStore) Complete(sessionID, userID, authCode string) bool {
 	return true
 }
 
+// CompleteIfPending marks the session authenticated only when no other path
+// completed it first. A pushed step-up approval uses this instead of
+// Complete so it can never override a ceremony that won the race — the
+// approval is then simply reported as lost.
+func (ss *SessionStore) CompleteIfPending(sessionID, userID, authCode string) bool {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	s, ok := ss.sessions[sessionID]
+	if !ok || s.Authenticated || time.Now().After(s.ExpiresAt) {
+		return false
+	}
+	s.Authenticated = true
+	s.UserID = userID
+	s.AuthCode = authCode
+	return true
+}
+
 func (ss *SessionStore) cleanup() {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
@@ -548,10 +574,75 @@ func (ss *SessionStore) cleanup() {
 
 // --- /authorize ---
 
+// AttributeStepUp wires the push arm of attribute step-up into /authorize.
+// When a request carries a session_hint identifying a holder whose standing
+// grant for this client is NARROWER than the request, the IdP pushes only
+// the delta to the holder's wallet for one-tap approval instead of forcing
+// a full QR ceremony. Pass nil to disable the arm entirely.
+type AttributeStepUp struct {
+	// Issuer verifies an OIDC access token presented as session_hint.
+	Issuer *tokens.Issuer
+	// WalletSession resolves a "wallet:<token>" hint (the wallet's own
+	// bearer format). Optional.
+	WalletSession func(token string) (string, bool)
+	// Sessions is the durable session store carrying each grant's recorded
+	// attribute set.
+	Sessions *sessions.Store
+	// Push records a pending wallet approval bound to `session` and its
+	// exact requested set, and delivers the push. `payload` is the same
+	// descriptor the QR carries (requested set, requirements, vouchers) so
+	// the wallet's consent path is identical to the scan path; `added` is
+	// the delta the consent screen shows. Returns false when the holder has
+	// no push-capable wallet registered.
+	Push func(sub string, session *AuthSession, added []string, payload map[string]interface{}) bool
+}
+
+// resolveHint resolves a session_hint to the holder's sub. The hint is a
+// CLAIM used only to decide who to push to — it authorises nothing, and a
+// hint that fails verification simply disables the push arm for the request.
+func (s *AttributeStepUp) resolveHint(hint string) string {
+	if s == nil || hint == "" {
+		return ""
+	}
+	if rest, ok := strings.CutPrefix(hint, "wallet:"); ok {
+		if s.WalletSession == nil {
+			return ""
+		}
+		if sub, valid := s.WalletSession(rest); valid {
+			return sub
+		}
+		return ""
+	}
+	if s.Issuer == nil {
+		return ""
+	}
+	claims, err := s.Issuer.VerifyAccessToken(hint)
+	if err != nil {
+		return ""
+	}
+	sub, _ := claims["sub"].(string)
+	return sub
+}
+
+// subtractKeys returns the members of a that are not in b, preserving order.
+func subtractKeys(a, b []string) []string {
+	have := make(map[string]bool, len(b))
+	for _, k := range b {
+		have[k] = true
+	}
+	var out []string
+	for _, k := range a {
+		if !have[k] {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
 // HandleAuthorize handles the OIDC authorization request.
 // Creates a session with a QR payload for the Privasys Wallet app and returns
 // the session data as JSON for the SDK iframe to consume.
-func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL string, minter *voucher.Minter) http.HandlerFunc {
+func HandleAuthorize(reg *clients.Registry, sessionStore *SessionStore, issuerURL string, minter *voucher.Minter, stepUp *AttributeStepUp) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 
@@ -665,7 +756,7 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 			CreatedAt:           time.Now(),
 			ExpiresAt:           time.Now().Add(5 * time.Minute),
 		}
-		sessions.Create(session)
+		sessionStore.Create(session)
 
 		// Build QR payload for wallet universal link. clientId identifies the
 		// relying party stably (rpId is the shared FIDO2 RP, privasys.id, for
@@ -686,6 +777,11 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		reqs := attributeRequirements(scope, namedAttributes, client)
 
 		requested, reqs = applyPresenceACR(acrValues, requested, reqs)
+
+		// A pushed step-up approval commits to the hash of exactly this set;
+		// its completion re-derives the hash from the session (see
+		// AuthSession.RequestedKeys).
+		session.RequestedKeys = requested
 
 		if len(requested) > 0 {
 			qrPayload["requestedAttributes"] = requested
@@ -725,6 +821,29 @@ func HandleAuthorize(reg *clients.Registry, sessions *SessionStore, issuerURL st
 		if len(requested) > 0 {
 			resp["requested_attributes"] = requested
 			resp["attribute_requirements"] = reqs
+		}
+
+		// Attribute step-up by push: a session_hint that resolves to a holder
+		// whose standing grant for this client is narrower than this request
+		// gets the DELTA pushed to their wallet for one-tap approval. The
+		// hint only chooses who to push to. The live presence ceremony can
+		// never ride a push approval — it needs the wallet's full flow — and
+		// with no push-capable wallet the SDK simply runs the ceremony.
+		if stepUp != nil && stepUp.Sessions != nil && stepUp.Push != nil {
+			if sub := stepUp.resolveHint(q.Get("session_hint")); sub != "" {
+				if granted, ok := stepUp.Sessions.GrantedAttributesForApp(sub, clientID); ok {
+					added := subtractKeys(requested, granted)
+					if len(added) > 0 && !slices.Contains(added, presenceAttribute) {
+						pushed := stepUp.Push(sub, session, added, qrPayload)
+						resp["step_up"] = map[string]interface{}{
+							"pushed": pushed,
+							"added":  added,
+						}
+						log.Printf("authorize: step-up delta %v for client %s (pushed=%v)",
+							added, clientID, pushed)
+					}
+				}
+			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
@@ -1106,6 +1225,19 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 			log.Printf("token: session row lookup/creation failed: %v", err)
 		} else {
 			sid = row.SID
+		}
+	}
+
+	// Record the attribute set this grant covered, so a later /authorize
+	// carrying a session_hint can compute the delta of a widened request
+	// (attribute step-up by push). Recorded as the effective REQUESTED set
+	// the holder decided on (scope-derived + named, whitelist-capped) — not
+	// the values that arrived: an attribute the holder saw and declined, or
+	// has no value for, must not re-prompt on every connect.
+	if sess != nil && sid != "" {
+		granted := requestedAttributes(ac.Scope, ac.NamedAttributes, client)
+		if err := sess.SetGrantedAttributes(sid, granted); err != nil {
+			log.Printf("token: record granted attributes: %v", err)
 		}
 	}
 

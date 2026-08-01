@@ -1198,9 +1198,20 @@ function ConnectFlow() {
             const decided = new Set(latest?.requestedAttributes ?? []);
             // Skip the screen only when a remembered decision already covers
             // every requested attribute for this exact enclave measurement.
+            //
+            // `plan.length > 0` is load-bearing, not defensive. An EMPTY plan
+            // satisfies `every()` vacuously, so a request the wallet could not
+            // put on the screen — a government key whose value it cannot resolve
+            // — would silently reuse the previous decision and share the OLD
+            // attributes without asking. That is the worst possible reading of
+            // "nothing to show": the holder is never consulted, and a relying
+            // party asking for something new receives something else instead.
+            // An empty plan means the wallet has nothing to offer, which is
+            // exactly when a remembered decision must NOT stand in.
             if (
                 standing &&
                 latest?.persistent &&
+                plan.length > 0 &&
                 plan.every((i) => decided.has(i.key))
             ) {
                 approvedAttrsRef.current = new Set(standing.attributes);

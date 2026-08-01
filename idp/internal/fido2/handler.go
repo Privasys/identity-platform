@@ -526,11 +526,19 @@ func (h *Handler) CompleteRegistration(
 			if ok {
 				relay := buildSessionRelayClaims(r)
 				authCode := codeStore.Create(&oidc.AuthCode{
-					ClientID:            session.ClientID,
-					RedirectURI:         session.RedirectURI,
-					UserID:              userID,
-					Scope:               session.Scope,
-					Nonce:               session.Nonce,
+					ClientID:    session.ClientID,
+					RedirectURI: session.RedirectURI,
+					UserID:      userID,
+					Scope:       session.Scope,
+					Nonce:       session.Nonce,
+					// The request's acr_values and NAMED attribute keys must
+					// ride the code: token issue keeps a request-only (_id)
+					// attribute only when it was named, so a code minted
+					// without NamedAttributes silently drops a government
+					// disclosure the wallet already minted (and the relying
+					// party already paid for) when it patches in later.
+					ACRValues:           session.ACRValues,
+					NamedAttributes:     session.NamedAttributes,
 					CodeChallenge:       session.CodeChallenge,
 					CodeChallengeMethod: session.CodeChallengeMethod,
 					AuthTime:            time.Now(),
@@ -784,11 +792,18 @@ func (h *Handler) CompleteAuthentication(
 			if ok {
 				relay := buildSessionRelayClaims(r)
 				authCode := codeStore.Create(&oidc.AuthCode{
-					ClientID:            session.ClientID,
-					RedirectURI:         session.RedirectURI,
-					UserID:              userID,
-					Scope:               session.Scope,
-					Nonce:               session.Nonce,
+					ClientID:    session.ClientID,
+					RedirectURI: session.RedirectURI,
+					UserID:      userID,
+					Scope:       session.Scope,
+					Nonce:       session.Nonce,
+					// acr_values + named keys must ride the code (see the
+					// registration-path comment): without NamedAttributes the
+					// token filter drops every request-only (_id) attribute
+					// the wallet patches in, after the disclosure was minted
+					// and paid for.
+					ACRValues:           session.ACRValues,
+					NamedAttributes:     session.NamedAttributes,
 					CodeChallenge:       session.CodeChallenge,
 					CodeChallengeMethod: session.CodeChallengeMethod,
 					AuthTime:            time.Now(),

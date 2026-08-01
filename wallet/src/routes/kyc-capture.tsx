@@ -28,7 +28,7 @@ import { getProfileValue, setProfileValue } from '@/services/attributes';
 import { appIdFromOids } from '@/services/release-provenance';
 import {
     applyGovAttributes, attestVerifier, getVerifierInfo, govAttributeCandidates, readDocumentMrz,
-    verifyIdentity, type KycRecord, type VerifierAttestation,
+    verifyIdentity, VerifierHttpError, type KycRecord, type VerifierAttestation,
 } from '@/services/kyc';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
@@ -397,11 +397,28 @@ export default function KycCaptureScreen() {
             } catch (e: any) {
                 if (cancelled) return;
                 console.warn('[KYC] enclave MRZ read failed:', e?.message);
-                Alert.alert(
-                    "Couldn't read the photo page",
-                    'Make sure the whole page is in frame, flat and well lit, then retake the photo.',
-                    [{ text: 'Retake photo', onPress: () => { openCapture(); } }],
-                );
+                // Only an unreadable capture (HTTP 422) is fixed by retaking.
+                // Everything else — a rejected attestation, a gate refusal, the
+                // enclave being unreachable — must say so, or the user retakes
+                // the photo for ever against a failure the camera cannot fix.
+                const unreadable =
+                    e instanceof VerifierHttpError ? e.isUnreadableCapture : !(e instanceof VerifierHttpError);
+                if (unreadable) {
+                    Alert.alert(
+                        "Couldn't read the photo page",
+                        'Make sure the whole page is in frame, flat and well lit, then retake the photo.',
+                        [{ text: 'Retake photo', onPress: () => { openCapture(); } }],
+                    );
+                } else {
+                    Alert.alert(
+                        'ID check unavailable',
+                        `${e?.detail || e?.message || 'The identity verifier refused the request.'}\n\nThis is not a problem with your photo. Try again in a moment; if it persists, contact support.`,
+                        [
+                            { text: 'Try again', onPress: () => { setMrzReadDone(false); } },
+                            { text: 'Cancel', style: 'cancel', onPress: () => { router.back(); } },
+                        ],
+                    );
+                }
             } finally {
                 if (!cancelled) setBusy(false);
             }

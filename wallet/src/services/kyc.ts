@@ -347,6 +347,32 @@ async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
     };
 }
 
+/** A non-2xx answer from the verifier enclave, carrying the status so a caller
+ *  can distinguish "the capture was unreadable, retry helps" (422) from a gate
+ *  refusal or transport failure, where retrying the same thing cannot help. */
+export class VerifierHttpError extends Error {
+    readonly status: number;
+    readonly detail: string;
+    constructor(status: number, body: string) {
+        let detail = (body || '').slice(0, 300);
+        try {
+            const parsed = JSON.parse(body) as { error?: string };
+            if (parsed?.error) detail = parsed.error;
+        } catch {
+            // not JSON: keep the raw snippet
+        }
+        super(`Identity verifier returned HTTP ${status}: ${detail}`);
+        this.name = 'VerifierHttpError';
+        this.status = status;
+        this.detail = detail;
+    }
+    /** True when the failure is about the captured image, so a retake is the
+     *  right remedy. Anything else needs a different action or a fix. */
+    get isUnreadableCapture(): boolean {
+        return this.status === 422;
+    }
+}
+
 /** A tool's declared input fields, keyed by field name (the slice of the app
  *  manifest this module needs). */
 interface ManifestTool {
@@ -404,16 +430,28 @@ async function fillCredentialFields(
         plan[path] ??
         (Object.keys(plan).length === 0 &&
         (path === '/read-mrz' || path === '/verify-identity' || path.startsWith('/prove/'))
-            ? { wia: 'wallet_instance_attestation' }
+            ? {
+                  wia: 'wallet_instance_attestation',
+                  // holder_pub too: the enclave binds the WIA's cnf.jwk to it,
+                  // so a WIA without it is refused. The call sites that set it
+                  // themselves are skipped by the not-empty check above.
+                  holder_pub: 'holder_public_key'
+              }
             : {});
 
     const out = { ...body };
     for (const [name, marker] of Object.entries(fields)) {
         if (out[name] !== undefined && out[name] !== '') continue;
         if (marker === 'wallet_instance_attestation') {
-            // Omitted silently when this device has no cached WIA: a relaxed
-            // enclave still serves the call, a strict one refuses it clearly.
-            const wia = await getValidWia();
+            // ENROL here, do not merely read the cache: a WIA lives 24-72h, so
+            // the first gated call of a session usually finds none. Enrolling
+            // is exactly what this moment is for — the manifest says this
+            // endpoint needs the credential — and it is where the biometric
+            // prompt belongs. Reading the cache instead left read-mrz (the
+            // first gated call since verifier v0.6.5) failing on every device
+            // whose WIA had aged out. Best-effort: a failure sends no WIA and
+            // the enclave states the reason.
+            const wia = await ensureWia().catch(() => null);
             if (wia) out[name] = wia;
         } else if (marker === 'holder_public_key') {
             out[name] = await getHolderPublicKey();
@@ -471,7 +509,11 @@ async function postToVerifier<T>(path: string, body: unknown, voucher?: string):
         );
     }
     if (res.status < 200 || res.status >= 300) {
-        throw new Error(`Identity verifier returned HTTP ${res.status}: ${res.body.slice(0, 200)}`);
+        // Typed so callers can tell a retryable capture problem (422: the OCR
+        // could not read the MRZ) from one retrying cannot fix (a rejected
+        // attestation, a gate refusal). Presenting the latter as "retake the
+        // photo" traps the user in a loop that cannot succeed.
+        throw new VerifierHttpError(res.status, res.body);
     }
     return JSON.parse(res.body) as T;
 }

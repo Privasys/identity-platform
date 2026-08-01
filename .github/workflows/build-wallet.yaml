@@ -98,7 +98,11 @@ env:
   # response over its 2 KiB buffer, so bigger bodies (the first was Drive's
   # ~2.1 KiB root listing) arrived as status 200 with an EMPTY body — the
   # "empty Drive tab" bug. Affects every RA-TLS response over ~2 KiB.
-  RATLS_VERSION: v0.7.6
+  # v0.7.7 surfaces EVERY extension under the Privasys arc in custom_oids
+  # (membership by arc, not a fixed allowlist). The 3.5.* sub-arc is
+  # app-published at runtime, so the exact-match allowlist silently dropped
+  # exactly those — the attestation view now sees app extensions.
+  RATLS_VERSION: v0.7.7
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

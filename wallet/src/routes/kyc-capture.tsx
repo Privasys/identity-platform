@@ -563,10 +563,12 @@ export default function KycCaptureScreen() {
                         onPress={() => { setDocType('passport'); setStep('consent'); }}
                     >
                         <Ionicons name="airplane-outline" size={22} color={p.action} />
-                        <View style={styles.docOptionBody}>
+                        {/* NativeView: the themed View paints the screen background,
+                            which shows as a grey patch inside the white card. */}
+                        <NativeView style={styles.docOptionBody}>
                             <Text style={styles.docOptionTitle}>Passport</Text>
                             <Text style={styles.docOptionSub}>Any country&apos;s biometric passport</Text>
-                        </View>
+                        </NativeView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </Pressable>
 
@@ -575,10 +577,10 @@ export default function KycCaptureScreen() {
                         onPress={() => { setDocType('id-card'); setStep('consent'); }}
                     >
                         <Ionicons name="card-outline" size={22} color={p.action} />
-                        <View style={styles.docOptionBody}>
+                        <NativeView style={styles.docOptionBody}>
                             <Text style={styles.docOptionTitle}>National ID card</Text>
                             <Text style={styles.docOptionSub}>Biometric (eMRTD) ID cards</Text>
-                        </View>
+                        </NativeView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </Pressable>
 
@@ -772,6 +774,9 @@ export default function KycCaptureScreen() {
             {step === 'selfie' && (
                 <View style={styles.flex}>
                     <CameraView ref={cameraRef} style={styles.camera} facing="front" />
+                    {/* Head outline so the user centres their face for the
+                        enclave's match against the document photo. */}
+                    <NativeView pointerEvents="none" style={styles.selfieFaceGuide} />
                     <View style={styles.selfieOverlay}>
                         <Text style={styles.selfieText}>
                             Take a quick selfie so the enclave can match it to your document photo.
@@ -900,6 +905,11 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     secondaryText: { color: p.action, fontSize: 15 },
     camera: { flex: 1, width: '100%' },
     selfieOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, gap: 12, backgroundColor: 'rgba(0,0,0,0.55)' },
+    selfieFaceGuide: {
+        position: 'absolute', alignSelf: 'center', top: '12%',
+        width: 250, height: 330, borderRadius: 999,
+        borderWidth: 3, borderColor: 'rgba(255,255,255,0.85)', borderStyle: 'dashed',
+    },
     selfieText: { color: '#FFFFFF', fontSize: 15, textAlign: 'center' },
     captureMask: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.3)' },
     frameGuide: {

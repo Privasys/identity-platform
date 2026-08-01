@@ -242,6 +242,27 @@ export function isDerived(key: string): boolean {
 }
 
 /**
+ * Whether disclosing this key reveals the underlying document value.
+ *
+ * Two very different things are both "gov-verified", and telling the holder
+ * they are the same is a lie in one direction:
+ *
+ *   - `age_over_18` answers a QUESTION about the date of birth. The date stays
+ *     in the wallet; the relying party learns only yes or no.
+ *   - `birthdate_id` IS the date of birth, certified. Consenting shares the
+ *     value itself — signed, but fully readable by the relying party.
+ *
+ * The referential marks the second kind with `certifiedField`: the document
+ * field the credential opens. Anything without one is an insight computed from
+ * the identity receipt, and the source data never leaves.
+ */
+export function revealsUnderlyingValue(key: string): boolean {
+    const def = ATTRIBUTE_MAP[key];
+    if (!def) return false;
+    return !!def.certifiedField && def.derived !== true;
+}
+
+/**
  * The marketplace attribute key a requested attribute discloses as, in the
  * provider-namespaced form the relying party's voucher authorises.
  *

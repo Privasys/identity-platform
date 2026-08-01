@@ -16,7 +16,13 @@ import { StyleSheet, Pressable, Alert, Linking, ScrollView, View as RNView } fro
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { attributeLabel, ATTRIBUTE_MAP, getProfileValue } from '@/services/attributes';
+import {
+    attributeLabel,
+    ATTRIBUTE_MAP,
+    certifiedFieldFor,
+    getProfileValue,
+    revealsUnderlyingValue
+} from '@/services/attributes';
 import * as fido2 from '@/services/fido2';
 import {
     fetchRunningAppReleases,
@@ -26,7 +32,7 @@ import {
 import { listMySessions, revokeSession } from '@/services/sessions-api';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
-import { useProfileStore } from '@/stores/profile';
+import { useProfileStore, type UserProfile } from '@/stores/profile';
 import {
     IDENTITY_LABELS,
     KIND_LABELS,
@@ -54,6 +60,29 @@ function formatWhen(ms: number): string {
 function shortHex(v?: string): string {
     if (!v) return '—';
     return v.length > 20 ? `${v.slice(0, 10)}…${v.slice(-6)}` : v;
+}
+
+/**
+ * What to show the holder for one shared attribute.
+ *
+ * A government-backed disclosure is not automatically a private one. Asking for
+ * `age_over_18` proves an answer and keeps the date of birth in the wallet;
+ * asking for `birthdate_id` shares the date itself, signed. Telling the holder
+ * "raw value not shared" in the second case is simply untrue, and it is untrue
+ * in the direction that matters — it understates what they just gave away.
+ *
+ * The value shown for a revealing disclosure is the wallet's OWN copy of the
+ * certified field, never the credential: a stored token is a bearer secret and
+ * has no business in a history screen.
+ */
+function sharedValueText(
+    s: { key: string; value?: string; gov?: boolean },
+    profile: UserProfile | null
+): string {
+    if (!s.gov) return s.value ?? '—';
+    if (!revealsUnderlyingValue(s.key)) return 'Verified proof — value not revealed';
+    const own = profile ? getProfileValue(profile, certifiedFieldFor(s.key)) : undefined;
+    return own ? `${own} — verified` : 'Verified value shared';
 }
 
 export default function ServiceDetailScreen() {
@@ -432,7 +461,7 @@ export default function ServiceDetailScreen() {
                                       <SharedAttributeRow
                                           key={s.key}
                                           label={ATTRIBUTE_MAP[s.key] ? attributeLabel(s.key) : s.key}
-                                          value={s.gov ? 'Verified proof (raw value not shared)' : (s.value ?? '—')}
+                                          value={sharedValueText(s, profile)}
                                           gov={!!s.gov}
                                       />
                                   ))
@@ -442,11 +471,7 @@ export default function ServiceDetailScreen() {
                                           <SharedAttributeRow
                                               key={key}
                                               label={attributeLabel(key)}
-                                              value={
-                                                  gov
-                                                      ? 'Verified proof'
-                                                      : (profile && getProfileValue(profile, key)) || '—'
-                                              }
+                                              value={sharedValueText({ key, gov }, profile)}
                                               gov={gov}
                                           />
                                       );
@@ -514,6 +539,9 @@ function TraceRow({
 }) {
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
+    // Needed to show what a value-revealing disclosure actually disclosed —
+    // the wallet's own copy of the certified field, not the credential.
+    const profile = useProfileStore((s) => s.profile);
     const shared = trace.sharedAttributes ?? [];
     const denied = trace.deniedAttributes ?? [];
     return (
@@ -573,7 +601,7 @@ function TraceRow({
                                             {ATTRIBUTE_MAP[s.key] ? attributeLabel(s.key) : s.key}
                                         </Text>
                                         <Text style={styles.sharedValue} numberOfLines={1}>
-                                            {s.gov ? 'Verified proof (raw value not shared)' : (s.value ?? '—')}
+                                            {sharedValueText(s, profile)}
                                         </Text>
                                     </RNView>
                                     {s.gov && (

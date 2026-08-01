@@ -213,12 +213,17 @@ export interface DocMrzFields {
  */
 export async function readDocumentMrz(docImageBase64: string): Promise<DocMrzFields> {
     await verifyVerifierEnclave();
+    // holder_pub rides along solely to bind the WIA's cnf.jwk — /read-mrz is
+    // WIA-gated like verify_identity from verifier v0.6.4 (the enclave OCR is
+    // wallet-only, not an open document-reading service). Harmless against
+    // older verifiers, which ignore both fields.
+    const holderPub = await getHolderPublicKey();
     const resp = await postToVerifier<{
         document_number: string;
         date_of_birth: string;
         date_of_expiry: string;
         is_screenshot?: boolean | null;
-    }>('/read-mrz', { doc_image: docImageBase64 });
+    }>('/read-mrz', { doc_image: docImageBase64, holder_pub: holderPub });
     return {
         documentNumber: resp.document_number,
         dateOfBirth: resp.date_of_birth,
@@ -353,7 +358,7 @@ async function postToVerifier<T>(path: string, body: unknown, voucher?: string):
     // is fail-open during rollout (IDENTITY_VERIFIER_REQUIRE_WIA).
     let finalBody = body;
     if (
-        (path === '/verify-identity' || path.startsWith('/prove/')) &&
+        (path === '/read-mrz' || path === '/verify-identity' || path.startsWith('/prove/')) &&
         body &&
         typeof body === 'object'
     ) {

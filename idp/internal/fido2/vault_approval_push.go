@@ -178,6 +178,8 @@ func sendVaultApprovalPush(pushToken, vaultOp string, summary vaultApprovalSumma
 		}
 	case "export":
 		body = "Approve exporting a key for " + who
+	case "policy-update":
+		body = "Approve a key-policy update for " + who
 	default:
 		body = "A vault operation needs your approval"
 	}

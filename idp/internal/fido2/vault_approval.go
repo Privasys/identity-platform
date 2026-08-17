@@ -207,6 +207,15 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			// neither required nor honoured (force it empty so a caller cannot
 			// smuggle a non-empty binding that would collide with promote).
 			req.MeasurementDigest = ""
+		case "policy-update":
+			// A key-policy update (vault UpdatePolicy — e.g. arming the
+			// acceptable-TCB set, retiring a measurement under step-up). The
+			// vault's UpdatePolicy step-up condition is amr-only (non-bound),
+			// so like export this binds the empty measurement slot; the value
+			// of this operation type is the HONEST approval card — before it
+			// existed, policy updates had to ride an "export"-labelled
+			// ceremony (2026-08-17).
+			req.MeasurementDigest = ""
 		case "", "promote":
 			req.Operation = "promote"
 			if req.MeasurementDigest == "" {

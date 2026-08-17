@@ -73,8 +73,16 @@ try {
 
 if (payload) {
   const s = payload.summary || {};
+  // Friendly labels for known operations; unknown ones show their raw name
+  // (never hide what is being approved).
+  const opLabels = {
+    "promote": "Promote a new version",
+    "export": "Export a key",
+    "policy-update": "Update a key's policy",
+    "app-recovery": "App recovery"
+  };
   document.getElementById("op").innerHTML =
-    "<b>Operation</b>: " + (s.operation || "?") + "<br/>" +
+    "<b>Operation</b>: " + (opLabels[s.operation] || s.operation || "?") + "<br/>" +
     "<b>Key</b>: " + (s.handle || "?") +
     (s.measurement ? "<br/><b>New measurement</b>: " + s.measurement : "");
 }

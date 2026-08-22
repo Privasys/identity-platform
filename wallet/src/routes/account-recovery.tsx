@@ -47,6 +47,7 @@ import {
     type DeviceInfo,
 } from '@/services/recovery-api';
 import { ensurePrivasysSession, getPrivasysAccount } from '@/services/privasys-id';
+import { backupSovereignSecrets } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 
@@ -156,6 +157,24 @@ export default function AccountRecoveryScreen() {
                 setRecoveryPhraseSaved(false);
                 setNewPhrase(result.recoveryPhrase);
                 setPhraseStatus({ has_phrase: true });
+                // Wrap the wallet's root secrets under the fresh phrase and
+                // store the blob IdP-side (the sovereign backup). Uses the
+                // exact server-returned phrase, so a mistyped note can never
+                // corrupt the blob. Surfaced on failure: a silently missing
+                // backup defeats its purpose.
+                try {
+                    await backupSovereignSecrets(
+                        result.recoveryPhrase,
+                        profile?.pairwiseSeed ?? null,
+                        result.sessionToken,
+                    );
+                } catch (e: any) {
+                    Alert.alert(
+                        'Backup incomplete',
+                        `Your data-key backup could not be stored: ${e?.message ?? e}. ` +
+                        'Regenerate your recovery phrase later to retry.',
+                    );
+                }
             }
             await loadData();
         } catch (e: any) {
@@ -188,6 +207,24 @@ export default function AccountRecoveryScreen() {
                             setRecoveryPhraseSaved(false);
                             setNewPhrase(res.phrase);
                             setPhraseStatus({ has_phrase: true });
+                            // Re-wrap the sovereign backup under the new
+                            // phrase immediately: the server just invalidated
+                            // the old phrase, so until this PUT lands the
+                            // stored blob is openable only by a phrase that
+                            // no longer recovers the account.
+                            try {
+                                await backupSovereignSecrets(
+                                    res.phrase,
+                                    profile?.pairwiseSeed ?? null,
+                                    sess.sessionToken,
+                                );
+                            } catch (e: any) {
+                                Alert.alert(
+                                    'Backup incomplete',
+                                    `Your data-key backup could not be re-wrapped: ${e?.message ?? e}. ` +
+                                    'Regenerate the phrase again to retry.',
+                                );
+                            }
                         } catch (e: any) {
                             Alert.alert('Error', e.message);
                         } finally {

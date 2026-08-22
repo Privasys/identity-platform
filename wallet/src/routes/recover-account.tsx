@@ -14,7 +14,6 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
@@ -33,7 +32,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { bip39ChecksumValid } from '@/services/bip39';
 import { BIP39_WORDLIST, BIP39_WORDSET } from '@/services/bip39-wordlist';
+import { restoreSovereignSecrets, stashRecoveredPairwiseSeed } from '@/services/sovereign';
 import { register as fido2Register } from '@/services/fido2';
 import { canonicalUserHandle } from '@/services/privasys-id';
 import {
@@ -52,26 +53,6 @@ import * as NativeKeys from '../../modules/native-keys/src/index';
 // EVERY successful /recovery/begin crash right after the server had already
 // consumed the phrase — the reason recovery never completed for anyone.
 const RECOVERY_STATE_KEY = 'privasys.recovery-state';
-
-/**
- * Validate the BIP39 checksum of a 24-word phrase: the final 8 bits of the
- * 264-bit word-index string must equal the first byte of SHA-256 over the
- * 256-bit entropy. A mistyped word that is still in the wordlist slips past
- * the dictionary check but fails this with 255/256 probability.
- */
-function bip39ChecksumValid(words: string[]): boolean {
-    if (words.length !== 24) return false;
-    const indices = words.map((w) => BIP39_WORDLIST.indexOf(w));
-    if (indices.some((i) => i < 0)) return false;
-    let bits = '';
-    for (const i of indices) bits += i.toString(2).padStart(11, '0');
-    const entropy = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) {
-        entropy[i] = parseInt(bits.slice(i * 8, (i + 1) * 8), 2);
-    }
-    const expected = sha256(entropy)[0].toString(2).padStart(8, '0');
-    return bits.slice(256) === expected;
-}
 
 interface RecoveryState {
     requestId: string;
@@ -99,6 +80,12 @@ export default function RecoverAccountScreen() {
     const [recoveryState, setRecoveryState] = useState<RecoveryState | null>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const autoCompletedRef = useRef(false);
+    // The entered phrase, held in memory across the ceremony so the
+    // sovereign backup can be unwrapped after this device re-registers.
+    // Deliberately NOT persisted: if the app restarts mid-recovery the
+    // restore is skipped (the user still holds the phrase on paper; the
+    // blob remains server-side).
+    const enteredPhraseRef = useRef<string | null>(null);
 
     // Load persisted recovery state on mount.
     useEffect(() => {
@@ -264,6 +251,7 @@ export default function RecoverAccountScreen() {
             } else {
                 setStep('waiting');
             }
+            enteredPhraseRef.current = phrase;
             setCodeInput('');
         } catch (e: any) {
             Alert.alert('Invalid Code', e.message || 'The recovery code was not recognized. Please try again.');
@@ -423,6 +411,37 @@ export default function RecoverAccountScreen() {
                     }
                 }
             }
+
+            // Restore the sovereign backup (data root + pairwise seed): the
+            // entered phrase — still in memory for the single-session flow —
+            // unwraps the blob the old device stored. Best-effort: a
+            // pre-framework account has no blob, and a restart mid-recovery
+            // dropped the phrase; neither should fail the registration.
+            const phrase = enteredPhraseRef.current;
+            const sessionToken = result.sessionToken ?? '';
+            if (phrase && sessionToken) {
+                try {
+                    const restored = await restoreSovereignSecrets(phrase, sessionToken);
+                    if (restored?.pairwiseSeedHex) {
+                        const prof = useProfileStore.getState().profile;
+                        if (!prof) {
+                            // Profile not created yet on this device: the
+                            // creation paths prefer the stashed seed, which is
+                            // what carries pairwise identities across devices.
+                            await stashRecoveredPairwiseSeed(restored.pairwiseSeedHex);
+                        } else if (prof.pairwiseSeed !== restored.pairwiseSeedHex) {
+                            // A different seed is already in use on this
+                            // device (possibly by another account) — replacing
+                            // it would rotate every derived sub. Keep the
+                            // device seed; the data root is still restored.
+                            console.warn('[recover-account] recovered pairwise seed differs from the device seed; keeping the device seed');
+                        }
+                    }
+                } catch (e: any) {
+                    console.warn('[recover-account] sovereign restore failed:', e?.message);
+                }
+            }
+            enteredPhraseRef.current = null;
 
             await Storage.deleteItemAsync(RECOVERY_STATE_KEY);
             setStep('restored');

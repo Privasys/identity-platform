@@ -30,6 +30,7 @@ import {
 } from '@/services/biometrics';
 import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
+import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -102,9 +103,12 @@ export default function ProfileScreen() {
             await ensureDeviceKey();
             setSetupDone(2);
 
-            // 3 — Derive the identity and create the on-device profile.
+            // 3 — Derive the identity and create the on-device profile. A
+            // seed recovered from the sovereign backup (account recovery on
+            // this device) takes precedence over minting a fresh one — that
+            // is what carries pairwise identities across devices.
             const did = await generateDid();
-            const pairwiseSeed = await generatePairwiseSeed();
+            const pairwiseSeed = (await takeRecoveredPairwiseSeed()) ?? (await generatePairwiseSeed());
             const canonicalDid = await generateCanonicalDid(pairwiseSeed);
             useProfileStore.getState().createProfile({
                 displayName: 'Privasys User',

@@ -65,6 +65,7 @@ import {
 } from '@/services/attribute-approval-api';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
+import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { issueEncAuthForSignIn } from '@/services/encauth';
 import { ensureWia } from '@/services/wia';
 import * as fido2 from '@/services/fido2';
@@ -2755,7 +2756,9 @@ function AttributeAcquisitionView({
                 // standalone onboarding screen to have created it.
                 await ensureDeviceKey();
                 const did = await generateDid();
-                const pairwiseSeed = await generatePairwiseSeed();
+                // A seed recovered from the sovereign backup takes precedence
+                // over minting a fresh one (see routes/(tabs)/profile.tsx).
+                const pairwiseSeed = (await takeRecoveredPairwiseSeed()) ?? (await generatePairwiseSeed());
                 const canonicalDid = await generateCanonicalDid(pairwiseSeed);
                 useProfileStore.getState().createProfile({
                     displayName: '',

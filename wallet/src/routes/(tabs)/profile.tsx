@@ -30,7 +30,7 @@ import {
 } from '@/services/biometrics';
 import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
-import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
+import { clearSovereignLocalState, takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -543,6 +543,13 @@ export default function ProfileScreen() {
                                             for (const app of apps) {
                                                 removeTrustedApp(app.rpId);
                                             }
+                                            // The canonical meta-account lives in its own
+                                            // slot OUTSIDE credentials[]; leaving it made
+                                            // "Clear All Data" silently keep the old
+                                            // account (and its possibly-dead credential)
+                                            // for the next sign-in (2026-08-22).
+                                            useAuthStore.getState().setPrivasysId(null);
+                                            void clearSovereignLocalState();
                                             clearProfile();
                                         }
                                     }

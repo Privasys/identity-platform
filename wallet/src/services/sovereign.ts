@@ -290,6 +290,18 @@ export async function takeRecoveredPairwiseSeed(): Promise<string | null> {
     return seed || null;
 }
 
+/**
+ * Erase all sovereign state on this device: the data root and any stashed
+ * recovered seed. Part of "Clear All Data" — a device wipe that left the
+ * root behind would silently reuse the old key family for the next
+ * identity created on the device.
+ */
+export async function clearSovereignLocalState(): Promise<void> {
+    await SecureStore.deleteItemAsync(ROOT_KEY);
+    await SecureStore.deleteItemAsync(RECOVERED_SEED_KEY);
+    cachedRoot = null;
+}
+
 /** Test hook: drop the in-memory root cache. */
 export function __clearRootCacheForTests(): void {
     cachedRoot = null;

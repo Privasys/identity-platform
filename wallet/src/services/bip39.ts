@@ -18,6 +18,8 @@
  */
 
 import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+import * as Crypto from 'expo-crypto';
 import { BIP39_WORDLIST } from '@/services/bip39-wordlist';
 
 /**
@@ -75,4 +77,26 @@ export function entropyToMnemonic(entropy: Uint8Array): string[] {
         words.push(BIP39_WORDLIST[parseInt(bits.slice(i * 11, (i + 1) * 11), 2)]);
     }
     return words;
+}
+
+/**
+ * Generate a fresh 24-word phrase from device entropy. The phrase is
+ * minted CLIENT-SIDE and only its hash is registered with the IdP
+ * (POST /recovery/phrase/register), so the plaintext never reaches the
+ * server — the server sees it exactly once, at account recovery, when
+ * the user presents it as the credential.
+ */
+export async function generateMnemonic(): Promise<string[]> {
+    const entropy = new Uint8Array(await Crypto.getRandomBytesAsync(32));
+    return entropyToMnemonic(entropy);
+}
+
+/**
+ * hex(sha256(normalised phrase)) — byte-identical to the IdP's
+ * HashPhrase (lowercase, single-space-joined words), which is what
+ * recovery matches the ENTERED phrase against. Pinned by a shared test
+ * vector on both sides.
+ */
+export function phraseHashHex(words: string[]): string {
+    return bytesToHex(sha256(new TextEncoder().encode(words.join(' '))));
 }

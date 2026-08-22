@@ -66,11 +66,32 @@ export async function getRecoveryPhraseStatus(userId: string): Promise<RecoveryP
     });
 }
 
-/** Authenticated — generate a new 24-word phrase (replaces any existing one). */
+/**
+ * Authenticated — LEGACY server-side phrase generation (the server mints
+ * the phrase and returns the plaintext once). Kept only as the fallback
+ * for IdPs that predate client-side generation; new code mints locally
+ * (services/bip39 generateMnemonic) and calls registerPhraseHash.
+ */
 export async function regenerateRecoveryPhrase(walletSessionToken: string): Promise<RecoveryPhraseResult> {
     return idpFetch('/recovery/phrase/regenerate', {
         method: 'POST',
         headers: walletHeaders(walletSessionToken),
+    });
+}
+
+/**
+ * Authenticated — register a CLIENT-generated phrase by its hash
+ * (hex(sha256(normalised phrase))), replacing any existing one. The
+ * plaintext phrase never leaves the device.
+ */
+export async function registerPhraseHash(
+    walletSessionToken: string,
+    phraseHash: string,
+): Promise<{ status: string; has_phrase: boolean }> {
+    return idpFetch('/recovery/phrase/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...walletHeaders(walletSessionToken) },
+        body: JSON.stringify({ phrase_hash: phraseHash }),
     });
 }
 

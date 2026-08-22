@@ -47,7 +47,7 @@ import {
     type DeviceInfo,
 } from '@/services/recovery-api';
 import { ensurePrivasysSession, getPrivasysAccount } from '@/services/privasys-id';
-import { backupSovereignSecrets } from '@/services/sovereign';
+import { backupSovereignSecrets, mintPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 
@@ -152,26 +152,41 @@ export default function AccountRecoveryScreen() {
         setSigningIn(true);
         try {
             const result = await ensurePrivasysSession(profile?.displayName);
-            // First registration returns the recovery phrase exactly once
+            // First registration: the server auto-mints a phrase and returns
+            // it once, but we immediately supersede it with a CLIENT-minted
+            // one whose plaintext never reaches the server — only its hash
+            // is registered. The server-returned phrase is kept solely as
+            // the fallback for an IdP that predates client-side generation.
+            // Either way the sovereign backup is stored under whichever
+            // phrase the user is shown.
             if (result.recoveryPhrase) {
                 setRecoveryPhraseSaved(false);
-                setNewPhrase(result.recoveryPhrase);
-                setPhraseStatus({ has_phrase: true });
-                // Wrap the wallet's root secrets under the fresh phrase and
-                // store the blob IdP-side (the sovereign backup). Uses the
-                // exact server-returned phrase, so a mistyped note can never
-                // corrupt the blob. Surfaced on failure: a silently missing
-                // backup defeats its purpose.
+                let phrase = result.recoveryPhrase;
+                let backupError: string | undefined;
                 try {
-                    await backupSovereignSecrets(
-                        result.recoveryPhrase,
-                        profile?.pairwiseSeed ?? null,
+                    const minted = await mintPhraseWithBackup(
                         result.sessionToken,
+                        profile?.pairwiseSeed ?? null,
                     );
-                } catch (e: any) {
+                    phrase = minted.phrase;
+                    backupError = minted.backupError;
+                } catch {
+                    try {
+                        await backupSovereignSecrets(
+                            phrase,
+                            profile?.pairwiseSeed ?? null,
+                            result.sessionToken,
+                        );
+                    } catch (be: any) {
+                        backupError = be?.message ?? String(be);
+                    }
+                }
+                setNewPhrase(phrase);
+                setPhraseStatus({ has_phrase: true });
+                if (backupError) {
                     Alert.alert(
                         'Backup incomplete',
-                        `Your data-key backup could not be stored: ${e?.message ?? e}. ` +
+                        `Your data-key backup could not be stored: ${backupError}. ` +
                         'Regenerate your recovery phrase later to retry.',
                     );
                 }
@@ -201,27 +216,44 @@ export default function AccountRecoveryScreen() {
                         try {
                             // Refresh session if needed
                             const sess = await ensurePrivasysSession(profile?.displayName);
-                            const res = await regenerateRecoveryPhrase(sess.sessionToken);
+                            // Client-side generation: mint locally, register
+                            // only the hash, re-wrap the sovereign backup
+                            // under the new phrase in the same breath (the
+                            // old phrase stops recovering the account the
+                            // instant the hash lands). Falls back to the
+                            // legacy server-minted phrase on an IdP that
+                            // predates /recovery/phrase/register.
+                            let phrase: string;
+                            let backupError: string | undefined;
+                            try {
+                                const minted = await mintPhraseWithBackup(
+                                    sess.sessionToken,
+                                    profile?.pairwiseSeed ?? null,
+                                );
+                                phrase = minted.phrase;
+                                backupError = minted.backupError;
+                            } catch {
+                                const res = await regenerateRecoveryPhrase(sess.sessionToken);
+                                phrase = res.phrase;
+                                try {
+                                    await backupSovereignSecrets(
+                                        phrase,
+                                        profile?.pairwiseSeed ?? null,
+                                        sess.sessionToken,
+                                    );
+                                } catch (be: any) {
+                                    backupError = be?.message ?? String(be);
+                                }
+                            }
                             // A brand-new phrase is shown but not yet written
                             // down — un-confirm until the user taps "I've saved".
                             setRecoveryPhraseSaved(false);
-                            setNewPhrase(res.phrase);
+                            setNewPhrase(phrase);
                             setPhraseStatus({ has_phrase: true });
-                            // Re-wrap the sovereign backup under the new
-                            // phrase immediately: the server just invalidated
-                            // the old phrase, so until this PUT lands the
-                            // stored blob is openable only by a phrase that
-                            // no longer recovers the account.
-                            try {
-                                await backupSovereignSecrets(
-                                    res.phrase,
-                                    profile?.pairwiseSeed ?? null,
-                                    sess.sessionToken,
-                                );
-                            } catch (e: any) {
+                            if (backupError) {
                                 Alert.alert(
                                     'Backup incomplete',
-                                    `Your data-key backup could not be re-wrapped: ${e?.message ?? e}. ` +
+                                    `Your data-key backup could not be re-wrapped: ${backupError}. ` +
                                     'Regenerate the phrase again to retry.',
                                 );
                             }

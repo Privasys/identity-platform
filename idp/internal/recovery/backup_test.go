@@ -78,6 +78,49 @@ func TestSovereignBackupRoundTrip(t *testing.T) {
 	}
 }
 
+func TestRegisterPhraseHash(t *testing.T) {
+	h, userID := backupTestHandler(t)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /recovery/phrase/register", h.HandleRegisterPhraseHash)
+	post := func(body, bearer string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "/recovery/phrase/register", strings.NewReader(body))
+		if bearer != "" {
+			req.Header.Set("Authorization", "Bearer "+bearer)
+		}
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// The wallet computes hex(sha256(normalised phrase)) client-side; it
+	// must land byte-identical to the server's own HashPhrase, or recovery
+	// (which hashes the ENTERED phrase server-side) would never match. The
+	// pinned vector below is mirrored in the wallet's sovereign tests.
+	const phrase = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual"
+	const pinned = "0b07c3c70386fced9d5953dddd210300099eff25a37c98290c5b4f57aab778d8"
+	if got := HashPhrase(phrase); got != pinned {
+		t.Fatalf("HashPhrase vector drifted: %s", got)
+	}
+
+	if rec := post(`{"phrase_hash":"`+pinned+`"}`, "wallet:good"); rec.Code != http.StatusOK {
+		t.Fatalf("register: %d %s", rec.Code, rec.Body.String())
+	}
+	// Recovery-side lookup: hashing the entered phrase finds the user.
+	if got, err := h.db.FindUserByRecoveryCode(HashPhrase(phrase)); err != nil || got != userID {
+		t.Fatalf("FindUserByRecoveryCode: %q %v", got, err)
+	}
+
+	// Refusals: no bearer, malformed hashes.
+	if rec := post(`{"phrase_hash":"`+pinned+`"}`, ""); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("no bearer: want 401, got %d", rec.Code)
+	}
+	for _, bad := range []string{`{"phrase_hash":""}`, `{"phrase_hash":"XYZ"}`, `{"phrase_hash":"` + strings.ToUpper(pinned) + `"}`, `nope`} {
+		if rec := post(bad, "wallet:good"); rec.Code != http.StatusBadRequest {
+			t.Fatalf("body %.20q: want 400, got %d", bad, rec.Code)
+		}
+	}
+}
+
 func TestSovereignBackupValidation(t *testing.T) {
 	h, _ := backupTestHandler(t)
 

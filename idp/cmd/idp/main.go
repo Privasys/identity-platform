@@ -372,6 +372,7 @@ func main() {
 	recoveryHandler.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	// Recovery phrase (BIP39) endpoints — preferred names.
 	mux.HandleFunc("POST /recovery/phrase/regenerate", recoveryHandler.HandleRegeneratePhrase)
+	mux.HandleFunc("POST /recovery/phrase/register", recoveryHandler.HandleRegisterPhraseHash)
 	mux.HandleFunc("GET /recovery/phrase/status", recoveryHandler.HandlePhraseStatus)
 	mux.HandleFunc("DELETE /recovery/phrase", recoveryHandler.HandleDeleteRecoveryCodes)
 	// Legacy code endpoint aliases (back-compat for older wallet builds).

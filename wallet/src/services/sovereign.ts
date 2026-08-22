@@ -44,7 +44,8 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from '@/utils/storage';
 import { bytesToBase64url, base64urlToBytes } from '@/utils/encoding';
-import { mnemonicToEntropy, normaliseMnemonic } from '@/services/bip39';
+import { generateMnemonic, mnemonicToEntropy, normaliseMnemonic, phraseHashHex } from '@/services/bip39';
+import { registerPhraseHash } from '@/services/recovery-api';
 import { getSovereignBackup, putSovereignBackup } from '@/services/sovereign-api';
 
 const ROOT_KEY = 'privasys.sovereign-root';
@@ -216,6 +217,31 @@ export async function backupSovereignSecrets(
         pairwiseSeedHex,
     });
     await putSovereignBackup(walletSessionToken, blob);
+}
+
+/**
+ * Mint a recovery phrase CLIENT-SIDE, register only its hash with the
+ * IdP, and store the sovereign backup wrapped under it — the plaintext
+ * phrase never leaves the device. Throws if the hash registration fails
+ * (an IdP that predates client-side generation; the caller falls back
+ * to the legacy server-minted phrase). A backup failure AFTER the hash
+ * registered does NOT throw: the phrase is live server-side at that
+ * point and must still be shown to the user, so the error is returned
+ * for the caller to surface.
+ */
+export async function mintPhraseWithBackup(
+    walletSessionToken: string,
+    pairwiseSeedHex: string | null
+): Promise<{ phrase: string; backupError?: string }> {
+    const words = await generateMnemonic();
+    await registerPhraseHash(walletSessionToken, phraseHashHex(words));
+    const phrase = words.join(' ');
+    try {
+        await backupSovereignSecrets(phrase, pairwiseSeedHex, walletSessionToken);
+        return { phrase };
+    } catch (e: any) {
+        return { phrase, backupError: e?.message ?? String(e) };
+    }
 }
 
 /**

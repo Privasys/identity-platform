@@ -35,7 +35,14 @@ jest.mock('expo-crypto', () => ({
     }),
 }));
 
-import { mnemonicToEntropy, entropyToMnemonic, bip39ChecksumValid, normaliseMnemonic } from '@/services/bip39';
+import {
+    mnemonicToEntropy,
+    entropyToMnemonic,
+    bip39ChecksumValid,
+    generateMnemonic,
+    normaliseMnemonic,
+    phraseHashHex,
+} from '@/services/bip39';
 import {
     deriveW,
     ensureDataRoot,
@@ -85,6 +92,28 @@ describe('bip39', () => {
         const words = entropyToMnemonic(randomEntropy());
         const messy = '  ' + words.join('   ').toUpperCase() + ' \n';
         expect(normaliseMnemonic(messy)).toEqual(words);
+    });
+
+    it('generates valid client-side phrases', async () => {
+        const a = await generateMnemonic();
+        const b = await generateMnemonic();
+        expect(a).toHaveLength(24);
+        expect(bip39ChecksumValid(a)).toBe(true);
+        expect(bip39ChecksumValid(b)).toBe(true);
+        expect(a.join(' ')).not.toEqual(b.join(' '));
+    });
+
+    it('phrase hash matches the IdP HashPhrase vector', () => {
+        // Pinned on both sides: the IdP test asserts HashPhrase of this
+        // exact phrase equals the same hex (internal/recovery/backup_test.go).
+        // If either side drifts, registration and recovery stop matching.
+        const words = (
+            'abandon ability able about above absent absorb abstract absurd abuse access accident ' +
+            'account accuse achieve acid acoustic acquire across act action actor actress actual'
+        ).split(' ');
+        expect(phraseHashHex(words)).toBe(
+            '0b07c3c70386fced9d5953dddd210300099eff25a37c98290c5b4f57aab778d8'
+        );
     });
 });
 

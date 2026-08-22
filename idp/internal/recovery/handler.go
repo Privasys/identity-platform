@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -65,6 +66,43 @@ func (h *Handler) HandleRegeneratePhrase(w http.ResponseWriter, r *http.Request)
 		"phrase":  phrase,
 		"message": "Save this 24-word phrase securely. It will not be shown again.",
 	})
+}
+
+// phraseHashShape is hex(sha256(normalised phrase)) — the only value a
+// client-side-generated registration may carry.
+var phraseHashShape = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// HandleRegisterPhraseHash registers a CLIENT-generated recovery phrase by
+// its hash, replacing any existing phrase. The wallet mints the 24-word
+// BIP39 phrase locally and sends only hex(sha256(normalised phrase)), so
+// the plaintext never reaches the server — unlike the legacy regenerate
+// endpoint, which mints server-side and returns the plaintext once. The
+// server cannot verify entropy behind a hash; a client registering a weak
+// phrase only weakens its own account, exactly as a leaked phrase would.
+// POST /recovery/phrase/register  (requires wallet sessionToken or JWT bearer)
+func (h *Handler) HandleRegisterPhraseHash(w http.ResponseWriter, r *http.Request) {
+	userID := h.authenticateBearer(w, r)
+	if userID == "" {
+		return
+	}
+	var req struct {
+		PhraseHash string `json:"phrase_hash"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
+		return
+	}
+	if !phraseHashShape.MatchString(req.PhraseHash) {
+		http.Error(w, `{"error":"phrase_hash must be 64 lowercase hex chars"}`, http.StatusBadRequest)
+		return
+	}
+	if err := h.db.StoreRecoveryCodes(userID, []string{req.PhraseHash}); err != nil {
+		log.Printf("[recovery] store phrase hash error: %v", err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"status": "stored", "has_phrase": true})
 }
 
 // HandlePhraseStatus returns whether the user has a recovery phrase set up.

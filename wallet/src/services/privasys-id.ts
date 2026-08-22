@@ -33,7 +33,22 @@ import { useAuthStore, type PrivasysIdAccount } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 
 const PRIVASYS_ORIGIN = 'privasys.id';
-const PRIVASYS_KEY_ALIAS = 'privasys-id-account';
+/**
+ * A collision-free hardware-key alias for a fresh canonical registration.
+ * Registrations historically shared the FIXED alias 'privasys-id-account',
+ * which bricks credentials: any flow that retires a same-alias credential
+ * and deletes "unused" keys can destroy the keypair under a live
+ * credential, and a later registration re-creates the alias with FRESH
+ * material — the old credential then signs with the wrong key forever
+ * (2026-08-22, the new-phone incident). Existing slots keep signing with
+ * whatever alias they recorded; only NEW registrations mint unique ones.
+ */
+function freshCanonicalKeyAlias(): string {
+    const raw = Crypto.getRandomBytes(4);
+    let hex = '';
+    for (const b of raw) hex += b.toString(16).padStart(2, '0');
+    return `privasys-id-account-${hex}`;
+}
 const SESSION_TTL_MS = 25 * 60 * 1000; // 25 min (server is 30, leave margin)
 
 /**
@@ -171,9 +186,10 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
     const canonicalUserId = await deriveCanonicalUserId(profile.pairwiseSeed);
     const userHandle = b64url(canonicalUserId);
 
+    const keyAlias = freshCanonicalKeyAlias();
     const result = await fido2Register(
         PRIVASYS_ORIGIN,
-        PRIVASYS_KEY_ALIAS,
+        keyAlias,
         '', // no browser session relay
         displayName || profile.displayName,
         userHandle,
@@ -190,7 +206,7 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
         sessionToken: result.sessionToken,
         sessionExpiresAt: Date.now() + SESSION_TTL_MS,
         credentialId: result.credentialId,
-        keyAlias: PRIVASYS_KEY_ALIAS,
+        keyAlias,
     };
     store.setPrivasysId(account);
 

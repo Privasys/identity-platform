@@ -400,9 +400,13 @@ export default function RecoverAccountScreen() {
             // (two-phase swap: the new one is persisted first).
             for (const old of superseded) {
                 auth.removeCredential(old.credentialId);
-                const aliasStillUsed = useAuthStore
-                    .getState()
-                    .credentials.some((c) => c.keyAlias === old.keyAlias);
+                // The alias-still-used check must also cover the canonical
+                // slot (outside credentials[]): deleting a key the slot still
+                // references bricks the canonical credential.
+                const postSwap = useAuthStore.getState();
+                const aliasStillUsed =
+                    postSwap.credentials.some((c) => c.keyAlias === old.keyAlias) ||
+                    postSwap.privasysId?.keyAlias === old.keyAlias;
                 if (!aliasStillUsed && old.keyAlias !== keyAlias) {
                     try {
                         await NativeKeys.deleteKey(old.keyAlias);

@@ -650,6 +650,10 @@ func (h *Handler) HandleRevokeDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
+	// Credential deletions are rare, destructive and were previously
+	// silent, which made the 2026-08-22 incident needlessly hard to
+	// reconstruct.
+	log.Printf("[recovery] revoked credential %s for user %s", credID, userID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"revoked"}`))

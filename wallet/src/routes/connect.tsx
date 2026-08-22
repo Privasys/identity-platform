@@ -1921,12 +1921,17 @@ function ConnectFlow() {
             // Two-phase swap, phase 2: the replacement is registered and
             // persisted, so the superseded credential can be retired. Its
             // hardware key is deleted only if no other credential references
-            // the alias (legacy shared `fido2-<rpId>` aliases may).
+            // the alias (legacy shared `fido2-<rpId>` aliases may) —
+            // INCLUDING the canonical meta-account slot, which lives outside
+            // credentials[] and historically shared the fixed
+            // 'privasys-id-account' alias: deleting its key here bricked the
+            // canonical credential (2026-08-22, the new-phone incident).
             if (replace && replace.credentialId !== result.credentialId) {
                 removeCredential(replace.credentialId);
-                const aliasStillUsed = useAuthStore
-                    .getState()
-                    .credentials.some((c) => c.keyAlias === replace.keyAlias);
+                const authState = useAuthStore.getState();
+                const aliasStillUsed =
+                    authState.credentials.some((c) => c.keyAlias === replace.keyAlias) ||
+                    authState.privasysId?.keyAlias === replace.keyAlias;
                 if (!aliasStillUsed && replace.keyAlias !== keyAlias) {
                     try {
                         await NativeKeys.deleteKey(replace.keyAlias);

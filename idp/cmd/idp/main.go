@@ -378,6 +378,10 @@ func main() {
 	mux.HandleFunc("POST /recovery/codes", recoveryHandler.HandleRegeneratePhrase)
 	mux.HandleFunc("GET /recovery/codes", recoveryHandler.HandlePhraseStatus)
 	mux.HandleFunc("DELETE /recovery/codes", recoveryHandler.HandleDeleteRecoveryCodes)
+	// Sovereign backup blob: opaque, client-side-encrypted wallet root
+	// secrets, wrapped under recovery-phrase-derived material.
+	mux.HandleFunc("PUT /recovery/backup", recoveryHandler.HandlePutBackup)
+	mux.HandleFunc("GET /recovery/backup", recoveryHandler.HandleGetBackup)
 	mux.HandleFunc("POST /recovery/begin", recoveryHandler.HandleBeginRecovery)
 	mux.HandleFunc("GET /recovery/status", recoveryHandler.HandleRecoveryStatus)
 	mux.HandleFunc("POST /recovery/complete", recoveryHandler.HandleCompleteRecovery)

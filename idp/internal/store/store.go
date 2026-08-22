@@ -179,6 +179,16 @@ func migrate(db *sql.DB) error {
 			decided_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (request_id, guardian_id)
 		);
+
+		-- Sovereign backup: the wallet's root secrets (data root, pairwise
+		-- seed) wrapped client-side under recovery-phrase-derived material.
+		-- Opaque base64url ciphertext to the IdP; one blob per user,
+		-- re-wrapped by the wallet at every phrase ceremony.
+		CREATE TABLE IF NOT EXISTS sovereign_backups (
+			user_id    TEXT PRIMARY KEY REFERENCES users(user_id),
+			blob       TEXT NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
 	`)
 	if err != nil {
 		return err
@@ -612,6 +622,33 @@ func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID s
 	}
 
 	return tx.Commit()
+}
+
+// --- Sovereign backup operations ---
+
+// PutSovereignBackup stores (or replaces) a user's sovereign backup blob.
+func (db *DB) PutSovereignBackup(userID, blob string) error {
+	_, err := db.Exec(`
+		INSERT INTO sovereign_backups (user_id, blob, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(user_id) DO UPDATE SET
+			blob = excluded.blob, updated_at = CURRENT_TIMESTAMP`,
+		userID, blob,
+	)
+	return err
+}
+
+// GetSovereignBackup returns a user's sovereign backup blob, or "" when
+// none is stored.
+func (db *DB) GetSovereignBackup(userID string) (string, error) {
+	var blob string
+	err := db.QueryRow(
+		"SELECT blob FROM sovereign_backups WHERE user_id = ?", userID,
+	).Scan(&blob)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return blob, err
 }
 
 // --- Recovery code operations ---

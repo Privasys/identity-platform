@@ -128,17 +128,10 @@ export default function ProfileScreen() {
             // brings this screen back — with a stale busy=true the button
             // spun forever and the wallet was unusable (2026-08-22).
             setSetupBusy(false);
-            // The wallet is unusable-in-anger without a recovery phrase, but
-            // the only nudge used to be a Home-screen banner disconnected
-            // from setup. Offer the next step right here.
-            Alert.alert(
-                'Wallet ready',
-                'One more step: set your 24-word recovery phrase so you can recover your account if you lose this device.',
-                [
-                    { text: 'Later', style: 'cancel' },
-                    { text: 'Set it up now', onPress: () => router.push('/account-recovery') },
-                ],
-            );
+            // The setup flow continues onto its second page: the dedicated
+            // recovery-phrase step (a real screen, not a popup). It carries
+            // its own "later" escape for users who insist.
+            router.push('/secure-wallet');
         } catch (e: any) {
             Alert.alert(
                 'Setup failed',

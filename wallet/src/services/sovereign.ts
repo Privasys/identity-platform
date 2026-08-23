@@ -45,7 +45,7 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from '@/utils/storage';
 import { bytesToBase64url, base64urlToBytes } from '@/utils/encoding';
 import { generateMnemonic, mnemonicToEntropy, normaliseMnemonic, phraseHashHex } from '@/services/bip39';
-import { registerPhraseHash } from '@/services/recovery-api';
+import { regenerateRecoveryPhrase, registerPhraseHash } from '@/services/recovery-api';
 import { getSovereignBackup, putSovereignBackup } from '@/services/sovereign-api';
 
 const ROOT_KEY = 'privasys.sovereign-root';
@@ -241,6 +241,37 @@ export async function mintPhraseWithBackup(
         return { phrase };
     } catch (e: any) {
         return { phrase, backupError: e?.message ?? String(e) };
+    }
+}
+
+/**
+ * The one phrase ceremony every screen shares: mint client-side and
+ * register only the hash; against an IdP that predates client-side
+ * generation, fall back to a server-minted phrase (the one the
+ * registration just returned when given, else a regeneration) — and in
+ * every branch store the sovereign backup under whichever phrase the
+ * user will be shown. Returns the phrase plus a backup error to surface
+ * (never thrown once a phrase is live server-side: it must be shown).
+ */
+export async function establishPhraseWithBackup(
+    sessionToken: string,
+    serverMintedPhrase: string | null,
+    pairwiseSeedHex: string | null
+): Promise<{ phrase: string; backupError?: string }> {
+    try {
+        return await mintPhraseWithBackup(sessionToken, pairwiseSeedHex);
+    } catch {
+        let phrase = serverMintedPhrase;
+        if (!phrase) {
+            const res = await regenerateRecoveryPhrase(sessionToken);
+            phrase = res.phrase;
+        }
+        try {
+            await backupSovereignSecrets(phrase, pairwiseSeedHex, sessionToken);
+            return { phrase };
+        } catch (be: any) {
+            return { phrase, backupError: be?.message ?? String(be) };
+        }
     }
 }
 

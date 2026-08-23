@@ -49,7 +49,7 @@ import {
     type DeviceInfo,
 } from '@/services/recovery-api';
 import { ensurePrivasysSession, getPrivasysAccount } from '@/services/privasys-id';
-import { backupSovereignSecrets, mintPhraseWithBackup } from '@/services/sovereign';
+import { establishPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 
@@ -163,32 +163,17 @@ export default function AccountRecoveryScreen() {
             // phrase the user is shown.
             if (result.recoveryPhrase) {
                 setRecoveryPhraseSaved(false);
-                let phrase = result.recoveryPhrase;
-                let backupError: string | undefined;
-                try {
-                    const minted = await mintPhraseWithBackup(
-                        result.sessionToken,
-                        profile?.pairwiseSeed ?? null,
-                    );
-                    phrase = minted.phrase;
-                    backupError = minted.backupError;
-                } catch {
-                    try {
-                        await backupSovereignSecrets(
-                            phrase,
-                            profile?.pairwiseSeed ?? null,
-                            result.sessionToken,
-                        );
-                    } catch (be: any) {
-                        backupError = be?.message ?? String(be);
-                    }
-                }
-                setNewPhrase(phrase);
+                const r = await establishPhraseWithBackup(
+                    result.sessionToken,
+                    result.recoveryPhrase,
+                    profile?.pairwiseSeed ?? null,
+                );
+                setNewPhrase(r.phrase);
                 setPhraseStatus({ has_phrase: true });
-                if (backupError) {
+                if (r.backupError) {
                     Alert.alert(
                         'Backup incomplete',
-                        `Your data-key backup could not be stored: ${backupError}. ` +
+                        `Your data-key backup could not be stored: ${r.backupError}. ` +
                         'Regenerate your recovery phrase later to retry.',
                     );
                 }
@@ -218,44 +203,25 @@ export default function AccountRecoveryScreen() {
                         try {
                             // Refresh session if needed
                             const sess = await ensurePrivasysSession(profile?.displayName);
-                            // Client-side generation: mint locally, register
-                            // only the hash, re-wrap the sovereign backup
-                            // under the new phrase in the same breath (the
-                            // old phrase stops recovering the account the
-                            // instant the hash lands). Falls back to the
-                            // legacy server-minted phrase on an IdP that
-                            // predates /recovery/phrase/register.
-                            let phrase: string;
-                            let backupError: string | undefined;
-                            try {
-                                const minted = await mintPhraseWithBackup(
-                                    sess.sessionToken,
-                                    profile?.pairwiseSeed ?? null,
-                                );
-                                phrase = minted.phrase;
-                                backupError = minted.backupError;
-                            } catch {
-                                const res = await regenerateRecoveryPhrase(sess.sessionToken);
-                                phrase = res.phrase;
-                                try {
-                                    await backupSovereignSecrets(
-                                        phrase,
-                                        profile?.pairwiseSeed ?? null,
-                                        sess.sessionToken,
-                                    );
-                                } catch (be: any) {
-                                    backupError = be?.message ?? String(be);
-                                }
-                            }
+                            // Client-side generation with legacy-IdP fallback,
+                            // re-wrapping the sovereign backup under the new
+                            // phrase in the same breath (the old phrase stops
+                            // recovering the account the instant the new hash
+                            // lands). Shared ceremony: establishPhraseWithBackup.
+                            const r = await establishPhraseWithBackup(
+                                sess.sessionToken,
+                                null,
+                                profile?.pairwiseSeed ?? null,
+                            );
                             // A brand-new phrase is shown but not yet written
                             // down — un-confirm until the user taps "I've saved".
                             setRecoveryPhraseSaved(false);
-                            setNewPhrase(phrase);
+                            setNewPhrase(r.phrase);
                             setPhraseStatus({ has_phrase: true });
-                            if (backupError) {
+                            if (r.backupError) {
                                 Alert.alert(
                                     'Backup incomplete',
-                                    `Your data-key backup could not be re-wrapped: ${backupError}. ` +
+                                    `Your data-key backup could not be re-wrapped: ${r.backupError}. ` +
                                     'Regenerate the phrase again to retry.',
                                 );
                             }
@@ -415,12 +381,13 @@ export default function AccountRecoveryScreen() {
             >
                 {notConfigured && (
                     <RNView style={styles.card}>
-                        <Text style={styles.fieldLabel}>Sign in to Privasys ID</Text>
+                        <Text style={styles.fieldLabel}>Recovery settings are locked</Text>
                         <Text style={styles.helperText}>
-                            Sign in once with your biometrics to manage your recovery phrase,
-                            guardians and registered devices. On your first sign-in your
-                            24-word recovery phrase is created and shown right away.
+                            Confirm it&apos;s you to view and manage your recovery phrase,
+                            guardians and registered devices.
                         </Text>
+                        {/* Outcome-named action: the biometric prompt appears as part
+                            of unlocking, it is not the thing the user is asking for. */}
                         <Pressable
                             style={[styles.primaryButton, signingIn && { opacity: 0.6 }]}
                             onPress={handleSignIn}
@@ -429,7 +396,7 @@ export default function AccountRecoveryScreen() {
                             {signingIn ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
-                                <Text style={styles.primaryButtonText}>Sign in with biometrics</Text>
+                                <Text style={styles.primaryButtonText}>Unlock recovery settings</Text>
                             )}
                         </Pressable>
                     </RNView>

@@ -12,8 +12,10 @@ import 'react-native-reanimated';
 
 import { SplashAnimation } from '@/components/SplashAnimation';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useAppLocale } from '@/hooks/useAppLocale';
 import { useDeviceUuid } from '@/hooks/useDeviceUuid';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
+import { initI18n } from '@/i18n';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useDependencyApprovalsStore } from '@/stores/dependency-approvals';
@@ -29,6 +31,11 @@ import { installLogCapture } from '@/utils/logs';
 // possible so the Settings → Logs screen and the Connect → Report Error
 // flow can surface the lines that led up to a problem.
 installLogCapture();
+
+// Bring i18next up before any screen renders. This is synchronous and starts
+// on the compiled-in en-GB bundle, so it cannot fail and cannot delay the
+// first frame; the user's own language is swapped in later by useAppLocale.
+initI18n();
 // import * as Sentry from '@sentry/react-native';
 
 // Sentry.init({
@@ -84,6 +91,7 @@ if (Platform.OS === 'android') {
 export default function RootLayout() {
     useExpoPushToken();
     useDeviceUuid();
+    useAppLocale();
     const [loaded, error] = useFonts({
         Inter: require('@/assets/fonts/InterVariable.ttf'),
         ...FontAwesome.font

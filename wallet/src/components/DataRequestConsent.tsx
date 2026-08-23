@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { useTranslation } from 'react-i18next';
 
 export interface ConsentDataItem {
     key: string;
@@ -42,6 +43,10 @@ export interface AttestationSummary {
     codeHash: string;
 }
 
+/**
+ * "Intel SGX" / "Intel TDX" are product names and stay verbatim in every
+ * language, so this needs no translation and takes no `t`.
+ */
 function teeLabel(teeType: string): string {
     return teeType === 'sgx' ? 'Intel SGX' : teeType === 'tdx' ? 'Intel TDX' : teeType;
 }
@@ -53,13 +58,13 @@ export function DataRequestConsent({
     appIcon = 'cube-outline',
     attestation,
     expandable = false,
-    sectionTitle = 'REQUESTED DATA',
+    sectionTitle,
     sectionDescription,
     items,
     note,
     persistent,
-    denyLabel = 'Deny',
-    approveLabel = 'Share',
+    denyLabel,
+    approveLabel,
     approveCount,
     approveDisabled,
     submitting,
@@ -95,7 +100,13 @@ export function DataRequestConsent({
     contentTopInset?: number;
 }) {
     const p = usePalette();
+    const { t } = useTranslation();
     const styles = useMemo(() => makeStyles(p), [p]);
+    // Defaults resolve here rather than in the parameter list, so they follow
+    // a language change like every other string on the screen.
+    const sectionHeading = sectionTitle ?? t('consent.requestedData');
+    const denyText = denyLabel ?? t('connect.deny');
+    const approveText = approveLabel ?? t('connect.share');
     const [showMeasurement, setShowMeasurement] = useState(false);
     const showDetails = !expandable || showMeasurement;
     return (
@@ -131,7 +142,7 @@ export function DataRequestConsent({
                             <RNView style={styles.attestationBadge}>
                                 <Ionicons name="shield-checkmark" size={16} color={p.green} />
                                 <Text style={styles.attestationLabel}>
-                                    Attested · {teeLabel(attestation.teeType)}
+                                    {t('consent.attestedWith', { tee: teeLabel(attestation.teeType) })}
                                 </Text>
                             </RNView>
                             {expandable ? (
@@ -144,13 +155,13 @@ export function DataRequestConsent({
                         </RNView>
                         {showDetails ? (
                             <RNView style={styles.measurementDetails}>
-                                <Text style={styles.measurementLabel}>Measurement</Text>
+                                <Text style={styles.measurementLabel}>{t('consent.measurement')}</Text>
                                 <Text style={styles.measurementValue} numberOfLines={2}>
                                     {attestation.measurement}
                                 </Text>
                                 {attestation.codeHash ? (
                                     <>
-                                        <Text style={styles.measurementLabel}>Code Hash</Text>
+                                        <Text style={styles.measurementLabel}>{t('attestation.codeHash')}</Text>
                                         <Text style={styles.measurementValue} numberOfLines={2}>
                                             {attestation.codeHash}
                                         </Text>
@@ -162,7 +173,7 @@ export function DataRequestConsent({
                 ) : null}
 
                 {/* Requested data */}
-                <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+                <Text style={styles.sectionTitle}>{sectionHeading}</Text>
                 {sectionDescription ? (
                     <Text style={styles.sectionDescription}>{sectionDescription}</Text>
                 ) : null}
@@ -196,10 +207,8 @@ export function DataRequestConsent({
                 {persistent ? (
                     <RNView style={styles.persistentRow}>
                         <RNView style={styles.persistentInfo}>
-                            <Text style={styles.persistentLabel}>Always share with this app</Text>
-                            <Text style={styles.persistentHint}>
-                                Auto-approve future requests while the enclave code stays the same.
-                            </Text>
+                            <Text style={styles.persistentLabel}>{t('consent.alwaysShare')}</Text>
+                            <Text style={styles.persistentHint}>{t('consent.alwaysShareHint')}</Text>
                         </RNView>
                         <Switch
                             value={persistent.value}
@@ -220,7 +229,7 @@ export function DataRequestConsent({
                     onPress={onDeny}
                     disabled={submitting}
                 >
-                    <Text style={styles.denyButtonText}>{denyLabel}</Text>
+                    <Text style={styles.denyButtonText}>{denyText}</Text>
                 </Pressable>
                 <Pressable
                     style={[styles.approveButton, (submitting || approveDisabled) && styles.disabledButton]}
@@ -229,7 +238,9 @@ export function DataRequestConsent({
                 >
                     <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" />
                     <Text style={styles.approveButtonText}>
-                        {approveLabel}{approveCount !== undefined ? ` (${approveCount})` : ''}
+                        {approveCount !== undefined
+                            ? t('consent.approveWithCount', { label: approveText, count: approveCount })
+                            : approveText}
                     </Text>
                 </Pressable>
             </RNView>

@@ -13,11 +13,13 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react-native';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { attributeLabel, exportAttributesForAudit } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 
 export default function ExportDataScreen() {
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const { profile } = useProfileStore();
@@ -42,11 +44,11 @@ export default function ExportDataScreen() {
             file.write(json);
             await Sharing.shareAsync(file.uri, {
                 mimeType: 'application/json',
-                dialogTitle: 'Export Profile Data',
+                dialogTitle: t('export.dialogTitle'),
                 UTI: 'public.json',
             });
         } catch (e: any) {
-            Alert.alert('Export failed', e.message);
+            Alert.alert(t('export.failed'), e.message);
         }
     };
 
@@ -54,7 +56,7 @@ export default function ExportDataScreen() {
 
     return (
         <RNView style={styles.screen}>
-            <SubPageHeader title="Export Data" />
+            <SubPageHeader title={t('profile.exportData')} />
             <ScrollView contentContainerStyle={styles.content}>
                 <Text style={styles.intro}>
                     Export your attributes as a JSON file with their provenance and verification
@@ -70,7 +72,7 @@ export default function ExportDataScreen() {
                                 <RNView style={{ flex: 1 }}>
                                     <Text style={styles.rowLabel}>{attributeLabel(attr.key)}</Text>
                                     <Text style={styles.rowValue} numberOfLines={1}>
-                                        {attr.key === 'picture' ? 'Profile photo' : attr.value}
+                                        {attr.key === 'picture' ? t('import.profilePhoto') : attr.value}
                                     </Text>
                                 </RNView>
                                 <Switch value={selected.has(attr.key)} onValueChange={() => toggle(attr.key)} />
@@ -84,7 +86,7 @@ export default function ExportDataScreen() {
                         >
                             <Ionicons name="share-outline" size={18} color="#FFFFFF" />
                             <Text style={styles.primaryText}>
-                                Export {count} attribute{count !== 1 ? 's' : ''}
+                                {t('export.exportCount', { count })}
                             </Text>
                         </Pressable>
                         <Pressable style={styles.secondary} onPress={() => doExport(new Set(attrs.map((a) => a.key)))}>

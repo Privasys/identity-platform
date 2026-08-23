@@ -3,10 +3,12 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, ScrollView, Pressable, TextInput, View as RNView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import {
-    KIND_LABELS,
+    KIND_LABEL_KEYS,
     serviceHosts,
     type SessionTrace,
     useServiceSessionsStore
@@ -151,13 +153,20 @@ function buildRows(
     return rows;
 }
 
-/** Compact "when" for the card subtitle. */
-function relativeWhen(ms: number, now: number): string {
+/**
+ * Compact "when" for the card subtitle.
+ *
+ * Counts go through plural keys rather than a bare suffix: "2 minutes" takes a
+ * different form from "1 minute" in Polish, Welsh and Irish. Anything older
+ * than a day falls back to a date rendered from the locale pack's own pattern,
+ * not the device's.
+ */
+function relativeWhen(ms: number, now: number, t: TFunction): string {
     const diff = now - ms;
-    if (diff < 60_000) return 'just now';
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-    return new Date(ms).toLocaleDateString();
+    if (diff < 60_000) return t('time.justNow');
+    if (diff < 3_600_000) return t('time.minutesAgo', { count: Math.floor(diff / 60_000) });
+    if (diff < 86_400_000) return t('time.hoursAgo', { count: Math.floor(diff / 3_600_000) });
+    return t('time.onDate', { when: new Date(ms) });
 }
 
 export default function HomeScreen() {
@@ -174,6 +183,7 @@ export default function HomeScreen() {
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
+    const { t } = useTranslation();
     const [now, setNow] = useState(() => Date.now());
     const [query, setQuery] = useState('');
 
@@ -191,12 +201,12 @@ export default function HomeScreen() {
     // only clear itself when its TTL expires, which the user cannot hurry.
     const endOrphanSession = (session: RelaySession) => {
         Alert.alert(
-            'End session',
-            `End the sealed session for ${session.appName ?? appName(session.rpId)}? Anything using it will need to reconnect.`,
+            t('home.endSessionTitle'),
+            t('home.endSessionBody', { app: session.appName ?? appName(session.rpId) }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'End session',
+                    text: t('home.endSessionConfirm'),
                     style: 'destructive',
                     onPress: () => removeRelaySession(session.sessionId)
                 }
@@ -229,11 +239,12 @@ export default function HomeScreen() {
         <RNView style={styles.screen}>
             {/* Gradient header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
+                {/* Product name: never translated. */}
                 <Text style={styles.headerTitle}>Privasys Wallet</Text>
                 <Text style={styles.headerSubtitle}>
                     {rows.length === 0
-                        ? 'No active sessions yet'
-                        : `${rows.length} active session${rows.length !== 1 ? 's' : ''}`}
+                        ? t('home.noSessions')
+                        : t('home.activeSessions', { count: rows.length })}
                 </Text>
             </RNView>
 
@@ -246,16 +257,14 @@ export default function HomeScreen() {
                     <Pressable
                         style={styles.approvalsBanner}
                         onPress={() => router.push('/account-recovery')}
-                        accessibilityLabel="Save your recovery phrase"
+                        accessibilityLabel={t('home.savePhraseTitle')}
                     >
                         <RNView style={[styles.approvalsIcon, { backgroundColor: '#FDE68A' }]}>
                             <Ionicons name="key-outline" size={18} color="#B45309" />
                         </RNView>
                         <RNView style={styles.approvalsInfo}>
-                            <Text style={styles.approvalsTitle}>Save your recovery phrase</Text>
-                            <Text style={styles.approvalsMeta}>
-                                Write it down so you can recover your account if you lose this device
-                            </Text>
+                            <Text style={styles.approvalsTitle}>{t('home.savePhraseTitle')}</Text>
+                            <Text style={styles.approvalsMeta}>{t('home.savePhraseBody')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </Pressable>
@@ -264,17 +273,16 @@ export default function HomeScreen() {
                     <Pressable
                         style={styles.approvalsBanner}
                         onPress={() => router.push('/vault-approvals')}
-                        accessibilityLabel={`${pendingApprovals.length} pending vault approval${pendingApprovals.length !== 1 ? 's' : ''}`}
+                        accessibilityLabel={t('home.pendingVaultApprovals', { count: pendingApprovals.length })}
                     >
                         <RNView style={styles.approvalsIcon}>
                             <Ionicons name="key" size={18} color={p.infoText} />
                         </RNView>
                         <RNView style={styles.approvalsInfo}>
                             <Text style={styles.approvalsTitle}>
-                                {pendingApprovals.length} pending approval
-                                {pendingApprovals.length !== 1 ? 's' : ''}
+                                {t('home.pendingApprovals', { count: pendingApprovals.length })}
                             </Text>
-                            <Text style={styles.approvalsMeta}>Tap to review and approve with your passkey</Text>
+                            <Text style={styles.approvalsMeta}>{t('home.pendingApprovalsHint')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.infoText} />
                     </Pressable>
@@ -284,10 +292,8 @@ export default function HomeScreen() {
                         <RNView style={styles.emptyIconContainer}>
                             <Ionicons name="qr-code-outline" size={48} color={p.blue} />
                         </RNView>
-                        <Text style={styles.emptyTitle}>Ready to connect</Text>
-                        <Text style={styles.emptyText}>
-                            Scan a QR code to connect{`\n`}to your first service.
-                        </Text>
+                        <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
+                        <Text style={styles.emptyText}>{t('home.emptyBody')}</Text>
                     </RNView>
                 ) : (
                     <ScrollView
@@ -306,19 +312,19 @@ export default function HomeScreen() {
                                 />
                                 <TextInput
                                     style={styles.searchInput}
-                                    placeholder="Search sessions"
+                                    placeholder={t('home.searchPlaceholder')}
                                     placeholderTextColor={p.textMuted}
                                     value={query}
                                     onChangeText={setQuery}
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                     returnKeyType="search"
-                                    accessibilityLabel="Search sessions"
+                                    accessibilityLabel={t('home.searchPlaceholder')}
                                 />
                                 {query.length > 0 && (
                                     <Pressable
                                         onPress={() => setQuery('')}
-                                        accessibilityLabel="Clear search"
+                                        accessibilityLabel={t('home.clearSearch')}
                                         hitSlop={8}
                                     >
                                         <Ionicons
@@ -331,11 +337,11 @@ export default function HomeScreen() {
                             </RNView>
                         )}
 
-                        <Text style={styles.sectionTitle}>ACTIVE SESSIONS</Text>
+                        <Text style={styles.sectionTitle}>{t('home.sectionActiveSessions')}</Text>
 
                         {filtered.length === 0 ? (
                             <Text style={styles.noResults}>
-                                No sessions match &ldquo;{query}&rdquo;.
+                                {t('home.noResults', { query })}
                             </Text>
                         ) : (
                             filtered.map((row) => {
@@ -357,11 +363,14 @@ export default function HomeScreen() {
                                             ? 'shield-checkmark'
                                             : 'key';
                                 const kindLabel = row.trace
-                                    ? KIND_LABELS[row.trace.kind]
+                                    ? t(KIND_LABEL_KEYS[row.trace.kind])
                                     : teeType === 'none'
-                                        ? 'Passkey'
-                                        : 'Enclave';
-                                const meta = `${kindLabel} · ${relativeWhen(row.lastActiveMs, now)}`;
+                                        ? t('identityKind.passkey')
+                                        : t('sessionKind.enclave');
+                                const meta = t('home.cardMeta', {
+                                    kind: kindLabel,
+                                    when: relativeWhen(row.lastActiveMs, now, t)
+                                });
                                 const onPress =
                                     row.trace || row.app
                                         ? () =>
@@ -415,7 +424,7 @@ export default function HomeScreen() {
             <Pressable
                 style={styles.scanFab}
                 onPress={() => router.push('/scan')}
-                accessibilityLabel="Scan QR code"
+                accessibilityLabel={t('home.scanQrCode')}
             >
                 <Ionicons name="qr-code-outline" size={26} color="#FFFFFF" />
             </Pressable>

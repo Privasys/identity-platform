@@ -19,6 +19,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Alert, StyleSheet, Pressable, ActivityIndicator, ScrollView, FlatList } from 'react-native';
 
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
+import { useTranslation } from 'react-i18next';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, attestEnclave } from '@/services/attestation';
@@ -63,6 +64,7 @@ interface AppEntry {
 }
 
 export default function BatchConnectScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const params = useLocalSearchParams<{ payload?: string }>();
     const pushToken = useExpoPushToken();
@@ -85,7 +87,7 @@ export default function BatchConnectScreen() {
         hasStarted.current = true;
 
         if (!params.payload) {
-            setError('No batch payload received');
+            setError(t('batch.noPayload'));
             setStep('error');
             return;
         }
@@ -94,7 +96,7 @@ export default function BatchConnectScreen() {
         try {
             parsed = JSON.parse(params.payload);
         } catch {
-            setError('Invalid batch payload');
+            setError(t('batch.invalidPayload'));
             setStep('error');
             return;
         }
@@ -184,7 +186,7 @@ export default function BatchConnectScreen() {
         const updated = entries.map((entry, i) => {
             const result = results[i];
             if (result.status === 'rejected') {
-                return { ...entry, status: 'failed' as const, error: result.reason?.message ?? 'Verification failed' };
+                return { ...entry, status: 'failed' as const, error: result.reason?.message ?? t('batch.verificationFailed') };
             }
 
             const attestation = result.value;
@@ -231,18 +233,18 @@ export default function BatchConnectScreen() {
             .join(', ');
 
         const result = await LocalAuthentication.authenticateAsync({
-            promptMessage: `Sign in to ${appNames}`,
+            promptMessage: t('connect.signInTo', { host: appNames }),
             // Strong so this one biometric unlocks the time-bound signing key for
             // the whole batch; markSigningGate then suppresses a re-prompt inside
             // each per-app fido2 ceremony below.
             biometricsSecurityLevel: 'strong',
-            fallbackLabel: 'Use Passcode',
-            cancelLabel: 'Cancel',
+            fallbackLabel: t('profile.usePasscode'),
+            cancelLabel: t('common.cancel'),
             disableDeviceFallback: false,
         });
 
         if (!result.success) {
-            setError('Authentication cancelled');
+            setError(t('batch.authCancelled'));
             setStep('error');
             return;
         }
@@ -405,7 +407,7 @@ export default function BatchConnectScreen() {
             } else if (outcome.status === 'error' || outcome.status === 'unreachable') {
                 // No verdict — keep the row's prior state, just report.
                 patch({ challenging: false });
-                Alert.alert('Challenge failed', outcome.message ?? 'Could not verify the enclave.');
+                Alert.alert(t('drive.challengeFailedTitle'), outcome.message ?? t('drive.challengeFailedBody'));
             } else {
                 // Definite bad verdict: exclude from approval.
                 patch({
@@ -416,7 +418,7 @@ export default function BatchConnectScreen() {
             }
         } catch (e: any) {
             patch({ challenging: false });
-            Alert.alert('Challenge failed', e?.message ?? 'Could not verify the enclave.');
+            Alert.alert(t('drive.challengeFailedTitle'), e?.message ?? t('drive.challengeFailedBody'));
         }
     }, [apps]);
 
@@ -438,8 +440,11 @@ export default function BatchConnectScreen() {
             {item.attestation && item.status === 'verified' && (
                 <View style={styles.appDetailRow}>
                     <Text style={styles.appDetail}>
-                        {item.attestation.tee_type?.toUpperCase()}: {item.attestation.valid ? 'Valid' : 'Invalid'}
-                        {item.challenged ? '  ·  ⚡ Challenged' : ''}
+                        {t('batch.attestationLine', {
+                            tee: item.attestation.tee_type?.toUpperCase() ?? '',
+                            verdict: item.attestation.valid ? t('batch.valid') : t('batch.invalid')
+                        })}
+                        {item.challenged ? t('batch.challengedSuffix') : ''}
                     </Text>
                     {/* Enclave rows only (non-enclave RPs have nothing to
                         challenge); already-challenged rows have proven
@@ -454,7 +459,7 @@ export default function BatchConnectScreen() {
                             {item.challenging ? (
                                 <ActivityIndicator size="small" color={p.infoText} />
                             ) : (
-                                <Text style={styles.challengeChipText}>⚡ Challenge</Text>
+                                <Text style={styles.challengeChipText}>{t('batch.challengeChip')}</Text>
                             )}
                         </Pressable>
                     )}
@@ -471,16 +476,18 @@ export default function BatchConnectScreen() {
                     <View style={styles.centered}>
                         <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.statusText}>
-                            Verifying {apps.length} enclaves...
+                            {t('batch.verifyingEnclaves', { count: apps.length })}
                         </Text>
                     </View>
                 )}
 
                 {step === 'review' && (
                     <ScrollView contentContainerStyle={styles.reviewContainer}>
-                        <Text style={styles.title}>Batch Sign-In</Text>
+                        <Text style={styles.title}>{t('batch.title')}</Text>
                         <Text style={styles.subtitle}>
-                            {apps.filter((a) => a.status === 'verified').length} app(s) verified
+                            {t('batch.appsVerified', {
+                                count: apps.filter((a) => a.status === 'verified').length
+                            })}
                         </Text>
 
                         <FlatList
@@ -493,10 +500,10 @@ export default function BatchConnectScreen() {
 
                         <View style={styles.buttonRow}>
                             <Pressable style={styles.rejectButton} onPress={handleReject}>
-                                <Text style={styles.rejectButtonText}>Reject All</Text>
+                                <Text style={styles.rejectButtonText}>{t('batch.rejectAll')}</Text>
                             </Pressable>
                             <Pressable style={styles.approveButton} onPress={handleApprove}>
-                                <Text style={styles.approveButtonText}>Approve All</Text>
+                                <Text style={styles.approveButtonText}>{t('batch.approveAll')}</Text>
                             </Pressable>
                         </View>
                     </ScrollView>
@@ -506,9 +513,9 @@ export default function BatchConnectScreen() {
                     <View style={styles.centered}>
                         <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.statusText}>
-                            {step === 'biometric' && 'Waiting for biometrics...'}
-                            {step === 'authenticating' && 'Authenticating...'}
-                            {step === 'relaying' && 'Sending to browser...'}
+                            {step === 'biometric' && t('batch.waitingBiometrics')}
+                            {step === 'authenticating' && t('batch.authenticating')}
+                            {step === 'relaying' && t('connect.sendingToBrowser')}
                         </Text>
                         <FlatList
                             data={apps}
@@ -523,9 +530,11 @@ export default function BatchConnectScreen() {
                 {step === 'done' && (
                     <View style={styles.centered}>
                         <Text style={styles.checkmark}>✓</Text>
-                        <Text style={styles.title}>All Connected</Text>
+                        <Text style={styles.title}>{t('batch.allConnected')}</Text>
                         <Text style={styles.subtitle}>
-                            {apps.filter((a) => a.status === 'relayed').length} app(s) authenticated.
+                            {t('batch.appsAuthenticated', {
+                                count: apps.filter((a) => a.status === 'relayed').length
+                            })}
                         </Text>
                     </View>
                 )}
@@ -533,7 +542,7 @@ export default function BatchConnectScreen() {
                 {step === 'error' && (
                     <View style={styles.centered}>
                         <Text style={styles.errorIcon}>✕</Text>
-                        <Text style={styles.title}>Batch Auth Failed</Text>
+                        <Text style={styles.title}>{t('batch.failed')}</Text>
                         {error && <Text style={styles.errorText}>{error}</Text>}
                         <FlatList
                             data={apps.filter((a) => a.status === 'failed')}
@@ -543,7 +552,7 @@ export default function BatchConnectScreen() {
                             style={styles.appList}
                         />
                         <Pressable style={styles.secondaryButton} onPress={handleReject}>
-                            <Text style={styles.secondaryButtonText}>Go back</Text>
+                            <Text style={styles.secondaryButtonText}>{t('common.goBack')}</Text>
                         </Pressable>
                     </View>
                 )}

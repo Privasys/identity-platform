@@ -19,6 +19,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View as NativeView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { AttestationView } from '@/components/AttestationView';
 import { DataRequestConsent } from '@/components/DataRequestConsent';
@@ -50,10 +51,10 @@ const DOC_PAGE_RATIO = 1.42;
 // turns these into the gov-assured *output* attributes (birthdate_id,
 // nationality_id, age_over_18, …) that the user picks in the "select" step; those
 // outputs ARE in the referential. `doc` is the document noun (passport / ID card).
-const KYC_INPUT_ITEMS: { key: string; icon: keyof typeof Ionicons.glyphMap; label: (doc: string) => string }[] = [
-    { key: 'doc_page', icon: 'camera-outline', label: (doc) => `Your ${doc}'s photo page` },
-    { key: 'nfc_chip', icon: 'hardware-chip-outline', label: (doc) => `Your ${doc} chip, read over NFC` },
-    { key: 'live_selfie', icon: 'person-outline', label: () => 'A live selfie' },
+const KYC_INPUT_ITEMS: { key: string; icon: keyof typeof Ionicons.glyphMap; labelKey: string }[] = [
+    { key: 'doc_page', icon: 'camera-outline', labelKey: 'kyc.inputDocPage' },
+    { key: 'nfc_chip', icon: 'hardware-chip-outline', labelKey: 'kyc.inputNfcChip' },
+    { key: 'live_selfie', icon: 'person-outline', labelKey: 'kyc.inputSelfie' },
 ];
 
 /**
@@ -128,6 +129,7 @@ function rememberVerifier(v: VerifierAttestation) {
 }
 
 export default function KycCaptureScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const p = usePalette();
@@ -224,7 +226,7 @@ export default function KycCaptureScreen() {
         let cancelled = false;
         getVerifierInfo()
             .then((info) => { if (!cancelled) setVerifierInfo(info); })
-            .catch(() => { if (!cancelled) setVerifierInfo({ origin: '', displayName: 'Privasys identity verifier' }); });
+            .catch(() => { if (!cancelled) setVerifierInfo({ origin: '', displayName: t('kyc.verifierName') }); });
         return () => { cancelled = true; };
     }, [step, verifierInfo]);
 
@@ -259,7 +261,7 @@ export default function KycCaptureScreen() {
             .catch((e) => {
                 if (cancelled) return;
                 console.warn('[KYC] enclave attestation failed:', e?.message);
-                setAttError(e?.message ?? 'Could not verify the enclave.');
+                setAttError(e?.message ?? t('drive.challengeFailedBody'));
             });
         return () => { cancelled = true; };
     }, [step, attRetry]);
@@ -278,7 +280,7 @@ export default function KycCaptureScreen() {
             setVerifierAtt(res);
         } catch (e: any) {
             console.warn('[KYC] challenge failed:', e?.message);
-            Alert.alert('Challenge failed', e?.message ?? 'Could not verify the enclave.');
+            Alert.alert(t('drive.challengeFailedTitle'), e?.message ?? t('drive.challengeFailedBody'));
         } finally {
             setChallengeInFlight(false);
         }
@@ -289,7 +291,7 @@ export default function KycCaptureScreen() {
         else router.replace('/(tabs)');
     };
 
-    const docLabel = docType === 'passport' ? 'passport' : 'ID card';
+    const docLabel = docType === 'passport' ? t('kyc.docPassportNoun') : t('kyc.docIdCardNoun');
 
     // ── Step 2: read the document chip over NFC (or dev stub) ────────────────
     const handleScan = async () => {
@@ -315,12 +317,12 @@ export default function KycCaptureScreen() {
             const rejectedKey = typeof e?.message === 'string' && e.message.includes('InvalidMRZKey');
             if (rejectedKey) {
                 Alert.alert(
-                    "The code didn't match the chip",
-                    'This usually means a look-alike character was misread (I vs 1, O vs 0, S vs 5, B vs 8, Z vs 2). Tap Retake photo, hold the page flat and steady, then try again.',
+                    t('kyc.mrzMismatchTitle'),
+                    t('kyc.mrzMismatchBody'),
                 );
             } else {
                 Alert.alert(
-                    'Could not read the chip',
+                    t('kyc.chipReadFailedTitle'),
                     `${e.message}\n\nHold your ${docLabel} flat against the top of your phone and keep it still.`,
                 );
             }
@@ -337,7 +339,7 @@ export default function KycCaptureScreen() {
         let p = permission;
         if (!p || !p.granted) p = await requestPermission();
         if (!p?.granted) {
-            Alert.alert('Camera needed', 'Allow camera access to photograph your document.');
+            Alert.alert(t('connect.cameraNeededTitle'), t('kyc.cameraNeededBody'));
             return;
         }
         setDocNumber(''); setDob(''); setExpiry(''); setDocImage('');
@@ -449,17 +451,19 @@ export default function KycCaptureScreen() {
                     e instanceof VerifierHttpError ? e.isUnreadableCapture : !(e instanceof VerifierHttpError);
                 if (unreadable) {
                     Alert.alert(
-                        "Couldn't read the photo page",
-                        'Make sure the whole page is in frame, flat and well lit, then retake the photo.',
-                        [{ text: 'Retake photo', onPress: () => { openCapture(); } }],
+                        t('kyc.photoPageFailedTitle'),
+                        t('kyc.photoPageFailedBody'),
+                        [{ text: t('kyc.retakePhoto'), onPress: () => { openCapture(); } }],
                     );
                 } else {
                     Alert.alert(
-                        'ID check unavailable',
-                        `${e?.detail || e?.message || 'The identity verifier refused the request.'}\n\nThis is not a problem with your photo. Try again in a moment; if it persists, contact support.`,
+                        t('kyc.unavailableTitle'),
+                        t('kyc.unavailableBody', {
+                            reason: e?.detail || e?.message || t('kyc.verifierRefused')
+                        }),
                         [
-                            { text: 'Try again', onPress: () => { setMrzReadDone(false); } },
-                            { text: 'Cancel', style: 'cancel', onPress: () => { router.back(); } },
+                            { text: t('common.retry'), onPress: () => { setMrzReadDone(false); } },
+                            { text: t('common.cancel'), style: 'cancel', onPress: () => { router.back(); } },
                         ],
                     );
                 }
@@ -485,17 +489,22 @@ export default function KycCaptureScreen() {
         const curGiven = getProfileValue(profile, 'given_name');
         const curFamily = getProfileValue(profile, 'family_name');
         if (idGiven === curGiven && idFamily === curFamily) return; // nothing to offer
-        const current = curGiven || curFamily ? `\n\nKeep your current name (${[curGiven, curFamily].filter(Boolean).join(' ')})?` : '';
+        const current = curGiven || curFamily
+            ? t('kyc.keepCurrentNameSuffix', { name: [curGiven, curFamily].filter(Boolean).join(' ') })
+            : '';
         Alert.alert(
-            'Use your verified name?',
-            `Your ID shows:\n  First name: ${idGiven ?? 'not set'}\n  Last name: ${idFamily ?? 'not set'}${current}`,
+            t('kyc.useVerifiedNameTitle'),
+            t('kyc.useVerifiedNameBody', {
+                given: idGiven ?? t('common.notSet'),
+                family: idFamily ?? t('common.notSet')
+            }) + current,
             [
-                { text: 'Keep current', style: 'cancel' },
+                { text: t('kyc.keepCurrentName'), style: 'cancel' },
                 {
-                    text: 'Use ID name',
+                    text: t('kyc.useIdName'),
                     onPress: () => {
                         const rec = [{
-                            verifier: 'privasys-kyc', verifierDisplayName: 'Privasys identity verifier',
+                            verifier: 'privasys-kyc', verifierDisplayName: t('kyc.verifierName'),
                             method: 'kyc_enclave' as const, assurance: 'gov' as const,
                             verifiedAt: Math.floor(Date.now() / 1000),
                         }];
@@ -519,7 +528,7 @@ export default function KycCaptureScreen() {
             const att = verifierAtt?.attestation;
             useServiceSessionsStore.getState().record({
                 serviceKey: verifierAtt?.origin ?? 'privasys-identity-verifier',
-                displayName: verifierAtt?.displayName ?? 'Privasys identity verifier',
+                displayName: verifierAtt?.displayName ?? t('kyc.verifierName'),
                 kind: 'identity-check',
                 identity: 'privasys-id',
                 rpId: verifierAtt?.origin ?? '',
@@ -529,8 +538,8 @@ export default function KycCaptureScreen() {
                 detail: `Verified a ${docLabel}; raw document and selfie processed in the enclave and discarded`,
                 sharedAttributes: [
                     { key: 'document_chip', value: `${docLabel} chip (NFC)` },
-                    ...(docImage ? [{ key: 'document_photo_page', value: 'Photo page image' }] : []),
-                    ...(liveImageBase64 ? [{ key: 'live_selfie', value: 'Live selfie' }] : [])
+                    ...(docImage ? [{ key: 'document_photo_page', value: t('kyc.photoPageImage') }] : []),
+                    ...(liveImageBase64 ? [{ key: 'live_selfie', value: t('kyc.liveSelfie') }] : [])
                 ],
                 attestations: att
                     ? [
@@ -557,7 +566,7 @@ export default function KycCaptureScreen() {
             setSelected(new Set(cands.map((c) => c.key)));
             setStep('select');
         } catch (e: any) {
-            Alert.alert('Verification failed', e.message);
+            Alert.alert(t('kyc.verificationFailed'), e.message);
             setStep('selfie');
         } finally {
             setBusy(false);
@@ -593,7 +602,7 @@ export default function KycCaptureScreen() {
             const photo = await cameraRef.current?.takePictureAsync({ base64: true, quality: 0.6 });
             await captureAndVerify(photo?.base64 ?? undefined);
         } catch (e: any) {
-            Alert.alert('Camera error', e.message);
+            Alert.alert(t('connect.cameraError'), e.message);
         }
     };
 
@@ -614,10 +623,8 @@ export default function KycCaptureScreen() {
                     showsVerticalScrollIndicator={false}
                 >
                     <Ionicons name="id-card-outline" size={40} color={p.action} />
-                    <Text style={styles.title}>What are you verifying?</Text>
-                    <Text style={styles.body}>
-                        Pick the document with an NFC chip. We read it in a secure enclave, on device.
-                    </Text>
+                    <Text style={styles.title}>{t('kyc.chooseDocTitle')}</Text>
+                    <Text style={styles.body}>{t('kyc.chooseDocBody')}</Text>
 
                     <Pressable
                         style={styles.docOption}
@@ -627,8 +634,8 @@ export default function KycCaptureScreen() {
                         {/* NativeView: the themed View paints the screen background,
                             which shows as a grey patch inside the white card. */}
                         <NativeView style={styles.docOptionBody}>
-                            <Text style={styles.docOptionTitle}>Passport</Text>
-                            <Text style={styles.docOptionSub}>Any country&apos;s biometric passport</Text>
+                            <Text style={styles.docOptionTitle}>{t('kyc.docPassport')}</Text>
+                            <Text style={styles.docOptionSub}>{t('kyc.docPassportSub')}</Text>
                         </NativeView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </Pressable>
@@ -639,18 +646,18 @@ export default function KycCaptureScreen() {
                     >
                         <Ionicons name="card-outline" size={22} color={p.action} />
                         <NativeView style={styles.docOptionBody}>
-                            <Text style={styles.docOptionTitle}>National ID card</Text>
-                            <Text style={styles.docOptionSub}>Biometric (eMRTD) ID cards</Text>
+                            <Text style={styles.docOptionTitle}>{t('kyc.docIdCard')}</Text>
+                            <Text style={styles.docOptionSub}>{t('kyc.docIdCardSub')}</Text>
                         </NativeView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </Pressable>
 
-                    <Text style={styles.note}>
-                        Driving licences don&apos;t carry an NFC identity chip and can&apos;t be verified this way.
-                    </Text>
+                    <Text style={styles.note}>{t('kyc.noDrivingLicences')}</Text>
                     {support && !support.supported && (
                         <Text style={[styles.note, { color: p.warnText }]}>
-                            NFC is unavailable on this device{support.reason ? ` (${support.reason})` : ''}, so the chip can&apos;t be read.
+                            {support.reason
+                                ? t('kyc.nfcUnavailableWithReason', { reason: support.reason })
+                                : t('kyc.nfcUnavailable')}
                         </Text>
                     )}
                 </ScrollView>
@@ -658,15 +665,19 @@ export default function KycCaptureScreen() {
 
             {step === 'consent' && (
                 <DataRequestConsent
-                    appName={verifierInfo?.displayName ?? 'Privasys identity verifier'}
+                    appName={verifierInfo?.displayName ?? t('kyc.verifierName')}
                     origin={verifierInfo?.origin ?? ''}
                     appIcon="id-card-outline"
-                    sectionTitle="WHAT THE VERIFIER READS"
+                    sectionTitle={t('kyc.whatVerifierReads')}
                     sectionDescription={`To verify your ${docLabel}, the Privasys identity verifier processes the following in a secure enclave and keeps nothing once done. Your data otherwise stays on this device.`}
-                    items={KYC_INPUT_ITEMS.map((i) => ({ key: i.key, icon: i.icon, label: i.label(docLabel) }))}
-                    note="You'll verify the enclave next; your chip is read over NFC only after you agree."
-                    denyLabel="Cancel"
-                    approveLabel="Agree and continue"
+                    items={KYC_INPUT_ITEMS.map((i) => ({
+                        key: i.key,
+                        icon: i.icon,
+                        label: t(i.labelKey, { doc: docLabel })
+                    }))}
+                    note={t('kyc.consentNote')}
+                    denyLabel={t('common.cancel')}
+                    approveLabel={t('kyc.agreeAndContinue')}
                     onDeny={close}
                     onApprove={() => setStep('attest')}
                     contentTopInset={insets.top + 36}
@@ -678,19 +689,19 @@ export default function KycCaptureScreen() {
                 attError ? (
                     <View style={styles.pad}>
                         <Ionicons name="alert-circle" size={40} color={p.danger} />
-                        <Text style={styles.title}>Couldn&apos;t verify the enclave</Text>
+                        <Text style={styles.title}>{t('kyc.enclaveVerifyFailed')}</Text>
                         <Text style={styles.body}>{attError}</Text>
                         <Pressable style={styles.primary} onPress={() => setAttRetry((n) => n + 1)}>
-                            <Text style={styles.primaryText}>Try again</Text>
+                            <Text style={styles.primaryText}>{t('common.retry')}</Text>
                         </Pressable>
                         <Pressable style={styles.secondary} onPress={close}>
-                            <Text style={styles.secondaryText}>Cancel</Text>
+                            <Text style={styles.secondaryText}>{t('common.cancel')}</Text>
                         </Pressable>
                     </View>
                 ) : !verifierAtt ? (
                     <View style={styles.pad}>
                         <ActivityIndicator size="large" color={p.action} />
-                        <Text style={styles.body}>Verifying the enclave…</Text>
+                        <Text style={styles.body}>{t('kyc.verifyingEnclave')}</Text>
                     </View>
                 ) : (
                     <AttestationView
@@ -766,25 +777,21 @@ export default function KycCaptureScreen() {
                     {captureState !== 'captured' && (
                         <NativeView style={[styles.captureHint, { top: insets.top + 14 }]} pointerEvents="none">
                             <Text style={styles.captureHintText}>
-                                Position the camera over your {docLabel}&apos;s photo page
+                                {t('kyc.captureHint', { doc: docLabel })}
                             </Text>
-                            <Text style={styles.captureHintSub}>
-                                It captures on its own once the page is sharp and in frame
-                            </Text>
+                            <Text style={styles.captureHintSub}>{t('kyc.captureHintSub')}</Text>
                         </NativeView>
                     )}
                     <NativeView style={[styles.capturePrompt, { bottom: insets.bottom + 14 }]} pointerEvents="none">
                         {captureState === 'captured' ? (
                             <>
                                 <Ionicons name="checkmark-circle" size={25} color="#34C759" />
-                                <Text style={styles.capturePromptReady}>Passport captured</Text>
+                                <Text style={styles.capturePromptReady}>{t('kyc.captured')}</Text>
                             </>
                         ) : (
                             <>
                                 <ActivityIndicator size="small" color="#FFFFFF" />
-                                <Text style={styles.capturePromptText}>
-                                    Fit the photo page inside the frame and hold still
-                                </Text>
+                                <Text style={styles.capturePromptText}>{t('kyc.fitInFrame')}</Text>
                             </>
                         )}
                     </NativeView>
@@ -796,24 +803,23 @@ export default function KycCaptureScreen() {
                     {!mrzReadDone ? (
                         <>
                             <ActivityIndicator size="large" color={p.action} />
-                            <Text style={styles.body}>Reading the photo page securely…</Text>
+                            <Text style={styles.body}>{t('kyc.readingPhotoPage')}</Text>
                             <Pressable style={styles.secondary} onPress={openCapture}>
-                                <Text style={styles.secondaryText}>Cancel</Text>
+                                <Text style={styles.secondaryText}>{t('common.cancel')}</Text>
                             </Pressable>
                         </>
                     ) : (
                         <>
                             <Ionicons name="phone-portrait-outline" size={40} color={p.action} />
-                            <Text style={styles.title}>Step 2 · Scan the chip</Text>
+                            <Text style={styles.title}>{t('kyc.step2Title')}</Text>
                             <Text style={styles.body}>
-                                Hold your {docLabel} flat against the top of your phone and keep it still. The chip
-                                unlocks using the details read from your photo.
+                                {t('kyc.step2Body', { doc: docLabel })}
                             </Text>
 
                             <View style={styles.summaryCard}>
-                                <SummaryRow label="Document" value={docNumber.trim()} />
-                                <SummaryRow label="Date of birth" value={dob.trim()} />
-                                <SummaryRow label="Expiry" value={expiry.trim()} />
+                                <SummaryRow label={t('kyc.summaryDocument')} value={docNumber.trim()} />
+                                <SummaryRow label={t('kyc.summaryDob')} value={dob.trim()} />
+                                <SummaryRow label={t('kyc.summaryExpiry')} value={expiry.trim()} />
                             </View>
 
                             <Pressable
@@ -824,11 +830,11 @@ export default function KycCaptureScreen() {
                                 {busy ? (
                                     <ActivityIndicator color="#FFFFFF" />
                                 ) : (
-                                    <Text style={styles.primaryText}>Scan document chip</Text>
+                                    <Text style={styles.primaryText}>{t('kyc.scanChip')}</Text>
                                 )}
                             </Pressable>
                             <Pressable style={styles.secondary} onPress={openCapture} disabled={busy}>
-                                <Text style={styles.secondaryText}>Retake photo</Text>
+                                <Text style={styles.secondaryText}>{t('kyc.retakePhoto')}</Text>
                             </Pressable>
                         </>
                     )}
@@ -842,11 +848,9 @@ export default function KycCaptureScreen() {
                         enclave's match against the document photo. */}
                     <NativeView pointerEvents="none" style={styles.selfieFaceGuide} />
                     <View style={styles.selfieOverlay}>
-                        <Text style={styles.selfieText}>
-                            Take a quick selfie so the enclave can match it to your document photo.
-                        </Text>
+                        <Text style={styles.selfieText}>{t('kyc.selfieBody')}</Text>
                         <Pressable style={styles.primary} onPress={handleSelfie}>
-                            <Text style={styles.primaryText}>Capture & verify</Text>
+                            <Text style={styles.primaryText}>{t('kyc.captureAndVerify')}</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -855,7 +859,7 @@ export default function KycCaptureScreen() {
             {step === 'verifying' && (
                 <View style={styles.pad}>
                     <ActivityIndicator size="large" color={p.action} />
-                    <Text style={styles.body}>Verifying your identity in the enclave…</Text>
+                    <Text style={styles.body}>{t('kyc.verifyingInEnclave')}</Text>
                 </View>
             )}
 
@@ -866,12 +870,10 @@ export default function KycCaptureScreen() {
                     showsVerticalScrollIndicator={false}
                 >
                     <Ionicons name="shield-checkmark" size={40} color={p.approve} />
-                    <Text style={styles.title}>Identity verified</Text>
-                    <Text style={styles.body}>
-                        Choose which government-verified details to add to your wallet.
-                    </Text>
+                    <Text style={styles.title}>{t('kyc.identityVerified')}</Text>
+                    <Text style={styles.body}>{t('kyc.chooseDetails')}</Text>
                     <ImportSelectionSheet
-                        providerName="your ID"
+                        providerName={t('kyc.providerYourId')}
                         attributes={candidates}
                         selected={selected}
                         onToggle={toggleAttr}
@@ -884,12 +886,10 @@ export default function KycCaptureScreen() {
             {step === 'done' && (
                 <View style={styles.pad}>
                     <Ionicons name="checkmark-circle" size={48} color={p.approve} />
-                    <Text style={styles.title}>All set</Text>
-                    <Text style={styles.body}>
-                        Your selected government-verified attributes have been added to your wallet.
-                    </Text>
+                    <Text style={styles.title}>{t('kyc.allSet')}</Text>
+                    <Text style={styles.body}>{t('kyc.allSetBody')}</Text>
                     <Pressable style={styles.primary} onPress={close}>
-                        <Text style={styles.primaryText}>Done</Text>
+                        <Text style={styles.primaryText}>{t('common.done')}</Text>
                     </Pressable>
                 </View>
             )}
@@ -934,12 +934,13 @@ function PassportPageGuide({ active }: { active: boolean }) {
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>{label}</Text>
-            <Text style={styles.summaryValue}>{value || 'Not set'}</Text>
+            <Text style={styles.summaryValue}>{value || t('common.notSet')}</Text>
         </View>
     );
 }

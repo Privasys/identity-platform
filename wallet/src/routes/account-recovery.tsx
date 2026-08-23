@@ -27,6 +27,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import {
@@ -56,6 +57,7 @@ import { useProfileStore } from '@/stores/profile';
 type InviteMethod = 'email' | 'qr';
 
 export default function AccountRecoveryScreen() {
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const p = usePalette();
@@ -172,15 +174,14 @@ export default function AccountRecoveryScreen() {
                 setPhraseStatus({ has_phrase: true });
                 if (r.backupError) {
                     Alert.alert(
-                        'Backup incomplete',
-                        `Your data-key backup could not be stored: ${r.backupError}. ` +
-                        'Regenerate your recovery phrase later to retry.',
+                        t('accountRecovery.backupIncompleteTitle'),
+                        t('accountRecovery.backupIncompleteLater', { reason: r.backupError }),
                     );
                 }
             }
             await loadData();
         } catch (e: any) {
-            Alert.alert('Sign-in failed', e.message || String(e));
+            Alert.alert(t('accountRecovery.signInFailed'), e.message || String(e));
         } finally {
             setSigningIn(false);
         }
@@ -190,14 +191,14 @@ export default function AccountRecoveryScreen() {
 
     const handleGeneratePhrase = async () => {
         Alert.alert(
-            'Generate Recovery Phrase',
+            t('accountRecovery.generateTitle'),
             phraseStatus?.has_phrase
-                ? 'This will replace your existing 24-word recovery phrase. The old phrase will no longer work.'
-                : 'Generate a new 24-word recovery phrase. Write it down and store it in a safe place. It will only be shown once.',
+                ? t('accountRecovery.generateReplaceBody')
+                : t('accountRecovery.generateNewBody'),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Generate',
+                    text: t('accountRecovery.generate'),
                     onPress: async () => {
                         setGeneratingPhrase(true);
                         try {
@@ -220,13 +221,12 @@ export default function AccountRecoveryScreen() {
                             setPhraseStatus({ has_phrase: true });
                             if (r.backupError) {
                                 Alert.alert(
-                                    'Backup incomplete',
-                                    `Your data-key backup could not be re-wrapped: ${r.backupError}. ` +
-                                    'Regenerate the phrase again to retry.',
+                                    t('accountRecovery.backupIncompleteTitle'),
+                                    t('accountRecovery.backupIncompleteAgain', { reason: r.backupError }),
                                 );
                             }
                         } catch (e: any) {
-                            Alert.alert('Error', e.message);
+                            Alert.alert(t('common.error'), e.message);
                         } finally {
                             setGeneratingPhrase(false);
                         }
@@ -238,14 +238,12 @@ export default function AccountRecoveryScreen() {
 
     const handleDeactivatePhrase = () => {
         Alert.alert(
-            'Deactivate Recovery Phrase',
-            'WARNING: Without a recovery phrase, your guardians could collude to take over your account. ' +
-            'Only deactivate if you fully trust all your guardians.\n\n' +
-            'Are you sure you want to delete your recovery phrase?',
+            t('accountRecovery.deactivateTitle'),
+            t('accountRecovery.deactivateBody'),
             [
-                { text: 'Keep Phrase', style: 'cancel' },
+                { text: t('accountRecovery.keepPhrase'), style: 'cancel' },
                 {
-                    text: 'I Understand, Deactivate',
+                    text: t('accountRecovery.deactivateConfirm'),
                     style: 'destructive',
                     onPress: async () => {
                         try {
@@ -253,9 +251,9 @@ export default function AccountRecoveryScreen() {
                             await deleteRecoveryPhrase(sess.sessionToken);
                             setRecoveryPhraseSaved(false);
                             setPhraseStatus({ has_phrase: false });
-                            Alert.alert('Deactivated', 'Recovery phrase deleted. You can regenerate one at any time.');
+                            Alert.alert(t('accountRecovery.deactivated'), t('accountRecovery.deactivatedBody'));
                         } catch (e: any) {
-                            Alert.alert('Error', e.message);
+                            Alert.alert(t('common.error'), e.message);
                         }
                     },
                 },
@@ -273,10 +271,13 @@ export default function AccountRecoveryScreen() {
             const res = await inviteGuardianByEmail(accessToken, guardianEmail.trim(), threshold, profile?.displayName ?? '');
             setGuardianEmail('');
             setShowInviteForm(false);
-            Alert.alert('Invited', `Guardian invitation email sent. Expires ${new Date(res.expires_at).toLocaleDateString()}.`);
+            Alert.alert(
+                t('accountRecovery.invited'),
+                t('accountRecovery.invitedBody', { when: new Date(res.expires_at) })
+            );
             await loadData();
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            Alert.alert(t('common.error'), e.message);
         } finally {
             setInviting(false);
         }
@@ -284,21 +285,24 @@ export default function AccountRecoveryScreen() {
 
     const handleAddGuardianByQR = async () => {
         // TODO: open camera, scan QR code, extract guardian_id from JSON.
-        Alert.alert('Scan QR Code', 'Camera QR scanner will be available in a future update.');
+        Alert.alert(t('accountRecovery.scanQrTitle'), t('accountRecovery.scanQrBody'));
     };
 
     const handleRemoveGuardian = (g: GuardianInfo) => {
-        Alert.alert('Remove Guardian', `Remove ${g.display_name || g.guardian_id} as a guardian?`, [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert(
+            t('accountRecovery.removeGuardianTitle'),
+            t('accountRecovery.removeGuardianBody', { guardian: g.display_name || g.guardian_id }),
+            [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-                text: 'Remove',
+                text: t('common.remove'),
                 style: 'destructive',
                 onPress: async () => {
                     try {
                         await removeGuardian(accessToken, g.guardian_id);
                         await loadData();
                     } catch (e: any) {
-                        Alert.alert('Error', e.message);
+                        Alert.alert(t('common.error'), e.message);
                     }
                 },
             },
@@ -310,29 +314,37 @@ export default function AccountRecoveryScreen() {
     const handleRespondInvite = async (invite: GuardianInvite, accept: boolean) => {
         try {
             await respondToGuardianInvite(accessToken, invite.user_id, accept);
-            Alert.alert(accept ? 'Accepted' : 'Declined', accept ? 'You are now a guardian.' : 'Invitation declined.');
+            Alert.alert(
+                accept ? t('accountRecovery.accepted') : t('accountRecovery.declined'),
+                accept ? t('accountRecovery.acceptedBody') : t('accountRecovery.declinedBody')
+            );
             await loadData();
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            Alert.alert(t('common.error'), e.message);
         }
     };
 
     const handleApproveRecovery = (req: RecoveryRequestInfo, approved: boolean) => {
         Alert.alert(
-            approved ? 'Approve Recovery' : 'Deny Recovery',
-            `${approved ? 'Approve' : 'Deny'} the recovery request from ${req.display_name || req.user_id}?`,
+            approved ? t('accountRecovery.approveRecovery') : t('accountRecovery.denyRecovery'),
+            approved
+                ? t('accountRecovery.approveRecoveryBody', { who: req.display_name || req.user_id })
+                : t('accountRecovery.denyRecoveryBody', { who: req.display_name || req.user_id }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: approved ? 'Approve' : 'Deny',
+                    text: approved ? t('attestation.approve') : t('connect.deny'),
                     style: approved ? 'default' : 'destructive',
                     onPress: async () => {
                         try {
                             await approveRecovery(accessToken, req.request_id, approved);
-                            Alert.alert('Done', approved ? 'Recovery approved.' : 'Recovery denied.');
+                            Alert.alert(
+                                t('common.done'),
+                                approved ? t('accountRecovery.recoveryApproved') : t('accountRecovery.recoveryDenied')
+                            );
                             await loadData();
                         } catch (e: any) {
-                            Alert.alert('Error', e.message);
+                            Alert.alert(t('common.error'), e.message);
                         }
                     },
                 },
@@ -343,17 +355,20 @@ export default function AccountRecoveryScreen() {
     // ── Device handlers ──
 
     const handleRevokeDevice = (d: DeviceInfo) => {
-        Alert.alert('Revoke Device', 'This will remove the credential. The device will no longer be able to authenticate.', [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert(
+            t('accountRecovery.revokeDeviceTitle'),
+            t('accountRecovery.revokeDeviceBody'),
+            [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-                text: 'Revoke',
+                text: t('history.revoke'),
                 style: 'destructive',
                 onPress: async () => {
                     try {
                         await revokeDevice(accessToken, d.credential_id);
                         await loadData();
                     } catch (e: any) {
-                        Alert.alert('Error', e.message);
+                        Alert.alert(t('common.error'), e.message);
                     }
                 },
             },
@@ -369,7 +384,7 @@ export default function AccountRecoveryScreen() {
                 <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </Pressable>
-                <Text style={styles.headerTitle}>Recovery Settings</Text>
+                <Text style={styles.headerTitle}>{t('profile.recoverySettings')}</Text>
                 <RNView style={{ width: 32 }} />
             </RNView>
 
@@ -381,11 +396,8 @@ export default function AccountRecoveryScreen() {
             >
                 {notConfigured && (
                     <RNView style={styles.card}>
-                        <Text style={styles.fieldLabel}>Recovery settings are locked</Text>
-                        <Text style={styles.helperText}>
-                            Confirm it&apos;s you to view and manage your recovery phrase,
-                            guardians and registered devices.
-                        </Text>
+                        <Text style={styles.fieldLabel}>{t('accountRecovery.lockedTitle')}</Text>
+                        <Text style={styles.helperText}>{t('accountRecovery.lockedBody')}</Text>
                         {/* Outcome-named action: the biometric prompt appears as part
                             of unlocking, it is not the thing the user is asking for. */}
                         <Pressable
@@ -396,23 +408,20 @@ export default function AccountRecoveryScreen() {
                             {signingIn ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
-                                <Text style={styles.primaryButtonText}>Unlock recovery settings</Text>
+                                <Text style={styles.primaryButtonText}>{t('accountRecovery.unlock')}</Text>
                             )}
                         </Pressable>
                     </RNView>
                 )}
 
                 {/* ── Recovery Phrase ── */}
-                <Text style={styles.sectionTitle}>RECOVERY PHRASE</Text>
-                <Text style={styles.sectionDescription}>
-                    A 24-word phrase to regain access if you lose your device. Write it down on paper
-                    and store it somewhere safe. It will only be shown once.
-                </Text>
+                <Text style={styles.sectionTitle}>{t('accountRecovery.sectionPhrase')}</Text>
+                <Text style={styles.sectionDescription}>{t('accountRecovery.sectionPhraseHint')}</Text>
 
                 {newPhrase ? (
                     <RNView style={styles.card}>
                         <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
-                            Save these 24 words in order. They won't be shown again
+                            {t('secureWallet.saveWords')}
                         </Text>
                         <RNView style={styles.codesGrid}>
                             {newPhrase.split(/\s+/).map((word, i) => (
@@ -431,12 +440,12 @@ export default function AccountRecoveryScreen() {
                                 onPress={async () => {
                                     await Clipboard.setStringAsync(newPhrase);
                                     Alert.alert(
-                                        'Copied',
-                                        'The phrase is on your clipboard. Paste it into your printing app, then clear the clipboard, because anything that reads your clipboard can read the phrase.',
+                                        t('common.copied'),
+                                        t('secureWallet.copiedWarning'),
                                     );
                                 }}
                             >
-                                <Text style={styles.secondaryButtonText}>Copy</Text>
+                                <Text style={styles.secondaryButtonText}>{t('common.copy')}</Text>
                             </Pressable>
                             <Pressable
                                 style={[styles.secondaryButton, { flex: 1 }]}
@@ -444,13 +453,10 @@ export default function AccountRecoveryScreen() {
                                     void Share.share({ message: newPhrase });
                                 }}
                             >
-                                <Text style={styles.secondaryButtonText}>Share / Print</Text>
+                                <Text style={styles.secondaryButtonText}>{t('secureWallet.sharePrint')}</Text>
                             </Pressable>
                         </RNView>
-                        <Text style={styles.helperText}>
-                            Safest is paper. If you copy or share the phrase to print it, avoid
-                            cloud destinations: anyone holding these 24 words holds your account.
-                        </Text>
+                        <Text style={styles.helperText}>{t('secureWallet.paperAdvice')}</Text>
                         <Pressable
                             style={styles.primaryButton}
                             onPress={() => {
@@ -462,7 +468,7 @@ export default function AccountRecoveryScreen() {
                                 setNewPhrase(null);
                             }}
                         >
-                            <Text style={styles.primaryButtonText}>I've saved my phrase</Text>
+                            <Text style={styles.primaryButtonText}>{t('secureWallet.savedIt')}</Text>
                         </Pressable>
                     </RNView>
                 ) : (
@@ -475,23 +481,17 @@ export default function AccountRecoveryScreen() {
                         {recoveryPhraseSaved && phraseStatus?.has_phrase ? (
                             <RNView style={styles.statusRow}>
                                 <Ionicons name="checkmark-circle" size={20} color={p.green} />
-                                <Text style={styles.statusText}>Recovery phrase saved</Text>
+                                <Text style={styles.statusText}>{t('accountRecovery.phraseSaved')}</Text>
                             </RNView>
                         ) : phraseStatus?.has_phrase ? (
                             <RNView style={styles.statusRow}>
                                 <Ionicons name="warning-outline" size={20} color="#F59E0B" />
-                                <Text style={styles.statusText}>
-                                    You have a recovery phrase, but it isn&apos;t saved on this device.
-                                    Generate a fresh one and write it down.
-                                </Text>
+                                <Text style={styles.statusText}>{t('accountRecovery.phraseNotOnDevice')}</Text>
                             </RNView>
                         ) : (
                             <RNView style={styles.statusRow}>
                                 <Ionicons name="alert-circle-outline" size={20} color="#F59E0B" />
-                                <Text style={styles.statusText}>
-                                    No recovery phrase yet. Generate one and write it down so you can
-                                    recover your account.
-                                </Text>
+                                <Text style={styles.statusText}>{t('accountRecovery.noPhrase')}</Text>
                             </RNView>
                         )}
                         {/* While signed out this rendered as a SECOND big blue
@@ -511,7 +511,9 @@ export default function AccountRecoveryScreen() {
                                     <ActivityIndicator color="#FFFFFF" size="small" />
                                 ) : (
                                     <Text style={styles.primaryButtonText}>
-                                        {phraseStatus?.has_phrase ? 'Regenerate Phrase' : 'Generate Recovery Phrase'}
+                                        {phraseStatus?.has_phrase
+                                            ? t('accountRecovery.regenerate')
+                                            : t('accountRecovery.generateTitle')}
                                     </Text>
                                 )}
                             </Pressable>
@@ -521,22 +523,25 @@ export default function AccountRecoveryScreen() {
                                 style={styles.secondaryButton}
                                 onPress={handleDeactivatePhrase}
                             >
-                                <Text style={[styles.secondaryButtonText, { color: p.danger, fontSize: 13 }]}>Deactivate Phrase (not recommended)</Text>
+                                <Text style={[styles.secondaryButtonText, { color: p.danger, fontSize: 13 }]}>
+                                    {t('accountRecovery.deactivateNotRecommended')}
+                                </Text>
                             </Pressable>
                         )}
                     </RNView>
                 )}
 
                 {/* ── Trusted Guardians ── */}
-                <Text style={styles.sectionTitle}>TRUSTED GUARDIANS</Text>
-                <Text style={styles.sectionDescription}>
-                    Nominate trusted contacts who can approve your account recovery. Invite them by email or scan their QR code.
-                </Text>
+                <Text style={styles.sectionTitle}>{t('accountRecovery.sectionGuardians')}</Text>
+                <Text style={styles.sectionDescription}>{t('accountRecovery.sectionGuardiansHint')}</Text>
 
                 {guardians.length > 0 && (
                     <RNView style={styles.card}>
                         <Text style={styles.fieldLabel}>
-                            Threshold: {guardianThreshold} of {guardians.length} required
+                            {t('accountRecovery.threshold', {
+                                required: guardianThreshold,
+                                total: guardians.length
+                            })}
                         </Text>
                         {guardians.map((g) => (
                             <RNView key={g.guardian_id} style={styles.guardianRow}>
@@ -564,31 +569,35 @@ export default function AccountRecoveryScreen() {
                                 onPress={() => setInviteMethod('email')}
                             >
                                 <Ionicons name="mail-outline" size={16} color={inviteMethod === 'email' ? p.blue : p.textMuted} />
-                                <Text style={[styles.methodText, inviteMethod === 'email' && styles.methodTextActive]}>Email</Text>
+                                <Text style={[styles.methodText, inviteMethod === 'email' && styles.methodTextActive]}>
+                                    {t('accountRecovery.methodEmail')}
+                                </Text>
                             </Pressable>
                             <Pressable
                                 style={[styles.methodOption, inviteMethod === 'qr' && styles.methodOptionActive]}
                                 onPress={() => setInviteMethod('qr')}
                             >
                                 <Ionicons name="qr-code-outline" size={16} color={inviteMethod === 'qr' ? p.blue : p.textMuted} />
-                                <Text style={[styles.methodText, inviteMethod === 'qr' && styles.methodTextActive]}>Scan QR</Text>
+                                <Text style={[styles.methodText, inviteMethod === 'qr' && styles.methodTextActive]}>
+                                    {t('accountRecovery.methodQr')}
+                                </Text>
                             </Pressable>
                         </RNView>
 
                         {inviteMethod === 'email' ? (
                             <>
-                                <Text style={styles.fieldLabel}>Guardian's email</Text>
+                                <Text style={styles.fieldLabel}>{t('accountRecovery.guardianEmail')}</Text>
                                 <TextInput
                                     style={styles.input}
                                     value={guardianEmail}
                                     onChangeText={setGuardianEmail}
-                                    placeholder="guardian@example.com"
+                                    placeholder={t('accountRecovery.guardianEmailPlaceholder')}
                                     placeholderTextColor={p.textMuted}
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                     autoFocus
                                 />
-                                <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Approval threshold (k)</Text>
+                                <Text style={[styles.fieldLabel, { marginTop: 8 }]}>{t('accountRecovery.approvalThreshold')}</Text>
                                 <TextInput
                                     style={styles.input}
                                     value={thresholdInput}
@@ -598,12 +607,10 @@ export default function AccountRecoveryScreen() {
                                     keyboardType="number-pad"
                                     maxLength={2}
                                 />
-                                <Text style={styles.helperText}>
-                                    An invitation email with a link will be sent. They don't need the app yet.
-                                </Text>
+                                <Text style={styles.helperText}>{t('accountRecovery.inviteEmailHint')}</Text>
                                 <RNView style={styles.formActions}>
                                     <Pressable onPress={() => setShowInviteForm(false)}>
-                                        <Text style={styles.cancelText}>Cancel</Text>
+                                        <Text style={styles.cancelText}>{t('common.cancel')}</Text>
                                     </Pressable>
                                     <Pressable
                                         style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }, (inviting || !guardianEmail.trim()) && { opacity: 0.6 }]}
@@ -613,26 +620,26 @@ export default function AccountRecoveryScreen() {
                                         {inviting ? (
                                             <ActivityIndicator color="#FFFFFF" size="small" />
                                         ) : (
-                                            <Text style={styles.primaryButtonText}>Send Invite</Text>
+                                            <Text style={styles.primaryButtonText}>{t('accountRecovery.sendInvite')}</Text>
                                         )}
                                     </Pressable>
                                 </RNView>
                             </>
                         ) : (
                             <>
-                                <Text style={styles.helperText}>
-                                    Ask your guardian to open their Privasys Wallet and show their Guardian QR code, then scan it with your camera.
-                                </Text>
+                                <Text style={styles.helperText}>{t('accountRecovery.inviteQrHint')}</Text>
                                 <RNView style={styles.formActions}>
                                     <Pressable onPress={() => setShowInviteForm(false)}>
-                                        <Text style={styles.cancelText}>Cancel</Text>
+                                        <Text style={styles.cancelText}>{t('common.cancel')}</Text>
                                     </Pressable>
                                     <Pressable
                                         style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
                                         onPress={handleAddGuardianByQR}
                                     >
                                         <Ionicons name="camera-outline" size={18} color="#FFFFFF" />
-                                        <Text style={[styles.primaryButtonText, { marginLeft: 6 }]}>Open Scanner</Text>
+                                        <Text style={[styles.primaryButtonText, { marginLeft: 6 }]}>
+                                            {t('accountRecovery.openScanner')}
+                                        </Text>
                                     </Pressable>
                                 </RNView>
                             </>
@@ -645,20 +652,18 @@ export default function AccountRecoveryScreen() {
                         disabled={notConfigured}
                     >
                         <Ionicons name="person-add-outline" size={18} color={p.blue} />
-                        <Text style={styles.outlineButtonText}>Add Guardian</Text>
+                        <Text style={styles.outlineButtonText}>{t('accountRecovery.addGuardian')}</Text>
                     </Pressable>
                 )}
 
                 {/* ── Devices ── */}
-                <Text style={styles.sectionTitle}>REGISTERED DEVICES</Text>
-                <Text style={styles.sectionDescription}>
-                    FIDO2 credentials registered on the Privasys ID server for your account.
-                </Text>
+                <Text style={styles.sectionTitle}>{t('accountRecovery.sectionDevices')}</Text>
+                <Text style={styles.sectionDescription}>{t('accountRecovery.sectionDevicesHint')}</Text>
 
                 {devices.length === 0 ? (
                     <RNView style={styles.emptyCard}>
                         <Ionicons name="phone-portrait-outline" size={28} color={p.textMuted} />
-                        <Text style={styles.emptyText}>No registered devices</Text>
+                        <Text style={styles.emptyText}>{t('accountRecovery.noDevices')}</Text>
                     </RNView>
                 ) : (
                     <RNView style={styles.card}>
@@ -673,16 +678,23 @@ export default function AccountRecoveryScreen() {
                                 <RNView style={{ flex: 1 }}>
                                     <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <Text style={styles.deviceLabel}>
-                                            {isThisDevice ? 'This device' : `Credential ${d.credential_id.substring(0, 8)}…`}
+                                            {isThisDevice
+                                                ? t('accountRecovery.thisDevice')
+                                                : t('accountRecovery.credentialLabel', {
+                                                    id: d.credential_id.substring(0, 8)
+                                                })}
                                         </Text>
                                         {isThisDevice && (
                                             <RNView style={styles.thisDeviceBadge}>
-                                                <Text style={styles.thisDeviceBadgeText}>Current</Text>
+                                                <Text style={styles.thisDeviceBadgeText}>{t('accountRecovery.current')}</Text>
                                             </RNView>
                                         )}
                                     </RNView>
                                     <Text style={styles.deviceDetail}>
-                                        Sign count: {d.sign_count} · Registered: {new Date(d.created_at).toLocaleDateString()}
+                                        {t('accountRecovery.deviceMeta', {
+                                            count: d.sign_count,
+                                            when: new Date(d.created_at)
+                                        })}
                                     </Text>
                                 </RNView>
                                 {/* Never let the user revoke the device they are on — it would
@@ -701,29 +713,31 @@ export default function AccountRecoveryScreen() {
                 {/* ── Guardian Duties ── */}
                 {(pendingInvites.length > 0 || recoveryRequests.length > 0) && (
                     <>
-                        <Text style={styles.sectionTitle}>GUARDIAN DUTIES</Text>
-                        <Text style={styles.sectionDescription}>
-                            Actions requested of you as a trusted guardian.
-                        </Text>
+                        <Text style={styles.sectionTitle}>{t('accountRecovery.sectionDuties')}</Text>
+                        <Text style={styles.sectionDescription}>{t('accountRecovery.sectionDutiesHint')}</Text>
 
                         {pendingInvites.map((inv) => (
                             <RNView key={inv.user_id} style={styles.card}>
-                                <Text style={styles.dutyTitle}>Guardian Invitation</Text>
+                                <Text style={styles.dutyTitle}>{t('accountRecovery.dutyInvitation')}</Text>
                                 <Text style={styles.dutyDescription}>
-                                    {inv.display_name || inv.user_id} wants you as a recovery guardian.
+                                    {t('accountRecovery.dutyInvitationBody', {
+                                        who: inv.display_name || inv.user_id
+                                    })}
                                 </Text>
                                 <RNView style={styles.formActions}>
                                     <Pressable
                                         style={[styles.outlineButton, { flex: 0, borderColor: p.danger }]}
                                         onPress={() => handleRespondInvite(inv, false)}
                                     >
-                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>Decline</Text>
+                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>
+                                            {t('accountRecovery.decline')}
+                                        </Text>
                                     </Pressable>
                                     <Pressable
                                         style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
                                         onPress={() => handleRespondInvite(inv, true)}
                                     >
-                                        <Text style={styles.primaryButtonText}>Accept</Text>
+                                        <Text style={styles.primaryButtonText}>{t('accountRecovery.accept')}</Text>
                                     </Pressable>
                                 </RNView>
                             </RNView>
@@ -731,22 +745,26 @@ export default function AccountRecoveryScreen() {
 
                         {recoveryRequests.map((req) => (
                             <RNView key={req.request_id} style={styles.card}>
-                                <Text style={styles.dutyTitle}>Recovery Request</Text>
+                                <Text style={styles.dutyTitle}>{t('accountRecovery.dutyRecovery')}</Text>
                                 <Text style={styles.dutyDescription}>
-                                    {req.display_name || req.user_id} is trying to recover their account. Do you approve?
+                                    {t('accountRecovery.dutyRecoveryBody', {
+                                        who: req.display_name || req.user_id
+                                    })}
                                 </Text>
                                 <RNView style={styles.formActions}>
                                     <Pressable
                                         style={[styles.outlineButton, { flex: 0, borderColor: p.danger }]}
                                         onPress={() => handleApproveRecovery(req, false)}
                                     >
-                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>Deny</Text>
+                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>
+                                            {t('connect.deny')}
+                                        </Text>
                                     </Pressable>
                                     <Pressable
                                         style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
                                         onPress={() => handleApproveRecovery(req, true)}
                                     >
-                                        <Text style={styles.primaryButtonText}>Approve</Text>
+                                        <Text style={styles.primaryButtonText}>{t('attestation.approve')}</Text>
                                     </Pressable>
                                 </RNView>
                             </RNView>

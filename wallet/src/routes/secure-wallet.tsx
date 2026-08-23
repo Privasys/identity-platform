@@ -30,6 +30,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { useTranslation } from 'react-i18next';
 import { ensurePrivasysSession } from '@/services/privasys-id';
 import { establishPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
@@ -38,6 +39,7 @@ import { useProfileStore } from '@/stores/profile';
 export default function SecureWalletScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const profile = useProfileStore((s) => s.profile);
@@ -62,7 +64,7 @@ export default function SecureWalletScreen() {
             setPhrase(r.phrase);
             setBackupError(r.backupError ?? null);
         } catch (e: any) {
-            Alert.alert('Could not create the phrase', e?.message ?? String(e));
+            Alert.alert(t('secureWallet.createFailed'), e?.message ?? String(e));
         } finally {
             setCreating(false);
         }
@@ -80,7 +82,7 @@ export default function SecureWalletScreen() {
                 <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </Pressable>
-                <Text style={styles.headerTitle}>Secure Your Wallet</Text>
+                <Text style={styles.headerTitle}>{t('secureWallet.title')}</Text>
                 <RNView style={{ width: 32 }} />
             </RNView>
 
@@ -93,7 +95,7 @@ export default function SecureWalletScreen() {
                     <>
                         <RNView style={styles.card}>
                             <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
-                                Save these 24 words in order. They won&apos;t be shown again
+                                {t('secureWallet.saveWords')}
                             </Text>
                             <RNView style={styles.codesGrid}>
                                 {phrase.split(/\s+/).map((word, i) => (
@@ -108,12 +110,12 @@ export default function SecureWalletScreen() {
                                     onPress={async () => {
                                         await Clipboard.setStringAsync(phrase);
                                         Alert.alert(
-                                            'Copied',
-                                            'The phrase is on your clipboard. Paste it into your printing app, then clear the clipboard, because anything that reads your clipboard can read the phrase.',
+                                            t('common.copied'),
+                                            t('secureWallet.copiedWarning'),
                                         );
                                     }}
                                 >
-                                    <Text style={styles.secondaryButtonText}>Copy</Text>
+                                    <Text style={styles.secondaryButtonText}>{t('common.copy')}</Text>
                                 </Pressable>
                                 <Pressable
                                     style={[styles.secondaryButton, { flex: 1 }]}
@@ -121,24 +123,19 @@ export default function SecureWalletScreen() {
                                         void Share.share({ message: phrase });
                                     }}
                                 >
-                                    <Text style={styles.secondaryButtonText}>Share / Print</Text>
+                                    <Text style={styles.secondaryButtonText}>{t('secureWallet.sharePrint')}</Text>
                                 </Pressable>
                             </RNView>
-                            <Text style={styles.helperText}>
-                                Safest is paper. If you copy or share the phrase to print it, avoid
-                                cloud destinations: anyone holding these 24 words holds your account.
-                            </Text>
+                            <Text style={styles.helperText}>{t('secureWallet.paperAdvice')}</Text>
                             <Pressable style={styles.primaryButton} onPress={handleSaved}>
-                                <Text style={styles.primaryButtonText}>I&apos;ve saved my phrase</Text>
+                                <Text style={styles.primaryButtonText}>{t('secureWallet.savedIt')}</Text>
                             </Pressable>
                         </RNView>
                         {backupError && (
                             <RNView style={styles.warnCard}>
                                 <Ionicons name="warning-outline" size={18} color="#F59E0B" />
                                 <Text style={styles.warnText}>
-                                    Your encrypted data-key backup could not be stored ({backupError}).
-                                    Your phrase still works for account recovery; regenerate it later
-                                    from Recovery Settings to retry the backup.
+                                    {t('secureWallet.backupFailed', { reason: backupError })}
                                 </Text>
                             </RNView>
                         )}
@@ -147,25 +144,21 @@ export default function SecureWalletScreen() {
                     <>
                         <RNView style={styles.heroCard}>
                             <Ionicons name="key-outline" size={36} color={p.blue} />
-                            <Text style={styles.heroTitle}>One last step: your recovery phrase</Text>
-                            <Text style={styles.heroText}>
-                                Your wallet has no password and no account to reset. A 24-word
-                                phrase, created on this device and known only to you, is the one
-                                way back in if you ever lose this phone.
-                            </Text>
+                            <Text style={styles.heroTitle}>{t('secureWallet.heroTitle')}</Text>
+                            <Text style={styles.heroText}>{t('secureWallet.heroBody')}</Text>
                         </RNView>
                         <RNView style={styles.card}>
                             <RNView style={styles.bulletRow}>
                                 <Ionicons name="phone-portrait-outline" size={18} color={p.textMuted} />
-                                <Text style={styles.bulletText}>Created on this device. The words never leave it, only a fingerprint does.</Text>
+                                <Text style={styles.bulletText}>{t('secureWallet.bulletOnDevice')}</Text>
                             </RNView>
                             <RNView style={styles.bulletRow}>
                                 <Ionicons name="document-text-outline" size={18} color={p.textMuted} />
-                                <Text style={styles.bulletText}>Write it on paper or print it. Don&apos;t screenshot it.</Text>
+                                <Text style={styles.bulletText}>{t('secureWallet.bulletPaper')}</Text>
                             </RNView>
                             <RNView style={styles.bulletRow}>
                                 <Ionicons name="shield-checkmark-outline" size={18} color={p.textMuted} />
-                                <Text style={styles.bulletText}>It also protects the encrypted backup of your data keys.</Text>
+                                <Text style={styles.bulletText}>{t('secureWallet.bulletBackup')}</Text>
                             </RNView>
                         </RNView>
                         <Pressable
@@ -176,11 +169,11 @@ export default function SecureWalletScreen() {
                             {creating ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
-                                <Text style={styles.primaryButtonText}>Create my recovery phrase</Text>
+                                <Text style={styles.primaryButtonText}>{t('secureWallet.createPhrase')}</Text>
                             )}
                         </Pressable>
                         <Pressable onPress={() => router.back()} disabled={creating} hitSlop={8}>
-                            <Text style={styles.laterText}>I&apos;ll do this later</Text>
+                            <Text style={styles.laterText}>{t('secureWallet.later')}</Text>
                         </Pressable>
                     </>
                 )}

@@ -1,0 +1,159 @@
+# Copyright (c) Privasys. All rights reserved.
+# Licensed under the GNU Affero General Public License v3.0.
+
+name: Deploy wallet i18n packs
+
+# Publishes the wallet's locale packs to https://privasys.id/i18n/.
+#
+# The wallet fetches `${IDP}/i18n/<manifest-version>/<tag>.json` and rejects
+# any body whose SHA-256 is not pinned in its bundle, so this deploy is only
+# useful if the bytes served are byte-identical to the ones hashed at build
+# time. The packs are therefore generated here from wallet/src/i18n/locales
+# in the same run as the digest check, rather than vendored anywhere.
+#
+# Deploys are ADDITIVE: pack URLs are content-addressed, and an app build in
+# the wild only ever asks for the version it was compiled against. See
+# idp/caddy/install-i18n.sh.
+#
+# Reuses the WIF -> IAP path proven by publish-sdk.yaml.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'wallet/src/i18n/locales/**'
+      - 'wallet/src/i18n/manifest.ts'
+      - 'wallet/scripts/build-i18n-packs.mjs'
+      - 'idp/caddy/**'
+      - '.github/workflows/deploy-i18n-packs.yaml'
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: 'Verify served digests end to end after deploy'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write   # required for google-github-actions/auth WIF
+
+concurrency:
+  group: deploy-i18n-packs
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy locale packs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      # Fails if any locale file's digest does not match the committed
+      # manifest, which is the same condition that would make every pack
+      # fail verification on device. Better to break the deploy than to
+      # publish a tree that silently pins users to English.
+      - name: Build and verify packs
+        working-directory: wallet
+        run: |
+          set -euo pipefail
+          node scripts/build-i18n-packs.mjs
+          VERSION=$(ls dist-i18n)
+          echo "PACK_VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "Version: ${VERSION}"
+          ls -1 "dist-i18n/${VERSION}" | tr '\n' ' '; echo
+
+      - name: Create tarball
+        working-directory: wallet
+        run: tar -czf /tmp/i18n-packs.tar.gz -C dist-i18n .
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      # NOTE: SSH into idp-fr-par-1 via IAP requires google-guest-agent to be
+      # running on the VM. If it is ever disabled, every CI SSH attempt fails
+      # with "Permission denied (publickey)". See publish-sdk.yaml.
+      - name: Upload packs and installer
+        run: |
+          gcloud compute scp \
+            /tmp/i18n-packs.tar.gz \
+            idp/caddy/i18n.caddy \
+            idp/caddy/install-i18n.sh \
+            idp-fr-par-1:/tmp/ \
+            --project privasys-production \
+            --zone europe-west9-a \
+            --tunnel-through-iap \
+            --scp-flag="-O"
+
+      - name: Install packs and Caddy route
+        run: |
+          gcloud compute ssh idp-fr-par-1 \
+            --project privasys-production \
+            --zone europe-west9-a \
+            --tunnel-through-iap \
+            --command "chmod +x /tmp/install-i18n.sh && /tmp/install-i18n.sh && rm -f /tmp/install-i18n.sh"
+
+      # A 200 proves routing. It does not prove the bytes are the ones the
+      # wallet will accept, which is the only thing that actually matters
+      # here, so re-verify every digest against the committed manifest over
+      # real HTTPS.
+      - name: Verify served digests
+        if: ${{ github.event_name == 'push' || inputs.smoke }}
+        working-directory: wallet
+        run: |
+          set -euo pipefail
+          VERSION="${PACK_VERSION}"
+          FAIL=0
+          for F in dist-i18n/"${VERSION}"/*.json; do
+            TAG=$(basename "$F" .json)
+            URL="https://privasys.id/i18n/${VERSION}/${TAG}.json"
+            STATUS=$(curl -sS -o /tmp/pack.json -w '%{http_code}' "$URL")
+            WANT=$(sha256sum "$F" | cut -d' ' -f1)
+            GOT=$(sha256sum /tmp/pack.json | cut -d' ' -f1)
+            if [ "$STATUS" != "200" ] || [ "$WANT" != "$GOT" ]; then
+              echo "FAIL ${TAG}: HTTP ${STATUS} want ${WANT} got ${GOT}"
+              FAIL=1
+            else
+              echo "ok   ${TAG}"
+            fi
+          done
+          test "$FAIL" = "0"
+
+      - name: Check cache and CORS headers
+        if: ${{ github.event_name == 'push' || inputs.smoke }}
+        run: |
+          set -euo pipefail
+          URL="https://privasys.id/i18n/${PACK_VERSION}/fr.json"
+          curl -sSI "$URL" | tee /tmp/headers.txt
+          grep -qi 'cache-control: public, max-age=31536000, immutable' /tmp/headers.txt
+          grep -qi 'access-control-allow-origin: \*' /tmp/headers.txt
+          grep -qi 'content-type: application/json' /tmp/headers.txt
+          # A locale request must never be linkable to a session.
+          if grep -qi 'set-cookie' /tmp/headers.txt; then
+            echo "Set-Cookie present on a pack response" >&2
+            exit 1
+          fi
+
+      # Unknown paths under /i18n/ must 404 from the file server rather than
+      # falling through to the IdP, which would turn a typo into an opaque
+      # proxied error.
+      - name: Check unknown pack 404s
+        if: ${{ github.event_name == 'push' || inputs.smoke }}
+        run: |
+          set -euo pipefail
+          STATUS=$(curl -sS -o /dev/null -w '%{http_code}' \
+            "https://privasys.id/i18n/${PACK_VERSION}/zz.json")
+          echo "zz.json: HTTP ${STATUS}"
+          test "$STATUS" = "404"

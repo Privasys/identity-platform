@@ -13,6 +13,7 @@ import { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Switch, View as RNView } from 'react-native';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { useTranslation } from 'react-i18next';
 import { attributeLabel } from '@/services/attributes';
 import type { ProfileAttribute } from '@/stores/profile';
 
@@ -34,15 +35,13 @@ export function ImportSelectionSheet({
     busy?: boolean;
 }) {
     const p = usePalette();
+    const { t } = useTranslation();
     const styles = useMemo(() => makeStyles(p), [p]);
     const count = attributes.filter((a) => selected.has(a.key)).length;
     return (
         <RNView style={styles.card}>
-            <Text style={styles.title}>Import from {providerName}</Text>
-            <Text style={styles.subtitle}>
-                Choose what to add to your profile. Everything is selected by default. Untick
-                anything you'd rather not import.
-            </Text>
+            <Text style={styles.title}>{t('import.importFrom', { provider: providerName })}</Text>
+            <Text style={styles.subtitle}>{t('import.chooseWhatToAdd')}</Text>
 
             {attributes.map((attr) => {
                 const isOn = selected.has(attr.key);
@@ -58,10 +57,10 @@ export function ImportSelectionSheet({
                         <RNView style={styles.rowInfo}>
                             <Text style={styles.rowLabel}>{attributeLabel(attr.key)}</Text>
                             <Text style={styles.rowValue} numberOfLines={1}>
-                                {attr.key === 'picture' ? 'Profile photo'
-                                    : attr.key === 'picture_id' ? 'ID photo'
+                                {attr.key === 'picture' ? t('import.profilePhoto')
+                                    : attr.key === 'picture_id' ? t('import.idPhoto')
                                     : attr.value}
-                                {attr.verified ? '  ·  verified' : ''}
+                                {attr.verified ? t('import.verifiedSuffix') : ''}
                             </Text>
                         </RNView>
                         <Switch value={isOn} onValueChange={() => onToggle(attr.key)} />
@@ -75,11 +74,13 @@ export function ImportSelectionSheet({
                 disabled={count === 0 || busy}
             >
                 <Text style={styles.confirmText}>
-                    {count === 0 ? 'Select at least one' : `Import ${count} attribute${count !== 1 ? 's' : ''}`}
+                    {count === 0
+                        ? t('import.selectAtLeastOne')
+                        : t('import.importCount', { count })}
                 </Text>
             </Pressable>
             <Pressable style={styles.cancel} onPress={onCancel} disabled={busy}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
         </RNView>
     );

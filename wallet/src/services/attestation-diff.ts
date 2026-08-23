@@ -21,8 +21,12 @@ import type { TrustedApp } from '@/stores/trusted-apps';
 
 export interface AttestationFieldChange {
     field: 'platform' | 'code' | 'config';
-    /** Row label, e.g. 'Platform (MRTD)'. */
-    label: string;
+    /**
+     * Translation KEY for the row label, e.g. 'attestation.rowPlatformMrtd'.
+     * A key rather than a string because this record is built outside React
+     * and may be held across a language change.
+     */
+    labelKey: string;
     /** Hex value recorded at the last verification (undefined if none was). */
     previous?: string;
     /** Hex value in the fresh attestation (undefined if absent). */
@@ -37,17 +41,14 @@ export type AttestationChangeKind =
 export interface AttestationDiff {
     kind: AttestationChangeKind;
     changes: AttestationFieldChange[];
-    /** One-sentence human summary for the banner. */
-    summary: string;
+    /** Translation key for the one-sentence banner summary. */
+    summaryKey: string;
 }
 
-const SUMMARIES: Record<AttestationChangeKind, string> = {
-    'app-update':
-        'This app’s code has changed since you last verified it, usually a routine update by its developer. The secure enclave it runs in is the same.',
-    'platform-update':
-        'The secure enclave running this app has been upgraded. The app’s own code is the same as when you last verified it.',
-    'app-and-platform-update':
-        'Both this app’s code and the secure enclave running it have changed since you last verified it.',
+const SUMMARY_KEYS: Record<AttestationChangeKind, string> = {
+    'app-update': 'attestation.summaryAppUpdate',
+    'platform-update': 'attestation.summaryPlatformUpdate',
+    'app-and-platform-update': 'attestation.summaryAppAndPlatformUpdate',
 };
 
 function changed(previous?: string, current?: string): boolean {
@@ -71,7 +72,7 @@ export function diffTrustedAttestation(
     if (changed(trusted.mrenclave, att.mrenclave)) {
         changes.push({
             field: 'platform',
-            label: 'Platform (MRENCLAVE)',
+            labelKey: 'attestation.rowPlatformMrenclave',
             previous: trusted.mrenclave,
             current: att.mrenclave,
         });
@@ -79,7 +80,7 @@ export function diffTrustedAttestation(
     if (changed(trusted.mrtd, att.mrtd)) {
         changes.push({
             field: 'platform',
-            label: 'Platform (MRTD)',
+            labelKey: 'attestation.rowPlatformMrtd',
             previous: trusted.mrtd,
             current: att.mrtd,
         });
@@ -93,7 +94,7 @@ export function diffTrustedAttestation(
     if (trusted.rtmr1 && changed(trusted.rtmr1, att.rtmr1)) {
         changes.push({
             field: 'platform',
-            label: 'Platform (RTMR1)',
+            labelKey: 'attestation.rowPlatformRtmr1',
             previous: trusted.rtmr1,
             current: att.rtmr1,
         });
@@ -101,7 +102,7 @@ export function diffTrustedAttestation(
     if (trusted.rtmr2 && changed(trusted.rtmr2, att.rtmr2)) {
         changes.push({
             field: 'platform',
-            label: 'Platform (RTMR2)',
+            labelKey: 'attestation.rowPlatformRtmr2',
             previous: trusted.rtmr2,
             current: att.rtmr2,
         });
@@ -110,7 +111,7 @@ export function diffTrustedAttestation(
     if (changed(trusted.codeHash, att.workload_code_hash)) {
         changes.push({
             field: 'code',
-            label: 'Application code',
+            labelKey: 'attestation.rowApplicationCode',
             previous: trusted.codeHash,
             current: att.workload_code_hash,
         });
@@ -118,7 +119,7 @@ export function diffTrustedAttestation(
     if (changed(trusted.configRoot, att.workload_config_merkle_root)) {
         changes.push({
             field: 'config',
-            label: 'Application configuration',
+            labelKey: 'attestation.rowApplicationConfig',
             previous: trusted.configRoot,
             current: att.workload_config_merkle_root,
         });
@@ -134,5 +135,5 @@ export function diffTrustedAttestation(
             : 'platform-update'
         : 'app-update';
 
-    return { kind, changes, summary: SUMMARIES[kind] };
+    return { kind, changes, summaryKey: SUMMARY_KEYS[kind] };
 }

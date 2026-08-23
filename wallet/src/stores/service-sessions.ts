@@ -191,19 +191,25 @@ export function serviceHosts(traces: SessionTrace[]): Set<string> {
     return hosts;
 }
 
-/** Short human labels per kind — the subtle per-type difference on cards. */
-export const KIND_LABELS: Record<SessionKind, string> = {
-    'sign-in': 'Sign-in',
-    enclave: 'Enclave',
-    relayed: 'Sealed session',
-    'device-auth': 'One-time sign-in',
-    'identity-check': 'Identity check',
-    approval: 'Approval'
+/**
+ * Translation KEYS for the per-kind label, not the labels themselves.
+ *
+ * A zustand store has no React context and so no `t`; resolving here would
+ * freeze the English string into state and survive a language change. Screens
+ * call `t(KIND_LABEL_KEYS[kind])` at render instead.
+ */
+export const KIND_LABEL_KEYS: Record<SessionKind, string> = {
+    'sign-in': 'sessionKind.signIn',
+    enclave: 'sessionKind.enclave',
+    relayed: 'sessionKind.relayed',
+    'device-auth': 'sessionKind.deviceAuth',
+    'identity-check': 'sessionKind.identityCheck',
+    approval: 'sessionKind.approval'
 };
 
-/** Short human labels per identity type. */
-export const IDENTITY_LABELS: Record<IdentityKind, string> = {
-    'privasys-id': 'Privasys ID',
-    'external-idp': 'External IdP',
-    passkey: 'Passkey'
+/** Translation keys for the identity type. See KIND_LABEL_KEYS. */
+export const IDENTITY_LABEL_KEYS: Record<IdentityKind, string> = {
+    'privasys-id': 'identityKind.privasysId',
+    'external-idp': 'identityKind.externalIdp',
+    passkey: 'identityKind.passkey'
 };

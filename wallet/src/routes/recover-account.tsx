@@ -33,6 +33,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { bip39ChecksumValid } from '@/services/bip39';
+import { useTranslation } from 'react-i18next';
 import { BIP39_WORDLIST, BIP39_WORDSET } from '@/services/bip39-wordlist';
 import { restoreSovereignSecrets, stashRecoveredPairwiseSeed } from '@/services/sovereign';
 import { register as fido2Register } from '@/services/fido2';
@@ -66,6 +67,7 @@ interface RecoveryState {
 type FlowStep = 'enter-code' | 'waiting' | 'approved' | 'completed' | 'restored' | 'expired';
 
 export default function RecoverAccountScreen() {
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const p = usePalette();
@@ -188,10 +190,12 @@ export default function RecoverAccountScreen() {
         // A word phrase must be exactly 24 words — catch miscounts locally
         // with a specific message instead of a generic server rejection.
         if (words > 1 && words !== 24) {
+            // One whole sentence per plural form rather than a "was"/"were"
+            // switch inside a template: agreement is not a two-way choice in
+            // most of the languages we ship.
             Alert.alert(
-                'Check Your Phrase',
-                `A recovery phrase has 24 words, but ${words} ${words === 1 ? 'was' : 'were'} entered. ` +
-                'Separate the words with spaces and check none are missing or duplicated.'
+                t('recover.checkPhraseTitle'),
+                t('recover.wrongWordCount', { count: words })
             );
             return;
         }
@@ -204,9 +208,10 @@ export default function RecoverAccountScreen() {
                 .filter(({ w }) => !BIP39_WORDSET.has(w));
             if (unknown.length > 0) {
                 Alert.alert(
-                    'Check Your Phrase',
-                    'These are not recovery words. Check your transcription: ' +
-                    unknown.map(({ w, i }) => `#${i + 1} “${w}”`).join(', ')
+                    t('recover.checkPhraseTitle'),
+                    t('recover.unknownWords', {
+                        words: unknown.map(({ w, i }) => t('recover.wordAt', { position: i + 1, word: w })).join(', ')
+                    })
                 );
                 return;
             }
@@ -216,11 +221,11 @@ export default function RecoverAccountScreen() {
             // override only for unusual manually-created phrases.
             if (!bip39ChecksumValid(list)) {
                 Alert.alert(
-                    'Possible Typo',
-                    'The phrase does not pass its built-in consistency check, so one or more words are likely mistyped. Double-check against your written copy.',
+                    t('recover.possibleTypoTitle'),
+                    t('recover.possibleTypoBody'),
                     [
-                        { text: 'Let me fix it', style: 'cancel' },
-                        { text: 'Submit anyway', style: 'destructive', onPress: () => void submitPhrase(phrase) },
+                        { text: t('recover.letMeFixIt'), style: 'cancel' },
+                        { text: t('recover.submitAnyway'), style: 'destructive', onPress: () => void submitPhrase(phrase) },
                     ]
                 );
                 return;
@@ -254,7 +259,7 @@ export default function RecoverAccountScreen() {
             enteredPhraseRef.current = phrase;
             setCodeInput('');
         } catch (e: any) {
-            Alert.alert('Invalid Code', e.message || 'The recovery code was not recognised. Please try again.');
+            Alert.alert(t('recover.invalidCodeTitle'), e.message || t('recover.invalidCodeBody'));
         } finally {
             setSubmitting(false);
         }
@@ -275,7 +280,7 @@ export default function RecoverAccountScreen() {
             await Storage.setItemAsync(RECOVERY_STATE_KEY, JSON.stringify(newState));
             setStep('completed');
         } catch (e: any) {
-            Alert.alert('Error', e.message || 'Failed to complete recovery.');
+            Alert.alert(t('common.error'), e.message || t('recover.completeFailed'));
             setCompleteError(true);
         } finally {
             setCompleting(false);
@@ -452,9 +457,8 @@ export default function RecoverAccountScreen() {
         } catch (e: any) {
             console.error('[recover-account] recovered registration failed:', e?.message, e);
             Alert.alert(
-                'Registration Failed',
-                `Could not register this device to the recovered account: ${e?.message ?? e}. ` +
-                'Your existing sign-ins are unchanged, so you can retry.'
+                t('recover.registrationFailedTitle'),
+                t('recover.registrationFailedBody', { reason: e?.message ?? e })
             );
         } finally {
             setRegistering(false);
@@ -468,12 +472,12 @@ export default function RecoverAccountScreen() {
 
     const handleCancel = () => {
         Alert.alert(
-            'Cancel Recovery',
-            'Are you sure? You will need a new recovery code to try again.',
+            t('recover.cancelTitle'),
+            t('recover.cancelBody'),
             [
-                { text: 'Keep Waiting', style: 'cancel' },
+                { text: t('recover.keepWaiting'), style: 'cancel' },
                 {
-                    text: 'Cancel Recovery',
+                    text: t('recover.cancelTitle'),
                     style: 'destructive',
                     onPress: async () => {
                         await Storage.deleteItemAsync(RECOVERY_STATE_KEY);
@@ -492,7 +496,7 @@ export default function RecoverAccountScreen() {
                 <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </Pressable>
-                <Text style={styles.headerTitle}>Recover Account</Text>
+                <Text style={styles.headerTitle}>{t('profile.recoverAccount')}</Text>
                 <RNView style={{ width: 32 }} />
             </RNView>
 
@@ -515,18 +519,16 @@ export default function RecoverAccountScreen() {
                         <RNView style={styles.iconContainer}>
                             <Ionicons name="key-outline" size={48} color={p.blue} />
                         </RNView>
-                        <Text style={styles.title}>Enter Recovery Code</Text>
-                        <Text style={styles.subtitle}>
-                            Enter your 24-word recovery phrase to begin the account recovery process.
-                        </Text>
+                        <Text style={styles.title}>{t('recover.enterCodeTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.enterCodeBody')}</Text>
 
                         <RNView style={styles.card}>
-                            <Text style={styles.fieldLabel}>Recovery Phrase</Text>
+                            <Text style={styles.fieldLabel}>{t('recover.recoveryPhrase')}</Text>
                             <TextInput
                                 style={[styles.input, { minHeight: 100, textAlignVertical: 'top' }]}
                                 value={codeInput}
                                 onChangeText={setCodeInput}
-                                placeholder="word1 word2 word3 ... word24"
+                                placeholder={t('recover.phrasePlaceholder')}
                                 placeholderTextColor={p.textMuted}
                                 autoCapitalize="none"
                                 autoCorrect={false}
@@ -567,9 +569,9 @@ export default function RecoverAccountScreen() {
                                                 styles.wordCountComplete,
                                         ]}
                                     >
-                                        {wordStates.length} / 24 words
+                                        {t('recover.wordProgress', { count: wordStates.length })}
                                         {wordStates.some((s) => s.state === 'invalid')
-                                            ? ' · fix the red words'
+                                            ? t('recover.fixRedWords')
                                             : ''}
                                     </Text>
                                 </>
@@ -582,7 +584,7 @@ export default function RecoverAccountScreen() {
                                 {submitting ? (
                                     <ActivityIndicator color="#FFFFFF" size="small" />
                                 ) : (
-                                    <Text style={styles.primaryButtonText}>Begin Recovery</Text>
+                                    <Text style={styles.primaryButtonText}>{t('recover.begin')}</Text>
                                 )}
                             </Pressable>
                         </RNView>
@@ -595,15 +597,12 @@ export default function RecoverAccountScreen() {
                         <RNView style={styles.iconContainer}>
                             <ActivityIndicator color={p.blue} size="large" />
                         </RNView>
-                        <Text style={styles.title}>Waiting for Guardians</Text>
-                        <Text style={styles.subtitle}>
-                            Your recovery request has been sent to your trusted guardians.
-                            You can close this screen and come back. We'll keep checking.
-                        </Text>
+                        <Text style={styles.title}>{t('recover.waitingTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.waitingBody')}</Text>
 
                         <RNView style={styles.card}>
                             <RNView style={styles.progressRow}>
-                                <Text style={styles.progressLabel}>Guardian Approvals</Text>
+                                <Text style={styles.progressLabel}>{t('recover.guardianApprovals')}</Text>
                                 <Text style={styles.progressValue}>
                                     {recoveryState.guardiansApproved} / {recoveryState.guardiansRequired}
                                 </Text>
@@ -621,12 +620,14 @@ export default function RecoverAccountScreen() {
                                 />
                             </RNView>
                             <Text style={styles.expiresText}>
-                                Expires: {new Date(recoveryState.expiresAt).toLocaleString()}
+                                {t('recover.expiresAt', { when: new Date(recoveryState.expiresAt) })}
                             </Text>
                         </RNView>
 
                         <Pressable style={styles.secondaryButton} onPress={handleCancel}>
-                            <Text style={[styles.secondaryButtonText, { color: p.danger }]}>Cancel Recovery</Text>
+                            <Text style={[styles.secondaryButtonText, { color: p.danger }]}>
+                                {t('recover.cancelTitle')}
+                            </Text>
                         </Pressable>
                     </>
                 )}
@@ -637,11 +638,8 @@ export default function RecoverAccountScreen() {
                         <RNView style={styles.iconContainer}>
                             <Ionicons name="checkmark-circle" size={48} color={p.green} />
                         </RNView>
-                        <Text style={styles.title}>Recovery Approved</Text>
-                        <Text style={styles.subtitle}>
-                            All required approvals have been received. Finalising your recovery,
-                            then you can re-register this device.
-                        </Text>
+                        <Text style={styles.title}>{t('recover.approvedTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.approvedBody')}</Text>
 
                         {completeError ? (
                             <Pressable
@@ -652,13 +650,13 @@ export default function RecoverAccountScreen() {
                                 {completing ? (
                                     <ActivityIndicator color="#FFFFFF" size="small" />
                                 ) : (
-                                    <Text style={styles.primaryButtonText}>Retry</Text>
+                                    <Text style={styles.primaryButtonText}>{t('recover.retry')}</Text>
                                 )}
                             </Pressable>
                         ) : (
                             <RNView style={styles.finalisingRow}>
                                 <ActivityIndicator color={p.blue} size="small" />
-                                <Text style={styles.finalisingText}>Finalising your recovery…</Text>
+                                <Text style={styles.finalisingText}>{t('recover.finalising')}</Text>
                             </RNView>
                         )}
                     </>
@@ -673,12 +671,8 @@ export default function RecoverAccountScreen() {
                         <RNView style={styles.iconContainer}>
                             <Ionicons name="shield-checkmark" size={48} color={p.green} />
                         </RNView>
-                        <Text style={styles.title}>Account Recovered</Text>
-                        <Text style={styles.subtitle}>
-                            One step left: register this device to the recovered account. This
-                            creates a new passkey bound to your recovered identity, and your roles
-                            and app ownerships come back with it.
-                        </Text>
+                        <Text style={styles.title}>{t('recover.recoveredTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.recoveredBody')}</Text>
 
                         <Pressable
                             style={[styles.primaryButton, registering && { opacity: 0.6 }]}
@@ -688,7 +682,7 @@ export default function RecoverAccountScreen() {
                             {registering ? (
                                 <ActivityIndicator color="#FFFFFF" />
                             ) : (
-                                <Text style={styles.primaryButtonText}>Register This Device</Text>
+                                <Text style={styles.primaryButtonText}>{t('recover.registerDevice')}</Text>
                             )}
                         </Pressable>
                     </>
@@ -700,15 +694,11 @@ export default function RecoverAccountScreen() {
                         <RNView style={styles.iconContainer}>
                             <Ionicons name="checkmark-circle" size={48} color={p.green} />
                         </RNView>
-                        <Text style={styles.title}>Device Restored</Text>
-                        <Text style={styles.subtitle}>
-                            This device now signs in as your recovered account. Consider
-                            generating a fresh recovery phrase in Settings → Account Recovery, because
-                            recovery phrases are single-use.
-                        </Text>
+                        <Text style={styles.title}>{t('recover.restoredTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.restoredBody')}</Text>
 
                         <Pressable style={styles.primaryButton} onPress={handleDismiss}>
-                            <Text style={styles.primaryButtonText}>Done</Text>
+                            <Text style={styles.primaryButtonText}>{t('common.done')}</Text>
                         </Pressable>
                     </>
                 )}
@@ -719,10 +709,8 @@ export default function RecoverAccountScreen() {
                         <RNView style={styles.iconContainer}>
                             <Ionicons name="time-outline" size={48} color="#F59E0B" />
                         </RNView>
-                        <Text style={styles.title}>Recovery Expired</Text>
-                        <Text style={styles.subtitle}>
-                            Your recovery request has expired. Please start a new recovery with a different recovery code.
-                        </Text>
+                        <Text style={styles.title}>{t('recover.expiredTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.expiredBody')}</Text>
 
                         <Pressable
                             style={styles.primaryButton}
@@ -731,7 +719,7 @@ export default function RecoverAccountScreen() {
                                 setStep('enter-code');
                             }}
                         >
-                            <Text style={styles.primaryButtonText}>Try Again</Text>
+                            <Text style={styles.primaryButtonText}>{t('common.retry')}</Text>
                         </Pressable>
                     </>
                 )}

@@ -11,6 +11,7 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { ExternalLink } from '@/components/ExternalLink';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
@@ -56,10 +57,10 @@ export type AttestationVerificationLevel =
     | 'cached-trusted'
     | 'non-enclave';
 
-const CHANGED_TITLES: Record<AttestationDiff['kind'], string> = {
-    'app-update': 'App Updated',
-    'platform-update': 'Platform Updated',
-    'app-and-platform-update': 'App & Platform Changed',
+const CHANGED_TITLE_KEYS: Record<AttestationDiff['kind'], string> = {
+    'app-update': 'attestation.titleAppUpdated',
+    'platform-update': 'attestation.titlePlatformUpdated',
+    'app-and-platform-update': 'attestation.titleAppAndPlatformChanged',
 };
 
 export function AttestationView({
@@ -116,14 +117,17 @@ export function AttestationView({
     /** True while a challenge re-verification is in flight. */
     challengeInFlight?: boolean;
 }) {
+    const { t } = useTranslation();
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const insets = useSafeAreaInsets();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
-    const appType = attestation.tee_type === 'sgx' ? 'WASM Application' : 'Container Application';
+    const appType = attestation.tee_type === 'sgx'
+        ? t('attestation.wasmApplication')
+        : t('attestation.containerApplication');
     const teeColor = attestation.tee_type === 'sgx' ? p.green : p.blue;
-    const changedTitle = (diff && CHANGED_TITLES[diff.kind]) || 'App Changed';
+    const changedTitle = diff ? t(CHANGED_TITLE_KEYS[diff.kind]) : t('attestation.titleAppChanged');
 
     // Effective verification status. When no `verification` is supplied we keep
     // the legacy behaviour driven by the parsed cert's `valid` flag.
@@ -146,11 +150,11 @@ export function AttestationView({
     const provenanceLine = !isVerified
         ? null
         : verification?.challenged
-            ? '⚡ Challenged just now and bound to this session'
+            ? t('attestation.provenanceChallenged')
             : verificationLevel === 'fresh-as-verified'
-                ? 'Verified just now by as.privasys.org'
+                ? t('attestation.provenanceFresh')
                 : verificationLevel === 'cached-trusted'
-                    ? 'Trusted from a recent verification on this device'
+                    ? t('attestation.provenanceCached')
                     : null;
 
     return (
@@ -164,13 +168,15 @@ export function AttestationView({
                     <View style={styles.warningBanner}>
                         <Text style={styles.warningText}>
                             {diff
-                                ? `⚠ ${diff.summary}`
-                                : "⚠ This app's attestation has changed since you last verified it."}
+                                ? t('attestation.warningPrefix', { message: t(diff.summaryKey) })
+                                : t('attestation.warningGeneric')}
                         </Text>
                     </View>
                 )}
 
-                <Text style={styles.title}>{isChanged ? changedTitle : 'Verify Enclave'}</Text>
+                <Text style={styles.title}>
+                    {isChanged ? changedTitle : t('attestation.verifyEnclave')}
+                </Text>
                 <Text style={styles.attestationAppName}>{displayName}</Text>
                 <Text style={styles.attestationOrigin}>{rpId}</Text>
 
@@ -196,13 +202,16 @@ export function AttestationView({
                             ]}
                         >
                             {isVerified
-                                ? 'Attestation Valid'
+                                ? t('attestation.statusValid')
                                 : isUnreachable
-                                    ? 'Could Not Verify'
-                                    : 'Attestation Invalid'}
+                                    ? t('attestation.statusUnreachable')
+                                    : t('attestation.statusInvalid')}
                         </Text>
                         <Text style={styles.statusDetail}>
-                            {appType} · {attestation.tee_type?.toUpperCase()} enclave
+                            {t('attestation.statusDetail', {
+                                appType,
+                                tee: attestation.tee_type?.toUpperCase() ?? ''
+                            })}
                         </Text>
                         {provenanceLine && (
                             <Text style={styles.statusProvenance}>{provenanceLine}</Text>
@@ -218,9 +227,9 @@ export function AttestationView({
                 {isUnreachable && (
                     <View style={styles.unknownBanner}>
                         <Text style={styles.unknownText}>
-                            We couldn&apos;t verify this enclave&apos;s quote with the attestation
-                            service{verification?.message ? ` (${verification.message})` : ''}. You
-                            can continue anyway, or cancel and try again.
+                            {verification?.message
+                                ? t('attestation.unreachableWithReason', { reason: verification.message })
+                                : t('attestation.unreachable')}
                         </Text>
                     </View>
                 )}
@@ -229,13 +238,11 @@ export function AttestationView({
                     override lives in the Advanced section below. */}
                 {isInvalid && (
                     <View style={styles.problemBanner}>
-                        <Text style={styles.problemTitle}>⚠ This enclave failed verification</Text>
+                        <Text style={styles.problemTitle}>{t('attestation.failedTitle')}</Text>
                         {verification?.message ? (
                             <Text style={styles.problemDetail} selectable>{verification.message}</Text>
                         ) : null}
-                        <Text style={styles.problemHint}>
-                            Do not continue unless you understand and accept the risk.
-                        </Text>
+                        <Text style={styles.problemHint}>{t('attestation.failedHint')}</Text>
                     </View>
                 )}
 
@@ -253,7 +260,7 @@ export function AttestationView({
                             <Text style={styles.challengeIcon}>⚡</Text>
                         )}
                         <Text style={styles.challengeText}>
-                            {challengeInFlight ? 'Challenging…' : 'Challenge this enclave'}
+                            {challengeInFlight ? t('attestation.challenging') : t('attestation.challenge')}
                         </Text>
                     </Pressable>
                 )}
@@ -263,18 +270,18 @@ export function AttestationView({
                     generic warning. */}
                 {isChanged && diff && diff.changes.length > 0 && (
                     <>
-                        <Text style={styles.sectionHeader}>What Changed</Text>
+                        <Text style={styles.sectionHeader}>{t('attestation.whatChanged')}</Text>
                         <View style={styles.attestationCard}>
                             {diff.changes.map((c) => (
-                                <View key={c.label} style={styles.changeRow}>
-                                    <Text style={styles.changeLabel}>{c.label}</Text>
+                                <View key={c.labelKey} style={styles.changeRow}>
+                                    <Text style={styles.changeLabel}>{t(c.labelKey)}</Text>
                                     <View style={styles.changeValues}>
                                         <Text style={styles.changeOld} selectable>
-                                            {c.previous ? truncateHex(c.previous) : 'not recorded'}
+                                            {c.previous ? truncateHex(c.previous) : t('attestation.notRecordedLower')}
                                         </Text>
                                         <Text style={styles.changeArrow}>→</Text>
                                         <Text style={styles.changeNew} selectable>
-                                            {c.current ? truncateHex(c.current) : 'removed'}
+                                            {c.current ? truncateHex(c.current) : t('attestation.removed')}
                                         </Text>
                                     </View>
                                 </View>
@@ -288,14 +295,15 @@ export function AttestationView({
                     inspects what they are being asked to approve. */}
                 {(releases?.workload?.url || releases?.os?.url) && (
                     <>
-                        <Text style={styles.sectionHeader}>Published Release</Text>
+                        <Text style={styles.sectionHeader}>{t('attestation.publishedRelease')}</Text>
                         <View style={styles.attestationCard}>
                             {releases?.workload?.url && (
                                 <ExternalLink href={releases.workload.url}>
                                     <View style={styles.releaseRow}>
                                         <Text style={styles.releaseLabel}>
-                                            Review the app code
-                                            {releases.workload.label ? ` (${releases.workload.label})` : ''}
+                                            {releases.workload.label
+                                                ? t('attestation.reviewAppCodeLabelled', { label: releases.workload.label })
+                                                : t('attestation.reviewAppCode')}
                                         </Text>
                                         <Text style={styles.releaseLink}>GitHub ↗</Text>
                                     </View>
@@ -325,12 +333,12 @@ export function AttestationView({
                         <View style={styles.attestationCard}>
                             {dependencies.map((d, i) => {
                                 const badge = !d.published
-                                    ? 'verify'
+                                    ? t('attestation.depBadgeVerify')
                                     : d.status === 'approved'
-                                      ? 'approved'
+                                      ? t('attestation.depBadgeApproved')
                                       : d.status === 'denied'
-                                        ? 'denied before'
-                                        : 'new';
+                                        ? t('attestation.depBadgeDenied')
+                                        : t('attestation.depBadgeNew');
                                 const row = (
                                     <View style={styles.releaseRow}>
                                         <Text style={styles.releaseLabel}>
@@ -358,15 +366,13 @@ export function AttestationView({
                     review it before approving, since everything above reads as
                     reassuring green. */}
                 {isChanged && (
-                    <Text style={styles.reviewPrompt}>
-                        Please review the changes and approve only if you accept them.
-                    </Text>
+                    <Text style={styles.reviewPrompt}>{t('attestation.reviewPrompt')}</Text>
                 )}
 
                 {/* Collapsible details toggle */}
                 <Pressable style={styles.detailsToggle} onPress={() => setDetailsOpen(!detailsOpen)}>
                     <Text style={styles.detailsToggleText}>
-                        {detailsOpen ? 'Hide details' : 'Show attestation details'}
+                        {detailsOpen ? t('attestation.hideDetails') : t('attestation.showDetails')}
                     </Text>
                     <Text style={styles.detailsToggleIcon}>{detailsOpen ? '▲' : '▼'}</Text>
                 </Pressable>
@@ -378,23 +384,23 @@ export function AttestationView({
                             attestation.attestation_servers_hash ||
                             attestation.workload_key_source) && (
                             <>
-                                <Text style={styles.sectionHeader}>Verification</Text>
+                                <Text style={styles.sectionHeader}>{t('attestation.verification')}</Text>
                                 <View style={styles.attestationCard}>
                                     {attestation.quote_verification_status && (
-                                        <AttestationRow label="Quote Status" value={attestation.quote_verification_status} />
+                                        <AttestationRow label={t('attestation.quoteStatus')} value={attestation.quote_verification_status} />
                                     )}
                                     {attestation.attestation_servers_hash && (
-                                        <AttestationRow label="Attestation Server" value={truncateHex(attestation.attestation_servers_hash)} />
+                                        <AttestationRow label={t('attestation.attestationServer')} value={truncateHex(attestation.attestation_servers_hash)} />
                                     )}
                                     {attestation.workload_key_source && (
-                                        <AttestationRow label="Key Source" value={attestation.workload_key_source} />
+                                        <AttestationRow label={t('attestation.keySource')} value={attestation.workload_key_source} />
                                     )}
                                 </View>
                             </>
                         )}
 
                         {/* Enclave Identity */}
-                        <Text style={styles.sectionHeader}>Enclave Identity</Text>
+                        <Text style={styles.sectionHeader}>{t('attestation.enclaveIdentity')}</Text>
                         <View style={styles.attestationCard}>
                             {attestation.mrenclave && (
                                 <AttestationRow label="MRENCLAVE" value={truncateHex(attestation.mrenclave)} />
@@ -404,28 +410,28 @@ export function AttestationView({
                             )}
                             {attestation.mrtd && <AttestationRow label="MRTD" value={truncateHex(attestation.mrtd)} />}
                             {attestation.workload_code_hash && (
-                                <AttestationRow label="Code Hash" value={truncateHex(attestation.workload_code_hash)} />
+                                <AttestationRow label={t('attestation.codeHash')} value={truncateHex(attestation.workload_code_hash)} />
                             )}
                             {attestation.workload_config_merkle_root && (
-                                <AttestationRow label="Config Root" value={truncateHex(attestation.workload_config_merkle_root)} />
+                                <AttestationRow label={t('attestation.configRoot')} value={truncateHex(attestation.workload_config_merkle_root)} />
                             )}
                         </View>
 
                         {/* Certificate */}
-                        <Text style={styles.sectionHeader}>Certificate</Text>
+                        <Text style={styles.sectionHeader}>{t('attestation.certificate')}</Text>
                         <View style={styles.attestationCard}>
-                            <AttestationRow label="Subject" value={attestation.cert_subject} />
-                            <AttestationRow label="Valid From" value={attestation.cert_not_before} />
-                            <AttestationRow label="Valid Until" value={attestation.cert_not_after} />
+                            <AttestationRow label={t('attestation.subject')} value={attestation.cert_subject} />
+                            <AttestationRow label={t('attestation.validFrom')} value={attestation.cert_not_before} />
+                            <AttestationRow label={t('attestation.validUntil')} value={attestation.cert_not_after} />
                         </View>
 
                         {/* Advisory IDs */}
                         {attestation.advisory_ids && attestation.advisory_ids.length > 0 && (
                             <>
-                                <Text style={styles.sectionHeader}>Advisories</Text>
+                                <Text style={styles.sectionHeader}>{t('attestation.advisories')}</Text>
                                 <View style={styles.attestationCard}>
                                     {attestation.advisory_ids.map((id) => (
-                                        <AttestationRow key={id} label={id} value="Known advisory" />
+                                        <AttestationRow key={id} label={id} value={t('attestation.knownAdvisory')} />
                                     ))}
                                 </View>
                             </>
@@ -434,7 +440,7 @@ export function AttestationView({
                         {/* Custom OIDs */}
                         {attestation.custom_oids && attestation.custom_oids.length > 0 && (
                             <>
-                                <Text style={styles.sectionHeader}>Custom Extensions</Text>
+                                <Text style={styles.sectionHeader}>{t('attestation.customExtensions')}</Text>
                                 <View style={styles.attestationCard}>
                                     {attestation.custom_oids.map((oid) => (
                                         <AttestationRow key={oid.oid} label={oid.label || oid.oid} value={truncateHex(oid.value_hex)} />
@@ -457,18 +463,14 @@ export function AttestationView({
                             style={styles.advancedToggle}
                             onPress={() => setAdvancedOpen((o) => !o)}
                         >
-                            <Text style={styles.advancedToggleText}>Advanced</Text>
+                            <Text style={styles.advancedToggleText}>{t('attestation.advanced')}</Text>
                             <Text style={styles.detailsToggleIcon}>{advancedOpen ? '▲' : '▼'}</Text>
                         </Pressable>
                         {advancedOpen && (
                             <View style={styles.advancedBox}>
-                                <Text style={styles.advancedWarning}>
-                                    Verification failed. Continuing sends your request to an enclave
-                                    that could not prove its identity, so its code and data may not be
-                                    what they claim. Only proceed if you understand the risk.
-                                </Text>
+                                <Text style={styles.advancedWarning}>{t('attestation.advancedWarning')}</Text>
                                 <Pressable style={styles.dangerButton} onPress={onApprove}>
-                                    <Text style={styles.dangerButtonText}>Connect anyway</Text>
+                                    <Text style={styles.dangerButtonText}>{t('attestation.connectAnyway')}</Text>
                                 </Pressable>
                             </View>
                         )}
@@ -476,16 +478,22 @@ export function AttestationView({
                 )}
                 <View style={styles.buttonRow}>
                     <Pressable style={styles.rejectButton} onPress={onReject}>
-                        <Text style={styles.rejectButtonText}>{isInvalid ? 'Cancel' : 'Reject'}</Text>
+                        <Text style={styles.rejectButtonText}>
+                            {isInvalid ? t('common.cancel') : t('attestation.reject')}
+                        </Text>
                     </Pressable>
                     {isUnreachable ? (
                         <Pressable style={styles.continueButton} onPress={onApprove}>
-                            <Text style={styles.approveButtonText}>Continue anyway</Text>
+                            <Text style={styles.approveButtonText}>{t('attestation.continueAnyway')}</Text>
                         </Pressable>
                     ) : !isInvalid ? (
                         <Pressable style={styles.approveButton} onPress={onApprove}>
                             <Text style={styles.approveButtonText}>
-                                {isChanged ? (diff ? 'Approve Changes' : 'Trust Anyway') : 'Approve'}
+                                {isChanged
+                                    ? diff
+                                        ? t('attestation.approveChanges')
+                                        : t('attestation.trustAnyway')
+                                    : t('attestation.approve')}
                             </Text>
                         </Pressable>
                     ) : null}

@@ -36,29 +36,37 @@ import {
     useDriveNotificationsStore,
     type ShareRequest,
 } from '@/stores/drive-notifications';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
-/** Human label for a canonical attribute key. */
-function attrLabel(key: string): string {
-    const labels: Record<string, string> = {
-        name: 'Name',
-        email: 'Email',
-        organisation: 'Organisation',
-        organization: 'Organisation',
-        phone: 'Phone',
-        country: 'Country',
+/**
+ * Human label for a canonical attribute key. Unknown keys fall back to the
+ * key itself, title-cased, which is language-neutral and better than a
+ * missing-translation marker for a value the drive chose.
+ */
+function attrLabel(key: string, t: TFunction): string {
+    const keys: Record<string, string> = {
+        name: 'driveRequests.attrName',
+        email: 'driveRequests.attrEmail',
+        organisation: 'driveRequests.attrOrganisation',
+        organization: 'driveRequests.attrOrganisation',
+        phone: 'driveRequests.attrPhone',
+        country: 'driveRequests.attrCountry',
     };
-    return labels[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+    const k = keys[key];
+    return k ? t(k) : key.charAt(0).toUpperCase() + key.slice(1);
 }
 
-function timeAgo(epochSeconds: number): string {
+function timeAgo(epochSeconds: number, t: TFunction): string {
     const s = Math.max(0, Math.floor(Date.now() / 1000) - epochSeconds);
-    if (s < 60) return 'just now';
-    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-    return `${Math.floor(s / 86400)} d ago`;
+    if (s < 60) return t('time.justNow');
+    if (s < 3600) return t('time.minutesAgo', { count: Math.floor(s / 60) });
+    if (s < 86400) return t('time.hoursAgo', { count: Math.floor(s / 3600) });
+    return t('time.daysAgo', { count: Math.floor(s / 86400) });
 }
 
 export default function DriveRequestsScreen() {
+    const { t } = useTranslation();
     const palette = usePalette();
     const styles = makeStyles(palette);
     const store = useDriveNotificationsStore();
@@ -76,7 +84,7 @@ export default function DriveRequestsScreen() {
             setSyncNote(null);
         } catch (e) {
             // Local pushes still render; say why the list may be stale.
-            setSyncNote(e instanceof Error ? e.message : 'Could not reach your drive.');
+            setSyncNote(e instanceof Error ? e.message : t('driveRequests.unreachable'));
         }
     }, []);
 
@@ -100,9 +108,10 @@ export default function DriveRequestsScreen() {
 
     const decide = useCallback(
         async (req: ShareRequest, decision: 'approve' | 'deny') => {
-            const verb = decision === 'approve' ? 'Approve access' : 'Deny access';
             const auth = await LocalAuthentication.authenticateAsync({
-                promptMessage: `${verb} to "${req.nodeName}"`,
+                promptMessage: decision === 'approve'
+                    ? t('driveRequests.promptApprove', { item: req.nodeName })
+                    : t('driveRequests.promptDeny', { item: req.nodeName }),
             });
             if (!auth.success) return;
             setBusy(req.requestId);
@@ -111,8 +120,8 @@ export default function DriveRequestsScreen() {
                 store.markDecided(req.requestId, decision === 'approve' ? 'approved' : 'denied');
             } catch (e) {
                 Alert.alert(
-                    'Could not submit the decision',
-                    e instanceof Error ? e.message : 'Try again in a moment.'
+                    t('driveRequests.decisionFailedTitle'),
+                    e instanceof Error ? e.message : t('driveRequests.decisionFailedBody')
                 );
             } finally {
                 setBusy(null);
@@ -123,7 +132,7 @@ export default function DriveRequestsScreen() {
 
     return (
         <RNView style={styles.container}>
-            <SubPageHeader title="Drive requests" />
+            <SubPageHeader title={t('driveRequests.title')} />
             <ScrollView
                 contentContainerStyle={styles.scroll}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
@@ -131,16 +140,14 @@ export default function DriveRequestsScreen() {
                 {syncNote && (
                     <RNView style={styles.syncNote}>
                         <Ionicons name="cloud-offline-outline" size={16} color={palette.warnText} />
-                        <Text style={styles.syncNoteText}>
-                            Showing what this device knows; the drive could not be reached. Pull to retry.
-                        </Text>
+                        <Text style={styles.syncNoteText}>{t('driveRequests.syncNote')}</Text>
                     </RNView>
                 )}
-                <Text style={styles.sectionTitle}>Awaiting your decision</Text>
+                <Text style={styles.sectionTitle}>{t('driveRequests.awaiting')}</Text>
                 {pending.length === 0 && (
                     <RNView style={styles.emptyCard}>
                         <Ionicons name="checkmark-circle-outline" size={22} color={palette.textMuted} />
-                        <Text style={styles.emptyText}>No pending requests.</Text>
+                        <Text style={styles.emptyText}>{t('driveRequests.noPending')}</Text>
                     </RNView>
                 )}
                 {pending.map((req) => {
@@ -151,15 +158,15 @@ export default function DriveRequestsScreen() {
                             <RNView style={styles.cardHeader}>
                                 <Ionicons name="document-lock-outline" size={20} color={palette.action} />
                                 <Text style={styles.nodeName} numberOfLines={1}>
-                                    {req.nodeName || 'Shared item'}
+                                    {req.nodeName || t('driveRequests.sharedItem')}
                                 </Text>
-                                <Text style={styles.when}>{timeAgo(req.receivedAt)}</Text>
+                                <Text style={styles.when}>{timeAgo(req.receivedAt, t)}</Text>
                             </RNView>
                             {attrs.length > 0 ? (
                                 <RNView style={styles.attrs}>
                                     {attrs.map(([k, v]) => (
                                         <RNView key={k} style={styles.attrRow}>
-                                            <Text style={styles.attrKey}>{attrLabel(k)}</Text>
+                                            <Text style={styles.attrKey}>{attrLabel(k, t)}</Text>
                                             <Text style={styles.attrVal} numberOfLines={1}>
                                                 {v}
                                             </Text>
@@ -168,11 +175,13 @@ export default function DriveRequestsScreen() {
                                 </RNView>
                             ) : (
                                 <Text style={styles.noAttrs}>
-                                    No attributes were presented. Requester: {req.requesterSub.slice(0, 12)}…
+                                    {t('driveRequests.noAttributes', { requester: req.requesterSub.slice(0, 12) })}
                                 </Text>
                             )}
                             <Text style={styles.scope}>
-                                Requested access: {req.scope.join(', ') || 'read'}
+                                {t('driveRequests.requestedAccess', {
+                                    scope: req.scope.join(', ') || t('driveRequests.scopeRead')
+                                })}
                             </Text>
                             <RNView style={styles.actions}>
                                 <Pressable
@@ -180,7 +189,7 @@ export default function DriveRequestsScreen() {
                                     disabled={busy === req.requestId}
                                     onPress={() => void decide(req, 'deny')}
                                 >
-                                    <Text style={styles.btnDenyText}>Deny</Text>
+                                    <Text style={styles.btnDenyText}>{t('connect.deny')}</Text>
                                 </Pressable>
                                 <Pressable
                                     style={[styles.btn, styles.btnApprove]}
@@ -190,7 +199,7 @@ export default function DriveRequestsScreen() {
                                     {busy === req.requestId ? (
                                         <ActivityIndicator color="#fff" size="small" />
                                     ) : (
-                                        <Text style={styles.btnApproveText}>Approve</Text>
+                                        <Text style={styles.btnApproveText}>{t('attestation.approve')}</Text>
                                     )}
                                 </Pressable>
                             </RNView>
@@ -200,7 +209,7 @@ export default function DriveRequestsScreen() {
 
                 {decisions.length > 0 && (
                     <>
-                        <Text style={styles.sectionTitle}>Your requests</Text>
+                        <Text style={styles.sectionTitle}>{t('driveRequests.yourRequests')}</Text>
                         {decisions.map((d) => (
                             <RNView key={`${d.requestId}-${d.status}`} style={styles.card}>
                                 <RNView style={styles.cardHeader}>
@@ -210,14 +219,14 @@ export default function DriveRequestsScreen() {
                                         color={d.status === 'approved' ? palette.successText : palette.dangerText}
                                     />
                                     <Text style={styles.nodeName} numberOfLines={1}>
-                                        {d.nodeName || 'Shared item'}
+                                        {d.nodeName || t('driveRequests.sharedItem')}
                                     </Text>
-                                    <Text style={styles.when}>{timeAgo(d.receivedAt)}</Text>
+                                    <Text style={styles.when}>{timeAgo(d.receivedAt, t)}</Text>
                                 </RNView>
                                 <Text style={styles.decisionText}>
                                     {d.status === 'approved'
-                                        ? 'Your access request was approved. Open the link again to view it.'
-                                        : 'Your access request was declined.'}
+                                        ? t('driveRequests.yourRequestApproved')
+                                        : t('driveRequests.yourRequestDenied')}
                                 </Text>
                             </RNView>
                         ))}
@@ -226,7 +235,7 @@ export default function DriveRequestsScreen() {
 
                 {handled.length > 0 && (
                     <>
-                        <Text style={styles.sectionTitle}>Handled</Text>
+                        <Text style={styles.sectionTitle}>{t('driveRequests.handled')}</Text>
                         {handled
                             .slice()
                             .sort((a, b) => b.receivedAt - a.receivedAt)
@@ -250,7 +259,9 @@ export default function DriveRequestsScreen() {
                                                     : styles.badgeDenied,
                                             ]}
                                         >
-                                            {req.decision}
+                                            {req.decision === 'approved'
+                                                ? t('driveRequests.decisionApproved')
+                                                : t('driveRequests.decisionDenied')}
                                         </Text>
                                     </RNView>
                                 );

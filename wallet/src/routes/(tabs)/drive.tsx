@@ -32,12 +32,22 @@ import { diffTrustedAttestation, type AttestationDiff } from '@/services/attesta
 import { attestDrive, ensureDrive, type DriveAttestation, type DriveNode } from '@/services/drive';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
-function formatSize(bytes: number): string {
+/**
+ * File size for a list row.
+ *
+ * The UNIT is translated (some languages abbreviate bytes differently) but the
+ * NUMBER is not localised: these are small, and thousands separators here
+ * would only invite the grouping-inside-a-technical-value mistake that the
+ * measurement rows must never make.
+ */
+function formatSize(bytes: number, t: TFunction): string {
     if (!bytes) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes < 1024) return t('drive.sizeBytes', { value: bytes });
+    if (bytes < 1024 * 1024) return t('drive.sizeKb', { value: (bytes / 1024).toFixed(0) });
+    return t('drive.sizeMb', { value: (bytes / (1024 * 1024)).toFixed(1) });
 }
 
 interface Crumb {
@@ -46,6 +56,7 @@ interface Crumb {
 }
 
 export default function DriveScreen() {
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const insets = useSafeAreaInsets();
@@ -123,7 +134,7 @@ export default function DriveScreen() {
                 setPhase('approve');
             }
         } catch (e) {
-            setAttError(e instanceof Error ? e.message : 'Could not verify your drive.');
+            setAttError(e instanceof Error ? e.message : t('drive.verifyFailed'));
             setPhase('blocked');
         }
     }, [getApp, isAttestationMatch, rememberDrive]);
@@ -137,7 +148,7 @@ export default function DriveScreen() {
 
     const handleRejectDrive = useCallback(() => {
         setAtt(null);
-        setAttError('You declined to trust the Drive enclave. Approve it to use Drive.');
+        setAttError(t('drive.declined'));
         setPhase('blocked');
     }, []);
 
@@ -147,7 +158,10 @@ export default function DriveScreen() {
         try {
             setAtt(await attestDrive('challenge'));
         } catch (e) {
-            Alert.alert('Challenge failed', e instanceof Error ? e.message : 'Could not verify the enclave.');
+            Alert.alert(
+                t('drive.challengeFailedTitle'),
+                e instanceof Error ? e.message : t('drive.challengeFailedBody')
+            );
         } finally {
             setChallengeInFlight(false);
         }
@@ -160,7 +174,7 @@ export default function DriveScreen() {
         try {
             const s = await ensureDrive();
             if (!s) {
-                setError('Drive is not available on this deployment yet.');
+                setError(t('drive.notAvailable'));
                 setNodes(null);
                 return;
             }
@@ -170,7 +184,7 @@ export default function DriveScreen() {
                     : await s.drive.listRoot(s.tenant.id)
             );
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Could not open your drive.');
+            setError(e instanceof Error ? e.message : t('drive.openFailed'));
             setNodes(null);
         } finally {
             setLoading(false);
@@ -225,13 +239,13 @@ export default function DriveScreen() {
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
                 <RNView style={styles.headerRow}>
                     <RNView style={styles.headerText}>
-                        <Text style={styles.headerTitle}>Drive</Text>
-                        <Text style={styles.headerSubtitle}>Your confidential files</Text>
+                        <Text style={styles.headerTitle}>{t('tabs.drive')}</Text>
+                        <Text style={styles.headerSubtitle}>{t('drive.subtitle')}</Text>
                     </RNView>
                     <Pressable
                         style={styles.bell}
                         onPress={() => router.push('/drive-requests')}
-                        accessibilityLabel="Share requests"
+                        accessibilityLabel={t('drive.shareRequests')}
                     >
                         <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
                         {pendingCount > 0 && (
@@ -250,7 +264,7 @@ export default function DriveScreen() {
                     <Pressable style={styles.crumbBack} onPress={goBack}>
                         <Ionicons name="chevron-back" size={18} color={p.blue} />
                         <Text style={styles.crumbBackText}>
-                            {path.length > 1 ? path[path.length - 2].name : 'Drive'}
+                            {path.length > 1 ? path[path.length - 2].name : t('tabs.drive')}
                         </Text>
                     </Pressable>
                     <Text style={styles.crumbHere} numberOfLines={1}>
@@ -265,9 +279,9 @@ export default function DriveScreen() {
                 ) : phase === 'blocked' ? (
                     <RNView style={styles.emptyState}>
                         <Ionicons name="lock-closed-outline" size={44} color={p.textMuted} />
-                        <Text style={styles.emptyText}>{attError ?? 'Drive could not be verified.'}</Text>
+                        <Text style={styles.emptyText}>{attError ?? t('drive.couldNotVerify')}</Text>
                         <Pressable style={styles.retry} onPress={() => void prepare()}>
-                            <Text style={styles.retryText}>Try again</Text>
+                            <Text style={styles.retryText}>{t('common.retry')}</Text>
                         </Pressable>
                     </RNView>
                 ) : error ? (
@@ -275,14 +289,14 @@ export default function DriveScreen() {
                         <Ionicons name="cloud-offline-outline" size={44} color={p.textMuted} />
                         <Text style={styles.emptyText}>{error}</Text>
                         <Pressable style={styles.retry} onPress={() => void load(folder)}>
-                            <Text style={styles.retryText}>Try again</Text>
+                            <Text style={styles.retryText}>{t('common.retry')}</Text>
                         </Pressable>
                     </RNView>
                 ) : nodes && nodes.length === 0 ? (
                     <RNView style={styles.emptyState}>
                         <Ionicons name="folder-open-outline" size={44} color={p.textMuted} />
                         <Text style={styles.emptyText}>
-                            {folder ? 'This folder is empty.' : 'Your drive is empty.'}
+                            {folder ? t('drive.folderEmpty') : t('drive.driveEmpty')}
                         </Text>
                     </RNView>
                 ) : (
@@ -320,7 +334,9 @@ export default function DriveScreen() {
                                         {n.name}
                                     </Text>
                                     <Text style={styles.meta}>
-                                        {n.kind === 'folder' ? 'Folder' : formatSize(n.size_bytes) || 'File'}
+                                        {n.kind === 'folder'
+                                            ? t('drive.folder')
+                                            : formatSize(n.size_bytes, t) || t('drive.file')}
                                     </Text>
                                 </RNView>
                                 {n.kind === 'folder' && (

@@ -21,12 +21,13 @@ import {
     Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import {
-    biometricLabel,
+    biometricLabelKey,
     titleiseBiometric,
-    DEFAULT_BIOMETRIC_LABEL,
+    DEFAULT_BIOMETRIC_LABEL_KEY,
 } from '@/services/biometrics';
 import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
@@ -55,11 +56,15 @@ export default function ProfileScreen() {
     const [setupDone, setSetupDone] = useState(0);
     // Platform-appropriate name for the device unlock ("Face ID", "fingerprint",
     // ...), so Android fingerprint users are never told to "Set up Face ID".
-    const [bioLabel, setBioLabel] = useState(DEFAULT_BIOMETRIC_LABEL);
+    const { t } = useTranslation();
+    // The KEY is held in state, not the resolved string: a language change
+    // must re-render this label, and a stored string would not.
+    const [bioKey, setBioKey] = useState(DEFAULT_BIOMETRIC_LABEL_KEY);
+    const bioLabel = t(bioKey);
     useEffect(() => {
         let alive = true;
-        void biometricLabel().then((l) => {
-            if (alive) setBioLabel(l);
+        void biometricLabelKey().then((l) => {
+            if (alive) setBioKey(l);
         });
         return () => {
             alive = false;
@@ -82,16 +87,21 @@ export default function ProfileScreen() {
             const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
             if (!enrolled) {
                 Alert.alert(
-                    `Set up ${bioLabel} first`,
-                    `Turn on ${bioLabel} or a device ${Platform.OS === 'ios' ? 'passcode' : 'PIN, pattern or password'} in your phone settings, then come back and try again.`
+                    t('profile.setupBiometricFirstTitle', { method: bioLabel }),
+                    t(
+                        Platform.OS === 'ios'
+                            ? 'profile.setupBiometricFirstBodyIos'
+                            : 'profile.setupBiometricFirstBodyAndroid',
+                        { method: bioLabel }
+                    )
                 );
                 setSetupBusy(false);
                 return;
             }
             const auth = await LocalAuthentication.authenticateAsync({
-                promptMessage: 'Set up your Privasys wallet',
-                fallbackLabel: 'Use Passcode',
-                cancelLabel: 'Cancel'
+                promptMessage: t('profile.setupPrompt'),
+                fallbackLabel: t('profile.usePasscode'),
+                cancelLabel: t('common.cancel')
             });
             if (!auth.success) {
                 setSetupBusy(false);
@@ -111,7 +121,7 @@ export default function ProfileScreen() {
             const pairwiseSeed = (await takeRecoveredPairwiseSeed()) ?? (await generatePairwiseSeed());
             const canonicalDid = await generateCanonicalDid(pairwiseSeed);
             useProfileStore.getState().createProfile({
-                displayName: 'Privasys User',
+                displayName: t('profile.defaultDisplayName'),
                 email: '',
                 avatarUri: '',
                 locale: getDeviceLocale(),
@@ -134,8 +144,8 @@ export default function ProfileScreen() {
             router.push('/secure-wallet');
         } catch (e: any) {
             Alert.alert(
-                'Setup failed',
-                `We couldn't finish setting up your wallet: ${e.message}. Please try again.`
+                t('profile.setupFailedTitle'),
+                t('profile.setupFailedBody', { reason: e.message })
             );
             setSetupBusy(false);
             setSetupDone(0);
@@ -146,18 +156,23 @@ export default function ProfileScreen() {
         const setupItems = [
             {
                 icon: 'scan-outline' as const,
-                title: 'Only you can unlock it',
-                body: `${titleiseBiometric(bioLabel)} or your device ${Platform.OS === 'ios' ? 'passcode' : 'screen lock'} guards your wallet, so no one else can use it.`
+                title: t('profile.setupUnlockTitle'),
+                body: t(
+                    Platform.OS === 'ios'
+                        ? 'profile.setupUnlockBodyIos'
+                        : 'profile.setupUnlockBodyAndroid',
+                    { method: titleiseBiometric(bioLabel) }
+                )
             },
             {
                 icon: 'hardware-chip-outline' as const,
-                title: 'A key in secure hardware',
-                body: "Created inside your phone's secure chip. It never leaves your device, and we never see it."
+                title: t('profile.setupHardwareTitle'),
+                body: t('profile.setupHardwareBody')
             },
             {
                 icon: 'finger-print-outline' as const,
-                title: 'Your private identity',
-                body: 'Controlled only by you. No account and no password on our servers.'
+                title: t('profile.setupIdentityTitle'),
+                body: t('profile.setupIdentityBody')
             }
         ];
         return (
@@ -165,11 +180,8 @@ export default function ProfileScreen() {
                 <ScrollView contentContainerStyle={styles.setupScroll} showsVerticalScrollIndicator={false}>
                     <RNView style={styles.setupHeader}>
                         <Ionicons name="shield-checkmark-outline" size={56} color={p.green} />
-                        <Text style={styles.setupTitle}>Set up your wallet</Text>
-                        <Text style={styles.setupLede}>
-                            It takes a few seconds, and everything is created here on your phone.
-                            There is no account and no password.
-                        </Text>
+                        <Text style={styles.setupTitle}>{t('profile.setupTitle')}</Text>
+                        <Text style={styles.setupLede}>{t('profile.setupLede')}</Text>
                     </RNView>
 
                     {/* What this creates — each row ticks green as that step completes. */}
@@ -207,7 +219,9 @@ export default function ProfileScreen() {
                         ) : (
                             <>
                                 <Ionicons name="scan" size={18} color="#FFFFFF" />
-                                <Text style={styles.createProfileButtonText}>Set up with {bioLabel}</Text>
+                                <Text style={styles.createProfileButtonText}>
+                                    {t('profile.setupWith', { method: bioLabel })}
+                                </Text>
                             </>
                         )}
                     </Pressable>
@@ -217,7 +231,7 @@ export default function ProfileScreen() {
                         onPress={() => router.push('/recover-account' as never)}
                     >
                         <Ionicons name="key-outline" size={16} color={p.blue} />
-                        <Text style={styles.recoverButtonText}>Recover an existing account</Text>
+                        <Text style={styles.recoverButtonText}>{t('profile.recoverExisting')}</Text>
                     </Pressable>
                 </ScrollView>
             </RNView>
@@ -227,7 +241,7 @@ export default function ProfileScreen() {
     const handleCopy = (label: string, value?: string) => {
         if (!value) return;
         Clipboard.setStringAsync(value);
-        Alert.alert('Copied', `${label} copied to clipboard.`);
+        Alert.alert(t('common.copied'), t('profile.copiedToClipboard', { label }));
     };
 
     // The Privasys Account id is the IdP user id of the canonical account:
@@ -275,62 +289,60 @@ export default function ProfileScreen() {
                             </RNView>
                         )}
                     </RNView>
-                    <Text style={styles.profileName}>{profile.displayName || 'Privasys User'}</Text>
+                    <Text style={styles.profileName}>
+                        {profile.displayName || t('profile.defaultDisplayName')}
+                    </Text>
                     {profile.email ? (
                         <Text style={styles.profileEmail}>{profile.email}</Text>
                     ) : null}
                 </RNView>
 
                 {/* DID */}
-                <Text style={styles.sectionTitle}>IDENTITY</Text>
+                <Text style={styles.sectionTitle}>{t('profile.sectionIdentity')}</Text>
                 <Pressable
                     style={styles.didCard}
-                    onPress={() => handleCopy('Canonical DID', profile.canonicalDid || profile.did)}
+                    onPress={() => handleCopy(t('profile.canonicalDid'), profile.canonicalDid || profile.did)}
                 >
                     <Ionicons name="finger-print" size={20} color={p.blue} />
                     <RNView style={{ flex: 1 }}>
-                        <Text style={styles.didLabel}>Canonical DID</Text>
+                        <Text style={styles.didLabel}>{t('profile.canonicalDid')}</Text>
                         <Text style={styles.didText} numberOfLines={1}>
-                            {profile.canonicalDid || 'Not generated'}
+                            {profile.canonicalDid || t('profile.notGenerated')}
                         </Text>
                     </RNView>
                     <Ionicons name="copy-outline" size={18} color={p.textMuted} />
                 </Pressable>
                 <Pressable
                     style={styles.didCard}
-                    onPress={() => handleCopy('Privasys Account', privasysAccountId)}
+                    onPress={() => handleCopy(t('profile.privasysAccount'), privasysAccountId)}
                 >
                     <Ionicons name="person-circle-outline" size={20} color={p.blue} />
                     <RNView style={{ flex: 1 }}>
-                        <Text style={styles.didLabel}>Privasys Account</Text>
+                        <Text style={styles.didLabel}>{t('profile.privasysAccount')}</Text>
                         <Text style={styles.didText} numberOfLines={1}>
-                            {privasysAccountId || 'Not generated'}
+                            {privasysAccountId || t('profile.notGenerated')}
                         </Text>
                     </RNView>
                     <Ionicons name="copy-outline" size={18} color={p.textMuted} />
                 </Pressable>
                 <Pressable
                     style={styles.didCard}
-                    onPress={() => handleCopy('Device DID', profile.did)}
+                    onPress={() => handleCopy(t('profile.deviceDid'), profile.did)}
                 >
                     <Ionicons name="phone-portrait-outline" size={20} color={p.textSecondary} />
                     <RNView style={{ flex: 1 }}>
-                        <Text style={styles.didLabel}>Device DID</Text>
+                        <Text style={styles.didLabel}>{t('profile.deviceDid')}</Text>
                         <Text style={styles.didText} numberOfLines={1}>
-                            {profile.did || 'Not generated'}
+                            {profile.did || t('profile.notGenerated')}
                         </Text>
                     </RNView>
                     <Ionicons name="copy-outline" size={18} color={p.textMuted} />
                 </Pressable>
-                <Text style={styles.privacyNote}>
-                    Apps receive a unique derived ID, so they cannot track you across services.
-                </Text>
+                <Text style={styles.privacyNote}>{t('profile.privacyNote')}</Text>
 
                 {/* Personal Data */}
-                <Text style={styles.sectionTitle}>PERSONAL DATA</Text>
-                <Text style={styles.sectionDescription}>
-                    Manage your identity attributes and import data from external accounts.
-                </Text>
+                <Text style={styles.sectionTitle}>{t('profile.sectionPersonalData')}</Text>
+                <Text style={styles.sectionDescription}>{t('profile.sectionPersonalDataHint')}</Text>
 
                 <Pressable
                     style={styles.sharingCard}
@@ -341,11 +353,11 @@ export default function ProfileScreen() {
                             <Ionicons name="document-text-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>Manage Attributes</Text>
+                            <Text style={styles.sharingLabel}>{t('profile.manageAttributes')}</Text>
                             <Text style={styles.sharingDetail}>
                                 {profile.attributes.length === 0
-                                    ? 'No attributes yet'
-                                    : `${profile.attributes.length} attribute${profile.attributes.length !== 1 ? 's' : ''}`}
+                                    ? t('profile.noAttributes')
+                                    : t('profile.attributeCount', { count: profile.attributes.length })}
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
@@ -362,10 +374,8 @@ export default function ProfileScreen() {
                             <Ionicons name="shield-checkmark-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>ID Verify & Import</Text>
-                            <Text style={styles.sharingDetail}>
-                                Scan your passport or national ID for government-verified attributes
-                            </Text>
+                            <Text style={styles.sharingLabel}>{t('profile.idVerify')}</Text>
+                            <Text style={styles.sharingDetail}>{t('profile.idVerifyHint')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
@@ -381,10 +391,9 @@ export default function ProfileScreen() {
                             <Ionicons name="cloud-download-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>Import Data</Text>
-                            <Text style={styles.sharingDetail}>
-                                Import from Google, LinkedIn, Microsoft or GitHub
-                            </Text>
+                            <Text style={styles.sharingLabel}>{t('profile.importData')}</Text>
+                            {/* Provider names are brands and stay as they are. */}
+                            <Text style={styles.sharingDetail}>{t('profile.importDataHint')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
@@ -400,10 +409,8 @@ export default function ProfileScreen() {
                             <Ionicons name="share-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>Export Data</Text>
-                            <Text style={styles.sharingDetail}>
-                                Choose what to export, or export everything as JSON
-                            </Text>
+                            <Text style={styles.sharingLabel}>{t('profile.exportData')}</Text>
+                            <Text style={styles.sharingDetail}>{t('profile.exportDataHint')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
@@ -411,10 +418,8 @@ export default function ProfileScreen() {
 
                 {/* Data Sharing — above recovery: reviewing what left the
                     wallet is the more frequent task. */}
-                <Text style={styles.sectionTitle}>DATA SHARING</Text>
-                <Text style={styles.sectionDescription}>
-                    Review what you've shared with services.
-                </Text>
+                <Text style={styles.sectionTitle}>{t('profile.sectionDataSharing')}</Text>
+                <Text style={styles.sectionDescription}>{t('profile.sectionDataSharingHint')}</Text>
 
                 <Pressable
                     style={styles.sharingCard}
@@ -425,11 +430,11 @@ export default function ProfileScreen() {
                             <Ionicons name="time-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>Consent History</Text>
+                            <Text style={styles.sharingLabel}>{t('profile.consentHistory')}</Text>
                             <Text style={styles.sharingDetail}>
                                 {consentRecordCount === 0
-                                    ? 'No sharing events yet'
-                                    : `${consentRecordCount} event${consentRecordCount !== 1 ? 's' : ''}`}
+                                    ? t('profile.noSharingEvents')
+                                    : t('profile.eventCount', { count: consentRecordCount })}
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
@@ -437,10 +442,8 @@ export default function ProfileScreen() {
                 </Pressable>
 
                 {/* Account Recovery */}
-                <Text style={styles.sectionTitle}>ACCOUNT RECOVERY</Text>
-                <Text style={styles.sectionDescription}>
-                    Set up recovery options in case you lose access to your device.
-                </Text>
+                <Text style={styles.sectionTitle}>{t('profile.sectionRecovery')}</Text>
+                <Text style={styles.sectionDescription}>{t('profile.sectionRecoveryHint')}</Text>
 
                 <Pressable
                     style={styles.sharingCard}
@@ -455,7 +458,7 @@ export default function ProfileScreen() {
                             />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>Recovery Settings</Text>
+                            <Text style={styles.sharingLabel}>{t('profile.recoverySettings')}</Text>
                             <Text
                                 style={[
                                     styles.sharingDetail,
@@ -463,8 +466,8 @@ export default function ProfileScreen() {
                                 ]}
                             >
                                 {recoveryPhraseSaved
-                                    ? 'Backup codes, guardians & devices'
-                                    : 'Save your recovery phrase'}
+                                    ? t('profile.recoveryConfigured')
+                                    : t('home.savePhraseTitle')}
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
@@ -480,32 +483,30 @@ export default function ProfileScreen() {
                             <Ionicons name="key-outline" size={20} color={p.warnText} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>Recover Account</Text>
-                            <Text style={styles.sharingDetail}>
-                                Lost access? Start recovery here
-                            </Text>
+                            <Text style={styles.sharingLabel}>{t('profile.recoverAccount')}</Text>
+                            <Text style={styles.sharingDetail}>{t('profile.recoverAccountHint')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
 
                 {/* Profile metadata */}
-                <Text style={styles.sectionTitle}>DETAILS</Text>
+                <Text style={styles.sectionTitle}>{t('profile.sectionDetails')}</Text>
                 <RNView style={styles.metaCard}>
                     <RNView style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Created</Text>
+                        <Text style={styles.metaLabel}>{t('profile.created')}</Text>
                         <Text style={styles.metaValue}>
-                            {new Date(profile.createdAt * 1000).toLocaleDateString()}
+                            {t('time.onDate', { when: new Date(profile.createdAt * 1000) })}
                         </Text>
                     </RNView>
                     <RNView style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Last updated</Text>
+                        <Text style={styles.metaLabel}>{t('profile.lastUpdated')}</Text>
                         <Text style={styles.metaValue}>
-                            {new Date(profile.updatedAt * 1000).toLocaleDateString()}
+                            {t('time.onDate', { when: new Date(profile.updatedAt * 1000) })}
                         </Text>
                     </RNView>
                     <RNView style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Data attributes</Text>
+                        <Text style={styles.metaLabel}>{t('profile.dataAttributes')}</Text>
                         <Text style={styles.metaValue}>{profile.attributes.length}</Text>
                     </RNView>
                 </RNView>
@@ -513,36 +514,32 @@ export default function ProfileScreen() {
                 {/* Danger Zone */}
                 <RNView style={styles.dangerSection}>
                     <RNView style={styles.dangerDivider} />
-                    <Text style={styles.dangerTitle}>Danger Zone</Text>
-                    <Text style={styles.dangerDescription}>
-                        Registered credentials are the keys this device holds for your
-                        accounts. Removing one can permanently lock you out of that
-                        account. Signing in again creates a new, empty identity, and
-                        only account recovery brings the old one back.
-                    </Text>
+                    <Text style={styles.dangerTitle}>{t('profile.dangerZone')}</Text>
+                    <Text style={styles.dangerDescription}>{t('profile.dangerCredentials')}</Text>
                     <Pressable
                         style={styles.dangerButton}
                         onPress={() => router.push('/credentials' as never)}
                     >
                         <Ionicons name="key-outline" size={18} color={p.danger} />
                         <Text style={styles.dangerButtonText}>
-                            Registered credentials{credentials.length > 0 ? ` (${credentials.length})` : ''}
+                            {credentials.length > 0
+                                ? t('profile.registeredCredentialsCount', { count: credentials.length })
+                                : t('profile.registeredCredentials')}
                         </Text>
                     </Pressable>
                     <Text style={[styles.dangerDescription, { marginTop: 16 }]}>
-                        Clearing all data removes your profile, credentials, trusted
-                        apps, and everything else stored on this device.
+                        {t('profile.dangerClearHint')}
                     </Text>
                     <Pressable
                         style={styles.dangerButton}
                         onPress={() => {
                             Alert.alert(
-                                'Clear All Data',
-                                'This will permanently remove your profile, all credentials, trusted apps, and local data. This cannot be undone.',
+                                t('profile.clearAllData'),
+                                t('profile.clearAllDataBody'),
                                 [
-                                    { text: 'Cancel', style: 'cancel' },
+                                    { text: t('common.cancel'), style: 'cancel' },
                                     {
-                                        text: 'Clear Everything',
+                                        text: t('profile.clearEverything'),
                                         style: 'destructive',
                                         onPress: () => {
                                             for (const cred of credentials) {
@@ -572,7 +569,7 @@ export default function ProfileScreen() {
                         }}
                     >
                         <Ionicons name="trash-outline" size={18} color={p.danger} />
-                        <Text style={styles.dangerButtonText}>Clear All Data</Text>
+                        <Text style={styles.dangerButtonText}>{t('profile.clearAllData')}</Text>
                     </Pressable>
                 </RNView>
             </ScrollView>

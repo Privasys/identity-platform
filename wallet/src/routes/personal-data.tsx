@@ -27,11 +27,13 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES } from '@/services/attributes';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
 export default function PersonalDataScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
@@ -47,12 +49,12 @@ export default function PersonalDataScreen() {
 
     const handleRemoveAttribute = (attr: ProfileAttribute) => {
         Alert.alert(
-            `Remove ${attr.label}?`,
-            'This value will no longer be available for sharing.',
+            t('personalData.removeTitle', { label: attr.label }),
+            t('personalData.removeBody'),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Remove',
+                    text: t('common.remove'),
                     style: 'destructive',
                     onPress: () => {
                         // Other values stored under the same key (multi-valued attrs).
@@ -126,24 +128,20 @@ export default function PersonalDataScreen() {
 
     return (
         <RNView style={styles.screen}>
-            <SubPageHeader title="Personal Data" />
+            <SubPageHeader title={t('personalData.title')} />
 
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                <Text style={styles.sectionDescription}>
-                    Attributes you can selectively share with services. Tap to expand, swipe to delete.
-                </Text>
+                <Text style={styles.sectionDescription}>{t('personalData.description')}</Text>
 
                 {/* Attribute cards */}
                 {profile.attributes.length === 0 ? (
                     <RNView style={styles.emptyCard}>
                         <Ionicons name="document-text-outline" size={32} color={p.textMuted} />
-                        <Text style={styles.emptyCardText}>
-                            No attributes yet. Import from an account or add manually.
-                        </Text>
+                        <Text style={styles.emptyCardText}>{t('personalData.empty')}</Text>
                     </RNView>
                 ) : (
                     sortedAttributes.map((attr) => (
@@ -159,7 +157,7 @@ export default function PersonalDataScreen() {
                                     value: newValue,
                                     source: 'manual',
                                     sourceProvider: undefined,
-                                    sources: [{ source: 'manual', displayName: 'Manual', addedAt: now }],
+                                    sources: [{ source: 'manual', displayName: t('personalData.sourceManual'), addedAt: now }],
                                     verified: false,
                                     verifications: [],
                                 });
@@ -180,7 +178,7 @@ export default function PersonalDataScreen() {
                             style={styles.addAttrInput}
                             value={newAttrValue}
                             onChangeText={setNewAttrValue}
-                            placeholder="Enter value..."
+                            placeholder={t('personalData.enterValue')}
                             placeholderTextColor={p.textMuted}
                             autoFocus
                             autoCapitalize={addingAttribute === 'email' ? 'none' : 'words'}
@@ -188,14 +186,14 @@ export default function PersonalDataScreen() {
                         />
                         <RNView style={styles.addAttrActions}>
                             <Pressable onPress={() => setAddingAttribute(null)}>
-                                <Text style={styles.addAttrCancel}>Cancel</Text>
+                                <Text style={styles.addAttrCancel}>{t('common.cancel')}</Text>
                             </Pressable>
                             <Pressable
                                 style={[styles.addAttrSave, !newAttrValue.trim() && { opacity: 0.4 }]}
                                 onPress={handleSaveNewAttribute}
                                 disabled={!newAttrValue.trim()}
                             >
-                                <Text style={styles.addAttrSaveText}>Save</Text>
+                                <Text style={styles.addAttrSaveText}>{t('common.save')}</Text>
                             </Pressable>
                         </RNView>
                     </RNView>
@@ -230,6 +228,7 @@ export default function PersonalDataScreen() {
 // ── Attribute card with provenance details ──────────────────────────────
 
 function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onRemove: () => void; onEdit: (newValue: string) => void }) {
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const [expanded, setExpanded] = useState(false);
@@ -238,11 +237,11 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
 
     const sourceLabel =
         attr.source === 'provider' && attr.sourceProvider
-            ? `via ${attr.sourceProvider}`
+            ? t('personalData.viaProvider', { provider: attr.sourceProvider })
             : attr.source === 'manual'
-            ? 'entered manually'
+            ? t('personalData.enteredManually')
             : attr.source === 'document'
-            ? 'from document'
+            ? t('personalData.fromDocument')
             : attr.source;
 
     // Every party that has asserted this value. More than one = confirmations
@@ -251,19 +250,11 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
     const confirmed = sources && sources.length > 1;
 
     const acquiredDate = attr.acquiredAt
-        ? new Date(attr.acquiredAt * 1000).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-          })
+        ? t('time.onDateLong', { when: new Date(attr.acquiredAt * 1000) })
         : null;
 
     const updatedDate = attr.updatedAt
-        ? new Date(attr.updatedAt * 1000).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-          })
+        ? t('time.onDateLong', { when: new Date(attr.updatedAt * 1000) })
         : null;
 
     // Image attributes (everyday avatar + the gov ID portrait) render as a
@@ -274,11 +265,11 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
         if (isImage) return;
         if (attr.verified) {
             Alert.alert(
-                'Edit verified attribute?',
-                'This attribute has been verified. Editing it will remove the verification status.',
+                t('personalData.editVerifiedTitle'),
+                t('personalData.editVerifiedBody'),
                 [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Edit Anyway', onPress: () => { setEditing(true); setEditValue(attr.value); } },
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('personalData.editAnyway'), onPress: () => { setEditing(true); setEditValue(attr.value); } },
                 ],
             );
         } else {
@@ -298,7 +289,7 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
     const renderRightActions = () => (
         <Pressable style={styles.swipeDeleteAction} onPress={onRemove}>
             <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.swipeDeleteText}>Delete</Text>
+            <Text style={styles.swipeDeleteText}>{t('common.delete')}</Text>
         </Pressable>
     );
 
@@ -356,19 +347,21 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                             {attr.verified ? (
                                 <RNView style={styles.verifiedBadge}>
                                     <Ionicons name="checkmark-circle" size={12} color={p.green} />
-                                    <Text style={styles.verifiedText}>Verified</Text>
+                                    <Text style={styles.verifiedText}>{t('personalData.verified')}</Text>
                                 </RNView>
                             ) : (
                                 <RNView style={styles.verifiedBadge}>
                                     <Ionicons name="alert-circle-outline" size={12} color={p.warnText} />
-                                    <Text style={[styles.verifiedText, { color: p.warnText }]}>Unverified</Text>
+                                    <Text style={[styles.verifiedText, { color: p.warnText }]}>
+                                        {t('personalData.unverified')}
+                                    </Text>
                                 </RNView>
                             )}
                             {confirmed ? (
                                 <RNView style={styles.confirmBadge}>
                                     <Ionicons name="shield-checkmark" size={12} color={p.blue} />
                                     <Text style={styles.confirmText}>
-                                        Confirmed by {sources!.length} sources
+                                        {t('personalData.confirmedBy', { count: sources!.length })}
                                     </Text>
                                 </RNView>
                             ) : (
@@ -380,26 +373,26 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                             <RNView style={styles.provenanceSection}>
                                 {acquiredDate && (
                                     <RNView style={styles.provenanceRow}>
-                                        <Text style={styles.provenanceLabel}>Acquired</Text>
+                                        <Text style={styles.provenanceLabel}>{t('personalData.acquired')}</Text>
                                         <Text style={styles.provenanceValue}>{acquiredDate}</Text>
                                     </RNView>
                                 )}
                                 {updatedDate && updatedDate !== acquiredDate && (
                                     <RNView style={styles.provenanceRow}>
-                                        <Text style={styles.provenanceLabel}>Updated</Text>
+                                        <Text style={styles.provenanceLabel}>{t('personalData.updated')}</Text>
                                         <Text style={styles.provenanceValue}>{updatedDate}</Text>
                                     </RNView>
                                 )}
                                 {sources && sources.length > 0 && (
                                     <>
                                         <Text style={[styles.provenanceLabel, { marginTop: 8, marginBottom: 4 }]}>
-                                            Sources
+                                            {t('personalData.sources')}
                                         </Text>
                                         {sources.map((s, i) => (
                                             <RNView key={i} style={styles.provenanceRow}>
                                                 <Text style={styles.provenanceValue}>{s.displayName}</Text>
                                                 <Text style={styles.provenanceValue}>
-                                                    {new Date(s.addedAt * 1000).toLocaleDateString()}
+                                                    {t('time.onDate', { when: new Date(s.addedAt * 1000) })}
                                                 </Text>
                                             </RNView>
                                         ))}
@@ -408,26 +401,26 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                                 {(attr.verifications ?? []).length > 0 && (
                                     <>
                                         <Text style={[styles.provenanceLabel, { marginTop: 8, marginBottom: 4 }]}>
-                                            Verification Records
+                                            {t('personalData.verificationRecords')}
                                         </Text>
                                         {attr.verifications!.map((v, i) => (
                                             <RNView key={i} style={styles.verificationCard}>
                                                 <RNView style={styles.provenanceRow}>
-                                                    <Text style={styles.provenanceLabel}>Verifier</Text>
+                                                    <Text style={styles.provenanceLabel}>{t('personalData.verifier')}</Text>
                                                     <Text style={styles.provenanceValue}>
                                                         {v.verifierDisplayName}
                                                     </Text>
                                                 </RNView>
                                                 <RNView style={styles.provenanceRow}>
-                                                    <Text style={styles.provenanceLabel}>Method</Text>
+                                                    <Text style={styles.provenanceLabel}>{t('personalData.method')}</Text>
                                                     <Text style={styles.provenanceValue}>
                                                         {v.method.replace(/_/g, ' ')}
                                                     </Text>
                                                 </RNView>
                                                 <RNView style={styles.provenanceRow}>
-                                                    <Text style={styles.provenanceLabel}>Verified</Text>
+                                                    <Text style={styles.provenanceLabel}>{t('personalData.verified')}</Text>
                                                     <Text style={styles.provenanceValue}>
-                                                        {new Date(v.verifiedAt * 1000).toLocaleDateString()}
+                                                        {t('time.onDate', { when: new Date(v.verifiedAt * 1000) })}
                                                     </Text>
                                                 </RNView>
                                             </RNView>

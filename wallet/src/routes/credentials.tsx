@@ -29,6 +29,8 @@ import { Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useAuthStore, type Credential } from '@/stores/auth';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
@@ -36,12 +38,13 @@ import { useTrustedAppsStore } from '@/stores/trusted-apps';
 const IDP_RP = new URL(process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id').hostname;
 
 /** Short, stable account discriminator from the credential's userHandle. */
-function shortAccount(userHandle: string | undefined): string {
-    if (!userHandle) return 'unknown account';
-    return `account ${userHandle.slice(0, 8)}…`;
+function shortAccount(userHandle: string | undefined, t: TFunction): string {
+    if (!userHandle) return t('credentials.unknownAccount');
+    return t('credentials.accountShort', { id: userHandle.slice(0, 8) });
 }
 
 export default function CredentialsScreen() {
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const insets = useSafeAreaInsets();
@@ -55,21 +58,20 @@ export default function CredentialsScreen() {
     const removeOne = (cred: Credential) => {
         if (cred.rpId === IDP_RP) {
             const isActive = activeIdp?.credentialId === cred.credentialId;
+            // Two complete messages rather than one assembled from clauses:
+            // the "the one your sign-ins currently use" aside does not attach
+            // to the same place in every language.
             Alert.alert(
-                isActive ? 'Remove your account key?' : 'Remove an account key?',
-                `This is the key to your Privasys ${shortAccount(cred.userHandle)}` +
-                    (isActive ? ', the one your sign-ins currently use.' : '.') +
-                    '\n\nRemoving it permanently discards this device’s only way to ' +
-                    'prove that identity. Signing in again will NOT restore it: a new ' +
-                    'registration creates a NEW, empty account. Everything bound to ' +
-                    'this account (app ownership, roles, vault approvals) stays ' +
-                    'locked until you run account recovery with its recovery phrase.' +
-                    '\n\nOnly remove this if you are certain the account is disposable ' +
-                    'or safely held elsewhere.',
+                isActive
+                    ? t('credentials.removeActiveKeyTitle')
+                    : t('credentials.removeKeyTitle'),
+                isActive
+                    ? t('credentials.removeActiveKeyBody', { account: shortAccount(cred.userHandle, t) })
+                    : t('credentials.removeKeyBody', { account: shortAccount(cred.userHandle, t) }),
                 [
-                    { text: 'Cancel', style: 'cancel' },
+                    { text: t('common.cancel'), style: 'cancel' },
                     {
-                        text: 'Permanently remove key',
+                        text: t('credentials.permanentlyRemove'),
                         style: 'destructive',
                         onPress: () => {
                             removeCredential(cred.credentialId);
@@ -81,14 +83,12 @@ export default function CredentialsScreen() {
             return;
         }
         Alert.alert(
-            'Remove credential',
-            `Remove the passkey for ${cred.rpId}? You will register again the next ` +
-                'time you sign in to that app; anything stored under your current ' +
-                'identity there may not carry over.',
+            t('credentials.removeCredentialTitle'),
+            t('credentials.removeCredentialBody', { host: cred.rpId }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Remove',
+                    text: t('common.remove'),
                     style: 'destructive',
                     onPress: () => {
                         removeCredential(cred.credentialId);
@@ -102,18 +102,17 @@ export default function CredentialsScreen() {
     const removeAll = () => {
         const idpCount = credentials.filter((c) => c.rpId === IDP_RP).length;
         Alert.alert(
-            'Remove all credentials',
-            `This removes all ${credentials.length} credentials` +
-                (idpCount > 0
-                    ? `, including ${idpCount} Privasys account key${idpCount > 1 ? 's' : ''}. ` +
-                      'Those accounts become unreachable until account recovery: a fresh ' +
-                      'sign-in creates new, empty identities, not the old ones.'
-                    : '.') +
-                ' Continue?',
+            t('credentials.removeAllTitle'),
+            idpCount > 0
+                ? t('credentials.removeAllBodyWithAccounts', {
+                    total: credentials.length,
+                    count: idpCount
+                })
+                : t('credentials.removeAllBody', { count: credentials.length }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Remove all',
+                    text: t('credentials.removeAll'),
                     style: 'destructive',
                     onPress: () => {
                         for (const cred of [...credentials]) {
@@ -128,20 +127,16 @@ export default function CredentialsScreen() {
 
     return (
         <View style={styles.screen}>
-            <SubPageHeader title="Registered Credentials" />
+            <SubPageHeader title={t('credentials.title')} />
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
                 {credentials.length === 0 && !privasysId ? (
                     <View style={styles.emptyCard}>
                         <Ionicons name="key-outline" size={32} color={p.textMuted} />
-                        <Text style={styles.emptyText}>No credentials registered yet</Text>
+                        <Text style={styles.emptyText}>{t('credentials.empty')}</Text>
                     </View>
                 ) : (
                     <>
-                        <Text style={styles.intro}>
-                            The keys this device holds. Privasys account keys cannot be
-                            re-created by signing in again. Removing one locks that
-                            account until recovery.
-                        </Text>
+                        <Text style={styles.intro}>{t('credentials.intro')}</Text>
                         {credentials.map((cred) => {
                             const isIdp = cred.rpId === IDP_RP;
                             const isActive = isIdp && activeIdp?.credentialId === cred.credentialId;
@@ -149,24 +144,26 @@ export default function CredentialsScreen() {
                                 <View key={cred.credentialId} style={styles.card}>
                                     <View style={styles.info}>
                                         <Text style={styles.rp}>
-                                            {isIdp ? `Privasys ${shortAccount(cred.userHandle)}` : cred.rpId}
+                                            {isIdp
+                                                ? t('credentials.privasysAccount', {
+                                                    account: shortAccount(cred.userHandle, t)
+                                                })
+                                                : cred.rpId}
                                         </Text>
                                         {isActive ? (
-                                            <Text style={styles.activeBadge}>
-                                                Active: your sign-ins use this key
-                                            </Text>
+                                            <Text style={styles.activeBadge}>{t('credentials.activeBadge')}</Text>
                                         ) : isIdp ? (
-                                            <Text style={styles.inactiveBadge}>
-                                                Not used for sign-ins (other account)
-                                            </Text>
+                                            <Text style={styles.inactiveBadge}>{t('credentials.inactiveBadge')}</Text>
                                         ) : null}
                                         <Text style={styles.meta}>
-                                            {cred.userName} · Registered{' '}
-                                            {new Date(cred.registeredAt * 1000).toLocaleDateString()}
+                                            {t('credentials.registeredMeta', {
+                                                user: cred.userName,
+                                                when: new Date(cred.registeredAt * 1000)
+                                            })}
                                         </Text>
                                     </View>
                                     <Pressable onPress={() => removeOne(cred)} hitSlop={8}>
-                                        <Text style={styles.remove}>Remove</Text>
+                                        <Text style={styles.remove}>{t('common.remove')}</Text>
                                     </Pressable>
                                 </View>
                             );
@@ -176,19 +173,18 @@ export default function CredentialsScreen() {
                             <View style={styles.card}>
                                 <View style={styles.info}>
                                     <Text style={styles.rp}>
-                                        Privasys ID meta-{shortAccount(privasysId.userId)}
+                                        {t('credentials.metaAccount', {
+                                            account: shortAccount(privasysId.userId, t)
+                                        })}
                                     </Text>
-                                    <Text style={styles.meta}>
-                                        Your wallet&apos;s own account (recovery management).
-                                        Managed automatically, not removable here.
-                                    </Text>
+                                    <Text style={styles.meta}>{t('credentials.metaAccountHint')}</Text>
                                 </View>
                             </View>
                         ) : null}
 
                         <Pressable style={styles.removeAll} onPress={removeAll}>
                             <Ionicons name="trash-outline" size={18} color={p.danger} />
-                            <Text style={styles.removeAllText}>Remove all credentials</Text>
+                            <Text style={styles.removeAllText}>{t('credentials.removeAllTitle')}</Text>
                         </Pressable>
                     </>
                 )}

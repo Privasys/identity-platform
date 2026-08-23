@@ -21,6 +21,8 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { attributeLabel } from '@/services/attributes';
@@ -37,26 +39,19 @@ const makeDecisionColors = (p: Palette): Record<string, { bg: string; text: stri
 });
 
 /** Format epoch seconds to readable date/time. */
-function formatDate(epoch: number): string {
-    const d = new Date(epoch * 1000);
-    return d.toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+function formatDate(epoch: number, t: TFunction): string {
+    return t('time.onDateTime', { when: new Date(epoch * 1000) });
 }
 
 /** Short relative time (e.g. "2h ago", "3d ago"). */
-function relativeTime(epoch: number): string {
+function relativeTime(epoch: number, t: TFunction): string {
     const now = Math.floor(Date.now() / 1000);
     const diff = now - epoch;
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return formatDate(epoch);
+    if (diff < 60) return t('time.justNowCapitalised');
+    if (diff < 3600) return t('time.minutesAgo', { count: Math.floor(diff / 60) });
+    if (diff < 86400) return t('time.hoursAgo', { count: Math.floor(diff / 3600) });
+    if (diff < 604800) return t('time.daysAgo', { count: Math.floor(diff / 86400) });
+    return formatDate(epoch, t);
 }
 
 /** Extract unique app names from records. */
@@ -71,6 +66,7 @@ function uniqueApps(records: ConsentRecord[]): { rpId: string; name: string }[] 
 }
 
 export default function ConsentHistoryScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const p = usePalette();
@@ -107,11 +103,11 @@ export default function ConsentHistoryScreen() {
 
     const handleClearHistory = () => {
         Alert.alert(
-            'Clear consent history?',
-            'This removes the record of past decisions. It does not change your active auto-share rules.',
+            t('history.clearTitle'),
+            t('history.clearBody'),
             [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Clear all', style: 'destructive', onPress: () => clearRecords() }
+                { text: t('common.cancel'), style: 'cancel' },
+                { text: t('history.clearAll'), style: 'destructive', onPress: () => clearRecords() }
             ]
         );
     };
@@ -124,12 +120,12 @@ export default function ConsentHistoryScreen() {
     const handleRevokeStanding = (consent: StandingConsent) => {
         const appName = apps.find((a) => a.rpId === consent.rpId)?.name ?? consent.rpId;
         Alert.alert(
-            `Revoke standing consent?`,
-            `${appName} will need to request your data again each time.`,
+            t('history.revokeTitle'),
+            t('history.revokeBody', { app: appName }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Revoke',
+                    text: t('history.revoke'),
                     style: 'destructive',
                     onPress: () => removeStandingConsent(consent.rpId)
                 }
@@ -144,7 +140,7 @@ export default function ConsentHistoryScreen() {
                 <Pressable onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color={p.card} />
                 </Pressable>
-                <Text style={styles.headerTitle}>Consent History</Text>
+                <Text style={styles.headerTitle}>{t('profile.consentHistory')}</Text>
                 <RNView style={{ width: 32 }} />
             </RNView>
 
@@ -163,10 +159,10 @@ export default function ConsentHistoryScreen() {
                             ]}
                         >
                             {tab === 'history'
-                                ? `History (${filteredRecords.length})`
+                                ? t('history.tabHistory', { count: filteredRecords.length })
                                 : tab === 'standing'
-                                  ? `Auto-share (${standingConsents.length})`
-                                  : `Receipts (${filteredReceipts.length})`}
+                                  ? t('history.tabStanding', { count: standingConsents.length })
+                                  : t('history.tabReceipts', { count: filteredReceipts.length })}
                         </Text>
                     </Pressable>
                 ))}
@@ -185,7 +181,7 @@ export default function ConsentHistoryScreen() {
                         onPress={() => setFilterApp(null)}
                     >
                         <Text style={[styles.filterChipText, !filterApp && styles.filterChipTextActive]}>
-                            All
+                            {t('history.filterAll')}
                         </Text>
                     </Pressable>
                     {apps.map((app) => (
@@ -221,7 +217,7 @@ export default function ConsentHistoryScreen() {
                                 <Ionicons name="search" size={16} color={p.textMuted} />
                                 <TextInput
                                     style={styles.searchInput}
-                                    placeholder="Search by app, attribute, or decision"
+                                    placeholder={t('history.searchPlaceholder')}
                                     placeholderTextColor={p.textMuted}
                                     value={search}
                                     onChangeText={setSearch}
@@ -235,12 +231,12 @@ export default function ConsentHistoryScreen() {
                             <RNView style={styles.emptyState}>
                                 <Ionicons name="time-outline" size={48} color={p.textMuted} />
                                 <Text style={styles.emptyTitle}>
-                                    {search.trim() ? 'No matching records' : 'No consent history'}
+                                    {search.trim() ? t('history.noMatches') : t('history.empty')}
                                 </Text>
                                 <Text style={styles.emptyText}>
                                     {search.trim()
-                                        ? 'Try a different search.'
-                                        : 'Your data sharing decisions will appear here.'}
+                                        ? t('history.tryDifferentSearch')
+                                        : t('history.emptyHint')}
                                 </Text>
                             </RNView>
                         ) : (
@@ -255,7 +251,7 @@ export default function ConsentHistoryScreen() {
                                 ))}
                                 <Pressable style={styles.clearAllButton} onPress={handleClearHistory}>
                                     <Ionicons name="trash-outline" size={16} color={p.danger} />
-                                    <Text style={styles.clearAllText}>Clear all history</Text>
+                                    <Text style={styles.clearAllText}>{t('history.clearAllHistory')}</Text>
                                 </Pressable>
                             </>
                         )}
@@ -267,10 +263,8 @@ export default function ConsentHistoryScreen() {
                         {standingConsents.length === 0 ? (
                             <RNView style={styles.emptyState}>
                                 <Ionicons name="repeat-outline" size={48} color={p.textMuted} />
-                                <Text style={styles.emptyTitle}>No auto-share rules</Text>
-                                <Text style={styles.emptyText}>
-                                    When you approve "always share" for an app, it will appear here.
-                                </Text>
+                                <Text style={styles.emptyTitle}>{t('history.noStanding')}</Text>
+                                <Text style={styles.emptyText}>{t('history.noStandingHint')}</Text>
                             </RNView>
                         ) : (
                             standingConsents.map((consent) => (
@@ -290,10 +284,8 @@ export default function ConsentHistoryScreen() {
                         {filteredReceipts.length === 0 ? (
                             <RNView style={styles.emptyState}>
                                 <Ionicons name="receipt-outline" size={48} color={p.textMuted} />
-                                <Text style={styles.emptyTitle}>No receipts yet</Text>
-                                <Text style={styles.emptyText}>
-                                    Computation receipts from enclaves will appear here after data processing.
-                                </Text>
+                                <Text style={styles.emptyTitle}>{t('history.noReceipts')}</Text>
+                                <Text style={styles.emptyText}>{t('history.noReceiptsHint')}</Text>
                             </RNView>
                         ) : (
                             filteredReceipts.map((receipt) => (
@@ -318,6 +310,7 @@ function ConsentRecordCard({
     onDelete: () => void;
 }) {
     const p = usePalette();
+    const { t } = useTranslation();
     const styles = useMemo(() => makeStyles(p), [p]);
     const DECISION_COLORS = useMemo(() => makeDecisionColors(p), [p]);
     const [expanded, setExpanded] = useState(false);
@@ -333,7 +326,7 @@ function ConsentRecordCard({
         <RNView style={styles.swipeDeleteWrap}>
             <Pressable style={styles.swipeDelete} onPress={onDelete} accessibilityLabel="Delete record">
                 <Ionicons name="trash" size={20} color="#FFFFFF" />
-                <Text style={styles.swipeDeleteText}>Delete</Text>
+                <Text style={styles.swipeDeleteText}>{t('common.delete')}</Text>
             </Pressable>
         </RNView>
     );
@@ -354,7 +347,7 @@ function ConsentRecordCard({
                     <Text style={styles.recordAppName}>
                         {record.appName ?? record.rpId}
                     </Text>
-                    <Text style={styles.recordTime}>{relativeTime(record.consentedAt)}</Text>
+                    <Text style={styles.recordTime}>{relativeTime(record.consentedAt, t)}</Text>
                 </RNView>
                 <RNView style={[styles.decisionBadge, { backgroundColor: colors.bg }]}>
                     <Text style={[styles.decisionText, { color: colors.text }]}>
@@ -368,7 +361,7 @@ function ConsentRecordCard({
                     <RNView style={styles.attributeChips}>
                         <Ionicons name="checkmark-circle" size={14} color={p.green} />
                         <Text style={styles.chipText}>
-                            {record.approvedAttributes.length} shared
+                            {t('serviceDetail.sharedCount', { count: record.approvedAttributes.length })}
                         </Text>
                     </RNView>
                 )}
@@ -376,7 +369,7 @@ function ConsentRecordCard({
                     <RNView style={styles.attributeChips}>
                         <Ionicons name="close-circle" size={14} color={p.danger} />
                         <Text style={styles.chipText}>
-                            {record.deniedAttributes.length} denied
+                            {t('history.deniedCount', { count: record.deniedAttributes.length })}
                         </Text>
                     </RNView>
                 )}
@@ -388,7 +381,7 @@ function ConsentRecordCard({
                             color={standingActive ? p.blue : p.textMuted}
                         />
                         <Text style={[styles.chipText, !standingActive && styles.chipTextMuted]}>
-                            {standingActive ? 'Auto-share' : 'Auto-share · revoked'}
+                            {standingActive ? t('history.autoShare') : t('history.autoShareRevoked')}
                         </Text>
                     </RNView>
                 )}
@@ -398,7 +391,7 @@ function ConsentRecordCard({
                 <RNView style={styles.recordDetails}>
                     {record.approvedAttributes.length > 0 && (
                         <>
-                            <Text style={styles.detailLabel}>SHARED</Text>
+                            <Text style={styles.detailLabel}>{t('history.labelShared')}</Text>
                             {record.approvedAttributes.map((a) => (
                                 <Text key={a} style={styles.detailItem}>✓ {attributeLabel(a)}</Text>
                             ))}
@@ -406,17 +399,17 @@ function ConsentRecordCard({
                     )}
                     {record.deniedAttributes.length > 0 && (
                         <>
-                            <Text style={[styles.detailLabel, { marginTop: 8 }]}>DENIED</Text>
+                            <Text style={[styles.detailLabel, { marginTop: 8 }]}>{t('history.labelDenied')}</Text>
                             {record.deniedAttributes.map((a) => (
                                 <Text key={a} style={styles.detailItem}>✗ {attributeLabel(a)}</Text>
                             ))}
                         </>
                     )}
-                    <Text style={[styles.detailLabel, { marginTop: 8 }]}>ENCLAVE</Text>
+                    <Text style={[styles.detailLabel, { marginTop: 8 }]}>{t('history.labelEnclave')}</Text>
                     <Text style={styles.detailMono}>
                         {record.teeType.toUpperCase()} · {record.enclaveMeasurement.slice(0, 16)}…
                     </Text>
-                    <Text style={styles.detailTimestamp}>{formatDate(record.consentedAt)}</Text>
+                    <Text style={styles.detailTimestamp}>{formatDate(record.consentedAt, t)}</Text>
                 </RNView>
             )}
         </Pressable>
@@ -435,6 +428,7 @@ function StandingConsentCard({
     onRevoke: () => void;
 }) {
     const p = usePalette();
+    const { t } = useTranslation();
     const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <RNView style={styles.standingCard}>
@@ -442,11 +436,11 @@ function StandingConsentCard({
                 <RNView style={{ flex: 1 }}>
                     <Text style={styles.standingAppName}>{appName}</Text>
                     <Text style={styles.standingDetail}>
-                        Granted {formatDate(consent.grantedAt)}
+                        {t('history.granted', { when: formatDate(consent.grantedAt, t) })}
                     </Text>
                 </RNView>
                 <Pressable style={styles.revokeButton} onPress={onRevoke}>
-                    <Text style={styles.revokeButtonText}>Revoke</Text>
+                    <Text style={styles.revokeButtonText}>{t('history.revoke')}</Text>
                 </Pressable>
             </RNView>
             <RNView style={styles.standingAttributes}>
@@ -457,7 +451,7 @@ function StandingConsentCard({
                 ))}
             </RNView>
             <Text style={styles.standingMeasurement}>
-                Bound to measurement: {consent.enclaveMeasurement.slice(0, 16)}…
+                {t('history.boundToMeasurement', { measurement: consent.enclaveMeasurement.slice(0, 16) })}
             </Text>
         </RNView>
     );
@@ -466,6 +460,7 @@ function StandingConsentCard({
 /** Computation receipt card. */
 function ReceiptCard({ receipt }: { receipt: ComputationReceipt }) {
     const p = usePalette();
+    const { t } = useTranslation();
     const styles = useMemo(() => makeStyles(p), [p]);
     const [expanded, setExpanded] = useState(false);
 
@@ -478,7 +473,7 @@ function ReceiptCard({ receipt }: { receipt: ComputationReceipt }) {
                         {receipt.receiptId.slice(0, 12)}…
                     </Text>
                     <Text style={styles.receiptTime}>
-                        {relativeTime(receipt.receivedAt)}
+                        {relativeTime(receipt.receivedAt, t)}
                     </Text>
                 </RNView>
                 <Ionicons
@@ -490,15 +485,15 @@ function ReceiptCard({ receipt }: { receipt: ComputationReceipt }) {
 
             {expanded && (
                 <RNView style={styles.receiptDetails}>
-                    <Text style={styles.detailLabel}>ENCLAVE</Text>
+                    <Text style={styles.detailLabel}>{t('history.labelEnclave')}</Text>
                     <Text style={styles.detailMono}>{receipt.enclaveId.slice(0, 24)}…</Text>
-                    <Text style={styles.detailLabel}>CODE HASH</Text>
+                    <Text style={styles.detailLabel}>{t('history.labelCodeHash')}</Text>
                     <Text style={styles.detailMono}>{receipt.codeHash.slice(0, 24)}…</Text>
-                    <Text style={styles.detailLabel}>INPUT HASH</Text>
+                    <Text style={styles.detailLabel}>{t('history.labelInputHash')}</Text>
                     <Text style={styles.detailMono}>{receipt.inputHash.slice(0, 24)}…</Text>
-                    <Text style={styles.detailLabel}>OUTPUT HASH</Text>
+                    <Text style={styles.detailLabel}>{t('history.labelOutputHash')}</Text>
                     <Text style={styles.detailMono}>{receipt.outputHash.slice(0, 24)}…</Text>
-                    <Text style={styles.detailLabel}>SIGNATURE</Text>
+                    <Text style={styles.detailLabel}>{t('history.labelSignature')}</Text>
                     <Text style={styles.detailMono} numberOfLines={2}>
                         {receipt.signature}
                     </Text>

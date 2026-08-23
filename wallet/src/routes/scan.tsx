@@ -7,8 +7,10 @@ import { Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
+import { useTranslation } from 'react-i18next';
 
 export default function TabScanScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const p = usePalette();
@@ -189,7 +191,7 @@ export default function TabScanScreen() {
                     if (router.canGoBack()) router.back();
                     else router.replace('/(tabs)');
                 }}
-                accessibilityLabel="Close scanner"
+                accessibilityLabel={t('scan.close')}
                 hitSlop={12}
             >
                 <Ionicons name="close" size={26} color="#FFFFFF" />

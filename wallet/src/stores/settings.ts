@@ -20,9 +20,16 @@ export interface SettingsState {
     gracePeriodSec: number;
     /** Default enclave verification mode. Deterministic unless the user opts in. */
     verificationMode: VerificationMode;
+    /**
+     * Explicit app-language override as a BCP-47 tag, or null to follow the
+     * profile's `locale` attribute and then the device. Null is the default
+     * so a user who never opens this setting keeps tracking their phone.
+     */
+    language: string | null;
 
     setGracePeriod: (seconds: number) => void;
     setVerificationMode: (mode: VerificationMode) => void;
+    setLanguage: (tag: string | null) => void;
     hydrate: () => Promise<void>;
 }
 
@@ -38,6 +45,7 @@ function persist(get: () => SettingsState) {
         JSON.stringify({
             gracePeriodSec: s.gracePeriodSec,
             verificationMode: s.verificationMode,
+            language: s.language,
         })
     ).catch(console.error);
 }
@@ -45,6 +53,7 @@ function persist(get: () => SettingsState) {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     gracePeriodSec: 30,
     verificationMode: 'deterministic',
+    language: null,
 
     setGracePeriod: (seconds) => {
         set({ gracePeriodSec: seconds });
@@ -53,6 +62,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     setVerificationMode: (mode) => {
         set({ verificationMode: mode });
+        persist(get);
+    },
+
+    setLanguage: (tag) => {
+        set({ language: tag });
         persist(get);
     },
 
@@ -66,6 +80,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             }
             if (data.verificationMode === 'deterministic' || data.verificationMode === 'challenge') {
                 set({ verificationMode: data.verificationMode });
+            }
+            if (typeof data.language === 'string' || data.language === null) {
+                set({ language: data.language });
             }
         } catch {
             // Corrupted — use defaults

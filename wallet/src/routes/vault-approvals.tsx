@@ -32,6 +32,8 @@ import {
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { fetchReleaseProvenance, type ReleaseProvenance } from '@/services/release-provenance';
 import {
@@ -47,8 +49,8 @@ function shortHandle(handle: string): string {
     const parts = handle.split('/');
     return parts.length >= 2 ? `${parts[1].slice(0, 12)}…` : handle;
 }
-function shortHex(hex: string): string {
-    if (!hex) return 'None';
+function shortHex(hex: string, t: TFunction): string {
+    if (!hex) return t('common.none');
     return hex.length > 20 ? `${hex.slice(0, 10)}…${hex.slice(-6)}` : hex;
 }
 
@@ -80,16 +82,21 @@ function ReleaseLinkRow({
     );
 }
 /** Human countdown to expiry (expires_at is epoch seconds). */
-function formatRemaining(expiresAtSec: number, nowMs: number): string {
+function formatRemaining(expiresAtSec: number, nowMs: number, t: TFunction): string {
     const secs = Math.max(0, Math.round(expiresAtSec - nowMs / 1000));
-    if (secs <= 0) return 'Expired';
+    if (secs <= 0) return t('vaultApprovals.expired');
     const m = Math.floor(secs / 60);
     const s = secs % 60;
-    return m > 0 ? `Expires in ${m}m ${s}s` : `Expires in ${s}s`;
+    // Two separate keys rather than an optional minutes clause: the unit
+    // order and spacing differ by language.
+    return m > 0
+        ? t('vaultApprovals.expiresInMinutes', { minutes: m, seconds: s })
+        : t('vaultApprovals.expiresInSeconds', { count: s });
 }
 
 export default function VaultApprovalsScreen() {
     const params = useLocalSearchParams<{ vault_op?: string }>();
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
 
@@ -153,11 +160,8 @@ export default function VaultApprovalsScreen() {
             const credential = resolveApprovalCredential(req);
             if (!credential) {
                 Alert.alert(
-                    'Wrong device or identity',
-                    'This request targets a credential this device does not hold. ' +
-                        'Approve it from the device that holds it, or re-register this ' +
-                        'device to the account (Settings → Recovery).\n\n' +
-                        describeApprovalMismatch(req),
+                    t('vaultApprovals.wrongDeviceTitle'),
+                    t('vaultApprovals.wrongDeviceBody', { detail: describeApprovalMismatch(req) }),
                 );
                 return;
             }
@@ -170,14 +174,14 @@ export default function VaultApprovalsScreen() {
             // biometric shown here is already the only one.
             const approved =
                 Platform.OS === 'ios'
-                    ? await NativeKeys.authenticateForSigning('Approve vault operation')
+                    ? await NativeKeys.authenticateForSigning(t('vaultApprovals.biometricPrompt'))
                     : (
                           await LocalAuthentication.authenticateAsync({
-                              promptMessage: 'Approve vault operation',
+                              promptMessage: t('vaultApprovals.biometricPrompt'),
                               // Strong: must satisfy the time-bound AUTH_BIOMETRIC_STRONG
                               // signing key so the ensuing signature is authorised.
                               biometricsSecurityLevel: 'strong',
-                              cancelLabel: 'Cancel',
+                              cancelLabel: t('common.cancel'),
                           })
                       ).success;
             if (!approved) return;
@@ -188,7 +192,7 @@ export default function VaultApprovalsScreen() {
                 // Audit trail: a one-shot, operation-bound authentication.
                 useServiceSessionsStore.getState().record({
                     serviceKey: 'privasys-enclave-vault',
-                    displayName: 'Enclave Vault',
+                    displayName: t('vaultApprovals.enclaveVault'),
                     kind: 'approval',
                     identity: 'privasys-id',
                     rpId: req.options.publicKey.rpId ?? 'privasys.id',
@@ -198,17 +202,20 @@ export default function VaultApprovalsScreen() {
                     oneShot: true,
                     detail:
                         req.summary.operation === 'promote'
-                            ? `Approved a new version for key ${req.summary.handle}`
+                            ? t('vaultApprovals.detailPromote', { handle: req.summary.handle })
                             : req.summary.operation === 'export'
-                              ? `Approved a key export for ${req.summary.handle}`
-                              : `Approved a vault operation on ${req.summary.handle}`
+                              ? t('vaultApprovals.detailExport', { handle: req.summary.handle })
+                              : t('vaultApprovals.detailOther', { handle: req.summary.handle })
                 });
                 // Approved: the request drops off the pending list, which is the
                 // confirmation. No success popup — the biometric prompt was the
                 // deliberate action, and the terminal continues on its own.
                 forget(req.vault_op);
             } catch (e: any) {
-                Alert.alert('Approval failed', e?.message ?? 'Could not complete the approval.');
+                Alert.alert(
+                    t('vaultApprovals.approvalFailedTitle'),
+                    e?.message ?? t('vaultApprovals.approvalFailedBody')
+                );
             } finally {
                 setApprovingOp(null);
             }
@@ -218,15 +225,12 @@ export default function VaultApprovalsScreen() {
 
     return (
         <RNView style={styles.screen}>
-            <SubPageHeader title="Vault approvals" />
+            <SubPageHeader title={t('vaultApprovals.title')} />
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={p.green} />}
             >
-                <Text style={styles.subtitle}>
-                    Approve an operation you started from the CLI or portal. Each approval authorises exactly one
-                    operation.
-                </Text>
+                <Text style={styles.subtitle}>{t('vaultApprovals.subtitle')}</Text>
 
                 {loading && pending.length === 0 ? (
                     <ActivityIndicator style={styles.spinner} color={p.green} />
@@ -235,17 +239,14 @@ export default function VaultApprovalsScreen() {
                         <RNView style={styles.emptyIcon}>
                             <Ionicons name="checkmark-circle" size={30} color={p.green} />
                         </RNView>
-                        <Text style={styles.emptyTitle}>No pending approvals</Text>
-                        <Text style={styles.emptyBody}>
-                            Requests appear here for a few minutes after you start an operation that needs your
-                            approval. If one expired, restart it from your terminal.
-                        </Text>
+                        <Text style={styles.emptyTitle}>{t('vaultApprovals.emptyTitle')}</Text>
+                        <Text style={styles.emptyBody}>{t('vaultApprovals.emptyBody')}</Text>
                     </RNView>
                 ) : (
                     pending.map((req) => {
                         const highlighted = params.vault_op === req.vault_op;
                         const busy = approvingOp === req.vault_op;
-                        const remaining = formatRemaining(req.expires_at, now);
+                        const remaining = formatRemaining(req.expires_at, now, t);
                         const urgent = req.expires_at - now / 1000 < 60;
                         const s = req.summary;
                         const subject = s.app_name || shortHandle(s.handle);
@@ -258,10 +259,10 @@ export default function VaultApprovalsScreen() {
                                         </RNView>
                                         <Text style={styles.cardTitle}>
                                             {s.operation === 'promote'
-                                                ? 'Approve new version'
+                                                ? t('vaultApprovals.approveNewVersion')
                                                 : s.operation === 'export'
-                                                  ? 'Approve key export'
-                                                  : 'Approve operation'}
+                                                  ? t('vaultApprovals.approveKeyExport')
+                                                  : t('vaultApprovals.approveOperation')}
                                         </Text>
                                     </RNView>
                                     <RNView style={[styles.ttlPill, urgent && styles.ttlPillUrgent]}>
@@ -282,16 +283,16 @@ export default function VaultApprovalsScreen() {
                                 <Text style={styles.plain}>
                                     {s.operation === 'promote'
                                         ? s.app_name
-                                            ? 'Authorise this app to release its data key to the new version below. Only approve an upgrade you started.'
-                                            : 'Authorise the enclave to release its data key to the new measurement below. Only approve an upgrade you started.'
+                                            ? t('vaultApprovals.explainPromoteApp')
+                                            : t('vaultApprovals.explainPromoteEnclave')
                                         : s.operation === 'export'
-                                          ? 'Authorise a one-time export of this key’s material. Only approve if you are exporting it yourself.'
-                                          : 'Approve this vault operation only if you started it.'}
+                                          ? t('vaultApprovals.explainExport')
+                                          : t('vaultApprovals.explainOther')}
                                 </Text>
 
                                 {s.version ? (
                                     <RNView style={styles.row}>
-                                        <Text style={styles.label}>Version</Text>
+                                        <Text style={styles.label}>{t('vaultApprovals.version')}</Text>
                                         <Text style={styles.value}>{s.version}</Text>
                                     </RNView>
                                 ) : null}
@@ -310,19 +311,19 @@ export default function VaultApprovalsScreen() {
                                             {rel?.url ? (
                                                 <ReleaseLinkRow
                                                     icon="cube-outline"
-                                                    label="Published release"
-                                                    value={relLabel ?? 'View'}
+                                                    label={t('vaultApprovals.publishedRelease')}
+                                                    value={relLabel ?? t('serviceDetail.view')}
                                                     url={rel.url}
                                                 />
                                             ) : null}
                                             {prov.previous?.compare_url ? (
                                                 <ReleaseLinkRow
                                                     icon="git-compare-outline"
-                                                    label="Code changes"
+                                                    label={t('vaultApprovals.codeChanges')}
                                                     value={
                                                         prov.previous.label && relLabel
                                                             ? `${prov.previous.label} → ${relLabel}`
-                                                            : 'View diff'
+                                                            : t('vaultApprovals.viewDiff')
                                                     }
                                                     url={prov.previous.compare_url}
                                                 />
@@ -332,24 +333,24 @@ export default function VaultApprovalsScreen() {
                                 })()}
                                 {s.key_type ? (
                                     <RNView style={styles.row}>
-                                        <Text style={styles.label}>Key type</Text>
+                                        <Text style={styles.label}>{t('vaultApprovals.keyType')}</Text>
                                         <Text style={styles.value}>{s.key_type}</Text>
                                     </RNView>
                                 ) : null}
                                 <RNView style={styles.row}>
-                                    <Text style={styles.label}>App key</Text>
+                                    <Text style={styles.label}>{t('vaultApprovals.appKey')}</Text>
                                     <Text style={styles.value}>{shortHandle(s.handle)}</Text>
                                 </RNView>
                                 {typeof s.policy_version === 'number' ? (
                                     <RNView style={styles.row}>
-                                        <Text style={styles.label}>Policy version</Text>
+                                        <Text style={styles.label}>{t('vaultApprovals.policyVersion')}</Text>
                                         <Text style={styles.value}>{s.policy_version}</Text>
                                     </RNView>
                                 ) : null}
                                 {s.measurement ? (
                                     <RNView style={styles.row}>
-                                        <Text style={styles.label}>New measurement</Text>
-                                        <Text style={styles.mono}>{shortHex(s.measurement)}</Text>
+                                        <Text style={styles.label}>{t('vaultApprovals.newMeasurement')}</Text>
+                                        <Text style={styles.mono}>{shortHex(s.measurement, t)}</Text>
                                     </RNView>
                                 ) : null}
                                 <Pressable
@@ -362,7 +363,7 @@ export default function VaultApprovalsScreen() {
                                     ) : (
                                         <>
                                             <Ionicons name="finger-print" size={18} color="#FFFFFF" />
-                                            <Text style={styles.approveText}>Approve</Text>
+                                            <Text style={styles.approveText}>{t('attestation.approve')}</Text>
                                         </>
                                     )}
                                 </Pressable>

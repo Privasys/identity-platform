@@ -32,6 +32,7 @@ import {
     Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
@@ -701,6 +702,7 @@ export default function ConnectScreen() {
 function ConnectFlow() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const params = useLocalSearchParams<{
@@ -812,12 +814,12 @@ function ConnectFlow() {
                     brokerUrl: `wss://${url.host}/relay`
                 };
             } else {
-                setError('No connection payload received');
+                setError(t('connect.noPayload'));
                 setStep('error');
                 return;
             }
         } catch {
-            setError('Invalid QR code payload');
+            setError(t('connect.invalidPayload'));
             setStep('error');
             return;
         }
@@ -1152,7 +1154,10 @@ function ConnectFlow() {
             } else if (outcome.status === 'error') {
                 // Lost the connection mid-challenge — keep the prior view, just
                 // tell the user it couldn't run.
-                Alert.alert('Challenge failed', outcome.message ?? 'Could not reach the enclave.');
+                Alert.alert(
+                    t('drive.challengeFailedTitle'),
+                    outcome.message ?? t('connect.enclaveUnreachable')
+                );
             } else {
                 // The challenge surfaced a problem (or the service was down):
                 // show the recovery UX inline.
@@ -1364,8 +1369,8 @@ function ConnectFlow() {
                 const res = await requestSelfiePermission();
                 if (!res.granted) {
                     Alert.alert(
-                        'Camera needed',
-                        'The presence check matches a quick selfie to your ID photo inside the secure enclave. Without the camera it will be skipped.',
+                        t('connect.cameraNeededTitle'),
+                        t('connect.cameraNeededBody'),
                     );
                     return;
                 }
@@ -1374,13 +1379,13 @@ function ConnectFlow() {
                 base64: true,
                 quality: 0.6,
             });
-            if (!photo?.base64) throw new Error('Could not capture a selfie');
+            if (!photo?.base64) throw new Error(t('connect.selfieCaptureFailed'));
             selfieRef.current = photo.base64;
             const cont = selfieContinuation.current;
             selfieContinuation.current = null;
             if (cont) await cont();
         } catch (e: any) {
-            Alert.alert('Presence check', e?.message ?? 'Camera error');
+            Alert.alert(t('connect.presenceCheck'), e?.message ?? t('connect.cameraError'));
         }
     }, [selfiePermission, requestSelfiePermission]);
 
@@ -1410,10 +1415,7 @@ function ConnectFlow() {
             // honestly approve — an empty consent plan must never stand in
             // for consent (the wallet-v1.3.68 rule). The browser falls back
             // to its ceremony when this approval never completes.
-            setError(
-                'This service asks for data your wallet cannot provide, so there is nothing to approve. ' +
-                'Nothing was shared.',
-            );
+            setError(t('connect.nothingToApprove'));
             setStep('error');
             return;
         }
@@ -1427,11 +1429,11 @@ function ConnectFlow() {
         try {
             const options = payload.approvalOptions;
             if (!payload.approval || !options?.publicKey) {
-                throw new Error('Malformed approval payload');
+                throw new Error(t('connect.malformedApproval'));
             }
             const credential = resolveStepUpCredential(options);
             if (!credential) {
-                throw new Error('This device does not hold the credential this approval targets.');
+                throw new Error(t('connect.credentialNotHeld'));
             }
             // One fresh biometric for the whole approval — same shape as the
             // vault-approval screen: on iOS the signature itself is Face
@@ -1439,12 +1441,12 @@ function ConnectFlow() {
             // the strong-biometric prompt authorises the signing key.
             const approvedBio =
                 Platform.OS === 'ios'
-                    ? await NativeKeys.authenticateForSigning('Approve sharing more data')
+                    ? await NativeKeys.authenticateForSigning(t('connect.approveMoreData'))
                     : (
                           await LocalAuthentication.authenticateAsync({
-                              promptMessage: 'Approve sharing more data',
+                              promptMessage: t('connect.approveMoreData'),
                               biometricsSecurityLevel: 'strong',
-                              cancelLabel: 'Cancel',
+                              cancelLabel: t('common.cancel'),
                           })
                       ).success;
             if (!approvedBio) {
@@ -1631,12 +1633,12 @@ function ConnectFlow() {
         // leaves the approval screen up and the tap looks dead.
         const att = attestationRef.current ?? attestation;
         if (!att) {
-            setError('No verified attestation for this app.');
+            setError(t('connect.noVerifiedAttestation'));
             setStep('error');
             return;
         }
         if (!payload.appHost || !payload.clientId || !payload.sdkPub || !payload.sid) {
-            setError('Malformed approval request (missing appHost/clientId/sdkPub/sid).');
+            setError(t('connect.malformedApprovalRequest'));
             setStep('error');
             return;
         }
@@ -2226,8 +2228,10 @@ function ConnectFlow() {
         );
         if (requiredMissing.length > 0) {
             Alert.alert(
-                'Missing information',
-                `Please provide: ${requiredMissing.map((k) => attributeLabel(k)).join(', ')}`,
+                t('connect.missingInfoTitle'),
+                t('connect.missingInfoBody', {
+                    attributes: requiredMissing.map((k) => attributeLabel(k)).join(', ')
+                }),
             );
             return;
         }
@@ -2286,7 +2290,7 @@ function ConnectFlow() {
                 {step === 'verifying' && (
                     <View style={styles.centered}>
                         <ActivityIndicator size="large" color={p.action} />
-                        <Text style={styles.statusText}>Verifying server attestation...</Text>
+                        <Text style={styles.statusText}>{t('connect.verifyingAttestation')}</Text>
                     </View>
                 )}
 
@@ -2296,7 +2300,7 @@ function ConnectFlow() {
                             <View style={styles.confirmIcon}>
                                 <Text style={styles.confirmIconText}>{(qr.appName || appName(qr.rpId)).charAt(0).toUpperCase()}</Text>
                             </View>
-                            <Text style={styles.title}>Sign-in request</Text>
+                            <Text style={styles.title}>{t('connect.signInRequest')}</Text>
                             <Text style={styles.confirmAppName}>{qr.appName || appName(qr.rpId)}</Text>
                             <Text style={styles.confirmDomain}>{qr.rpId}</Text>
                             {/* What this sign-in actually connects to. For a
@@ -2318,17 +2322,17 @@ function ConnectFlow() {
                             {qr.requestedBy && (
                                 <View style={styles.confirmAgentBanner}>
                                     <Text style={styles.confirmAgentText}>
-                                        Requested by “{qr.requestedBy}”. Approving lets it act as you until you revoke it in Settings.
+                                        {t('connect.requestedByAgent', { agent: qr.requestedBy })}
                                     </Text>
                                 </View>
                             )}
                         </View>
                         <View style={styles.confirmActions}>
                             <Pressable style={styles.confirmDenyButton} onPress={handleReject}>
-                                <Text style={styles.confirmDenyButtonText}>Deny</Text>
+                                <Text style={styles.confirmDenyButtonText}>{t('connect.deny')}</Text>
                             </Pressable>
                             <Pressable style={styles.confirmApproveButton} onPress={handleConfirm}>
-                                <Text style={styles.confirmApproveButtonText}>Approve</Text>
+                                <Text style={styles.confirmApproveButtonText}>{t('attestation.approve')}</Text>
                             </Pressable>
                         </View>
                     </View>
@@ -2387,25 +2391,29 @@ function ConnectFlow() {
                             appName={qr.appName || appName(qr.rpId)}
                             origin={qr.clientId || qr.rpId}
                             sectionTitle={qr.mode === 'attribute-step-up'
-                                ? 'ADDITIONAL DATA REQUESTED'
-                                : 'THIS SERVICE WILL RECEIVE'}
+                                ? t('connect.consentTitleStepUp')
+                                : t('connect.consentTitle')}
                             sectionDescription={qr.mode === 'attribute-step-up'
-                                ? 'You are already signed in. This service now asks for the items below on top of what you previously shared.'
-                                : 'Choose what to share. Items marked required are needed to sign in.'}
+                                ? t('connect.consentDescriptionStepUp')
+                                : t('connect.consentDescription')}
                             items={consentItems.map((i) => ({
                                 key: i.key,
                                 label: i.label,
+                                // Each variant is a WHOLE sentence rather than a
+                                // "Required · " prefix glued to a phrase: the
+                                // separator and the order differ by language.
                                 sublabel: i.key === PRESENCE_KEY
-                                    ? (i.essential ? 'Required · ' : '') +
-                                      'Quick selfie matched to your ID in the enclave'
+                                    ? i.essential
+                                        ? t('connect.sublabelPresenceRequired')
+                                        : t('connect.sublabelPresence')
                                     : !i.hasValue
-                                        ? 'Will be verified during sign-in'
+                                        ? t('connect.sublabelWillBeVerified')
                                         : i.gov
                                             ? i.essential
-                                                ? 'Required · passport-verified proof'
-                                                : 'Passport-verified proof'
+                                                ? t('connect.sublabelGovRequired')
+                                                : t('connect.sublabelGov')
                                             : i.essential
-                                                ? 'Required'
+                                                ? t('connect.sublabelRequired')
                                                 : undefined,
                                 missing: !i.hasValue,
                                 toggle: {
@@ -2416,11 +2424,11 @@ function ConnectFlow() {
                             }))}
                             note={
                                 consentItems.some((i) => i.gov)
-                                    ? 'Verified attributes are shared as enclave-signed proofs bound to this service, never the raw document. The service pays for them; you pay nothing.'
+                                    ? t('connect.consentGovNote')
                                     : undefined
                             }
                             persistent={{ value: consentRemember, onChange: setConsentRemember }}
-                            approveLabel="Share"
+                            approveLabel={t('connect.share')}
                             approveCount={consentSelected.size}
                             onDeny={handleReject}
                             onApprove={handleConsentApprove}
@@ -2432,16 +2440,17 @@ function ConnectFlow() {
                     <RNView style={styles.selfieContainer}>
                         <CameraView ref={selfieCameraRef} style={styles.selfieCamera} facing="front" />
                         <RNView style={[styles.selfieOverlay, { paddingBottom: insets.bottom + 24 }]}>
-                            <Text style={styles.selfieTitle}>Confirm it&apos;s you</Text>
+                            <Text style={styles.selfieTitle}>{t('connect.selfieTitle')}</Text>
                             <Text style={styles.selfieText}>
-                                {(qr?.appName || 'This service') +
-                                    ' asked to confirm you are physically present. Your selfie is matched to your ID photo inside the secure enclave, then discarded.'}
+                                {t('connect.selfieBody', {
+                                    app: qr?.appName || t('connect.thisService')
+                                })}
                             </Text>
                             <Pressable style={styles.selfieCaptureButton} onPress={handleSelfieCapture}>
-                                <Text style={styles.selfieCaptureText}>Take selfie</Text>
+                                <Text style={styles.selfieCaptureText}>{t('connect.takeSelfie')}</Text>
                             </Pressable>
                             <Pressable onPress={handleSelfieSkip} hitSlop={8}>
-                                <Text style={styles.selfieSkipText}>Don&apos;t confirm presence</Text>
+                                <Text style={styles.selfieSkipText}>{t('connect.skipPresence')}</Text>
                             </Pressable>
                         </RNView>
                     </RNView>
@@ -2449,15 +2458,15 @@ function ConnectFlow() {
 
                 {step === 'biometric' && (
                     <View style={styles.centered}>
-                        <Text style={styles.title}>Authenticate</Text>
+                        <Text style={styles.title}>{t('connect.authenticate')}</Text>
                         <Text style={styles.subtitle}>
                             {isTrusted
-                                ? `Sign in to ${qr?.rpId}`
-                                : 'Confirm with biometrics to continue'}
+                                ? t('connect.signInTo', { host: qr?.rpId })
+                                : t('connect.confirmWithBiometrics')}
                         </Text>
                         <ActivityIndicator size="large" color={p.action} />
                         <Pressable style={styles.cancelButton} onPress={handleReject}>
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                            <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
                         </Pressable>
                     </View>
                 )}
@@ -2467,11 +2476,11 @@ function ConnectFlow() {
                         <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.statusText}>
                             {getCredentialForRp(qr?.rpId || '')
-                                ? 'Signing in...'
-                                : 'Registering credential...'}
+                                ? t('connect.signingIn')
+                                : t('connect.registeringCredential')}
                         </Text>
                         <Pressable style={styles.cancelButton} onPress={handleReject}>
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                            <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
                         </Pressable>
                     </View>
                 )}
@@ -2492,21 +2501,19 @@ function ConnectFlow() {
                 {step === 'relaying' && (
                     <View style={styles.centered}>
                         <ActivityIndicator size="large" color={p.action} />
-                        <Text style={styles.statusText}>Sending to browser...</Text>
+                        <Text style={styles.statusText}>{t('connect.sendingToBrowser')}</Text>
                     </View>
                 )}
 
                 {step === 'done' && (
                     <View style={styles.centered}>
                         <Text style={styles.checkmark}>✓</Text>
-                        <Text style={styles.title}>Connected</Text>
-                        <Text style={styles.subtitle}>
-                            You can now use the service in your browser.
-                        </Text>
+                        <Text style={styles.title}>{t('connect.connected')}</Text>
+                        <Text style={styles.subtitle}>{t('connect.connectedBody')}</Text>
                         {/* Explicit exit so the screen is never a dead end, even
                             if the auto-return timer is missed. */}
                         <Pressable style={styles.secondaryButton} onPress={() => router.replace('/(tabs)')}>
-                            <Text style={styles.secondaryButtonText}>Done</Text>
+                            <Text style={styles.secondaryButtonText}>{t('common.done')}</Text>
                         </Pressable>
                     </View>
                 )}
@@ -2514,18 +2521,15 @@ function ConnectFlow() {
                 {step === 'presence-failed' && (
                     <View style={styles.centered}>
                         <Text style={styles.errorIcon}>⚠</Text>
-                        <Text style={styles.title}>Couldn&apos;t confirm it&apos;s you</Text>
+                        <Text style={styles.title}>{t('connect.presenceFailedTitle')}</Text>
                         <Text style={styles.subtitle}>
                             {presenceFail?.retryable
-                                ? 'The live selfie didn’t match your ID photo. Make sure it’s you, in good light, and try the sign-in again.'
-                                : 'The presence check didn’t pass. Contact the service if you believe this is an error.'}
+                                ? t('connect.presenceFailedRetryable')
+                                : t('connect.presenceFailedFinal')}
                         </Text>
-                        <Text style={styles.presenceNote}>
-                            You have been signed in, but the service was told the presence
-                            check did not pass and may not let you continue.
-                        </Text>
+                        <Text style={styles.presenceNote}>{t('connect.presenceFailedNote')}</Text>
                         <Pressable style={styles.secondaryButton} onPress={() => router.replace('/(tabs)')}>
-                            <Text style={styles.secondaryButtonText}>Done</Text>
+                            <Text style={styles.secondaryButtonText}>{t('common.done')}</Text>
                         </Pressable>
                     </View>
                 )}
@@ -2533,17 +2537,17 @@ function ConnectFlow() {
                 {step === 'error' && (
                     <View style={styles.centered}>
                         <Text style={styles.errorIcon}>✕</Text>
-                        <Text style={styles.title}>Connection Failed</Text>
+                        <Text style={styles.title}>{t('connect.connectionFailed')}</Text>
                         {error && <Text style={styles.errorText}>{error}</Text>}
                         <Pressable style={styles.secondaryButton} onPress={handleReject}>
-                            <Text style={styles.secondaryButtonText}>Go back</Text>
+                            <Text style={styles.secondaryButtonText}>{t('common.goBack')}</Text>
                         </Pressable>
                         <Pressable
                             style={styles.reportLink}
                             onPress={() => setReportOpen(true)}
                             hitSlop={8}
                         >
-                            <Text style={styles.reportLinkText}>Report Error</Text>
+                            <Text style={styles.reportLinkText}>{t('connect.reportError')}</Text>
                         </Pressable>
                     </View>
                 )}
@@ -2578,15 +2582,16 @@ function ReportErrorModal({
 }) {
     const insets = useSafeAreaInsets();
     const p = usePalette();
+    const { t } = useTranslation();
     const reportStyles = useMemo(() => makeReportStyles(p), [p]);
     const report = visible ? buildErrorReport(errorMessage) : '';
 
     const onCopy = async () => {
         await Clipboard.setStringAsync(report);
         Alert.alert(
-            'Copied',
-            `Report copied to the clipboard. Paste it into your message to ${REPORT_DESTINATION} or share it with support.`,
-            [{ text: 'OK', onPress: onClose }],
+            t('common.copied'),
+            t('connect.reportCopied', { destination: REPORT_DESTINATION }),
+            [{ text: t('common.ok'), onPress: onClose }],
         );
     };
 
@@ -2597,20 +2602,17 @@ function ReportErrorModal({
                     <Pressable onPress={onClose} hitSlop={10}>
                         <Ionicons name="close" size={24} color={p.textPrimary} />
                     </Pressable>
-                    <Text style={reportStyles.headerTitle}>Report Error</Text>
+                    <Text style={reportStyles.headerTitle}>{t('connect.reportError')}</Text>
                     <RNView style={{ width: 24 }} />
                 </RNView>
 
                 <RNView style={reportStyles.destinationCard}>
-                    <Text style={reportStyles.destinationLabel}>Will be sent to</Text>
+                    <Text style={reportStyles.destinationLabel}>{t('connect.reportDestination')}</Text>
                     <Text style={reportStyles.destinationValue}>{REPORT_DESTINATION}</Text>
-                    <Text style={reportStyles.destinationNote}>
-                        Automatic submission is not wired up yet, so for now copy the report below
-                        and share it with the Privasys team.
-                    </Text>
+                    <Text style={reportStyles.destinationNote}>{t('connect.reportNote')}</Text>
                 </RNView>
 
-                <Text style={reportStyles.previewLabel}>Report contents</Text>
+                <Text style={reportStyles.previewLabel}>{t('connect.reportContents')}</Text>
                 <ScrollView style={reportStyles.previewScroll} contentContainerStyle={{ padding: 12 }}>
                     <Text style={reportStyles.previewText} selectable>
                         {report}
@@ -2619,11 +2621,11 @@ function ReportErrorModal({
 
                 <RNView style={[reportStyles.actions, { paddingBottom: insets.bottom + 16 }]}>
                     <Pressable style={reportStyles.cancelButton} onPress={onClose}>
-                        <Text style={reportStyles.cancelButtonText}>Cancel</Text>
+                        <Text style={reportStyles.cancelButtonText}>{t('common.cancel')}</Text>
                     </Pressable>
                     <Pressable style={reportStyles.copyButton} onPress={onCopy}>
                         <Ionicons name="copy-outline" size={16} color="#FFFFFF" />
-                        <Text style={reportStyles.copyButtonText}>Copy Report</Text>
+                        <Text style={reportStyles.copyButtonText}>{t('connect.copyReport')}</Text>
                     </Pressable>
                 </RNView>
             </RNView>
@@ -2730,6 +2732,7 @@ function AttributeAcquisitionView({
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const acqStyles = useMemo(() => makeAcqStyles(p), [p]);
+    const { t } = useTranslation();
     const { updateProfile, setAttribute, createProfile } = useProfileStore();
     const profile = useProfileStore((s) => s.profile);
 
@@ -2834,7 +2837,7 @@ function AttributeAcquisitionView({
             }
         } catch (e: any) {
             if (e.message !== 'Authentication cancelled') {
-                Alert.alert('Link failed', e.message);
+                Alert.alert(t('connect.linkFailed'), e.message);
             }
         } finally {
             setLinkingProvider(null);
@@ -2895,19 +2898,27 @@ function AttributeAcquisitionView({
                         <Ionicons name="person-add-outline" size={36} color={p.action} />
                     </RNView>
 
-                    <Text style={styles.title}>Profile needed</Text>
+                    <Text style={styles.title}>{t('connect.profileNeeded')}</Text>
+                    {/* The app name is bold INSIDE the sentence, so the sentence
+                        is split at a placeholder rather than concatenated: the
+                        name does not sit in the same position in every language. */}
                     <Text style={acqStyles.description}>
-                        <Text style={acqStyles.bold}>{displayAppName}</Text>
-                        {' needs the following to complete sign-in:'}
+                        <Trans
+                            i18nKey="connect.profileNeededBody"
+                            values={{ app: displayAppName }}
+                            components={{ b: <Text style={acqStyles.bold} /> }}
+                        />
                     </Text>
 
                     {/* Data sharing notice */}
                     <RNView style={acqStyles.privacyNotice}>
                         <Ionicons name="shield-outline" size={16} color={p.warnText} />
                         <Text style={acqStyles.privacyNoticeText}>
-                            These attributes will be shared with{' '}
-                            <Text style={acqStyles.bold}>{displayAppName}</Text>
-                            {' and will be under their control.'}
+                            <Trans
+                                i18nKey="connect.attributesShared"
+                                values={{ app: displayAppName }}
+                                components={{ b: <Text style={acqStyles.bold} /> }}
+                            />
                         </Text>
                     </RNView>
 
@@ -2917,7 +2928,7 @@ function AttributeAcquisitionView({
                             onPress={() => WebBrowser.openBrowserAsync(privacyPolicyUrl)}
                         >
                             <Ionicons name="document-text-outline" size={14} color={p.action} />
-                            <Text style={acqStyles.privacyLinkText}>Read privacy policy</Text>
+                            <Text style={acqStyles.privacyLinkText}>{t('connect.readPrivacyPolicy')}</Text>
                         </Pressable>
                     ) : null}
 
@@ -2927,7 +2938,11 @@ function AttributeAcquisitionView({
                             const isFilled = !stillMissing.includes(attr);
                             const govVerified = assuranceFor(attr, attributeRequirements) === 'gov';
                             const isOptional = !isEssential(attr, attributeRequirements);
-                            const suffix = govVerified ? ' (verified ID)' : isOptional ? ' (optional)' : '';
+                            const suffix = govVerified
+                                ? t('connect.suffixVerifiedId')
+                                : isOptional
+                                    ? t('connect.suffixOptional')
+                                    : '';
                             return (
                                 <RNView key={attr} style={acqStyles.attributeRow}>
                                     <Ionicons
@@ -2952,7 +2967,7 @@ function AttributeAcquisitionView({
                         /* Required attributes present — optional ones don't block */
                         <RNView style={acqStyles.readySection}>
                             <Ionicons name="checkmark-circle" size={32} color={p.approve} />
-                            <Text style={acqStyles.readyText}>All set! Tap continue to finish signing in.</Text>
+                            <Text style={acqStyles.readyText}>{t('connect.allSet')}</Text>
                         </RNView>
                     ) : mode === 'choose' ? (
                         /* Provider linking options */
@@ -2965,14 +2980,11 @@ function AttributeAcquisitionView({
                                         disabled={linkingProvider !== null}
                                     >
                                         <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
-                                        <Text style={acqStyles.providerButtonText}>Verify with your ID</Text>
+                                        <Text style={acqStyles.providerButtonText}>{t('connect.verifyWithId')}</Text>
                                     </Pressable>
                                     <RNView style={acqStyles.privacyNotice}>
                                         <Ionicons name="lock-closed-outline" size={16} color={p.warnText} />
-                                        <Text style={acqStyles.privacyNoticeText}>
-                                            A government-verified attribute is required. Your ID is checked in a
-                                            secure enclave; the value stays on your device.
-                                        </Text>
+                                        <Text style={acqStyles.privacyNoticeText}>{t('connect.govRequiredNotice')}</Text>
                                     </RNView>
                                     <RNView style={acqStyles.divider}>
                                         <RNView style={acqStyles.dividerLine} />
@@ -2981,7 +2993,7 @@ function AttributeAcquisitionView({
                                     </RNView>
                                 </>
                             )}
-                            <Text style={acqStyles.sectionTitle}>Import from an account</Text>
+                            <Text style={acqStyles.sectionTitle}>{t('connect.importFromAccount')}</Text>
                             {Object.entries(PROVIDERS).map(([key, config]) => {
                                 const isLinking = linkingProvider === key;
                                 return (
@@ -3000,7 +3012,7 @@ function AttributeAcquisitionView({
                                             <ActivityIndicator size="small" color="#FFFFFF" />
                                         ) : (
                                             <Text style={acqStyles.providerButtonText}>
-                                                Continue with {config.displayName}
+                                                {t('connect.continueWith', { provider: config.displayName })}
                                             </Text>
                                         )}
                                     </Pressable>
@@ -3018,13 +3030,13 @@ function AttributeAcquisitionView({
                                 onPress={() => setMode('manual')}
                             >
                                 <Ionicons name="create-outline" size={18} color={p.action} />
-                                <Text style={acqStyles.manualButtonText}>Enter manually</Text>
+                                <Text style={acqStyles.manualButtonText}>{t('connect.enterManually')}</Text>
                             </Pressable>
                         </>
                     ) : (
                         /* Manual entry form */
                         <>
-                            <Text style={acqStyles.sectionTitle}>Enter your information</Text>
+                            <Text style={acqStyles.sectionTitle}>{t('connect.enterYourInformation')}</Text>
                             {missingAttributes.map((attr) => {
                                 if (!stillMissing.includes(attr)) return null;
                                 const label = attributeLabel(attr);
@@ -3039,9 +3051,7 @@ function AttributeAcquisitionView({
                                             <Text style={acqStyles.inputLabel}>{label}</Text>
                                             <RNView style={acqStyles.privacyNotice}>
                                                 <Ionicons name="shield-checkmark-outline" size={16} color={p.warnText} />
-                                                <Text style={acqStyles.privacyNoticeText}>
-                                                    Filled by verifying your ID document, not typed.
-                                                </Text>
+                                                <Text style={acqStyles.privacyNoticeText}>{t('connect.filledByIdCheck')}</Text>
                                             </RNView>
                                         </RNView>
                                     );
@@ -3060,7 +3070,7 @@ function AttributeAcquisitionView({
                                                 <Text style={selected ? acqStyles.pickerValue : acqStyles.pickerPlaceholder}>
                                                     {selected
                                                         ? (localeOptions.find((o) => o.value === selected)?.label ?? selected)
-                                                        : 'Select a language'}
+                                                        : t('connect.selectLanguage')}
                                                 </Text>
                                             </Pressable>
                                         </RNView>
@@ -3073,7 +3083,11 @@ function AttributeAcquisitionView({
                                             style={acqStyles.input}
                                             value={manualValues[attr] ?? ''}
                                             onChangeText={(v) => setManualValues((prev) => ({ ...prev, [attr]: v }))}
-                                            placeholder={attr === 'email' ? 'you@example.com' : `Your ${label.toLowerCase()}`}
+                                            placeholder={
+                                                attr === 'email'
+                                                    ? t('connect.emailPlaceholder')
+                                                    : t('connect.attributePlaceholder', { label: label.toLowerCase() })
+                                            }
                                             placeholderTextColor={p.textMuted}
                                             keyboardType={attr === 'email' ? 'email-address' : 'default'}
                                             autoCapitalize={attr === 'email' ? 'none' : 'words'}
@@ -3088,14 +3102,14 @@ function AttributeAcquisitionView({
                                 onPress={handleManualSave}
                                 disabled={!manualRequiredFilled}
                             >
-                                <Text style={acqStyles.saveButtonText}>Save</Text>
+                                <Text style={acqStyles.saveButtonText}>{t('common.save')}</Text>
                             </Pressable>
 
                             <Pressable
                                 style={acqStyles.backLink}
                                 onPress={() => setMode('choose')}
                             >
-                                <Text style={acqStyles.backLinkText}>← Import from an account instead</Text>
+                                <Text style={acqStyles.backLinkText}>{t('connect.importInstead')}</Text>
                             </Pressable>
                         </>
                     )}
@@ -3110,7 +3124,7 @@ function AttributeAcquisitionView({
                 >
                     <Pressable style={acqStyles.pickerBackdrop} onPress={() => setLocalePickerOpen(false)}>
                         <RNView style={acqStyles.pickerSheet}>
-                            <Text style={acqStyles.pickerTitle}>Select a language</Text>
+                            <Text style={acqStyles.pickerTitle}>{t('connect.selectLanguage')}</Text>
                             <ScrollView>
                                 {localeOptions.map((opt) => (
                                     <Pressable
@@ -3136,14 +3150,14 @@ function AttributeAcquisitionView({
                 <RNView style={[acqStyles.bottomActions, { paddingBottom: Math.max(insets.bottom, 20) }]}>
                     <RNView style={styles.buttonRow}>
                         <Pressable style={styles.rejectButton} onPress={onCancel}>
-                            <Text style={styles.rejectButtonText}>Cancel</Text>
+                            <Text style={styles.rejectButtonText}>{t('common.cancel')}</Text>
                         </Pressable>
                         <Pressable
                             style={[styles.approveButton, requiredMissing.length > 0 && acqStyles.continueDisabled]}
                             onPress={handleContinue}
                             disabled={requiredMissing.length > 0}
                         >
-                            <Text style={styles.approveButtonText}>Continue</Text>
+                            <Text style={styles.approveButtonText}>{t('common.continue')}</Text>
                         </Pressable>
                     </RNView>
                 </RNView>

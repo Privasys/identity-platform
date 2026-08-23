@@ -44,9 +44,9 @@ describe('diffTrustedAttestation', () => {
         const diff = diffTrustedAttestation(trustedTdx(), attTdx({ workload_code_hash: D }));
         expect(diff?.kind).toBe('app-update');
         expect(diff?.changes).toEqual([
-            { field: 'code', label: 'Application code', previous: B, current: D },
+            { field: 'code', labelKey: 'attestation.rowApplicationCode', previous: B, current: D },
         ]);
-        expect(diff?.summary).toMatch(/routine update by its developer/);
+        expect(diff?.summaryKey).toBe('attestation.summaryAppUpdate');
     });
 
     it('classifies a config-only change as app-update', () => {
@@ -59,9 +59,9 @@ describe('diffTrustedAttestation', () => {
         const diff = diffTrustedAttestation(trustedTdx(), attTdx({ mrtd: D }));
         expect(diff?.kind).toBe('platform-update');
         expect(diff?.changes).toEqual([
-            { field: 'platform', label: 'Platform (MRTD)', previous: A, current: D },
+            { field: 'platform', labelKey: 'attestation.rowPlatformMrtd', previous: A, current: D },
         ]);
-        expect(diff?.summary).toMatch(/secure enclave running this app has been upgraded/);
+        expect(diff?.summaryKey).toBe('attestation.summaryPlatformUpdate');
     });
 
     it('classifies platform + code changes as app-and-platform-update', () => {
@@ -78,7 +78,7 @@ describe('diffTrustedAttestation', () => {
         const att = attTdx({ mrenclave: D, mrtd: undefined });
         const diff = diffTrustedAttestation(trusted, att);
         expect(diff?.kind).toBe('platform-update');
-        expect(diff?.changes[0].label).toBe('Platform (MRENCLAVE)');
+        expect(diff?.changes[0].labelKey).toBe('attestation.rowPlatformMrenclave');
     });
 
     it('surfaces a TEE-family migration as both platform axes', () => {
@@ -86,9 +86,9 @@ describe('diffTrustedAttestation', () => {
         const att = attTdx({ mrenclave: undefined, mrtd: D });
         const diff = diffTrustedAttestation(trusted, att);
         expect(diff?.kind).toBe('platform-update');
-        expect(diff?.changes.map((c) => c.label).sort()).toEqual([
-            'Platform (MRENCLAVE)',
-            'Platform (MRTD)',
+        expect(diff?.changes.map((c) => c.labelKey).sort()).toEqual([
+            'attestation.rowPlatformMrenclave',
+            'attestation.rowPlatformMrtd',
         ]);
     });
 
@@ -102,7 +102,7 @@ describe('diffTrustedAttestation', () => {
         );
         expect(diff?.kind).toBe('platform-update');
         expect(diff?.changes).toEqual([
-            { field: 'platform', label: 'Platform (RTMR1)', previous: A, current: D },
+            { field: 'platform', labelKey: 'attestation.rowPlatformRtmr1', previous: A, current: D },
         ]);
     });
 
@@ -119,7 +119,7 @@ describe('diffTrustedAttestation', () => {
         const diff = diffTrustedAttestation(trusted, attTdx());
         expect(diff?.kind).toBe('app-update');
         expect(diff?.changes).toEqual([
-            { field: 'code', label: 'Application code', previous: undefined, current: B },
+            { field: 'code', labelKey: 'attestation.rowApplicationCode', previous: undefined, current: B },
         ]);
     });
 });

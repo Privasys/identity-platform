@@ -1,0 +1,51 @@
+# Wallet locale packs, served as static JSON from privasys.id/i18n/.
+#
+# Installed on idp-fr-par-1 at /etc/caddy/conf.d/i18n.caddy and pulled into
+# the privasys.id site block by `import conf.d/*.caddy`. Deployed by
+# .github/workflows/deploy-i18n-packs.yaml; do not hand-edit on the VM.
+#
+# Why this lives on the auth host rather than in the IdP binary: these are
+# static translation files. Routing them through the enclave service would
+# put a copy change behind a measurement roll for no benefit.
+#
+# ORDER MATTERS. The main Caddyfile has a catch-all
+#
+#     @withExt path_regexp \.[A-Za-z0-9]+$
+#     handle @withExt { root * /var/www; file_server }
+#
+# which already matches anything ending in an extension, `.json` included.
+# Without this block the packs would still be *served* (from /var/www/i18n),
+# but with none of the headers below, and the change would look like it
+# worked. install-i18n.sh therefore puts `import conf.d/*.caddy` at the TOP
+# of the site block so this is evaluated first. If that import is ever moved
+# below @withExt, the cache and CORS headers silently stop applying; the
+# deploy workflow asserts on them for exactly that reason.
+#
+# `handle_path`, not `handle`: handle_path STRIPS the matched prefix before
+# passing the request on, handle does not. With plain `handle /i18n/*` the
+# file server would look for /var/www/i18n/i18n/<version>/<tag>.json and
+# every request would 404. (The sibling /auth/* block in the main Caddyfile
+# uses plain `handle` and compensates by rooting at /var/www instead.)
+
+handle_path /i18n/* {
+    # Content-addressed path: /i18n/<manifest-version>/<tag>.json, where the
+    # version is a digest over all pack contents. A given URL's bytes can
+    # never change, so cache it hard and never revalidate. When the copy
+    # changes the version changes, and the URL changes with it.
+    header Cache-Control "public, max-age=31536000, immutable"
+    header Access-Control-Allow-Origin "*"
+    header Content-Type "application/json; charset=utf-8"
+
+    # These are public static assets with no session in play. The wallet
+    # fetches them with `credentials: 'omit'` precisely so that requesting a
+    # language cannot be correlated with a signed-in user; make sure nothing
+    # here reintroduces that link.
+    header -Set-Cookie
+
+    # No `browse`: the directory listing would enumerate every shipped
+    # version for no reason. Unknown paths 404 rather than falling through
+    # to the IdP.
+    file_server {
+        root /var/www/i18n
+    }
+}

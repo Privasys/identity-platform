@@ -22,23 +22,28 @@ import { Text, usePalette, type Palette } from '@/components/Themed';
 import { getAttributeValues, recordConsent } from '@/services/consent';
 import type { DataRequest } from '@/services/consent';
 import { deliverViaBroker } from '@/services/data-transit';
+import { useTranslation } from 'react-i18next';
 
-/** Friendly labels for attribute keys. */
-const ATTRIBUTE_LABELS: Record<string, string> = {
-    displayName: 'Display Name',
-    email: 'Email Address',
-    avatarUri: 'Profile Photo',
-    locale: 'Language / Locale',
-    did: 'Decentralised Identifier',
-    sub: 'App-Specific Identifier'
+/**
+ * Translation keys for attribute labels. An unknown key falls through to the
+ * raw key, which `t` renders verbatim thanks to parseMissingKeyHandler.
+ */
+const ATTRIBUTE_LABEL_KEYS: Record<string, string> = {
+    displayName: 'consentRequest.fieldDisplayName',
+    email: 'consentRequest.fieldEmail',
+    avatarUri: 'consentRequest.fieldAvatar',
+    locale: 'consentRequest.fieldLocale',
+    did: 'consentRequest.fieldDid',
+    sub: 'consentRequest.fieldSub'
 };
 
-function attributeLabel(key: string): string {
-    return ATTRIBUTE_LABELS[key] ?? key;
+function attributeLabelKey(key: string): string {
+    return ATTRIBUTE_LABEL_KEYS[key] ?? key;
 }
 
 export default function ConsentRequestScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
@@ -95,8 +100,8 @@ export default function ConsentRequestScreen() {
         const hasValue = key in attributeValues;
         return {
             key,
-            label: attributeLabel(key),
-            sublabel: hasValue ? attributeValues[key] : 'Not in your profile',
+            label: t(attributeLabelKey(key)),
+            sublabel: hasValue ? attributeValues[key] : t('consentRequest.notInProfile'),
             missing: !hasValue,
             toggle: {
                 value: !!approvals[key] && hasValue,
@@ -112,7 +117,7 @@ export default function ConsentRequestScreen() {
             .map(([k]) => k);
 
         if (approved.length === 0) {
-            Alert.alert('No data selected', 'Select at least one attribute to share, or deny the request.');
+            Alert.alert(t('consentRequest.noDataTitle'), t('consentRequest.noDataBody'));
             return;
         }
 
@@ -133,7 +138,7 @@ export default function ConsentRequestScreen() {
 
             router.back();
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            Alert.alert(t('common.error'), e.message);
         } finally {
             setSubmitting(false);
         }
@@ -174,7 +179,7 @@ export default function ConsentRequestScreen() {
                 sectionDescription={`Select which data to share with this app. ${approvedCount} of ${totalCount} selected.`}
                 items={items}
                 persistent={{ value: persistent, onChange: setPersistent }}
-                approveLabel="Share"
+                approveLabel={t('connect.share')}
                 approveCount={approvedCount}
                 approveDisabled={approvedCount === 0}
                 submitting={submitting}

@@ -15,6 +15,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View as RN
 import { ConflictResolutionSheet, type AttributeConflict } from '@/components/ConflictResolutionSheet';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { ATTRIBUTE_MAP } from '@/services/attributes';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
@@ -28,6 +29,7 @@ const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function ImportDataScreen() {
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const { profile, updateProfile, linkProvider, mergeAttribute, resolveConflict } = useProfileStore();
@@ -50,7 +52,7 @@ export default function ImportDataScreen() {
             setPendingImport({ linked: result.provider, attributes: result.seedAttributes });
             setImportSelected(new Set(result.seedAttributes.map((a) => a.key)));
         } catch (e: any) {
-            if (e.message !== 'Authentication cancelled') Alert.alert('Import failed', e.message);
+            if (e.message !== 'Authentication cancelled') Alert.alert(t('import.failed'), e.message);
         } finally {
             setLinkingProvider(null);
         }
@@ -73,15 +75,18 @@ export default function ImportDataScreen() {
         if (attr.key === 'locale' && attr.value) updateProfile({ locale: attr.value });
     };
 
-    const finish = (t: { added: number; strengthened: number; kept: number }) => {
+    const finish = (totals: { added: number; strengthened: number; kept: number }) => {
         setPendingImport(null);
         setConflicts([]);
         setConflictIndex(0);
         const parts: string[] = [];
-        if (t.added) parts.push(`${t.added} added`);
-        if (t.strengthened) parts.push(`${t.strengthened} confirmed`);
-        if (t.kept) parts.push(`${t.kept} kept`);
-        Alert.alert('Import complete', parts.length ? parts.join(', ') + '.' : 'No changes.');
+        if (totals.added) parts.push(t('import.summaryAdded', { count: totals.added }));
+        if (totals.strengthened) parts.push(t('import.summaryConfirmed', { count: totals.strengthened }));
+        if (totals.kept) parts.push(t('import.summaryKept', { count: totals.kept }));
+        Alert.alert(
+            t('import.complete'),
+            parts.length ? t('import.completeSummary', { summary: parts.join(', ') }) : t('import.noChanges')
+        );
     };
 
     const applyImport = () => {
@@ -134,7 +139,7 @@ export default function ImportDataScreen() {
 
     return (
         <RNView style={styles.screen}>
-            <SubPageHeader title="Import Data" />
+            <SubPageHeader title={t('profile.importData')} />
             <ScrollView contentContainerStyle={styles.content}>
                 {conflicts.length > 0 ? (
                     <ConflictResolutionSheet

@@ -34,13 +34,15 @@ import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore, type UserProfile } from '@/stores/profile';
 import {
-    IDENTITY_LABELS,
-    KIND_LABELS,
+    IDENTITY_LABEL_KEYS,
+    KIND_LABEL_KEYS,
     serviceHosts,
     type SessionTrace,
     useServiceSessionsStore
 } from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 function appName(rpId: string): string {
@@ -48,17 +50,17 @@ function appName(rpId: string): string {
     return dot > 0 ? rpId.substring(0, dot) : rpId;
 }
 
-function formatWhen(ms: number): string {
-    return new Date(ms).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+/**
+ * Short "when" for a trail row. Rendered from the locale pack's own pattern
+ * rather than `toLocaleDateString`, which follows the DEVICE language and
+ * would print English months under translated copy.
+ */
+function formatWhen(ms: number, t: TFunction): string {
+    return t('serviceDetail.shortWhen', { when: new Date(ms) });
 }
 
-function shortHex(v?: string): string {
-    if (!v) return 'None';
+function shortHex(v: string | undefined, t: TFunction): string {
+    if (!v) return t('common.none');
     return v.length > 20 ? `${v.slice(0, 10)}…${v.slice(-6)}` : v;
 }
 
@@ -77,16 +79,18 @@ function shortHex(v?: string): string {
  */
 function sharedValueText(
     s: { key: string; value?: string; gov?: boolean },
-    profile: UserProfile | null
+    profile: UserProfile | null,
+    t: TFunction
 ): string {
-    if (!s.gov) return s.value ?? 'Not recorded';
-    if (!revealsUnderlyingValue(s.key)) return 'Verified proof (value not revealed)';
+    if (!s.gov) return s.value ?? t('common.notRecorded');
+    if (!revealsUnderlyingValue(s.key)) return t('serviceDetail.verifiedProofOnly');
     const own = profile ? getProfileValue(profile, certifiedFieldFor(s.key)) : undefined;
-    return own ? `${own} (verified)` : 'Verified value shared';
+    return own ? t('serviceDetail.verifiedValue', { value: own }) : t('serviceDetail.verifiedShared');
 }
 
 export default function ServiceDetailScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     // `serviceKey` is the app identity; `rpId` kept for legacy deep links.
     const params = useLocalSearchParams<{ serviceKey?: string; rpId?: string }>();
     const serviceKey = params.serviceKey || params.rpId || '';
@@ -180,12 +184,12 @@ export default function ServiceDetailScreen() {
     const handleServerSignOut = () => {
         if (!clientId || !credential) return;
         Alert.alert(
-            'Sign out from server',
-            `Revoke every server session for ${name}? Browsers and agents using them will need to sign in again.`,
+            t('serviceDetail.serverSignOutTitle'),
+            t('serviceDetail.serverSignOutBody', { app: name }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Sign out',
+                    text: t('serviceDetail.serverSignOutConfirm'),
                     style: 'destructive',
                     onPress: async () => {
                         setSigningOut(true);
@@ -198,7 +202,7 @@ export default function ServiceDetailScreen() {
                                 credential.serverRpId
                             );
                             if (!auth.sessionToken) {
-                                throw new Error('authentication did not return a session');
+                                throw new Error(t('errors.noSessionFromAuth'));
                             }
                             const sessions = await listMySessions(auth.sessionToken);
                             const mine = sessions.filter((s) => s.client_id === clientId);
@@ -206,15 +210,15 @@ export default function ServiceDetailScreen() {
                                 await revokeSession(auth.sessionToken, s.sid);
                             }
                             Alert.alert(
-                                'Signed out',
+                                t('serviceDetail.signedOutTitle'),
                                 mine.length === 0
-                                    ? 'No active server sessions for this app.'
-                                    : `${mine.length} server session${mine.length !== 1 ? 's' : ''} revoked. Issued tokens stop working within a minute.`
+                                    ? t('serviceDetail.signedOutNone')
+                                    : t('serviceDetail.signedOutRevoked', { count: mine.length })
                             );
                         } catch (e) {
                             Alert.alert(
-                                'Sign out failed',
-                                e instanceof Error ? e.message : 'Could not revoke the sessions.'
+                                t('serviceDetail.signOutFailedTitle'),
+                                e instanceof Error ? e.message : t('serviceDetail.signOutFailedBody')
                             );
                         } finally {
                             setSigningOut(false);
@@ -227,12 +231,12 @@ export default function ServiceDetailScreen() {
 
     const handleRemove = () => {
         Alert.alert(
-            'Remove Service',
-            `Disconnect from ${name}? You will need to scan the QR code again to reconnect.`,
+            t('serviceDetail.removeTitle'),
+            t('serviceDetail.removeBody', { app: name }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Remove',
+                    text: t('common.remove'),
                     style: 'destructive',
                     onPress: async () => {
                         setRemoving(true);
@@ -298,7 +302,7 @@ export default function ServiceDetailScreen() {
                 <RNView style={[styles.screen, { paddingTop: insets.top }]}>
                     <Text style={styles.notFound}>Service not found</Text>
                     <Pressable style={styles.backButton} onPress={() => router.back()}>
-                        <Text style={styles.backButtonText}>Go back</Text>
+                        <Text style={styles.backButtonText}>{t('common.goBack')}</Text>
                     </Pressable>
                 </RNView>
             </>
@@ -306,10 +310,15 @@ export default function ServiceDetailScreen() {
     }
 
     const headerMeta = latest
-        ? `${KIND_LABELS[latest.kind]} · ${IDENTITY_LABELS[latest.identity]}`
-        : `${teeType === 'none' ? 'Passkey' : teeType.toUpperCase()} · Connected ${
-              app ? new Date(app.lastVerified * 1000).toLocaleDateString() : ''
-          }`;
+        ? t('serviceDetail.headerMeta', {
+            kind: t(KIND_LABEL_KEYS[latest.kind]),
+            identity: t(IDENTITY_LABEL_KEYS[latest.identity])
+        })
+        : t('serviceDetail.headerMetaLegacy', {
+            // TEE names are acronyms and stay upper-case in every language.
+            type: teeType === 'none' ? t('identityKind.passkey') : teeType.toUpperCase(),
+            when: app ? t('time.onDate', { when: new Date(app.lastVerified * 1000) }) : ''
+        });
 
     return (
         <>
@@ -320,7 +329,7 @@ export default function ServiceDetailScreen() {
                     <Pressable onPress={() => router.back()} style={styles.backArrow}>
                         <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                     </Pressable>
-                    <Text style={styles.headerTitle}>Service Details</Text>
+                    <Text style={styles.headerTitle}>{t('serviceDetail.title')}</Text>
                     <RNView style={{ width: 36 }} />
                 </RNView>
 
@@ -361,51 +370,54 @@ export default function ServiceDetailScreen() {
                     {session && (
                         <RNView style={styles.card}>
                             <RNView style={styles.cardTitleRow}>
-                                <Text style={styles.cardTitle}>Sealed Session</Text>
+                                <Text style={styles.cardTitle}>{t('serviceDetail.sealedSession')}</Text>
                                 <RNView style={styles.sealedBadge}>
                                     <RNView style={styles.sealedDot} />
-                                    <Text style={styles.sealedText}>Active</Text>
+                                    <Text style={styles.sealedText}>{t('serviceDetail.active')}</Text>
                                 </RNView>
                             </RNView>
-                            <DetailRow label="Transport" value="AES-256-GCM (sealed CBOR)" />
-                            <DetailRow label="Session ID" value={session.sessionId} mono />
-                            <DetailRow label="Started" value={new Date(session.startedAt).toLocaleString()} />
-                            <DetailRow label="Expires" value={new Date(session.expiresAt).toLocaleString()} />
+                            {/* Cipher suite names are protocol identifiers, not prose. */}
+                            <DetailRow label={t('serviceDetail.transport')} value="AES-256-GCM (sealed CBOR)" />
+                            <DetailRow label={t('serviceDetail.sessionId')} value={session.sessionId} mono />
+                            <DetailRow label={t('serviceDetail.started')} value={t('time.onDateTime', { when: new Date(session.startedAt) })} />
+                            <DetailRow label={t('serviceDetail.expires')} value={t('time.onDateTime', { when: new Date(session.expiresAt) })} />
                         </RNView>
                     )}
 
                     {/* Latest attestation */}
                     <RNView style={styles.card}>
                         <Text style={styles.cardTitle}>
-                            {teeType === 'none' ? 'Connection' : 'Attestation'}
+                            {teeType === 'none' ? t('serviceDetail.connection') : t('serviceDetail.attestation')}
                         </Text>
                         <DetailRow
-                            label="Type"
-                            value={teeType === 'none' ? 'Passkey (no enclave)' : teeType.toUpperCase()}
+                            label={t('serviceDetail.type')}
+                            value={teeType === 'none' ? t('serviceDetail.passkeyNoEnclave') : teeType.toUpperCase()}
                         />
                         {latestAtt ? (
                             <>
-                                <DetailRow label="Enclave" value={latestAtt.host} />
+                                <DetailRow label={t('serviceDetail.enclave')} value={latestAtt.host} />
+                                {/* MRENCLAVE / MRTD are measurement register names
+                                    fixed by the Intel specs, never translated. */}
                                 {latestAtt.mrenclave && <DetailRow label="MRENCLAVE" value={latestAtt.mrenclave} mono />}
                                 {latestAtt.mrtd && <DetailRow label="MRTD" value={latestAtt.mrtd} mono />}
-                                {latestAtt.codeHash && <DetailRow label="Code Hash" value={latestAtt.codeHash} mono />}
-                                {latestAtt.configRoot && <DetailRow label="Config Root" value={latestAtt.configRoot} mono />}
-                                {latestAtt.imageRef && <DetailRow label="Image" value={latestAtt.imageRef} />}
-                                <DetailRow label="Verified" value={new Date(latestAtt.verifiedAt).toLocaleString()} />
+                                {latestAtt.codeHash && <DetailRow label={t('serviceDetail.codeHash')} value={latestAtt.codeHash} mono />}
+                                {latestAtt.configRoot && <DetailRow label={t('serviceDetail.configRoot')} value={latestAtt.configRoot} mono />}
+                                {latestAtt.imageRef && <DetailRow label={t('serviceDetail.image')} value={latestAtt.imageRef} />}
+                                <DetailRow label={t('serviceDetail.verified')} value={t('time.onDateTime', { when: new Date(latestAtt.verifiedAt) })} />
                             </>
                         ) : app ? (
                             <>
                                 {app.mrenclave && <DetailRow label="MRENCLAVE" value={app.mrenclave} mono />}
                                 {app.mrtd && <DetailRow label="MRTD" value={app.mrtd} mono />}
-                                {app.codeHash && <DetailRow label="Code Hash" value={app.codeHash} mono />}
-                                {app.configRoot && <DetailRow label="Config Root" value={app.configRoot} mono />}
-                                <DetailRow label="Origin" value={app.origin} />
+                                {app.codeHash && <DetailRow label={t('serviceDetail.codeHash')} value={app.codeHash} mono />}
+                                {app.configRoot && <DetailRow label={t('serviceDetail.configRoot')} value={app.configRoot} mono />}
+                                <DetailRow label={t('serviceDetail.origin')} value={app.origin} />
                             </>
                         ) : null}
                         {credential && (
                             <DetailRow
-                                label="Registered"
-                                value={new Date(credential.registeredAt * 1000).toLocaleDateString()}
+                                label={t('serviceDetail.registered')}
+                                value={t('time.onDate', { when: new Date(credential.registeredAt * 1000) })}
                             />
                         )}
                     </RNView>
@@ -415,19 +427,19 @@ export default function ServiceDetailScreen() {
                         match), with links to the release and the source. */}
                     {releases && (releases.workload?.url || releases.os?.url) && (
                         <RNView style={styles.card}>
-                            <Text style={styles.cardTitle}>Code provenance</Text>
+                            <Text style={styles.cardTitle}>{t('serviceDetail.codeProvenance')}</Text>
                             {releases.workload?.url ? (
                                 <ReleaseLink
-                                    label="App release"
-                                    value={releases.workload.label ?? 'View'}
+                                    label={t('serviceDetail.appRelease')}
+                                    value={releases.workload.label ?? t('serviceDetail.view')}
                                     url={releases.workload.url}
                                     match={releases.workload.matches}
                                 />
                             ) : null}
                             {releases.os?.url ? (
                                 <ReleaseLink
-                                    label="Enclave OS"
-                                    value={releases.os.tag ?? 'View'}
+                                    label={t('serviceDetail.enclaveOs')}
+                                    value={releases.os.tag ?? t('serviceDetail.view')}
                                     url={releases.os.url}
                                     match={
                                         releases.os.status === 'verified'
@@ -438,7 +450,7 @@ export default function ServiceDetailScreen() {
                                     }
                                 />
                             ) : null}
-                            <Text style={styles.provNote}>Verified by Privasys against the published release.</Text>
+                            <Text style={styles.provNote}>{t('serviceDetail.provenanceNote')}</Text>
                         </RNView>
                     )}
 
@@ -447,12 +459,13 @@ export default function ServiceDetailScreen() {
                     {(lastSharedTrace || legacyShared) && (
                         <RNView style={styles.card}>
                             <RNView style={styles.cardTitleRow}>
-                                <Text style={styles.cardTitle}>Shared attributes</Text>
+                                <Text style={styles.cardTitle}>{t('serviceDetail.sharedAttributes')}</Text>
                                 <Text style={styles.traceCount}>
                                     {formatWhen(
                                         lastSharedTrace
                                             ? lastSharedTrace.startedAt
-                                            : legacyShared!.consentedAt * 1000
+                                            : legacyShared!.consentedAt * 1000,
+                                        t
                                     )}
                                 </Text>
                             </RNView>
@@ -461,7 +474,7 @@ export default function ServiceDetailScreen() {
                                       <SharedAttributeRow
                                           key={s.key}
                                           label={ATTRIBUTE_MAP[s.key] ? attributeLabel(s.key) : s.key}
-                                          value={sharedValueText(s, profile)}
+                                          value={sharedValueText(s, profile, t)}
                                           gov={!!s.gov}
                                       />
                                   ))
@@ -471,7 +484,7 @@ export default function ServiceDetailScreen() {
                                           <SharedAttributeRow
                                               key={key}
                                               label={attributeLabel(key)}
-                                              value={sharedValueText({ key, gov }, profile)}
+                                              value={sharedValueText({ key, gov }, profile, t)}
                                               gov={gov}
                                           />
                                       );
@@ -483,7 +496,7 @@ export default function ServiceDetailScreen() {
                     {traces.length > 0 && (
                         <RNView style={styles.card}>
                             <RNView style={styles.cardTitleRow}>
-                                <Text style={styles.cardTitle}>Sessions</Text>
+                                <Text style={styles.cardTitle}>{t('serviceDetail.sessions')}</Text>
                                 <Text style={styles.traceCount}>{traces.length}</Text>
                             </RNView>
                             {traces.map((t) => (
@@ -506,7 +519,7 @@ export default function ServiceDetailScreen() {
                         >
                             <Ionicons name="log-out-outline" size={18} color={p.infoText} />
                             <Text style={styles.signOutButtonText}>
-                                {signingOut ? 'Signing out…' : 'Sign Out from Server'}
+                                {signingOut ? t('serviceDetail.signingOut') : t('serviceDetail.serverSignOut')}
                             </Text>
                         </Pressable>
                     )}
@@ -518,7 +531,7 @@ export default function ServiceDetailScreen() {
                         disabled={removing}
                     >
                         <Ionicons name="trash-outline" size={18} color={p.danger} />
-                        <Text style={styles.removeButtonText}>Remove Service</Text>
+                        <Text style={styles.removeButtonText}>{t('serviceDetail.removeTitle')}</Text>
                     </Pressable>
                 </ScrollView>
             </RNView>
@@ -539,6 +552,7 @@ function TraceRow({
 }) {
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
+    const { t } = useTranslation();
     // Needed to show what a value-revealing disclosure actually disclosed —
     // the wallet's own copy of the certified field, not the credential.
     const profile = useProfileStore((s) => s.profile);
@@ -548,13 +562,13 @@ function TraceRow({
         <RNView style={styles.traceRow}>
             <Pressable style={styles.traceHeader} onPress={onToggle}>
                 <RNView style={styles.traceInfo}>
-                    <Text style={styles.traceKind}>{KIND_LABELS[trace.kind]}</Text>
-                    <Text style={styles.traceWhen}>{formatWhen(trace.startedAt)}</Text>
+                    <Text style={styles.traceKind}>{t(KIND_LABEL_KEYS[trace.kind])}</Text>
+                    <Text style={styles.traceWhen}>{formatWhen(trace.startedAt, t)}</Text>
                 </RNView>
                 <RNView style={styles.traceRight}>
                     {shared.length > 0 && (
                         <Text style={styles.traceShared}>
-                            {shared.length} shared
+                            {t('serviceDetail.sharedCount', { count: shared.length })}
                         </Text>
                     )}
                     <Ionicons
@@ -568,32 +582,37 @@ function TraceRow({
                 <RNView style={styles.traceBody}>
                     {trace.requestedBy && (
                         <Text style={styles.traceAgent}>
-                            Requested by “{trace.requestedBy}” (unverified label)
+                            {t('serviceDetail.requestedBy', { agent: trace.requestedBy })}
                         </Text>
                     )}
                     {trace.detail && <Text style={styles.traceDetail}>{trace.detail}</Text>}
-                    <DetailRow label="Identity" value={IDENTITY_LABELS[trace.identity]} />
+                    <DetailRow label={t('serviceDetail.identity')} value={t(IDENTITY_LABEL_KEYS[trace.identity])} />
                     {trace.channel && (
-                        <DetailRow label="Via" value={trace.channel === 'qr' ? 'QR scan' : 'Push notification'} />
+                        <DetailRow
+                            label={t('serviceDetail.via')}
+                            value={trace.channel === 'qr' ? t('serviceDetail.viaQr') : t('serviceDetail.viaPush')}
+                        />
                     )}
-                    <DetailRow label="Signed in" value={new Date(trace.startedAt).toLocaleString()} />
+                    <DetailRow label={t('serviceDetail.signedIn')} value={t('time.onDateTime', { when: new Date(trace.startedAt) })} />
                     {trace.expiresAt ? (
                         <DetailRow
-                            label={trace.expiresAt > Date.now() ? 'Session expires' : 'Session expired'}
-                            value={new Date(trace.expiresAt).toLocaleString()}
+                            label={trace.expiresAt > Date.now()
+                                ? t('serviceDetail.sessionExpires')
+                                : t('serviceDetail.sessionExpired')}
+                            value={t('time.onDateTime', { when: new Date(trace.expiresAt) })}
                         />
                     ) : trace.oneShot ? (
-                        <DetailRow label="Session" value="One-time (completed on approval)" />
+                        <DetailRow label={t('serviceDetail.session')} value={t('serviceDetail.oneTimeSession')} />
                     ) : null}
                     {trace.requestedAttributes && trace.requestedAttributes.length > 0 && (
                         <DetailRow
-                            label="Requested"
+                            label={t('serviceDetail.requested')}
                             value={trace.requestedAttributes.map((k) => attributeLabel(k)).join(', ')}
                         />
                     )}
                     {shared.length > 0 && (
                         <RNView style={styles.sharedBlock}>
-                            <Text style={styles.sharedBlockTitle}>Shared with this session</Text>
+                            <Text style={styles.sharedBlockTitle}>{t('serviceDetail.sharedWithSession')}</Text>
                             {shared.map((s) => (
                                 <RNView key={s.key} style={styles.sharedRow}>
                                     <RNView style={styles.sharedInfo}>
@@ -601,13 +620,13 @@ function TraceRow({
                                             {ATTRIBUTE_MAP[s.key] ? attributeLabel(s.key) : s.key}
                                         </Text>
                                         <Text style={styles.sharedValue} numberOfLines={1}>
-                                            {sharedValueText(s, profile)}
+                                            {sharedValueText(s, profile, t)}
                                         </Text>
                                     </RNView>
                                     {s.gov && (
                                         <RNView style={styles.verifiedBadge}>
                                             <Ionicons name="shield-checkmark" size={12} color={p.infoText} />
-                                            <Text style={styles.verifiedText}>Proof</Text>
+                                            <Text style={styles.verifiedText}>{t('serviceDetail.proof')}</Text>
                                         </RNView>
                                     )}
                                 </RNView>
@@ -616,18 +635,20 @@ function TraceRow({
                     )}
                     {denied.length > 0 && (
                         <DetailRow
-                            label="Not shared"
+                            label={t('serviceDetail.notShared')}
                             value={denied.map((k) => attributeLabel(k)).join(', ')}
                         />
                     )}
                     {(trace.attestations ?? []).map((a) => (
                         <RNView key={`${a.host}-${a.verifiedAt}`} style={styles.attBlock}>
-                            <Text style={styles.sharedBlockTitle}>Enclave · {a.host}</Text>
+                            <Text style={styles.sharedBlockTitle}>
+                                {t('serviceDetail.enclaveHost', { host: a.host })}
+                            </Text>
                             <DetailRow label="TEE" value={a.teeType.toUpperCase()} />
-                            {a.mrenclave && <DetailRow label="MRENCLAVE" value={shortHex(a.mrenclave)} mono />}
-                            {a.mrtd && <DetailRow label="MRTD" value={shortHex(a.mrtd)} mono />}
-                            {a.codeHash && <DetailRow label="Code Hash" value={shortHex(a.codeHash)} mono />}
-                            <DetailRow label="Verified" value={new Date(a.verifiedAt).toLocaleString()} />
+                            {a.mrenclave && <DetailRow label="MRENCLAVE" value={shortHex(a.mrenclave, t)} mono />}
+                            {a.mrtd && <DetailRow label="MRTD" value={shortHex(a.mrtd, t)} mono />}
+                            {a.codeHash && <DetailRow label={t('serviceDetail.codeHash')} value={shortHex(a.codeHash, t)} mono />}
+                            <DetailRow label={t('serviceDetail.verified')} value={t('time.onDateTime', { when: new Date(a.verifiedAt) })} />
                         </RNView>
                     ))}
                 </RNView>

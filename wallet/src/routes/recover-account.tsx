@@ -205,7 +205,7 @@ export default function RecoverAccountScreen() {
             if (unknown.length > 0) {
                 Alert.alert(
                     'Check Your Phrase',
-                    'These are not recovery words — check your transcription: ' +
+                    'These are not recovery words. Check your transcription: ' +
                     unknown.map(({ w, i }) => `#${i + 1} “${w}”`).join(', ')
                 );
                 return;
@@ -217,7 +217,7 @@ export default function RecoverAccountScreen() {
             if (!bip39ChecksumValid(list)) {
                 Alert.alert(
                     'Possible Typo',
-                    'The phrase does not pass its built-in consistency check — one or more words are likely mistyped. Double-check against your written copy.',
+                    'The phrase does not pass its built-in consistency check, so one or more words are likely mistyped. Double-check against your written copy.',
                     [
                         { text: 'Let me fix it', style: 'cancel' },
                         { text: 'Submit anyway', style: 'destructive', onPress: () => void submitPhrase(phrase) },
@@ -254,7 +254,7 @@ export default function RecoverAccountScreen() {
             enteredPhraseRef.current = phrase;
             setCodeInput('');
         } catch (e: any) {
-            Alert.alert('Invalid Code', e.message || 'The recovery code was not recognized. Please try again.');
+            Alert.alert('Invalid Code', e.message || 'The recovery code was not recognised. Please try again.');
         } finally {
             setSubmitting(false);
         }
@@ -454,7 +454,7 @@ export default function RecoverAccountScreen() {
             Alert.alert(
                 'Registration Failed',
                 `Could not register this device to the recovered account: ${e?.message ?? e}. ` +
-                'Your existing sign-ins are unchanged — you can retry.'
+                'Your existing sign-ins are unchanged, so you can retry.'
             );
         } finally {
             setRegistering(false);
@@ -598,7 +598,7 @@ export default function RecoverAccountScreen() {
                         <Text style={styles.title}>Waiting for Guardians</Text>
                         <Text style={styles.subtitle}>
                             Your recovery request has been sent to your trusted guardians.
-                            You can close this screen and come back — we'll keep checking.
+                            You can close this screen and come back. We'll keep checking.
                         </Text>
 
                         <RNView style={styles.card}>
@@ -676,7 +676,7 @@ export default function RecoverAccountScreen() {
                         <Text style={styles.title}>Account Recovered</Text>
                         <Text style={styles.subtitle}>
                             One step left: register this device to the recovered account. This
-                            creates a new passkey bound to your recovered identity — your roles
+                            creates a new passkey bound to your recovered identity, and your roles
                             and app ownerships come back with it.
                         </Text>
 
@@ -703,7 +703,7 @@ export default function RecoverAccountScreen() {
                         <Text style={styles.title}>Device Restored</Text>
                         <Text style={styles.subtitle}>
                             This device now signs in as your recovered account. Consider
-                            generating a fresh recovery phrase in Settings → Account Recovery —
+                            generating a fresh recovery phrase in Settings → Account Recovery, because
                             recovery phrases are single-use.
                         </Text>
 

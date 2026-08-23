@@ -2416,7 +2416,7 @@ function ConnectFlow() {
                             }))}
                             note={
                                 consentItems.some((i) => i.gov)
-                                    ? 'Verified attributes are shared as enclave-signed proofs bound to this service — never the raw document. The service pays for them; you pay nothing.'
+                                    ? 'Verified attributes are shared as enclave-signed proofs bound to this service, never the raw document. The service pays for them; you pay nothing.'
                                     : undefined
                             }
                             persistent={{ value: consentRemember, onChange: setConsentRemember }}
@@ -2605,7 +2605,7 @@ function ReportErrorModal({
                     <Text style={reportStyles.destinationLabel}>Will be sent to</Text>
                     <Text style={reportStyles.destinationValue}>{REPORT_DESTINATION}</Text>
                     <Text style={reportStyles.destinationNote}>
-                        Automatic submission is not wired up yet — for now, copy the report below
+                        Automatic submission is not wired up yet, so for now copy the report below
                         and share it with the Privasys team.
                     </Text>
                 </RNView>
@@ -3040,7 +3040,7 @@ function AttributeAcquisitionView({
                                             <RNView style={acqStyles.privacyNotice}>
                                                 <Ionicons name="shield-checkmark-outline" size={16} color={p.warnText} />
                                                 <Text style={acqStyles.privacyNoticeText}>
-                                                    Filled by verifying your ID document — not typed.
+                                                    Filled by verifying your ID document, not typed.
                                                 </Text>
                                             </RNView>
                                         </RNView>

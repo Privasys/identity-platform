@@ -464,7 +464,7 @@ export function AttestationView({
                             <View style={styles.advancedBox}>
                                 <Text style={styles.advancedWarning}>
                                     Verification failed. Continuing sends your request to an enclave
-                                    that could not prove its identity — its code and data may not be
+                                    that could not prove its identity, so its code and data may not be
                                     what they claim. Only proceed if you understand the risk.
                                 </Text>
                                 <Pressable style={styles.dangerButton} onPress={onApprove}>

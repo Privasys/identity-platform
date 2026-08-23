@@ -193,7 +193,7 @@ export default function AccountRecoveryScreen() {
             'Generate Recovery Phrase',
             phraseStatus?.has_phrase
                 ? 'This will replace your existing 24-word recovery phrase. The old phrase will no longer work.'
-                : 'Generate a new 24-word recovery phrase. Write it down and store it in a safe place — it will only be shown once.',
+                : 'Generate a new 24-word recovery phrase. Write it down and store it in a safe place. It will only be shown once.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -406,13 +406,13 @@ export default function AccountRecoveryScreen() {
                 <Text style={styles.sectionTitle}>RECOVERY PHRASE</Text>
                 <Text style={styles.sectionDescription}>
                     A 24-word phrase to regain access if you lose your device. Write it down on paper
-                    and store it somewhere safe — it will only be shown once.
+                    and store it somewhere safe. It will only be shown once.
                 </Text>
 
                 {newPhrase ? (
                     <RNView style={styles.card}>
                         <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
-                            Save these 24 words in order — they won't be shown again
+                            Save these 24 words in order. They won't be shown again
                         </Text>
                         <RNView style={styles.codesGrid}>
                             {newPhrase.split(/\s+/).map((word, i) => (
@@ -432,7 +432,7 @@ export default function AccountRecoveryScreen() {
                                     await Clipboard.setStringAsync(newPhrase);
                                     Alert.alert(
                                         'Copied',
-                                        'The phrase is on your clipboard. Paste it into your printing app, then clear the clipboard — anything that reads your clipboard can read the phrase.',
+                                        'The phrase is on your clipboard. Paste it into your printing app, then clear the clipboard, because anything that reads your clipboard can read the phrase.',
                                     );
                                 }}
                             >
@@ -449,7 +449,7 @@ export default function AccountRecoveryScreen() {
                         </RNView>
                         <Text style={styles.helperText}>
                             Safest is paper. If you copy or share the phrase to print it, avoid
-                            cloud destinations — anyone holding these 24 words holds your account.
+                            cloud destinations: anyone holding these 24 words holds your account.
                         </Text>
                         <Pressable
                             style={styles.primaryButton}
@@ -496,7 +496,7 @@ export default function AccountRecoveryScreen() {
                         )}
                         {/* While signed out this rendered as a SECOND big blue
                             button (merely dimmed), indistinguishable from
-                            "Sign in with biometrics" above — two identical
+                            "Sign in with biometrics" above. Two identical
                             primary actions. Signed out, sign-in is the one
                             true next step (it creates and shows the phrase on
                             first sign-in), so the generate button only exists

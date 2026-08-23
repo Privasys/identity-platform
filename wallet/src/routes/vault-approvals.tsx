@@ -48,7 +48,7 @@ function shortHandle(handle: string): string {
     return parts.length >= 2 ? `${parts[1].slice(0, 12)}…` : handle;
 }
 function shortHex(hex: string): string {
-    if (!hex) return '—';
+    if (!hex) return 'None';
     return hex.length > 20 ? `${hex.slice(0, 10)}…${hex.slice(-6)}` : hex;
 }
 

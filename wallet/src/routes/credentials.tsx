@@ -58,11 +58,11 @@ export default function CredentialsScreen() {
             Alert.alert(
                 isActive ? 'Remove your account key?' : 'Remove an account key?',
                 `This is the key to your Privasys ${shortAccount(cred.userHandle)}` +
-                    (isActive ? ' — the one your sign-ins currently use.' : '.') +
+                    (isActive ? ', the one your sign-ins currently use.' : '.') +
                     '\n\nRemoving it permanently discards this device’s only way to ' +
                     'prove that identity. Signing in again will NOT restore it: a new ' +
                     'registration creates a NEW, empty account. Everything bound to ' +
-                    'this account — app ownership, roles, vault approvals — stays ' +
+                    'this account (app ownership, roles, vault approvals) stays ' +
                     'locked until you run account recovery with its recovery phrase.' +
                     '\n\nOnly remove this if you are certain the account is disposable ' +
                     'or safely held elsewhere.',
@@ -106,7 +106,7 @@ export default function CredentialsScreen() {
             `This removes all ${credentials.length} credentials` +
                 (idpCount > 0
                     ? `, including ${idpCount} Privasys account key${idpCount > 1 ? 's' : ''}. ` +
-                      'Those accounts become unreachable until account recovery — a fresh ' +
+                      'Those accounts become unreachable until account recovery: a fresh ' +
                       'sign-in creates new, empty identities, not the old ones.'
                     : '.') +
                 ' Continue?',
@@ -139,7 +139,7 @@ export default function CredentialsScreen() {
                     <>
                         <Text style={styles.intro}>
                             The keys this device holds. Privasys account keys cannot be
-                            re-created by signing in again — removing one locks that
+                            re-created by signing in again. Removing one locks that
                             account until recovery.
                         </Text>
                         {credentials.map((cred) => {
@@ -153,7 +153,7 @@ export default function CredentialsScreen() {
                                         </Text>
                                         {isActive ? (
                                             <Text style={styles.activeBadge}>
-                                                Active — your sign-ins use this key
+                                                Active: your sign-ins use this key
                                             </Text>
                                         ) : isIdp ? (
                                             <Text style={styles.inactiveBadge}>
@@ -180,7 +180,7 @@ export default function CredentialsScreen() {
                                     </Text>
                                     <Text style={styles.meta}>
                                         Your wallet&apos;s own account (recovery management).
-                                        Managed automatically — not removable here.
+                                        Managed automatically, not removable here.
                                     </Text>
                                 </View>
                             </View>

@@ -488,7 +488,7 @@ export default function KycCaptureScreen() {
         const current = curGiven || curFamily ? `\n\nKeep your current name (${[curGiven, curFamily].filter(Boolean).join(' ')})?` : '';
         Alert.alert(
             'Use your verified name?',
-            `Your ID shows:\n  First name: ${idGiven ?? '—'}\n  Last name: ${idFamily ?? '—'}${current}`,
+            `Your ID shows:\n  First name: ${idGiven ?? 'not set'}\n  Last name: ${idFamily ?? 'not set'}${current}`,
             [
                 { text: 'Keep current', style: 'cancel' },
                 {
@@ -939,7 +939,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     return (
         <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>{label}</Text>
-            <Text style={styles.summaryValue}>{value || '—'}</Text>
+            <Text style={styles.summaryValue}>{value || 'Not set'}</Text>
         </View>
     );
 }

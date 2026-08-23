@@ -58,7 +58,7 @@ function formatWhen(ms: number): string {
 }
 
 function shortHex(v?: string): string {
-    if (!v) return '—';
+    if (!v) return 'None';
     return v.length > 20 ? `${v.slice(0, 10)}…${v.slice(-6)}` : v;
 }
 
@@ -79,10 +79,10 @@ function sharedValueText(
     s: { key: string; value?: string; gov?: boolean },
     profile: UserProfile | null
 ): string {
-    if (!s.gov) return s.value ?? '—';
-    if (!revealsUnderlyingValue(s.key)) return 'Verified proof — value not revealed';
+    if (!s.gov) return s.value ?? 'Not recorded';
+    if (!revealsUnderlyingValue(s.key)) return 'Verified proof (value not revealed)';
     const own = profile ? getProfileValue(profile, certifiedFieldFor(s.key)) : undefined;
-    return own ? `${own} — verified` : 'Verified value shared';
+    return own ? `${own} (verified)` : 'Verified value shared';
 }
 
 export default function ServiceDetailScreen() {

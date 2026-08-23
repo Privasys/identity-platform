@@ -34,7 +34,7 @@ export async function checkDeviceSecurity(): Promise<SecurityStatus> {
 
     // Check if running on a real device
     if (!Device.isDevice) {
-        warnings.push('Running on a simulator/emulator — hardware keys are not available.');
+        warnings.push('Running on a simulator or emulator: hardware keys are not available.');
         hasSecureHardware = false;
     }
 
@@ -44,7 +44,7 @@ export async function checkDeviceSecurity(): Promise<SecurityStatus> {
         // Since we can't access the filesystem directly from JS, we check
         // what the device reports
         if (Device.modelName?.includes('Simulator')) {
-            warnings.push('iOS Simulator detected — Secure Enclave is not available.');
+            warnings.push('iOS Simulator detected: Secure Enclave is not available.');
             hasSecureHardware = false;
         }
     }
@@ -59,7 +59,7 @@ export async function checkDeviceSecurity(): Promise<SecurityStatus> {
             model.includes('sdk') ||
             model.includes('goldfish')
         ) {
-            warnings.push('Android emulator detected — StrongBox/TEE keys may not be available.');
+            warnings.push('Android emulator detected: StrongBox/TEE keys may not be available.');
             hasSecureHardware = false;
         }
     }

@@ -438,7 +438,7 @@ export default function BatchConnectScreen() {
             {item.attestation && item.status === 'verified' && (
                 <View style={styles.appDetailRow}>
                     <Text style={styles.appDetail}>
-                        {item.attestation.tee_type?.toUpperCase()} — {item.attestation.valid ? 'Valid' : 'Invalid'}
+                        {item.attestation.tee_type?.toUpperCase()}: {item.attestation.valid ? 'Valid' : 'Invalid'}
                         {item.challenged ? '  ·  ⚡ Challenged' : ''}
                     </Text>
                     {/* Enclave rows only (non-enclave RPs have nothing to

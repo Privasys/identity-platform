@@ -323,7 +323,7 @@ export default function ProfileScreen() {
                     <Ionicons name="copy-outline" size={18} color={p.textMuted} />
                 </Pressable>
                 <Text style={styles.privacyNote}>
-                    Apps receive a unique derived ID — they cannot track you across services.
+                    Apps receive a unique derived ID, so they cannot track you across services.
                 </Text>
 
                 {/* Personal Data */}
@@ -517,7 +517,7 @@ export default function ProfileScreen() {
                     <Text style={styles.dangerDescription}>
                         Registered credentials are the keys this device holds for your
                         accounts. Removing one can permanently lock you out of that
-                        account — signing in again creates a new, empty identity, and
+                        account. Signing in again creates a new, empty identity, and
                         only account recovery brings the old one back.
                     </Text>
                     <Pressable

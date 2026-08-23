@@ -144,7 +144,7 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
         throw new Error(cb.searchParams.get('error') || 'No result code received');
     }
     if (returnedNonce !== nonce) {
-        throw new Error('Nonce mismatch — possible CSRF attack');
+        throw new Error('Nonce mismatch: possible CSRF attack');
     }
 
     // 2. Redeem the one-time code with the PKCE verifier.

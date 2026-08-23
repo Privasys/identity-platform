@@ -93,7 +93,7 @@ export default function SecureWalletScreen() {
                     <>
                         <RNView style={styles.card}>
                             <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
-                                Save these 24 words in order — they won&apos;t be shown again
+                                Save these 24 words in order. They won&apos;t be shown again
                             </Text>
                             <RNView style={styles.codesGrid}>
                                 {phrase.split(/\s+/).map((word, i) => (
@@ -109,7 +109,7 @@ export default function SecureWalletScreen() {
                                         await Clipboard.setStringAsync(phrase);
                                         Alert.alert(
                                             'Copied',
-                                            'The phrase is on your clipboard. Paste it into your printing app, then clear the clipboard — anything that reads your clipboard can read the phrase.',
+                                            'The phrase is on your clipboard. Paste it into your printing app, then clear the clipboard, because anything that reads your clipboard can read the phrase.',
                                         );
                                     }}
                                 >
@@ -126,7 +126,7 @@ export default function SecureWalletScreen() {
                             </RNView>
                             <Text style={styles.helperText}>
                                 Safest is paper. If you copy or share the phrase to print it, avoid
-                                cloud destinations — anyone holding these 24 words holds your account.
+                                cloud destinations: anyone holding these 24 words holds your account.
                             </Text>
                             <Pressable style={styles.primaryButton} onPress={handleSaved}>
                                 <Text style={styles.primaryButtonText}>I&apos;ve saved my phrase</Text>
@@ -157,7 +157,7 @@ export default function SecureWalletScreen() {
                         <RNView style={styles.card}>
                             <RNView style={styles.bulletRow}>
                                 <Ionicons name="phone-portrait-outline" size={18} color={p.textMuted} />
-                                <Text style={styles.bulletText}>Created on this device — the words never leave it, only a fingerprint does.</Text>
+                                <Text style={styles.bulletText}>Created on this device. The words never leave it, only a fingerprint does.</Text>
                             </RNView>
                             <RNView style={styles.bulletRow}>
                                 <Ionicons name="document-text-outline" size={18} color={p.textMuted} />

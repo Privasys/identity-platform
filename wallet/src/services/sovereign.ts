@@ -135,7 +135,7 @@ export async function sovereignKeyForAttestedApp(
 ): Promise<Uint8Array> {
     if (outcome.status !== 'verified') {
         throw new Error(
-            `sovereign: refusing to release the data key — app attestation is '${outcome.status}', not 'verified'`
+            `sovereign: refusing to release the data key; app attestation is '${outcome.status}', not 'verified'`
         );
     }
     if (!appIdHex) {

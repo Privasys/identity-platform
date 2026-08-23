@@ -40,7 +40,7 @@ export function ImportSelectionSheet({
         <RNView style={styles.card}>
             <Text style={styles.title}>Import from {providerName}</Text>
             <Text style={styles.subtitle}>
-                Choose what to add to your profile. Everything is selected by default — untick
+                Choose what to add to your profile. Everything is selected by default. Untick
                 anything you'd rather not import.
             </Text>
 

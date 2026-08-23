@@ -123,7 +123,7 @@ async function fido2Fetch<T extends object>(origin: string, path: string, body?:
     console.log(`[FIDO2] ${path} — status=${result.status}, body=${result.body.substring(0, 300)}`);
 
     if (result.status < 200 || result.status >= 300) {
-        throw new Error(`FIDO2 request failed: ${result.status} — ${result.body.substring(0, 200)}`);
+        throw new Error(`FIDO2 request failed (${result.status}): ${result.body.substring(0, 200)}`);
     }
 
     const json: T = JSON.parse(result.body);

@@ -276,12 +276,12 @@ export async function attestVerifier(
     const oid = inspected.custom_oids?.find((o) => o.oid === v.imageOid);
     if (!oid) {
         throw new Error(
-            'verifier attestation is missing the identity image OID — refusing to send identity data'
+            'verifier attestation is missing the identity image OID; refusing to send identity data'
         );
     }
     if (oid.value_hex.toLowerCase() !== v.imageDigest.toLowerCase()) {
         throw new Error(
-            'verifier image digest does not match the expected published build — refusing to proceed'
+            'verifier image digest does not match the expected published build; refusing to proceed'
         );
     }
 
@@ -779,7 +779,7 @@ async function buildSignedBase(
 
 async function requireRecord(): Promise<KycRecord> {
     const record = await getLatestKycRecord();
-    if (!record) throw new Error('No verified identity on file — verify your ID first.');
+    if (!record) throw new Error('No verified identity on file. Verify your ID first.');
     return record;
 }
 
@@ -867,7 +867,7 @@ export async function provePresence(
     const record = await requireRecord();
     if (!record.dg2 || !record.salts[PORTRAIT_SALT_KEY]) {
         throw new Error(
-            'This identity receipt predates presence support — re-verify your ID to enable it.'
+            'This identity receipt predates presence support. Re-verify your ID to enable it.'
         );
     }
     const base = await buildSignedBase(record, rpId, nonce);
@@ -952,7 +952,7 @@ export async function discloseAttribute(
     if (key === 'holder_present') {
         // Presence needs a live selfie ceremony — the connect flow captures it
         // and calls provePresence directly; it can never resolve as a field.
-        throw new Error('holder_present requires a live selfie — use provePresence');
+        throw new Error('holder_present requires a live selfie: use provePresence');
     }
     return proveField(rpId, certifiedFieldFor(key), nonce, voucher);
 }

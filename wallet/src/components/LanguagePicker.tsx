@@ -20,7 +20,6 @@ import { Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { currentLocale } from '@/i18n';
 import { localeMeta } from '@/i18n/locales';
 import { useSettingsStore } from '@/stores/settings';
 
@@ -28,10 +27,15 @@ export function LanguagePicker() {
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
-    const { t } = useTranslation();
+
+    // Read the live language off the i18n instance, not from a module-level
+    // getter. useTranslation re-renders this component on languageChanged;
+    // a plain function call is evaluated once and then sits there saying
+    // "English" while the rest of the screen is in French.
+    const { t, i18n } = useTranslation();
+    const active = i18n.language;
 
     const language = useSettingsStore((s) => s.language);
-    const active = currentLocale();
     const endonym = localeMeta(active)?.endonym ?? active;
 
     // Following the device is a distinct state worth surfacing, so say so and

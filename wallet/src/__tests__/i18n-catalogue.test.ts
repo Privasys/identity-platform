@@ -213,6 +213,16 @@ describe('pack manifest', () => {
         expect(Object.keys(I18N_MANIFEST.digests).sort()).toEqual(translations);
     });
 
+    it('omits the bundled source locale, which is a trap for callers', () => {
+        // en-GB ships inside the binary, so it deliberately has no digest.
+        // Anything asking "is this language on the device?" by looking up the
+        // digest map therefore gets `undefined` for the ONE language that is
+        // always present, and will report the source language as needing a
+        // download forever. i18n/packs.ts special-cases it for this reason.
+        expect(SUPPORTED_LOCALES.some((l) => l.tag === FALLBACK_LOCALE)).toBe(true);
+        expect(I18N_MANIFEST.digests[FALLBACK_LOCALE]).toBeUndefined();
+    });
+
     it('is up to date with the locale files on disk', () => {
         // The digest rule is restated here rather than imported from
         // scripts/gen-i18n-manifest.mjs, which jest cannot load as ESM. That

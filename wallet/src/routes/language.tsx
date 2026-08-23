@@ -36,26 +36,40 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
-import { applyLocale, currentLocale } from '@/i18n';
+import { applyLocale } from '@/i18n';
 import { SUPPORTED_LOCALES, localeMeta } from '@/i18n/locales';
-import { isPackCached } from '@/i18n/packs';
+import { isPackAvailable } from '@/i18n/packs';
 import { useSettingsStore } from '@/stores/settings';
+
+/** Tags usable without a download. Recomputed only when one is added. */
+function availableTags(): Set<string> {
+    return new Set(SUPPORTED_LOCALES.filter((l) => isPackAvailable(l.tag)).map((l) => l.tag));
+}
 
 export default function LanguageScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
-    const { t } = useTranslation();
+
+    // `i18n.language` rather than a module read: useTranslation re-renders on
+    // languageChanged, so this is the only spelling of "current language" that
+    // cannot go stale under the component.
+    const { t, i18n } = useTranslation();
+    const active = i18n.language;
 
     const language = useSettingsStore((s) => s.language);
     const setLanguage = useSettingsStore((s) => s.setLanguage);
     const [pending, setPending] = useState<string | null>(null);
+    // Held in state, not recomputed per render: a download changes it exactly
+    // once, and the alternative is 25 filesystem hits every time this list
+    // paints.
+    const [available, setAvailable] = useState<Set<string>>(availableTags);
 
     const choose = useCallback(
         async (tag: string | null) => {
             if (pending) return;
-            const previous = currentLocale();
+            const previous = active;
 
             // "Use device language" resolves through the same negotiation the
             // app uses at launch, so it can also need a download.
@@ -77,8 +91,10 @@ export default function LanguageScreen() {
                 return;
             }
             setLanguage(tag);
+            // A first-time selection just wrote a pack to disk.
+            setAvailable(availableTags());
         },
-        [pending, setLanguage, t],
+        [active, pending, setLanguage, t],
     );
 
     return (
@@ -108,10 +124,13 @@ export default function LanguageScreen() {
                             key={locale.tag}
                             label={locale.endonym}
                             hint={locale.english}
-                            // Everything but the compiled-in source locale
-                            // needs a one-off download the first time.
-                            needsDownload={!isPackCached(locale.tag)}
+                            downloaded={available.has(locale.tag)}
                             selected={language === locale.tag}
+                            // When the preference is "use device language" the
+                            // tick sits on that row, so without this the
+                            // language actually on screen would be the one row
+                            // with nothing to say for itself.
+                            inUse={locale.tag === active}
                             busy={pending === locale.tag}
                             onPress={() => void choose(locale.tag)}
                             styles={styles}
@@ -126,11 +145,24 @@ export default function LanguageScreen() {
     );
 }
 
+/**
+ * Every row says one of four things, and none of them is silence:
+ *
+ *   spinner  the pack is downloading right now
+ *   ✓        this is your choice
+ *   ●        this is what you are reading, but not what you chose (you chose
+ *            "use device language" and it resolved here)
+ *   ☁        tapping this needs a download first
+ *
+ * A downloaded-but-unselected language previously fell through all of these
+ * and rendered nothing, which read as "this one is broken".
+ */
 function LanguageRow({
     label,
     hint,
-    needsDownload,
+    downloaded,
     selected,
+    inUse,
     busy,
     onPress,
     styles,
@@ -138,8 +170,9 @@ function LanguageRow({
 }: {
     label: string;
     hint?: string;
-    needsDownload?: boolean;
+    downloaded?: boolean;
     selected: boolean;
+    inUse?: boolean;
     busy: boolean;
     onPress: () => void;
     styles: ReturnType<typeof makeStyles>;
@@ -151,20 +184,26 @@ function LanguageRow({
             onPress={onPress}
             disabled={busy}
             accessibilityRole="radio"
-            accessibilityState={{ selected }}
+            accessibilityState={{ selected: selected || !!inUse }}
             accessibilityLabel={label}
         >
             <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>{label}</Text>
+                <Text style={[styles.rowLabel, (selected || inUse) && styles.rowLabelActive]}>
+                    {label}
+                </Text>
                 {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
             </View>
             {busy ? (
                 <ActivityIndicator size="small" color={p.textSecondary} />
             ) : selected ? (
                 <Ionicons name="checkmark" size={20} color={p.action} />
-            ) : needsDownload ? (
+            ) : inUse ? (
+                <Ionicons name="ellipse" size={9} color={p.action} />
+            ) : downloaded ? (
+                <Ionicons name="cloud-done-outline" size={17} color={p.textMuted} />
+            ) : (
                 <Ionicons name="cloud-download-outline" size={17} color={p.textMuted} />
-            ) : null}
+            )}
         </Pressable>
     );
 }
@@ -201,6 +240,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     rowText: { flex: 1, backgroundColor: 'transparent' },
     rowLabel: { fontSize: 15, fontWeight: '500', color: p.textPrimary },
+    rowLabelActive: { color: p.action },
     rowHint: { fontSize: 12, color: p.textMuted, marginTop: 2 },
     footnote: {
         fontSize: 12,

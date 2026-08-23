@@ -187,6 +187,31 @@ export function isPackCached(tag: string): boolean {
 }
 
 /**
+ * Is this language usable right now, without a download?
+ *
+ * Existence only. {@link isPackCached} re-reads and re-hashes the whole file,
+ * which is the right thing on the load path and the wrong thing for a list
+ * that asks about 25 locales every render.
+ *
+ * `en-GB` is compiled into the binary and has no manifest entry, so it is
+ * always available; asking the digest map about it returns undefined and
+ * would otherwise render the source language as "needs downloading" forever.
+ *
+ * Cheapness is safe here because this only drives an icon. Nothing is
+ * rendered from a pack until loadPack has verified its digest.
+ */
+export function isPackAvailable(tag: string): boolean {
+    const resolved = negotiateLocale(tag);
+    if (resolved === FALLBACK_LOCALE) return true;
+    if (!I18N_MANIFEST.digests[resolved]) return false;
+    try {
+        return packFile(resolved).exists;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Delete packs from superseded manifest versions.
  *
  * Called after a successful load rather than at launch: an upgrade that

@@ -123,7 +123,22 @@ export default function ProfileScreen() {
             });
             setOnboarded();
             setSetupDone(3);
-            // profile is now set → the screen re-renders to the normal profile view.
+            // Release the ceremony state even though the profile view takes
+            // over: the component stays MOUNTED, so a later "Clear All Data"
+            // brings this screen back — with a stale busy=true the button
+            // spun forever and the wallet was unusable (2026-08-22).
+            setSetupBusy(false);
+            // The wallet is unusable-in-anger without a recovery phrase, but
+            // the only nudge used to be a Home-screen banner disconnected
+            // from setup. Offer the next step right here.
+            Alert.alert(
+                'Wallet ready',
+                'One more step: set your 24-word recovery phrase so you can recover your account if you lose this device.',
+                [
+                    { text: 'Later', style: 'cancel' },
+                    { text: 'Set it up now', onPress: () => router.push('/account-recovery') },
+                ],
+            );
         } catch (e: any) {
             Alert.alert(
                 'Setup failed',
@@ -551,6 +566,12 @@ export default function ProfileScreen() {
                                             useAuthStore.getState().setPrivasysId(null);
                                             void clearSovereignLocalState();
                                             clearProfile();
+                                            // Reset the setup ceremony so the
+                                            // re-shown setup screen starts
+                                            // clean (stale busy/done state
+                                            // froze the button, 2026-08-22).
+                                            setSetupBusy(false);
+                                            setSetupDone(0);
                                         }
                                     }
                                 ]

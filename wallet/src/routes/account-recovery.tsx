@@ -23,7 +23,9 @@ import {
     Alert,
     ActivityIndicator,
     RefreshControl,
+    Share,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
@@ -415,8 +417,9 @@ export default function AccountRecoveryScreen() {
                     <RNView style={styles.card}>
                         <Text style={styles.fieldLabel}>Sign in to Privasys ID</Text>
                         <Text style={styles.helperText}>
-                            Recovery management requires a wallet session. Sign in once with your biometrics
-                            to manage your recovery phrase, guardians and registered devices.
+                            Sign in once with your biometrics to manage your recovery phrase,
+                            guardians and registered devices. On your first sign-in your
+                            24-word recovery phrase is created and shown right away.
                         </Text>
                         <Pressable
                             style={[styles.primaryButton, signingIn && { opacity: 0.6 }]}
@@ -451,6 +454,36 @@ export default function AccountRecoveryScreen() {
                                 </RNView>
                             ))}
                         </RNView>
+                        {/* Copy / export so the phrase can be printed. The
+                            share sheet and clipboard are less private than
+                            paper (clipboard managers, cloud share targets),
+                            so the caution stays visible next to the actions. */}
+                        <RNView style={{ flexDirection: 'row', gap: 10 }}>
+                            <Pressable
+                                style={[styles.secondaryButton, { flex: 1 }]}
+                                onPress={async () => {
+                                    await Clipboard.setStringAsync(newPhrase);
+                                    Alert.alert(
+                                        'Copied',
+                                        'The phrase is on your clipboard. Paste it into your printing app, then clear the clipboard — anything that reads your clipboard can read the phrase.',
+                                    );
+                                }}
+                            >
+                                <Text style={styles.secondaryButtonText}>Copy</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[styles.secondaryButton, { flex: 1 }]}
+                                onPress={() => {
+                                    void Share.share({ message: newPhrase });
+                                }}
+                            >
+                                <Text style={styles.secondaryButtonText}>Share / Print</Text>
+                            </Pressable>
+                        </RNView>
+                        <Text style={styles.helperText}>
+                            Safest is paper. If you copy or share the phrase to print it, avoid
+                            cloud destinations — anyone holding these 24 words holds your account.
+                        </Text>
                         <Pressable
                             style={styles.primaryButton}
                             onPress={() => {
@@ -494,19 +527,28 @@ export default function AccountRecoveryScreen() {
                                 </Text>
                             </RNView>
                         )}
-                        <Pressable
-                            style={[styles.primaryButton, (generatingPhrase || notConfigured) && { opacity: 0.6 }]}
-                            onPress={handleGeneratePhrase}
-                            disabled={generatingPhrase || notConfigured}
-                        >
-                            {generatingPhrase ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                            ) : (
-                                <Text style={styles.primaryButtonText}>
-                                    {phraseStatus?.has_phrase ? 'Regenerate Phrase' : 'Generate Recovery Phrase'}
-                                </Text>
-                            )}
-                        </Pressable>
+                        {/* While signed out this rendered as a SECOND big blue
+                            button (merely dimmed), indistinguishable from
+                            "Sign in with biometrics" above — two identical
+                            primary actions. Signed out, sign-in is the one
+                            true next step (it creates and shows the phrase on
+                            first sign-in), so the generate button only exists
+                            once a session does. */}
+                        {!notConfigured && (
+                            <Pressable
+                                style={[styles.primaryButton, generatingPhrase && { opacity: 0.6 }]}
+                                onPress={handleGeneratePhrase}
+                                disabled={generatingPhrase}
+                            >
+                                {generatingPhrase ? (
+                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                ) : (
+                                    <Text style={styles.primaryButtonText}>
+                                        {phraseStatus?.has_phrase ? 'Regenerate Phrase' : 'Generate Recovery Phrase'}
+                                    </Text>
+                                )}
+                            </Pressable>
+                        )}
                         {phraseStatus?.has_phrase && acceptedGuardianCount >= 1 && (
                             <Pressable
                                 style={styles.secondaryButton}

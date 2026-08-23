@@ -103,27 +103,45 @@ export function initI18n(): I18nInstance {
 }
 
 /**
+ * Why a language could not be applied.
+ *
+ * The two cases mean very different things and must not share a message.
+ * `unavailable` is "we could not get it", a transient annoyance. `rejected`
+ * is "what was served is not what this build is signed to accept", which is
+ * either a corrupted download or someone tampering with the pack, and the
+ * user is entitled to be told that rather than being shown a network error.
+ */
+export type ApplyFailure = 'unavailable' | 'rejected';
+export type ApplyResult = { ok: true } | { ok: false; reason: ApplyFailure };
+
+const APPLIED: ApplyResult = { ok: true };
+
+/**
  * Switch the displayed language, downloading its pack if needed.
  *
- * Returns true when `tag` is now displayed. Returns false when the pack could
- * not be fetched or failed verification, in which case the previous language
- * stays up. Callers should surface that as "could not download", never as a
- * silent no-op.
+ * On failure the previous language stays up and the reason is returned.
+ * Callers should surface it, never treat it as a silent no-op.
  */
-export async function applyLocale(tag: string | null | undefined): Promise<boolean> {
+export async function applyLocale(tag: string | null | undefined): Promise<ApplyResult> {
     initI18n();
     const target = negotiateLocale(tag ?? undefined);
 
-    if (target === activeLocale) return true;
+    if (target === activeLocale) return APPLIED;
 
     if (target === FALLBACK_LOCALE) {
         activeLocale = FALLBACK_LOCALE;
         await i18next.changeLanguage(FALLBACK_LOCALE);
-        return true;
+        return APPLIED;
     }
 
     const result = await loadPack(target);
-    if (!result.ok) return false;
+    if (!result.ok) {
+        // A pack that fails its digest check, or parses to something that is
+        // not a resource bundle, was not produced by the build this app
+        // trusts. Everything else is "could not fetch it".
+        const rejected = result.reason === 'digest-mismatch' || result.reason === 'malformed';
+        return { ok: false, reason: rejected ? 'rejected' : 'unavailable' };
+    }
 
     // Every locale file, en-GB included, carries a `format` block alongside
     // its copy so all packs have one shape and key-parity checking is a plain
@@ -131,7 +149,7 @@ export async function applyLocale(tag: string | null | undefined): Promise<boole
     // translated copy, so treat that as malformed rather than half-applying.
     const format = (result.resources as { format?: LocaleFormats }).format;
     if (!format || !Array.isArray(format.months) || format.months.length !== 12) {
-        return false;
+        return { ok: false, reason: 'rejected' };
     }
 
     FORMATS[target] = format;
@@ -140,7 +158,7 @@ export async function applyLocale(tag: string | null | undefined): Promise<boole
     await i18next.changeLanguage(target);
 
     if (result.from === 'network') purgeStalePacks();
-    return true;
+    return APPLIED;
 }
 
 export { i18next };

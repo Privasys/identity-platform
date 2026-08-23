@@ -15,9 +15,12 @@
  * stays ONE concept across the wallet, the IdP and any RP: what the user is
  * shown is what they would disclose.
  *
- * Applying is fire-and-forget. `applyLocale` resolves false when a pack
- * cannot be fetched or fails its digest check, and the wallet simply stays on
- * the language it already had. Nothing here blocks a render.
+ * Applying is fire-and-forget. When a pack cannot be fetched or fails its
+ * digest check the wallet simply stays on the language it already had, and
+ * the reason is ignored here: this runs at launch with no user waiting on it,
+ * so there is nothing useful to interrupt them with. The Language screen,
+ * where the user did ask for a specific language, does surface it. Nothing
+ * here blocks a render.
  */
 
 import { useEffect } from 'react';

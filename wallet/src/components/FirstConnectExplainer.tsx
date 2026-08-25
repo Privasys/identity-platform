@@ -99,9 +99,7 @@ export function FirstConnectExplainer({
     );
 
     if (watching) {
-        return (
-            <WhatToWatch onBack={() => setWatching(false)} styles={styles} p={p} insets={insets.bottom} />
-        );
+        return <WhatToWatch onBack={() => setWatching(false)} styles={styles} insets={insets.bottom} />;
     }
 
     return (
@@ -206,12 +204,10 @@ export function FirstConnectExplainer({
 function WhatToWatch({
     onBack,
     styles,
-    p,
     insets,
 }: {
     onBack: () => void;
     styles: ReturnType<typeof makeStyles>;
-    p: Palette;
     insets: number;
 }) {
     const { t } = useTranslation();

@@ -104,6 +104,16 @@ async function getJSON<T>(url: string): Promise<T | null> {
     }
 }
 
+/**
+ * GET an UNAUTHENTICATED management-service path from the first control-plane
+ * candidate that answers. Shared with services/store-listing.ts, which needs
+ * the same environment probing for the same reason: an app only exists on its
+ * own control plane, and a production wallet is routinely shown dev apps.
+ */
+export async function publicApiGet<T>(path: string, appHost?: string): Promise<T | null> {
+    return getJSONFirst<T>(path, appHost);
+}
+
 /** GET `path` from the first control-plane candidate that answers. */
 async function getJSONFirst<T>(path: string, appHost?: string): Promise<T | null> {
     for (const base of apiBasesForHost(appHost)) {

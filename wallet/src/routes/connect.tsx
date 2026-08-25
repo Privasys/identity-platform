@@ -59,6 +59,7 @@ import {
     type DependencyConsentItem,
 } from '@/services/dependency-consent';
 import { relaySessionToken } from '@/services/broker';
+import { fetchStoreListing, type StoreListing } from '@/services/store-listing';
 import {
     completeAttributeApproval,
     mergeStepUpConsent,
@@ -430,6 +431,14 @@ interface SignInConsentItem {
     gov: boolean;
     /** Whether the wallet can supply it right now (profile or device value). */
     hasValue: boolean;
+    /**
+     * The value that will actually be sent, when the wallet can resolve one
+     * AND the attribute discloses raw. Token-disclosed attributes deliberately
+     * have none: the relying party may only learn a predicate ("over 18"), so
+     * printing the date of birth beside "these exact values will be sent"
+     * would overstate what leaves the wallet.
+     */
+    preview?: string;
 }
 
 /** Stable per-relying-party consent key. `rpId` is the shared FIDO2 RP
@@ -564,8 +573,57 @@ function buildConsentPlan(
                             ? govValueKey(profile, key)
                             : selfAssertedValue(profile, key))) ||
                         !!ATTRIBUTE_MAP[key]?.deviceSourced,
+                    preview: previewValue(profile, key, assuranceFor(key, reqs) === 'gov'),
                 })
         .filter((i) => i.hasValue || i.essential);
+}
+
+/**
+ * The value the relying party will actually receive for `key`, or undefined
+ * when there is nothing honest to show.
+ *
+ * Undefined for: token-disclosed attributes (the relying party may learn only
+ * a predicate), derived insights (computed in the enclave, never stored),
+ * device-sourced values (resolved asynchronously at disclosure time), and the
+ * ceremonial presence key (produced by the live check, not held).
+ */
+function previewValue(
+    profile: import('@/stores/profile').UserProfile | null,
+    key: string,
+    gov: boolean,
+): string | undefined {
+    if (!profile) return undefined;
+    if (key === PRESENCE_KEY || isDerived(key) || ATTRIBUTE_MAP[key]?.deviceSourced) return undefined;
+    if (disclosesAsToken(key)) return undefined;
+    if (!gov) return selfAssertedValue(profile, key) || undefined;
+    const govKey = govValueKey(profile, key);
+    return (govKey ? getProfileValue(profile, govKey) : undefined) || undefined;
+}
+
+/**
+ * The tick state a freshly-shown checklist starts from: essentials locked on,
+ * a previously decided attribute restored to what the holder chose last time,
+ * and an undecided one on unless it is gov-assurance (those are explicit
+ * opt-in). Shared by the approval screen and the standalone consent screen so
+ * the two can never drift into offering different defaults.
+ */
+function defaultConsentSelection(
+    plan: SignInConsentItem[],
+    payload: QRPayload,
+    att: AttestationResult | null,
+): Set<string> {
+    const key = consentKeyFor(payload);
+    const meas = att?.mrtd ?? att?.mrenclave ?? '';
+    const codeHash = att?.workload_code_hash ?? '';
+    const consent = useConsentStore.getState();
+    const standing = consent.getStandingConsent(key, meas, codeHash);
+    const decided = new Set(consent.getRecordsForApp(key)[0]?.requestedAttributes ?? []);
+    const prevApproved = new Set(standing?.attributes ?? []);
+    return new Set(
+        plan
+            .filter((i) => i.essential || (decided.has(i.key) ? prevApproved.has(i.key) : !i.gov))
+            .map((i) => i.key),
+    );
 }
 
 type FlowStep =
@@ -785,6 +843,15 @@ function ConnectFlow() {
     const [presenceFail, setPresenceFail] = useState<{ retryable: boolean } | null>(null);
     const approvedAttrsRef = useRef<Set<string> | null>(null);
     const consentContinuation = useRef<(() => Promise<void>) | null>(null);
+    /**
+     * Set once the approval screen's own checklist has been committed. The
+     * approval screen now carries the disclosure decision, so asking again on
+     * a separate consent screen would put the same question twice and let the
+     * SECOND answer be the one that counted.
+     */
+    const consentSettledRef = useRef(false);
+    /** Public store listing for the app being approved, when it published one. */
+    const [listing, setListing] = useState<StoreListing | null>(null);
     // Fresh-presence ceremony (holder_present): selfie captured in-flow, then
     // matched in-enclave against the committed document portrait. The selfie
     // lives only in this ref for the duration of the ceremony.
@@ -1256,6 +1323,12 @@ function ConnectFlow() {
                 await cont();
                 return;
             }
+            // The approval screen already put this exact checklist in front of
+            // the user and they committed it with Approve.
+            if (consentSettledRef.current) {
+                await runWithPresence(approvedAttrsRef.current ?? new Set(), cont);
+                return;
+            }
             const key = consentKeyFor(payload);
             const att = attestationRef.current;
             const meas = att?.mrtd ?? att?.mrenclave ?? '';
@@ -1288,31 +1361,68 @@ function ConnectFlow() {
                 await runWithPresence(approvedAttrsRef.current, cont);
                 return;
             }
-            const prevApproved = new Set(standing?.attributes ?? []);
             setConsentItems(plan);
-            setConsentSelected(
-                new Set(
-                    plan
-                        .filter((i) =>
-                            i.essential ||
-                            (decided.has(i.key) ? prevApproved.has(i.key) : !i.gov),
-                        )
-                        .map((i) => i.key),
-                ),
-            );
+            setConsentSelected(defaultConsentSelection(plan, payload, att ?? null));
             setConsentRemember(true);
             consentContinuation.current = cont;
             setStep('consent');
         },
         [],
     );
+    /**
+     * The approval screen is the consent gate, so its checklist must exist
+     * before the user can approve. Seeded on entry to either approval step,
+     * with the same defaults the standalone consent screen would have used.
+     *
+     * Skipped for voucher-only (no disclosure at all) and attribute step-up
+     * (which gates the DELTA on its own screen and merges with the standing
+     * grant; running it here would write the delta as if it were the whole).
+     */
+    const attributesGated =
+        !!qr && qr.mode !== 'voucher-only' && qr.mode !== 'attribute-step-up';
+
+    useEffect(() => {
+        if (!qr || !attributesGated) return;
+        if (step !== 'attestation' && step !== 'attestation-changed') return;
+        const plan = buildConsentPlan(qr, useProfileStore.getState().profile);
+        setConsentItems(plan);
+        setConsentSelected(defaultConsentSelection(plan, qr, attestationRef.current));
+    }, [step, qr, attributesGated]);
+
+    /**
+     * Who is asking, from the public store. Best-effort and unauthenticated;
+     * a null result is a real answer ("this app published no listing") that the
+     * approval screen states rather than papering over with a DNS fragment.
+     *
+     * Keyed on the APP host, not the FIDO2 rpId: an IdP-brokered ceremony has
+     * rpId=privasys.id for every client, and looking that up would name the
+     * identity provider instead of the app the user is connecting to.
+     */
+    useEffect(() => {
+        const host = qr?.appHost ?? qr?.rpId;
+        if (!host || (step !== 'attestation' && step !== 'attestation-changed')) return;
+        let live = true;
+        void fetchStoreListing(host).then((l) => {
+            if (live) setListing(l);
+        });
+        return () => {
+            live = false;
+        };
+    }, [step, qr?.appHost, qr?.rpId]);
+
     const ensureConsentRef = useRef(ensureConsentThen);
     ensureConsentRef.current = ensureConsentThen;
 
-    /** User confirmed the consent screen: record the decision (and standing
-     *  consent when asked to remember), then run the stashed continuation with
-     *  the approved set gating every disclosure. */
-    const handleConsentApprove = useCallback(async () => {
+    /**
+     * Write one disclosure decision to the consent ledger and adopt it as the
+     * set gating this ceremony.
+     *
+     * Shared by the approval screen (which now carries the checklist) and the
+     * standalone consent screen, so there is exactly one place that decides
+     * what a decision means: the record, the standing grant, and
+     * `approvedAttrsRef` can never disagree.
+     */
+    const commitConsent = useCallback((items: SignInConsentItem[], selected: Set<string>, remember: boolean) => {
         if (!qr) return;
         const key = consentKeyFor(qr);
         const att = attestationRef.current ?? attestation;
@@ -1323,8 +1433,8 @@ function ConnectFlow() {
             att?.tee_type === 'sev-snp' || att?.tee_type === 'nvidia-gpu'
                 ? att.tee_type
                 : ('none' as const);
-        const approved = consentItems.filter((i) => consentSelected.has(i.key)).map((i) => i.key);
-        const denied = consentItems.filter((i) => !consentSelected.has(i.key)).map((i) => i.key);
+        const approved = items.filter((i) => i.essential || selected.has(i.key)).map((i) => i.key);
+        const denied = items.filter((i) => !i.essential && !selected.has(i.key)).map((i) => i.key);
         const now = Math.floor(Date.now() / 1000);
         const consent = useConsentStore.getState();
         // A step-up consent covers only the DELTA the screen showed, but the
@@ -1345,19 +1455,19 @@ function ConnectFlow() {
             origin: qr.rpId,
             appName: qr.appName,
             requestedAttributes: isStepUp
-                ? mergeStepUpConsent(priorLatest?.requestedAttributes, consentItems.map((i) => i.key))
-                : consentItems.map((i) => i.key),
+                ? mergeStepUpConsent(priorLatest?.requestedAttributes, items.map((i) => i.key))
+                : items.map((i) => i.key),
             approvedAttributes: isStepUp ? mergeStepUpConsent(priorApproved, approved) : approved,
             deniedAttributes: denied,
             decision: denied.length === 0 ? 'approved' : approved.length === 0 ? 'denied' : 'partial',
-            persistent: consentRemember,
+            persistent: remember,
             teeType,
             enclaveMeasurement: meas,
             codeHash,
             consentedAt: now,
             expiresAt: 0,
         });
-        if (consentRemember) {
+        if (remember) {
             consent.setStandingConsent({
                 rpId: key,
                 attributes: isStepUp ? mergeStepUpConsent(priorApproved, approved) : approved,
@@ -1369,10 +1479,16 @@ function ConnectFlow() {
         approvedAttrsRef.current = isStepUp
             ? new Set(mergeStepUpConsent(priorApproved, approved))
             : new Set(approved);
+    }, [qr, attestation]);
+
+    /** User confirmed the standalone consent screen: commit, then run the
+     *  stashed continuation with the approved set gating every disclosure. */
+    const handleConsentApprove = useCallback(async () => {
+        commitConsent(consentItems, consentSelected, consentRemember);
         const cont = consentContinuation.current;
         consentContinuation.current = null;
-        if (cont) await runWithPresence(approvedAttrsRef.current, cont);
-    }, [qr, attestation, consentItems, consentSelected, consentRemember, runWithPresence]);
+        if (cont) await runWithPresence(approvedAttrsRef.current ?? new Set(), cont);
+    }, [commitConsent, consentItems, consentSelected, consentRemember, runWithPresence]);
 
     const toggleConsentAttr = useCallback((key: string) => {
         setConsentSelected((prev) => {
@@ -1549,6 +1665,15 @@ function ConnectFlow() {
             if (qr.mode === 'voucher-only') {
                 await doVoucherOnly(qr);
                 return;
+            }
+
+            // The approval screen carried the checklist, so Approve commits the
+            // disclosure decision as well as the trust decision. Recorded as
+            // persistent, which the screen states in as many words rather than
+            // deciding quietly on the holder's behalf.
+            if (attributesGated && consentItems.length > 0) {
+                commitConsent(consentItems, consentSelected, true);
+                consentSettledRef.current = true;
             }
 
             // Consent first — the disclosure step is gated by what it approves.
@@ -2379,12 +2504,23 @@ function ConnectFlow() {
                     />
                 )}
 
-                {step === 'attestation' && attestation && qr && (
+                {(step === 'attestation' || step === 'attestation-changed') && attestation && qr && (
                     <AttestationView
                         attestation={attestation}
-                        rpId={qr.rpId}
-                        displayName={appName(qr.rpId)}
-                        isChanged={false}
+                        // The app being connected to, not the FIDO2 rpId. For an
+                        // IdP-brokered ceremony those differ: rpId is
+                        // privasys.id for every client, and showing it as the
+                        // address would name the identity provider instead of
+                        // the app the user is about to let in.
+                        rpId={qr.appHost ?? qr.rpId}
+                        // Store name first, then whatever the IdP supplied.
+                        // Never appName(rpId): that is a DNS label, and putting
+                        // it where a name goes dresses up a hostname fragment
+                        // as something a publisher chose.
+                        displayName={listing?.name || qr.appName || undefined}
+                        listing={listing}
+                        isChanged={step === 'attestation-changed'}
+                        diff={step === 'attestation-changed' ? attestationDiff : undefined}
                         verificationLevel={verificationLevel}
                         verification={verification ?? undefined}
                         releases={releases}
@@ -2395,30 +2531,29 @@ function ConnectFlow() {
                             status: d.status,
                             published: d.provenance.published,
                         }))}
-                        onApprove={handleApprove}
-                        onReject={handleReject}
-                        onChallenge={handleChallenge}
-                        challengeInFlight={challengeInFlight}
-                    />
-                )}
-
-                {step === 'attestation-changed' && attestation && qr && (
-                    <AttestationView
-                        attestation={attestation}
-                        rpId={qr.rpId}
-                        displayName={appName(qr.rpId)}
-                        isChanged={true}
-                        diff={attestationDiff}
-                        verificationLevel={verificationLevel}
-                        verification={verification ?? undefined}
-                        releases={releases}
-                        dependencies={dependencyItems.map((d) => ({
-                            name: d.provenance.name,
-                            label: d.provenance.label,
-                            url: d.provenance.url,
-                            status: d.status,
-                            published: d.provenance.published,
-                        }))}
+                        attributes={attributesGated && consentItems.length > 0 ? {
+                            appLabel: listing?.name || qr.appName || appName(qr.appHost ?? qr.rpId),
+                            items: consentItems.map((i) => ({
+                                key: i.key,
+                                label: i.label,
+                                essential: i.essential,
+                                preview: i.preview,
+                                // No preview means the value is not a stored
+                                // string: say WHY rather than leaving the row
+                                // blank. Each variant is a whole sentence,
+                                // because the separator and word order differ
+                                // by language.
+                                note: i.key === PRESENCE_KEY
+                                    ? t('connect.sublabelPresence')
+                                    : !i.hasValue
+                                        ? t('connect.sublabelWillBeVerified')
+                                        : i.gov
+                                            ? t('connect.sublabelGov')
+                                            : undefined,
+                            })),
+                            selected: consentSelected,
+                            onToggle: toggleConsentAttr,
+                        } : undefined}
                         onApprove={handleApprove}
                         onReject={handleReject}
                         onChallenge={handleChallenge}

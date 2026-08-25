@@ -1,0 +1,16 @@
+# Copyright (c) Privasys. All rights reserved.
+# Licensed under the GNU Affero General Public License v3.0.
+
+# Locale packs are hashed BYTE FOR BYTE and served content-addressed: the
+# wallet pins a SHA-256 per pack in its bundle and refuses anything else.
+#
+# On a Windows checkout with core.autocrlf=true, git writes these files with
+# CRLF, so `npm run i18n:manifest` produces digests no other machine can
+# reproduce. The manifest then looks fine locally, the commit stores LF, and
+# every pack fails verification for every user — silently, because a rejected
+# pack just leaves the wallet on English. Observed 2026-08-25; the deploy
+# workflow's served-digest check caught it before it shipped.
+#
+# Pinning eol=lf makes the working tree, the object store and CI agree.
+wallet/src/i18n/locales/*.json text eol=lf
+wallet/src/i18n/manifest.ts    text eol=lf

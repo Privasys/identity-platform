@@ -34,6 +34,32 @@ const BUNDLED = 'en-GB';
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 
+/**
+ * Refuse to hash a pack containing CRLF.
+ *
+ * These digests are the trust root, and they are taken over raw bytes. A
+ * Windows checkout with core.autocrlf=true hands this script CRLF files, so
+ * the manifest it writes pins bytes that exist on exactly one machine: git
+ * stores LF, CI serves LF, and every pack then fails verification for every
+ * user. The failure is silent on device, because a rejected pack simply
+ * leaves the wallet on English.
+ *
+ * .gitattributes pins these files to LF, so reaching this error means the
+ * working tree predates it. `git add --renormalize wallet/src/i18n/locales`
+ * fixes it.
+ */
+function assertLf(tag, buf) {
+    if (buf.includes(13)) {
+        console.error(
+            `${tag}.json contains CRLF. The manifest hashes raw bytes, so this would ` +
+            `pin digests that only reproduce on this machine and every pack would ` +
+            `fail verification on device.\n` +
+            `Fix: git add --renormalize wallet/src/i18n/locales && git checkout -- wallet/src/i18n/locales`,
+        );
+        process.exit(1);
+    }
+}
+
 export function buildManifest() {
     const files = readdirSync(LOCALES_DIR)
         .filter((f) => f.endsWith('.json'))
@@ -43,6 +69,7 @@ export function buildManifest() {
 
     const digests = {};
     for (const tag of files) {
+        assertLf(tag, readFileSync(join(LOCALES_DIR, `${tag}.json`)));
         // Digest the bytes on the wire, which is the file verbatim. Any
         // re-serialising here would silently break the device-side check.
         digests[tag] = sha256(readFileSync(join(LOCALES_DIR, `${tag}.json`)));

@@ -26,10 +26,20 @@ export interface SettingsState {
      * so a user who never opens this setting keeps tracking their phone.
      */
     language: string | null;
+    /**
+     * Whether the one-time "how connecting works" explainer has been shown.
+     *
+     * Set when the user finishes OR skips it, so a skip is not punished by
+     * replaying the same four cards on the next connection. The explainer
+     * stays reachable from Settings, which is the only way back in once this
+     * is true.
+     */
+    seenFirstConnect: boolean;
 
     setGracePeriod: (seconds: number) => void;
     setVerificationMode: (mode: VerificationMode) => void;
     setLanguage: (tag: string | null) => void;
+    setSeenFirstConnect: (seen: boolean) => void;
     hydrate: () => Promise<void>;
 }
 
@@ -46,6 +56,7 @@ function persist(get: () => SettingsState) {
             gracePeriodSec: s.gracePeriodSec,
             verificationMode: s.verificationMode,
             language: s.language,
+            seenFirstConnect: s.seenFirstConnect,
         })
     ).catch(console.error);
 }
@@ -54,6 +65,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     gracePeriodSec: 30,
     verificationMode: 'deterministic',
     language: null,
+    seenFirstConnect: false,
 
     setGracePeriod: (seconds) => {
         set({ gracePeriodSec: seconds });
@@ -70,6 +82,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         persist(get);
     },
 
+    setSeenFirstConnect: (seen) => {
+        set({ seenFirstConnect: seen });
+        persist(get);
+    },
+
     hydrate: async () => {
         const raw = await SecureStore.getItemAsync(STORE_KEY);
         if (!raw) return;
@@ -83,6 +100,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             }
             if (typeof data.language === 'string' || data.language === null) {
                 set({ language: data.language });
+            }
+            if (typeof data.seenFirstConnect === 'boolean') {
+                set({ seenFirstConnect: data.seenFirstConnect });
             }
         } catch {
             // Corrupted — use defaults

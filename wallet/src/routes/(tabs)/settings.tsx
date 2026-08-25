@@ -121,6 +121,17 @@ export default function SettingsScreen() {
                     </>
                 ) : null}
 
+                {/* How connecting works — the only way back into the
+                    first-connection explainer once it has been seen or
+                    skipped, so it is not optional. */}
+                <Text style={styles.sectionTitle}>{t('firstConnect.settingsTitle')}</Text>
+                <Text style={styles.sectionDescription}>{t('firstConnect.settingsDescription')}</Text>
+                <Pressable style={styles.logsButton} onPress={() => router.push('/how-it-works')}>
+                    <Ionicons name="shield-checkmark-outline" size={18} color={p.textPrimary} />
+                    <Text style={styles.logsButtonText}>{t('firstConnect.settingsRow')}</Text>
+                    <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                </Pressable>
+
                 {/* Logs */}
                 <Text style={styles.sectionTitle}>{t('settings.logsTitle')}</Text>
                 <Text style={styles.sectionDescription}>

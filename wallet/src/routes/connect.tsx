@@ -46,6 +46,7 @@ import { base64urlToBytes } from '@/utils/encoding';
 import { buildErrorReport, REPORT_DESTINATION } from '@/utils/logs';
 
 import { DataRequestConsent } from '@/components/DataRequestConsent';
+import { FirstConnectExplainer } from '@/components/FirstConnectExplainer';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
@@ -570,6 +571,8 @@ function buildConsentPlan(
 type FlowStep =
     | 'verifying'
     | 'confirm'
+    /** One-time "how connecting works" cards, ahead of the FIRST approval. */
+    | 'explainer'
     | 'attestation'
     | 'attestation-changed'
     | 'consent'
@@ -718,6 +721,13 @@ function ConnectFlow() {
     const { getApp, isAttestationMatch, addOrUpdate: addTrustedApp } = useTrustedAppsStore();
     const { gracePeriodSec } = useSettingsStore();
     const verificationMode = useSettingsStore((s) => s.verificationMode);
+    const seenFirstConnect = useSettingsStore((s) => s.seenFirstConnect);
+    const setSeenFirstConnect = useSettingsStore((s) => s.setSeenFirstConnect);
+    // Zero trusted apps means this wallet has never admitted anything, so the
+    // approval about to be shown is the user's first. Counted rather than
+    // inferred from the flag alone: a wallet restored onto a new device has
+    // apps but no settings, and re-explaining to that user is harmless.
+    const trustedAppCount = useTrustedAppsStore((s) => s.apps.length);
     const addRelaySession = useSessionsStore((s) => s.add);
     const profile = useProfileStore((s) => s.profile);
 
@@ -1117,6 +1127,17 @@ function ConnectFlow() {
                 // approve. The "fresh-as-verified" badge surfaced in
                 // AttestationView is the user-visible signal that the
                 // attestation server confirmed the quote.
+                //
+                // First approval this wallet has ever been asked for: explain
+                // what just happened before asking them to act on it. Only on
+                // this clean path — the explainer says "your wallet checked
+                // the app", which must never precede a check we could not
+                // complete, so the unreachable/invalid branches above go
+                // straight to the verdict.
+                if (trustedAppCount === 0 && !seenFirstConnect) {
+                    setStep('explainer');
+                    return;
+                }
                 setStep('attestation');
             } catch (e: any) {
                 console.error(`[CONNECT] attestation FAILED:`, e.message, e);
@@ -1124,7 +1145,7 @@ function ConnectFlow() {
                 setStep('error');
             }
         },
-        [getApp, isAttestationMatch, addTrustedApp, getCredentialForRp, checkUnlocked, gracePeriodSec, verificationMode]
+        [getApp, isAttestationMatch, addTrustedApp, getCredentialForRp, checkUnlocked, gracePeriodSec, verificationMode, trustedAppCount, seenFirstConnect]
     );
 
     /**
@@ -2336,6 +2357,26 @@ function ConnectFlow() {
                             </Pressable>
                         </View>
                     </View>
+                )}
+
+                {step === 'explainer' && qr && (
+                    <FirstConnectExplainer
+                        // The IdP-supplied name, never appName(rpId): that is a
+                        // DNS label, and "drive wants to connect" reads as a
+                        // glitch. Undefined falls back to a generic noun.
+                        appName={qr.appName}
+                        onDone={() => {
+                            setSeenFirstConnect(true);
+                            setStep('attestation');
+                        }}
+                        onSkip={() => {
+                            // A skip counts as seen. Replaying four cards the
+                            // user just dismissed trains them to dismiss the
+                            // approval screen behind it too.
+                            setSeenFirstConnect(true);
+                            setStep('attestation');
+                        }}
+                    />
                 )}
 
                 {step === 'attestation' && attestation && qr && (

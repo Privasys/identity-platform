@@ -347,31 +347,12 @@ async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
     };
 }
 
-/** A non-2xx answer from the verifier enclave, carrying the status so a caller
- *  can distinguish "the capture was unreadable, retry helps" (422) from a gate
- *  refusal or transport failure, where retrying the same thing cannot help. */
-export class VerifierHttpError extends Error {
-    readonly status: number;
-    readonly detail: string;
-    constructor(status: number, body: string) {
-        let detail = (body || '').slice(0, 300);
-        try {
-            const parsed = JSON.parse(body) as { error?: string };
-            if (parsed?.error) detail = parsed.error;
-        } catch {
-            // not JSON: keep the raw snippet
-        }
-        super(`Identity verifier returned HTTP ${status}: ${detail}`);
-        this.name = 'VerifierHttpError';
-        this.status = status;
-        this.detail = detail;
-    }
-    /** True when the failure is about the captured image, so a retake is the
-     *  right remedy. Anything else needs a different action or a fix. */
-    get isUnreadableCapture(): boolean {
-        return this.status === 422;
-    }
-}
+// The verifier failure taxonomy lives in its own leaf module (no imports) so
+// the rule deciding what a user is offered after a failed capture can be
+// tested without the React Native runtime. Re-exported so callers are
+// unaffected by where it lives.
+import { VerifierHttpError } from './kyc-errors';
+export { VerifierHttpError, isRetryableCapture } from './kyc-errors';
 
 /** A tool's declared input fields, keyed by field name (the slice of the app
  *  manifest this module needs). */
@@ -507,9 +488,16 @@ async function postToVerifier<T>(path: string, body: unknown, voucher?: string):
     const headers: Record<string, string> = voucher ? { 'X-Privasys-Voucher': voucher } : {};
     const proof = await walletCallHeaders('POST', path);
     if (proof) Object.assign(headers, proof);
+    const payload = JSON.stringify(finalBody);
+    // Payload size is the first thing to know when a call to the verifier dies
+    // mid-write: an uncompressed passport photo is megabytes, and a body the
+    // app refuses without draining breaks the socket before any status comes
+    // back. Logged for every call so the log export answers the question
+    // without a second reproduction.
+    console.log(`[KYC] POST ${path} -> ${origin} (${payload.length} bytes)`);
     let res: { status: number; body: string };
     try {
-        res = await NativeRaTls.post(host, port, path, JSON.stringify(finalBody), headers);
+        res = await NativeRaTls.post(host, port, path, payload, headers);
     } catch (e: any) {
         // Older verifiers refuse a large body (e.g. the selfie) without draining
         // the request, so the refusal's status never reaches us — the socket
@@ -517,6 +505,7 @@ async function postToVerifier<T>(path: string, body: unknown, voucher?: string):
         // ACTUAL state instead of guessing (a broken pipe is not evidence of a
         // configuration problem).
         const msg = String(e?.message ?? e);
+        console.warn(`[KYC] POST ${path} failed after ${payload.length} bytes: ${msg}`);
         if (/broken pipe|connection reset|connection closed|os error 32|reset by peer/i.test(msg)) {
             throw new Error(await diagnoseInterruptedCall(host, port));
         }
@@ -528,6 +517,7 @@ async function postToVerifier<T>(path: string, body: unknown, voucher?: string):
         );
     }
     if (res.status < 200 || res.status >= 300) {
+        console.warn(`[KYC] POST ${path} -> HTTP ${res.status}: ${res.body.slice(0, 200)}`);
         // Typed so callers can tell a retryable capture problem (422: the OCR
         // could not read the MRZ) from one retrying cannot fix (a rejected
         // attestation, a gate refusal). Presenting the latter as "retake the

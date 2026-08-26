@@ -22,6 +22,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { AttestationView } from '@/components/AttestationView';
+import { fetchStoreListing, type StoreListing } from '@/services/store-listing';
+import { FirstConnectExplainer } from '@/components/FirstConnectExplainer';
+import { useSettingsStore } from '@/stores/settings';
 import { DataRequestConsent } from '@/components/DataRequestConsent';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
@@ -29,7 +32,7 @@ import { getProfileValue, setProfileValue } from '@/services/attributes';
 import { appIdFromOids } from '@/services/release-provenance';
 import {
     applyGovAttributes, attestVerifier, getVerifierInfo, govAttributeCandidates, readDocumentMrz,
-    verifyIdentity, VerifierHttpError, type KycRecord, type VerifierAttestation,
+    verifyIdentity, isRetryableCapture, type KycRecord, type VerifierAttestation,
 } from '@/services/kyc';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
@@ -172,6 +175,22 @@ export default function KycCaptureScreen() {
     // Verifier identity (name + origin) for the consent card, resolved from the
     // store before the user agrees (the RA-TLS verification is the next page).
     const [verifierInfo, setVerifierInfo] = useState<{ origin: string; displayName: string } | null>(null);
+    // Who publishes the verifier, from the public store. Without this the
+    // approval screen said "Not published" about an app that IS published,
+    // because this screen simply never asked (2026-08-26).
+    const [verifierListing, setVerifierListing] = useState<StoreListing | null>(null);
+    /**
+     * The one-time "how connecting works" cards, shown OVER the enclave page
+     * rather than as a step of their own so dismissing them does not re-run the
+     * attestation underneath.
+     *
+     * Identity verification can be the very first approval a wallet is ever
+     * asked for, and this screen used to walk straight into the enclave page
+     * with nothing explaining it. Gated exactly as the sign-in flow gates it,
+     * and on the SAME flag, so a user who has already seen the cards is never
+     * shown them twice (2026-08-26).
+     */
+    const [showExplainer, setShowExplainer] = useState(false);
 
     // Size the guide from the live landscape viewport and leave a dark margin so
     // every edge of the document remains visible.
@@ -219,6 +238,26 @@ export default function KycCaptureScreen() {
         return () => { cancelled = true; clearInterval(iv); };
     }, [step, cameraReady]);
 
+    /**
+     * Who is asking, from the public store. Best-effort and unauthenticated;
+     * a null result is a real answer ("this app published no listing") that the
+     * approval screen states rather than papering over.
+     *
+     * Keyed on the verifier's own origin, which IS the app host here, so the
+     * slug derivation has nothing to disambiguate.
+     */
+    useEffect(() => {
+        const host = verifierAtt?.origin;
+        if (!host || step !== 'attest') return;
+        let live = true;
+        void fetchStoreListing(host).then((l) => {
+            if (live) setVerifierListing(l);
+        });
+        return () => {
+            live = false;
+        };
+    }, [step, verifierAtt?.origin]);
+
     // Resolve the verifier's name + origin for the consent card (no attestation
     // yet — that is the dedicated enclave page after consent).
     useEffect(() => {
@@ -257,6 +296,17 @@ export default function KycCaptureScreen() {
                 }
                 setAttIsChanged(!!trusted);
                 setVerifierAtt(res);
+                // First approval this wallet has ever been asked for: explain
+                // what just happened before asking them to act on it. Only here
+                // — the cards say "your wallet checked the app", which must
+                // never precede a check that did not complete, and the catch
+                // below owns every other outcome. Read from the stores rather
+                // than closed-over render values so a decision made moments ago
+                // in another flow is respected.
+                const { seenFirstConnect } = useSettingsStore.getState();
+                if (useTrustedAppsStore.getState().apps.length === 0 && !seenFirstConnect) {
+                    setShowExplainer(true);
+                }
             })
             .catch((e) => {
                 if (cancelled) return;
@@ -447,8 +497,7 @@ export default function KycCaptureScreen() {
                 // Everything else — a rejected attestation, a gate refusal, the
                 // enclave being unreachable — must say so, or the user retakes
                 // the photo for ever against a failure the camera cannot fix.
-                const unreadable =
-                    e instanceof VerifierHttpError ? e.isUnreadableCapture : !(e instanceof VerifierHttpError);
+                const unreadable = isRetryableCapture(e);
                 if (unreadable) {
                     Alert.alert(
                         t('kyc.photoPageFailedTitle'),
@@ -703,11 +752,27 @@ export default function KycCaptureScreen() {
                         <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.body}>{t('kyc.verifyingEnclave')}</Text>
                     </View>
+                ) : showExplainer ? (
+                    <FirstConnectExplainer
+                        appName={verifierAtt.displayName}
+                        onDone={() => {
+                            useSettingsStore.getState().setSeenFirstConnect(true);
+                            setShowExplainer(false);
+                        }}
+                        onSkip={() => {
+                            // A skip counts as seen. Replaying cards the user
+                            // just dismissed trains them to dismiss the approval
+                            // screen behind it too.
+                            useSettingsStore.getState().setSeenFirstConnect(true);
+                            setShowExplainer(false);
+                        }}
+                    />
                 ) : (
                     <AttestationView
                         attestation={verifierAtt.attestation}
                         rpId={verifierAtt.origin}
                         displayName={verifierAtt.displayName}
+                        listing={verifierListing}
                         isChanged={attIsChanged}
                         verificationLevel="fresh-as-verified"
                         verification={{

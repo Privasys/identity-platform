@@ -83,29 +83,35 @@ public class NativeKeysModule: Module {
         AsyncFunction("sign") { (keyId: String, dataBase64url: String) -> String in
             let tag = Self.tag(for: keyId)
 
-            // Sign with the shared biometric context so a burst of signatures
-            // in one ceremony rides a single Face ID (see signingContext).
-            guard let privateKey = Self.loadPrivateKey(tag: tag, context: Self.signingContext) else {
-                return "{\"error\":\"key not found\"}"
-            }
-
             guard let data = Self.base64urlDecode(dataBase64url) else {
                 return "{\"error\":\"invalid base64url data\"}"
             }
 
-            var error: Unmanaged<CFError>?
-            guard let signature = SecKeyCreateSignature(
-                privateKey,
-                .ecdsaSignatureMessageX962SHA256,
-                data as CFData,
-                &error
-            ) as Data? else {
-                let msg = error?.takeRetainedValue().localizedDescription ?? "unknown"
-                return "{\"error\":\"\(msg)\"}"
+            // Sign with the shared biometric context so a burst of signatures
+            // in one ceremony rides a single Face ID (see signingContext).
+            //
+            // An LAContext is good for ONE authentication. Its reuse window
+            // lets a burst of Secure Enclave operations ride that single Face
+            // ID, but once the window lapses the context is spent: the next
+            // operation FAILS instead of prompting again. The context here is
+            // static and was only ever replaced by an explicit step-up, so the
+            // first signature more than a minute after the last one failed and
+            // kept failing. On a wallet set up minutes earlier that was every
+            // WIA enrolment, which is what put the identity verifier out of
+            // reach (2026-08-26).
+            //
+            // So a failure is retried exactly once on a FRESH context, which is
+            // guaranteed unspent and prompts. The burst optimisation is intact:
+            // the retry only runs when the fast path has already failed.
+            if let sig = Self.trySign(tag: tag, data: data, context: Self.signingContext) {
+                return "{\"signature\":\"\(Self.base64urlEncode(sig))\"}"
             }
-
-            let sigB64 = Self.base64urlEncode(signature)
-            return "{\"signature\":\"\(sigB64)\"}"
+            let fresh = Self.makeSigningContext()
+            Self.signingContext = fresh
+            if let sig = Self.trySign(tag: tag, data: data, context: fresh) {
+                return "{\"signature\":\"\(Self.base64urlEncode(sig))\"}"
+            }
+            return "{\"error\":\"\(Self.lastSignError)\"}"
         }
 
         // Force a fresh biometric bound to the signing context for a sensitive
@@ -149,6 +155,31 @@ public class NativeKeysModule: Module {
     }
 
     // MARK: - Helpers
+
+    /// Last failure from `trySign`, so the retry can report why BOTH attempts
+    /// failed rather than a bare "unknown".
+    private static var lastSignError = "unknown"
+
+    /// One signing attempt on the given context. nil on any failure, with the
+    /// reason recorded in `lastSignError`.
+    private static func trySign(tag: Data, data: Data, context: LAContext) -> Data? {
+        guard let privateKey = loadPrivateKey(tag: tag, context: context) else {
+            lastSignError = "key not found"
+            return nil
+        }
+        var error: Unmanaged<CFError>?
+        guard let signature = SecKeyCreateSignature(
+            privateKey,
+            .ecdsaSignatureMessageX962SHA256,
+            data as CFData,
+            &error
+        ) as Data? else {
+            lastSignError = (error?.takeRetainedValue().localizedDescription ?? "unknown")
+                .replacingOccurrences(of: "\"", with: "'")
+            return nil
+        }
+        return signature
+    }
 
     private static func tag(for keyId: String) -> Data {
         (keyTagPrefix + keyId).data(using: .utf8)!

@@ -39,6 +39,32 @@ export class VerifierHttpError extends Error {
 }
 
 /**
+ * A credential the endpoint requires could not be obtained on this device, so
+ * the call was never made.
+ *
+ * Distinct from every other failure here in that nothing left the phone. The
+ * endpoints that need a Wallet Instance Attestation are gated by the runtime,
+ * which refuses an unexempt call before reading the request body; against a
+ * body the size of a passport photo that refusal reaches the client as a
+ * connection reset rather than a status, so the wallet checks first and says
+ * what is actually missing.
+ */
+export class VerifierMissingCredentialError extends Error {
+    /** The underlying enrolment failure, when one was recorded. */
+    readonly reason: string | null;
+    constructor(reason: string | null) {
+        super(
+            'This device could not prove it is a genuine Privasys Wallet, which the ' +
+            'identity verifier requires before it will read a document' +
+            (reason ? ` (${reason})` : '') +
+            '.'
+        );
+        this.name = 'VerifierMissingCredentialError';
+        this.reason = reason;
+    }
+}
+
+/**
  * Is retaking the photo the right remedy for this failure?
  *
  * TRUE for exactly one case: the verifier read the image and could not make out

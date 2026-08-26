@@ -46,6 +46,22 @@ interface StoredWia {
 
 let inflight: Promise<string | null> | null = null;
 
+/**
+ * Why the last enrolment attempt failed, or null if none has.
+ *
+ * Enrolment is best-effort and swallows its error, which is right for the
+ * endpoints that work without a WIA. It is wrong for the endpoints that do not:
+ * they used to upload a large body and receive a connection reset, because the
+ * runtime's gate refuses an unexempt call before draining the request. Keeping
+ * the reason lets those callers refuse locally and say why (2026-08-26).
+ */
+let lastEnrolError: string | null = null;
+
+/** The reason the most recent enrolment failed, for callers that must have a WIA. */
+export function lastWiaError(): string | null {
+    return lastEnrolError;
+}
+
 /** The cached WIA if present and comfortably unexpired, else null. Never prompts. */
 export async function getValidWia(): Promise<string | null> {
     try {
@@ -123,6 +139,16 @@ async function enrol(): Promise<string | null> {
         // an internal SHA-256), which is exactly what the IdP verifies.
         const holderSig = (await NativeKeys.sign(HOLDER_KEY_ID, challenge)).signature;
 
+        // Never post a half-built proof. The iOS module used to report failure
+        // by RETURNING an error object, so these came through as undefined,
+        // JSON.stringify dropped them, and the IdP answered "holder
+        // proof-of-possession signature is invalid" — an accurate statement
+        // about an empty signature that read as a cryptographic fault
+        // (2026-08-26). NativeKeys now throws, and this is the belt to that
+        // brace: a future native change cannot quietly reintroduce it.
+        if (!holderPub) throw new Error('holder public key unavailable');
+        if (!holderSig) throw new Error('holder key produced no signature');
+
         const attestation = await acquireDeviceAttestation(challenge, holderPub);
         if (!attestation) return null; // no attestation available (e.g. simulator) → skip, stay WIA-less
 
@@ -150,7 +176,8 @@ async function enrol(): Promise<string | null> {
         return out.wia;
     } catch (e) {
         // Soft rollout: enrolment failures must never break identity verification.
-        console.warn('[WIA] enrolment skipped:', e instanceof Error ? e.message : e);
+        lastEnrolError = e instanceof Error ? e.message : String(e);
+        console.warn('[WIA] enrolment skipped:', lastEnrolError);
         return null;
     }
 }

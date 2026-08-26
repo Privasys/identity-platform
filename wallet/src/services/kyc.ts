@@ -45,7 +45,7 @@ import * as SecureStore from '@/utils/storage';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
 import { walletCallHeaders } from './wallet-call';
-import { ensureWia, getValidWia } from './wia';
+import { ensureWia, getValidWia, lastWiaError } from './wia';
 
 /** Hardware-bound holder key; the IVR binds to it and prove_* requests are
  *  signed by it. Same key the wallet uses for its DID / FIDO2 signing. */
@@ -347,11 +347,13 @@ async function verifyVerifierEnclave(): Promise<VerifierIdentity> {
     };
 }
 
+export { VerifierMissingCredentialError } from './kyc-errors';
+
 // The verifier failure taxonomy lives in its own leaf module (no imports) so
 // the rule deciding what a user is offered after a failed capture can be
 // tested without the React Native runtime. Re-exported so callers are
 // unaffected by where it lives.
-import { VerifierHttpError } from './kyc-errors';
+import { VerifierHttpError, VerifierMissingCredentialError } from './kyc-errors';
 export { VerifierHttpError, isRetryableCapture } from './kyc-errors';
 
 /** A tool's declared input fields, keyed by field name (the slice of the app
@@ -453,7 +455,17 @@ async function fillCredentialFields(
             // whose WIA had aged out. Best-effort: a failure sends no WIA and
             // the enclave states the reason.
             const wia = await ensureWia().catch(() => null);
-            if (wia) out[name] = wia;
+            if (!wia) {
+                // Refuse locally rather than upload. This endpoint's own
+                // manifest says it needs the credential, so the call cannot
+                // succeed; the runtime's gate refuses an unexempt call BEFORE
+                // reading the request, and against a body the size of a
+                // passport photo that arrives as a connection reset rather than
+                // a status. A tester saw four "retake the photo" prompts in a
+                // row for exactly this (2026-08-26).
+                throw new VerifierMissingCredentialError(lastWiaError());
+            }
+            out[name] = wia;
         } else if (marker === 'holder_public_key') {
             out[name] = await getHolderPublicKey();
         }

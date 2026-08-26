@@ -8,6 +8,24 @@ import type { KeyInfo, SignatureResult } from './NativeKeys.types.js';
 const NativeKeys = Platform.OS !== 'web' ? requireNativeModule('NativeKeys') : null;
 
 /**
+ * Parse a native result, THROWING when the native side reported a failure.
+ *
+ * The iOS module signals failure by RETURNING `{"error":"..."}` rather than
+ * rejecting (Android throws instead). Parsing that blindly handed callers an
+ * object whose fields were all `undefined`, and `JSON.stringify` then dropped
+ * them from request bodies entirely — so a keychain refusal on iOS travelled to
+ * the server as a MISSING signature and came back as "holder proof-of-possession
+ * signature is invalid" (403). The wallet reported that verbatim, which blamed
+ * the cryptography for what was actually a local key-access failure, and the
+ * real reason was never logged at all (2026-08-26).
+ */
+function parseNativeResult<T>(json: string, operation: string): T {
+    const parsed = JSON.parse(json) as T & { error?: string };
+    if (parsed?.error) throw new Error(`NativeKeys.${operation}: ${parsed.error}`);
+    return parsed;
+}
+
+/**
  * Generate a P-256 key pair in the platform's secure hardware.
  *
  * - iOS: Secure Enclave via `SecKeyCreateRandomKey` with
@@ -25,7 +43,7 @@ const NativeKeys = Platform.OS !== 'web' ? requireNativeModule('NativeKeys') : n
 export async function generateKey(keyId: string, requireBiometric = true): Promise<KeyInfo> {
     if (!NativeKeys) throw new Error('NativeKeys is not available on web');
     const json: string = await NativeKeys.generateKey(keyId, requireBiometric);
-    return JSON.parse(json);
+    return parseNativeResult<KeyInfo>(json, 'generateKey');
 }
 
 /**
@@ -37,11 +55,14 @@ export async function generateKey(keyId: string, requireBiometric = true): Promi
  * @param keyId  Key identifier (must have been created with `generateKey`).
  * @param data   Base64url-encoded data to sign.
  * @returns Base64url-encoded DER ECDSA signature.
+ * @throws if the key is unavailable or the hardware refuses to sign. Callers
+ *   that can proceed without a signature must catch; none may treat a missing
+ *   `signature` as an empty one.
  */
 export async function sign(keyId: string, data: string): Promise<SignatureResult> {
     if (!NativeKeys) throw new Error('NativeKeys is not available on web');
     const json: string = await NativeKeys.sign(keyId, data);
-    return JSON.parse(json);
+    return parseNativeResult<SignatureResult>(json, 'sign');
 }
 
 /**
@@ -74,7 +95,7 @@ export async function deleteKey(keyId: string): Promise<void> {
 export async function getPublicKey(keyId: string): Promise<KeyInfo> {
     if (!NativeKeys) throw new Error('NativeKeys is not available on web');
     const json: string = await NativeKeys.getPublicKey(keyId);
-    return JSON.parse(json);
+    return parseNativeResult<KeyInfo>(json, 'getPublicKey');
 }
 
 /**

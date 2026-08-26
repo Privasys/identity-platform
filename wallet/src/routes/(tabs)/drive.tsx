@@ -301,7 +301,7 @@ export default function DriveScreen() {
                     </RNView>
                 ) : (
                     <ScrollView
-                        contentContainerStyle={styles.list}
+                        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 32 }]}
                         showsVerticalScrollIndicator={false}
                         refreshControl={
                             <RefreshControl

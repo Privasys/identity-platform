@@ -93,6 +93,7 @@
     "provenanceCached": "Betroet ud fra en nylig verificering på denne enhed",
     "unreachable": "Tjenesten, der bekræfter en apps kode, svarede ikke. At fortsætte betyder, at du stoler på denne app, som du stoler på et almindeligt websted.",
     "unreachableWithReason": "Tjenesten, der bekræfter en apps kode, svarede ikke ({{reason}}). At fortsætte betyder, at du stoler på denne app, som du stoler på et almindeligt websted.",
+    "deviceUnattested": "Din telefon kunne ikke bevise, at den kører en ægte Privasys Wallet, så kontrollen af koden blev aldrig forsøgt. At fortsætte betyder, at du stoler på denne app, som du stoler på et almindeligt websted.",
     "failedHint": "Koden, der kører her, svarer ikke til noget, udgiveren har udgivet. Fortsæt kun, hvis du ved præcis hvorfor.",
     "whatChanged": "Hvad der er ændret",
     "rowPlatformMrenclave": "Platform (MRENCLAVE)",

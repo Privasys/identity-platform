@@ -133,6 +133,7 @@
     "provenanceCached": "Usaldusväärne hiljutise kontrolli põhjal selles seadmes",
     "unreachable": "Teenus, mis kinnitab rakenduse koodi, ei vastanud. Jätkamine tähendab, et usaldate seda rakendust nagu tavalist veebisaiti.",
     "unreachableWithReason": "Teenus, mis kinnitab rakenduse koodi, ei vastanud ({{reason}}). Jätkamine tähendab, et usaldate seda rakendust nagu tavalist veebisaiti.",
+    "deviceUnattested": "Teie telefon ei suutnud tõendada, et selles töötab ehtne Privasys Wallet, seega koodi kontrollimist ei üritatudki. Jätkamine tähendab, et usaldate seda rakendust nagu tavalist veebisaiti.",
     "failedHint": "Siin töötav kood ei vasta millelegi, mille selle avaldaja on välja andnud. Jätkake ainult siis, kui teate täpselt, miks.",
     "whatChanged": "Mis muutus",
     "rowPlatformMrenclave": "Platvorm (MRENCLAVE)",

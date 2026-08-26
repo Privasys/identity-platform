@@ -1118,6 +1118,7 @@ function ConnectFlow() {
                             mode: outcome.mode,
                             challenged: outcome.challenged,
                             message: outcome.message,
+                            deviceUnattested: outcome.deviceUnattested,
                         });
                         setAttestationChanged(false);
                         setStep('attestation');
@@ -1267,6 +1268,7 @@ function ConnectFlow() {
                     mode: outcome.mode,
                     challenged: outcome.challenged,
                     message: outcome.message,
+                    deviceUnattested: outcome.deviceUnattested,
                 });
             }
         } finally {

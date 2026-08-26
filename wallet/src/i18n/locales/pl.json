@@ -93,6 +93,7 @@
     "provenanceCached": "Zaufana na podstawie niedawnej weryfikacji na tym urządzeniu",
     "unreachable": "Usługa potwierdzająca kod aplikacji nie odpowiedziała. Kontynuowanie oznacza zaufanie tej aplikacji tak jak zwykłej stronie internetowej.",
     "unreachableWithReason": "Usługa potwierdzająca kod aplikacji nie odpowiedziała ({{reason}}). Kontynuowanie oznacza zaufanie tej aplikacji tak jak zwykłej stronie internetowej.",
+    "deviceUnattested": "Twój telefon nie mógł udowodnić, że działa na nim autentyczna aplikacja Privasys Wallet, więc sprawdzenie kodu w ogóle nie zostało podjęte. Kontynuowanie oznacza zaufanie tej aplikacji tak jak zwykłej stronie internetowej.",
     "failedHint": "Uruchomiony tutaj kod nie odpowiada niczemu, co opublikował jego wydawca. Nie kontynuuj, jeśli nie wiesz dokładnie dlaczego.",
     "whatChanged": "Co się zmieniło",
     "rowPlatformMrenclave": "Platforma (MRENCLAVE)",

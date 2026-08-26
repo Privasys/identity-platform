@@ -39,7 +39,7 @@ export default function SettingsScreen() {
                 <Text style={styles.headerTitle}>{t('settings.title')}</Text>
             </RNView>
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+            <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
                 <LanguagePicker />
 
                 {/* Grace Period */}

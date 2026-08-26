@@ -52,6 +52,10 @@ import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaT
  *  - `verified`   — trusted; normal Approve/Reject.
  *  - `unreachable`— the attestation service could not be reached (no verdict).
  *    We offer a plain "Continue anyway", since this is an availability issue.
+ *    `deviceUnattested` narrows it further: the service was never asked,
+ *    because this phone could not prove it runs a genuine wallet. Same
+ *    recovery UX, different sentence, because that outcome says nothing about
+ *    the app on the other end.
  *  - `invalid`    — a definite bad verdict (bad quote, or the service rejected
  *    it). We show the problem and bury the override in an "Advanced" section,
  *    like a browser's invalid-certificate "proceed anyway".
@@ -63,6 +67,9 @@ export interface VerificationState {
     /** True when a fresh nonce + TLS channel binder were folded in this run. */
     challenged: boolean;
     message?: string;
+    /** `unreachable` because THIS DEVICE could not attest, so the service was
+     *  never called. See the note above. */
+    deviceUnattested?: boolean;
 }
 
 /**
@@ -390,9 +397,11 @@ export function AttestationView({
                         <RNView style={styles.verdictExplain}>
                             <Text style={styles.verdictExplainText} selectable>
                                 {isUnreachable
-                                    ? verification?.message
-                                        ? t('attestation.unreachableWithReason', { reason: verification.message })
-                                        : t('attestation.unreachable')
+                                    ? verification?.deviceUnattested
+                                        ? t('attestation.deviceUnattested')
+                                        : verification?.message
+                                            ? t('attestation.unreachableWithReason', { reason: verification.message })
+                                            : t('attestation.unreachable')
                                     : verification?.message
                                         ? `${t('attestation.failedHint')} (${verification.message})`
                                         : t('attestation.failedHint')}

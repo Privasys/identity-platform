@@ -133,6 +133,7 @@
     "provenanceCached": "Uzticams, pamatojoties uz nesenu pārbaudi šajā ierīcē",
     "unreachable": "Pakalpojums, kas apstiprina lietotnes kodu, neatbildēja. Turpinot jūs uzticaties šai lietotnei tāpat kā parastai tīmekļa vietnei.",
     "unreachableWithReason": "Pakalpojums, kas apstiprina lietotnes kodu, neatbildēja ({{reason}}). Turpinot jūs uzticaties šai lietotnei tāpat kā parastai tīmekļa vietnei.",
+    "deviceUnattested": "Jūsu tālrunis nespēja pierādīt, ka tajā darbojas īsta Privasys Wallet, tāpēc koda pārbaude vispār netika mēģināta. Turpinot jūs uzticaties šai lietotnei tāpat kā parastai tīmekļa vietnei.",
     "failedHint": "Šeit darbojošais kods neatbilst nekam, ko tā izdevējs būtu publicējis. Neturpiniet, ja vien precīzi nezināt, kāpēc.",
     "whatChanged": "Kas ir mainījies",
     "rowPlatformMrenclave": "Platforma (MRENCLAVE)",

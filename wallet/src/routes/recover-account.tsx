@@ -42,18 +42,14 @@ import {
     beginRecovery,
     getRecoveryStatus,
     completeRecovery,
+    // Declared in the service, not here, so the wallet wipe can clear it too.
+    RECOVERY_STATE_KEY,
     type RecoveryBeginResult,
 } from '@/services/recovery-api';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 import * as Storage from '@/utils/storage';
 import * as NativeKeys from '../../modules/native-keys/src/index';
-
-// SecureStore keys allow only [A-Za-z0-9._-]. The previous value
-// ('@privasys/recovery-state') was rejected by iOS at write time, which made
-// EVERY successful /recovery/begin crash right after the server had already
-// consumed the phrase — the reason recovery never completed for anyone.
-const RECOVERY_STATE_KEY = 'privasys.recovery-state';
 
 interface RecoveryState {
     requestId: string;
@@ -509,7 +505,7 @@ export default function RecoverAccountScreen() {
             >
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >

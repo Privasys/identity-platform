@@ -84,6 +84,12 @@ interface DriveNotificationsState {
     lookup: (sub: string) => KnownSubject | undefined;
     /** Pending (undecided) requests, newest first. */
     pendingRequests: () => ShareRequest[];
+    /**
+     * Drop every subject, request and decision. Part of the wallet wipe — see
+     * services/wipe.ts. `hydrated` stays true: the store IS loaded, it is
+     * simply empty, and resetting it would make the Drive tab spin forever.
+     */
+    clearAll: () => void;
     hydrate: () => Promise<void>;
 }
 
@@ -176,6 +182,11 @@ export const useDriveNotificationsStore = create<DriveNotificationsState>((set, 
             if (!changed) return s;
             return { requests: [...byId.values()] };
         });
+        persist(get());
+    },
+
+    clearAll: () => {
+        set({ subjects: {}, requests: [], decisions: [] });
         persist(get());
     },
 

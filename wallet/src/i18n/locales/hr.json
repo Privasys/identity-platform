@@ -133,6 +133,7 @@
     "provenanceCached": "Pouzdano na temelju nedavne provjere na ovom uređaju",
     "unreachable": "Usluga koja potvrđuje kod aplikacije nije odgovorila. Nastavak znači da ovoj aplikaciji vjerujete kao običnoj web-stranici.",
     "unreachableWithReason": "Usluga koja potvrđuje kod aplikacije nije odgovorila ({{reason}}). Nastavak znači da ovoj aplikaciji vjerujete kao običnoj web-stranici.",
+    "deviceUnattested": "Vaš telefon nije mogao dokazati da na njemu radi izvorni Privasys Wallet, pa provjera koda uopće nije pokušana. Nastavak znači da ovoj aplikaciji vjerujete kao običnoj web-stranici.",
     "failedHint": "Kod koji se ovdje izvodi ne odgovara ničemu što je njegov izdavač objavio. Nastavite samo ako točno znate zašto.",
     "whatChanged": "Što se promijenilo",
     "rowPlatformMrenclave": "Platforma (MRENCLAVE)",

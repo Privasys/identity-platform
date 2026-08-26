@@ -206,7 +206,7 @@ export default function ConsentHistoryScreen() {
 
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
                 showsVerticalScrollIndicator={false}
             >
                 {activeTab === 'history' && (

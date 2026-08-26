@@ -46,6 +46,8 @@ export interface TrustedAppsState {
 
     addOrUpdate: (app: TrustedApp) => void;
     remove: (rpId: string) => void;
+    /** Forget every app. Part of the wallet wipe — see services/wipe.ts. */
+    clearAll: () => void;
     getApp: (rpId: string) => TrustedApp | undefined;
     /** Check if an app's attestation matches what we last verified. */
     isAttestationMatch: (
@@ -82,6 +84,11 @@ export const useTrustedAppsStore = create<TrustedAppsState>((set, get) => ({
 
     remove: (rpId) => {
         set((s) => ({ apps: s.apps.filter((a) => a.rpId !== rpId) }));
+        persist(get());
+    },
+
+    clearAll: () => {
+        set({ apps: [] });
         persist(get());
     },
 

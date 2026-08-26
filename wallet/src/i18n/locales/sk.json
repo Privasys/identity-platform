@@ -133,6 +133,7 @@
     "provenanceCached": "Dôveryhodné na základe nedávneho overenia v tomto zariadení",
     "unreachable": "Služba, ktorá potvrdzuje kód aplikácie, neodpovedala. Pokračovaním dôverujete tejto aplikácii rovnako ako bežnej webovej stránke.",
     "unreachableWithReason": "Služba, ktorá potvrdzuje kód aplikácie, neodpovedala ({{reason}}). Pokračovaním dôverujete tejto aplikácii rovnako ako bežnej webovej stránke.",
+    "deviceUnattested": "Váš telefón nedokázal preukázať, že v ňom beží pravá aplikácia Privasys Wallet, takže kontrola kódu sa vôbec neuskutočnila. Pokračovaním dôverujete tejto aplikácii rovnako ako bežnej webovej stránke.",
     "failedHint": "Kód, ktorý tu beží, nezodpovedá ničomu, čo vydavateľ zverejnil. Pokračujte len vtedy, ak presne viete prečo.",
     "whatChanged": "Čo sa zmenilo",
     "rowPlatformMrenclave": "Platforma (MRENCLAVE)",

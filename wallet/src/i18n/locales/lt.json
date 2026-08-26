@@ -133,6 +133,7 @@
     "provenanceCached": "Patikimas remiantis neseniai atliktu patikrinimu šiame įrenginyje",
     "unreachable": "Paslauga, patvirtinanti programėlės kodą, neatsakė. Tęsdami pasitikite šia programėle taip, kaip pasitikite įprasta svetaine.",
     "unreachableWithReason": "Paslauga, patvirtinanti programėlės kodą, neatsakė ({{reason}}). Tęsdami pasitikite šia programėle taip, kaip pasitikite įprasta svetaine.",
+    "deviceUnattested": "Jūsų telefonas negalėjo įrodyti, kad jame veikia tikra „Privasys Wallet“, todėl kodo patikra net nebuvo bandyta. Tęsdami pasitikite šia programėle taip, kaip pasitikite įprasta svetaine.",
     "failedHint": "Čia veikiantis kodas neatitinka nieko, ką paskelbė jo leidėjas. Tęskite tik tada, jei tiksliai žinote kodėl.",
     "whatChanged": "Kas pasikeitė",
     "rowPlatformMrenclave": "Platforma (MRENCLAVE)",

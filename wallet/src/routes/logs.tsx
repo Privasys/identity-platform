@@ -98,7 +98,7 @@ export default function LogsScreen() {
             <ScrollView
                 key={refreshKey}
                 style={styles.scroll}
-                contentContainerStyle={styles.content}
+                contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
             >
                 {entries.length === 0 ? (
                     <View style={styles.emptyCard}>

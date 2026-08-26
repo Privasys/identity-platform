@@ -93,6 +93,7 @@
     "provenanceCached": "Confiável a partir de uma verificação recente neste dispositivo",
     "unreachable": "O serviço que confirma o código de uma aplicação não respondeu. Continuar significa confiar nesta aplicação como confia num site comum.",
     "unreachableWithReason": "O serviço que confirma o código de uma aplicação não respondeu ({{reason}}). Continuar significa confiar nesta aplicação como confia num site comum.",
+    "deviceUnattested": "O seu telemóvel não conseguiu provar que executa uma Privasys Wallet autêntica, pelo que a verificação do código nem chegou a ser tentada. Continuar significa confiar nesta aplicação como confia num site comum.",
     "failedHint": "O código em execução aqui não corresponde a nada que o seu editor tenha publicado. Só continue se souber exatamente porquê.",
     "whatChanged": "O que mudou",
     "rowPlatformMrenclave": "Plataforma (MRENCLAVE)",

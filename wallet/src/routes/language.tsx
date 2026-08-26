@@ -107,7 +107,7 @@ export default function LanguageScreen() {
                 <Text style={styles.headerTitle}>{t('language.title')}</Text>
             </RNView>
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+            <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
                 <Text style={styles.description}>{t('language.description')}</Text>
 
                 <View style={styles.card}>

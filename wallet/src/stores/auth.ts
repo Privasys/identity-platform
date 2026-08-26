@@ -54,6 +54,13 @@ export interface AuthState {
     setPrivasysId: (account: PrivasysIdAccount | null) => void;
     setPrivasysSession: (sessionToken: string, ttlMs: number) => void;
     setRecoveryPhraseSaved: (saved: boolean) => void;
+    /**
+     * Forget the whole account: credentials, the meta-account slot, the unlock
+     * grace window and the recovery-phrase acknowledgement. Part of the wallet
+     * wipe — see services/wipe.ts. Hardware keys are NOT touched here; they are
+     * keyed by alias and are re-used by the next identity on this device.
+     */
+    clearAll: () => void;
     hydrate: () => Promise<void>;
 }
 
@@ -83,6 +90,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     setOnboarded: () => {
         set({ isOnboarded: true });
+        persist(get());
+    },
+
+    clearAll: () => {
+        set({
+            isOnboarded: false,
+            credentials: [],
+            isUnlocked: false,
+            unlockExpiresAt: 0,
+            privasysId: null,
+            recoveryPhraseSaved: false,
+        });
         persist(get());
     },
 

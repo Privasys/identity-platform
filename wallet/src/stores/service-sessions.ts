@@ -128,6 +128,8 @@ interface ServiceSessionsState {
     attachAttestation: (traceId: string, att: AttestationTrace) => void;
     /** Drop every trace for a service (user removed the app). */
     removeService: (serviceKey: string) => void;
+    /** Drop every trace. Part of the wallet wipe — see services/wipe.ts. */
+    clearAll: () => void;
     hydrate: () => Promise<void>;
 }
 
@@ -152,6 +154,11 @@ export const useServiceSessionsStore = create<ServiceSessionsState>((set, get) =
 
     removeService: (serviceKey) => {
         set((s) => ({ traces: s.traces.filter((t) => t.serviceKey !== serviceKey) }));
+        persist(get());
+    },
+
+    clearAll: () => {
+        set({ traces: [] });
         persist(get());
     },
 

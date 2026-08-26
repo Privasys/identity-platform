@@ -1,4 +1,3 @@
-import * as Integrity from '@expo/app-integrity';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
@@ -6,7 +5,6 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState, useCallback } from 'react';
-import { Platform } from 'react-native';
 import 'react-native-get-random-values';
 import 'react-native-reanimated';
 
@@ -69,23 +67,14 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-// Check app integrity on app start
-if (Platform.OS === 'android') {
-    (async () => {
-        try {
-            await Integrity.prepareIntegrityTokenProviderAsync(
-                process.env['EXPO_PUBLIC_GOOGLE_PROJECT_ID'] ?? '0'
-            );
-            console.log('Android app integrity provider initialised.');
-        } catch (error) {
-            console.warn('App integrity not available on this device:', error);
-        }
-    })();
-} else if (Platform.OS === 'ios') {
-    if (Integrity.isSupported) {
-        console.log('iOS App Attest is supported on this device.');
-    }
-}
+// Device attestation is NOT warmed up here. The wallet mints its own tokens
+// through modules/app-attest (iOS App Attest, Android Play Integrity CLASSIC
+// requests), which need no provider preparation. The block that used to sit
+// here called @expo/app-integrity's prepareIntegrityTokenProviderAsync — an API
+// belonging to the STANDARD Play Integrity request, which nothing in the wallet
+// issues. With EXPO_PUBLIC_GOOGLE_PROJECT_ID unset it logged
+// "App integrity not available on this device" on every Android launch, which
+// read like a real attestation failure while having no bearing on any (2026-08-26).
 
 // export default Sentry.wrap(function RootLayout() {
 export default function RootLayout() {

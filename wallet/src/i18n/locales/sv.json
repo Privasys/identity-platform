@@ -93,6 +93,7 @@
     "provenanceCached": "Betrodd utifrån en nyligen gjord verifiering på den här enheten",
     "unreachable": "Tjänsten som bekräftar en apps kod svarade inte. Att fortsätta innebär att du litar på appen som du litar på en vanlig webbplats.",
     "unreachableWithReason": "Tjänsten som bekräftar en apps kod svarade inte ({{reason}}). Att fortsätta innebär att du litar på appen som du litar på en vanlig webbplats.",
+    "deviceUnattested": "Din telefon kunde inte bevisa att den kör en äkta Privasys Wallet, så kontrollen av koden gjordes aldrig. Att fortsätta innebär att du litar på appen som du litar på en vanlig webbplats.",
     "failedHint": "Koden som körs här matchar ingenting som utgivaren har släppt. Fortsätt bara om du vet exakt varför.",
     "whatChanged": "Vad som har ändrats",
     "rowPlatformMrenclave": "Plattform (MRENCLAVE)",

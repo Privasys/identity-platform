@@ -93,6 +93,7 @@
     "provenanceCached": "Vertrouwd op basis van een recente verificatie op dit apparaat",
     "unreachable": "De dienst die de code van een app bevestigt, gaf geen antwoord. Doorgaan betekent dat je deze app vertrouwt zoals je een gewone website vertrouwt.",
     "unreachableWithReason": "De dienst die de code van een app bevestigt, gaf geen antwoord ({{reason}}). Doorgaan betekent dat je deze app vertrouwt zoals je een gewone website vertrouwt.",
+    "deviceUnattested": "Je telefoon kon niet aantonen dat er een echte Privasys Wallet op draait, dus de controle van de code is niet eens geprobeerd. Doorgaan betekent dat je deze app vertrouwt zoals je een gewone website vertrouwt.",
     "failedHint": "De code die hier draait komt met niets overeen dat de uitgever heeft gepubliceerd. Ga alleen door als je precies weet waarom.",
     "whatChanged": "Wat er is gewijzigd",
     "rowPlatformMrenclave": "Platform (MRENCLAVE)",

@@ -58,6 +58,14 @@ export interface AttestationOutcome {
     result?: AttestationResult;
     /** Native failure category, when not verified. */
     kind?: VerifyErrorKind;
+    /**
+     * True when the attestation service was never CALLED, because this device
+     * could not produce an App Attest / Play Integrity token to authenticate
+     * with. Distinct from the service being down: it says nothing at all about
+     * the app being connected to, and the approval screen must not imply that
+     * the app failed a check that never ran.
+     */
+    deviceUnattested?: boolean;
     /** Human-readable problem, when not verified. */
     message?: string;
 }
@@ -119,11 +127,14 @@ export async function attestEnclave(
     // getAttestationServerToken degrades to '' only when the device genuinely
     // cannot attest (e.g. a debug build on an emulator).
     if (!opts.attestationServerToken) {
-        // Short phrase — AttestationView renders it as "...service (<message>)."
         return {
             status: 'unreachable',
             mode: opts.mode,
             challenged,
+            deviceUnattested: true,
+            // Diagnostic only. The screen renders its own sentence for this
+            // case rather than interpolating a technical phrase that blamed
+            // the wrong party (2026-08-26).
             message: 'no App Attest or Play Integrity token available',
         };
     }

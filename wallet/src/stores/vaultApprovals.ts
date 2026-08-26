@@ -34,6 +34,8 @@ interface VaultApprovalsState {
     remember: (vaultOp: string) => void;
     /** Drop a capability (approved or dismissed) from both sets. */
     forget: (vaultOp: string) => void;
+    /** Forget every capability. Part of the wallet wipe — see services/wipe.ts. */
+    clearAll: () => void;
     /** Re-fetch every known op; prune the dead; update `pending`. */
     refresh: () => Promise<void>;
 }
@@ -54,6 +56,10 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
             knownOps: s.knownOps.filter((o) => o !== vaultOp),
             pending: s.pending.filter((r) => r.vault_op !== vaultOp),
         }));
+    },
+
+    clearAll: () => {
+        set({ knownOps: [], pending: [], loading: false });
     },
 
     refresh: async () => {

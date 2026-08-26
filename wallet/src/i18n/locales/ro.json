@@ -133,6 +133,7 @@
     "provenanceCached": "De încredere pe baza unei verificări recente pe acest dispozitiv",
     "unreachable": "Serviciul care confirmă codul unei aplicații nu a răspuns. Dacă continui, ai încredere în această aplicație așa cum ai încredere într-un site obișnuit.",
     "unreachableWithReason": "Serviciul care confirmă codul unei aplicații nu a răspuns ({{reason}}). Dacă continui, ai încredere în această aplicație așa cum ai încredere într-un site obișnuit.",
+    "deviceUnattested": "Telefonul tău nu a putut dovedi că rulează o aplicație Privasys Wallet autentică, așa că verificarea codului nici măcar nu a fost încercată. Dacă continui, ai încredere în această aplicație așa cum ai încredere într-un site obișnuit.",
     "failedHint": "Codul care rulează aici nu corespunde cu nimic din ce a publicat editorul său. Nu continua decât dacă știi exact de ce.",
     "whatChanged": "Ce s-a schimbat",
     "rowPlatformMrenclave": "Platformă (MRENCLAVE)",

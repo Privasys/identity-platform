@@ -133,6 +133,7 @@
     "provenanceCached": "Dibynadwy ar sail gwiriad diweddar ar y ddyfais hon",
     "unreachable": "Ni atebodd y gwasanaeth sy'n cadarnhau cod ap. Mae parhau'n golygu ymddiried yn yr ap hwn fel yr ydych yn ymddiried mewn gwefan gyffredin.",
     "unreachableWithReason": "Ni atebodd y gwasanaeth sy'n cadarnhau cod ap ({{reason}}). Mae parhau'n golygu ymddiried yn yr ap hwn fel yr ydych yn ymddiried mewn gwefan gyffredin.",
+    "deviceUnattested": "Ni allai eich ffôn brofi ei fod yn rhedeg Privasys Wallet dilys, felly ni cheisiwyd gwirio'r cod o gwbl. Mae parhau'n golygu ymddiried yn yr ap hwn fel yr ydych yn ymddiried mewn gwefan gyffredin.",
     "failedHint": "Nid yw'r cod sy'n rhedeg yma'n cyfateb i unrhyw beth a ryddhawyd gan ei gyhoeddwr. Peidiwch â pharhau oni bai eich bod yn gwybod yn union pam.",
     "whatChanged": "Beth newidiodd",
     "rowPlatformMrenclave": "Platfform (MRENCLAVE)",

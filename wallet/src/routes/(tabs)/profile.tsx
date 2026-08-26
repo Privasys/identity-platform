@@ -31,22 +31,21 @@ import {
 } from '@/services/biometrics';
 import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
-import { clearSovereignLocalState, takeRecoveredPairwiseSeed } from '@/services/sovereign';
+import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
+import { wipeWallet } from '@/services/wipe';
+import { BIOMETRIC_TIMEOUT_MS, withTimeout } from '@/utils/timeout';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
-import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
-    const { profile, clearProfile } =
-        useProfileStore();
-    const { credentials, removeCredential } = useAuthStore();
+    const profile = useProfileStore((s) => s.profile);
+    const credentials = useAuthStore((s) => s.credentials);
     const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
-    const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
     const consentRecordCount = useConsentStore((s) => s.records.length);
 
     const setOnboarded = useAuthStore((s) => s.setOnboarded);
@@ -54,6 +53,10 @@ export default function ProfileScreen() {
     // (biometric confirmed → key created → identity ready).
     const [setupBusy, setSetupBusy] = useState(false);
     const [setupDone, setSetupDone] = useState(0);
+    // A wipe deletes the sovereign root asynchronously. Setup must not start
+    // until that lands, or the fresh identity can pick the old pairwise seed
+    // back up out of the not-yet-deleted stash.
+    const [wiping, setWiping] = useState(false);
     // Platform-appropriate name for the device unlock ("Face ID", "fingerprint",
     // ...), so Android fingerprint users are never told to "Set up Face ID".
     const { t } = useTranslation();
@@ -79,6 +82,7 @@ export default function ProfileScreen() {
      * gone, so it runs here and, lazily, on the sign-in path.
      */
     const handleSetup = async () => {
+        if (setupBusy) return;
         setSetupBusy(true);
         setSetupDone(0);
         try {
@@ -95,16 +99,23 @@ export default function ProfileScreen() {
                         { method: bioLabel }
                     )
                 );
-                setSetupBusy(false);
                 return;
             }
-            const auth = await LocalAuthentication.authenticateAsync({
-                promptMessage: t('profile.setupPrompt'),
-                fallbackLabel: t('profile.usePasscode'),
-                cancelLabel: t('common.cancel')
-            });
+            // Bounded, because a wedged prompt is otherwise unrecoverable: the
+            // promise from authenticateAsync can simply never settle (seen on
+            // iOS on a second run-through, 2026-08-26), and with the spinner
+            // owned by this function the wallet froze until the user force-quit
+            // the app. A timeout turns that into an error they can retry.
+            const auth = await withTimeout(
+                LocalAuthentication.authenticateAsync({
+                    promptMessage: t('profile.setupPrompt'),
+                    fallbackLabel: t('profile.usePasscode'),
+                    cancelLabel: t('common.cancel')
+                }),
+                BIOMETRIC_TIMEOUT_MS,
+                'device unlock prompt'
+            );
             if (!auth.success) {
-                setSetupBusy(false);
                 return;
             }
             setSetupDone(1);
@@ -133,22 +144,25 @@ export default function ProfileScreen() {
             });
             setOnboarded();
             setSetupDone(3);
-            // Release the ceremony state even though the profile view takes
-            // over: the component stays MOUNTED, so a later "Clear All Data"
-            // brings this screen back — with a stale busy=true the button
-            // spun forever and the wallet was unusable (2026-08-22).
-            setSetupBusy(false);
             // The setup flow continues onto its second page: the dedicated
-            // recovery-phrase step (a real screen, not a popup). It carries
-            // its own "later" escape for users who insist.
+            // recovery-phrase step (a real screen, not a popup). It carries its
+            // own "later" escape for users who insist. Reaching it is not
+            // load-bearing: the Home tab shows a standing "save your recovery
+            // phrase" banner for as long as recoveryPhraseSaved is false, and
+            // the wipe now resets that flag so a cleared wallet asks again.
             router.push('/secure-wallet');
         } catch (e: any) {
             Alert.alert(
                 t('profile.setupFailedTitle'),
-                t('profile.setupFailedBody', { reason: e.message })
+                t('profile.setupFailedBody', { reason: e?.message ?? String(e) })
             );
-            setSetupBusy(false);
             setSetupDone(0);
+        } finally {
+            // ALWAYS release the ceremony state: the component stays MOUNTED
+            // after setup succeeds, so a later "Clear All Data" brings this
+            // screen back, and a stale busy=true left the button spinning with
+            // the wallet unusable (2026-08-22, and again 2026-08-26).
+            setSetupBusy(false);
         }
     };
 
@@ -210,11 +224,15 @@ export default function ProfileScreen() {
                     </RNView>
 
                     <Pressable
-                        style={[styles.createProfileButton, styles.setupButton, setupBusy && { opacity: 0.6 }]}
+                        style={[
+                            styles.createProfileButton,
+                            styles.setupButton,
+                            (setupBusy || wiping) && { opacity: 0.6 }
+                        ]}
                         onPress={handleSetup}
-                        disabled={setupBusy}
+                        disabled={setupBusy || wiping}
                     >
-                        {setupBusy ? (
+                        {setupBusy || wiping ? (
                             <ActivityIndicator color="#FFFFFF" size="small" />
                         ) : (
                             <>
@@ -542,26 +560,23 @@ export default function ProfileScreen() {
                                         text: t('profile.clearEverything'),
                                         style: 'destructive',
                                         onPress: () => {
-                                            for (const cred of credentials) {
-                                                removeCredential(cred.credentialId);
-                                            }
-                                            for (const app of apps) {
-                                                removeTrustedApp(app.rpId);
-                                            }
-                                            // The canonical meta-account lives in its own
-                                            // slot OUTSIDE credentials[]; leaving it made
-                                            // "Clear All Data" silently keep the old
-                                            // account (and its possibly-dead credential)
-                                            // for the next sign-in (2026-08-22).
-                                            useAuthStore.getState().setPrivasysId(null);
-                                            void clearSovereignLocalState();
-                                            clearProfile();
-                                            // Reset the setup ceremony so the
-                                            // re-shown setup screen starts
-                                            // clean (stale busy/done state
-                                            // froze the button, 2026-08-22).
-                                            setSetupBusy(false);
-                                            setSetupDone(0);
+                                            // Everything the wipe touches lives in
+                                            // services/wipe.ts, which is covered by a test
+                                            // that fails when a new persisted key appears
+                                            // without a clear. Enumerating stores here is
+                                            // what let sessions, consent history, KYC
+                                            // records and the recovery-phrase flag survive
+                                            // a "Clear All Data" (2026-08-26).
+                                            setWiping(true);
+                                            void wipeWallet().finally(() => {
+                                                // Reset the setup ceremony so the re-shown
+                                                // setup screen starts clean (stale
+                                                // busy/done state froze the button,
+                                                // 2026-08-22).
+                                                setSetupBusy(false);
+                                                setSetupDone(0);
+                                                setWiping(false);
+                                            });
                                         }
                                     }
                                 ]

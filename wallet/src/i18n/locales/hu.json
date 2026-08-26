@@ -93,6 +93,7 @@
     "provenanceCached": "Megbízható az eszközön nemrég végzett ellenőrzés alapján",
     "unreachable": "Az a szolgáltatás, amely egy alkalmazás kódját megerősíti, nem válaszolt. A folytatással úgy bízik ebben az alkalmazásban, ahogyan egy szokásos webhelyben.",
     "unreachableWithReason": "Az a szolgáltatás, amely egy alkalmazás kódját megerősíti, nem válaszolt ({{reason}}). A folytatással úgy bízik ebben az alkalmazásban, ahogyan egy szokásos webhelyben.",
+    "deviceUnattested": "A telefonja nem tudta igazolni, hogy valódi Privasys Wallet fut rajta, ezért a kód ellenőrzésére kísérlet sem történt. A folytatással úgy bízik ebben az alkalmazásban, ahogyan egy szokásos webhelyben.",
     "failedHint": "Az itt futó kód nem egyezik semmivel, amit a kiadója közzétett. Csak akkor folytassa, ha pontosan tudja, miért.",
     "whatChanged": "Mi változott",
     "rowPlatformMrenclave": "Platform (MRENCLAVE)",

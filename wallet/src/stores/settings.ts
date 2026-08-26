@@ -40,6 +40,15 @@ export interface SettingsState {
     setVerificationMode: (mode: VerificationMode) => void;
     setLanguage: (tag: string | null) => void;
     setSeenFirstConnect: (seen: boolean) => void;
+    /**
+     * Reset to first-run defaults, EXCEPT the explicit app-language override.
+     * Everything else here is state the wallet inferred or the user set while
+     * an identity existed, so a wipe should forget it; the language is a plain
+     * accessibility preference, and silently flipping the interface back to the
+     * device language would leave a user unable to read the setup screen they
+     * are dropped on.
+     */
+    clearAll: () => void;
     hydrate: () => Promise<void>;
 }
 
@@ -84,6 +93,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     setSeenFirstConnect: (seen) => {
         set({ seenFirstConnect: seen });
+        persist(get);
+    },
+
+    clearAll: () => {
+        set({ gracePeriodSec: 30, verificationMode: 'deterministic', seenFirstConnect: false });
         persist(get);
     },
 

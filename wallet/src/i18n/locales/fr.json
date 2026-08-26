@@ -93,6 +93,7 @@
     "provenanceCached": "Approuvée d'après une vérification récente sur cet appareil",
     "unreachable": "Le service qui confirme le code d'une application n'a pas répondu. Continuer revient à faire confiance à cette application comme à un site web ordinaire.",
     "unreachableWithReason": "Le service qui confirme le code d'une application n'a pas répondu ({{reason}}). Continuer revient à faire confiance à cette application comme à un site web ordinaire.",
+    "deviceUnattested": "Votre téléphone n'a pas pu prouver qu'il exécute une véritable application Privasys Wallet, la vérification du code n'a donc pas été tentée. Continuer revient à faire confiance à cette application comme à un site web ordinaire.",
     "failedHint": "Le code exécuté ici ne correspond à rien de ce que son éditeur a publié. Ne continuez que si vous savez exactement pourquoi.",
     "whatChanged": "Ce qui a changé",
     "rowPlatformMrenclave": "Plateforme (MRENCLAVE)",

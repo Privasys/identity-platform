@@ -33,7 +33,6 @@ console.log(
 
 // process.env.EXPO_PUBLIC_SENTRY_AUTH_TOKEN ??= process.env.SENTRY_AUTH_TOKEN;
 process.env.EXPO_PUBLIC_SENTRY_DSN ??= process.env.SENTRY_DSN;
-process.env.EXPO_PUBLIC_GOOGLE_PROJECT_ID ??= process.env.GOOGLE_PROJECT_ID;
 process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KEY;
 
 const envConfig = {

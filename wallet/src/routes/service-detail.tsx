@@ -333,7 +333,7 @@ export default function ServiceDetailScreen() {
                     <RNView style={{ width: 36 }} />
                 </RNView>
 
-                <ScrollView contentContainerStyle={styles.content}>
+                <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
                     {/* Service icon + name */}
                     <RNView style={styles.serviceHeader}>
                         <RNView

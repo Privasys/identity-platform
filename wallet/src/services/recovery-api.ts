@@ -43,6 +43,19 @@ function authHeaders(accessToken: string): HeadersInit {
 
 // ── Recovery phrase (BIP39 24-word) ─────────────────────────────────────
 
+/**
+ * SecureStore key for in-flight account-recovery state.
+ *
+ * SecureStore keys allow only [A-Za-z0-9._-]. The original value
+ * ('@privasys/recovery-state') was rejected by iOS at write time, which made
+ * EVERY successful /recovery/begin crash right after the server had already
+ * consumed the phrase — the reason recovery never completed for anyone.
+ *
+ * Declared here rather than in the route that writes it so services/wipe.ts can
+ * clear it without importing a screen.
+ */
+export const RECOVERY_STATE_KEY = 'privasys.recovery-state';
+
 export interface RecoveryPhraseResult {
     /** Space-separated 24-word BIP39 phrase. Returned ONCE. */
     phrase: string;

@@ -133,6 +133,7 @@
     "provenanceCached": "Iontaofa ar bhonn fíorú a rinneadh le déanaí ar an ngléas seo",
     "unreachable": "Níor fhreagair an tseirbhís a dhearbhaíonn cód aipe. Má leanann tú ar aghaidh, tá muinín agat as an aip seo mar a bheadh as gnáthshuíomh gréasáin.",
     "unreachableWithReason": "Níor fhreagair an tseirbhís a dhearbhaíonn cód aipe ({{reason}}). Má leanann tú ar aghaidh, tá muinín agat as an aip seo mar a bheadh as gnáthshuíomh gréasáin.",
+    "deviceUnattested": "Níorbh fhéidir le do ghuthán a chruthú go bhfuil fíor-Privasys Wallet ar siúl air, mar sin níor triaileadh an cód a sheiceáil ar chor ar bith. Má leanann tú ar aghaidh, tá muinín agat as an aip seo mar a bheadh as gnáthshuíomh gréasáin.",
     "failedHint": "Ní réitíonn an cód atá á rith anseo le haon rud a d'eisigh a fhoilsitheoir. Ná lean ar aghaidh mura bhfuil a fhios agat go díreach cén fáth.",
     "whatChanged": "Cad a athraigh",
     "rowPlatformMrenclave": "Ardán (MRENCLAVE)",

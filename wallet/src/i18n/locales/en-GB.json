@@ -133,6 +133,7 @@
     "provenanceCached": "Trusted from a recent verification on this device",
     "unreachable": "The service that confirms an app's code did not answer. Continuing means trusting this app the way you trust an ordinary website.",
     "unreachableWithReason": "The service that confirms an app's code did not answer ({{reason}}). Continuing means trusting this app the way you trust an ordinary website.",
+    "deviceUnattested": "Your phone could not prove it is running a genuine Privasys Wallet, so the code check was never attempted. Continuing means trusting this app the way you trust an ordinary website.",
     "failedHint": "The code running here does not match anything its publisher released. Do not continue unless you know exactly why.",
     "whatChanged": "What Changed",
     "rowPlatformMrenclave": "Platform (MRENCLAVE)",

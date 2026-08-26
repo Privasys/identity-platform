@@ -39,6 +39,8 @@ interface SessionsState {
     remove: (sessionId: string) => void;
     /** Drop expired sessions. Call from a timer in the UI. */
     pruneExpired: () => void;
+    /** Drop every session. Part of the wallet wipe — see services/wipe.ts. */
+    clearAll: () => void;
     /** Hydrate from secure storage. */
     hydrate: () => Promise<void>;
 }
@@ -56,6 +58,11 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
     remove: (sessionId) => {
         set((s) => ({ sessions: s.sessions.filter((x) => x.sessionId !== sessionId) }));
+        persist(get());
+    },
+
+    clearAll: () => {
+        set({ sessions: [] });
         persist(get());
     },
 

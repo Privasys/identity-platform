@@ -133,6 +133,7 @@
     "provenanceCached": "Fdata fuq il-bażi ta' verifika reċenti fuq dan l-apparat",
     "unreachable": "Is-servizz li jikkonferma l-kodiċi ta' app ma weġibx. Jekk tkompli, tkun qed tafda din l-app bħalma tafda sit web ordinarju.",
     "unreachableWithReason": "Is-servizz li jikkonferma l-kodiċi ta' app ma weġibx ({{reason}}). Jekk tkompli, tkun qed tafda din l-app bħalma tafda sit web ordinarju.",
+    "deviceUnattested": "It-telefon tiegħek ma setax jipprova li qed iħaddem Privasys Wallet ġenwina, għalhekk il-verifika tal-kodiċi lanqas biss ġiet ippruvata. Jekk tkompli, tkun qed tafda din l-app bħalma tafda sit web ordinarju.",
     "failedHint": "Il-kodiċi li qed jaħdem hawn ma jaqbel ma' xejn li ħareġ il-pubblikatur tiegħu. Tkomplix jekk ma tafx eżattament għaliex.",
     "whatChanged": "X'inbidel",
     "rowPlatformMrenclave": "Pjattaforma (MRENCLAVE)",

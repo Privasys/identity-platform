@@ -63,6 +63,18 @@ async function loadPriv(): Promise<Uint8Array> {
     return priv;
 }
 
+/**
+ * Drop the device notification-sealing key, in storage and in memory.
+ *
+ * Part of the wallet wipe — see services/wipe.ts. The next call to
+ * `ensureNotifySealKey` mints a fresh key, so pushes sealed to the old identity
+ * can no longer be opened on this device.
+ */
+export async function clearNotifySealKey(): Promise<void> {
+    cachedPriv = null;
+    await SecureStore.deleteItemAsync(KEY_STORE);
+}
+
 /** Open a sealed notification payload. Returns the parsed JSON object,
  *  or null when the envelope is malformed or not for this device's key
  *  (e.g. the key rotated since the push was sent). */

@@ -93,6 +93,7 @@
     "provenanceCached": "Luotettu tällä laitteella hiljattain tehdyn vahvistuksen perusteella",
     "unreachable": "Palvelu, joka vahvistaa sovelluksen koodin, ei vastannut. Jatkaminen tarkoittaa, että luotat tähän sovellukseen kuten tavalliseen verkkosivustoon.",
     "unreachableWithReason": "Palvelu, joka vahvistaa sovelluksen koodin, ei vastannut ({{reason}}). Jatkaminen tarkoittaa, että luotat tähän sovellukseen kuten tavalliseen verkkosivustoon.",
+    "deviceUnattested": "Puhelimesi ei pystynyt todistamaan, että siinä on aito Privasys Wallet, joten koodin tarkistusta ei edes yritetty. Jatkaminen tarkoittaa, että luotat tähän sovellukseen kuten tavalliseen verkkosivustoon.",
     "failedHint": "Täällä ajettava koodi ei vastaa mitään, mitä sen julkaisija on julkaissut. Jatka vain, jos tiedät tarkalleen miksi.",
     "whatChanged": "Mikä muuttui",
     "rowPlatformMrenclave": "Alusta (MRENCLAVE)",

@@ -2593,34 +2593,39 @@ function ConnectFlow() {
                 {step === 'consent' && qr && (
                     <RNView style={{ flex: 1, paddingTop: insets.top }}>
                         <DataRequestConsent
-                            appName={qr.appName || appName(qr.rpId)}
+                            title={t('consent.requestTitle')}
+                            appName={qr.appName || appName(qr.appHost ?? qr.rpId)}
                             origin={qr.clientId || qr.rpId}
+                            contentTopInset={insets.top}
                             sectionTitle={qr.mode === 'attribute-step-up'
                                 ? t('connect.consentTitleStepUp')
                                 : t('connect.consentTitle')}
                             sectionDescription={qr.mode === 'attribute-step-up'
                                 ? t('connect.consentDescriptionStepUp')
-                                : t('connect.consentDescription')}
+                                : t('connect.consentDescription', {
+                                    app: qr.appName || appName(qr.appHost ?? qr.rpId),
+                                })}
                             items={consentItems.map((i) => ({
                                 key: i.key,
                                 label: i.label,
-                                // Each variant is a WHOLE sentence rather than a
-                                // "Required · " prefix glued to a phrase: the
-                                // separator and the order differ by language.
-                                sublabel: i.key === PRESENCE_KEY
-                                    ? i.essential
-                                        ? t('connect.sublabelPresenceRequired')
-                                        : t('connect.sublabelPresence')
+                                // The value the relying party actually receives,
+                                // when there is one to show honestly.
+                                value: i.preview,
+                                // Stands in when there is not. A gov attribute
+                                // disclosed as a token yields a predicate, not
+                                // the value behind it, and the row has to say so
+                                // rather than sit blank next to a line promising
+                                // "these exact values".
+                                note: i.key === PRESENCE_KEY
+                                    ? t('connect.sublabelPresence')
                                     : !i.hasValue
                                         ? t('connect.sublabelWillBeVerified')
-                                        : i.gov
-                                            ? i.essential
-                                                ? t('connect.sublabelGovRequired')
-                                                : t('connect.sublabelGov')
-                                            : i.essential
-                                                ? t('connect.sublabelRequired')
-                                                : undefined,
+                                        : i.preview
+                                            ? undefined
+                                            : t('consent.proofOnly'),
                                 missing: !i.hasValue,
+                                required: i.essential,
+                                gov: i.gov,
                                 toggle: {
                                     value: consentSelected.has(i.key),
                                     onChange: () => toggleConsentAttr(i.key),

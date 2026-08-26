@@ -225,7 +225,44 @@ export default (context: ConfigContext): ExpoConfig => {
                         compileSdkVersion: 36,
                         targetSdkVersion: 36,
                         buildToolsVersion: '36.1.0',
-                        kotlinVersion: '2.1.20'
+                        kotlinVersion: '2.1.20',
+                        // R8. Play Console flags an unoptimised release build,
+                        // and this is the flag it is asking about:
+                        // developer.android.com/topic/performance/app-optimization/enable-app-optimization
+                        //
+                        // `shrinkResources` is deliberately NOT enabled with it.
+                        // That is a separate, more aggressive pass over
+                        // resources for a much smaller saving, and it strips
+                        // anything referenced only by name. Clear the Play
+                        // warning first, then consider it on its own.
+                        enableMinifyInReleaseBuilds: true,
+                        // Everything R8 cannot see. Each of these fails at
+                        // RUNTIME, not at build time, so a green CI build says
+                        // nothing about whether they are right.
+                        extraProguardRules: [
+                            '# --- JNI bridge to the Rust RA-TLS client ---',
+                            '# The native symbol is the mangled CLASS + METHOD name, so renaming',
+                            '# either gives an UnsatisfiedLinkError on the first attestation, which',
+                            '# is every single sign-in. The bundled proguard-android.txt already',
+                            '# keeps classes with native methods; this states it outright rather',
+                            '# than depending on a file we do not own staying that way.',
+                            '-keep class org.privasys.nativeratls.NativeRaTlsBridge { *; }',
+                            '-keepclasseswithmembernames class * { native <methods>; }',
+                            '',
+                            '# --- Passport and eID reading ---',
+                            '# JMRTD and SCUBA resolve card services and codecs by name, and',
+                            '# BouncyCastle registers its algorithms reflectively through the JCA',
+                            '# provider. R8 sees no reference to any of it and strips it, and the',
+                            '# failure only appears when someone holds a real document to a real',
+                            '# phone, which no build can reproduce.',
+                            '-keep class org.jmrtd.** { *; }',
+                            '-keep class net.sf.scuba.** { *; }',
+                            '-keep class org.bouncycastle.** { *; }',
+                            '-dontwarn org.jmrtd.**',
+                            '-dontwarn net.sf.scuba.**',
+                            '-dontwarn org.bouncycastle.**',
+                            '-dontwarn javax.naming.**'
+                        ].join('\n')
                     },
                     ios: { deploymentTarget: '16.0' }
                 }

@@ -37,7 +37,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { ExternalLink } from '@/components/ExternalLink';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
@@ -94,6 +94,29 @@ export interface AttributeRow {
     /** Assurance or acquisition note, shown when there is no preview. */
     note?: string;
 }
+
+/**
+ * Custom OIDs the screen already renders as their own row, or that carry a
+ * multi-kilobyte blob no one reads off a phone.
+ *
+ * Listing them twice made "All other details" longer and less useful: the
+ * workload code hash is the App summary's workload hash, the config merkle
+ * root is Config root, the attestation servers hash is Attestation server, and
+ * the app id is what resolved the listing at the top of the screen. The quote
+ * itself is the raw evidence the attestation service already checked.
+ */
+const SUPPRESSED_OIDS = new Set([
+    '1.3.6.1.4.1.65230.1.1',   // SGX quote
+    '1.3.6.1.4.1.65230.1.2',   // TDX quote
+    '1.3.6.1.4.1.65230.4.1',   // SEV-SNP report
+    '1.3.6.1.4.1.65230.5.1',   // NVIDIA GPU evidence
+    '1.3.6.1.4.1.65230.2.7',   // attestation servers hash -> Attestation server
+    '1.3.6.1.4.1.65230.3.1',   // workload config merkle root -> Config root
+    '1.3.6.1.4.1.65230.3.2',   // workload code hash -> Workload hash
+    '1.3.6.1.4.1.65230.3.4',   // workload key source -> Key source
+    '1.3.6.1.4.1.65230.3.6',   // workload app id -> resolved the listing
+    '1.3.6.1.4.1.65230.6.1',   // attested dependency set -> This app also uses
+]);
 
 /** "Intel SGX" / "Intel TDX" are product names and stay verbatim everywhere. */
 function teeLabel(teeType?: string): string | undefined {
@@ -184,6 +207,13 @@ export function AttestationView({
 }) {
     const { t } = useTranslation();
     const [advancedOpen, setAdvancedOpen] = useState(false);
+    /**
+     * Attribute rows whose value the user has tapped to see in full. Values are
+     * truncated to one line by default because space here is scarce, but a
+     * truncated value is not a value the user has actually checked, so every
+     * one of them has to be openable.
+     */
+    const [shownInFull, setShownInFull] = useState<Set<string>>(new Set());
     const insets = useSafeAreaInsets();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
@@ -244,10 +274,15 @@ export function AttestationView({
                 )}
 
                 <Text style={styles.ask}>
-                    {t(askKey, { app: displayName ?? '' })}
+                    <Trans
+                        i18nKey={askKey}
+                        values={{ app: displayName ?? '' }}
+                        components={{ b: <Text style={styles.askApp} /> }}
+                    />
                 </Text>
 
                 {/* ── The app ─────────────────────────────────────────────── */}
+                <Text style={styles.sectionHeader}>{t('attestation.appSummary')}</Text>
                 <View style={styles.card}>
                     <View style={styles.cardBody}>
                         <PropRow
@@ -400,6 +435,7 @@ export function AttestationView({
                             <View style={styles.cardBody}>
                                 {attributes!.items.map((item, i) => {
                                     const on = item.essential || attributes!.selected.has(item.key);
+                                    const full = shownInFull;
                                     return (
                                         <Pressable
                                             key={item.key}
@@ -426,6 +462,10 @@ export function AttestationView({
                                                     item.essential ? p.approve : on ? p.action : p.textMuted
                                                 }
                                             />
+                                            {/* Label and "required" share one
+                                                line: stacking them cost a whole
+                                                row of height per attribute and
+                                                bought nothing. */}
                                             <View style={styles.attrLabelWrap}>
                                                 <Text
                                                     style={[styles.attrLabel, !on && styles.attrLabelOff]}
@@ -449,7 +489,18 @@ export function AttestationView({
                                                     // facts belong on screen.
                                                     !on && styles.attrValueOff,
                                                 ]}
-                                                numberOfLines={1}
+                                                numberOfLines={full.has(item.key) ? undefined : 1}
+                                                onPress={
+                                                    item.preview
+                                                        ? () => setShownInFull((s) => {
+                                                            const n = new Set(s);
+                                                            if (n.has(item.key)) n.delete(item.key);
+                                                            else n.add(item.key);
+                                                            return n;
+                                                        })
+                                                        : undefined
+                                                }
+                                                suppressHighlighting
                                             >
                                                 {item.preview ?? item.note ?? ''}
                                             </Text>
@@ -476,10 +527,16 @@ export function AttestationView({
                                             : d.status === 'denied'
                                                 ? t('attestation.depBadgeDenied')
                                                 : t('attestation.depBadgeNew');
+                                    // `name`, never `label`. `label` is the
+                                    // dependency's VERSION, so preferring it
+                                    // produced a list reading "v0.1.0 / v0.1.27"
+                                    // with no indication of what those were.
+                                    const version = d.label && d.label !== d.name ? d.label : undefined;
                                     return (
                                         <PropRow
                                             key={`${d.name}-${i}`}
-                                            label={d.label || d.name}
+                                            label={d.name}
+                                            sublabel={version}
                                             {...(d.url
                                                 ? { link: { url: d.url, label: badge } }
                                                 : { value: badge })}
@@ -582,15 +639,22 @@ export function AttestationView({
                         {(attestation.advisory_ids ?? []).map((id) => (
                             <PropRow key={id} label={t('attestation.advisories')} value={id} mono styles={styles} />
                         ))}
-                        {(attestation.custom_oids ?? []).map((oid) => (
-                            <PropRow
-                                key={oid.oid}
-                                label={oid.label || oid.oid}
-                                value={truncateHex(oid.value_hex)}
-                                mono
-                                styles={styles}
-                            />
-                        ))}
+                        {(attestation.custom_oids ?? [])
+                            .filter((o) => !SUPPRESSED_OIDS.has(o.oid))
+                            .map((oid) => (
+                                <PropRow
+                                    key={oid.oid}
+                                    // The native parser labels anything outside
+                                    // its table "Unknown", which is a worse row
+                                    // than no label at all: it names nothing and
+                                    // reads like a fault. The OID number at
+                                    // least identifies the extension.
+                                    label={!oid.label || oid.label === 'Unknown' ? oid.oid : oid.label}
+                                    value={truncateHex(oid.value_hex)}
+                                    mono
+                                    styles={styles}
+                                />
+                            ))}
                         {listing?.privacy_url ? (
                             <PropRow
                                 label={t('attestation.propPrivacy')}
@@ -669,6 +733,7 @@ export function AttestationView({
  */
 function PropRow({
     label,
+    sublabel,
     value,
     link,
     mono,
@@ -679,6 +744,8 @@ function PropRow({
     styles,
 }: {
     label: string;
+    /** Second line under the label, for a version or a qualifier. */
+    sublabel?: string;
     value?: string;
     link?: { url: string; label: string };
     mono?: boolean;
@@ -711,7 +778,10 @@ function PropRow({
     );
     return (
         <View style={[styles.propRow, last && styles.rowLast]}>
-            <Text style={styles.propLabel}>{label}</Text>
+            <View style={styles.propLabelWrap}>
+                <Text style={styles.propLabel}>{label}</Text>
+                {sublabel ? <Text style={styles.propSublabel}>{sublabel}</Text> : null}
+            </View>
             <View style={styles.propValueWrap}>{body}</View>
         </View>
     );
@@ -742,7 +812,10 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     warningText: { color: p.warnText, fontSize: 13, lineHeight: 19, backgroundColor: 'transparent' },
 
-    ask: { fontSize: 17, lineHeight: 25, color: p.textPrimary, fontWeight: '500', marginBottom: 16 },
+    // Room to breathe on both sides: this sentence is the whole request, and
+    // it was reading as a caption wedged under the header.
+    ask: { fontSize: 17, lineHeight: 26, color: p.textSecondary, marginTop: 10, marginBottom: 26 },
+    askApp: { fontWeight: '700', color: p.textPrimary },
 
     card: {
         backgroundColor: p.card,
@@ -763,7 +836,9 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         backgroundColor: 'transparent',
     },
     rowLast: { borderBottomWidth: 0 },
-    propLabel: { fontSize: 13, color: p.textSecondary, flexShrink: 0 },
+    propLabelWrap: { flexShrink: 0, backgroundColor: 'transparent' },
+    propLabel: { fontSize: 13, color: p.textSecondary },
+    propSublabel: { fontSize: 11, color: p.textMuted, marginTop: 1 },
     propValueWrap: { flex: 1, alignItems: 'flex-end', backgroundColor: 'transparent' },
     propValue: { fontSize: 13, color: p.textPrimary, fontWeight: '500', textAlign: 'right' },
     propMono: { fontSize: 12, fontWeight: '400' },
@@ -825,10 +900,16 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: p.border,
     },
-    attrLabelWrap: { flexShrink: 0, backgroundColor: 'transparent' },
+    attrLabelWrap: {
+        flexShrink: 0,
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: 6,
+        backgroundColor: 'transparent',
+    },
     attrLabel: { fontSize: 13, color: p.textPrimary },
     attrLabelOff: { color: p.textMuted },
-    attrRequired: { fontSize: 10, color: p.textMuted, letterSpacing: 0.3, marginTop: 1 },
+    attrRequired: { fontSize: 10, color: p.textMuted, letterSpacing: 0.3 },
     attrValue: { flex: 1, fontSize: 12.5, color: p.textPrimary, fontWeight: '500', textAlign: 'right' },
     attrValueNote: { color: p.textSecondary, fontWeight: '400', fontSize: 11.5 },
     attrValueOff: { color: p.textMuted, textDecorationLine: 'line-through' },

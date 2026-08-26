@@ -582,10 +582,21 @@ function buildConsentPlan(
  * The value the relying party will actually receive for `key`, or undefined
  * when there is nothing honest to show.
  *
- * Undefined for: token-disclosed attributes (the relying party may learn only
- * a predicate), derived insights (computed in the enclave, never stored),
- * device-sourced values (resolved asynchronously at disclosure time), and the
- * ceremonial presence key (produced by the live check, not held).
+ * Undefined for: GOV attributes answered by an enclave-signed token (the
+ * relying party may learn only a predicate such as "over 18", so printing the
+ * date of birth would overstate what leaves the wallet), derived insights
+ * (computed in the enclave, never stored), device-sourced values (resolved
+ * asynchronously at disclosure time), and the ceremonial presence key
+ * (produced by the live check, not held).
+ *
+ * The gov qualifier on that first case is load-bearing. `disclosesAsToken` is
+ * written for government keys, where the question is voucher-versus-raw, and
+ * it answers `true` for anything with no explicit `disclosure` field — which
+ * is every ordinary self-asserted attribute. Testing it unconditionally
+ * therefore suppressed the value of every plain attribute the user has, and
+ * the checklist rendered `Email` and `Display Name` with nothing beside them.
+ * A self-asserted email IS sent raw, and showing it is the entire point of
+ * the line above that says these exact values will be sent.
  */
 function previewValue(
     profile: import('@/stores/profile').UserProfile | null,
@@ -594,10 +605,12 @@ function previewValue(
 ): string | undefined {
     if (!profile) return undefined;
     if (key === PRESENCE_KEY || isDerived(key) || ATTRIBUTE_MAP[key]?.deviceSourced) return undefined;
-    if (disclosesAsToken(key)) return undefined;
-    if (!gov) return selfAssertedValue(profile, key) || undefined;
-    const govKey = govValueKey(profile, key);
-    return (govKey ? getProfileValue(profile, govKey) : undefined) || undefined;
+    if (gov) {
+        if (disclosesAsToken(key)) return undefined;
+        const govKey = govValueKey(profile, key);
+        return (govKey ? getProfileValue(profile, govKey) : undefined) || undefined;
+    }
+    return selfAssertedValue(profile, key) || undefined;
 }
 
 /**

@@ -14,7 +14,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -293,9 +293,25 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
         </Pressable>
     );
 
+    // A swipe that lands on the row also fires its onPress, which expanded the
+    // card mid-gesture: the row grew to show its provenance rows and the delete
+    // action, which stretches to the row, grew with it into a tall red slab.
+    // Swallow exactly one press after a swipe opens.
+    const swipedOpen = useRef(false);
+
     return (
-        <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
-            <Pressable onPress={() => !editing && setExpanded(!expanded)}>
+        <Swipeable
+            renderRightActions={renderRightActions}
+            overshootRight={false}
+            onSwipeableWillOpen={() => { swipedOpen.current = true; }}
+            onSwipeableClose={() => { swipedOpen.current = false; }}
+        >
+            <Pressable
+                onPress={() => {
+                    if (swipedOpen.current) return;
+                    if (!editing) setExpanded(!expanded);
+                }}
+            >
                 <RNView style={styles.attributeRow}>
                     <RNView style={styles.attributeInfo}>
                         <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -679,8 +695,12 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         width: 80,
+        // Fixed height, aligned to the top of the row rather than stretched to
+        // it. Delete is one button whatever the row happens to be showing; an
+        // expanded attribute used to turn it into a full-height red panel.
+        height: 64,
+        alignSelf: 'flex-start',
         borderRadius: 12,
-        marginBottom: 8,
         marginLeft: 8,
     },
     swipeDeleteText: {

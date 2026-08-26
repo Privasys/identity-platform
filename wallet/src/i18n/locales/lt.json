@@ -462,6 +462,8 @@
     "card4Aside": "Galite paprašyti bet kurios programėlės pasitvirtinti realiu laiku ir bet kada atšaukti prieigą.",
     "watchTitle": "Į ką atkreipti dėmesį",
     "watchIntro": "Trys dalykai, kuriuos verta žinoti prieš ką nors leidžiant.",
+    "watchLiveTitle": "Netikėta užklausa yra užklausa, kurią reikia atmesti",
+    "watchLiveBody": "Patvirtinimai vyksta realiuoju laiku. Kiekvienas turėtų kilti iš to, ką ką tik padarėte, pavyzdžiui, nuskaitėte kodą ar atvėrėte nuorodą. Jei užklausa ateina savaime, atmeskite ją.",
     "watch1Title": "Pavadinimas nėra įrodymas",
     "watch1Body": "Bet kas gali pavadinti savo programėlę kaip nori. Adresas ir kūrėjas yra tos dalys, kurias sunku suklastoti, ir būtent jas verta perskaityti.",
     "watch2Title": "„Nepavyko patikrinti šios programėlės“ nėra patvirtinimas",

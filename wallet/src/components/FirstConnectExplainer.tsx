@@ -48,8 +48,16 @@ const CARDS = [
     { icon: 'alert-circle-outline', key: 'watch' },
 ] as const;
 
-/** The three caveats on the last card. */
-const WATCH = ['watch1', 'watch2', 'watch3'] as const;
+/**
+ * The caveats on the last card, most important first.
+ *
+ * `watchLive` leads because it is the only one that tells the holder what to
+ * do with a request they did not cause. Approval is a real-time act: every
+ * prompt should be the consequence of something the holder just did, so one
+ * that arrives on its own is the single clearest signal of an attack, and it
+ * needs no technical understanding at all to act on.
+ */
+const WATCH = ['watchLive', 'watch1', 'watch2', 'watch3'] as const;
 
 export function FirstConnectExplainer({
     appName,

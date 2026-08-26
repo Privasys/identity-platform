@@ -456,6 +456,8 @@
     "card4Aside": "You can make any app prove itself live, and you can withdraw access at any time.",
     "watchTitle": "What to watch for",
     "watchIntro": "Three things worth knowing before you allow anything.",
+    "watchLiveTitle": "A request you did not expect is a request to reject",
+    "watchLiveBody": "Approvals happen in real time. Every one should be the result of something you just did, like scanning a code or opening a link. If one arrives on its own, reject it.",
     "watch1Title": "A name is not proof",
     "watch1Body": "Anyone can call their app anything. The address and the developer are the parts that are hard to fake, and they are the parts to read.",
     "watch2Title": "“We could not check this app” is not a pass",

@@ -434,6 +434,8 @@
     "card4Aside": "Můžete kteroukoli aplikaci vyzvat, aby se prokázala živě, a přístup můžete kdykoli odebrat.",
     "watchTitle": "Na co si dát pozor",
     "watchIntro": "Tři věci, které je dobré vědět, než cokoli povolíte.",
+    "watchLiveTitle": "Žádost, kterou jste nečekali, je žádost k odmítnutí",
+    "watchLiveBody": "Schvalování probíhá v reálném čase. Každá žádost by měla být důsledkem něčeho, co jste právě udělali, třeba naskenování kódu nebo otevření odkazu. Pokud přijde sama od sebe, odmítněte ji.",
     "watch1Title": "Jméno není důkaz",
     "watch1Body": "Kdokoli může svou aplikaci pojmenovat jakkoli. Adresa a vývojář jsou části, které se padělají těžko, a právě ty si přečtěte.",
     "watch2Title": "„Tuto aplikaci se nepodařilo ověřit“ není schválení",

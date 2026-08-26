@@ -462,6 +462,8 @@
     "card4Aside": "Svaku aplikaciju možete zatražiti da se dokaže uživo, a pristup možete oduzeti u bilo kojem trenutku.",
     "watchTitle": "Na što paziti",
     "watchIntro": "Tri stvari koje je dobro znati prije nego bilo što dopustite.",
+    "watchLiveTitle": "Zahtjev koji niste očekivali zahtjev je koji treba odbiti",
+    "watchLiveBody": "Odobrenja se događaju u stvarnom vremenu. Svako bi trebalo biti posljedica nečega što ste upravo učinili, primjerice skeniranja koda ili otvaranja poveznice. Stigne li samo od sebe, odbijte ga.",
     "watch1Title": "Ime nije dokaz",
     "watch1Body": "Svatko svoju aplikaciju može nazvati kako želi. Adresa i razvojni programer dijelovi su koje je teško krivotvoriti i upravo njih treba pročitati.",
     "watch2Title": "„Nismo mogli provjeriti ovu aplikaciju” nije odobrenje",

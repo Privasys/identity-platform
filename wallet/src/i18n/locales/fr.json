@@ -434,6 +434,8 @@
     "card4Aside": "Vous pouvez demander à toute application de prouver son identité en direct, et vous pouvez retirer l'accès à tout moment.",
     "watchTitle": "À quoi faire attention",
     "watchIntro": "Trois choses à savoir avant d'autoriser quoi que ce soit.",
+    "watchLiveTitle": "Une demande inattendue est une demande à refuser",
+    "watchLiveBody": "Les approbations se font en temps réel. Chacune devrait résulter de quelque chose que vous venez de faire, comme scanner un code ou ouvrir un lien. Si une demande arrive toute seule, refusez-la.",
     "watch1Title": "Un nom n'est pas une preuve",
     "watch1Body": "N'importe qui peut donner n'importe quel nom à son application. L'adresse et le développeur sont les éléments difficiles à falsifier, et ce sont ceux qu'il faut lire.",
     "watch2Title": "« Nous n'avons pas pu vérifier cette application » n'est pas une réussite",

@@ -428,6 +428,8 @@
     "card4Aside": "Bármelyik alkalmazástól kérheti, hogy élőben igazolja magát, és a hozzáférést bármikor visszavonhatja.",
     "watchTitle": "Mire érdemes figyelni",
     "watchIntro": "Három dolog, amit érdemes tudni, mielőtt bármit engedélyez.",
+    "watchLiveTitle": "A nem várt kérés olyan kérés, amit el kell utasítani",
+    "watchLiveBody": "A jóváhagyások valós időben történnek. Mindegyiknek abból kell következnie, amit Ön épp tett, például egy kód beolvasásából vagy egy hivatkozás megnyitásából. Ha magától érkezik, utasítsa el.",
     "watch1Title": "A név nem bizonyíték",
     "watch1Body": "Bárki bárminek nevezheti az alkalmazását. A cím és a fejlesztő az, amit nehéz hamisítani, és éppen ezeket érdemes elolvasni.",
     "watch2Title": "A „Nem tudtuk ellenőrizni ezt az alkalmazást” nem jelent megfelelést",

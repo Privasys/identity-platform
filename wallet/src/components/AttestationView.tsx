@@ -132,14 +132,6 @@ export function truncateHex(hex: string): string {
     return `${hex.slice(0, 8)}…${hex.slice(-8)}`;
 }
 
-/** Date part of an X.509 timestamp, which is all a properties row has room for. */
-function shortDate(value?: string): string | undefined {
-    if (!value) return undefined;
-    const t = Date.parse(value);
-    if (Number.isNaN(t)) return value;
-    return new Date(t).toISOString().slice(0, 10);
-}
-
 export function AttestationView({
     attestation,
     rpId,
@@ -285,6 +277,17 @@ export function AttestationView({
                 <Text style={styles.sectionHeader}>{t('attestation.appSummary')}</Text>
                 <View style={styles.card}>
                     <View style={styles.cardBody}>
+                        {/* What the app IS, before what it is called and where
+                            it lives. A reader who knows nothing about this app
+                            gets the one line that orients them first. */}
+                        {listing?.tagline ? (
+                            <PropRow
+                                label={t('attestation.propDescription')}
+                                value={listing.tagline}
+                                wrap
+                                styles={styles}
+                            />
+                        ) : null}
                         <PropRow
                             label={t('attestation.propAddress')}
                             value={rpId}
@@ -319,7 +322,18 @@ export function AttestationView({
                             />
                         ) : null}
                         {tee ? (
-                            <PropRow label={t('attestation.propEnclave')} value={tee} styles={styles} last />
+                            <PropRow label={t('attestation.propEnclave')} value={tee} styles={styles} />
+                        ) : null}
+                        {/* Last row of the summary: the terms the holder is
+                            agreeing to sit with the app they are agreeing
+                            about, not buried among measurements. */}
+                        {listing?.privacy_url ? (
+                            <PropRow
+                                label={t('attestation.propPrivacy')}
+                                link={{ url: listing.privacy_url, label: t('attestation.openLink') }}
+                                styles={styles}
+                                last
+                            />
                         ) : null}
                     </View>
 
@@ -557,9 +571,6 @@ export function AttestationView({
                         {listing?.category ? (
                             <PropRow label={t('attestation.propCategory')} value={listing.category} styles={styles} />
                         ) : null}
-                        {listing?.tagline ? (
-                            <PropRow label={t('attestation.propDescription')} value={listing.tagline} wrap styles={styles} />
-                        ) : null}
                         {/* The release page for the running build. It carries the
                             version link when there is one, because for an app built
                             from a published image that page is the only published
@@ -602,13 +613,6 @@ export function AttestationView({
                                 styles={styles}
                             />
                         ) : null}
-                        {attestation.quote_verification_status ? (
-                            <PropRow
-                                label={t('attestation.quoteStatus')}
-                                value={attestation.quote_verification_status}
-                                styles={styles}
-                            />
-                        ) : null}
                         {attestation.workload_key_source ? (
                             <PropRow label={t('attestation.keySource')} value={attestation.workload_key_source} styles={styles} />
                         ) : null}
@@ -630,12 +634,6 @@ export function AttestationView({
                                 styles={styles}
                             />
                         ) : null}
-                        {attestation.cert_subject ? (
-                            <PropRow label={t('attestation.subject')} value={attestation.cert_subject} wrap styles={styles} />
-                        ) : null}
-                        {attestation.cert_not_after ? (
-                            <PropRow label={t('attestation.validUntil')} value={shortDate(attestation.cert_not_after)} styles={styles} />
-                        ) : null}
                         {(attestation.advisory_ids ?? []).map((id) => (
                             <PropRow key={id} label={t('attestation.advisories')} value={id} mono styles={styles} />
                         ))}
@@ -655,13 +653,6 @@ export function AttestationView({
                                     styles={styles}
                                 />
                             ))}
-                        {listing?.privacy_url ? (
-                            <PropRow
-                                label={t('attestation.propPrivacy')}
-                                link={{ url: listing.privacy_url, label: t('attestation.openLink') }}
-                                styles={styles}
-                            />
-                        ) : null}
                         {listing?.website_url ? (
                             <PropRow
                                 label={t('attestation.propWebsite')}
@@ -935,7 +926,11 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         paddingVertical: 15,
         borderRadius: 12,
         alignItems: 'center',
-        backgroundColor: p.approve,
+        // p.green, the brand colour the header and every other primary action
+        // in the wallet uses, NOT p.approve. Two greens a screen apart read as
+        // a mistake, and this is the one the rest of the product already
+        // speaks in.
+        backgroundColor: p.green,
     },
     continueButton: {
         flex: 1.35,

@@ -428,6 +428,8 @@
     "card4Aside": "Voit pyytää mitä tahansa sovellusta todistamaan itsensä reaaliajassa, ja voit peruuttaa käyttöoikeuden milloin tahansa.",
     "watchTitle": "Mihin kannattaa kiinnittää huomiota",
     "watchIntro": "Kolme asiaa, jotka on hyvä tietää ennen kuin sallit mitään.",
+    "watchLiveTitle": "Odottamaton pyyntö on pyyntö, joka kannattaa hylätä",
+    "watchLiveBody": "Hyväksynnät tapahtuvat reaaliajassa. Jokaisen pitäisi seurata jostakin, minkä juuri teit, kuten koodin skannaamisesta tai linkin avaamisesta. Jos pyyntö tulee itsestään, hylkää se.",
     "watch1Title": "Nimi ei ole todiste",
     "watch1Body": "Kuka tahansa voi nimetä sovelluksensa miksi haluaa. Osoite ja kehittäjä ovat niitä osia, joita on vaikea väärentää, ja juuri ne kannattaa lukea.",
     "watch2Title": "”Emme voineet tarkistaa tätä sovellusta” ei ole hyväksyntä",

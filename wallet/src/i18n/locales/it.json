@@ -434,6 +434,8 @@
     "card4Aside": "Puoi chiedere a qualsiasi app di identificarsi in diretta, e puoi revocare l'accesso in qualsiasi momento.",
     "watchTitle": "A cosa fare attenzione",
     "watchIntro": "Tre cose da sapere prima di consentire qualsiasi cosa.",
+    "watchLiveTitle": "Una richiesta che non ti aspettavi è una richiesta da rifiutare",
+    "watchLiveBody": "Le approvazioni avvengono in tempo reale. Ognuna dovrebbe derivare da qualcosa che hai appena fatto, come scansionare un codice o aprire un link. Se ne arriva una da sola, rifiutala.",
     "watch1Title": "Un nome non è una prova",
     "watch1Body": "Chiunque può chiamare la propria app come vuole. L'indirizzo e lo sviluppatore sono le parti difficili da falsificare, e sono quelle da leggere.",
     "watch2Title": "«Non siamo riusciti a verificare questa app» non è un via libera",

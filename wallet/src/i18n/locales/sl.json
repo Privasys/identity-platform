@@ -468,6 +468,8 @@
     "card4Aside": "Vsako aplikacijo lahko pozovete, da se izkaže v živo, dostop pa lahko kadar koli odvzamete.",
     "watchTitle": "Na kaj biti pozoren",
     "watchIntro": "Tri stvari, ki jih je dobro vedeti, preden karkoli dovolite.",
+    "watchLiveTitle": "Zahteva, ki je niste pričakovali, je zahteva za zavrnitev",
+    "watchLiveBody": "Odobritve potekajo v realnem času. Vsaka bi morala biti posledica nečesa, kar ste pravkar storili, na primer skeniranja kode ali odprtja povezave. Če pride sama od sebe, jo zavrnite.",
     "watch1Title": "Ime ni dokaz",
     "watch1Body": "Vsak lahko svojo aplikacijo poimenuje kakor koli. Naslov in razvijalec sta dela, ki ju je težko ponarediti, in prav ta velja prebrati.",
     "watch2Title": "»Te aplikacije nismo mogli preveriti« ni potrditev",

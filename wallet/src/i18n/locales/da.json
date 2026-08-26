@@ -428,6 +428,8 @@
     "card4Aside": "Du kan bede enhver app om at legitimere sig live, og du kan trække adgangen tilbage når som helst.",
     "watchTitle": "Hvad du skal holde øje med",
     "watchIntro": "Tre ting, det er værd at vide, før du tillader noget.",
+    "watchLiveTitle": "En anmodning du ikke ventede, er en anmodning du skal afvise",
+    "watchLiveBody": "Godkendelser sker i realtid. Hver enkelt bør være følgen af noget, du lige har gjort, som at scanne en kode eller åbne et link. Dukker en op af sig selv, så afvis den.",
     "watch1Title": "Et navn er ikke et bevis",
     "watch1Body": "Enhver kan kalde sin app hvad som helst. Adressen og udvikleren er de dele, der er svære at forfalske, og det er dem, du skal læse.",
     "watch2Title": "“Vi kunne ikke tjekke denne app” er ikke en godkendelse",

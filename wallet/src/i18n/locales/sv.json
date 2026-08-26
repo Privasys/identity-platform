@@ -428,6 +428,8 @@
     "card4Aside": "Du kan begära att vilken app som helst styrker sig i realtid, och du kan dra tillbaka åtkomsten när som helst.",
     "watchTitle": "Vad du bör se upp med",
     "watchIntro": "Tre saker värda att veta innan du tillåter något.",
+    "watchLiveTitle": "En begäran du inte väntade dig är en begäran att avvisa",
+    "watchLiveBody": "Godkännanden sker i realtid. Varje begäran ska vara följden av något du just gjort, som att skanna en kod eller öppna en länk. Dyker en upp av sig själv, avvisa den.",
     "watch1Title": "Ett namn är inget bevis",
     "watch1Body": "Vem som helst kan kalla sin app vad som helst. Adressen och utvecklaren är de delar som är svåra att förfalska, och det är dem du ska läsa.",
     "watch2Title": "”Vi kunde inte kontrollera appen” är inte ett godkännande",

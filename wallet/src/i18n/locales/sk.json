@@ -462,6 +462,8 @@
     "card4Aside": "Ktorúkoľvek aplikáciu môžete vyzvať, aby sa preukázala naživo, a prístup môžete kedykoľvek odobrať.",
     "watchTitle": "Na čo si dať pozor",
     "watchIntro": "Tri veci, ktoré je dobré vedieť, než čokoľvek povolíte.",
+    "watchLiveTitle": "Žiadosť, ktorú ste nečakali, je žiadosť na zamietnutie",
+    "watchLiveBody": "Schvaľovanie prebieha v reálnom čase. Každá žiadosť by mala byť dôsledkom niečoho, čo ste práve urobili, napríklad naskenovania kódu alebo otvorenia odkazu. Ak príde sama od seba, zamietnite ju.",
     "watch1Title": "Meno nie je dôkaz",
     "watch1Body": "Ktokoľvek môže svoju aplikáciu pomenovať akokoľvek. Adresa a vývojár sú časti, ktoré sa falšujú ťažko, a práve tie si prečítajte.",
     "watch2Title": "„Túto aplikáciu sa nepodarilo overiť“ nie je schválenie",

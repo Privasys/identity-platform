@@ -462,6 +462,8 @@
     "card4Aside": "Poți cere oricărei aplicații să se legitimeze în direct și poți retrage accesul oricând.",
     "watchTitle": "La ce să fii atent",
     "watchIntro": "Trei lucruri de știut înainte să permiți ceva.",
+    "watchLiveTitle": "O cerere la care nu te așteptai este o cerere de respins",
+    "watchLiveBody": "Aprobările au loc în timp real. Fiecare ar trebui să fie urmarea a ceva ce tocmai ai făcut, cum ar fi scanarea unui cod sau deschiderea unui link. Dacă apare de la sine, respinge-o.",
     "watch1Title": "Un nume nu este o dovadă",
     "watch1Body": "Oricine își poate numi aplicația cum vrea. Adresa și dezvoltatorul sunt părțile greu de falsificat și tocmai pe ele merită să le citești.",
     "watch2Title": "„Nu am putut verifica această aplicație” nu înseamnă că a trecut",

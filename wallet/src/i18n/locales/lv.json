@@ -462,6 +462,8 @@
     "card4Aside": "Jūs varat pieprasīt jebkurai lietotnei apliecināt sevi tiešraidē un varat atsaukt piekļuvi jebkurā laikā.",
     "watchTitle": "Kam pievērst uzmanību",
     "watchIntro": "Trīs lietas, ko vērts zināt, pirms kaut ko atļaujat.",
+    "watchLiveTitle": "Pieprasījums, ko negaidījāt, ir pieprasījums, kas jānoraida",
+    "watchLiveBody": "Apstiprinājumi notiek reāllaikā. Katram vajadzētu izrietēt no kaut kā, ko tikko izdarījāt, piemēram, koda skenēšanas vai saites atvēršanas. Ja tas parādās pats no sevis, noraidiet to.",
     "watch1Title": "Nosaukums nav pierādījums",
     "watch1Body": "Ikviens var nosaukt savu lietotni, kā vēlas. Adrese un izstrādātājs ir tās daļas, ko grūti viltot, un tieši tās ir vērts izlasīt.",
     "watch2Title": "„Mēs nevarējām pārbaudīt šo lietotni” nav apstiprinājums",

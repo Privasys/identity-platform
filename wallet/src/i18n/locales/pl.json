@@ -440,6 +440,8 @@
     "card4Aside": "Możesz zażądać od każdej aplikacji potwierdzenia tożsamości na żywo i w każdej chwili cofnąć dostęp.",
     "watchTitle": "Na co uważać",
     "watchIntro": "Trzy rzeczy, które warto wiedzieć, zanim na cokolwiek zezwolisz.",
+    "watchLiveTitle": "Nieoczekiwana prośba to prośba do odrzucenia",
+    "watchLiveBody": "Zatwierdzenia odbywają się w czasie rzeczywistym. Każde powinno wynikać z czynności wykonanej przed chwilą, na przykład zeskanowania kodu lub otwarcia linku. Jeśli prośba pojawi się sama, odrzuć ją.",
     "watch1Title": "Nazwa nie jest dowodem",
     "watch1Body": "Każdy może nazwać swoją aplikację dowolnie. Adres i twórca to elementy, które trudno podrobić, i to je należy czytać.",
     "watch2Title": "„Nie udało się sprawdzić tej aplikacji” to nie to samo co zaliczenie",

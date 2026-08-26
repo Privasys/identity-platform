@@ -456,6 +456,8 @@
     "card4Aside": "Võite paluda igal rakendusel end reaalajas tõendada ja saate juurdepääsu igal ajal tühistada.",
     "watchTitle": "Millele tähelepanu pöörata",
     "watchIntro": "Kolm asja, mida tasub teada, enne kui midagi lubate.",
+    "watchLiveTitle": "Ootamatu taotlus on taotlus, mis tuleb tagasi lükata",
+    "watchLiveBody": "Kinnitused toimuvad reaalajas. Iga taotlus peaks tulenema millestki, mida te just tegite, näiteks koodi skannimisest või lingi avamisest. Kui see tuleb iseenesest, lükake see tagasi.",
     "watch1Title": "Nimi ei ole tõend",
     "watch1Body": "Igaüks võib oma rakendust nimetada kuidas tahes. Aadress ja arendaja on osad, mida on raske võltsida, ja just neid tasub lugeda.",
     "watch2Title": "„Me ei saanud seda rakendust kontrollida” ei ole heakskiit",

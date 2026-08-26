@@ -474,6 +474,8 @@
     "card4Aside": "Is féidir leat a iarraidh ar aon aip í féin a chruthú beo, agus is féidir leat rochtain a tharraingt siar ag am ar bith.",
     "watchTitle": "Cad ar a mbeidh tú ag faire",
     "watchIntro": "Trí rud ar fiú iad a bheith ar eolas agat sula gceadaíonn tú aon rud.",
+    "watchLiveTitle": "Iarratas nach raibh tú ag súil leis, is iarratas é le diúltú",
+    "watchLiveBody": "Tarlaíonn ceadanna i bhfíor-am. Ba cheart go dtiocfadh gach ceann as rud éigin a rinne tú díreach anois, cosúil le cód a scanadh nó nasc a oscailt. Má thagann ceann uaidh féin, diúltaigh dó.",
     "watch1Title": "Ní cruthúnas é ainm",
     "watch1Body": "Is féidir le duine ar bith aon ainm a thabhairt ar a aip. Is iad an seoladh agus an forbróir na codanna atá deacair a bhrionnú, agus is iad sin is fiú a léamh.",
     "watch2Title": "Ní pas é „Níorbh fhéidir linn an aip seo a sheiceáil”",

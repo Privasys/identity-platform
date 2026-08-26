@@ -434,6 +434,8 @@
     "card4Aside": "Puedes pedir a cualquier aplicación que se identifique en directo, y puedes retirar el acceso en cualquier momento.",
     "watchTitle": "A qué prestar atención",
     "watchIntro": "Tres cosas que conviene saber antes de permitir nada.",
+    "watchLiveTitle": "Una solicitud que no esperabas es una solicitud que hay que rechazar",
+    "watchLiveBody": "Las aprobaciones ocurren en tiempo real. Cada una debería ser consecuencia de algo que acabas de hacer, como escanear un código o abrir un enlace. Si llega sola, recházala.",
     "watch1Title": "Un nombre no es una prueba",
     "watch1Body": "Cualquiera puede llamar a su aplicación como quiera. La dirección y el desarrollador son las partes difíciles de falsificar, y son las que hay que leer.",
     "watch2Title": "«No hemos podido comprobar esta aplicación» no es un aprobado",

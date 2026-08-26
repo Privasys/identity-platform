@@ -428,6 +428,8 @@
     "card4Aside": "Sie können jede App auffordern, sich live auszuweisen, und Sie können den Zugriff jederzeit entziehen.",
     "watchTitle": "Worauf Sie achten sollten",
     "watchIntro": "Drei Dinge, die Sie wissen sollten, bevor Sie etwas erlauben.",
+    "watchLiveTitle": "Eine unerwartete Anfrage ist eine Anfrage zum Ablehnen",
+    "watchLiveBody": "Freigaben geschehen in Echtzeit. Jede sollte die Folge von etwas sein, das Sie gerade getan haben, etwa einen Code scannen oder einen Link öffnen. Kommt eine von selbst, lehnen Sie sie ab.",
     "watch1Title": "Ein Name ist kein Beweis",
     "watch1Body": "Jeder kann seine App nennen, wie er will. Die Adresse und der Entwickler sind die Teile, die sich schwer fälschen lassen, und genau die sollten Sie lesen.",
     "watch2Title": "„Wir konnten diese App nicht prüfen“ ist kein Bestehen",

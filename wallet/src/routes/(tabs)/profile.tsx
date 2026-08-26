@@ -29,6 +29,7 @@ import {
     titleiseBiometric,
     DEFAULT_BIOMETRIC_LABEL_KEY,
 } from '@/services/biometrics';
+import { profileDisplayName } from '@/services/attributes';
 import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
@@ -64,6 +65,10 @@ export default function ProfileScreen() {
     // must re-render this label, and a stored string would not.
     const [bioKey, setBioKey] = useState(DEFAULT_BIOMETRIC_LABEL_KEY);
     const bioLabel = t(bioKey);
+    // Derived, not the stored field: displayName is seeded with the placeholder
+    // at setup and only an explicit Display Name overwrites it, so a wallet that
+    // imported a first and last name still called its owner "Privasys User".
+    const shownName = profile ? profileDisplayName(profile, t('profile.defaultDisplayName')) : '';
     useEffect(() => {
         let alive = true;
         void biometricLabelKey().then((l) => {
@@ -295,10 +300,10 @@ export default function ProfileScreen() {
                                     console.warn('[avatar] failed to load', profile.avatarUri, e.nativeEvent?.error)
                                 }
                             />
-                        ) : profile.displayName ? (
+                        ) : shownName ? (
                             <RNView style={styles.avatar}>
                                 <Text style={styles.avatarInitial}>
-                                    {profile.displayName.charAt(0).toUpperCase()}
+                                    {shownName.charAt(0).toUpperCase()}
                                 </Text>
                             </RNView>
                         ) : (
@@ -307,9 +312,7 @@ export default function ProfileScreen() {
                             </RNView>
                         )}
                     </RNView>
-                    <Text style={styles.profileName}>
-                        {profile.displayName || t('profile.defaultDisplayName')}
-                    </Text>
+                    <Text style={styles.profileName}>{shownName}</Text>
                     {profile.email ? (
                         <Text style={styles.profileEmail}>{profile.email}</Text>
                     ) : null}

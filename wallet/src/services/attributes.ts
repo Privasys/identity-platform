@@ -589,6 +589,39 @@ export function claimsToProfileAttributes(
     return attrs;
 }
 
+/**
+ * The name to show a human for this profile.
+ *
+ * The stored `displayName` is seeded with a generic placeholder at setup and is
+ * only ever overwritten by an explicit Display Name, so a wallet that imported
+ * a first and last name from Google still introduced its owner as "Privasys
+ * User" (2026-08-26). Derived rather than written back: the underlying
+ * attributes stay the single source of truth, and editing one is reflected
+ * everywhere without a migration.
+ *
+ * Precedence: an explicit Display Name, then first + last name, then whatever
+ * is stored. `fallback` is the localised placeholder, passed in because this
+ * module has no translator.
+ */
+export function profileDisplayName(profile: UserProfile, fallback: string): string {
+    // The `name` ATTRIBUTE, not getProfileValue('name'): `name` maps to the
+    // `displayName` profile field, which getProfileValue prefers, and that field
+    // holds the placeholder on every wallet that has never set one. Going
+    // through it made this step always "explicit" and always the placeholder.
+    // Both writers of an explicit Display Name (the import sync and the Personal
+    // Data editor) set the attribute as well as the field, so reading the
+    // attribute loses nothing.
+    const explicit = profile.attributes?.find((a) => a.key === 'name')?.value?.trim();
+    if (explicit) return explicit;
+
+    const given = getProfileValue(profile, 'given_name')?.trim();
+    const family = getProfileValue(profile, 'family_name')?.trim();
+    const full = [given, family].filter(Boolean).join(' ');
+    if (full) return full;
+
+    return profile.displayName?.trim() || fallback;
+}
+
 /** Human-friendly name for a provider key. */
 function providerDisplayName(provider: string): string {
     const names: Record<string, string> = {

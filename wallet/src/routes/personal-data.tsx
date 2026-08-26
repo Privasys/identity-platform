@@ -29,7 +29,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { CANONICAL_ATTRIBUTES } from '@/services/attributes';
+import { CANONICAL_ATTRIBUTES, isGovVerified } from '@/services/attributes';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
 export default function PersonalDataScreen() {
@@ -104,8 +104,17 @@ export default function PersonalDataScreen() {
     };
 
     const existingKeys = new Set(profile.attributes.map((a) => a.key));
+    // Government-verified keys are NOT offered for manual entry. A passport
+    // number, a document expiry or an "18 or older" proof means something only
+    // because a chip signed for it; letting someone type one produces a field
+    // that looks like the real thing on a screen that is otherwise about
+    // provenance. They arrive from the identity verifier or not at all, so the
+    // chips list only what a person can legitimately assert about themselves
+    // (2026-08-26). Date of Birth and Nationality stay: those are self-asserted
+    // keys with gov-verified twins (birthdate_id, nationality_id), and the
+    // disclosure path already knows the difference.
     const missingAttributes = CANONICAL_ATTRIBUTES.filter(
-        (a) => !existingKeys.has(a.key) && a.key !== 'picture',
+        (a) => !existingKeys.has(a.key) && a.key !== 'picture' && !isGovVerified(a.key),
     );
 
     // Logical display order, not insertion order: keep related attributes together

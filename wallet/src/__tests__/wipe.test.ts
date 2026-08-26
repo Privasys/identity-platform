@@ -49,6 +49,18 @@ jest.mock('@/services/platform-token', () => ({
     }),
 }));
 
+// Hardware keys live outside SecureStore, so they get their own ledger.
+const mockHardwareKeys = new Set<string>();
+jest.mock('../../modules/native-keys/src/index', () => ({
+    deleteKey: jest.fn(async (alias: string) => {
+        mockHardwareKeys.delete(alias);
+    }),
+    sign: jest.fn(),
+    generateKey: jest.fn(),
+    getPublicKey: jest.fn(),
+    keyExists: jest.fn(async () => true),
+}));
+
 // sovereign.ts is exercised for real (it owns two of the keys the wipe must
 // clear), so give it the same test-only randomness sovereign.test.ts uses.
 jest.mock('expo-crypto', () => ({
@@ -127,6 +139,8 @@ describe('wipeWallet', () => {
             {},
         );
         useSettingsStore.getState().setSeenFirstConnect(true);
+        mockHardwareKeys.add('privasys-wallet-default');
+        mockHardwareKeys.add('alias-1');
 
         await wipeWallet();
 
@@ -148,6 +162,14 @@ describe('wipeWallet', () => {
         // The explainer must play again for the first connection of the next
         // identity on this device.
         expect(useSettingsStore.getState().seenFirstConnect).toBe(false);
+
+        // The device signing key and every credential's key. This is the ONLY
+        // action allowed to delete them, so a wipe that left them behind would
+        // hand the next identity a key it never generated: on one tester's
+        // iPhone an inherited key the hardware had retired made the identity
+        // verifier permanently unreachable, and the device key's public half
+        // travels in the WIA, linking two identities on one phone.
+        expect([...mockHardwareKeys]).toEqual([]);
     });
 
     it('leaves nothing behind in secure storage', async () => {

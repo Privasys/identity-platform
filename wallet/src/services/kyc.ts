@@ -32,7 +32,7 @@ import { useSettingsStore } from '@/stores/settings';
 import {
     ATTRIBUTE_MAP, attributeLabel, certifiedFieldFor, marketplaceKeyFor, setProfileValue
 } from '@/services/attributes';
-import { deriveAppSub } from '@/services/did';
+import { deriveAppSub, signWithDeviceKey } from '@/services/did';
 import { derToRawEcdsa } from '@/services/encauth';
 import { useProfileStore, type ProfileAttribute, type VerificationRecord } from '@/stores/profile';
 import {
@@ -443,7 +443,15 @@ async function fillCredentialFields(
             : {});
 
     const out = { ...body };
-    for (const [name, marker] of Object.entries(fields)) {
+    // The WIA is minted FIRST, whatever order the manifest lists the fields in.
+    // Enrolling is the step that signs, so it is the step that discovers a key
+    // the hardware has retired; doing it first means the call fails with that
+    // reason rather than with a public key read from a key that cannot sign.
+    const ordered = Object.entries(fields).sort(
+        ([, a], [, b]) =>
+            Number(b === 'wallet_instance_attestation') - Number(a === 'wallet_instance_attestation'),
+    );
+    for (const [name, marker] of ordered) {
         if (out[name] !== undefined && out[name] !== '') continue;
         if (marker === 'wallet_instance_attestation') {
             // ENROL here, do not merely read the cache: a WIA lives 24-72h, so
@@ -750,7 +758,7 @@ async function holderSignature(
     ts: number
 ): Promise<string> {
     const msg = new TextEncoder().encode(canonicalJson({ ivr: jti, nonce, rp_id: rpId, ts }));
-    const { signature } = await NativeKeys.sign(HOLDER_KEY_ID, b64uBytes(msg));
+    const signature = await signWithDeviceKey(b64uBytes(msg), HOLDER_KEY_ID);
     const raw = derToRawEcdsa(b64uToBytes(signature));
     if (raw.length !== 64) throw new Error('holder_sig must be 64 bytes');
     return b64uBytes(raw);

@@ -29,8 +29,8 @@
 
 import { base64urlToBytes, bytesToBase64url } from '@/utils/encoding';
 
-import * as NativeKeys from '../../modules/native-keys/src/index';
 import { derToRawEcdsa } from './encauth';
+import { signWithDeviceKey } from './did';
 import { getValidWia } from './wia';
 
 /** Same stable device holder key the WIA binds (wia.ts / kyc.ts). */
@@ -71,9 +71,9 @@ export async function walletCallHeaders(
 
         // The runtime verifies an ES256 JWS, so the DER signature the
         // platform keystore returns is converted to the JOSE raw R||S form.
-        const { signature } = await NativeKeys.sign(
-            HOLDER_KEY_ID,
-            bytesToBase64url(encoder.encode(signingInput))
+        const signature = await signWithDeviceKey(
+            bytesToBase64url(encoder.encode(signingInput)),
+            HOLDER_KEY_ID
         );
         const raw = derToRawEcdsa(base64urlToBytes(signature));
         if (raw.length !== 64) throw new Error('holder signature must be 64 bytes');

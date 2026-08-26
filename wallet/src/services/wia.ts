@@ -25,6 +25,7 @@ import { base64urlToBytes, bytesToBase64url } from '@/utils/encoding';
 import * as SecureStore from '@/utils/storage';
 
 import * as AppAttest from '../../modules/app-attest/src/index';
+import { signWithDeviceKey } from './did';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import { ensurePrivasysSession } from './privasys-id';
 
@@ -132,12 +133,14 @@ async function enrol(): Promise<string | null> {
             {}
         );
 
-        const holderPub = (await NativeKeys.getPublicKey(HOLDER_KEY_ID)).publicKey; // b64url SEC1
-
         // Proof of possession: sign the fresh challenge with the holder key.
-        // NativeKeys.sign takes base64url data and signs its decoded bytes (with
-        // an internal SHA-256), which is exactly what the IdP verifies.
-        const holderSig = (await NativeKeys.sign(HOLDER_KEY_ID, challenge)).signature;
+        // signWithDeviceKey takes base64url data and signs its decoded bytes
+        // (with an internal SHA-256), which is exactly what the IdP verifies.
+        //
+        // Signed first so a key the hardware has retired is reported as such,
+        // rather than as a public key read from a key that cannot sign.
+        const holderSig = await signWithDeviceKey(challenge, HOLDER_KEY_ID);
+        const holderPub = (await NativeKeys.getPublicKey(HOLDER_KEY_ID)).publicKey; // b64url SEC1
 
         // Never post a half-built proof. The iOS module used to report failure
         // by RETURNING an error object, so these came through as undefined,

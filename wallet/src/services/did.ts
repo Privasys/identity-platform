@@ -106,6 +106,102 @@ export async function ensureDeviceKey(keyId: string = DEFAULT_KEY_ID): Promise<v
     await NativeKeys.generateKey(keyId, true);
 }
 
+/**
+ * Does this message mean the key exists but can never be used again?
+ *
+ * A biometric-gated key is bound to the biometric enrolment that existed when
+ * it was created. Re-enrol Face ID (or a fingerprint) and the key is dead:
+ * still listed, its public key still readable, and every signature refused for
+ * ever. Because `keyExists` and the native `generateKey` both treat a readable
+ * public key as proof of a working key, nothing ever replaced it, and the
+ * device could not produce a holder proof again on that install.
+ *
+ * That is what put the identity verifier out of reach on a tester's iPhone:
+ * CryptoTokenKit error -3 on every WIA enrolment, while FIDO2 kept working
+ * because its credential keys were younger than the enrolment change
+ * (2026-08-26).
+ *
+ * Matched NARROWLY, and the exclusions matter more than the inclusions: a
+ * cancelled prompt, a failed match, or "authentication needed" are ordinary
+ * outcomes of asking a human for a fingerprint, and must never be mistaken for
+ * a key worth abandoning.
+ */
+function isUnusableKeyError(message: string): boolean {
+    // iOS: the Secure Enclave refuses the operation outright.
+    if (/CryptoTokenKit error -3\b/.test(message)) return true;
+    // Either platform: the entry is gone from under us.
+    if (/key not found/i.test(message)) return true;
+    // Android: setInvalidatedByBiometricEnrollment, the same cause by name.
+    if (/KeyPermanentlyInvalidated/i.test(message)) return true;
+    return false;
+}
+
+/**
+ * The device's signing key exists but the hardware will not use it again.
+ *
+ * Carries its own remedy, because there is exactly one: erase the wallet and
+ * set it up afresh. Clearing all data is the ONLY thing that deletes this key,
+ * so a flow that hits this cannot fix itself, and must say what will.
+ */
+export class DeviceKeyUnusableError extends Error {
+    /**
+     * The platform's own words, kept for the log.
+     *
+     * NOT named `detail`: the KYC screen renders `e.detail || e.message`, so a
+     * field with that name would put "CryptoTokenKit error -3" in front of the
+     * user in place of the sentence that tells them what to do.
+     */
+    readonly platformMessage: string;
+    constructor(platformMessage: string) {
+        super(
+            "This device's signing key can no longer be used, which usually means " +
+            'the phone\'s fingerprint or face enrolment changed after the wallet was ' +
+            'set up. Clear all data in Profile and set the wallet up again to fix it.'
+        );
+        this.name = 'DeviceKeyUnusableError';
+        this.platformMessage = platformMessage;
+    }
+}
+
+/**
+ * Delete the device's signing key.
+ *
+ * The ONLY caller is the wallet wipe (services/wipe.ts). Nothing else may
+ * delete this key: it is the root of the device DID and of every holder proof,
+ * so destroying it is a decision for the person holding the phone, taken once,
+ * deliberately, through "Clear All Data". A failure elsewhere is never
+ * evidence enough to throw it away, however confident the failure looks.
+ */
+export async function deleteDeviceKey(keyId: string = DEFAULT_KEY_ID): Promise<void> {
+    await NativeKeys.deleteKey(keyId);
+}
+
+/**
+ * Sign with the device key.
+ *
+ * Every holder proof goes through here so that one place decides what a
+ * refusal means. A key the hardware has retired surfaces as
+ * {@link DeviceKeyUnusableError}, which names the only remedy; everything else
+ * propagates untouched, because a cancelled prompt is not a broken key.
+ *
+ * @param dataB64url base64url of the bytes to sign (hashed with SHA-256 by the
+ *   platform, on both platforms).
+ * @returns base64url of the DER ECDSA signature.
+ */
+export async function signWithDeviceKey(
+    dataB64url: string,
+    keyId: string = DEFAULT_KEY_ID
+): Promise<string> {
+    try {
+        return (await NativeKeys.sign(keyId, dataB64url)).signature;
+    } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (!isUnusableKeyError(message)) throw e;
+        console.warn(`[did] device key ${keyId} refused to sign: ${message}`);
+        throw new DeviceKeyUnusableError(message);
+    }
+}
+
 export async function generateDid(keyId: string = DEFAULT_KEY_ID): Promise<string> {
     const keyInfo = await NativeKeys.getPublicKey(keyId);
     const pubkeyBytes = base64urlToBytes(keyInfo.publicKey);

@@ -219,7 +219,7 @@ export function AttestationView({
         : hasAttributes ? 'attestation.asksSignInAndDataUnnamed' : 'attestation.asksSignInUnnamed';
 
     const workloadHash = attestation.workload_code_hash;
-    const source = sourceUrl(listing, releases?.workload?.url);
+    const source = sourceUrl(listing);
     const tee = teeLabel(attestation.tee_type);
 
     return (
@@ -503,8 +503,25 @@ export function AttestationView({
                         {listing?.tagline ? (
                             <PropRow label={t('attestation.propDescription')} value={listing.tagline} wrap styles={styles} />
                         ) : null}
-                        {releases?.workload?.label ? (
-                            <PropRow label={t('attestation.propVersion')} value={releases.workload.label} styles={styles} />
+                        {/* The release page for the running build. It carries the
+                            version link when there is one, because for an app built
+                            from a published image that page is the only published
+                            artefact there is, and it is a package page rather than
+                            source. Calling it a version is true; calling it source
+                            code would not be. */}
+                        {releases?.workload?.label || releases?.workload?.url ? (
+                            <PropRow
+                                label={t('attestation.propVersion')}
+                                {...(releases.workload?.url
+                                    ? {
+                                        link: {
+                                            url: releases.workload.url,
+                                            label: releases.workload.label || t('attestation.openLink'),
+                                        },
+                                    }
+                                    : { value: releases.workload?.label })}
+                                styles={styles}
+                            />
                         ) : null}
                         {listing?.reproducibility?.build_run_url ? (
                             <PropRow

@@ -15,7 +15,11 @@ import { slugForHost, sourceLabel, sourceUrl, type StoreListing } from '@/servic
 
 describe('slugForHost', () => {
     it('takes the first label of an app host', () => {
-        expect(slugForHost('drive.apps.privasys.org')).toBe('drive');
+        // The live host and slug for Privasys Drive, checked against the store
+        // on 2026-08-26. The two have to agree or the app silently falls back
+        // to "not published" on its own approval screen, which is exactly the
+        // bug this pins: the enclave host is privasys-drive.apps…, NOT drive.apps…
+        expect(slugForHost('privasys-drive.apps.privasys.org')).toBe('privasys-drive');
         expect(slugForHost('web-search-brave.apps-test.privasys.org')).toBe('web-search-brave');
     });
 
@@ -40,25 +44,29 @@ describe('slugForHost', () => {
 });
 
 describe('sourceUrl', () => {
-    const withCommit = { reproducibility: { commit_url: 'https://github.com/Privasys/drive' } } as StoreListing;
-
-    it('prefers the store commit URL', () => {
-        expect(sourceUrl(withCommit, 'https://github.com/Privasys/other/releases/tag/v1')).toBe(
-            'https://github.com/Privasys/drive',
-        );
+    it('returns the store commit URL', () => {
+        const listing = { reproducibility: { commit_url: 'https://github.com/Privasys/drive' } } as StoreListing;
+        expect(sourceUrl(listing)).toBe('https://github.com/Privasys/drive');
     });
 
-    it('falls back to the published release when the store has no commit', () => {
-        // Real case: an app built from a published package rather than source
-        // has no commit_url in its listing (verified against the live store),
-        // so the release page is the only reviewable link there is.
-        expect(sourceUrl({ reproducibility: {} } as StoreListing, 'https://github.com/Privasys/x/releases')).toBe(
-            'https://github.com/Privasys/x/releases',
-        );
+    it('is undefined for an app built from a published image', () => {
+        // The real shape of Privasys Drive in the live store: source_type
+        // "package", a digest-pinned container image, and no commit_url. The
+        // row must DISAPPEAR rather than borrow the release URL, because that
+        // one can be a GHCR package page and "Source code" pointing at a
+        // package page is a claim we cannot support on a trust screen.
+        const listing = {
+            reproducibility: {
+                source_type: 'package',
+                container_image: 'ghcr.io/privasys/drive@sha256:892d8e8b',
+                enclave_os_release_url: 'https://github.com/Privasys/enclave-os-virtual/releases',
+            },
+        } as StoreListing;
+        expect(sourceUrl(listing)).toBeUndefined();
     });
 
-    it('is undefined when neither is known, so the row is dropped', () => {
-        expect(sourceUrl(null, undefined)).toBeUndefined();
+    it('is undefined with no listing at all', () => {
+        expect(sourceUrl(null)).toBeUndefined();
     });
 });
 

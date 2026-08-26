@@ -84,15 +84,22 @@ export async function fetchStoreListing(host: string): Promise<StoreListing | nu
 }
 
 /**
- * Repository / source link for an app, preferring the store's own commit URL
- * and falling back to the published release page the attestation already
- * resolves. Returns undefined when neither is known, and the row is dropped.
+ * Repository link for an app: the store's commit URL, and nothing else.
+ *
+ * It deliberately does NOT fall back to the attested release URL. That URL is
+ * "a GitHub release page or a GHCR package page" (see WorkloadRelease), and an
+ * app built from a published image has only the latter. Labelling a container
+ * package page "Source code" on a screen whose whole job is to let someone
+ * check what is running would be a claim we cannot support: a package page
+ * shows a digest, not the code that produced it.
+ *
+ * Verified against the live store on 2026-08-26: Privasys Drive is
+ * `source_type: package` with no commit_url, so this correctly returns
+ * undefined and the row is dropped. The release link still appears, labelled
+ * as a version, in All other details.
  */
-export function sourceUrl(
-    listing: StoreListing | null | undefined,
-    releaseUrl?: string,
-): string | undefined {
-    return listing?.reproducibility?.commit_url || releaseUrl || undefined;
+export function sourceUrl(listing: StoreListing | null | undefined): string | undefined {
+    return listing?.reproducibility?.commit_url || undefined;
 }
 
 /**

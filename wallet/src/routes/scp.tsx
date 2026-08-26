@@ -88,9 +88,7 @@ export default function ScpRedirect() {
                 if (cancelled) return;
                 setShortRouting(true);
                 const json = JSON.stringify(desc);
-                if (desc.apps && Array.isArray(desc.apps)) {
-                    router.replace({ pathname: '/batch-connect', params: { payload: json } });
-                } else if (desc.origin && desc.sessionId && desc.rpId) {
+                if (desc.origin && desc.sessionId && desc.rpId) {
                     router.replace({ pathname: '/connect', params: { payload: json, source: 'qr' } });
                 } else {
                     setShortError(t('scp.missingFields'));
@@ -114,9 +112,6 @@ export default function ScpRedirect() {
             const json = atob(padded);
             const parsed = JSON.parse(json);
 
-            if (parsed.apps && Array.isArray(parsed.apps)) {
-                return { pathname: '/batch-connect' as const, params: { payload: json } };
-            }
             if (parsed.origin && parsed.sessionId && parsed.rpId) {
                 return { pathname: '/connect' as const, params: { payload: json, source: 'qr' as const } };
             }

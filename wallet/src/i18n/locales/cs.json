@@ -159,33 +159,6 @@
     "openLink": "Otevřít"
   },
 
-  "batch": {
-    "title": "Hromadné přihlášení",
-    "noPayload": "Nebyla přijata žádná hromadná data",
-    "invalidPayload": "Neplatná hromadná data",
-    "verificationFailed": "Ověření se nezdařilo",
-    "authCancelled": "Ověření bylo zrušeno",
-    "verifyingEnclaves_one": "Ověřuje se {{count}} enkláva...",
-    "verifyingEnclaves_few": "Ověřují se {{count}} enklávy...",
-    "verifyingEnclaves_other": "Ověřuje se {{count}} enkláv...",
-    "appsVerified_one": "{{count}} aplikace ověřena",
-    "appsVerified_few": "{{count}} aplikace ověřeny",
-    "appsVerified_other": "{{count}} aplikací ověřeno",
-    "appsAuthenticated_one": "{{count}} aplikace ověřena.",
-    "appsAuthenticated_few": "{{count}} aplikace ověřeny.",
-    "appsAuthenticated_other": "{{count}} aplikací ověřeno.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Platná",
-    "invalid": "Neplatná",
-    "challengedSuffix": "  ·  ⚡ Vyzvána",
-    "challengeChip": "⚡ Vyzvat",
-    "rejectAll": "Odmítnout vše",
-    "approveAll": "Schválit vše",
-    "waitingBiometrics": "Čeká se na biometrii...",
-    "authenticating": "Probíhá ověřování...",
-    "allConnected": "Vše připojeno",
-    "failed": "Hromadné ověření se nezdařilo"
-  },
 
   "biometric": {
     "faceId": "Face ID",

@@ -159,30 +159,6 @@
     "openLink": "Openen"
   },
 
-  "batch": {
-    "title": "Batch-aanmelding",
-    "noPayload": "Geen batchpayload ontvangen",
-    "invalidPayload": "Ongeldige batchpayload",
-    "verificationFailed": "Verificatie mislukt",
-    "authCancelled": "Authenticatie geannuleerd",
-    "verifyingEnclaves_one": "{{count}} enclave wordt geverifieerd...",
-    "verifyingEnclaves_other": "{{count}} enclaves worden geverifieerd...",
-    "appsVerified_one": "{{count}} app geverifieerd",
-    "appsVerified_other": "{{count}} apps geverifieerd",
-    "appsAuthenticated_one": "{{count}} app geauthenticeerd.",
-    "appsAuthenticated_other": "{{count}} apps geauthenticeerd.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Geldig",
-    "invalid": "Ongeldig",
-    "challengedSuffix": "  ·  ⚡ Uitgedaagd",
-    "challengeChip": "⚡ Uitdagen",
-    "rejectAll": "Alles weigeren",
-    "approveAll": "Alles goedkeuren",
-    "waitingBiometrics": "Wachten op biometrie...",
-    "authenticating": "Authenticeren...",
-    "allConnected": "Alles verbonden",
-    "failed": "Batch-authenticatie mislukt"
-  },
 
   "biometric": {
     "faceId": "Face ID",

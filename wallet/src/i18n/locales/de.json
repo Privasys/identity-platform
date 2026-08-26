@@ -159,30 +159,6 @@
     "openLink": "Öffnen"
   },
 
-  "batch": {
-    "title": "Sammel-Anmeldung",
-    "noPayload": "Keine Sammel-Nutzdaten empfangen",
-    "invalidPayload": "Ungültige Sammel-Nutzdaten",
-    "verificationFailed": "Prüfung fehlgeschlagen",
-    "authCancelled": "Authentifizierung abgebrochen",
-    "verifyingEnclaves_one": "{{count}} Enklave wird geprüft...",
-    "verifyingEnclaves_other": "{{count}} Enklaven werden geprüft...",
-    "appsVerified_one": "{{count}} App geprüft",
-    "appsVerified_other": "{{count}} Apps geprüft",
-    "appsAuthenticated_one": "{{count}} App authentifiziert.",
-    "appsAuthenticated_other": "{{count}} Apps authentifiziert.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Gültig",
-    "invalid": "Ungültig",
-    "challengedSuffix": "  ·  ⚡ Herausgefordert",
-    "challengeChip": "⚡ Herausfordern",
-    "rejectAll": "Alle ablehnen",
-    "approveAll": "Alle freigeben",
-    "waitingBiometrics": "Warten auf Biometrie...",
-    "authenticating": "Authentifizierung...",
-    "allConnected": "Alle verbunden",
-    "failed": "Sammel-Authentifizierung fehlgeschlagen"
-  },
 
   "biometric": {
     "faceId": "Face ID",

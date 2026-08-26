@@ -159,33 +159,6 @@
     "openLink": "Abrir"
   },
 
-  "batch": {
-    "title": "Inicio de sesión por lotes",
-    "noPayload": "No se ha recibido ninguna carga por lotes",
-    "invalidPayload": "Carga por lotes no válida",
-    "verificationFailed": "Error de verificación",
-    "authCancelled": "Autenticación cancelada",
-    "verifyingEnclaves_one": "Verificando {{count}} enclave...",
-    "verifyingEnclaves_many": "Verificando {{count}} enclaves...",
-    "verifyingEnclaves_other": "Verificando {{count}} enclaves...",
-    "appsVerified_one": "{{count}} aplicación verificada",
-    "appsVerified_many": "{{count}} aplicaciones verificadas",
-    "appsVerified_other": "{{count}} aplicaciones verificadas",
-    "appsAuthenticated_one": "{{count}} aplicación autenticada.",
-    "appsAuthenticated_many": "{{count}} aplicaciones autenticadas.",
-    "appsAuthenticated_other": "{{count}} aplicaciones autenticadas.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Válida",
-    "invalid": "No válida",
-    "challengedSuffix": "  ·  ⚡ Desafiado",
-    "challengeChip": "⚡ Desafiar",
-    "rejectAll": "Rechazar todo",
-    "approveAll": "Aprobar todo",
-    "waitingBiometrics": "Esperando la biometría...",
-    "authenticating": "Autenticando...",
-    "allConnected": "Todo conectado",
-    "failed": "Error en la autenticación por lotes"
-  },
 
   "biometric": {
     "faceId": "Face ID",

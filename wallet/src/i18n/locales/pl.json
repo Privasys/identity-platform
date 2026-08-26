@@ -159,36 +159,6 @@
     "openLink": "Otwórz"
   },
 
-  "batch": {
-    "title": "Logowanie zbiorcze",
-    "noPayload": "Nie otrzymano danych zbiorczych",
-    "invalidPayload": "Nieprawidłowe dane zbiorcze",
-    "verificationFailed": "Weryfikacja nie powiodła się",
-    "authCancelled": "Uwierzytelnianie anulowane",
-    "verifyingEnclaves_one": "Weryfikowanie {{count}} enklawy...",
-    "verifyingEnclaves_few": "Weryfikowanie {{count}} enklaw...",
-    "verifyingEnclaves_many": "Weryfikowanie {{count}} enklaw...",
-    "verifyingEnclaves_other": "Weryfikowanie {{count}} enklaw...",
-    "appsVerified_one": "Zweryfikowano {{count}} aplikację",
-    "appsVerified_few": "Zweryfikowano {{count}} aplikacje",
-    "appsVerified_many": "Zweryfikowano {{count}} aplikacji",
-    "appsVerified_other": "Zweryfikowano {{count}} aplikacji",
-    "appsAuthenticated_one": "Uwierzytelniono {{count}} aplikację.",
-    "appsAuthenticated_few": "Uwierzytelniono {{count}} aplikacje.",
-    "appsAuthenticated_many": "Uwierzytelniono {{count}} aplikacji.",
-    "appsAuthenticated_other": "Uwierzytelniono {{count}} aplikacji.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Prawidłowa",
-    "invalid": "Nieprawidłowa",
-    "challengedSuffix": "  ·  ⚡ Zakwestionowana",
-    "challengeChip": "⚡ Zakwestionuj",
-    "rejectAll": "Odrzuć wszystko",
-    "approveAll": "Zatwierdź wszystko",
-    "waitingBiometrics": "Oczekiwanie na biometrię...",
-    "authenticating": "Uwierzytelnianie...",
-    "allConnected": "Wszystko połączone",
-    "failed": "Uwierzytelnianie zbiorcze nie powiodło się"
-  },
 
   "biometric": {
     "faceId": "Face ID",

@@ -159,30 +159,6 @@
     "openLink": "Öppna"
   },
 
-  "batch": {
-    "title": "Batchinloggning",
-    "noPayload": "Ingen batchnyttolast togs emot",
-    "invalidPayload": "Ogiltig batchnyttolast",
-    "verificationFailed": "Verifieringen misslyckades",
-    "authCancelled": "Autentiseringen avbröts",
-    "verifyingEnclaves_one": "Verifierar {{count}} enklav...",
-    "verifyingEnclaves_other": "Verifierar {{count}} enklaver...",
-    "appsVerified_one": "{{count}} app verifierad",
-    "appsVerified_other": "{{count}} appar verifierade",
-    "appsAuthenticated_one": "{{count}} app autentiserad.",
-    "appsAuthenticated_other": "{{count}} appar autentiserade.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Giltig",
-    "invalid": "Ogiltig",
-    "challengedSuffix": "  ·  ⚡ Utmanad",
-    "challengeChip": "⚡ Utmana",
-    "rejectAll": "Avvisa alla",
-    "approveAll": "Godkänn alla",
-    "waitingBiometrics": "Väntar på biometri...",
-    "authenticating": "Autentiserar...",
-    "allConnected": "Allt anslutet",
-    "failed": "Batchautentiseringen misslyckades"
-  },
 
   "biometric": {
     "faceId": "Face ID",

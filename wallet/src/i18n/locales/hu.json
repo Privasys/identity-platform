@@ -159,30 +159,6 @@
     "openLink": "Megnyitás"
   },
 
-  "batch": {
-    "title": "Kötegelt bejelentkezés",
-    "noPayload": "Nem érkezett kötegelt adat",
-    "invalidPayload": "Érvénytelen kötegelt adat",
-    "verificationFailed": "Az ellenőrzés sikertelen",
-    "authCancelled": "A hitelesítés megszakítva",
-    "verifyingEnclaves_one": "{{count}} enkláv ellenőrzése...",
-    "verifyingEnclaves_other": "{{count}} enkláv ellenőrzése...",
-    "appsVerified_one": "{{count}} alkalmazás ellenőrizve",
-    "appsVerified_other": "{{count}} alkalmazás ellenőrizve",
-    "appsAuthenticated_one": "{{count}} alkalmazás hitelesítve.",
-    "appsAuthenticated_other": "{{count}} alkalmazás hitelesítve.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Érvényes",
-    "invalid": "Érvénytelen",
-    "challengedSuffix": "  ·  ⚡ Kihívva",
-    "challengeChip": "⚡ Kihívás",
-    "rejectAll": "Összes elutasítása",
-    "approveAll": "Összes jóváhagyása",
-    "waitingBiometrics": "Várakozás a biometriára...",
-    "authenticating": "Hitelesítés...",
-    "allConnected": "Minden csatlakoztatva",
-    "failed": "A kötegelt hitelesítés sikertelen"
-  },
 
   "biometric": {
     "faceId": "Face ID",

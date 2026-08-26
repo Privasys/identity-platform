@@ -132,19 +132,6 @@ export interface AuthEvents {
     onError?: (error: Error) => void;
 }
 
-/** Configuration for one app in a batch auth request. */
-export interface BatchAppConfig {
-    rpId: string;
-    brokerUrl: string;
-    attestation?: 'required' | 'preferred' | 'none';
-}
-
-/** Result of a batch authentication (one entry per app). */
-export interface BatchAuthResult {
-    results: AuthResult[];
-    /** Apps that failed authentication. */
-    errors: Array<{ rpId: string; error: string }>;
-}
 
 /** The current state of an auth request. */
 export type AuthState =

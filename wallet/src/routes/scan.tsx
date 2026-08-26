@@ -108,16 +108,6 @@ export default function TabScanScreen() {
                 try {
                     const parsed = JSON.parse(json);
 
-                    // Batch payload: { origin, sessionId, brokerUrl, apps: [...] }
-                    if (parsed.apps && Array.isArray(parsed.apps)) {
-                        navigating.current = true;
-                        router.push({
-                            pathname: '/batch-connect',
-                            params: { payload: json }
-                        });
-                        return true;
-                    }
-
                     // Single-app payload: { origin, sessionId, rpId, brokerUrl }
                     if (parsed.origin && parsed.sessionId && parsed.rpId) {
                         navigating.current = true;

@@ -159,33 +159,6 @@
     "openLink": "Ouvrir"
   },
 
-  "batch": {
-    "title": "Connexion groupée",
-    "noPayload": "Aucune charge utile groupée reçue",
-    "invalidPayload": "Charge utile groupée invalide",
-    "verificationFailed": "Échec de la vérification",
-    "authCancelled": "Authentification annulée",
-    "verifyingEnclaves_one": "Vérification de {{count}} enclave...",
-    "verifyingEnclaves_many": "Vérification de {{count}} enclaves...",
-    "verifyingEnclaves_other": "Vérification de {{count}} enclaves...",
-    "appsVerified_one": "{{count}} application vérifiée",
-    "appsVerified_many": "{{count}} applications vérifiées",
-    "appsVerified_other": "{{count}} applications vérifiées",
-    "appsAuthenticated_one": "{{count}} application authentifiée.",
-    "appsAuthenticated_many": "{{count}} applications authentifiées.",
-    "appsAuthenticated_other": "{{count}} applications authentifiées.",
-    "attestationLine": "{{tee}} : {{verdict}}",
-    "valid": "Valide",
-    "invalid": "Invalide",
-    "challengedSuffix": "  ·  ⚡ Défiée",
-    "challengeChip": "⚡ Défier",
-    "rejectAll": "Tout refuser",
-    "approveAll": "Tout approuver",
-    "waitingBiometrics": "En attente de la biométrie...",
-    "authenticating": "Authentification...",
-    "allConnected": "Tout est connecté",
-    "failed": "Échec de l'authentification groupée"
-  },
 
   "biometric": {
     "faceId": "Face ID",

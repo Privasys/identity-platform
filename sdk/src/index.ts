@@ -12,11 +12,9 @@ export type {
     AttestationInfo,
     AuthEvents,
     AuthState,
-    BatchAppConfig,
-    BatchAuthResult,
 } from './types';
 export type { WebAuthnConfig, WebAuthnState, WebAuthnEvents } from './webauthn';
-export { generateQRPayload, generateBatchQRPayload, generateSessionId } from './qr';
+export { generateQRPayload, generateSessionId } from './qr';
 export { SessionManager } from './session';
 export { AuthFrame, ConnectError, InsufficientCreditsError } from './frame-client';
 export type {

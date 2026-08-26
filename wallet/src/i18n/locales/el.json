@@ -159,30 +159,6 @@
     "openLink": "Άνοιγμα"
   },
 
-  "batch": {
-    "title": "Ομαδική σύνδεση",
-    "noPayload": "Δεν ελήφθη ομαδικό ωφέλιμο φορτίο",
-    "invalidPayload": "Μη έγκυρο ομαδικό ωφέλιμο φορτίο",
-    "verificationFailed": "Η επαλήθευση απέτυχε",
-    "authCancelled": "Η πιστοποίηση ακυρώθηκε",
-    "verifyingEnclaves_one": "Επαλήθευση {{count}} θύλακα...",
-    "verifyingEnclaves_other": "Επαλήθευση {{count}} θυλάκων...",
-    "appsVerified_one": "{{count}} εφαρμογή επαληθεύτηκε",
-    "appsVerified_other": "{{count}} εφαρμογές επαληθεύτηκαν",
-    "appsAuthenticated_one": "{{count}} εφαρμογή πιστοποιήθηκε.",
-    "appsAuthenticated_other": "{{count}} εφαρμογές πιστοποιήθηκαν.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Έγκυρη",
-    "invalid": "Μη έγκυρη",
-    "challengedSuffix": "  ·  ⚡ Αμφισβητήθηκε",
-    "challengeChip": "⚡ Αμφισβήτηση",
-    "rejectAll": "Απόρριψη όλων",
-    "approveAll": "Έγκριση όλων",
-    "waitingBiometrics": "Αναμονή βιομετρικών...",
-    "authenticating": "Πιστοποίηση...",
-    "allConnected": "Όλα συνδεδεμένα",
-    "failed": "Η ομαδική πιστοποίηση απέτυχε"
-  },
 
   "biometric": {
     "faceId": "Face ID",

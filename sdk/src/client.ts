@@ -1,8 +1,8 @@
 // Copyright (c) Privasys. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.0.
 
-import type { AuthConfig, AuthEvents, AuthResult, AuthState, AttestationInfo, BatchAppConfig, BatchAuthResult, SessionRelayBinding } from './types';
-import { generateQRPayload, generateBatchQRPayload } from './qr';
+import type { AuthConfig, AuthEvents, AuthResult, AuthState, AttestationInfo, SessionRelayBinding } from './types';
+import { generateQRPayload } from './qr';
 import { SessionManager } from './session';
 
 const DEFAULT_TIMEOUT = 120_000;
@@ -217,26 +217,6 @@ export class PrivasysAuth {
         this.setState('idle');
     }
 
-    /**
-     * Batch auth: authenticate with multiple enclaves in a single wallet approval.
-     * Returns a QR payload and a promise that resolves when all (or some) apps are authenticated.
-     */
-    getMultiple(apps: BatchAppConfig[]): {
-        sessionId: string;
-        appSessions: Array<{ rpId: string; sessionId: string }>;
-        payload: string;
-        result: Promise<BatchAuthResult>;
-    } {
-        const { sessionId, appSessions, payload } = generateBatchQRPayload({
-            brokerUrl: this.config.brokerUrl,
-            apps: apps.map((a) => ({ rpId: a.rpId })),
-        });
-
-        // Open one WebSocket per app, wait for all to complete or timeout
-        const result = this.waitForBatch(appSessions);
-
-        return { sessionId, appSessions, payload, result };
-    }
 
     /** Update the event handlers. */
     on(events: Partial<AuthEvents>): void {
@@ -305,41 +285,6 @@ export class PrivasysAuth {
         this.events.onStateChange?.(state);
     }
 
-    private async waitForBatch(
-        appSessions: Array<{ rpId: string; sessionId: string }>,
-    ): Promise<BatchAuthResult> {
-        const timeout = this.config.timeout ?? DEFAULT_TIMEOUT;
-        this.setState('waiting-for-scan');
-
-        const settled = await Promise.allSettled(
-            appSessions.map((app) =>
-                Promise.race([
-                    this.waitForResult(app.sessionId),
-                    new Promise<never>((_, reject) =>
-                        setTimeout(() => reject(new Error('Batch item timed out')), timeout),
-                    ),
-                ]),
-            ),
-        );
-
-        const results: AuthResult[] = [];
-        const errors: Array<{ rpId: string; error: string }> = [];
-
-        for (let i = 0; i < settled.length; i++) {
-            const outcome = settled[i];
-            if (outcome.status === 'fulfilled') {
-                results.push(outcome.value);
-            } else {
-                errors.push({
-                    rpId: appSessions[i].rpId,
-                    error: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
-                });
-            }
-        }
-
-        this.setState(errors.length === 0 ? 'complete' : 'error');
-        return { results, errors };
-    }
 
     private cleanup(sessionId: string): void {
         const ws = this.activeConnections.get(sessionId);

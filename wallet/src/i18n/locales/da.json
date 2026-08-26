@@ -159,30 +159,6 @@
     "openLink": "Åbn"
   },
 
-  "batch": {
-    "title": "Samlet login",
-    "noPayload": "Ingen samlet nyttelast modtaget",
-    "invalidPayload": "Ugyldig samlet nyttelast",
-    "verificationFailed": "Verificeringen mislykkedes",
-    "authCancelled": "Godkendelsen blev annulleret",
-    "verifyingEnclaves_one": "Verificerer {{count}} enklave...",
-    "verifyingEnclaves_other": "Verificerer {{count}} enklaver...",
-    "appsVerified_one": "{{count}} app verificeret",
-    "appsVerified_other": "{{count}} apps verificeret",
-    "appsAuthenticated_one": "{{count}} app godkendt.",
-    "appsAuthenticated_other": "{{count}} apps godkendt.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Gyldig",
-    "invalid": "Ugyldig",
-    "challengedSuffix": "  ·  ⚡ Udfordret",
-    "challengeChip": "⚡ Udfordr",
-    "rejectAll": "Afvis alle",
-    "approveAll": "Godkend alle",
-    "waitingBiometrics": "Venter på biometri...",
-    "authenticating": "Godkender...",
-    "allConnected": "Alt er forbundet",
-    "failed": "Den samlede godkendelse mislykkedes"
-  },
 
   "biometric": {
     "faceId": "Face ID",

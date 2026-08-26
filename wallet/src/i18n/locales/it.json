@@ -159,33 +159,6 @@
     "openLink": "Apri"
   },
 
-  "batch": {
-    "title": "Accesso in blocco",
-    "noPayload": "Nessun payload in blocco ricevuto",
-    "invalidPayload": "Payload in blocco non valido",
-    "verificationFailed": "Verifica non riuscita",
-    "authCancelled": "Autenticazione annullata",
-    "verifyingEnclaves_one": "Verifica di {{count}} enclave...",
-    "verifyingEnclaves_many": "Verifica di {{count}} enclave...",
-    "verifyingEnclaves_other": "Verifica di {{count}} enclave...",
-    "appsVerified_one": "{{count}} app verificata",
-    "appsVerified_many": "{{count}} app verificate",
-    "appsVerified_other": "{{count}} app verificate",
-    "appsAuthenticated_one": "{{count}} app autenticata.",
-    "appsAuthenticated_many": "{{count}} app autenticate.",
-    "appsAuthenticated_other": "{{count}} app autenticate.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Valida",
-    "invalid": "Non valida",
-    "challengedSuffix": "  ·  ⚡ Sfidata",
-    "challengeChip": "⚡ Sfida",
-    "rejectAll": "Rifiuta tutto",
-    "approveAll": "Approva tutto",
-    "waitingBiometrics": "In attesa della biometria...",
-    "authenticating": "Autenticazione...",
-    "allConnected": "Tutto connesso",
-    "failed": "Autenticazione in blocco non riuscita"
-  },
 
   "biometric": {
     "faceId": "Face ID",

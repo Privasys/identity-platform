@@ -159,30 +159,6 @@
     "openLink": "Avaa"
   },
 
-  "batch": {
-    "title": "Eräkirjautuminen",
-    "noPayload": "Erähyötykuormaa ei saatu",
-    "invalidPayload": "Virheellinen erähyötykuorma",
-    "verificationFailed": "Vahvistus epäonnistui",
-    "authCancelled": "Tunnistautuminen peruutettiin",
-    "verifyingEnclaves_one": "Vahvistetaan {{count}} enklaavi...",
-    "verifyingEnclaves_other": "Vahvistetaan {{count}} enklaavia...",
-    "appsVerified_one": "{{count}} sovellus vahvistettu",
-    "appsVerified_other": "{{count}} sovellusta vahvistettu",
-    "appsAuthenticated_one": "{{count}} sovellus tunnistautunut.",
-    "appsAuthenticated_other": "{{count}} sovellusta tunnistautunut.",
-    "attestationLine": "{{tee}}: {{verdict}}",
-    "valid": "Kelpaa",
-    "invalid": "Ei kelpaa",
-    "challengedSuffix": "  ·  ⚡ Haastettu",
-    "challengeChip": "⚡ Haasta",
-    "rejectAll": "Hylkää kaikki",
-    "approveAll": "Hyväksy kaikki",
-    "waitingBiometrics": "Odotetaan biometriaa...",
-    "authenticating": "Tunnistaudutaan...",
-    "allConnected": "Kaikki yhdistetty",
-    "failed": "Erätunnistautuminen epäonnistui"
-  },
 
   "biometric": {
     "faceId": "Face ID",

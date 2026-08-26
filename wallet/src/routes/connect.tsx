@@ -1731,7 +1731,23 @@ function ConnectFlow() {
             setError(`Approval failed: ${e?.message ?? e}`);
             setStep('error');
         }
-    }, [qr, attestation, attestationChanged, ensureConsentThen]);
+        // consentItems/consentSelected are load-bearing deps, not decoration.
+        // The checklist is seeded by an effect AFTER the step becomes
+        // 'attestation', which is later than qr/attestation last changed, so
+        // without them this callback closed over the EMPTY initial array. The
+        // commit was then skipped, consentSettledRef stayed false, and the
+        // standalone consent screen ran after Approve: the exact double-ask
+        // this design removes. Observed on 1.3.83.
+    }, [
+        qr,
+        attestation,
+        attestationChanged,
+        ensureConsentThen,
+        attributesGated,
+        commitConsent,
+        consentItems,
+        consentSelected,
+    ]);
 
     /** Build the wallet-side session-relay argument from the QR payload
      *  and the verified attestation, or return undefined when the QR did

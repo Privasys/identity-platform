@@ -17,9 +17,10 @@
  * the approval screen behind "show what we checked", for the reader who wants
  * it.
  *
- * The fifth panel ("What to watch for") is NOT in the main sequence. An
- * explainer that only reassures teaches people to tap through, so the caveats
- * get their own screen, reachable from the last card and from Settings.
+ * The fifth card is "What to watch for", and it is IN the sequence rather
+ * than behind a link. An explainer that only reassures teaches people to tap
+ * through; putting the caveats where they can be skipped means the people who
+ * most need them are exactly the ones who never see them.
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -44,7 +45,11 @@ const CARDS = [
     { icon: 'search-outline', key: 'card2' },
     { icon: 'lock-closed-outline', key: 'card3' },
     { icon: 'options-outline', key: 'card4' },
+    { icon: 'alert-circle-outline', key: 'watch' },
 ] as const;
+
+/** The three caveats on the last card. */
+const WATCH = ['watch1', 'watch2', 'watch3'] as const;
 
 export function FirstConnectExplainer({
     appName,
@@ -74,7 +79,6 @@ export function FirstConnectExplainer({
 
     const scroller = useRef<ScrollView>(null);
     const [index, setIndex] = useState(0);
-    const [watching, setWatching] = useState(false);
 
     const app = appName?.trim() || t('firstConnect.genericApp');
     const last = index === CARDS.length - 1;
@@ -98,10 +102,6 @@ export function FirstConnectExplainer({
         [width],
     );
 
-    if (watching) {
-        return <WhatToWatch onBack={() => setWatching(false)} styles={styles} insets={insets.bottom} />;
-    }
-
     return (
         <RNView style={styles.screen}>
             {onSkip ? (
@@ -123,13 +123,31 @@ export function FirstConnectExplainer({
                 style={styles.pager}
             >
                 {CARDS.map((card) => (
-                    <RNView key={card.key} style={[styles.page, { width }]}>
+                    <ScrollView
+                        key={card.key}
+                        style={{ width }}
+                        // flexGrow + centre keeps the short cards vertically
+                        // centred exactly as before, while letting the caveats
+                        // card scroll on a small screen instead of clipping.
+                        contentContainerStyle={styles.page}
+                        showsVerticalScrollIndicator={false}
+                    >
                         <View style={styles.glyphWrap}>
                             <Ionicons name={card.icon} size={30} color={p.green} />
                         </View>
                         <Text style={styles.cardTitle}>{t(`firstConnect.${card.key}Title`)}</Text>
 
-                        {card.key === 'card2' ? (
+                        {card.key === 'watch' ? (
+                            <>
+                                <Text style={styles.cardBody}>{t('firstConnect.watchIntro')}</Text>
+                                {WATCH.map((k) => (
+                                    <View key={k} style={styles.watchItem}>
+                                        <Text style={styles.watchItemTitle}>{t(`firstConnect.${k}Title`)}</Text>
+                                        <Text style={styles.watchItemBody}>{t(`firstConnect.${k}Body`)}</Text>
+                                    </View>
+                                ))}
+                            </>
+                        ) : card.key === 'card2' ? (
                             // The contrast is the payload, so it gets structure
                             // rather than two paragraphs a reader can skim past.
                             <>
@@ -157,14 +175,7 @@ export function FirstConnectExplainer({
                             </>
                         )}
 
-                        {card.key === 'card4' ? (
-                            <Pressable onPress={() => setWatching(true)} style={styles.watchLink} hitSlop={8}>
-                                <Ionicons name="alert-circle-outline" size={16} color={p.action} />
-                                <Text style={styles.watchLinkText}>{t('firstConnect.watchTitle')}</Text>
-                                <Ionicons name="chevron-forward" size={15} color={p.action} />
-                            </Pressable>
-                        ) : null}
-                    </RNView>
+                    </ScrollView>
                 ))}
             </ScrollView>
 
@@ -197,52 +208,16 @@ export function FirstConnectExplainer({
     );
 }
 
-/**
- * The caveats. Three items, each one thing the user can actually act on when
- * they next see the approval screen.
- */
-function WhatToWatch({
-    onBack,
-    styles,
-    insets,
-}: {
-    onBack: () => void;
-    styles: ReturnType<typeof makeStyles>;
-    insets: number;
-}) {
-    const { t } = useTranslation();
-    const items = ['watch1', 'watch2', 'watch3'] as const;
-    return (
-        <RNView style={styles.screen}>
-            <ScrollView contentContainerStyle={styles.watchContent}>
-                <Text style={styles.cardTitle}>{t('firstConnect.watchTitle')}</Text>
-                <Text style={styles.cardBody}>{t('firstConnect.watchIntro')}</Text>
-                {items.map((key) => (
-                    <View key={key} style={styles.watchItem}>
-                        <Text style={styles.watchItemTitle}>{t(`firstConnect.${key}Title`)}</Text>
-                        <Text style={styles.watchItemBody}>{t(`firstConnect.${key}Body`)}</Text>
-                    </View>
-                ))}
-            </ScrollView>
-            <RNView style={[styles.actions, { paddingBottom: Math.max(insets, 20) }]}>
-                <Pressable style={[styles.button, styles.buttonGo]} onPress={onBack}>
-                    <Text style={styles.buttonGoText}>{t('firstConnect.gotIt')}</Text>
-                </Pressable>
-            </RNView>
-        </RNView>
-    );
-}
-
 const makeStyles = (p: Palette) => StyleSheet.create({
     screen: { flex: 1, backgroundColor: p.screenBg },
     topBar: { paddingHorizontal: 20, paddingBottom: 4, alignItems: 'flex-end' },
     skip: { fontSize: 15, fontWeight: '500', color: p.textSecondary },
 
     pager: { flex: 1 },
-    // No `flex` here. In a horizontal ScrollView the content container lays
-    // out in a row, so flex-grow fights the fixed page width and the paging
-    // snap lands mid-card. Height comes from the row's default stretch.
-    page: { justifyContent: 'center', paddingHorizontal: 28, gap: 14 },
+    // flexGrow, not flex: this is a contentContainerStyle now, so it must be
+    // free to exceed the viewport on the caveats card while still filling it
+    // (and so centring still works) on the short ones.
+    page: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 20, gap: 14 },
 
     glyphWrap: {
         width: 56,
@@ -277,10 +252,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     contrastLabelHere: { color: p.successText },
     contrastBody: { fontSize: 14.5, lineHeight: 21, color: p.textSecondary, backgroundColor: 'transparent' },
 
-    watchLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-    watchLinkText: { fontSize: 14.5, fontWeight: '600', color: p.action },
-
-    watchContent: { paddingHorizontal: 28, paddingTop: 28, paddingBottom: 24, gap: 14 },
     watchItem: {
         backgroundColor: p.card,
         borderRadius: 12,

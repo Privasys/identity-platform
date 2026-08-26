@@ -14,7 +14,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -293,37 +293,42 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
         </Pressable>
     );
 
-    // A swipe that lands on the row also fires its onPress, which expanded the
-    // card mid-gesture: the row grew to show its provenance rows and the delete
-    // action, which stretches to the row, grew with it into a tall red slab.
-    // Swallow exactly one press after a swipe opens.
-    const swipedOpen = useRef(false);
+    // The whole row used to be the expand target, so a swipe that ended on it
+    // also fired onPress: the card expanded to show its provenance rows
+    // mid-gesture, and the delete action grew with it. Guarding the press on a
+    // swipe-open flag was not enough, because the press can land before the
+    // swipe is recognised as one.
+    //
+    // The chevron is the target now. A swipe cannot expand anything, so the
+    // row height is fixed for the whole gesture and the action beside it
+    // cannot follow it downwards.
+    const toggleExpanded = () => {
+        if (!editing) setExpanded((v) => !v);
+    };
 
     return (
-        <Swipeable
-            renderRightActions={renderRightActions}
-            overshootRight={false}
-            onSwipeableWillOpen={() => { swipedOpen.current = true; }}
-            onSwipeableClose={() => { swipedOpen.current = false; }}
-        >
-            <Pressable
-                onPress={() => {
-                    if (swipedOpen.current) return;
-                    if (!editing) setExpanded(!expanded);
-                }}
-            >
+        <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
+            <RNView>
                 <RNView style={styles.attributeRow}>
                     <RNView style={styles.attributeInfo}>
-                        <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Pressable
+                            onPress={toggleExpanded}
+                            disabled={editing}
+                            hitSlop={10}
+                            accessibilityRole="button"
+                            accessibilityState={{ expanded }}
+                            accessibilityLabel={attr.label}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}
+                        >
                             <Text style={styles.attributeLabel}>{attr.label}</Text>
                             {!editing && (
-                                expanded ? (
-                                    <Ionicons name="chevron-up" size={12} color={p.textMuted} />
-                                ) : (
-                                    <Ionicons name="chevron-down" size={12} color={p.textMuted} />
-                                )
+                                <Ionicons
+                                    name={expanded ? 'chevron-up' : 'chevron-down'}
+                                    size={12}
+                                    color={p.textMuted}
+                                />
                             )}
-                        </RNView>
+                        </Pressable>
 
                         {editing ? (
                             <RNView style={styles.inlineEditRow}>
@@ -447,7 +452,7 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                         )}
                     </RNView>
                 </RNView>
-            </Pressable>
+            </RNView>
         </Swipeable>
     );
 }

@@ -355,17 +355,6 @@
     "alwaysShareHint": "Cymeradwyo ceisiadau yn y dyfodol yn awtomatig cyhyd â bod cod y cwafell yn aros yr un fath.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Enw arddangos",
-    "fieldEmail": "Cyfeiriad e-bost",
-    "fieldAvatar": "Llun proffil",
-    "fieldLocale": "Iaith / rhanbarth",
-    "fieldDid": "Dynodydd datganoledig",
-    "fieldSub": "Dynodydd penodol i'r ap",
-    "notInProfile": "Ddim yn eich proffil",
-    "noDataTitle": "Ni ddewiswyd unrhyw ddata",
-    "noDataBody": "Dewiswch o leiaf un priodoledd i'w rannu, neu gwrthodwch y cais."
-  },
   "credentials": {
     "title": "Tystlythyrau cofrestredig",
     "empty": "Dim tystlythyrau wedi'u cofrestru eto",

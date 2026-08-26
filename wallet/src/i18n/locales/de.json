@@ -309,17 +309,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Anzeigename",
-    "fieldEmail": "E-Mail-Adresse",
-    "fieldAvatar": "Profilbild",
-    "fieldLocale": "Sprache / Region",
-    "fieldDid": "Dezentraler Identifikator",
-    "fieldSub": "App-spezifischer Identifikator",
-    "notInProfile": "Nicht in Ihrem Profil",
-    "noDataTitle": "Keine Daten ausgewählt",
-    "noDataBody": "Wählen Sie mindestens ein Attribut zum Teilen aus oder lehnen Sie die Anfrage ab."
-  },
 
   "credentials": {
     "title": "Registrierte Anmeldeinformationen",

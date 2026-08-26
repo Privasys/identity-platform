@@ -346,17 +346,6 @@
     "alwaysShareHint": "Automātiski apstiprināt turpmākos pieprasījumus, kamēr anklāva kods paliek nemainīgs.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Attēlojamais vārds",
-    "fieldEmail": "E-pasta adrese",
-    "fieldAvatar": "Profila fotoattēls",
-    "fieldLocale": "Valoda / reģions",
-    "fieldDid": "Decentralizēts identifikators",
-    "fieldSub": "Lietotnei specifisks identifikators",
-    "notInProfile": "Nav jūsu profilā",
-    "noDataTitle": "Nav atlasītu datu",
-    "noDataBody": "Atlasiet vismaz vienu kopīgojamo atribūtu vai noraidiet pieprasījumu."
-  },
   "credentials": {
     "title": "Reģistrētie akreditācijas dati",
     "empty": "Vēl nav reģistrētu akreditācijas datu",

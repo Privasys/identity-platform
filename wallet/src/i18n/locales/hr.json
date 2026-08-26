@@ -346,17 +346,6 @@
     "alwaysShareHint": "Automatski odobri buduće zahtjeve dok kod enklave ostaje isti.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Prikazano ime",
-    "fieldEmail": "Adresa e-pošte",
-    "fieldAvatar": "Profilna fotografija",
-    "fieldLocale": "Jezik / regija",
-    "fieldDid": "Decentralizirani identifikator",
-    "fieldSub": "Identifikator specifičan za aplikaciju",
-    "notInProfile": "Nije u vašem profilu",
-    "noDataTitle": "Nisu odabrani podaci",
-    "noDataBody": "Odaberite barem jedan atribut za dijeljenje ili odbijte zahtjev."
-  },
   "credentials": {
     "title": "Registrirane vjerodajnice",
     "empty": "Još nema registriranih vjerodajnica",

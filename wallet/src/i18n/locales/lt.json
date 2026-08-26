@@ -346,17 +346,6 @@
     "alwaysShareHint": "Automatiškai patvirtinti būsimus prašymus, kol anklavo kodas nesikeičia.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Rodomas vardas",
-    "fieldEmail": "El. pašto adresas",
-    "fieldAvatar": "Profilio nuotrauka",
-    "fieldLocale": "Kalba / regionas",
-    "fieldDid": "Decentralizuotas identifikatorius",
-    "fieldSub": "Programai būdingas identifikatorius",
-    "notInProfile": "Nėra jūsų profilyje",
-    "noDataTitle": "Nepasirinkta duomenų",
-    "noDataBody": "Pasirinkite bent vieną atributą, kuriuo dalysitės, arba atmeskite prašymą."
-  },
   "credentials": {
     "title": "Registruoti kredencialai",
     "empty": "Kol kas nėra registruotų kredencialų",

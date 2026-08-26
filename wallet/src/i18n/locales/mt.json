@@ -352,17 +352,6 @@
     "alwaysShareHint": "Approva awtomatikament talbiet futuri sakemm il-kodiċi tal-enklavi jibqa' l-istess.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Isem li jintwera",
-    "fieldEmail": "Indirizz tal-email",
-    "fieldAvatar": "Ritratt tal-profil",
-    "fieldLocale": "Lingwa / reġjun",
-    "fieldDid": "Identifikatur deċentralizzat",
-    "fieldSub": "Identifikatur speċifiku għall-app",
-    "notInProfile": "Mhux fil-profil tiegħek",
-    "noDataTitle": "L-ebda data magħżula",
-    "noDataBody": "Agħżel mill-inqas attribut wieħed x'taqsam, jew ċaħad it-talba."
-  },
   "credentials": {
     "title": "Kredenzjali rreġistrati",
     "empty": "Għad m'hemm l-ebda kredenzjal irreġistrat",

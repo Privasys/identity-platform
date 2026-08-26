@@ -309,17 +309,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Weergavenaam",
-    "fieldEmail": "E-mailadres",
-    "fieldAvatar": "Profielfoto",
-    "fieldLocale": "Taal en regio",
-    "fieldDid": "Gedecentraliseerde identificatie",
-    "fieldSub": "App-specifieke identificatie",
-    "notInProfile": "Niet in je profiel",
-    "noDataTitle": "Geen gegevens geselecteerd",
-    "noDataBody": "Selecteer minstens één attribuut om te delen, of weiger het verzoek."
-  },
 
   "credentials": {
     "title": "Geregistreerde inloggegevens",

@@ -346,17 +346,6 @@
     "alwaysShareHint": "Aprobă automat cererile viitoare cât timp codul enclavei rămâne același.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Nume afișat",
-    "fieldEmail": "Adresă de e-mail",
-    "fieldAvatar": "Fotografie de profil",
-    "fieldLocale": "Limbă / regiune",
-    "fieldDid": "Identificator descentralizat",
-    "fieldSub": "Identificator specific aplicației",
-    "notInProfile": "Nu se află în profilul tău",
-    "noDataTitle": "Nicio dată selectată",
-    "noDataBody": "Selectează cel puțin un atribut de împărtășit sau refuză cererea."
-  },
   "credentials": {
     "title": "Credențiale înregistrate",
     "empty": "Niciun credențial înregistrat încă",

@@ -309,17 +309,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Εμφανιζόμενο όνομα",
-    "fieldEmail": "Διεύθυνση email",
-    "fieldAvatar": "Φωτογραφία προφίλ",
-    "fieldLocale": "Γλώσσα και περιοχή",
-    "fieldDid": "Αποκεντρωμένο αναγνωριστικό",
-    "fieldSub": "Αναγνωριστικό ανά εφαρμογή",
-    "notInProfile": "Δεν υπάρχει στο προφίλ σας",
-    "noDataTitle": "Δεν επιλέχθηκαν δεδομένα",
-    "noDataBody": "Επιλέξτε τουλάχιστον ένα χαρακτηριστικό προς κοινοποίηση ή απορρίψτε το αίτημα."
-  },
 
   "credentials": {
     "title": "Καταχωρισμένα διαπιστευτήρια",

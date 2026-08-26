@@ -343,17 +343,6 @@
     "alwaysShareHint": "Kiida tulevased taotlused automaatselt heaks, kuni anklaavi kood jääb samaks.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Kuvatav nimi",
-    "fieldEmail": "E-posti aadress",
-    "fieldAvatar": "Profiilifoto",
-    "fieldLocale": "Keel / piirkond",
-    "fieldDid": "Detsentraliseeritud identifikaator",
-    "fieldSub": "Rakendusepõhine identifikaator",
-    "notInProfile": "Pole teie profiilis",
-    "noDataTitle": "Andmeid pole valitud",
-    "noDataBody": "Valige jagamiseks vähemalt üks atribuut või keelduge taotlusest."
-  },
   "credentials": {
     "title": "Registreeritud mandaadid",
     "empty": "Ühtegi mandaati pole veel registreeritud",

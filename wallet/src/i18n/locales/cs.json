@@ -312,17 +312,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Zobrazované jméno",
-    "fieldEmail": "E-mailová adresa",
-    "fieldAvatar": "Profilová fotografie",
-    "fieldLocale": "Jazyk a region",
-    "fieldDid": "Decentralizovaný identifikátor",
-    "fieldSub": "Identifikátor specifický pro aplikaci",
-    "notInProfile": "Není ve vašem profilu",
-    "noDataTitle": "Nebyly vybrány žádné údaje",
-    "noDataBody": "Vyberte alespoň jeden atribut ke sdílení, nebo požadavek zamítněte."
-  },
 
   "credentials": {
     "title": "Registrované přihlašovací údaje",

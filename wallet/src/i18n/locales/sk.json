@@ -346,17 +346,6 @@
     "alwaysShareHint": "Automaticky schvaľovať budúce žiadosti, kým zostáva kód enklávy rovnaký.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Zobrazované meno",
-    "fieldEmail": "E-mailová adresa",
-    "fieldAvatar": "Profilová fotografia",
-    "fieldLocale": "Jazyk / lokalita",
-    "fieldDid": "Decentralizovaný identifikátor",
-    "fieldSub": "Identifikátor špecifický pre aplikáciu",
-    "notInProfile": "Nie je vo vašom profile",
-    "noDataTitle": "Nevybrali ste žiadne údaje",
-    "noDataBody": "Vyberte aspoň jeden atribút na zdieľanie alebo žiadosť zamietnite."
-  },
   "credentials": {
     "title": "Registrované poverenia",
     "empty": "Zatiaľ nie sú registrované žiadne poverenia",

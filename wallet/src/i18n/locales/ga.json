@@ -352,17 +352,6 @@
     "alwaysShareHint": "Ceadaigh iarratais amach anseo go huathoibríoch fad is a fhanann cód an iamhchlóis mar an gcéanna.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Ainm taispeána",
-    "fieldEmail": "Seoladh ríomhphoist",
-    "fieldAvatar": "Grianghraf próifíle",
-    "fieldLocale": "Teanga / logán",
-    "fieldDid": "Aitheantóir díláraithe",
-    "fieldSub": "Aitheantóir sonrach don aip",
-    "notInProfile": "Níl sé i do phróifíl",
-    "noDataTitle": "Níor roghnaíodh aon sonraí",
-    "noDataBody": "Roghnaigh tréith amháin ar a laghad le roinnt, nó diúltaigh don iarratas."
-  },
   "credentials": {
     "title": "Dintiúir chláraithe",
     "empty": "Níl aon dintiúr cláraithe fós",

@@ -309,17 +309,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Visningsnamn",
-    "fieldEmail": "E-postadress",
-    "fieldAvatar": "Profilbild",
-    "fieldLocale": "Språk och region",
-    "fieldDid": "Decentraliserad identifierare",
-    "fieldSub": "Appspecifik identifierare",
-    "notInProfile": "Finns inte i din profil",
-    "noDataTitle": "Inga uppgifter valda",
-    "noDataBody": "Välj minst ett attribut att dela, eller neka begäran."
-  },
 
   "credentials": {
     "title": "Registrerade inloggningsuppgifter",

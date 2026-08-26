@@ -309,17 +309,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Megjelenítendő név",
-    "fieldEmail": "E-mail-cím",
-    "fieldAvatar": "Profilkép",
-    "fieldLocale": "Nyelv és régió",
-    "fieldDid": "Decentralizált azonosító",
-    "fieldSub": "Alkalmazásspecifikus azonosító",
-    "notInProfile": "Nincs a profiljában",
-    "noDataTitle": "Nincs kiválasztott adat",
-    "noDataBody": "Válasszon legalább egy megosztandó attribútumot, vagy utasítsa el a kérelmet."
-  },
 
   "credentials": {
     "title": "Regisztrált hitelesítő adatok",

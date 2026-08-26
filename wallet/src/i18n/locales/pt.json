@@ -312,17 +312,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Nome a apresentar",
-    "fieldEmail": "Endereço de e-mail",
-    "fieldAvatar": "Fotografia de perfil",
-    "fieldLocale": "Idioma e definições regionais",
-    "fieldDid": "Identificador descentralizado",
-    "fieldSub": "Identificador específico da aplicação",
-    "notInProfile": "Não está no seu perfil",
-    "noDataTitle": "Nenhum dado selecionado",
-    "noDataBody": "Selecione pelo menos um atributo para partilhar, ou recuse o pedido."
-  },
 
   "credentials": {
     "title": "Credenciais registadas",

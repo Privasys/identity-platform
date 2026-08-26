@@ -315,17 +315,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Nazwa wyświetlana",
-    "fieldEmail": "Adres e-mail",
-    "fieldAvatar": "Zdjęcie profilowe",
-    "fieldLocale": "Język i ustawienia regionalne",
-    "fieldDid": "Zdecentralizowany identyfikator",
-    "fieldSub": "Identyfikator właściwy dla aplikacji",
-    "notInProfile": "Brak w Twoim profilu",
-    "noDataTitle": "Nie wybrano żadnych danych",
-    "noDataBody": "Wybierz co najmniej jeden atrybut do udostępnienia albo odrzuć żądanie."
-  },
 
   "credentials": {
     "title": "Zarejestrowane poświadczenia",

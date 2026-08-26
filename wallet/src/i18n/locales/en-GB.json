@@ -343,17 +343,6 @@
     "alwaysShareHint": "Auto-approve future requests while the enclave code stays the same.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Display Name",
-    "fieldEmail": "Email Address",
-    "fieldAvatar": "Profile Photo",
-    "fieldLocale": "Language / Locale",
-    "fieldDid": "Decentralised Identifier",
-    "fieldSub": "App-Specific Identifier",
-    "notInProfile": "Not in your profile",
-    "noDataTitle": "No data selected",
-    "noDataBody": "Select at least one attribute to share, or deny the request."
-  },
   "credentials": {
     "title": "Registered Credentials",
     "empty": "No credentials registered yet",

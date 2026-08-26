@@ -349,17 +349,6 @@
     "alwaysShareHint": "Samodejno odobri prihodnje zahteve, dokler koda enklave ostaja enaka.",
     "approveWithCount": "{{label}} ({{count}})"
   },
-  "consentRequest": {
-    "fieldDisplayName": "Prikazno ime",
-    "fieldEmail": "E-poštni naslov",
-    "fieldAvatar": "Profilna fotografija",
-    "fieldLocale": "Jezik / območje",
-    "fieldDid": "Decentralizirani identifikator",
-    "fieldSub": "Identifikator, specifičen za aplikacijo",
-    "notInProfile": "Ni v vašem profilu",
-    "noDataTitle": "Izbranih ni nobenih podatkov",
-    "noDataBody": "Izberite vsaj en atribut za deljenje ali zavrnite zahtevo."
-  },
   "credentials": {
     "title": "Registrirane poverilnice",
     "empty": "Registriranih poverilnic še ni",

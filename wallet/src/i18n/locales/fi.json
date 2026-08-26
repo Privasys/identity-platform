@@ -309,17 +309,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Näyttönimi",
-    "fieldEmail": "Sähköpostiosoite",
-    "fieldAvatar": "Profiilikuva",
-    "fieldLocale": "Kieli ja alue",
-    "fieldDid": "Hajautettu tunniste",
-    "fieldSub": "Sovelluskohtainen tunniste",
-    "notInProfile": "Ei profiilissasi",
-    "noDataTitle": "Tietoja ei valittu",
-    "noDataBody": "Valitse vähintään yksi jaettava määrite tai hylkää pyyntö."
-  },
 
   "credentials": {
     "title": "Rekisteröidyt tunnistetiedot",

@@ -309,17 +309,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Vist navn",
-    "fieldEmail": "E-mailadresse",
-    "fieldAvatar": "Profilbillede",
-    "fieldLocale": "Sprog og område",
-    "fieldDid": "Decentral identifikator",
-    "fieldSub": "App-specifik identifikator",
-    "notInProfile": "Findes ikke i din profil",
-    "noDataTitle": "Ingen data valgt",
-    "noDataBody": "Vælg mindst én attribut at dele, eller afvis anmodningen."
-  },
 
   "credentials": {
     "title": "Registrerede legitimationsoplysninger",

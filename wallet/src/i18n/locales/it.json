@@ -312,17 +312,6 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
 
-  "consentRequest": {
-    "fieldDisplayName": "Nome visualizzato",
-    "fieldEmail": "Indirizzo e-mail",
-    "fieldAvatar": "Foto del profilo",
-    "fieldLocale": "Lingua e impostazioni locali",
-    "fieldDid": "Identificatore decentralizzato",
-    "fieldSub": "Identificatore specifico dell'app",
-    "notInProfile": "Non presente nel tuo profilo",
-    "noDataTitle": "Nessun dato selezionato",
-    "noDataBody": "Seleziona almeno un attributo da condividere, oppure rifiuta la richiesta."
-  },
 
   "credentials": {
     "title": "Credenziali registrate",

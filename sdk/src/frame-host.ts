@@ -19,7 +19,7 @@ import { AuthUI } from './ui';
 import type { AuthUIConfig, SignInResult } from './ui';
 import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
 import type { AuthSession } from './types';
-import { PrivasysSession, type EncAuthEnvelope } from './enclave-session';
+import { PrivasysSession, type EncAuthEnvelope, type SealedWebSocket } from './enclave-session';
 
 const sessions = new SessionManager();
 
@@ -52,6 +52,10 @@ interface ActiveSession {
 
 let pendingHandshake: PendingHandshake | null = null;
 let activeSession: ActiveSession | null = null;
+// Sealed WebSockets the parent opened, keyed by the parent's correlation id.
+// The WebSocket lives here (where K is); the parent bridges send/recv over
+// postMessage. Cleaned up on close.
+const activeWebSockets = new Map<number, SealedWebSocket>();
 
 /** Read a string claim out of a JWT without verification (the IdP signed it). */
 function jwtClaim(token: string, claim: string): string | null {
@@ -1688,6 +1692,66 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 error: err instanceof Error ? err.message : String(err),
             });
         }
+    }
+
+    // ── Sealed WebSocket bridge ──────────────────────────────────────────
+    // Only the iframe holds K, so the sealed WebSocket runs HERE and the
+    // parent drives it over postMessage. The parent posts
+    // `privasys:session:ws-open {id, path}`; we reply `ws-open-ack` (or
+    // `ws-error`) and then relay `ws-message` / `ws-close` / `ws-error`
+    // events. The parent posts `ws-send {id, data}` and `ws-close {id}`.
+    if (data.type === 'privasys:session:ws-open') {
+        const id = data.id as number;
+        const post = (type: string, payload: Record<string, unknown> = {}) =>
+            window.parent.postMessage({ type, id, ...payload }, e.origin);
+        if (!activeSession) {
+            post('privasys:session:ws-error', { error: 'no active session' });
+            post('privasys:session:ws-close', { code: 1006, reason: 'no active session' });
+            return;
+        }
+        if (activeWebSockets.has(id)) {
+            post('privasys:session:ws-error', { error: 'websocket id already in use' });
+            return;
+        }
+        let ws: SealedWebSocket;
+        try {
+            ws = activeSession.session.openWebSocket(String(data.path || '/'));
+        } catch (err) {
+            post('privasys:session:ws-error', { error: err instanceof Error ? err.message : String(err) });
+            post('privasys:session:ws-close', { code: 1006, reason: 'open failed' });
+            return;
+        }
+        activeWebSockets.set(id, ws);
+        ws.onMessage((d) => post('privasys:session:ws-message', { data: d }));
+        ws.onError((err) => post('privasys:session:ws-error', { error: err.message }));
+        ws.onClose((info) => {
+            activeWebSockets.delete(id);
+            post('privasys:session:ws-close', { code: info.code, reason: info.reason, wasClean: info.wasClean });
+        });
+        ws.ready.then(
+            () => post('privasys:session:ws-open-ack'),
+            (err) => {
+                activeWebSockets.delete(id);
+                post('privasys:session:ws-error', { error: err instanceof Error ? err.message : String(err) });
+            },
+        );
+        return;
+    }
+    if (data.type === 'privasys:session:ws-send') {
+        const ws = activeWebSockets.get(data.id as number);
+        if (ws) {
+            try { ws.send(data.data as Uint8Array); } catch { /* closed mid-send */ }
+        }
+        return;
+    }
+    if (data.type === 'privasys:session:ws-close') {
+        const id = data.id as number;
+        const ws = activeWebSockets.get(id);
+        if (ws) {
+            activeWebSockets.delete(id);
+            ws.close(typeof data.code === 'number' ? data.code : 1000, String(data.reason ?? ''));
+        }
+        return;
     }
 });
 

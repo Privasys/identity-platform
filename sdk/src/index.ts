@@ -47,6 +47,8 @@ export type { AttributeAssuranceBadge, AttributePickerConfig } from './attribute
 export { PrivasysSession } from './enclave-session';
 export type {
     EncAuthRejectReason,
+    OpenWebSocketOptions,
+    SealedWebSocket,
     SessionInitOptions,
     WalletAttestationResult,
 } from './enclave-session';

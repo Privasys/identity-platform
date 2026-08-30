@@ -51,6 +51,11 @@
  * {@link InsufficientCreditsError} when the account is out of credits.
  * `offline_access` issues a refresh token and no attributes.
  */
+// Type-only import (erased at build): the sealed WebSocket the parent gets
+// back is the same shape as the one the iframe runs, just bridged over
+// postMessage.
+import type { SealedWebSocket } from './enclave-session';
+
 export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'identity' | 'offline_access';
 
 /**
@@ -288,6 +293,100 @@ export interface SealedSession {
      * decrypted plaintext bytes; SSE event parsing is left to the caller.
      */
     stream(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedStreamResponse>;
+    /**
+     * Open a sealed, bidirectional WebSocket to the enclave app at `path`.
+     * The socket runs inside the privasys.id iframe (where the session key
+     * lives) and is bridged to this page over postMessage; every message,
+     * both ways, is sealed so the terminate-leg gateway never sees plaintext.
+     * See {@link SealedWebSocket}. One sealed WebSocket per session.
+     */
+    openWebSocket(path: string): SealedWebSocket;
+}
+
+/**
+ * Parent-side handle for a sealed WebSocket that actually runs in the
+ * privasys.id iframe (where the session key lives). `send` / `close` are
+ * posted to the iframe; open-ack / message / close / error events arrive back
+ * and are dispatched here by the AuthFrame message listener. Implements the
+ * same {@link SealedWebSocket} contract as the in-iframe socket.
+ */
+class BridgedSealedWebSocket implements SealedWebSocket {
+    readonly ready: Promise<void>;
+    private resolveReady!: () => void;
+    private rejectReady!: (e: Error) => void;
+    private readyPending = true;
+    private _open = false;
+    private closedLocally = false;
+    private readonly msgCbs = new Set<(d: Uint8Array) => void>();
+    private readonly closeCbs = new Set<(i: { code: number; reason: string; wasClean: boolean }) => void>();
+    private readonly errCbs = new Set<(e: Error) => void>();
+
+    constructor(private readonly post: (msg: Record<string, unknown>) => void) {
+        this.ready = new Promise<void>((resolve, reject) => {
+            this.resolveReady = resolve;
+            this.rejectReady = reject;
+        });
+        // A rejected `ready` nobody awaits must not surface as unhandled.
+        this.ready.catch(() => undefined);
+    }
+
+    get open(): boolean {
+        return this._open && !this.closedLocally;
+    }
+
+    send(data: Uint8Array | ArrayBuffer | string | object): void {
+        if (this.closedLocally) throw new Error('sealed websocket is closed');
+        // string / object / bytes all survive structured clone; the iframe's
+        // SealedWebSocket.send serialises them before sealing.
+        this.post({ type: 'privasys:session:ws-send', data });
+    }
+    onMessage(cb: (d: Uint8Array) => void): () => void {
+        this.msgCbs.add(cb);
+        return () => this.msgCbs.delete(cb);
+    }
+    onClose(cb: (i: { code: number; reason: string; wasClean: boolean }) => void): void {
+        this.closeCbs.add(cb);
+    }
+    onError(cb: (e: Error) => void): void {
+        this.errCbs.add(cb);
+    }
+    close(code = 1000, reason = ''): void {
+        this.closedLocally = true;
+        if (this.readyPending) {
+            this.readyPending = false;
+            this.rejectReady(new Error('sealed websocket closed by caller'));
+        }
+        this.post({ type: 'privasys:session:ws-close', code, reason });
+    }
+
+    // ── dispatched by the AuthFrame message listener ──
+    _onAck(): void {
+        this._open = true;
+        if (this.readyPending) {
+            this.readyPending = false;
+            this.resolveReady();
+        }
+    }
+    _onMessage(d: Uint8Array): void {
+        for (const cb of this.msgCbs) {
+            try { cb(d); } catch { /* isolate listener errors */ }
+        }
+    }
+    _onError(e: Error): void {
+        for (const cb of this.errCbs) {
+            try { cb(e); } catch { /* isolate */ }
+        }
+    }
+    _onClose(i: { code: number; reason: string; wasClean: boolean }): void {
+        this._open = false;
+        if (this.readyPending) {
+            this.readyPending = false;
+            this.rejectReady(new Error(`sealed websocket closed before open (code ${i.code})`));
+        }
+        for (const cb of this.closeCbs) {
+            try { cb(i); } catch { /* isolate */ }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -412,6 +511,10 @@ export class AuthFrame {
         resolve?: (r: SealedStreamResponse) => void;
         reject?: (e: Error) => void;
     }>();
+    // Sealed WebSockets opened through this frame, keyed by correlation id.
+    // The socket itself runs in the iframe (frame-host); these are the
+    // parent-side bridges the iframe drives over postMessage.
+    private sealedWebSockets = new Map<number, BridgedSealedWebSocket>();
 
     constructor(config: AuthFrameConfig) {
         const { authOrigin, container, ...rest } = config;
@@ -908,6 +1011,29 @@ export class AuthFrame {
                 return true;
             }
 
+            case 'privasys:session:ws-open-ack': {
+                this.sealedWebSockets.get(data.id as number)?._onAck();
+                return true;
+            }
+            case 'privasys:session:ws-message': {
+                this.sealedWebSockets.get(data.id as number)?._onMessage(data.data as Uint8Array);
+                return true;
+            }
+            case 'privasys:session:ws-error': {
+                this.sealedWebSockets.get(data.id as number)?._onError(new Error(String(data.error || 'sealed websocket error')));
+                return true;
+            }
+            case 'privasys:session:ws-close': {
+                const id = data.id as number;
+                this.sealedWebSockets.get(id)?._onClose({
+                    code: typeof data.code === 'number' ? data.code : 1006,
+                    reason: String(data.reason ?? ''),
+                    wasClean: Boolean(data.wasClean),
+                });
+                this.sealedWebSockets.delete(id);
+                return true;
+            }
+
             default:
                 return false;
         }
@@ -1068,6 +1194,21 @@ export class AuthFrame {
                         this.authOrigin,
                     );
                 });
+            },
+            openWebSocket: (path) => {
+                if (!this.sealedIframe?.contentWindow) {
+                    throw new Error('AuthFrame: sealed iframe is gone');
+                }
+                const id = ++this.sealedReqSeq;
+                const target = this.sealedIframe.contentWindow;
+                const bridge = new BridgedSealedWebSocket((msg) => {
+                    try {
+                        target.postMessage({ ...msg, id }, this.authOrigin);
+                    } catch { /* iframe gone; close path will fire */ }
+                });
+                this.sealedWebSockets.set(id, bridge);
+                target.postMessage({ type: 'privasys:session:ws-open', id, path }, this.authOrigin);
+                return bridge;
             },
         };
         this.sealedSession = sealed;

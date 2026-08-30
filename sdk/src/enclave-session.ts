@@ -45,23 +45,23 @@ const SESSION_AUTH_SCHEME = 'PrivasysSession';
 const HKDF_INFO = new TextEncoder().encode('privasys-session/v1');
 const DIR_C2S = new TextEncoder().encode('privasys-dir/c2s');
 const DIR_S2C = new TextEncoder().encode('privasys-dir/s2c');
-// WebSocket transport uses SEPARATE direction prefixes from the HTTP
-// request/response transport. The AES-GCM nonce is `prefix[0..4) || ctr`,
-// and reusing a (key, nonce) pair is catastrophic — it leaks the keystream.
-// The HTTP and WS channels share the session key K but keep INDEPENDENT
-// per-direction counters, so they MUST NOT share a prefix or their nonces
-// would collide the moment both are active on one session. Distinct HKDF
-// info labels give each channel its own keystream. Mirrored by the enclave
-// relay (sessionrelay.go). A session runs at most ONE sealed WebSocket at a
-// time (the WS counters restart at 0 per connection); a second concurrent WS
-// would reuse this prefix from ctr 0 and is rejected by the relay.
-const DIR_WS_C2S = new TextEncoder().encode('privasys-dir/ws-c2s');
-const DIR_WS_S2C = new TextEncoder().encode('privasys-dir/ws-s2c');
-/** Reserved WS subprotocol marking a sealed session-relay WebSocket. The
- *  session id rides as the SECOND advertised subprotocol because a browser
- *  `WebSocket` cannot set an Authorization header; the relay reads it from
- *  `Sec-WebSocket-Protocol` and echoes back only this marker. Mirrored by
- *  the enclave relay. */
+// WebSocket streams use SEPARATE, PER-STREAM direction prefixes: the HKDF
+// info folds the stream's hex id into these labels
+// (`privasys-dir/ws-c2s/<streamHex>`). The AES-GCM nonce is
+// `prefix[0..4) || ctr`, and reusing a (key, nonce) pair is catastrophic —
+// it leaks the keystream — so every stream having its own keystream is what
+// lets one session hold many concurrent WebSockets (and reopen freely)
+// without ever colliding with each other or with the HTTP request/response
+// nonces. Mirrored by the enclave relay (sessionrelay.go / mux.go).
+const DIR_WS_C2S_LABEL = 'privasys-dir/ws-c2s';
+const DIR_WS_S2C_LABEL = 'privasys-dir/ws-s2c';
+/** Reserved WS subprotocol marking a sealed session-relay WebSocket. A
+ *  browser `WebSocket` cannot set an Authorization header, so the SDK
+ *  advertises `[marker, sessionId, streamHex]` in Sec-WebSocket-Protocol.
+ *  The GATEWAY terminates the socket, echoes the marker, and relays the
+ *  sealed frames as one multiplexed stream over its pooled enclave leg;
+ *  the enclave demuxes, unseals and forwards to the app's own WebSocket.
+ *  Mirrored by the gateway (wsmux) and the enclave relay (mux.go). */
 const SEALED_WS_SUBPROTOCOL = 'privasys.sealed.v1';
 const INIT_PATH = '/__privasys/session-bootstrap';
 
@@ -152,9 +152,11 @@ interface DerivedKeys {
     aead: CryptoKey;
     c2sPrefix: Uint8Array;
     s2cPrefix: Uint8Array;
-    /** Nonce prefixes for the sealed-WebSocket channel (see DIR_WS_*). */
-    wsC2sPrefix: Uint8Array;
-    wsS2cPrefix: Uint8Array;
+    /** HKDF inputs retained so WebSocket streams can derive PER-STREAM
+     *  nonce prefixes on demand (see DIR_WS_*): a session runs many
+     *  concurrent streams and each needs its own keystream. */
+    hkdfIkm: CryptoKey;
+    sessionSalt: Uint8Array;
 }
 
 export class PrivasysSession {
@@ -306,22 +308,12 @@ export class PrivasysSession {
                 32,
             ),
         );
-        const wsC2sPrefix = new Uint8Array(
-            await crypto.subtle.deriveBits(
-                { name: 'HKDF', hash: 'SHA-256', salt: sessionIdBytes as BufferSource, info: DIR_WS_C2S as BufferSource },
-                ikm,
-                32,
-            ),
+        const session = new PrivasysSession(
+            opts.host,
+            opts.sessionId,
+            { aead, c2sPrefix, s2cPrefix, hkdfIkm: ikm, sessionSalt: sessionIdBytes },
+            fetchImpl,
         );
-        const wsS2cPrefix = new Uint8Array(
-            await crypto.subtle.deriveBits(
-                { name: 'HKDF', hash: 'SHA-256', salt: sessionIdBytes as BufferSource, info: DIR_WS_S2C as BufferSource },
-                ikm,
-                32,
-            ),
-        );
-
-        const session = new PrivasysSession(opts.host, opts.sessionId, { aead, c2sPrefix, s2cPrefix, wsC2sPrefix, wsS2cPrefix }, fetchImpl);
         if (opts.getEncAuth) session.getEncAuth = opts.getEncAuth;
         return session;
     }
@@ -485,11 +477,12 @@ export class PrivasysSession {
      * the way back.
      *
      * Because a browser `WebSocket` cannot set an Authorization header, the
-     * session id is carried as the second advertised subprotocol
-     * (`[SEALED_WS_SUBPROTOCOL, sessionId]`); the relay validates it during
-     * the upgrade. Only ONE sealed WebSocket may be open per session at a
-     * time (see DIR_WS_*): a second concurrent one reuses the WS keystream
-     * and the relay rejects it.
+     * session id rides as the second advertised subprotocol, followed by a
+     * fresh random stream id (`[marker, sessionId, streamHex]`). The
+     * gateway terminates the socket and relays it as one multiplexed
+     * stream over its pooled enclave leg; each stream runs on its OWN
+     * keystream (streamHex folded into the HKDF info and AAD), so a
+     * session can hold many concurrent WebSockets and reopen freely.
      *
      * Unlike `request`/`stream`, a WebSocket cannot be silently rebound: if
      * the session is evicted the enclave closes the socket, surfaced via
@@ -506,20 +499,24 @@ export class PrivasysSession {
         if (!WS) {
             throw new Error('openWebSocket: no WebSocket implementation available (pass opts.WebSocketImpl)');
         }
-        // AAD is fixed for the whole connection ("WS:<path>:<sessionId>"),
-        // matching the HTTP transport's method:path:session binding; per-frame
-        // uniqueness comes from the counter in the nonce.
-        const ad = encodeAD('WS', path, this.sessionId);
+        const streamBytes = crypto.getRandomValues(new Uint8Array(8));
+        const streamHex = Array.from(streamBytes, (b) => b.toString(16).padStart(2, '0')).join('');
         const url = `wss://${this.host}${path}`;
-        const ws = new WS(url, [SEALED_WS_SUBPROTOCOL, this.sessionId, ...(opts?.protocols ?? [])]);
+        const ws = new WS(url, [
+            SEALED_WS_SUBPROTOCOL,
+            this.sessionId,
+            streamHex,
+            ...(opts?.protocols ?? []),
+        ]);
         ws.binaryType = 'arraybuffer';
-        return new SealedWebSocketImpl(
-            ws,
-            this.keys.aead,
-            this.keys.wsC2sPrefix,
-            this.keys.wsS2cPrefix,
-            ad,
-        );
+        return new SealedWebSocketImpl(ws, {
+            aead: this.keys.aead,
+            hkdfIkm: this.keys.hkdfIkm,
+            sessionSalt: this.keys.sessionSalt,
+            sessionId: this.sessionId,
+            path,
+            streamHex,
+        });
     }
 
     /**
@@ -715,12 +712,40 @@ export interface SealedWebSocket {
     close(code?: number, reason?: string): void;
 }
 
+/** Everything a SealedWebSocketImpl needs from its parent session. */
+interface SealedWSConfig {
+    aead: CryptoKey;
+    hkdfIkm: CryptoKey;
+    sessionSalt: Uint8Array;
+    sessionId: string;
+    path: string;
+    streamHex: string;
+}
+
+/** The stream's derived keystream, fixed once the upgrade completes. */
+interface StreamKeys {
+    c2sPrefix: Uint8Array;
+    s2cPrefix: Uint8Array;
+    ad: Uint8Array;
+}
+
 /**
  * Sealed-WebSocket implementation. Sealing (outbound) and unsealing (inbound)
  * are async (WebCrypto), but each direction's counter MUST advance in
  * send / receive order, so both are serialised through a per-direction promise
- * chain. Outbound frames additionally wait for the socket to open before they
- * are put on the wire, preserving order across the open boundary.
+ * chain.
+ *
+ * Per-stream keystream: prefixes derived with the streamHex folded into the
+ * HKDF info, AAD `WS:<path>:<sessionId>:<streamHex>`. The SDK's first frame
+ * is the sealed stream open (ctr 0, plaintext "open"), which authenticates
+ * the (path, session, stream) tuple end-to-end through the gateway's mux;
+ * the enclave's first frame is the sealed ack (ctr 0, plaintext "ack"),
+ * which resolves `ready`. Application data flows from ctr 1 in both
+ * directions, strictly monotonic.
+ *
+ * Both chains await `keys`, which only resolves after the socket is open and
+ * the stream open is on the wire — so queued sends stay ordered across the
+ * open boundary and behind the open frame.
  */
 class SealedWebSocketImpl implements SealedWebSocket {
     readonly ready: Promise<void>;
@@ -728,8 +753,14 @@ class SealedWebSocketImpl implements SealedWebSocket {
     private rejectReady!: (e: Error) => void;
     private readyPending = true;
 
-    private c2sCtr = 0n;
+    private readonly keys: Promise<StreamKeys>;
+    private resolveKeys!: (m: StreamKeys) => void;
+    private rejectKeys!: (e: Error) => void;
+    private keysPending = true;
+
+    private msgIdx = 0n; // logical outbound message index (assigned at enqueue)
     private s2cCtr = 0n;
+    private ackSeen = false;
     private opened = false;
     private closedLocally = false;
     private outChain: Promise<void> = Promise.resolve();
@@ -741,37 +772,91 @@ class SealedWebSocketImpl implements SealedWebSocket {
 
     constructor(
         private readonly ws: WebSocket,
-        private readonly aead: CryptoKey,
-        private readonly c2sPrefix: Uint8Array,
-        private readonly s2cPrefix: Uint8Array,
-        private readonly ad: Uint8Array,
+        private readonly cfg: SealedWSConfig,
     ) {
         this.ready = new Promise<void>((resolve, reject) => {
             this.resolveReady = resolve;
             this.rejectReady = reject;
         });
-        // A rejected `ready` that no caller awaits must not surface as an
-        // unhandled rejection; the close/error callbacks carry the signal too.
+        this.keys = new Promise<StreamKeys>((resolve, reject) => {
+            this.resolveKeys = resolve;
+            this.rejectKeys = reject;
+        });
+        // Rejections that no caller awaits must not surface as unhandled;
+        // the close/error callbacks carry the signal too.
         this.ready.catch(() => undefined);
+        this.keys.catch(() => undefined);
 
         ws.onopen = () => {
             this.opened = true;
-            if (this.readyPending) {
-                this.readyPending = false;
-                this.resolveReady();
-            }
+            void this.openStream();
         };
         ws.onmessage = (ev: MessageEvent) => this.onWireMessage(ev);
         ws.onerror = () => this.emitError(new Error('sealed websocket transport error'));
         ws.onclose = (ev: CloseEvent) => {
+            if (this.keysPending) {
+                this.keysPending = false;
+                this.rejectKeys(new Error(`sealed websocket closed (code ${ev.code})`));
+            }
             if (this.readyPending) {
                 this.readyPending = false;
-                this.rejectReady(new Error(`sealed websocket closed before open (code ${ev.code})`));
+                this.rejectReady(new Error(`sealed websocket closed before ready (code ${ev.code}${ev.reason ? `: ${ev.reason}` : ''})`));
             }
             for (const cb of this.closeCbs) {
                 try { cb({ code: ev.code, reason: ev.reason, wasClean: ev.wasClean }); } catch { /* isolate */ }
             }
         };
+    }
+
+    /** Derive the per-stream keystream and put the sealed stream open on the
+     *  wire before any queued data. */
+    private async openStream(): Promise<void> {
+        try {
+            if (this.ws.protocol !== SEALED_WS_SUBPROTOCOL) {
+                throw new Error(`sealed websocket: server did not accept the sealed subprotocol (got ${JSON.stringify(this.ws.protocol)})`);
+            }
+            const enc = new TextEncoder();
+            const derive = async (label: string) => new Uint8Array(
+                await crypto.subtle.deriveBits(
+                    {
+                        name: 'HKDF',
+                        hash: 'SHA-256',
+                        salt: this.cfg.sessionSalt as BufferSource,
+                        info: enc.encode(`${label}/${this.cfg.streamHex}`) as BufferSource,
+                    },
+                    this.cfg.hkdfIkm,
+                    32,
+                ),
+            );
+            const keys: StreamKeys = {
+                c2sPrefix: await derive(DIR_WS_C2S_LABEL),
+                s2cPrefix: await derive(DIR_WS_S2C_LABEL),
+                ad: enc.encode(`WS:${this.cfg.path}:${this.cfg.sessionId}:${this.cfg.streamHex}`),
+            };
+            // Sealed stream open (ctr 0): authenticates the
+            // (path, session, stream) tuple end-to-end — the gateway's
+            // routing header only works if the enclave derives the same
+            // AAD and keystream from it.
+            const openFrame = await this.sealEnvelope(enc.encode('open'), 0n, keys);
+            if (this.ws.readyState !== 1) throw new Error('sealed websocket closed during stream open');
+            this.ws.send(openFrame.buffer as ArrayBuffer);
+            if (this.keysPending) {
+                this.keysPending = false;
+                this.resolveKeys(keys);
+            }
+            // `ready` resolves on the enclave's sealed ack.
+        } catch (e) {
+            const err = e instanceof Error ? e : new Error('sealed websocket: open failed');
+            this.emitError(err);
+            this.close(1002, 'open failed');
+        }
+    }
+
+    private settleReady(): void {
+        if (this.readyPending) {
+            this.readyPending = false;
+            this.resolveReady();
+        }
     }
 
     get open(): boolean {
@@ -781,36 +866,38 @@ class SealedWebSocketImpl implements SealedWebSocket {
     send(data: Uint8Array | ArrayBuffer | string | object): void {
         if (this.closedLocally) throw new Error('sealed websocket is closed');
         const plaintext = serializePlaintext(data);
-        // Assign the counter at ENQUEUE time so on-wire order matches call
-        // order even though sealing resolves asynchronously.
-        const ctr = this.c2sCtr++;
+        // Assign the message index at ENQUEUE time so on-wire order matches
+        // call order even though sealing resolves asynchronously. Wire
+        // counter = index + 1: ctr 0 is the sealed stream open.
+        const idx = this.msgIdx++;
         this.outChain = this.outChain.then(async () => {
             if (this.closedLocally) return;
+            let k: StreamKeys;
+            try { k = await this.keys; } catch { return; }
             let frame: Uint8Array;
             try {
-                const nonce = makeNonce(this.c2sPrefix, ctr);
-                const ct = new Uint8Array(
-                    await crypto.subtle.encrypt(
-                        { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: this.ad as BufferSource },
-                        this.aead,
-                        plaintext as BufferSource,
-                    ),
-                );
-                frame = encodeSealed({ v: 1, ctr, ct });
+                frame = await this.sealEnvelope(plaintext, idx + 1n, k);
             } catch (e) {
                 this.emitError(e instanceof Error ? e : new Error('sealed websocket: encrypt failed'));
                 return;
-            }
-            // Wait for open so pre-open sends flush in order; bail if the
-            // socket died in the meantime.
-            if (!this.opened) {
-                try { await this.ready; } catch { return; }
             }
             if (this.ws.readyState !== 1) return;
             this.ws.send(frame.buffer as ArrayBuffer);
         });
         // Chain errors are reported via emitError; keep the chain alive.
         this.outChain = this.outChain.catch(() => undefined);
+    }
+
+    private async sealEnvelope(pt: Uint8Array, ctr: bigint, k: StreamKeys): Promise<Uint8Array> {
+        const nonce = makeNonce(k.c2sPrefix, ctr);
+        const ct = new Uint8Array(
+            await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: k.ad as BufferSource },
+                this.cfg.aead,
+                pt as BufferSource,
+            ),
+        );
+        return encodeSealed({ v: 1, ctr, ct });
     }
 
     private onWireMessage(ev: MessageEvent): void {
@@ -822,6 +909,8 @@ class SealedWebSocketImpl implements SealedWebSocket {
         }
         this.inChain = this.inChain.then(async () => {
             if (this.closedLocally) return;
+            let k: StreamKeys;
+            try { k = await this.keys; } catch { return; }
             let plaintext: Uint8Array;
             try {
                 const bytes = raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(await (raw as Blob).arrayBuffer());
@@ -832,15 +921,26 @@ class SealedWebSocketImpl implements SealedWebSocket {
                 if (env.ctr < this.s2cCtr) {
                     throw new Error(`sealed websocket: replayed/out-of-order frame (ctr ${env.ctr} < ${this.s2cCtr})`);
                 }
-                const nonce = makeNonce(this.s2cPrefix, env.ctr);
+                const nonce = makeNonce(k.s2cPrefix, env.ctr);
                 plaintext = new Uint8Array(
                     await crypto.subtle.decrypt(
-                        { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: this.ad as BufferSource },
-                        this.aead,
+                        { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: k.ad as BufferSource },
+                        this.cfg.aead,
                         env.ct as BufferSource,
                     ),
                 );
                 this.s2cCtr = env.ctr + 1n;
+                if (!this.ackSeen) {
+                    // The enclave's first frame must be the sealed stream
+                    // ack (ctr 0, "ack"); it resolves `ready` and is not an
+                    // application message.
+                    if (env.ctr !== 0n || new TextDecoder().decode(plaintext) !== 'ack') {
+                        throw new Error('sealed websocket: invalid stream ack');
+                    }
+                    this.ackSeen = true;
+                    this.settleReady();
+                    return;
+                }
             } catch (e) {
                 this.emitError(e instanceof Error ? e : new Error('sealed websocket: decrypt failed'));
                 this.close(1002, 'protocol error');
@@ -865,6 +965,10 @@ class SealedWebSocketImpl implements SealedWebSocket {
 
     close(code = 1000, reason = ''): void {
         this.closedLocally = true;
+        if (this.keysPending) {
+            this.keysPending = false;
+            this.rejectKeys(new Error('sealed websocket closed by caller'));
+        }
         if (this.readyPending) {
             this.readyPending = false;
             this.rejectReady(new Error('sealed websocket closed by caller'));

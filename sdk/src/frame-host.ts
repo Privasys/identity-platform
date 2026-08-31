@@ -1525,7 +1525,16 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         grant_type: 'refresh_token',
                         refresh_token: fresh.refreshToken,
                         client_id: fresh.clientId,
-                        scope: `audience:${audience} openid email profile offline_access`,
+                        // Mint under the SESSION'S OWN granted scopes: the IdP
+                        // refuses a refresh grant broader than the original, so
+                        // a fixed scope list here forces every relying app to
+                        // over-request (a session without `email` could never
+                        // mint). Audience consumers authorise on the audience
+                        // claim; identity claims ride along only when the
+                        // session granted them. Sessions stored by an older
+                        // frame host carry no scope — keep the historical list
+                        // for those so existing sessions keep minting.
+                        scope: `audience:${audience} ${fresh.scope || 'openid email profile offline_access'}`,
                     }),
                 });
                 if (!resp.ok) {

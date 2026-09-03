@@ -2593,7 +2593,13 @@ function ConnectFlow() {
                 )}
 
                 {step === 'consent' && qr && (
-                    <RNView style={{ flex: 1, paddingTop: insets.top }}>
+                    // NO paddingTop here. DataRequestConsent puts the inset
+                    // INSIDE its green header (contentTopInset + 14), the way
+                    // AttestationView does, so the band fills the status bar.
+                    // Padding the wrapper as well pushed the whole header down
+                    // and left the screen background showing above it, and the
+                    // title sat low because the inset was then applied twice.
+                    <RNView style={{ flex: 1 }}>
                         <DataRequestConsent
                             title={t('consent.requestTitle')}
                             appName={qr.appName || appName(qr.appHost ?? qr.rpId)}

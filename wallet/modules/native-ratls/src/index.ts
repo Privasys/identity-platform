@@ -66,8 +66,9 @@ export async function inspect(
 /**
  * Connect to an enclave and verify its RA-TLS certificate against a policy.
  *
- * In challenge mode, a nonce is sent in the TLS ClientHello so the enclave
- * binds it into a fresh attestation certificate, proving liveness.
+ * The evidence is obtained after the TLS handshake (RA-TLS v2). In challenge
+ * mode the enclave binds it to this connection's TLS exporter value, proving
+ * liveness.
  *
  * @param host    Enclave hostname or IP address.
  * @param port    Enclave port number.

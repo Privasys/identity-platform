@@ -16,7 +16,7 @@ jest.mock('@/utils/storage', () => {
 
 // Control the transparency-log gate.
 jest.mock('@/services/release-provenance', () => ({
-    OID_WORKLOAD_APP_ID: '1.3.6.1.4.1.65230.3.6',
+    OID_WORKLOAD_APP_ID: '1.3.6.1.4.1.65230.4.1',
     fetchRunningAppReleases: jest.fn(),
 }));
 

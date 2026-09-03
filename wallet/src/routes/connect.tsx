@@ -1076,8 +1076,8 @@ function ConnectFlow() {
                 let level: AttestationVerificationLevel;
                 if (reverifyDue) {
                     // Full verification through the attestation service, in the
-                    // user's chosen mode (deterministic by default, or challenge
-                    // — a fresh nonce bound to this TLS session). Mandatory on
+                    // user's chosen mode (deterministic by default, or challenge,
+                    // evidence bound to this TLS session). Mandatory on
                     // first connect and on periodic refresh.
                     const asToken = await getAttestationServerToken();
                     const reason = !trustedApp
@@ -1231,9 +1231,9 @@ function ConnectFlow() {
 
     /**
      * "Challenge this enclave" — force a fresh challenge-mode re-verification of
-     * the currently-shown enclave. Sends a brand-new random nonce so the enclave
-     * folds it plus the TLS channel binder into a fresh quote, proving liveness
-     * and binding the attestation to this exact session. Available from the
+     * the currently-shown enclave. The enclave produces a fresh quote bound to
+     * this TLS connection's exporter value, proving liveness and binding the
+     * attestation to this exact session. Available from the
      * approval screen when the default mode is deterministic.
      */
     const handleChallenge = useCallback(async () => {

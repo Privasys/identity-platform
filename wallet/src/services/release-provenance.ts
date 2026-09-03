@@ -79,8 +79,8 @@ export interface ReleaseProvenance {
 }
 
 /** OID 3.2 (workload image digest) and 3.6 (workload app id) on the RA-TLS leaf. */
-export const OID_WORKLOAD_IMAGE_DIGEST = '1.3.6.1.4.1.65230.3.2';
-export const OID_WORKLOAD_APP_ID = '1.3.6.1.4.1.65230.3.6';
+export const OID_WORKLOAD_IMAGE_DIGEST = '1.3.6.1.4.1.65230.4.2';
+export const OID_WORKLOAD_APP_ID = '1.3.6.1.4.1.65230.4.1';
 
 /**
  * Re-dash the OID 3.6 app-id (32-char undashed hex) into the management-service

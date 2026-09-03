@@ -49,6 +49,8 @@ describe('dependency decoder', () => {
         const d = deps[0];
         expect(d.appId).toBe('confidential-ai');
         expect(d.measurements).toEqual(['sgx:aabb', 'tdx:11:22:33']);
+        // The OID strings inside the shared vector are opaque sample values
+        // (pre-v2 numbers), kept byte-identical across the four codecs.
         expect(d.requiredOids).toEqual([
             { oid: '1.3.6.1.4.1.65230.3.2', valueHex: 'dead' },
             { oid: '1.3.6.1.4.1.65230.3.6', valueHex: '6169' }, // "ai"

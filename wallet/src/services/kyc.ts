@@ -67,10 +67,10 @@ const VERIFIER_APP_NAME =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_APP ?? 'privasys-identity-verifier';
 
 /** Attestation extension carrying the workload image digest (org.privasys,
- *  1.3.6.1.4.1.65230.3.2). Pinning this is what makes "send my passport to the
+ *  1.3.6.1.4.1.65230.4.2). Pinning this is what makes "send my passport to the
  *  enclave" safe: we only talk to the published, auditable code. The resolve API
  *  returns this too; this is the default. */
-const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.3.2';
+const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.4.2';
 
 /** Fallback verifier coordinates, used only until the app is resolvable from the
  *  store (then the resolved hostname + attested digest win). The old dev/test

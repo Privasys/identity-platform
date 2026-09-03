@@ -113,16 +113,12 @@ export interface AttributeRow {
  * itself is the raw evidence the attestation service already checked.
  */
 const SUPPRESSED_OIDS = new Set([
-    '1.3.6.1.4.1.65230.1.1',   // SGX quote
-    '1.3.6.1.4.1.65230.1.2',   // TDX quote
-    '1.3.6.1.4.1.65230.4.1',   // SEV-SNP report
-    '1.3.6.1.4.1.65230.5.1',   // NVIDIA GPU evidence
-    '1.3.6.1.4.1.65230.2.7',   // attestation servers hash -> Attestation server
-    '1.3.6.1.4.1.65230.3.1',   // workload config merkle root -> Config root
-    '1.3.6.1.4.1.65230.3.2',   // workload code hash -> Workload hash
-    '1.3.6.1.4.1.65230.3.4',   // workload key source -> Key source
-    '1.3.6.1.4.1.65230.3.6',   // workload app id -> resolved the listing
-    '1.3.6.1.4.1.65230.6.1',   // attested dependency set -> This app also uses
+    '1.3.6.1.4.1.65230.2.3',   // attestation servers hash -> Attestation server
+    '1.3.6.1.4.1.65230.5.1',   // workload config merkle root -> Config root
+    '1.3.6.1.4.1.65230.4.2',   // workload code hash -> Workload hash
+    '1.3.6.1.4.1.65230.6.1',   // workload key source -> Key source
+    '1.3.6.1.4.1.65230.4.1',   // workload app id -> resolved the listing
+    '1.3.6.1.4.1.65230.7.1',   // attested dependency set -> This app also uses
 ]);
 
 /** "Intel SGX" / "Intel TDX" are product names and stay verbatim everywhere. */

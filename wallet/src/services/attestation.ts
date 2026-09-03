@@ -8,15 +8,12 @@
  * enclave attestation during the connect / KYC / drive flows.
  *
  * `attestEnclave` is the entry point every flow should use: it picks the
- * verification mode (deterministic vs challenge), generates a fresh nonce for
- * challenge mode, always consults the attestation service, and turns the
+ * verification mode (deterministic vs challenge, the latter binding the
+ * evidence to the connection), always consults the attestation service, and turns the
  * native layer's typed failures into a structured {@link AttestationOutcome}
  * so callers can render the right recovery UX (continue-anyway vs
  * show-the-problem-with-an-override).
  */
-
-import * as Crypto from 'expo-crypto';
-import { bytesToHex } from '@noble/hashes/utils.js';
 
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
 import { RaTlsError } from '../../modules/native-ratls/src/index';
@@ -52,7 +49,7 @@ export interface AttestationOutcome {
     status: AttestationStatus;
     /** The verification mode actually used. */
     mode: VerificationMode;
-    /** True when a fresh nonce + channel binder were folded in (challenge mode). */
+    /** True when the evidence was bound to this connection (challenge mode). */
     challenged: boolean;
     /** Present when `status === 'verified'`. */
     result?: AttestationResult;
@@ -68,11 +65,6 @@ export interface AttestationOutcome {
     deviceUnattested?: boolean;
     /** Human-readable problem, when not verified. */
     message?: string;
-}
-
-/** Fresh 32-byte random nonce, hex-encoded — regenerated for every challenge. */
-function freshNonceHex(): string {
-    return bytesToHex(Crypto.getRandomBytes(32));
 }
 
 function splitOrigin(origin: string): { host: string; port: number } {
@@ -141,9 +133,9 @@ export async function attestEnclave(
     const { host, port } = splitOrigin(origin);
     const policy: VerificationPolicy = {
         tee: opts.tee,
-        report_data_mode: opts.mode,
-        // A fresh nonce every time — never reuse a session id or QR nonce.
-        nonce: challenged ? freshNonceHex() : undefined,
+        // Challenge mode binds the evidence to this connection (the native layer
+        // draws the fresh context); deterministic accepts the cached quote.
+        attestation: opts.mode,
         attestation_server: opts.attestationServer ?? AS_ENDPOINT,
         attestation_server_token: opts.attestationServerToken,
     };

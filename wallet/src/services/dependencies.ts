@@ -5,7 +5,7 @@
  * Attested cross-enclave dependencies (wallet side).
  *
  * An enclave that depends on other enclaves advertises its DIRECT dependencies
- * in the certificate extension OID 1.3.6.1.4.1.65230.6.1. This module decodes
+ * in the certificate extension OID 1.3.6.1.4.1.65230.7.1. This module decodes
  * that extension (the canonical, length-prefixed encoding shared with the RA-TLS
  * SDKs and the enclave runtime) so the wallet can show the user what a service
  * pulls in, and cache a per-dependency approval keyed by (app-id, identity).
@@ -17,7 +17,7 @@
  */
 
 /** OID carrying a workload's direct attested-dependency set. */
-export const OID_ATTESTED_DEPENDENCY_SET = '1.3.6.1.4.1.65230.6.1';
+export const OID_ATTESTED_DEPENDENCY_SET = '1.3.6.1.4.1.65230.7.1';
 
 export interface DependencyOid {
     oid: string;

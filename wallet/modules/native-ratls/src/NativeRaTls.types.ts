@@ -42,8 +42,13 @@ export interface VerificationPolicy {
     mrenclave?: string;
     mrsigner?: string;
     mrtd?: string;
-    report_data_mode?: 'deterministic' | 'challenge' | 'skip';
-    nonce?: string;
+    /**
+     * RA-TLS v2 attestation mode. `challenge` (the default) binds the enclave's
+     * evidence to this connection's TLS exporter value; `deterministic` accepts
+     * the enclave's cached quote (bound to its key and quote time); `none`
+     * skips the evidence exchange.
+     */
+    attestation?: 'deterministic' | 'challenge' | 'none';
     attestation_server?: string;
     attestation_server_token?: string;
 }

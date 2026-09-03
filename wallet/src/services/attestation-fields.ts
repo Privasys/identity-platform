@@ -5,9 +5,9 @@ import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaT
 
 /**
  * Resolve the per-endpoint code hash. Container RA-TLS certs in
- * enclave-os-virtual carry `workload_code_hash` (.65230.3.2 — scoped to
+ * enclave-os-virtual carry `workload_code_hash` (.65230.4.2 — scoped to
  * one container); platform/management certs and enclave-os-mini SGX certs
- * carry `combined_workloads_hash` (.65230.2.5 — covers the whole VM /
+ * carry `combined_workloads_hash` (.65230.2.4 — covers the whole VM /
  * enclave). Prefer the workload-scoped value when present.
  */
 export function effectiveCodeHash(att: AttestationResult): string | undefined {

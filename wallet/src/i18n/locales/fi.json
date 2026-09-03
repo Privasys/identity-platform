@@ -891,5 +891,14 @@
     "detailPromote": "Hyväksyttiin uusi versio avaimelle {{handle}}",
     "detailExport": "Hyväksyttiin avaimen vienti kohteelle {{handle}}",
     "detailOther": "Hyväksyttiin holvin toimenpide kohteelle {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Päivitys vaaditaan",
+    "recommendedTitle": "Päivitys saatavilla",
+    "whatChanges": "Mikä muuttuu",
+    "openStore": "Avaa kauppa",
+    "notNow": "Ei nyt",
+    "learnMore": "Lue lisää",
+    "versions": "Sinulla on {{current}}. Tarvitaan {{minimum}} tai uudempi."
   }
 }

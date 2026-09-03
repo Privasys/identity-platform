@@ -915,5 +915,14 @@
     "detailPromote": "Nuova versione approvata per la chiave {{handle}}",
     "detailExport": "Esportazione della chiave approvata per {{handle}}",
     "detailOther": "Operazione del vault approvata su {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Aggiornamento necessario",
+    "recommendedTitle": "Aggiornamento disponibile",
+    "whatChanges": "Cosa cambia",
+    "openStore": "Apri lo store",
+    "notNow": "Non ora",
+    "learnMore": "Scopri di più",
+    "versions": "Hai {{current}}. Serve {{minimum}} o successiva."
   }
 }

@@ -926,5 +926,14 @@
     "detailPromote": "Schválená nová verzia pre kľúč {{handle}}",
     "detailExport": "Schválený export kľúča pre {{handle}}",
     "detailOther": "Schválená operácia trezora nad {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Vyžaduje sa aktualizácia",
+    "recommendedTitle": "Dostupná aktualizácia",
+    "whatChanges": "Čo sa mení",
+    "openStore": "Otvoriť obchod",
+    "notNow": "Teraz nie",
+    "learnMore": "Zistiť viac",
+    "versions": "Máte {{current}}. Potrebná je {{minimum}} alebo novšia."
   }
 }

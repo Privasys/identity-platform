@@ -902,5 +902,14 @@
     "detailPromote": "Approved a new version for key {{handle}}",
     "detailExport": "Approved a key export for {{handle}}",
     "detailOther": "Approved a vault operation on {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Update required",
+    "recommendedTitle": "Update available",
+    "whatChanges": "What changes",
+    "openStore": "Open the App Store",
+    "notNow": "Not now",
+    "learnMore": "Read more",
+    "versions": "You have {{current}}. This needs {{minimum}} or later."
   }
 }

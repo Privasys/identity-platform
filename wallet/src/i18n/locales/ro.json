@@ -926,5 +926,14 @@
     "detailPromote": "S-a aprobat o versiune nouă pentru cheia {{handle}}",
     "detailExport": "S-a aprobat un export de cheie pentru {{handle}}",
     "detailOther": "S-a aprobat o operațiune de seif pe {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Actualizare necesară",
+    "recommendedTitle": "Actualizare disponibilă",
+    "whatChanges": "Ce se schimbă",
+    "openStore": "Deschide magazinul",
+    "notNow": "Nu acum",
+    "learnMore": "Află mai multe",
+    "versions": "Ai {{current}}. Este necesară {{minimum}} sau mai nouă."
   }
 }

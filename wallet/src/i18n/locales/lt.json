@@ -926,5 +926,14 @@
     "detailPromote": "Patvirtinta nauja versija raktui {{handle}}",
     "detailExport": "Patvirtintas rakto eksportas raktui {{handle}}",
     "detailOther": "Patvirtinta seifo operacija su {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Būtinas naujinimas",
+    "recommendedTitle": "Yra naujinimas",
+    "whatChanges": "Kas keičiasi",
+    "openStore": "Atidaryti parduotuvę",
+    "notNow": "Ne dabar",
+    "learnMore": "Sužinoti daugiau",
+    "versions": "Turite {{current}}. Reikia {{minimum}} arba naujesnės."
   }
 }

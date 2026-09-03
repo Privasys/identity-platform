@@ -891,5 +891,14 @@
     "detailPromote": "Εγκρίθηκε νέα έκδοση για το κλειδί {{handle}}",
     "detailExport": "Εγκρίθηκε εξαγωγή κλειδιού για {{handle}}",
     "detailOther": "Εγκρίθηκε λειτουργία θησαυροφυλακίου στο {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Απαιτείται ενημέρωση",
+    "recommendedTitle": "Διαθέσιμη ενημέρωση",
+    "whatChanges": "Τι αλλάζει",
+    "openStore": "Άνοιγμα καταστήματος",
+    "notNow": "Όχι τώρα",
+    "learnMore": "Διαβάστε περισσότερα",
+    "versions": "Έχετε {{current}}. Απαιτείται {{minimum}} ή νεότερη."
   }
 }

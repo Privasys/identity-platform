@@ -998,5 +998,14 @@
     "detailPromote": "Cymeradwywyd fersiwn newydd ar gyfer yr allwedd {{handle}}",
     "detailExport": "Cymeradwywyd allforio allwedd ar gyfer {{handle}}",
     "detailOther": "Cymeradwywyd gweithrediad cell ar {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Rhaid diweddaru",
+    "recommendedTitle": "Diweddariad ar gael",
+    "whatChanges": "Beth sy'n newid",
+    "openStore": "Agor y siop",
+    "notNow": "Nid nawr",
+    "learnMore": "Darllen mwy",
+    "versions": "Mae gennych {{current}}. Mae angen {{minimum}} neu fwy diweddar."
   }
 }

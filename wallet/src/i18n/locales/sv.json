@@ -891,5 +891,14 @@
     "detailPromote": "Godkände en ny version för nyckeln {{handle}}",
     "detailExport": "Godkände en nyckelexport för {{handle}}",
     "detailOther": "Godkände en valvåtgärd på {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Uppdatering krävs",
+    "recommendedTitle": "Uppdatering tillgänglig",
+    "whatChanges": "Vad som ändras",
+    "openStore": "Öppna butiken",
+    "notNow": "Inte nu",
+    "learnMore": "Läs mer",
+    "versions": "Du har {{current}}. Det krävs {{minimum}} eller senare."
   }
 }

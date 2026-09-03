@@ -1,0 +1,48 @@
+# Minimum supported wallet version, served as static JSON from
+# privasys.id/wallet/version.json.
+#
+# Installed on idp-fr-par-1 at /etc/caddy/conf.d/wallet-version.caddy and pulled
+# into the privasys.id site block by `import conf.d/*.caddy`. Deployed by
+# .github/workflows/deploy-wallet-version.yaml; do not hand-edit on the VM.
+#
+# Same reasoning as i18n.caddy for living on the auth host rather than in the
+# IdP binary: this is a static document, and routing it through the enclave
+# service would put a copy change behind a measurement roll for no benefit.
+#
+# THE PATH IS EXACT, AND THAT IS NOT A STYLE CHOICE. `/wallet/` is already the
+# IdP's: cmd/idp/main.go serves GET /wallet/link and GET /wallet/link/result,
+# which are the social-account linking flow the wallet itself uses. A
+# `handle_path /wallet/*` block here would match both, hand them to a file
+# server that has never heard of them, and return 404 for a live feature. So
+# this matches one URL and nothing else, and any new document under /wallet/
+# needs its own line rather than a widened glob.
+#
+# ORDER MATTERS, for the same reason as the i18n block: the main Caddyfile's
+# `@withExt path_regexp \.[A-Za-z0-9]+$` catch-all already matches `.json`, so
+# without this block the document would still be served but with none of the
+# headers below, and the change would look like it worked.
+
+handle /wallet/version.json {
+    # UNLIKE the locale packs, this URL is mutable and singular: the whole point
+    # is that its contents change and every wallet notices. So a short TTL and a
+    # revalidation, not `immutable`. Sixty seconds bounds how long a raised
+    # floor takes to reach a device that is already running, and how long a
+    # MISTAKEN floor takes to lift, which is the direction that matters more.
+    header Cache-Control "public, max-age=60, must-revalidate"
+    header Access-Control-Allow-Origin "*"
+    header Content-Type "application/json; charset=utf-8"
+
+    # Public, no session in play, and fetched with `credentials: 'omit'` so that
+    # asking whether an update exists cannot be correlated with a signed-in
+    # user. Make sure nothing here reintroduces that link.
+    header -Set-Cookie
+
+    # `handle` does not strip the matched path, so the request still reads
+    # /wallet/version.json. Rewrite it to the bare filename and root at the
+    # document's own directory: that keeps this block's file server unable to
+    # reach anything else on the host, which is the point of giving it a
+    # directory of its own.
+    rewrite * /version.json
+    root * /var/www/wallet-version
+    file_server
+}

@@ -939,5 +939,14 @@
     "detailPromote": "Zatwierdzono nową wersję dla klucza {{handle}}",
     "detailExport": "Zatwierdzono eksport klucza dla {{handle}}",
     "detailOther": "Zatwierdzono operację sejfu na {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Wymagana aktualizacja",
+    "recommendedTitle": "Dostępna aktualizacja",
+    "whatChanges": "Co się zmienia",
+    "openStore": "Otwórz sklep",
+    "notNow": "Nie teraz",
+    "learnMore": "Dowiedz się więcej",
+    "versions": "Masz {{current}}. Potrzebna jest {{minimum}} lub nowsza."
   }
 }

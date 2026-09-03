@@ -926,5 +926,14 @@
     "detailPromote": "Apstiprināta jauna versija atslēgai {{handle}}",
     "detailExport": "Apstiprināts atslēgas eksports atslēgai {{handle}}",
     "detailOther": "Apstiprināta seifa darbība ar {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Nepieciešams atjauninājums",
+    "recommendedTitle": "Pieejams atjauninājums",
+    "whatChanges": "Kas mainās",
+    "openStore": "Atvērt veikalu",
+    "notNow": "Ne tagad",
+    "learnMore": "Uzzināt vairāk",
+    "versions": "Jums ir {{current}}. Nepieciešama {{minimum}} vai jaunāka."
   }
 }

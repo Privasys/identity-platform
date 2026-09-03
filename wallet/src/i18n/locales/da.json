@@ -891,5 +891,14 @@
     "detailPromote": "Godkendte en ny version til nøglen {{handle}}",
     "detailExport": "Godkendte en nøgleeksport for {{handle}}",
     "detailOther": "Godkendte en hvælvingshandling på {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Opdatering påkrævet",
+    "recommendedTitle": "Opdatering tilgængelig",
+    "whatChanges": "Hvad ændrer sig",
+    "openStore": "Åbn butikken",
+    "notNow": "Ikke nu",
+    "learnMore": "Læs mere",
+    "versions": "Du har {{current}}. Der kræves {{minimum}} eller nyere."
   }
 }

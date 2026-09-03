@@ -915,5 +915,14 @@
     "detailPromote": "Nova versão aprovada para a chave {{handle}}",
     "detailExport": "Exportação de chave aprovada para {{handle}}",
     "detailOther": "Operação do cofre aprovada em {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Atualização necessária",
+    "recommendedTitle": "Atualização disponível",
+    "whatChanges": "O que muda",
+    "openStore": "Abrir a loja",
+    "notNow": "Agora não",
+    "learnMore": "Saber mais",
+    "versions": "Tem a {{current}}. É necessária a {{minimum}} ou posterior."
   }
 }

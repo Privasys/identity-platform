@@ -974,5 +974,14 @@
     "detailPromote": "Ġiet approvata verżjoni ġdida għaċ-ċavetta {{handle}}",
     "detailExport": "Ġiet approvata esportazzjoni ta' ċavetta għal {{handle}}",
     "detailOther": "Ġiet approvata operazzjoni tas-safe fuq {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Aġġornament meħtieġ",
+    "recommendedTitle": "Aġġornament disponibbli",
+    "whatChanges": "X’jinbidel",
+    "openStore": "Iftaħ il-ħanut",
+    "notNow": "Mhux issa",
+    "learnMore": "Aqra aktar",
+    "versions": "Għandek {{current}}. Teħtieġ {{minimum}} jew aktar reċenti."
   }
 }

@@ -891,5 +891,14 @@
     "detailPromote": "Nieuwe versie goedgekeurd voor sleutel {{handle}}",
     "detailExport": "Sleutelexport goedgekeurd voor {{handle}}",
     "detailOther": "Kluisbewerking goedgekeurd op {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Update vereist",
+    "recommendedTitle": "Update beschikbaar",
+    "whatChanges": "Wat er verandert",
+    "openStore": "Open de store",
+    "notNow": "Niet nu",
+    "learnMore": "Meer lezen",
+    "versions": "Je hebt {{current}}. Nodig is {{minimum}} of nieuwer."
   }
 }

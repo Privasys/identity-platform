@@ -891,5 +891,14 @@
     "detailPromote": "Új verzió jóváhagyva a(z) {{handle}} kulcshoz",
     "detailExport": "Kulcsexportálás jóváhagyva ehhez: {{handle}}",
     "detailOther": "Széfművelet jóváhagyva ezen: {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Frissítés szükséges",
+    "recommendedTitle": "Elérhető frissítés",
+    "whatChanges": "Mi változik",
+    "openStore": "Áruház megnyitása",
+    "notNow": "Most nem",
+    "learnMore": "Tudjon meg többet",
+    "versions": "Önnél {{current}} van. Ehhez {{minimum}} vagy újabb kell."
   }
 }

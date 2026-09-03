@@ -891,5 +891,14 @@
     "detailPromote": "Neue Version für Schlüssel {{handle}} freigegeben",
     "detailExport": "Schlüsselexport für {{handle}} freigegeben",
     "detailOther": "Tresor-Operation für {{handle}} freigegeben"
+  },
+  "update": {
+    "requiredTitle": "Update erforderlich",
+    "recommendedTitle": "Update verfügbar",
+    "whatChanges": "Was sich ändert",
+    "openStore": "Store öffnen",
+    "notNow": "Jetzt nicht",
+    "learnMore": "Mehr erfahren",
+    "versions": "Sie haben {{current}}. Erforderlich ist {{minimum}} oder neuer."
   }
 }

@@ -926,5 +926,14 @@
     "detailPromote": "Odobrena nova verzija za ključ {{handle}}",
     "detailExport": "Odobren izvoz ključa za {{handle}}",
     "detailOther": "Odobrena operacija trezora nad {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Potrebno je ažuriranje",
+    "recommendedTitle": "Dostupno je ažuriranje",
+    "whatChanges": "Što se mijenja",
+    "openStore": "Otvori trgovinu",
+    "notNow": "Ne sada",
+    "learnMore": "Saznajte više",
+    "versions": "Imate {{current}}. Potrebna je {{minimum}} ili novija."
   }
 }

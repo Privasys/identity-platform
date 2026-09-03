@@ -216,6 +216,11 @@ describe('wipe coverage', () => {
         'src/hooks/useDeviceUuid.ts',
         // A cache of allowed values for profile attributes. No personal data.
         'src/services/value-sets.ts',
+        // The minimum-supported-version verdict. It describes the BUILD, not the
+        // person, so it is not the user's to erase; and clearing it would let a
+        // wipe lift a required-update wall on a device that is offline, which is
+        // the one bypass the gate exists to close.
+        'src/services/app-version.ts',
         // The generic SecureStore/localStorage shim itself.
         'src/utils/storage.ts',
     ]);

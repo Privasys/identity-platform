@@ -9,10 +9,12 @@ import 'react-native-get-random-values';
 import 'react-native-reanimated';
 
 import { SplashAnimation } from '@/components/SplashAnimation';
+import { UpdateGate } from '@/components/UpdateGate';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAppLocale } from '@/hooks/useAppLocale';
 import { useDeviceUuid } from '@/hooks/useDeviceUuid';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
+import { useUpdateGate } from '@/hooks/useUpdateGate';
 import { initI18n } from '@/i18n';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
@@ -87,6 +89,9 @@ export default function RootLayout() {
     });
 
     const hasProfile = useProfileStore((s) => s.profile != null);
+    // Is this build still supported? Null until an answer arrives, so a slow or
+    // absent network never delays the app.
+    const { notice: updateNotice, dismiss: dismissUpdate } = useUpdateGate();
     const [storesReady, setStoresReady] = useState(false);
     const [showSplashAnim, setShowSplashAnim] = useState(true);
 
@@ -127,6 +132,15 @@ export default function RootLayout() {
     return (
         <>
             <RootLayoutNav hasProfile={hasProfile} />
+            {/* Above the navigator, below the splash. A required notice has no
+                dismiss handler, and that absence IS what makes it a wall: there
+                is no flag the screen could be talked out of. */}
+            {updateNotice && (
+                <UpdateGate
+                    notice={updateNotice}
+                    onDismiss={updateNotice.level === 'required' ? undefined : dismissUpdate}
+                />
+            )}
             {showSplashAnim && (
                 <SplashAnimation
                     onComplete={onSplashComplete}

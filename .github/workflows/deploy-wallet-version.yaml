@@ -1,0 +1,210 @@
+# Copyright (c) Privasys. All rights reserved.
+# Licensed under the GNU Affero General Public License v3.0.
+
+name: Deploy wallet version floor
+
+# Publishes idp/wallet-version/version.json to
+# https://privasys.id/wallet/version.json, which every wallet reads at launch
+# and on each return to the foreground.
+#
+# The document is SIGNED here, with a key whose public half is pinned in the
+# wallet bundle. Serving privasys.id is therefore enough to REPLACE the
+# document but not to make a wallet act on it, which matters because this is a
+# remote kill switch sitting behind an ordinary TLS certificate.
+#
+# It can wall the entire installed base, so the deploy checks more than a 200:
+# it re-reads the served envelope, verifies the signature the way the wallet
+# will, asserts the payload is the committed document, and asserts the cache
+# headers still allow a change to propagate. A stuck `immutable` header on THIS
+# url would mean a mistaken floor could not be lifted.
+#
+# Reuses the WIF -> IAP path proven by deploy-i18n-packs.yaml.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'idp/wallet-version/version.json'
+      - 'idp/caddy/wallet-version.caddy'
+      - 'idp/caddy/install-wallet-version.sh'
+      - '.github/workflows/deploy-wallet-version.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # required for google-github-actions/auth WIF
+
+concurrency:
+  group: deploy-wallet-version
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy version floor
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Everything that can be caught before the document is live, is. A
+      # malformed document parses as "no floor" on every device, so a bad push
+      # disarms the gate silently rather than failing loudly.
+      #
+      # The rules live in a committed CommonJS module rather than inline here,
+      # so the wallet's own test suite exercises the very same file
+      # (wallet/src/__tests__/version-manifest-validate.test.ts). A guard that
+      # only ever runs in CI is a guard nobody has run.
+      - name: Validate the document
+        run: node idp/wallet-version/validate.cjs idp/wallet-version/version.json
+
+      # The silent failure this whole feature is prone to: a floor signed by a
+      # key no shipped build carries is ignored by every wallet, and looks
+      # exactly like the feature being broken. Two ways in, both caught here:
+      # the secret and the pin were generated in different runs, or the release
+      # carrying the pin has not shipped.
+      - name: Check the signing key is pinned in the wallet
+        env:
+          WALLET_VERSION_SIGNING_KEY: ${{ secrets.WALLET_VERSION_SIGNING_KEY }}
+          WALLET_VERSION_KEY_ID: ${{ secrets.WALLET_VERSION_KEY_ID }}
+        run: |
+          set -euo pipefail
+          node - <<'JS'
+          const crypto = require('node:crypto');
+          const { readFileSync } = require('node:fs');
+          const pem = process.env.WALLET_VERSION_SIGNING_KEY;
+          const keyId = process.env.WALLET_VERSION_KEY_ID;
+          if (!pem || !keyId) {
+            console.error('WALLET_VERSION_SIGNING_KEY / WALLET_VERSION_KEY_ID are not set.');
+            console.error('Mint one with: node idp/wallet-version/gen-key.cjs');
+            console.error('Its public half must be pinned in a SHIPPED wallet release first.');
+            process.exit(1);
+          }
+          const src = readFileSync('wallet/src/services/version-signing-keys.ts', 'utf8');
+          const pinned = {};
+          for (const m of src.matchAll(/'([\w.-]+)':\s*'([A-Za-z0-9_-]{43})'/g)) pinned[m[1]] = m[2];
+          const pub = crypto.createPublicKey(crypto.createPrivateKey(pem)).export({ format: 'jwk' }).x;
+          if (!pinned[keyId]) {
+            console.error(`keyId ${keyId} is not pinned in the wallet. Pinned: ${Object.keys(pinned).join(', ') || '(none)'}`);
+            process.exit(1);
+          }
+          if (pinned[keyId] !== pub) {
+            // The classic version of this: gen-key.cjs run twice, the PEM kept
+            // from one run and the public key pasted from the other.
+            console.error(`keyId ${keyId} is pinned, but as a DIFFERENT key.`);
+            console.error(`  pinned: ${pinned[keyId]}`);
+            console.error(`  secret: ${pub}`);
+            process.exit(1);
+          }
+          console.log(`signing key ${keyId} matches the pin in this checkout`);
+          JS
+
+      # Deliberately hard-fails when the signing secret is absent. Publishing
+      # unsigned would return 200 and be ignored by every wallet, which is
+      # indistinguishable from the feature being broken; failing here says so.
+      - name: Sign the document
+        env:
+          WALLET_VERSION_SIGNING_KEY: ${{ secrets.WALLET_VERSION_SIGNING_KEY }}
+          WALLET_VERSION_KEY_ID: ${{ secrets.WALLET_VERSION_KEY_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WALLET_VERSION_SIGNING_KEY}" ] || [ -z "${WALLET_VERSION_KEY_ID}" ]; then
+            echo "WALLET_VERSION_SIGNING_KEY / WALLET_VERSION_KEY_ID are not set." >&2
+            echo "Mint one with: node idp/wallet-version/gen-key.cjs" >&2
+            echo "The matching public key must be pinned in a SHIPPED wallet release first." >&2
+            exit 1
+          fi
+          node idp/wallet-version/sign.cjs idp/wallet-version/version.json > /tmp/version.json
+          echo "signed as ${WALLET_VERSION_KEY_ID}"
+          wc -c /tmp/version.json
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      # NOTE: SSH into idp-fr-par-1 via IAP requires google-guest-agent to be
+      # running on the VM. If it is ever disabled, every CI SSH attempt fails
+      # with "Permission denied (publickey)". See publish-sdk.yaml.
+      # /tmp/version.json is the SIGNED envelope written by the step above, not
+      # the plain document in the repo.
+      - name: Upload document and installer
+        run: |
+          gcloud compute scp \
+            /tmp/version.json \
+            idp/caddy/wallet-version.caddy \
+            idp/caddy/install-wallet-version.sh \
+            idp-fr-par-1:/tmp/ \
+            --project privasys-production \
+            --zone europe-west9-a \
+            --tunnel-through-iap \
+            --scp-flag="-O"
+
+      - name: Install document and Caddy route
+        run: |
+          gcloud compute ssh idp-fr-par-1 \
+            --project privasys-production \
+            --zone europe-west9-a \
+            --tunnel-through-iap \
+            --command "chmod +x /tmp/install-wallet-version.sh && /tmp/install-wallet-version.sh && rm -f /tmp/install-wallet-version.sh"
+
+      # A 200 proves routing. It proves nothing about what a wallet will accept,
+      # which is the only thing that matters for a document that can wall every
+      # wallet. So verify the signature exactly as the app does, then assert the
+      # payload inside is the document that was reviewed in this repo.
+      - name: Verify the served envelope
+        env:
+          WALLET_VERSION_SIGNING_KEY: ${{ secrets.WALLET_VERSION_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          URL="https://privasys.id/wallet/version.json"
+          STATUS=$(curl -sS -o /tmp/served.json -w '%{http_code}' "$URL")
+          test "$STATUS" = "200" || { echo "HTTP ${STATUS}"; exit 1; }
+          node - <<'JS'
+          const crypto = require('node:crypto');
+          const { readFileSync } = require('node:fs');
+          const env = JSON.parse(readFileSync('/tmp/served.json', 'utf8'));
+          const payload = Buffer.from(env.payload, 'base64url');
+          // Public half derived from the signing key, so this checks the same
+          // pairing the wallet will, not merely that a signature is present.
+          const pub = crypto.createPublicKey(crypto.createPrivateKey(process.env.WALLET_VERSION_SIGNING_KEY));
+          const ok = crypto.verify(null, payload, pub, Buffer.from(env.sig, 'base64url'));
+          if (!ok) { console.error('served signature does not verify'); process.exit(1); }
+          const served = JSON.parse(payload.toString('utf8'));
+          const committed = JSON.parse(readFileSync('idp/wallet-version/version.json', 'utf8'));
+          if (JSON.stringify(served) !== JSON.stringify(committed)) {
+            console.error('served payload is not the committed document');
+            console.error('served:   ', JSON.stringify(served));
+            console.error('committed:', JSON.stringify(committed));
+            process.exit(1);
+          }
+          console.log('signature ok, payload matches:', JSON.stringify(served));
+          JS
+
+      # `immutable` here would be a trap: a mistaken floor could not be lifted
+      # until every cache in the path expired. Assert the TTL stays short.
+      - name: Check cache and CORS headers
+        run: |
+          set -euo pipefail
+          curl -sSI "https://privasys.id/wallet/version.json" | tee /tmp/headers.txt
+          grep -qi 'cache-control: public, max-age=60, must-revalidate' /tmp/headers.txt
+          grep -qi 'access-control-allow-origin: \*' /tmp/headers.txt
+          ! grep -qi 'immutable' /tmp/headers.txt
+
+      # The route this deploy could plausibly break. /wallet/link and
+      # /wallet/link/result are the IdP's social-account linking flow, live and
+      # used by the wallet; a prefix match on /wallet/* here would hand them to
+      # a file server and 404 a working feature. Prove they still reach the IdP.
+      - name: Check the IdP still owns the rest of /wallet/
+        run: |
+          set -euo pipefail
+          BODY=$(curl -sS -o /tmp/link.txt -w '%{http_code}' "https://privasys.id/wallet/link" || true)
+          echo "GET /wallet/link -> ${BODY}"
+          # Whatever it answers (a redirect, a 400 for missing parameters), it
+          # must not be our document and must not be the file server's 404.
+          ! grep -q '"schema"' /tmp/link.txt
+          test "${BODY}" != "404" || { echo "/wallet/link now 404s: this deploy shadowed the IdP"; exit 1; }

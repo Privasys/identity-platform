@@ -902,5 +902,14 @@
     "detailPromote": "Kiideti heaks uus versioon võtmele {{handle}}",
     "detailExport": "Kiideti heaks võtme eksport võtmele {{handle}}",
     "detailOther": "Kiideti heaks hoidla toiming võtmel {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Vajalik on uuendus",
+    "recommendedTitle": "Uuendus on saadaval",
+    "whatChanges": "Mis muutub",
+    "openStore": "Ava pood",
+    "notNow": "Mitte praegu",
+    "learnMore": "Loe rohkem",
+    "versions": "Teil on {{current}}. Vaja on {{minimum}} või uuemat."
   }
 }

@@ -902,5 +902,14 @@
     "detailPromote": "Одобрена е нова версия за ключ {{handle}}",
     "detailExport": "Одобрено е изнасяне на ключ за {{handle}}",
     "detailOther": "Одобрена е операция в трезора върху {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Необходима е актуализация",
+    "recommendedTitle": "Налична е актуализация",
+    "whatChanges": "Какво се променя",
+    "openStore": "Отваряне на магазина",
+    "notNow": "Не сега",
+    "learnMore": "Прочетете повече",
+    "versions": "Имате {{current}}. Необходима е {{minimum}} или по-нова."
   }
 }

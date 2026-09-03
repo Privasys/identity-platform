@@ -915,5 +915,14 @@
     "detailPromote": "Nouvelle version approuvée pour la clé {{handle}}",
     "detailExport": "Export de clé approuvé pour {{handle}}",
     "detailOther": "Opération de coffre approuvée sur {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Mise à jour requise",
+    "recommendedTitle": "Mise à jour disponible",
+    "whatChanges": "Ce qui change",
+    "openStore": "Ouvrir la boutique",
+    "notNow": "Pas maintenant",
+    "learnMore": "En savoir plus",
+    "versions": "Vous avez {{current}}. Il faut {{minimum}} ou une version plus récente."
   }
 }

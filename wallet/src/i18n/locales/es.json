@@ -915,5 +915,14 @@
     "detailPromote": "Nueva versión aprobada para la clave {{handle}}",
     "detailExport": "Exportación de clave aprobada para {{handle}}",
     "detailOther": "Operación de bóveda aprobada sobre {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Actualización necesaria",
+    "recommendedTitle": "Actualización disponible",
+    "whatChanges": "Qué cambia",
+    "openStore": "Abrir la tienda",
+    "notNow": "Ahora no",
+    "learnMore": "Leer más",
+    "versions": "Tienes {{current}}. Se necesita {{minimum}} o posterior."
   }
 }

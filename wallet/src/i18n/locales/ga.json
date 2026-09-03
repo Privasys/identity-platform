@@ -974,5 +974,14 @@
     "detailPromote": "Ceadaíodh leagan nua don eochair {{handle}}",
     "detailExport": "Ceadaíodh easpórtáil eochrach do {{handle}}",
     "detailOther": "Ceadaíodh oibríocht daingin ar {{handle}}"
+  },
+  "update": {
+    "requiredTitle": "Nuashonrú riachtanach",
+    "recommendedTitle": "Nuashonrú ar fáil",
+    "whatChanges": "Na hathruithe",
+    "openStore": "Oscail an siopa",
+    "notNow": "Ní anois",
+    "learnMore": "Tuilleadh eolais",
+    "versions": "Tá {{current}} agat. Teastaíonn {{minimum}} nó níos déanaí."
   }
 }

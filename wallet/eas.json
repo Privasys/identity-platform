@@ -41,9 +41,9 @@
         "production": {
             "ios": {
                 "ascAppId": "6761209489",
-                "ascApiKeyId": "9H3WFH5GZY",
-                "ascApiKeyIssuerId": "187e7a6e-cbee-4599-8043-eb862a5bf2f9",
-                "ascApiKeyPath": "../keys/AuthKey_9H3WFH5GZY.p8"
+                "ascApiKeyId": "LK6XPT3RK2",
+                "ascApiKeyIssuerId": "7b8de6b6-bda6-4fd6-a8e4-5f755fab8fea",
+                "ascApiKeyPath": "../keys/AuthKey_LK6XPT3RK2.p8"
             },
             "android": {
                 "serviceAccountKeyPath": "./google-play-key.json",

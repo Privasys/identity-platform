@@ -370,7 +370,7 @@ jobs:
       - name: Write App Store Connect API Key
         run: |
           mkdir -p keys
-          echo "${{ secrets.ASC_API_KEY_P8_BASE64 }}" | base64 -d > keys/AuthKey_9H3WFH5GZY.p8
+          echo "${{ secrets.ASC_API_KEY_P8_BASE64 }}" | base64 -d > keys/AuthKey_LK6XPT3RK2.p8
 
       - name: Submit to TestFlight
         working-directory: wallet

@@ -231,8 +231,11 @@ func sendAttributeApprovalPush(pushToken, capability string, addedCount int) {
 	msg := []map[string]interface{}{{
 		"to":    pushToken,
 		"sound": "default",
-		"title": "Data request",
-		"body":  body,
+		// APNs priority 10. See the note in admin/notify.go: Expo's default
+		// maps to priority 5, which lets iOS defer delivery for power.
+		"priority": "high",
+		"title":    "Data request",
+		"body":     body,
 		"data": map[string]string{
 			"type":     "attribute-approval",
 			"approval": capability,

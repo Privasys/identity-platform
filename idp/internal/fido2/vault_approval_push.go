@@ -189,8 +189,11 @@ func sendVaultApprovalPush(pushToken, vaultOp string, summary vaultApprovalSumma
 	msg := []map[string]interface{}{{
 		"to":    pushToken,
 		"sound": "default",
-		"title": "Vault approval",
-		"body":  body,
+		// APNs priority 10. See the note in admin/notify.go: Expo's default
+		// maps to priority 5, which lets iOS defer delivery for power.
+		"priority": "high",
+		"title":    "Vault approval",
+		"body":     body,
 		"data": map[string]string{
 			"type":     "vault-approval",
 			"vault_op": vaultOp,

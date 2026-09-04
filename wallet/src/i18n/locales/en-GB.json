@@ -615,6 +615,8 @@
     "defaultDisplayName": "Privasys User",
     "setupTitle": "Set up your wallet",
     "setupLede": "It takes a few seconds, and everything is created here on your phone. There is no account and no password.",
+    "finishRestoreTitle": "Finish restoring your wallet",
+    "finishRestoreLede": "Your account is recovered. One step left on this device: confirm it is you, and your identity comes back with it.",
     "setupWith": "Set up with {{method}}",
     "setupPrompt": "Set up your Privasys wallet",
     "usePasscode": "Use Passcode",
@@ -716,7 +718,9 @@
     "restoredTitle": "Device Restored",
     "restoredBody": "This device now signs in as your recovered account. Consider generating a fresh recovery phrase in Settings → Account Recovery, because recovery phrases are single-use.",
     "expiredTitle": "Recovery Expired",
-    "expiredBody": "Your recovery request has expired. Please start a new recovery with a different recovery code."
+    "expiredBody": "Your recovery request has expired. Please start a new recovery with a different recovery code.",
+    "newPhraseTitle": "Your new recovery phrase",
+    "newPhraseBody": "Recovering replaced your old phrase, so those words no longer work. Write these 24 down and keep them somewhere safe. They are shown once."
   },
   "scan": {
     "close": "Close scanner"

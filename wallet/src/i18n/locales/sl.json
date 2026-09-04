@@ -639,6 +639,8 @@
     "defaultDisplayName": "Uporabnik Privasys",
     "setupTitle": "Nastavite svojo denarnico",
     "setupLede": "Traja nekaj sekund, vse pa se ustvari tukaj, na vašem telefonu. Ni računa in ni gesla.",
+    "finishRestoreTitle": "Dokončajte obnovitev denarnice",
+    "finishRestoreLede": "Vaš račun je obnovljen. Na tej napravi je ostal en korak: potrdite, da ste to vi, in vaša identiteta se vrne z njim.",
     "setupWith": "Nastavi z {{method}}",
     "setupPrompt": "Nastavite svojo denarnico Privasys",
     "usePasscode": "Uporabi geslo naprave",
@@ -750,7 +752,9 @@
     "restoredTitle": "Naprava obnovljena",
     "restoredBody": "Ta naprava se zdaj prijavlja kot vaš obnovljeni račun. Razmislite o tem, da v Nastavitve → Obnovitev računa ustvarite novo obnovitveno geslo, saj so obnovitvena gesla za enkratno uporabo.",
     "expiredTitle": "Obnovitev je potekla",
-    "expiredBody": "Vaša zahteva za obnovitev je potekla. Začnite novo obnovitev z drugo obnovitveno kodo, prosim."
+    "expiredBody": "Vaša zahteva za obnovitev je potekla. Začnite novo obnovitev z drugo obnovitveno kodo, prosim.",
+    "newPhraseTitle": "Vaša nova obnovitvena fraza",
+    "newPhraseBody": "Obnovitev je zamenjala staro frazo, zato tiste besede ne delujejo več. Zapišite si teh 24 in jih shranite na varno. Prikažejo se enkrat."
   },
   "scan": {
     "close": "Zapri skener"

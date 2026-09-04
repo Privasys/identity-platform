@@ -627,6 +627,8 @@
     "defaultDisplayName": "Utilizator Privasys",
     "setupTitle": "Configurează-ți portofelul",
     "setupLede": "Durează câteva secunde, iar totul se creează aici, pe telefonul tău. Nu există niciun cont și nicio parolă.",
+    "finishRestoreTitle": "Termină restaurarea portofelului",
+    "finishRestoreLede": "Contul tău a fost recuperat. A mai rămas un pas pe acest dispozitiv: confirmă că ești tu, iar identitatea revine odată cu el.",
     "setupWith": "Configurează cu {{method}}",
     "setupPrompt": "Configurează-ți portofelul Privasys",
     "usePasscode": "Folosește codul de acces",
@@ -733,7 +735,9 @@
     "restoredTitle": "Dispozitiv restaurat",
     "restoredBody": "Acest dispozitiv se autentifică acum ca fiind contul tău recuperat. Ia în calcul să generezi o frază de recuperare nouă în Setări → Recuperarea contului, pentru că frazele de recuperare se folosesc o singură dată.",
     "expiredTitle": "Recuperare expirată",
-    "expiredBody": "Cererea ta de recuperare a expirat. Te rugăm să începi o recuperare nouă cu un alt cod de recuperare."
+    "expiredBody": "Cererea ta de recuperare a expirat. Te rugăm să începi o recuperare nouă cu un alt cod de recuperare.",
+    "newPhraseTitle": "Noua ta frază de recuperare",
+    "newPhraseBody": "Recuperarea a înlocuit fraza veche, așa că acele cuvinte nu mai funcționează. Notează aceste 24 și păstrează-le în siguranță. Se afișează o singură dată."
   },
   "scan": {
     "close": "Închide scanerul"

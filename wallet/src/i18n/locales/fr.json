@@ -606,6 +606,8 @@
     "defaultDisplayName": "Utilisateur Privasys",
     "setupTitle": "Configurez votre portefeuille",
     "setupLede": "Cela prend quelques secondes, et tout est créé ici, sur votre téléphone. Il n'y a ni compte ni mot de passe.",
+    "finishRestoreTitle": "Terminez la restauration de votre portefeuille",
+    "finishRestoreLede": "Votre compte est récupéré. Il reste une étape sur cet appareil : confirmez que c'est bien vous, et votre identité revient avec.",
     "setupWith": "Configurer avec {{method}}",
     "setupPrompt": "Configurer votre Privasys Wallet",
     "usePasscode": "Utiliser le code",
@@ -713,7 +715,9 @@
     "restoredTitle": "Appareil restauré",
     "restoredBody": "Cet appareil se connecte désormais avec votre compte récupéré. Pensez à générer une nouvelle phrase de récupération dans Réglages → Récupération de compte, car les phrases de récupération sont à usage unique.",
     "expiredTitle": "Récupération expirée",
-    "expiredBody": "Votre demande de récupération a expiré. Veuillez lancer une nouvelle récupération avec un autre code de récupération."
+    "expiredBody": "Votre demande de récupération a expiré. Veuillez lancer une nouvelle récupération avec un autre code de récupération.",
+    "newPhraseTitle": "Votre nouvelle phrase de récupération",
+    "newPhraseBody": "La récupération a remplacé votre ancienne phrase, ces mots ne fonctionnent donc plus. Notez ces 24 mots et gardez-les en lieu sûr. Ils ne s'affichent qu'une fois."
   },
 
   "scan": {

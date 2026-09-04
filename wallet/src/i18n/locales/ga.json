@@ -651,6 +651,8 @@
     "defaultDisplayName": "Úsáideoir Privasys",
     "setupTitle": "Socraigh do sparán",
     "setupLede": "Tógann sé cúpla soicind, agus cruthaítear gach rud anseo ar do ghuthán. Níl aon chuntas ná pasfhocal ann.",
+    "finishRestoreTitle": "Críochnaigh athchóiriú do sparáin",
+    "finishRestoreLede": "Tá do chuntas aisghafa. Céim amháin fágtha ar an ngléas seo: deimhnigh gur tusa atá ann, agus fillfidh d’aitheantas leis.",
     "setupWith": "Socraigh le {{method}}",
     "setupPrompt": "Socraigh do sparán Privasys",
     "usePasscode": "Úsáid pascód",
@@ -767,7 +769,9 @@
     "restoredTitle": "Gléas athchóirithe",
     "restoredBody": "Síníonn an gléas seo isteach anois mar do chuntas aisghabhtha. Smaoinigh ar fhrása aisghabhála nua a chruthú i Socruithe → Aisghabháil Cuntais, mar is frásaí aonúsáide iad frásaí aisghabhála.",
     "expiredTitle": "Aisghabháil imithe in éag",
-    "expiredBody": "Tá d'iarratas aisghabhála imithe in éag. Tosaigh aisghabháil nua le cód aisghabhála difriúil le do thoil."
+    "expiredBody": "Tá d'iarratas aisghabhála imithe in éag. Tosaigh aisghabháil nua le cód aisghabhála difriúil le do thoil.",
+    "newPhraseTitle": "Do fhrása aisghabhála nua",
+    "newPhraseBody": "Chuir an aisghabháil frása nua in ionad an tseanchinn, mar sin ní oibríonn na focail sin a thuilleadh. Scríobh na 24 seo síos agus coinnigh slán iad. Taispeántar uair amháin iad."
   },
   "scan": {
     "close": "Dún an scanóir"

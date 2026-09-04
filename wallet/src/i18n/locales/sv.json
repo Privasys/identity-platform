@@ -594,6 +594,8 @@
     "defaultDisplayName": "Privasys-användare",
     "setupTitle": "Ställ in din plånbok",
     "setupLede": "Det tar några sekunder, och allt skapas här på din telefon. Det finns inget konto och inget lösenord.",
+    "finishRestoreTitle": "Slutför återställningen av din plånbok",
+    "finishRestoreLede": "Ditt konto är återställt. Ett steg återstår på den här enheten: bekräfta att det är du, så följer din identitet med.",
     "setupWith": "Ställ in med {{method}}",
     "setupPrompt": "Ställ in din Privasys Wallet",
     "usePasscode": "Använd lösenkod",
@@ -696,7 +698,9 @@
     "restoredTitle": "Enheten är återställd",
     "restoredBody": "Den här enheten loggar nu in som ditt återställda konto. Överväg att skapa en ny återställningsfras i Inställningar → Kontoåterställning, eftersom återställningsfraser bara kan användas en gång.",
     "expiredTitle": "Återställningen har gått ut",
-    "expiredBody": "Din återställningsbegäran har gått ut. Starta en ny återställning med en annan återställningskod."
+    "expiredBody": "Din återställningsbegäran har gått ut. Starta en ny återställning med en annan återställningskod.",
+    "newPhraseTitle": "Din nya återställningsfras",
+    "newPhraseBody": "Återställningen ersatte din gamla fras, så de orden fungerar inte längre. Skriv ner dessa 24 och förvara dem säkert. De visas en gång."
   },
 
   "scan": {

@@ -594,6 +594,8 @@
     "defaultDisplayName": "Privasys-bruger",
     "setupTitle": "Opsæt din wallet",
     "setupLede": "Det tager få sekunder, og alt oprettes her på din telefon. Der er ingen konto og ingen adgangskode.",
+    "finishRestoreTitle": "Færdiggør gendannelsen af din tegnebog",
+    "finishRestoreLede": "Din konto er gendannet. Ét skridt tilbage på denne enhed: bekræft at det er dig, så følger din identitet med.",
     "setupWith": "Opsæt med {{method}}",
     "setupPrompt": "Opsæt din Privasys Wallet",
     "usePasscode": "Brug adgangskode",
@@ -696,7 +698,9 @@
     "restoredTitle": "Enheden er gendannet",
     "restoredBody": "Denne enhed logger nu ind som din gendannede konto. Overvej at oprette en ny gendannelsessætning under Indstillinger → Kontogendannelse, for gendannelsessætninger kan kun bruges én gang.",
     "expiredTitle": "Gendannelsen er udløbet",
-    "expiredBody": "Din gendannelsesanmodning er udløbet. Start en ny gendannelse med en anden gendannelseskode."
+    "expiredBody": "Din gendannelsesanmodning er udløbet. Start en ny gendannelse med en anden gendannelseskode.",
+    "newPhraseTitle": "Din nye gendannelsessætning",
+    "newPhraseBody": "Gendannelsen erstattede din gamle sætning, så de ord virker ikke længere. Skriv disse 24 ned, og opbevar dem sikkert. De vises kun én gang."
   },
 
   "scan": {

@@ -606,6 +606,8 @@
     "defaultDisplayName": "Usuario de Privasys",
     "setupTitle": "Configura tu monedero",
     "setupLede": "Tarda unos segundos, y todo se crea aquí, en tu teléfono. No hay cuenta ni contraseña.",
+    "finishRestoreTitle": "Termina de restaurar tu cartera",
+    "finishRestoreLede": "Tu cuenta está recuperada. Queda un paso en este dispositivo: confirma que eres tú y tu identidad vuelve con ello.",
     "setupWith": "Configurar con {{method}}",
     "setupPrompt": "Configurar tu Privasys Wallet",
     "usePasscode": "Usar el código",
@@ -713,7 +715,9 @@
     "restoredTitle": "Dispositivo restaurado",
     "restoredBody": "Este dispositivo ahora inicia sesión con tu cuenta recuperada. Conviene generar una nueva frase de recuperación en Ajustes → Recuperación de cuenta, porque las frases de recuperación son de un solo uso.",
     "expiredTitle": "Recuperación caducada",
-    "expiredBody": "Tu solicitud de recuperación ha caducado. Inicia una nueva recuperación con otro código de recuperación."
+    "expiredBody": "Tu solicitud de recuperación ha caducado. Inicia una nueva recuperación con otro código de recuperación.",
+    "newPhraseTitle": "Tu nueva frase de recuperación",
+    "newPhraseBody": "La recuperación sustituyó tu frase anterior, así que esas palabras ya no funcionan. Anota estas 24 y guárdalas en un lugar seguro. Se muestran una sola vez."
   },
 
   "scan": {

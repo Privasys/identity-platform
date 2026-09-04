@@ -594,6 +594,8 @@
     "defaultDisplayName": "Privasys felhasználó",
     "setupTitle": "Állítsa be a tárcáját",
     "setupLede": "Néhány másodpercet vesz igénybe, és minden itt, a telefonján jön létre. Nincs fiók és nincs jelszó.",
+    "finishRestoreTitle": "Fejezze be a tárca visszaállítását",
+    "finishRestoreLede": "A fiókja helyreállt. Ezen az eszközön egy lépés maradt: erősítse meg, hogy ön az, és a személyazonossága visszatér vele.",
     "setupWith": "Beállítás ezzel: {{method}}",
     "setupPrompt": "A Privasys Wallet beállítása",
     "usePasscode": "Kód használata",
@@ -696,7 +698,9 @@
     "restoredTitle": "Az eszköz helyreállt",
     "restoredBody": "Ez az eszköz mostantól a helyreállított fiókjaként jelentkezik be. Érdemes új helyreállítási kifejezést létrehoznia a Beállítások → Fiók-helyreállítás menüben, mert a helyreállítási kifejezések egyszer használatosak.",
     "expiredTitle": "A helyreállítás lejárt",
-    "expiredBody": "A helyreállítási kérelme lejárt. Indítson új helyreállítást másik helyreállítási kóddal."
+    "expiredBody": "A helyreállítási kérelme lejárt. Indítson új helyreállítást másik helyreállítási kóddal.",
+    "newPhraseTitle": "Az új helyreállítási kifejezése",
+    "newPhraseBody": "A helyreállítás lecserélte a régi kifejezését, így azok a szavak már nem működnek. Írja le ezt a 24 szót, és tartsa biztonságos helyen. Csak egyszer jelennek meg."
   },
 
   "scan": {

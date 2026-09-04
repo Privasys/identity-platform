@@ -627,6 +627,8 @@
     "defaultDisplayName": "Korisnik Privasys",
     "setupTitle": "Postavite svoj novčanik",
     "setupLede": "Traje nekoliko sekundi, a sve se stvara ovdje, na vašem telefonu. Nema računa ni lozinke.",
+    "finishRestoreTitle": "Dovršite vraćanje novčanika",
+    "finishRestoreLede": "Vaš je račun vraćen. Na ovom uređaju ostaje jedan korak: potvrdite da ste to vi i vaš se identitet vraća s njim.",
     "setupWith": "Postavi pomoću {{method}}",
     "setupPrompt": "Postavite svoj novčanik Privasys",
     "usePasscode": "Koristi zaporku uređaja",
@@ -733,7 +735,9 @@
     "restoredTitle": "Uređaj vraćen",
     "restoredBody": "Ovaj uređaj sada se prijavljuje kao vaš oporavljeni račun. Razmislite o generiranju nove fraze za oporavak u Postavke → Oporavak računa jer su fraze za oporavak jednokratne.",
     "expiredTitle": "Oporavak je istekao",
-    "expiredBody": "Vaš zahtjev za oporavak je istekao. Molimo započnite novi oporavak s drugim kodom za oporavak."
+    "expiredBody": "Vaš zahtjev za oporavak je istekao. Molimo započnite novi oporavak s drugim kodom za oporavak.",
+    "newPhraseTitle": "Vaša nova fraza za oporavak",
+    "newPhraseBody": "Oporavak je zamijenio staru frazu, pa te riječi više ne vrijede. Zapišite ovih 24 i čuvajte ih na sigurnom. Prikazuju se jednom."
   },
   "scan": {
     "close": "Zatvori skener"

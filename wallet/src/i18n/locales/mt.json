@@ -651,6 +651,8 @@
     "defaultDisplayName": "Utent ta' Privasys",
     "setupTitle": "Issettja l-kartiera tiegħek",
     "setupLede": "Jieħu ftit sekondi, u kollox jinħoloq hawn fuq it-telefon tiegħek. M'hemm l-ebda kont u l-ebda password.",
+    "finishRestoreTitle": "Temm ir-restawr tal-kartiera tiegħek",
+    "finishRestoreLede": "Il-kont tiegħek ġie rkuprat. Fadal pass wieħed fuq dan l-apparat: ikkonferma li huwa int, u l-identità tiegħek terġa’ lura miegħu.",
     "setupWith": "Issettja bi {{method}}",
     "setupPrompt": "Issettja l-kartiera Privasys tiegħek",
     "usePasscode": "Uża l-passcode",
@@ -767,7 +769,9 @@
     "restoredTitle": "L-apparat ġie rrestawrat",
     "restoredBody": "Dan l-apparat issa jagħmel login bħala l-kont irkuprat tiegħek. Ikkunsidra li tiġġenera frażi tal-irkupru ġdida f'Issettjar → Irkupru tal-Kont, għax il-frażijiet tal-irkupru jintużaw darba biss.",
     "expiredTitle": "L-irkupru skada",
-    "expiredBody": "It-talba tiegħek għal irkupru skadiet. Jekk jogħġbok ibda rkupru ġdid b'kodiċi tal-irkupru differenti."
+    "expiredBody": "It-talba tiegħek għal irkupru skadiet. Jekk jogħġbok ibda rkupru ġdid b'kodiċi tal-irkupru differenti.",
+    "newPhraseTitle": "Il-frażi l-ġdida ta’ rkupru tiegħek",
+    "newPhraseBody": "L-irkupru bidel il-frażi l-antika tiegħek, għalhekk dawk il-kliem ma jaħdmux aktar. Ikteb dawn l-24 u żommhom f’post sigur. Jintwerew darba biss."
   },
   "scan": {
     "close": "Agħlaq l-iskener"

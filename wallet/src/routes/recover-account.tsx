@@ -14,6 +14,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
@@ -60,7 +61,7 @@ interface RecoveryState {
     expiresAt: string;
 }
 
-type FlowStep = 'enter-code' | 'waiting' | 'approved' | 'completed' | 'restored' | 'expired';
+type FlowStep = 'enter-code' | 'waiting' | 'approved' | 'completed' | 'new-phrase' | 'restored' | 'expired';
 
 export default function RecoverAccountScreen() {
     const { t } = useTranslation();
@@ -70,6 +71,16 @@ export default function RecoverAccountScreen() {
     const styles = useMemo(() => makeStyles(p), [p]);
 
     const [step, setStep] = useState<FlowStep>('enter-code');
+    /**
+     * The phrase the IdP issues when the recovered device registers.
+     *
+     * Recovery revokes the account's credentials and its old phrase, and the
+     * registration that follows mints a replacement, returned ONCE in that
+     * response. This screen used to take the result, read the credential out of
+     * it and drop the phrase on the floor, so a holder finished a recovery with
+     * no way to ever do another one and nothing telling them so.
+     */
+    const [issuedPhrase, setIssuedPhrase] = useState<string | null>(null);
     const [codeInput, setCodeInput] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [completing, setCompleting] = useState(false);
@@ -454,7 +465,16 @@ export default function RecoverAccountScreen() {
             enteredPhraseRef.current = null;
 
             await Storage.deleteItemAsync(RECOVERY_STATE_KEY);
-            setStep('restored');
+            if (result.recoveryPhrase) {
+                // Not saved until the holder says so: the nudge on Home is
+                // driven by this flag, and it is the only thing that will chase
+                // them if they walk away from the next screen.
+                useAuthStore.getState().setRecoveryPhraseSaved(false);
+                setIssuedPhrase(result.recoveryPhrase);
+                setStep('new-phrase');
+            } else {
+                setStep('restored');
+            }
         } catch (e: any) {
             console.error('[recover-account] recovered registration failed:', e?.message, e);
             // A retry button, because the alert says the sign-ins are unchanged
@@ -692,6 +712,46 @@ export default function RecoverAccountScreen() {
                             ) : (
                                 <Text style={styles.primaryButtonText}>{t('recover.registerDevice')}</Text>
                             )}
+                        </Pressable>
+                    </>
+                )}
+
+                {/* Step 4b: the replacement phrase, shown once. */}
+                {step === 'new-phrase' && issuedPhrase && (
+                    <>
+                        <RNView style={styles.iconContainer}>
+                            <Ionicons name="key" size={48} color={p.blue} />
+                        </RNView>
+                        <Text style={styles.title}>{t('recover.newPhraseTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.newPhraseBody')}</Text>
+
+                        <RNView style={styles.wordChips}>
+                            {issuedPhrase.split(/\s+/).map((word, i) => (
+                                <RNView key={i} style={styles.wordChip}>
+                                    <Text style={styles.wordChipText}>{i + 1}. {word}</Text>
+                                </RNView>
+                            ))}
+                        </RNView>
+
+                        <Pressable
+                            style={styles.secondaryButton}
+                            onPress={async () => {
+                                await Clipboard.setStringAsync(issuedPhrase);
+                                Alert.alert(t('common.copied'), t('secureWallet.copiedWarning'));
+                            }}
+                        >
+                            <Text style={styles.secondaryButtonText}>{t('common.copy')}</Text>
+                        </Pressable>
+
+                        <Pressable
+                            style={styles.primaryButton}
+                            onPress={() => {
+                                useAuthStore.getState().setRecoveryPhraseSaved(true);
+                                setIssuedPhrase(null);
+                                setStep('restored');
+                            }}
+                        >
+                            <Text style={styles.primaryButtonText}>{t('secureWallet.savedIt')}</Text>
                         </Pressable>
                     </>
                 )}

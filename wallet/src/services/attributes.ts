@@ -284,6 +284,15 @@ export function marketplaceKeyFor(key: string): string {
  * `attributes` bag.
  */
 export function getProfileValue(profile: UserProfile, key: string): string | undefined {
+    // `name` before the profile field, because that field is seeded with a
+    // placeholder at setup and a placeholder is not a value. Reading it
+    // straight through is how a relying party ended up being told the holder
+    // was called "Privasys User" while the wallet held a first and last name
+    // imported from Google (2026-09-04). This is the same precedence
+    // profileDisplayName renders with, resolved in one place so what is SHOWN
+    // and what is SENT cannot drift.
+    if (key === 'name') return resolvedName(profile);
+
     const def = ATTRIBUTE_MAP[key];
     if (def?.profileField) {
         const val = profile[def.profileField];
@@ -291,6 +300,33 @@ export function getProfileValue(profile: UserProfile, key: string): string | und
     }
     // Fall back to extended attributes bag
     return profile.attributes?.find((a) => a.key === key)?.value || undefined;
+}
+
+/**
+ * An explicit Display Name, else first and last, else nothing.
+ *
+ * The stored `displayName` FIELD is deliberately not consulted. Every writer of
+ * a real name (the provider import and the Personal Data editor) sets the
+ * `name` attribute and mirrors it into the field, so a field with no attribute
+ * behind it can only be the placeholder seeded at setup. Returning it would be
+ * indistinguishable from the holder having chosen to be called "Privasys User",
+ * which is how a relying party came to be told exactly that while the wallet
+ * held a first and last name imported from Google.
+ *
+ * Returning undefined instead is what makes the caller treat the name as
+ * missing: the consent flow already prompts for a missing attribute, prefilled
+ * from whatever the profile can offer, so an older wallet carrying the
+ * placeholder is asked once to confirm its name rather than quietly disclosing
+ * one nobody chose. Display sites keep showing the placeholder through
+ * profileDisplayName's fallback.
+ */
+function resolvedName(profile: UserProfile): string | undefined {
+    const explicit = profile.attributes?.find((a) => a.key === 'name')?.value?.trim();
+    if (explicit) return explicit;
+
+    const given = profile.attributes?.find((a) => a.key === 'given_name')?.value?.trim();
+    const family = profile.attributes?.find((a) => a.key === 'family_name')?.value?.trim();
+    return [given, family].filter(Boolean).join(' ') || undefined;
 }
 
 /**
@@ -603,23 +639,14 @@ export function claimsToProfileAttributes(
  * is stored. `fallback` is the localised placeholder, passed in because this
  * module has no translator.
  */
+export function profileName(profile: UserProfile | null | undefined): string | undefined {
+    return profile ? resolvedName(profile) : undefined;
+}
+
 export function profileDisplayName(profile: UserProfile, fallback: string): string {
-    // The `name` ATTRIBUTE, not getProfileValue('name'): `name` maps to the
-    // `displayName` profile field, which getProfileValue prefers, and that field
-    // holds the placeholder on every wallet that has never set one. Going
-    // through it made this step always "explicit" and always the placeholder.
-    // Both writers of an explicit Display Name (the import sync and the Personal
-    // Data editor) set the attribute as well as the field, so reading the
-    // attribute loses nothing.
-    const explicit = profile.attributes?.find((a) => a.key === 'name')?.value?.trim();
-    if (explicit) return explicit;
-
-    const given = getProfileValue(profile, 'given_name')?.trim();
-    const family = getProfileValue(profile, 'family_name')?.trim();
-    const full = [given, family].filter(Boolean).join(' ');
-    if (full) return full;
-
-    return profile.displayName?.trim() || fallback;
+    // One resolution, shared with getProfileValue, so the name on the Profile
+    // screen is the name a relying party receives.
+    return resolvedName(profile) || fallback;
 }
 
 /** Human-friendly name for a provider key. */

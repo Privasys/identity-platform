@@ -43,7 +43,8 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { base64urlToBytes } from '@/utils/encoding';
-import { buildErrorReport, REPORT_DESTINATION } from '@/utils/logs';
+import { buildErrorReport } from '@/utils/logs';
+import { sendErrorReport, ReportSendError, REPORT_INBOX, type ReportFailure } from '@/services/error-report';
 
 import { DataRequestConsent } from '@/components/DataRequestConsent';
 import { FirstConnectExplainer } from '@/components/FirstConnectExplainer';
@@ -73,7 +74,7 @@ import { issueEncAuthForSignIn } from '@/services/encauth';
 import { ensureWia } from '@/services/wia';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
-import { selfAssertedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, govValueKey, isDerived, setProfileValue } from '@/services/attributes';
+import { selfAssertedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, profileName, govValueKey, isDerived, setProfileValue } from '@/services/attributes';
 import { discloseAttribute, provePresence, voucherForAttribute } from '@/services/kyc';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
@@ -2078,7 +2079,7 @@ function ConnectFlow() {
                 payload.origin,
                 keyAlias,
                 payload.sessionId,
-                currentProfile?.displayName,
+                profileName(currentProfile),
                 undefined,
                 sessionRelayArg,
             );
@@ -2818,11 +2819,13 @@ function ConnectFlow() {
 // ── Report Error preview modal ──────────────────────────────────────────
 
 /**
- * Shows the user exactly what will be sent and to whom before they hand
- * the report off. We do not auto-submit anything yet — the destination
- * (errors.privasys.org) will become a real ingestion endpoint once the
- * companion API is ready. For now the user copies the text and pastes
- * it into the conversation, email, or issue tracker themselves.
+ * Shows the holder exactly what will be sent and to whom, then sends it.
+ *
+ * Nothing leaves the device until the Send button is pressed, and the text
+ * above that button is the text that goes: the preview is the report, not a
+ * summary of it. The copy button stays, because every way sending can fail
+ * (no mailer configured, too many reports recently, no network) leaves a
+ * report the holder can still paste into an email themselves.
  */
 function ReportErrorModal({
     visible,
@@ -2838,14 +2841,41 @@ function ReportErrorModal({
     const { t } = useTranslation();
     const reportStyles = useMemo(() => makeReportStyles(p), [p]);
     const report = visible ? buildErrorReport(errorMessage) : '';
+    const [contact, setContact] = useState('');
+    const [sending, setSending] = useState(false);
 
     const onCopy = async () => {
         await Clipboard.setStringAsync(report);
         Alert.alert(
             t('common.copied'),
-            t('connect.reportCopied', { destination: REPORT_DESTINATION }),
+            t('connect.reportCopied', { destination: REPORT_INBOX }),
             [{ text: t('common.ok'), onPress: onClose }],
         );
+    };
+
+    const onSend = async () => {
+        setSending(true);
+        try {
+            await sendErrorReport({ message: report, contact, context: 'connect' });
+            Alert.alert(
+                t('connect.reportSentTitle'),
+                t('connect.reportSentBody', { destination: REPORT_INBOX }),
+                [{ text: t('common.ok'), onPress: onClose }],
+            );
+        } catch (e) {
+            // Every failure ends the same way: leave the modal open so the copy
+            // button is still there, and say which fallback applies.
+            const reason: ReportFailure = e instanceof ReportSendError ? e.reason : 'failed';
+            const bodies: Record<ReportFailure, string> = {
+                unavailable: t('connect.reportUnavailableBody', { destination: REPORT_INBOX }),
+                rateLimited: t('connect.reportRateLimitedBody', { destination: REPORT_INBOX }),
+                network: t('connect.reportNetworkBody', { destination: REPORT_INBOX }),
+                failed: t('connect.reportFailedBody', { destination: REPORT_INBOX }),
+            };
+            Alert.alert(t('connect.reportFailedTitle'), bodies[reason], [{ text: t('common.ok') }]);
+        } finally {
+            setSending(false);
+        }
     };
 
     return (
@@ -2861,8 +2891,23 @@ function ReportErrorModal({
 
                 <RNView style={reportStyles.destinationCard}>
                     <Text style={reportStyles.destinationLabel}>{t('connect.reportDestination')}</Text>
-                    <Text style={reportStyles.destinationValue}>{REPORT_DESTINATION}</Text>
+                    <Text style={reportStyles.destinationValue}>{REPORT_INBOX}</Text>
                     <Text style={reportStyles.destinationNote}>{t('connect.reportNote')}</Text>
+                </RNView>
+
+                <RNView style={reportStyles.contactRow}>
+                    <Text style={reportStyles.previewLabel}>{t('connect.reportContactLabel')}</Text>
+                    <TextInput
+                        style={reportStyles.contactInput}
+                        value={contact}
+                        onChangeText={setContact}
+                        placeholder={t('connect.reportContactPlaceholder')}
+                        placeholderTextColor={p.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="email-address"
+                        editable={!sending}
+                    />
                 </RNView>
 
                 <Text style={reportStyles.previewLabel}>{t('connect.reportContents')}</Text>
@@ -2873,12 +2918,23 @@ function ReportErrorModal({
                 </ScrollView>
 
                 <RNView style={[reportStyles.actions, { paddingBottom: insets.bottom + 16 }]}>
-                    <Pressable style={reportStyles.cancelButton} onPress={onClose}>
-                        <Text style={reportStyles.cancelButtonText}>{t('common.cancel')}</Text>
+                    <Pressable style={reportStyles.cancelButton} onPress={onCopy} disabled={sending}>
+                        <Ionicons name="copy-outline" size={16} color={p.textPrimary} />
+                        <Text style={reportStyles.cancelButtonText}>{t('connect.copyReport')}</Text>
                     </Pressable>
-                    <Pressable style={reportStyles.copyButton} onPress={onCopy}>
-                        <Ionicons name="copy-outline" size={16} color="#FFFFFF" />
-                        <Text style={reportStyles.copyButtonText}>{t('connect.copyReport')}</Text>
+                    <Pressable
+                        style={[reportStyles.copyButton, sending && reportStyles.buttonBusy]}
+                        onPress={onSend}
+                        disabled={sending}
+                    >
+                        {sending ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                            <Ionicons name="send-outline" size={16} color="#FFFFFF" />
+                        )}
+                        <Text style={reportStyles.copyButtonText}>
+                            {sending ? t('connect.reportSending') : t('connect.sendReport')}
+                        </Text>
                     </Pressable>
                 </RNView>
             </RNView>
@@ -2930,14 +2986,29 @@ const makeReportStyles = (p: Palette) => StyleSheet.create({
     },
     cancelButton: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
         paddingVertical: 14,
         borderRadius: 12,
         backgroundColor: p.card,
         borderWidth: 1,
         borderColor: p.border,
-        alignItems: 'center',
     },
     cancelButtonText: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+    contactRow: { paddingHorizontal: 20, marginBottom: 12 },
+    contactInput: {
+        backgroundColor: p.card,
+        borderWidth: 1,
+        borderColor: p.border,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: p.textPrimary,
+    },
+    buttonBusy: { opacity: 0.7 },
     copyButton: {
         flex: 1,
         flexDirection: 'row',

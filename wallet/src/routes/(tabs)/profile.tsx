@@ -157,7 +157,11 @@ export default function ProfileScreen() {
             const pairwiseSeed = (await takeRecoveredPairwiseSeed()) ?? (await generatePairwiseSeed());
             const canonicalDid = await generateCanonicalDid(pairwiseSeed);
             useProfileStore.getState().createProfile({
-                displayName: t('profile.defaultDisplayName'),
+                // EMPTY, not the placeholder. Storing the placeholder made it
+                // indistinguishable from a name the holder had chosen, and it
+                // was disclosed to relying parties as one. The Profile screen
+                // supplies it for display instead.
+                displayName: '',
                 email: '',
                 avatarUri: '',
                 locale: getDeviceLocale(),

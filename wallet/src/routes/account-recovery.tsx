@@ -52,6 +52,7 @@ import {
 import { ensurePrivasysSession, getPrivasysAccount } from '@/services/privasys-id';
 import { establishPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
+import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 
 type InviteMethod = 'email' | 'qr';
@@ -155,7 +156,7 @@ export default function AccountRecoveryScreen() {
     const handleSignIn = async () => {
         setSigningIn(true);
         try {
-            const result = await ensurePrivasysSession(profile?.displayName);
+            const result = await ensurePrivasysSession(profileName(profile));
             // First registration: the server auto-mints a phrase and returns
             // it once, but we immediately supersede it with a CLIENT-minted
             // one whose plaintext never reaches the server — only its hash
@@ -203,7 +204,7 @@ export default function AccountRecoveryScreen() {
                         setGeneratingPhrase(true);
                         try {
                             // Refresh session if needed
-                            const sess = await ensurePrivasysSession(profile?.displayName);
+                            const sess = await ensurePrivasysSession(profileName(profile));
                             // Client-side generation with legacy-IdP fallback,
                             // re-wrapping the sovereign backup under the new
                             // phrase in the same breath (the old phrase stops
@@ -247,7 +248,7 @@ export default function AccountRecoveryScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const sess = await ensurePrivasysSession(profile?.displayName);
+                            const sess = await ensurePrivasysSession(profileName(profile));
                             await deleteRecoveryPhrase(sess.sessionToken);
                             setRecoveryPhraseSaved(false);
                             setPhraseStatus({ has_phrase: false });
@@ -268,7 +269,7 @@ export default function AccountRecoveryScreen() {
         const threshold = Math.max(1, parseInt(thresholdInput, 10) || 1);
         setInviting(true);
         try {
-            const res = await inviteGuardianByEmail(accessToken, guardianEmail.trim(), threshold, profile?.displayName ?? '');
+            const res = await inviteGuardianByEmail(accessToken, guardianEmail.trim(), threshold, profileName(profile) ?? '');
             setGuardianEmail('');
             setShowInviteForm(false);
             Alert.alert(

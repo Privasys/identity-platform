@@ -48,6 +48,7 @@ import {
     type RecoveryBeginResult,
 } from '@/services/recovery-api';
 import { useAuthStore } from '@/stores/auth';
+import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 import * as Storage from '@/utils/storage';
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -335,7 +336,7 @@ export default function RecoverAccountScreen() {
                 'privasys.id',
                 keyAlias,
                 '', // no browser ceremony to relay
-                profile?.displayName,
+                profileName(profile),
                 recoveryState.userId,
             );
 

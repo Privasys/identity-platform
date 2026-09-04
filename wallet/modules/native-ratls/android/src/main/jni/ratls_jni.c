@@ -15,6 +15,18 @@ extern char *ratls_post(const char *host, unsigned short port, const char *ca_ce
 extern char *ratls_request(const char *method, const char *host, unsigned short port,
                            const char *ca_cert_path, const char *path, const char *body,
                            const char *headers_json);
+/* options_json: {"attestation":"challenge"|"deterministic"|"none",
+ *                "trust":"auto"|"fleet"|"public"}. NULL or "" is challenge mode
+ * with automatic trust, matching ratls_request.
+ *
+ * Declared here because this file, unlike the iOS side, has no shared header to
+ * include: every Rust symbol is an extern written out by hand, so a new one in
+ * ra-tls-clients is invisible to the compiler until it is added. Omitting it
+ * does not fail at link time, it fails at compile time under C99 with an
+ * implicit-declaration error and a garbage int-to-pointer return. */
+extern char *ratls_request_with(const char *method, const char *host, unsigned short port,
+                                const char *ca_cert_path, const char *path, const char *body,
+                                const char *headers_json, const char *options_json);
 extern void ratls_free_string(char *ptr);
 
 JNIEXPORT jstring JNICALL
@@ -80,6 +92,34 @@ Java_org_privasys_nativeratls_NativeRaTlsBridge_nativeRequest(
     (*env)->ReleaseStringUTFChars(env, path, path_c);
     (*env)->ReleaseStringUTFChars(env, body, body_c);
     if (headers_c) (*env)->ReleaseStringUTFChars(env, headers_json, headers_c);
+
+    jstring json = (*env)->NewStringUTF(env, result ? result : "{\"error\":\"FFI returned null\"}");
+    if (result) ratls_free_string(result);
+    return json;
+}
+
+JNIEXPORT jstring JNICALL
+Java_org_privasys_nativeratls_NativeRaTlsBridge_nativeRequestWith(
+    JNIEnv *env, jclass clazz, jstring method, jstring host, jint port,
+    jstring ca_cert_path, jstring path, jstring body, jstring headers_json,
+    jstring options_json) {
+    const char *method_c = (*env)->GetStringUTFChars(env, method, NULL);
+    const char *host_c = (*env)->GetStringUTFChars(env, host, NULL);
+    const char *ca_c = ca_cert_path ? (*env)->GetStringUTFChars(env, ca_cert_path, NULL) : NULL;
+    const char *path_c = (*env)->GetStringUTFChars(env, path, NULL);
+    const char *body_c = (*env)->GetStringUTFChars(env, body, NULL);
+    const char *headers_c = headers_json ? (*env)->GetStringUTFChars(env, headers_json, NULL) : NULL;
+    const char *options_c = options_json ? (*env)->GetStringUTFChars(env, options_json, NULL) : NULL;
+
+    char *result = ratls_request_with(method_c, host_c, (unsigned short)port, ca_c, path_c, body_c, headers_c, options_c);
+
+    (*env)->ReleaseStringUTFChars(env, method, method_c);
+    (*env)->ReleaseStringUTFChars(env, host, host_c);
+    if (ca_c) (*env)->ReleaseStringUTFChars(env, ca_cert_path, ca_c);
+    (*env)->ReleaseStringUTFChars(env, path, path_c);
+    (*env)->ReleaseStringUTFChars(env, body, body_c);
+    if (headers_c) (*env)->ReleaseStringUTFChars(env, headers_json, headers_c);
+    if (options_c) (*env)->ReleaseStringUTFChars(env, options_json, options_c);
 
     jstring json = (*env)->NewStringUTF(env, result ? result : "{\"error\":\"FFI returned null\"}");
     if (result) ratls_free_string(result);

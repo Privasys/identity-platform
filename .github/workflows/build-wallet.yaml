@@ -102,21 +102,26 @@ env:
   # (membership by arc, not a fixed allowlist). The 3.5.* sub-arc is
   # app-published at runtime, so the exact-match allowlist silently dropped
   # exactly those — the attestation view now sees app extensions.
-  # HELD AT v0.7.7 until the RA-TLS v2 back-end is live.
+  # v0.9.1: the RA-TLS v2 client, with trust selection.
   #
-  # v0.9.0 is the v2 client and it broke every call to privasys.id. v0.7.7 with
-  # no CA file supplied used NoCertVerifier, so the TLS chain was never checked
-  # and attestation did the work; v0.9.0 verifies against a RootCertStore
-  # holding ONLY the embedded Privasys intermediate CAs. privasys.id serves an
-  # ordinary public certificate, so it does not chain to them: every FIDO2 call
-  # failed with "invalid peer certificate: UnknownIssuer" in 48ms, which meant
-  # no sign-in and no registration at all on 1.3.94.
+  # v0.9.0 was pinned briefly and broke every call to privasys.id. v0.7.7 with
+  # no CA file used NoCertVerifier, so the chain was never checked and
+  # attestation did the work; v0.9.0 verified against a RootCertStore holding
+  # ONLY the embedded Privasys intermediate CAs. privasys.id serves an ordinary
+  # public certificate and does not chain to them, so every FIDO2 call failed
+  # with "invalid peer certificate: UnknownIssuer" in 48ms. 1.3.94 could not
+  # sign in at all.
   #
-  # Note for the v2 migration: this is not only about the back-end speaking v2.
-  # The IdP is not an enclave and will never present a Privasys-CA certificate,
-  # so privasys.id needs public-PKI verification. Enclave hosts do chain to that
-  # CA and are unaffected.
-  RATLS_VERSION: v0.7.7
+  # v0.9.1 adds trust selection (auto | fleet | public), and the wallet now asks
+  # for it explicitly rather than relying on the automatic fallback: the IdP is
+  # reached with {"attestation":"none","trust":"public"} because it is not an
+  # enclave and will never present a Privasys-CA certificate. Enclave hosts keep
+  # the attested path.
+  #
+  # This pin needs a back-end that speaks v2. Moving it ahead of one is what
+  # produced the failure above, and nothing in the build catches that: it looks
+  # like a successful build right up until a human tries to sign in.
+  RATLS_VERSION: v0.9.1
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

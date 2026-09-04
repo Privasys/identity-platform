@@ -37,6 +37,11 @@ type Config struct {
 	AzureClientID     string
 	AzureClientSecret string
 	MailSender        string // Sender email address (default: no-reply@privasys.org)
+	// Where wallet error reports are forwarded. The wallet shows this address
+	// to the holder before they send, from its own constant (REPORT_INBOX), so
+	// changing it here without changing it there makes the wallet state a
+	// destination the server does not use.
+	SupportEmail string
 
 	// Wallet Instance Attestation (WIA). The IdP, as wallet provider, attests
 	// the wallet's hardware holder key and issues a short-lived WIA JWT the
@@ -102,6 +107,7 @@ func Load() *Config {
 		AzureClientID:     envStr("IDP_AZURE_CLIENT_ID", ""),
 		AzureClientSecret: envStr("IDP_AZURE_CLIENT_SECRET", ""),
 		MailSender:        envStr("IDP_MAIL_SENDER", "no-reply@privasys.org"),
+		SupportEmail:      envStr("IDP_SUPPORT_EMAIL", "support@privasys.org"),
 
 		WIASigningKeyPath:  envStr("IDP_WIA_SIGNING_KEY_FILE", "/data/wia-signing-key.pem"),
 		WIAAttestationMode: envStr("IDP_WIA_ATTESTATION_MODE", "soft"),

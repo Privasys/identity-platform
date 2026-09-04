@@ -24,8 +24,10 @@ jest.mock('@/utils/storage', () => ({
 
 import {
     CANONICAL_ATTRIBUTES,
+    getProfileValue,
     isGovVerified,
     profileDisplayName,
+    selfAssertedValue,
 } from '@/services/attributes';
 import type { UserProfile } from '@/stores/profile';
 
@@ -112,6 +114,33 @@ describe('manually addable attributes', () => {
     });
 });
 
+// What a relying party receives, which is a different function from what the
+// Profile screen renders. They disagreed: the header derived a name from the
+// imported first and last, while the disclosure read the profile field and sent
+// the placeholder, so the CLI greeted the holder as "Privasys User" (2026-09-04).
+describe('the name disclosed to a relying party', () => {
+    it('is the name the Profile screen shows', () => {
+        const p = profileWith([
+            { key: 'given_name', value: 'bertrand' },
+            { key: 'family_name', value: 'spams' },
+        ], 'Privasys User');
+        expect(getProfileValue(p, 'name')).toBe('bertrand spams');
+        expect(getProfileValue(p, 'name')).toBe(profileDisplayName(p, FALLBACK));
+    });
+
+    it('prefers an explicit Display Name', () => {
+        const p = profileWith([{ key: 'name', value: 'Bee' }, { key: 'given_name', value: 'bertrand' }], 'Bee');
+        expect(getProfileValue(p, 'name')).toBe('Bee');
+    });
+
+    // Undefined is what makes the consent flow list `name` as missing and
+    // prompt for it, rather than disclosing a name nobody chose.
+    it('is absent when the wallet holds only the placeholder', () => {
+        expect(getProfileValue(profileWith([], 'Privasys User'), 'name')).toBeUndefined();
+        expect(selfAssertedValue(profileWith([], 'Privasys User'), 'name')).toBeUndefined();
+    });
+});
+
 describe('profileDisplayName', () => {
     it('uses an explicit Display Name above all else', () => {
         const p = profileWith([
@@ -141,8 +170,12 @@ describe('profileDisplayName', () => {
             .toBe('spams');
     });
 
-    it('keeps a stored name when no attribute carries one', () => {
-        expect(profileDisplayName(profileWith([], 'Stored Name'), FALLBACK)).toBe('Stored Name');
+    // A stored field with no attribute behind it can only be the setup
+    // placeholder, whatever it happens to say: every writer of a real name sets
+    // the attribute and mirrors it into the field. Rendering the caller's
+    // fallback is the same string in the same language.
+    it('does not treat the stored field as a chosen name', () => {
+        expect(profileDisplayName(profileWith([], 'Privasys User'), FALLBACK)).toBe(FALLBACK);
     });
 
     it('falls back to the placeholder for a wallet that knows nothing', () => {

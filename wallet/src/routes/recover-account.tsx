@@ -45,8 +45,12 @@ import {
     // Declared in the service, not here, so the wallet wipe can clear it too.
     RECOVERY_STATE_KEY,
     type RecoveryBeginResult,
+    type RecoveryAccountSummary,
 } from '@/services/recovery-api';
+import { RecoveryPhraseCard } from '@/components/RecoveryPhraseCard';
+import { shortAccountId } from '@/utils/account-id';
 import { useAuthStore } from '@/stores/auth';
+import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 import * as Storage from '@/utils/storage';
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -60,7 +64,20 @@ interface RecoveryState {
     expiresAt: string;
 }
 
-type FlowStep = 'enter-code' | 'waiting' | 'approved' | 'completed' | 'restored' | 'expired';
+type FlowStep =
+    | 'enter-code'
+    // Between the phrase and anything destructive. A phrase identifies its
+    // account by itself, and until this step existed nothing told the holder
+    // WHICH account it had matched, while the very next call deleted that
+    // account's credentials. Bertrand held phrases for two accounts and
+    // recovered the wrong one twice (2026-07-30, 2026-09-04).
+    | 'confirm-account'
+    | 'waiting'
+    | 'approved'
+    | 'completed'
+    | 'new-phrase'
+    | 'restored'
+    | 'expired';
 
 export default function RecoverAccountScreen() {
     const { t } = useTranslation();
@@ -70,6 +87,19 @@ export default function RecoverAccountScreen() {
     const styles = useMemo(() => makeStyles(p), [p]);
 
     const [step, setStep] = useState<FlowStep>('enter-code');
+    /**
+     * The phrase the IdP issues when the recovered device registers.
+     *
+     * Recovery revokes the account's credentials and its old phrase, and the
+     * registration that follows mints a replacement, returned ONCE in that
+     * response. This screen used to take the result, read the credential out of
+     * it and drop the phrase on the floor, so a holder finished a recovery with
+     * no way to ever do another one and nothing telling them so.
+     */
+    const [issuedPhrase, setIssuedPhrase] = useState<string | null>(null);
+    // The account the phrase matched, shown for confirmation before the flow
+    // does anything that cannot be undone.
+    const [matchedAccount, setMatchedAccount] = useState<RecoveryAccountSummary | null>(null);
     const [codeInput, setCodeInput] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [completing, setCompleting] = useState(false);
@@ -252,11 +282,12 @@ export default function RecoverAccountScreen() {
             setRecoveryState(state);
             await Storage.setItemAsync(RECOVERY_STATE_KEY, JSON.stringify(state));
 
-            if (res.status === 'approved') {
-                setStep('approved');
-            } else {
-                setStep('waiting');
-            }
+            // Confirm the account BEFORE anything destructive, whichever path
+            // follows. Completing is what deletes the account's credentials,
+            // and on the no-guardian path that used to happen automatically,
+            // one render after the phrase was accepted.
+            setMatchedAccount(res.account ?? { user_id: res.user_id, credential_count: 0, role_count: 0 });
+            setStep('confirm-account');
             enteredPhraseRef.current = phrase;
             setCodeInput('');
         } catch (e: any) {
@@ -264,6 +295,11 @@ export default function RecoverAccountScreen() {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    /** The holder has recognised the account: carry on into the flow proper. */
+    const confirmAccount = () => {
+        setStep(recoveryState?.status === 'approved' ? 'approved' : 'waiting');
     };
 
     const handleComplete = async () => {
@@ -324,7 +360,7 @@ export default function RecoverAccountScreen() {
                 'privasys.id',
                 keyAlias,
                 '', // no browser ceremony to relay
-                profile?.displayName,
+                profileName(profile),
                 recoveryState.userId,
             );
 
@@ -454,7 +490,16 @@ export default function RecoverAccountScreen() {
             enteredPhraseRef.current = null;
 
             await Storage.deleteItemAsync(RECOVERY_STATE_KEY);
-            setStep('restored');
+            if (result.recoveryPhrase) {
+                // Not saved until the holder says so: the nudge on Home is
+                // driven by this flag, and it is the only thing that will chase
+                // them if they walk away from the next screen.
+                useAuthStore.getState().setRecoveryPhraseSaved(false);
+                setIssuedPhrase(result.recoveryPhrase);
+                setStep('new-phrase');
+            } else {
+                setStep('restored');
+            }
         } catch (e: any) {
             console.error('[recover-account] recovered registration failed:', e?.message, e);
             // A retry button, because the alert says the sign-ins are unchanged
@@ -511,9 +556,15 @@ export default function RecoverAccountScreen() {
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                // Offset the custom header so the keyboard shrinks the scroll
-                // area correctly and the primary button scrolls into view.
-                keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 50 : 0}
+                // No offset. React Native computes the padding as
+                // (view bottom - (keyboard top - offset)), so a POSITIVE offset
+                // ADDS that much dead space above the keyboard rather than
+                // correcting for a header. This view already begins BELOW the
+                // header, so its bottom is the screen bottom and the plain
+                // keyboard height is exactly right. An earlier cut passed
+                // insets.top + 50 and put a block of roughly 97pt on screen,
+                // which hid more than the keyboard ever did.
+                keyboardVerticalOffset={0}
             >
             <ScrollView
                 style={styles.scrollView}
@@ -596,6 +647,60 @@ export default function RecoverAccountScreen() {
                                 )}
                             </Pressable>
                         </RNView>
+                    </>
+                )}
+
+                {/* Step 1b: name the account before anything is destroyed. */}
+                {step === 'confirm-account' && matchedAccount && (
+                    <>
+                        <RNView style={styles.iconContainer}>
+                            <Ionicons name="person-circle-outline" size={48} color={p.blue} />
+                        </RNView>
+                        <Text style={styles.title}>{t('recover.confirmAccountTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.confirmAccountBody')}</Text>
+
+                        <RNView style={styles.card}>
+                            <Text style={styles.fieldLabel}>{t('recover.accountLabel')}</Text>
+                            <Text style={styles.accountId} selectable>
+                                {shortAccountId(matchedAccount.user_id, 16) ?? matchedAccount.user_id}
+                            </Text>
+
+                            {matchedAccount.display_name ? (
+                                <Text style={styles.accountDetail}>{matchedAccount.display_name}</Text>
+                            ) : null}
+                            {matchedAccount.email ? (
+                                <Text style={styles.accountDetail}>{matchedAccount.email}</Text>
+                            ) : null}
+                            {matchedAccount.created_at ? (
+                                <Text style={styles.accountDetail}>
+                                    {t('recover.accountCreated', { when: matchedAccount.created_at })}
+                                </Text>
+                            ) : null}
+                            <Text style={styles.accountDetail}>
+                                {t('recover.accountDevices', { n: matchedAccount.credential_count })}
+                            </Text>
+                            <Text style={styles.accountDetail}>
+                                {t('recover.accountPermissions', { n: matchedAccount.role_count })}
+                            </Text>
+                        </RNView>
+
+                        {/* Said plainly, because it is the part that cannot be
+                            undone: the other devices lose access. */}
+                        <Text style={styles.warningText}>{t('recover.confirmAccountWarning')}</Text>
+
+                        <Pressable style={styles.primaryButton} onPress={confirmAccount}>
+                            <Text style={styles.primaryButtonText}>{t('recover.confirmAccountYes')}</Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.secondaryButton}
+                            onPress={() => {
+                                setMatchedAccount(null);
+                                setRecoveryState(null);
+                                setStep('enter-code');
+                            }}
+                        >
+                            <Text style={styles.secondaryButtonText}>{t('recover.confirmAccountNo')}</Text>
+                        </Pressable>
                     </>
                 )}
 
@@ -693,6 +798,26 @@ export default function RecoverAccountScreen() {
                                 <Text style={styles.primaryButtonText}>{t('recover.registerDevice')}</Text>
                             )}
                         </Pressable>
+                    </>
+                )}
+
+                {/* Step 4b: the replacement phrase, shown once. */}
+                {step === 'new-phrase' && issuedPhrase && (
+                    <>
+                        <RNView style={styles.iconContainer}>
+                            <Ionicons name="key" size={48} color={p.blue} />
+                        </RNView>
+                        <Text style={styles.title}>{t('recover.newPhraseTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.newPhraseBody')}</Text>
+
+                        <RecoveryPhraseCard
+                            phrase={issuedPhrase}
+                            onSaved={() => {
+                                useAuthStore.getState().setRecoveryPhraseSaved(true);
+                                setIssuedPhrase(null);
+                                setStep('restored');
+                            }}
+                        />
                     </>
                 )}
 
@@ -836,6 +961,23 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     wordChipTextInvalid: {
         color: p.dangerText,
         fontWeight: '600',
+    },
+    accountId: {
+        fontSize: 15,
+        fontFamily: 'SpaceMono',
+        color: p.textPrimary,
+        marginBottom: 10,
+    },
+    accountDetail: {
+        fontSize: 13,
+        color: p.textSecondary,
+        lineHeight: 20,
+    },
+    warningText: {
+        fontSize: 13,
+        color: p.textMuted,
+        lineHeight: 18,
+        marginBottom: 16,
     },
     wordCount: {
         fontSize: 12,

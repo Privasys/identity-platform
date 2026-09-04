@@ -44,6 +44,7 @@ import (
 	"github.com/Privasys/idp/internal/sessions"
 	"github.com/Privasys/idp/internal/social"
 	"github.com/Privasys/idp/internal/store"
+	"github.com/Privasys/idp/internal/support"
 	"github.com/Privasys/idp/internal/tokens"
 	"github.com/Privasys/idp/internal/vault"
 	"github.com/Privasys/idp/internal/voucher"
@@ -368,6 +369,12 @@ func main() {
 		ClientSecret: cfg.AzureClientSecret,
 		Sender:       cfg.MailSender,
 	}
+	// Wallet error reports. Unauthenticated by design: a holder who cannot sign
+	// in is exactly the holder who needs to report something. Reuses the Graph
+	// credentials above and mails a fixed inbox, never one from the request.
+	supportHandler := support.NewHandler(recoveryMailer, cfg.SupportEmail)
+	mux.HandleFunc("POST /wallet/report", supportHandler.HandleReport)
+
 	recoveryHandler := recovery.NewHandler(db, recoveryMailer, issuer)
 	recoveryHandler.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	// Recovery phrase (BIP39) endpoints — preferred names.

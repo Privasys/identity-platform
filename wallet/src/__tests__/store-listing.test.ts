@@ -11,7 +11,8 @@
  * plausible-looking name on a trust screen is worse than none.
  */
 
-import { slugForHost, sourceLabel, sourceUrl, type StoreListing } from '@/services/store-listing';
+import type { WorkloadRelease } from '@/services/release-provenance';
+import { slugForHost, sourceLabel, sourceRow, sourceUrl, type StoreListing } from '@/services/store-listing';
 
 describe('slugForHost', () => {
     it('takes the first label of an app host', () => {
@@ -82,5 +83,39 @@ describe('sourceLabel', () => {
 
     it('returns the input unchanged when it will not parse', () => {
         expect(sourceLabel('not a url')).toBe('not a url');
+    });
+});
+
+describe('sourceRow', () => {
+    const workload = {
+        url: 'https://github.com/Privasys/wasm-app-example/commit/9f2c1ab4d3e5f60718293a4b5c6d7e8f90a1b2c3',
+        commit_url: 'https://github.com/Privasys/wasm-app-example/commit/9f2c1ab4d3e5f60718293a4b5c6d7e8f90a1b2c3',
+        commit: '9f2c1ab4d3e5f60718293a4b5c6d7e8f90a1b2c3',
+    } as WorkloadRelease;
+
+    it('names the commit for an app with no store listing', () => {
+        // The case this exists for: an unpublished app. There is no listing to
+        // read, so the row used to vanish for exactly the apps a holder has
+        // least other reason to trust.
+        expect(sourceRow(null, workload)).toEqual({
+            url: workload.commit_url,
+            label: 'Privasys/wasm-app-example@9f2c1ab',
+        });
+    });
+
+    it('prefers the store listing when the app published one', () => {
+        const listing = { reproducibility: { commit_url: 'https://github.com/Privasys/drive' } } as StoreListing;
+        expect(sourceRow(listing, workload)).toEqual({
+            url: 'https://github.com/Privasys/drive',
+            label: 'Privasys/drive',
+        });
+    });
+
+    it('is undefined when neither side has a commit', () => {
+        // A build run URL is not source code, so a workload that carries only
+        // one leaves the row off rather than pointing "Source code" at a log.
+        const runOnly = { build_run_url: 'https://github.com/Privasys/reproducible-app-builder/actions/runs/1' } as WorkloadRelease;
+        expect(sourceRow(null, runOnly)).toBeUndefined();
+        expect(sourceRow(null, null)).toBeUndefined();
     });
 });

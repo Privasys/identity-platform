@@ -111,6 +111,18 @@ func (m *Mailer) getToken() (string, error) {
 	return m.token, nil
 }
 
+// Send delivers one plain-text message. Exported so packages outside recovery
+// can reuse the Graph credentials this Mailer holds without importing recovery
+// semantics: the support inbox is the second caller. It is deliberately
+// text-only, and every caller passes a recipient it chose itself rather than
+// one taken from a request.
+func (m *Mailer) Send(to, subject, body string) error {
+	if !m.Enabled() {
+		return fmt.Errorf("mailer not configured")
+	}
+	return m.send(to, subject, body)
+}
+
 func (m *Mailer) send(to, subject, body string) error {
 	token, err := m.getToken()
 	if err != nil {

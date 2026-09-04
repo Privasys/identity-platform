@@ -17,6 +17,8 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
     StyleSheet,
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     Pressable,
     View as RNView,
@@ -25,6 +27,7 @@ import {
     Image,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +40,7 @@ export default function PersonalDataScreen() {
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
+    const insets = useSafeAreaInsets();
     const { profile, updateProfile, setAttribute, updateAttributeValue, removeAttributeValue } = useProfileStore();
 
     const [addingAttribute, setAddingAttribute] = useState<string | null>(null);
@@ -139,10 +143,22 @@ export default function PersonalDataScreen() {
         <RNView style={styles.screen}>
             <SubPageHeader title={t('personalData.title')} />
 
+            {/* The editor and the add-attribute field sit at the BOTTOM of a
+                long list, so the keyboard covered whichever one had focus and
+                the list could not scroll past it: entering a display name by
+                hand was impossible. Same treatment as recover-account, plus
+                bottom padding the height of the keyboard has something to
+                scroll into. */}
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 50 : 0}
+            >
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
             >
                 <Text style={styles.sectionDescription}>{t('personalData.description')}</Text>
 
@@ -230,6 +246,7 @@ export default function PersonalDataScreen() {
 
                 <RNView style={{ height: 40 }} />
             </ScrollView>
+            </KeyboardAvoidingView>
         </RNView>
     );
 }

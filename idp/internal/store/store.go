@@ -718,6 +718,32 @@ func (db *DB) FindUserByRecoveryCode(codeHash string) (string, error) {
 	return userID, nil
 }
 
+// CountCredentials reports how many credentials a user currently has.
+//
+// Zero means either a brand-new account or one whose credentials were just
+// revoked by a recovery, and both want the same thing: the registration about
+// to happen mints a fresh recovery phrase and retires whatever came before.
+func (db *DB) CountCredentials(userID string) (int, error) {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM credentials WHERE user_id = ?", userID).Scan(&count)
+	return count, err
+}
+
+// MarkRecoveryCodesUsed retires every unused recovery code for a user.
+//
+// Retire rather than delete: FindUserByRecoveryCode already filters on
+// used_at IS NULL, so a retired phrase stops working while the row survives to
+// say that it once existed. The column was in the schema from the start and
+// nothing ever wrote it, which meant a phrase was valid for ever, including
+// after the recovery that was supposed to consume it.
+func (db *DB) MarkRecoveryCodesUsed(userID string) error {
+	_, err := db.Exec(
+		"UPDATE recovery_codes SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL",
+		userID,
+	)
+	return err
+}
+
 // HasRecoveryCodes checks if a user has any unused recovery codes.
 func (db *DB) HasRecoveryCodes(userID string) (int, error) {
 	var count int
@@ -1026,11 +1052,18 @@ func (db *DB) CompleteRecovery(requestID, userID string) error {
 		return err
 	}
 
-	// Invalidate all existing recovery codes.
-	_, err = tx.Exec("DELETE FROM recovery_codes WHERE user_id = ?", userID)
-	if err != nil {
-		return err
-	}
+	// The recovery codes are DELIBERATELY LEFT ALONE here.
+	//
+	// This used to delete them, one statement after deleting every credential.
+	// Between those two lines and a successful device registration the account
+	// had no credential and no phrase, so anything that interrupted the flow
+	// left it permanently unreachable. A tester lost an account to exactly that:
+	// recovery completed, the registration call failed at the TLS layer, and the
+	// phrase that had just worked was already gone.
+	//
+	// The phrase is retired instead when the replacement credential exists, in
+	// fido2/register/complete, which is the first moment the account is usable
+	// again. Until then the holder can retry with the same phrase.
 
 	// Invalidate all refresh tokens.
 	_, err = tx.Exec("DELETE FROM refresh_tokens WHERE user_id = ?", userID)

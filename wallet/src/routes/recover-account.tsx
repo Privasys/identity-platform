@@ -92,9 +92,14 @@ export default function RecoverAccountScreen() {
                 const saved = await Storage.getItemAsync(RECOVERY_STATE_KEY);
                 if (saved) {
                     const state: RecoveryState = JSON.parse(saved);
-                    // Check if expired.
+                    // Say so rather than silently reopening on the phrase
+                    // screen: a holder who left mid-flow and came back an hour
+                    // later otherwise sees no explanation for why they are
+                    // starting again, and reads the fresh prompt as the app
+                    // having lost their progress.
                     if (new Date(state.expiresAt) < new Date()) {
                         await Storage.deleteItemAsync(RECOVERY_STATE_KEY);
+                        Alert.alert(t('recover.expiredTitle'), t('recover.expiredBody'));
                         return;
                     }
                     setRecoveryState(state);
@@ -452,9 +457,16 @@ export default function RecoverAccountScreen() {
             setStep('restored');
         } catch (e: any) {
             console.error('[recover-account] recovered registration failed:', e?.message, e);
+            // A retry button, because the alert says the sign-ins are unchanged
+            // and the holder can try again, and then offered no way to. Backing
+            // out of this screen is how a recovery gets abandoned half-done.
             Alert.alert(
                 t('recover.registrationFailedTitle'),
-                t('recover.registrationFailedBody', { reason: e?.message ?? e })
+                t('recover.registrationFailedBody', { reason: e?.message ?? e }),
+                [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('common.retry'), onPress: () => { void handleRegisterRecovered(); } },
+                ],
             );
         } finally {
             setRegistering(false);

@@ -27,6 +27,38 @@ import type { VerificationMode } from '@/stores/settings';
 export type { AttestationResult, VerificationPolicy };
 export type { VerificationMode };
 
+/**
+ * Every Privasys enclave is published under this suffix, and nothing else is.
+ *
+ * RA-TLS v2 makes the caller state up front whether it expects an attested peer,
+ * so the wallet has to decide before it opens the connection rather than
+ * inspecting a certificate and finding out. The hostname IS the rule.
+ */
+const ENCLAVE_HOST_SUFFIX = '.apps.privasys.org';
+
+/**
+ * Can this host be expected to present enclave evidence?
+ *
+ * Both answers fail safe. A real enclave published somewhere else is treated as
+ * an ordinary host: less trust claimed than is available, never more. A
+ * non-enclave under the enclave suffix is asked for evidence it cannot give and
+ * the connection fails loudly. Neither direction lets an unattested peer be
+ * shown to the holder as attested, which is the only outcome that would matter.
+ *
+ * Suffix match, so `apps.privasys.org` itself is not an enclave and neither is
+ * `something.apps.privasys.org.example.com`. Lower-cased, trailing root dot
+ * removed, and any port dropped, because all three arrive from QR payloads that
+ * the wallet does not control.
+ */
+export function isAttestableHost(host: string): boolean {
+    const bare = String(host ?? '')
+        .trim()
+        .toLowerCase()
+        .split(':')[0]
+        .replace(/\.$/, '');
+    return bare.length > ENCLAVE_HOST_SUFFIX.length && bare.endsWith(ENCLAVE_HOST_SUFFIX);
+}
+
 /** Canonical attestation service endpoint. */
 export const AS_ENDPOINT = 'https://as.privasys.org';
 

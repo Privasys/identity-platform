@@ -136,5 +136,51 @@ public class NativeRaTlsModule: Module {
                 }
             }
         }
+
+        // `request` with connection options (JSON: attestation and trust), so a
+        // host that is not an enclave can be reached over an ordinary
+        // public-PKI TLS connection without an evidence exchange.
+        AsyncFunction("requestWith") { (method: String, host: String, port: Int, path: String, body: String, headersJson: String?, caCertPath: String?, optionsJson: String?) -> String in
+            return await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let result = method.withCString { methodPtr in
+                        host.withCString { hostPtr in
+                            path.withCString { pathPtr in
+                                body.withCString { bodyPtr in
+                                    func call(_ caPtr: UnsafePointer<CChar>?, _ hPtr: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>? {
+                                        if let optionsJson {
+                                            return optionsJson.withCString { oPtr in
+                                                ratls_request_with(methodPtr, hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr, hPtr, oPtr)
+                                            }
+                                        }
+                                        return ratls_request_with(methodPtr, hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr, hPtr, nil)
+                                    }
+                                    func withHeaders(_ caPtr: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>? {
+                                        if let headersJson {
+                                            return headersJson.withCString { hPtr in call(caPtr, hPtr) }
+                                        }
+                                        return call(caPtr, nil)
+                                    }
+                                    if let caPath = caCertPath {
+                                        return caPath.withCString { caPtr in withHeaders(caPtr) }
+                                    } else {
+                                        return withHeaders(nil)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    guard let result else {
+                        continuation.resume(returning: "{\"error\":\"FFI returned null\"}")
+                        return
+                    }
+
+                    let json = String(cString: result)
+                    ratls_free_string(result)
+                    continuation.resume(returning: json)
+                }
+            }
+        }
     }
 }

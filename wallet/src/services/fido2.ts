@@ -107,16 +107,23 @@ async function fido2Fetch<T extends object>(origin: string, path: string, body?:
     console.log(`[FIDO2] fetch ${path} → ${host}:${port}`);
     if (body) console.log(`[FIDO2] request body: ${JSON.stringify(body).substring(0, 300)}`);
 
+    // The identity provider is not an enclave: an ordinary TLS connection
+    // verified against the public PKI, no evidence exchange (RA-TLS v2 trust
+    // selection). The FIDO2 ceremony itself carries the security.
     let result;
     try {
-        result = await NativeRaTls.post(
+        result = await NativeRaTls.request(
+            'POST',
             host,
             port,
             path,
             body ? JSON.stringify(body) : '{}',
+            undefined,
+            undefined,
+            { attestation: 'none', trust: 'public' }
         );
     } catch (e: any) {
-        console.error(`[FIDO2] ${path} — NativeRaTls.post threw: ${e.message}`, e);
+        console.error(`[FIDO2] ${path} — NativeRaTls.request threw: ${e.message}`, e);
         throw e;
     }
 

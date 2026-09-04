@@ -116,7 +116,7 @@ env:
   # The IdP is not an enclave and will never present a Privasys-CA certificate,
   # so privasys.id needs public-PKI verification. Enclave hosts do chain to that
   # CA and are unaffected.
-  RATLS_VERSION: v0.7.7
+  RATLS_VERSION: v0.9.1
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

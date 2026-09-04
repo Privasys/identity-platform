@@ -59,12 +59,16 @@ export default function CredentialsScreen() {
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const insets = useSafeAreaInsets();
-    const { credentials, removeCredential, getCredentialForRp, privasysId } = useAuthStore();
+    const { credentials, removeCredential, getCredentialForRp, privasysId, setActiveCredential } =
+        useAuthStore();
     const { remove: removeTrustedApp } = useTrustedAppsStore();
 
-    // The credential sign-ins actually select for the shared IdP RP
-    // (newest-wins) — badge it so two same-rpId rows are distinguishable.
+    // The credential sign-ins actually select for the shared IdP RP: the
+    // holder's choice if they made one, else newest-wins. Badged, so two
+    // same-rpId rows are distinguishable.
     const activeIdp = getCredentialForRp(IDP_RP);
+    // Only worth offering a choice when there is one to make.
+    const idpCount = credentials.filter((c) => c.rpId === IDP_RP).length;
 
     const removeOne = (cred: Credential) => {
         if (cred.rpId === IDP_RP) {
@@ -166,6 +170,27 @@ export default function CredentialsScreen() {
                                         ) : isIdp ? (
                                             <Text style={styles.inactiveBadge}>{t('credentials.inactiveBadge')}</Text>
                                         ) : null}
+                                        {/* Choosing is the point of this screen when a
+                                            device holds more than one account: which one
+                                            a sign-in uses was decided purely by
+                                            registration order, and that guess was wrong
+                                            in both directions. */}
+                                        {isIdp && !isActive && idpCount > 1 ? (
+                                            <Pressable
+                                                onPress={() => {
+                                                    setActiveCredential(cred.credentialId);
+                                                    Alert.alert(
+                                                        t('credentials.accountSwitchedTitle'),
+                                                        t('credentials.accountSwitchedBody', {
+                                                            account: shortAccount(cred.userHandle, t),
+                                                        }),
+                                                    );
+                                                }}
+                                                hitSlop={8}
+                                            >
+                                                <Text style={styles.useThis}>{t('credentials.useThisAccount')}</Text>
+                                            </Pressable>
+                                        ) : null}
                                         <Text style={styles.meta}>
                                             {t('credentials.registeredMeta', {
                                                 user: cred.userName,
@@ -219,6 +244,12 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     info: { flex: 1, backgroundColor: 'transparent' },
     rp: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
+    useThis: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: p.blue,
+        marginTop: 6,
+    },
     activeBadge: { fontSize: 12, color: p.green, fontWeight: '600', marginBottom: 2 },
     inactiveBadge: { fontSize: 12, color: p.textMuted, marginBottom: 2 },
     meta: { fontSize: 12, color: p.textSecondary },

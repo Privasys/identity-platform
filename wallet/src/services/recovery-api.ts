@@ -253,6 +253,23 @@ export async function revokeDevice(accessToken: string, credentialId: string): P
 
 // ── Recovery flow ───────────────────────────────────────────────────────
 
+/**
+ * The account a recovery phrase matched, for the confirmation shown BEFORE the
+ * recovery is completed. Optional throughout: an older IdP does not send it,
+ * and a summary that could not be built must never block a recovery.
+ */
+export interface RecoveryAccountSummary {
+    user_id: string;
+    display_name?: string;
+    email?: string;
+    created_at?: string;
+    /** Registered devices that completing the recovery will revoke. */
+    credential_count: number;
+    /** Roles held, as a count: enough to tell an account that owns things from
+     *  one that owns nothing, without listing what. */
+    role_count: number;
+}
+
 export interface RecoveryBeginResult {
     request_id: string;
     user_id: string;
@@ -260,6 +277,7 @@ export interface RecoveryBeginResult {
     guardians_required: number;
     guardians_approved: number;
     expires_at: string;
+    account?: RecoveryAccountSummary;
 }
 
 /**

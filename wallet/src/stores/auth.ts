@@ -47,6 +47,14 @@ export interface AuthState {
     setOnboarded: () => void;
     addCredential: (credential: Credential) => void;
     removeCredential: (credentialId: string) => void;
+    /**
+     * The account this device signs in as, when one rpId carries several.
+     * Null means "whichever registered most recently", which is the right
+     * default and was, until this existed, the ONLY mechanism.
+     */
+    activeCredentialId: string | null;
+    /** Pick the account for ceremonies on the shared IdP rpId. */
+    setActiveCredential: (credentialId: string | null) => void;
     getCredentialForRp: (rpId: string) => Credential | undefined;
     getCredentialById: (credentialId: string) => Credential | undefined;
     setUnlocked: (durationMs: number) => void;
@@ -87,6 +95,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     unlockExpiresAt: 0,
     privasysId: null,
     recoveryPhraseSaved: false,
+    activeCredentialId: null,
 
     setOnboarded: () => {
         set({ isOnboarded: true });
@@ -101,6 +110,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             unlockExpiresAt: 0,
             privasysId: null,
             recoveryPhraseSaved: false,
+            activeCredentialId: null,
         });
         persist(get());
     },
@@ -110,26 +120,41 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         persist(get());
     },
 
+    setActiveCredential: (credentialId) => {
+        set({ activeCredentialId: credentialId });
+        persist(get());
+    },
+
     removeCredential: (credentialId) => {
         set((s) => ({
-            credentials: s.credentials.filter((c) => c.credentialId !== credentialId)
+            credentials: s.credentials.filter((c) => c.credentialId !== credentialId),
+            // A pin to a credential that no longer exists would silently fall
+            // back to newest-wins while the UI still claimed a choice had been
+            // made. Drop it with the credential.
+            activeCredentialId: s.activeCredentialId === credentialId ? null : s.activeCredentialId,
         }));
         persist(get());
     },
 
     getCredentialForRp: (rpId) => {
-        // One rpId can carry credentials for MULTIPLE accounts (the shared
-        // privasys.id RP after an account recovery registers a second
-        // account's credential). Array order means oldest-wins — exactly
-        // wrong after a recovery, where the newest registration is the
-        // account the user just deliberately bound to this device
-        // (2026-07-30: a stale entry shadowed the freshly recovered admin
-        // credential and every sign-in landed on the wrong account). Prefer
-        // the newest; the full answer for multi-account RPs is an account
-        // chooser in the ceremony.
-        return [...get().credentials]
-            .filter((c) => c.rpId === rpId)
-            .sort((a, b) => (b.registeredAt ?? 0) - (a.registeredAt ?? 0))[0];
+        // One rpId can carry credentials for MULTIPLE accounts: the shared
+        // privasys.id RP does, once a recovery has registered a second
+        // account's credential on the same device.
+        const forRp = get().credentials.filter((c) => c.rpId === rpId);
+
+        // An explicit choice wins. Without one this was decided entirely by
+        // registration order, which is a guess about intent and got it wrong
+        // in both directions: oldest-wins let a stale entry shadow a freshly
+        // recovered account (2026-07-30), and newest-wins then handed every
+        // ceremony to whichever account a later recovery happened to bind
+        // (2026-09-04). Neither is knowable from timestamps, so the holder
+        // can now say, on the Registered Credentials screen.
+        const pinned = forRp.find((c) => c.credentialId === get().activeCredentialId);
+        if (pinned) return pinned;
+
+        // No choice made: newest registration, which is the better default
+        // because it is usually the account just deliberately bound here.
+        return [...forRp].sort((a, b) => (b.registeredAt ?? 0) - (a.registeredAt ?? 0))[0];
     },
 
     getCredentialById: (credentialId) => {
@@ -199,11 +224,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     credentials = credentials.filter((c) => c.credentialId !== stray.credentialId);
                 }
             }
+            // Never restore a pin to a credential that is no longer here: the
+            // hydrate normalisation above can drop one, and a dangling pin
+            // reads as a choice while behaving like no choice at all.
+            const pinned = data.activeCredentialId ?? null;
+            const activeCredentialId = credentials.some((c) => c.credentialId === pinned) ? pinned : null;
             set({
                 isOnboarded: data.isOnboarded ?? false,
                 credentials,
                 privasysId,
                 recoveryPhraseSaved: data.recoveryPhraseSaved ?? false,
+                activeCredentialId,
             });
             persist(get());
         } catch {
@@ -218,6 +249,7 @@ function persist(state: AuthState) {
         credentials: state.credentials,
         privasysId: state.privasysId,
         recoveryPhraseSaved: state.recoveryPhraseSaved,
+        activeCredentialId: state.activeCredentialId,
     };
     SecureStore.setItemAsync(STORE_KEY, JSON.stringify(data)).catch(console.error);
 }

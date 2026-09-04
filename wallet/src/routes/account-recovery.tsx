@@ -23,9 +23,7 @@ import {
     Alert,
     ActivityIndicator,
     RefreshControl,
-    Share,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -52,6 +50,7 @@ import {
 import { ensurePrivasysSession, getPrivasysAccount } from '@/services/privasys-id';
 import { establishPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
+import { RecoveryPhraseCard } from '@/components/RecoveryPhraseCard';
 import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 
@@ -420,58 +419,16 @@ export default function AccountRecoveryScreen() {
                 <Text style={styles.sectionDescription}>{t('accountRecovery.sectionPhraseHint')}</Text>
 
                 {newPhrase ? (
-                    <RNView style={styles.card}>
-                        <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
-                            {t('secureWallet.saveWords')}
-                        </Text>
-                        <RNView style={styles.codesGrid}>
-                            {newPhrase.split(/\s+/).map((word, i) => (
-                                <RNView key={i} style={styles.codeItem}>
-                                    <Text style={styles.codeText}>{i + 1}. {word}</Text>
-                                </RNView>
-                            ))}
-                        </RNView>
-                        {/* Copy / export so the phrase can be printed. The
-                            share sheet and clipboard are less private than
-                            paper (clipboard managers, cloud share targets),
-                            so the caution stays visible next to the actions. */}
-                        <RNView style={{ flexDirection: 'row', gap: 10 }}>
-                            <Pressable
-                                style={[styles.secondaryButton, { flex: 1 }]}
-                                onPress={async () => {
-                                    await Clipboard.setStringAsync(newPhrase);
-                                    Alert.alert(
-                                        t('common.copied'),
-                                        t('secureWallet.copiedWarning'),
-                                    );
-                                }}
-                            >
-                                <Text style={styles.secondaryButtonText}>{t('common.copy')}</Text>
-                            </Pressable>
-                            <Pressable
-                                style={[styles.secondaryButton, { flex: 1 }]}
-                                onPress={() => {
-                                    void Share.share({ message: newPhrase });
-                                }}
-                            >
-                                <Text style={styles.secondaryButtonText}>{t('secureWallet.sharePrint')}</Text>
-                            </Pressable>
-                        </RNView>
-                        <Text style={styles.helperText}>{t('secureWallet.paperAdvice')}</Text>
-                        <Pressable
-                            style={styles.primaryButton}
-                            onPress={() => {
-                                // Confirmed: this is the one place the human tells
-                                // us they wrote it down. Persist it so the nudge
-                                // stops until the phrase is next (re)generated or
-                                // invalidated.
-                                setRecoveryPhraseSaved(true);
-                                setNewPhrase(null);
-                            }}
-                        >
-                            <Text style={styles.primaryButtonText}>{t('secureWallet.savedIt')}</Text>
-                        </Pressable>
-                    </RNView>
+                    <RecoveryPhraseCard
+                        phrase={newPhrase}
+                        onSaved={() => {
+                            // Confirmed: this is the one place the human tells us
+                            // they wrote it down. Persist it so the nudge stops
+                            // until the phrase is next regenerated or invalidated.
+                            setRecoveryPhraseSaved(true);
+                            setNewPhrase(null);
+                        }}
+                    />
                 ) : (
                     <RNView style={styles.card}>
                         {/* Honest, three-state status. has_phrase is only what
@@ -957,25 +914,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
 
     // Recovery codes grid
-    codesGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 6,
-        marginBottom: 12,
-    },
-    codeItem: {
-        backgroundColor: p.cardAlt,
-        borderRadius: 6,
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-    },
-    codeText: {
-        fontSize: 13,
-        fontFamily: 'Inter',
-        color: p.textPrimary,
-        fontWeight: '500',
-        letterSpacing: 0.5,
-    },
 
     // Guardian row
     guardianRow: {

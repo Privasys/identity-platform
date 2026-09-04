@@ -152,7 +152,15 @@ export default function PersonalDataScreen() {
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 50 : 0}
+                // No offset. React Native computes the padding as
+                // (view bottom - (keyboard top - offset)), so a POSITIVE offset
+                // ADDS that much dead space above the keyboard rather than
+                // correcting for a header. This view already begins BELOW the
+                // header, so its bottom is the screen bottom and the plain
+                // keyboard height is exactly right. An earlier cut passed
+                // insets.top + 50 and put a block of roughly 97pt on screen,
+                // which hid more than the keyboard ever did.
+                keyboardVerticalOffset={0}
             >
             <ScrollView
                 style={styles.scrollView}

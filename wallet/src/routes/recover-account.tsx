@@ -14,7 +14,6 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
@@ -47,6 +46,7 @@ import {
     RECOVERY_STATE_KEY,
     type RecoveryBeginResult,
 } from '@/services/recovery-api';
+import { RecoveryPhraseCard } from '@/components/RecoveryPhraseCard';
 import { useAuthStore } from '@/stores/auth';
 import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
@@ -532,9 +532,15 @@ export default function RecoverAccountScreen() {
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                // Offset the custom header so the keyboard shrinks the scroll
-                // area correctly and the primary button scrolls into view.
-                keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 50 : 0}
+                // No offset. React Native computes the padding as
+                // (view bottom - (keyboard top - offset)), so a POSITIVE offset
+                // ADDS that much dead space above the keyboard rather than
+                // correcting for a header. This view already begins BELOW the
+                // header, so its bottom is the screen bottom and the plain
+                // keyboard height is exactly right. An earlier cut passed
+                // insets.top + 50 and put a block of roughly 97pt on screen,
+                // which hid more than the keyboard ever did.
+                keyboardVerticalOffset={0}
             >
             <ScrollView
                 style={styles.scrollView}
@@ -726,34 +732,14 @@ export default function RecoverAccountScreen() {
                         <Text style={styles.title}>{t('recover.newPhraseTitle')}</Text>
                         <Text style={styles.subtitle}>{t('recover.newPhraseBody')}</Text>
 
-                        <RNView style={styles.wordChips}>
-                            {issuedPhrase.split(/\s+/).map((word, i) => (
-                                <RNView key={i} style={styles.wordChip}>
-                                    <Text style={styles.wordChipText}>{i + 1}. {word}</Text>
-                                </RNView>
-                            ))}
-                        </RNView>
-
-                        <Pressable
-                            style={styles.secondaryButton}
-                            onPress={async () => {
-                                await Clipboard.setStringAsync(issuedPhrase);
-                                Alert.alert(t('common.copied'), t('secureWallet.copiedWarning'));
-                            }}
-                        >
-                            <Text style={styles.secondaryButtonText}>{t('common.copy')}</Text>
-                        </Pressable>
-
-                        <Pressable
-                            style={styles.primaryButton}
-                            onPress={() => {
+                        <RecoveryPhraseCard
+                            phrase={issuedPhrase}
+                            onSaved={() => {
                                 useAuthStore.getState().setRecoveryPhraseSaved(true);
                                 setIssuedPhrase(null);
                                 setStep('restored');
                             }}
-                        >
-                            <Text style={styles.primaryButtonText}>{t('secureWallet.savedIt')}</Text>
-                        </Pressable>
+                        />
                     </>
                 )}
 

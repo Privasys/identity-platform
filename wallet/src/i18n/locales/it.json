@@ -606,6 +606,8 @@
     "defaultDisplayName": "Utente Privasys",
     "setupTitle": "Configura il tuo portafoglio",
     "setupLede": "Bastano pochi secondi, e tutto viene creato qui, sul tuo telefono. Non c'è alcun account né password.",
+    "finishRestoreTitle": "Completa il ripristino del portafoglio",
+    "finishRestoreLede": "Il tuo account è recuperato. Resta un passaggio su questo dispositivo: conferma che sei tu e la tua identità torna con esso.",
     "setupWith": "Configura con {{method}}",
     "setupPrompt": "Configura il tuo Privasys Wallet",
     "usePasscode": "Usa il codice",
@@ -713,7 +715,9 @@
     "restoredTitle": "Dispositivo ripristinato",
     "restoredBody": "Questo dispositivo ora accede con il tuo account recuperato. Conviene generare una nuova frase di recupero in Impostazioni → Recupero dell'account, perché le frasi di recupero sono monouso.",
     "expiredTitle": "Recupero scaduto",
-    "expiredBody": "La tua richiesta di recupero è scaduta. Avvia un nuovo recupero con un altro codice di recupero."
+    "expiredBody": "La tua richiesta di recupero è scaduta. Avvia un nuovo recupero con un altro codice di recupero.",
+    "newPhraseTitle": "La tua nuova frase di recupero",
+    "newPhraseBody": "Il recupero ha sostituito la vecchia frase, quindi quelle parole non funzionano più. Annota queste 24 e conservale al sicuro. Vengono mostrate una sola volta."
   },
 
   "scan": {

@@ -594,6 +594,8 @@
     "defaultDisplayName": "Privasys-käyttäjä",
     "setupTitle": "Ota lompakkosi käyttöön",
     "setupLede": "Se vie muutaman sekunnin, ja kaikki luodaan tässä puhelimessasi. Tiliä tai salasanaa ei ole.",
+    "finishRestoreTitle": "Viimeistele lompakon palautus",
+    "finishRestoreLede": "Tilisi on palautettu. Tällä laitteella on yksi vaihe jäljellä: vahvista että se olet sinä, ja henkilöllisyytesi palaa sen mukana.",
     "setupWith": "Ota käyttöön menetelmällä {{method}}",
     "setupPrompt": "Ota Privasys Wallet käyttöön",
     "usePasscode": "Käytä pääsykoodia",
@@ -696,7 +698,9 @@
     "restoredTitle": "Laite palautettu",
     "restoredBody": "Tämä laite kirjautuu nyt palautetulla tililläsi. Kannattaa luoda uusi palautuslause kohdassa Asetukset → Tilin palautus, koska palautuslauseet ovat kertakäyttöisiä.",
     "expiredTitle": "Palautus vanhentunut",
-    "expiredBody": "Palautuspyyntösi on vanhentunut. Aloita uusi palautus toisella palautuskoodilla."
+    "expiredBody": "Palautuspyyntösi on vanhentunut. Aloita uusi palautus toisella palautuskoodilla.",
+    "newPhraseTitle": "Uusi palautuslauseesi",
+    "newPhraseBody": "Palautus korvasi vanhan lauseesi, joten ne sanat eivät enää toimi. Kirjoita nämä 24 ylös ja säilytä ne turvassa. Ne näytetään kerran."
   },
 
   "scan": {

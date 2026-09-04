@@ -627,6 +627,8 @@
     "defaultDisplayName": "Privasys lietotājs",
     "setupTitle": "Iestatiet savu maku",
     "setupLede": "Tas aizņem dažas sekundes, un viss tiek izveidots šeit, jūsu tālrunī. Nav ne konta, ne paroles.",
+    "finishRestoreTitle": "Pabeidziet maka atjaunošanu",
+    "finishRestoreLede": "Jūsu konts ir atkopts. Šajā ierīcē atlicis viens solis: apstipriniet, ka tas esat jūs, un identitāte atgriezīsies līdzi.",
     "setupWith": "Iestatīt ar {{method}}",
     "setupPrompt": "Iestatiet savu Privasys maku",
     "usePasscode": "Izmantot piekļuves kodu",
@@ -733,7 +735,9 @@
     "restoredTitle": "Ierīce atjaunota",
     "restoredBody": "Šī ierīce tagad piesakās kā jūsu atkoptais konts. Apsveriet iespēju izveidot jaunu atkopšanas frāzi sadaļā Iestatījumi → Konta atkopšana, jo atkopšanas frāzes ir vienreizējas.",
     "expiredTitle": "Atkopšanas termiņš beidzies",
-    "expiredBody": "Jūsu atkopšanas pieprasījuma termiņš ir beidzies. Lūdzu, sāciet jaunu atkopšanu ar citu atkopšanas kodu."
+    "expiredBody": "Jūsu atkopšanas pieprasījuma termiņš ir beidzies. Lūdzu, sāciet jaunu atkopšanu ar citu atkopšanas kodu.",
+    "newPhraseTitle": "Jūsu jaunā atkopšanas frāze",
+    "newPhraseBody": "Atkopšana aizstāja veco frāzi, tāpēc tie vārdi vairs nedarbojas. Pierakstiet šos 24 un glabājiet tos drošā vietā. Tie tiek parādīti vienu reizi."
   },
   "scan": {
     "close": "Aizvērt skeneri"

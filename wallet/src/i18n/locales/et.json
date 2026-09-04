@@ -615,6 +615,8 @@
     "defaultDisplayName": "Privasyse kasutaja",
     "setupTitle": "Seadistage oma rahakott",
     "setupLede": "See võtab paar sekundit ja kõik luuakse siin, teie telefonis. Kontot ega parooli pole.",
+    "finishRestoreTitle": "Lõpetage rahakoti taastamine",
+    "finishRestoreLede": "Teie konto on taastatud. Selles seadmes on jäänud üks samm: kinnitage, et see olete teie, ja identiteet tuleb sellega tagasi.",
     "setupWith": "Seadista {{method}} abil",
     "setupPrompt": "Seadistage oma Privasyse rahakott",
     "usePasscode": "Kasuta pääsukoodi",
@@ -716,7 +718,9 @@
     "restoredTitle": "Seade taastatud",
     "restoredBody": "See seade logib nüüd sisse teie taastatud kontona. Kaaluge uue taastefraasi loomist menüüs Sätted → Konto taastamine, sest taastefraasid on ühekordsed.",
     "expiredTitle": "Taastamine on aegunud",
-    "expiredBody": "Teie taastamistaotlus on aegunud. Palun alustage uut taastamist teise taastekoodiga."
+    "expiredBody": "Teie taastamistaotlus on aegunud. Palun alustage uut taastamist teise taastekoodiga.",
+    "newPhraseTitle": "Teie uus taastefraas",
+    "newPhraseBody": "Taastamine asendas vana fraasi, seega need sõnad enam ei toimi. Kirjutage need 24 üles ja hoidke turvalises kohas. Neid näidatakse üks kord."
   },
   "scan": {
     "close": "Sulge skanner"

@@ -618,6 +618,8 @@
     "defaultDisplayName": "Użytkownik Privasys",
     "setupTitle": "Skonfiguruj swój portfel",
     "setupLede": "Zajmie to kilka sekund, a wszystko powstaje tutaj, w Twoim telefonie. Nie ma konta ani hasła.",
+    "finishRestoreTitle": "Dokończ przywracanie portfela",
+    "finishRestoreLede": "Twoje konto zostało odzyskane. Na tym urządzeniu został jeden krok: potwierdź, że to Ty, a Twoja tożsamość wróci razem z nim.",
     "setupWith": "Skonfiguruj przy użyciu {{method}}",
     "setupPrompt": "Skonfiguruj swój Privasys Wallet",
     "usePasscode": "Użyj kodu",
@@ -730,7 +732,9 @@
     "restoredTitle": "Urządzenie przywrócone",
     "restoredBody": "To urządzenie loguje się teraz jako Twoje odzyskane konto. Rozważ wygenerowanie nowej frazy odzyskiwania w Ustawienia → Odzyskiwanie konta, ponieważ frazy odzyskiwania są jednorazowe.",
     "expiredTitle": "Odzyskiwanie wygasło",
-    "expiredBody": "Twoja prośba o odzyskanie wygasła. Rozpocznij nowe odzyskiwanie z innym kodem odzyskiwania."
+    "expiredBody": "Twoja prośba o odzyskanie wygasła. Rozpocznij nowe odzyskiwanie z innym kodem odzyskiwania.",
+    "newPhraseTitle": "Twoja nowa fraza odzyskiwania",
+    "newPhraseBody": "Odzyskiwanie zastąpiło starą frazę, więc tamte słowa już nie działają. Zapisz te 24 i przechowuj je bezpiecznie. Są pokazywane raz."
   },
 
   "scan": {

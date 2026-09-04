@@ -627,6 +627,8 @@
     "defaultDisplayName": "Privasys naudotojas",
     "setupTitle": "Nustatykite savo piniginę",
     "setupLede": "Tai užtrunka kelias sekundes, ir viskas sukuriama čia, jūsų telefone. Nėra nei paskyros, nei slaptažodžio.",
+    "finishRestoreTitle": "Užbaikite piniginės atkūrimą",
+    "finishRestoreLede": "Jūsų paskyra atkurta. Šiame įrenginyje liko vienas žingsnis: patvirtinkite, kad tai jūs, ir tapatybė sugrįš kartu.",
     "setupWith": "Nustatyti su {{method}}",
     "setupPrompt": "Nustatykite savo Privasys piniginę",
     "usePasscode": "Naudoti prieigos kodą",
@@ -733,7 +735,9 @@
     "restoredTitle": "Įrenginys atkurtas",
     "restoredBody": "Šis įrenginys dabar jungiasi kaip jūsų atkurta paskyra. Apsvarstykite galimybę sukurti naują atkūrimo frazę skiltyje Nustatymai → Paskyros atkūrimas, nes atkūrimo frazės yra vienkartinės.",
     "expiredTitle": "Atkūrimo galiojimas baigėsi",
-    "expiredBody": "Jūsų atkūrimo prašymo galiojimas baigėsi. Pradėkite naują atkūrimą su kitu atkūrimo kodu."
+    "expiredBody": "Jūsų atkūrimo prašymo galiojimas baigėsi. Pradėkite naują atkūrimą su kitu atkūrimo kodu.",
+    "newPhraseTitle": "Jūsų nauja atkūrimo frazė",
+    "newPhraseBody": "Atkūrimas pakeitė seną frazę, todėl tie žodžiai nebeveikia. Užsirašykite šiuos 24 ir laikykite saugioje vietoje. Jie parodomi vieną kartą."
   },
   "scan": {
     "close": "Uždaryti skaitytuvą"

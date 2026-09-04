@@ -594,6 +594,8 @@
     "defaultDisplayName": "Privasys-Nutzer",
     "setupTitle": "Richten Sie Ihr Wallet ein",
     "setupLede": "Es dauert nur wenige Sekunden, und alles wird hier auf Ihrem Telefon erstellt. Es gibt weder Konto noch Passwort.",
+    "finishRestoreTitle": "Wiederherstellung abschließen",
+    "finishRestoreLede": "Ihr Konto ist wiederhergestellt. Auf diesem Gerät fehlt ein Schritt: bestätigen Sie, dass Sie es sind, und Ihre Identität kommt damit zurück.",
     "setupWith": "Mit {{method}} einrichten",
     "setupPrompt": "Ihr Privasys Wallet einrichten",
     "usePasscode": "Code verwenden",
@@ -696,7 +698,9 @@
     "restoredTitle": "Gerät wiederhergestellt",
     "restoredBody": "Dieses Gerät meldet sich jetzt als Ihr wiederhergestelltes Konto an. Erzeugen Sie am besten eine neue Wiederherstellungsphrase unter Einstellungen → Kontowiederherstellung, denn Wiederherstellungsphrasen sind nur einmal verwendbar.",
     "expiredTitle": "Wiederherstellung abgelaufen",
-    "expiredBody": "Ihre Wiederherstellungsanfrage ist abgelaufen. Bitte starten Sie eine neue Wiederherstellung mit einem anderen Wiederherstellungscode."
+    "expiredBody": "Ihre Wiederherstellungsanfrage ist abgelaufen. Bitte starten Sie eine neue Wiederherstellung mit einem anderen Wiederherstellungscode.",
+    "newPhraseTitle": "Ihre neue Wiederherstellungsphrase",
+    "newPhraseBody": "Die Wiederherstellung hat Ihre alte Phrase ersetzt, jene Wörter funktionieren also nicht mehr. Notieren Sie diese 24 und bewahren Sie sie sicher auf. Sie werden nur einmal angezeigt."
   },
 
   "scan": {

@@ -627,6 +627,8 @@
     "defaultDisplayName": "Používateľ Privasys",
     "setupTitle": "Nastavte si peňaženku",
     "setupLede": "Trvá to pár sekúnd a všetko sa vytvára tu, vo vašom telefóne. Neexistuje žiadny účet ani heslo.",
+    "finishRestoreTitle": "Dokončite obnovu peňaženky",
+    "finishRestoreLede": "Váš účet je obnovený. Na tomto zariadení zostáva jeden krok: potvrďte, že ste to vy, a vaša identita sa vráti s ním.",
     "setupWith": "Nastaviť pomocou {{method}}",
     "setupPrompt": "Nastavte si peňaženku Privasys",
     "usePasscode": "Použiť prístupový kód",
@@ -733,7 +735,9 @@
     "restoredTitle": "Zariadenie obnovené",
     "restoredBody": "Toto zariadenie sa teraz prihlasuje ako váš obnovený účet. Zvážte vygenerovanie novej frázy na obnovu v Nastavenia → Obnova účtu, pretože frázy na obnovu sú jednorazové.",
     "expiredTitle": "Platnosť obnovy vypršala",
-    "expiredBody": "Platnosť vašej žiadosti o obnovu vypršala. Začnite, prosím, novú obnovu s iným kódom na obnovu."
+    "expiredBody": "Platnosť vašej žiadosti o obnovu vypršala. Začnite, prosím, novú obnovu s iným kódom na obnovu.",
+    "newPhraseTitle": "Vaša nová obnovovacia fráza",
+    "newPhraseBody": "Obnovenie nahradilo starú frázu, takže tie slová už nefungujú. Zapíšte si týchto 24 a uschovajte ich na bezpečnom mieste. Zobrazia sa raz."
   },
   "scan": {
     "close": "Zavrieť skener"

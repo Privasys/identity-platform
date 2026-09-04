@@ -606,6 +606,8 @@
     "defaultDisplayName": "Utilizador Privasys",
     "setupTitle": "Configure a sua carteira",
     "setupLede": "Demora alguns segundos, e tudo é criado aqui, no seu telemóvel. Não há conta nem palavra-passe.",
+    "finishRestoreTitle": "Termine a reposição da sua carteira",
+    "finishRestoreLede": "A sua conta foi recuperada. Falta um passo neste dispositivo: confirme que é você e a sua identidade volta com isso.",
     "setupWith": "Configurar com {{method}}",
     "setupPrompt": "Configurar a sua Privasys Wallet",
     "usePasscode": "Usar o código",
@@ -713,7 +715,9 @@
     "restoredTitle": "Dispositivo restaurado",
     "restoredBody": "Este dispositivo inicia agora sessão como a sua conta recuperada. Considere gerar uma nova frase de recuperação em Definições → Recuperação de conta, porque as frases de recuperação são de utilização única.",
     "expiredTitle": "Recuperação expirada",
-    "expiredBody": "O seu pedido de recuperação expirou. Inicie uma nova recuperação com outro código de recuperação."
+    "expiredBody": "O seu pedido de recuperação expirou. Inicie uma nova recuperação com outro código de recuperação.",
+    "newPhraseTitle": "A sua nova frase de recuperação",
+    "newPhraseBody": "A recuperação substituiu a sua frase antiga, pelo que essas palavras já não funcionam. Anote estas 24 e guarde-as em lugar seguro. São mostradas uma só vez."
   },
 
   "scan": {

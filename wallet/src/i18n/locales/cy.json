@@ -663,6 +663,8 @@
     "defaultDisplayName": "Defnyddiwr Privasys",
     "setupTitle": "Sefydlwch eich waled",
     "setupLede": "Mae'n cymryd ychydig eiliadau, ac mae popeth yn cael ei greu yma ar eich ffôn. Does dim cyfrif a dim cyfrinair.",
+    "finishRestoreTitle": "Gorffen adfer eich waled",
+    "finishRestoreLede": "Mae eich cyfrif wedi'i adfer. Un cam ar ôl ar y ddyfais hon: cadarnhewch mai chi ydyw, a daw eich hunaniaeth yn ôl gydag ef.",
     "setupWith": "Sefydlu gyda {{method}}",
     "setupPrompt": "Sefydlwch eich waled Privasys",
     "usePasscode": "Defnyddio cod pas",
@@ -784,7 +786,9 @@
     "restoredTitle": "Adferwyd y ddyfais",
     "restoredBody": "Mae'r ddyfais hon bellach yn mewngofnodi fel eich cyfrif adferedig. Ystyriwch gynhyrchu ymadrodd adfer newydd yn Gosodiadau → Adfer Cyfrif, gan mai unwaith yn unig y gellir defnyddio ymadroddion adfer.",
     "expiredTitle": "Daeth yr adferiad i ben",
-    "expiredBody": "Mae eich cais am adfer wedi dod i ben. Dechreuwch adferiad newydd gyda chod adfer gwahanol."
+    "expiredBody": "Mae eich cais am adfer wedi dod i ben. Dechreuwch adferiad newydd gyda chod adfer gwahanol.",
+    "newPhraseTitle": "Eich ymadrodd adfer newydd",
+    "newPhraseBody": "Mae adfer wedi disodli eich hen ymadrodd, felly nid yw'r geiriau hynny'n gweithio mwyach. Ysgrifennwch y 24 hyn a'u cadw'n ddiogel. Dangosir hwy unwaith yn unig."
   },
   "scan": {
     "close": "Cau'r sganiwr"

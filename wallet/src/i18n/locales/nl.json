@@ -594,6 +594,8 @@
     "defaultDisplayName": "Privasys-gebruiker",
     "setupTitle": "Stel je wallet in",
     "setupLede": "Het duurt een paar seconden, en alles wordt hier op je telefoon aangemaakt. Er is geen account en geen wachtwoord.",
+    "finishRestoreTitle": "Rond het herstel van je wallet af",
+    "finishRestoreLede": "Je account is hersteld. Op dit toestel is er nog één stap: bevestig dat jij het bent, en je identiteit komt ermee terug.",
     "setupWith": "Instellen met {{method}}",
     "setupPrompt": "Je Privasys Wallet instellen",
     "usePasscode": "Toegangscode gebruiken",
@@ -696,7 +698,9 @@
     "restoredTitle": "Apparaat hersteld",
     "restoredBody": "Dit apparaat meldt zich nu aan als je herstelde account. Maak bij voorkeur een nieuwe herstelzin aan bij Instellingen → Accountherstel, want herstelzinnen zijn eenmalig te gebruiken.",
     "expiredTitle": "Herstel verlopen",
-    "expiredBody": "Je herstelverzoek is verlopen. Start een nieuw herstel met een andere herstelcode."
+    "expiredBody": "Je herstelverzoek is verlopen. Start een nieuw herstel met een andere herstelcode.",
+    "newPhraseTitle": "Je nieuwe herstelzin",
+    "newPhraseBody": "Het herstel heeft je oude zin vervangen, dus die woorden werken niet meer. Schrijf deze 24 op en bewaar ze veilig. Ze worden één keer getoond."
   },
 
   "scan": {

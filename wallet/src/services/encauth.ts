@@ -105,9 +105,9 @@ function concat(parts: Uint8Array[]): Uint8Array {
  * workloadDigest, encMeas, quoteHash MUST be SHA-256 outputs (32 bytes each).
  *
  * `workloadDigest` is CBOR key 4 (named `app_id` in the wire format /
- * crypto-contract §8.1). It is NOT the static OID 3.6 app-id; it is the
+ * crypto-contract §8.1). It is NOT the static OID 4.1 app-id; it is the
  * workload-measurement digest over OIDs 3.1/3.2/3.3/3.4 (see
- * workloadDigestHash), so it moves with the OID 3.2 code hash.
+ * workloadDigestHash), so it moves with the OID 4.2 code hash.
  */
 export interface EncAuthPayload {
     sub: string;

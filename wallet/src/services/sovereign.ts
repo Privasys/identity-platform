@@ -139,7 +139,7 @@ export async function sovereignKeyForAttestedApp(
         );
     }
     if (!appIdHex) {
-        throw new Error('sovereign: attested app has no app id (OID 3.6); refusing');
+        throw new Error('sovereign: attested app has no app id (OID 4.1); refusing');
     }
     const root = await ensureDataRoot();
     return deriveW(root, pairwiseSub, appIdHex);

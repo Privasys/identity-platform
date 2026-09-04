@@ -25,9 +25,9 @@ export interface DependencyOid {
     valueHex: string;
 }
 
-/** One declared direct dependency, decoded from the OID 6.1 extension. */
+/** One declared direct dependency, decoded from the OID 7.1 extension. */
 export interface DeclaredDependency {
-    /** Management app-id of the dependency (matches its OID 3.6). */
+    /** Management app-id of the dependency (matches its OID 4.1). */
     appId: string;
     /** Any-of allowed measurements, in canonical string form ("sgx:.." / "tdx:..:..:.."). */
     measurements: string[];

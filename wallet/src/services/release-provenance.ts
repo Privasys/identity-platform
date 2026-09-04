@@ -17,7 +17,7 @@
  *       workload_release (with matches) — used on Service Details for a RUNNING
  *       app the wallet is connected to.
  *
- * Framing: this is "verified by Privasys" (the OID 3.2 digest → GitHub release
+ * Framing: this is "verified by Privasys" (the OID 4.2 digest → GitHub release
  * mapping is mgmt's assertion), not a trustless reproducible-build proof. The
  * hardware-rooted anchor remains the attested quote / the vault binding.
  */
@@ -52,7 +52,7 @@ export interface WorkloadRelease {
     label?: string;
     /** Published image digest (bare hex sha256). */
     digest?: string;
-    /** OID 3.2 (attested/target) == the published digest. Absent when unknown. */
+    /** OID 4.2 (attested/target) == the published digest. Absent when unknown. */
     matches?: boolean;
     /**
      * The source commit the build came from, when mgmt has one. A commit page
@@ -92,12 +92,12 @@ export interface ReleaseProvenance {
     matches?: boolean;
 }
 
-/** OID 3.2 (workload image digest) and 3.6 (workload app id) on the RA-TLS leaf. */
+/** OID 4.2 (workload code digest) and 4.1 (workload app id) on the RA-TLS leaf. */
 export const OID_WORKLOAD_IMAGE_DIGEST = '1.3.6.1.4.1.65230.4.2';
 export const OID_WORKLOAD_APP_ID = '1.3.6.1.4.1.65230.4.1';
 
 /**
- * Re-dash the OID 3.6 app-id (32-char undashed hex) into the management-service
+ * Re-dash the OID 4.1 app-id (32-char undashed hex) into the management-service
  * UUID form the release endpoints expect. Returns undefined when absent/malformed.
  */
 export function appIdFromOids(
@@ -139,7 +139,7 @@ async function getJSONFirst<T>(path: string, appHost?: string): Promise<T | null
 
 /**
  * Resolve the published release + code-diff for a specific app version. Public;
- * no enclave needs to be running. Pass `digest` (the target OID 3.2 hex) to also
+ * no enclave needs to be running. Pass `digest` (the target OID 4.2 hex) to also
  * get the `matches` verdict. Returns null on any failure — the caller degrades
  * to no release card.
  */
@@ -160,7 +160,7 @@ export async function fetchReleaseProvenance(
 /**
  * The release links stamped on a RUNNING app's live attestation (os_release +
  * workload_release). Used on Service Details for a connected enclave app whose
- * management app id we know (OID 3.6). Returns null on failure.
+ * management app id we know (OID 4.1). Returns null on failure.
  */
 export async function fetchRunningAppReleases(
     appId: string,

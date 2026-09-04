@@ -176,7 +176,7 @@ export function AttestationView({
      */
     releases?: { workload?: WorkloadRelease; os?: OsRelease } | null;
     /**
-     * Attested cross-enclave dependencies this app declares (OID 6.1).
+     * Attested cross-enclave dependencies this app declares (OID 7.1).
      * `published` is the transparency-log gate; `status` reflects the approval
      * cache (approved/denied/new).
      */

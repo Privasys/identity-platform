@@ -476,6 +476,14 @@ func (h *Handler) CompleteRegistration(
 			return
 		}
 
+		// Counted BEFORE the insert. Zero means either a brand-new account or
+		// one whose credentials a recovery just revoked, and this registration
+		// is what makes it reachable again.
+		priorCredentials, credCountErr := h.db.CountCredentials(string(entry.user.ID))
+		if credCountErr != nil {
+			log.Printf("fido2/register/complete: count credentials: %v", credCountErr)
+		}
+
 		// Store credential in DB.
 		credID := base64.RawURLEncoding.EncodeToString(credential.ID)
 		pubKeyBytes := credential.PublicKey // raw COSE key bytes
@@ -505,10 +513,19 @@ func (h *Handler) CompleteRegistration(
 		// Issue a wallet session token for management ops (recovery phrase, etc).
 		sessionToken := h.walletSessions.issue(userID)
 
-		// On first registration, auto-generate a BIP39 recovery phrase if the
-		// user has none. Returned ONCE; user must save it.
+		// The first credential on an account mints a recovery phrase, and this
+		// is also where a recovery is finalised: the phrase that was used to get
+		// here is retired now, not when the recovery completed, because until
+		// this credential existed the holder still needed a way back in.
+		//
+		// Returned ONCE. A caller that reaches this and drops the response
+		// leaves the holder with a phrase they have never seen, so the wallet
+		// shows it before it does anything else with the result.
 		var recoveryPhrase string
-		if existing, _ := h.db.HasRecoveryCodes(userID); existing == 0 {
+		if priorCredentials == 0 && credCountErr == nil {
+			if err := h.db.MarkRecoveryCodesUsed(userID); err != nil {
+				log.Printf("fido2/register/complete: retire recovery codes: %v", err)
+			}
 			if phrase, err := recovery.GenerateRecoveryPhrase(); err == nil {
 				if err := h.db.StoreRecoveryCodes(userID, []string{recovery.HashPhrase(phrase)}); err == nil {
 					recoveryPhrase = phrase

@@ -225,6 +225,18 @@ func (h *Handler) HandleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 		status = "awaiting_guardians"
 	}
 
+	// Describe the account the phrase matched. The NEXT call the client makes
+	// deletes this account's credentials, and until now nothing told the holder
+	// which account that would be: recovery finds it by phrase alone. Someone
+	// holding phrases for two accounts recovered the wrong one twice.
+	//
+	// Best effort. A summary that cannot be built must not block a recovery,
+	// since the holder may be locked out and this is only an aid to recognition.
+	summary, err := h.db.GetRecoveryAccountSummary(userID)
+	if err != nil {
+		log.Printf("[recovery] account summary for %s: %v", userID, err)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"request_id":         requestID,
@@ -233,6 +245,7 @@ func (h *Handler) HandleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 		"guardians_required": guardiansRequired,
 		"guardians_approved": 0,
 		"expires_at":         expiresAt.UTC().Format(time.RFC3339),
+		"account":            summary,
 	})
 }
 

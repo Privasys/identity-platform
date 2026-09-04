@@ -38,5 +38,12 @@ class NativeRaTlsModule : Module() {
                 NativeRaTlsBridge.nativeRequest(method, host, port, caCertPath, path, body, headersJson)
             }
         }
+
+        // `request` with connection options (JSON: attestation and trust).
+        AsyncFunction("requestWith") { method: String, host: String, port: Int, path: String, body: String, headersJson: String?, caCertPath: String?, optionsJson: String? ->
+            runBlocking(Dispatchers.IO) {
+                NativeRaTlsBridge.nativeRequestWith(method, host, port, caCertPath, path, body, headersJson, optionsJson)
+            }
+        }
     }
 }

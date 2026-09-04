@@ -315,6 +315,18 @@ export async function stashRecoveredPairwiseSeed(seedHex: string): Promise<void>
 }
 
 /** Take (and clear) a stashed recovered pairwise seed, if any. */
+/**
+ * Is a recovered seed waiting to be adopted by a profile?
+ *
+ * Peeks without consuming, so the first-run screen can tell that a recovery
+ * completed and the only step left is creating the local profile. Without it
+ * that screen greets someone who has just recovered with "set up your wallet",
+ * which reads as the recovery having failed.
+ */
+export async function hasRecoveredPairwiseSeed(): Promise<boolean> {
+    return !!(await SecureStore.getItemAsync(RECOVERED_SEED_KEY));
+}
+
 export async function takeRecoveredPairwiseSeed(): Promise<string | null> {
     const seed = await SecureStore.getItemAsync(RECOVERED_SEED_KEY);
     if (seed) await SecureStore.deleteItemAsync(RECOVERED_SEED_KEY);

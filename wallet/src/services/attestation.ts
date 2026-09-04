@@ -27,6 +27,49 @@ import type { VerificationMode } from '@/stores/settings';
 export type { AttestationResult, VerificationPolicy };
 export type { VerificationMode };
 
+/**
+ * Every Privasys enclave is published under one of these, and nothing else is.
+ *
+ * RA-TLS v2 makes the caller state up front whether it expects an attested peer,
+ * so the wallet has to decide before it opens the connection rather than
+ * inspecting a certificate and finding out. The hostname IS the rule.
+ *
+ * The test fleet is a separate suffix rather than a wildcard over
+ * `privasys.org`, because the difference between "an enclave" and "a Privasys
+ * web property" is exactly what this decides. `privasys.id` and
+ * `api.developer.privasys.org` are ours too and neither is an enclave.
+ *
+ * A host under the test suffix does NOT also match the production one:
+ * `x.apps.test.privasys.org` does not end in `.apps.privasys.org`, so both have
+ * to be listed.
+ */
+const ENCLAVE_HOST_SUFFIXES = ['.apps.privasys.org', '.apps.test.privasys.org'];
+
+/**
+ * Can this host be expected to present enclave evidence?
+ *
+ * Both answers fail safe. A real enclave published somewhere else is treated as
+ * an ordinary host: less trust claimed than is available, never more. A
+ * non-enclave under the enclave suffix is asked for evidence it cannot give and
+ * the connection fails loudly. Neither direction lets an unattested peer be
+ * shown to the holder as attested, which is the only outcome that would matter.
+ *
+ * Suffix match, so `apps.privasys.org` itself is not an enclave and neither is
+ * `something.apps.privasys.org.example.com`. Lower-cased, trailing root dot
+ * removed, and any port dropped, because all three arrive from QR payloads that
+ * the wallet does not control.
+ */
+export function isAttestableHost(host: string): boolean {
+    const bare = String(host ?? '')
+        .trim()
+        .toLowerCase()
+        .split(':')[0]
+        .replace(/\.$/, '');
+    return ENCLAVE_HOST_SUFFIXES.some(
+        (suffix) => bare.length > suffix.length && bare.endsWith(suffix),
+    );
+}
+
 /** Canonical attestation service endpoint. */
 export const AS_ENDPOINT = 'https://as.privasys.org';
 

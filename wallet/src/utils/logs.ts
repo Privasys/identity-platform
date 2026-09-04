@@ -13,7 +13,8 @@
  *  - the "View Logs" / "Export Logs" entries in Settings.
  *  - the "Report Error" preview on the Connect error screen,
  *    which uses {@link buildErrorReport} to produce a single
- *    self-contained text blob the user can copy to the clipboard.
+ *    self-contained text blob the user reads before sending it to support
+ *    (see services/error-report.ts) or copies to the clipboard.
  */
 
 import Constants from 'expo-constants';
@@ -30,9 +31,6 @@ export interface LogEntry {
 }
 
 const MAX_ENTRIES = 500;
-
-/** The error reporting destination shown to the user before a manual report. */
-export const REPORT_DESTINATION = 'errors.privasys.org';
 
 const buffer: LogEntry[] = [];
 let installed = false;

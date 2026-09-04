@@ -9,6 +9,12 @@ const NativeRaTls = Platform.OS !== 'web' ? requireNativeModule('NativeRaTls') :
 
 /** An Error carrying the native RA-TLS failure category, so callers can branch
  *  their recovery UX (continue-anyway vs show-the-problem). */
+/** Connection options of `request()` (RA-TLS v2 trust selection). */
+export interface RequestOptions {
+    attestation?: 'challenge' | 'deterministic' | 'none';
+    trust?: 'auto' | 'fleet' | 'public';
+}
+
 export class RaTlsError extends Error {
     kind?: VerifyErrorKind;
     constructor(result: AttestationError) {
@@ -148,6 +154,11 @@ export async function post(
  * @param body    Request body string ("" for none).
  * @param headers Optional extra request headers.
  * @param caCertPath  Optional path to a CA PEM file on disk.
+ * @param options  Connection options. `attestation` selects the evidence
+ *   exchange (challenge by default); `trust` selects the anchors the chain
+ *   must reach (auto by default). A host that is not an enclave, such as the
+ *   identity provider, is reached with `{ attestation: 'none', trust: 'public' }`:
+ *   an ordinary TLS connection verified against the public PKI.
  * @returns Parsed response with status code and body.
  */
 export async function request(
@@ -157,14 +168,19 @@ export async function request(
     path: string,
     body: string,
     headers?: Record<string, string>,
-    caCertPath?: string
+    caCertPath?: string,
+    options?: RequestOptions
 ): Promise<PostResult> {
     if (!NativeRaTls) throw new Error('NativeRaTls is not available on web');
     const headersJson =
         headers && Object.keys(headers).length > 0 ? JSON.stringify(headers) : null;
-    const json: string = await NativeRaTls.request(
-        method, host, port, path, body, headersJson, caCertPath ?? null
-    );
+    const json: string = options
+        ? await NativeRaTls.requestWith(
+            method, host, port, path, body, headersJson, caCertPath ?? null, JSON.stringify(options)
+        )
+        : await NativeRaTls.request(
+            method, host, port, path, body, headersJson, caCertPath ?? null
+        );
     const result: PostResult | AttestationError = JSON.parse(json);
     if ('error' in result) throw new RaTlsError(result);
     return result;

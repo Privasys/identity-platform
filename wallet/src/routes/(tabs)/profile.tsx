@@ -32,7 +32,7 @@ import {
 import { profileDisplayName } from '@/services/attributes';
 import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
-import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
+import { hasRecoveredPairwiseSeed, takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { wipeWallet } from '@/services/wipe';
 import { BIOMETRIC_TIMEOUT_MS, withTimeout } from '@/utils/timeout';
 import { useAuthStore } from '@/stores/auth';
@@ -58,6 +58,26 @@ export default function ProfileScreen() {
     // until that lands, or the fresh identity can pick the old pairwise seed
     // back up out of the not-yet-deleted stash.
     const [wiping, setWiping] = useState(false);
+    /**
+     * True when a recovery finished but no local profile exists yet.
+     *
+     * Recovery restores the account server-side and stashes the pairwise seed;
+     * creating the profile that adopts it is a separate step, and landing on
+     * this screen is how that step is reached. Unmarked, someone who has just
+     * recovered is greeted by "Set up your wallet", which reads as the recovery
+     * having failed. It did not: pressing the button finishes it, and the seed
+     * below is what carries the original identity forward.
+     */
+    const [resumingRecovery, setResumingRecovery] = useState(false);
+    useEffect(() => {
+        let alive = true;
+        void hasRecoveredPairwiseSeed().then((has) => {
+            if (alive) setResumingRecovery(has);
+        });
+        return () => {
+            alive = false;
+        };
+    }, [profile]);
     // Platform-appropriate name for the device unlock ("Face ID", "fingerprint",
     // ...), so Android fingerprint users are never told to "Set up Face ID".
     const { t } = useTranslation();
@@ -137,7 +157,11 @@ export default function ProfileScreen() {
             const pairwiseSeed = (await takeRecoveredPairwiseSeed()) ?? (await generatePairwiseSeed());
             const canonicalDid = await generateCanonicalDid(pairwiseSeed);
             useProfileStore.getState().createProfile({
-                displayName: t('profile.defaultDisplayName'),
+                // EMPTY, not the placeholder. Storing the placeholder made it
+                // indistinguishable from a name the holder had chosen, and it
+                // was disclosed to relying parties as one. The Profile screen
+                // supplies it for display instead.
+                displayName: '',
                 email: '',
                 avatarUri: '',
                 locale: getDeviceLocale(),
@@ -198,9 +222,17 @@ export default function ProfileScreen() {
             <RNView style={[styles.screen, { paddingTop: insets.top }]}>
                 <ScrollView contentContainerStyle={styles.setupScroll} showsVerticalScrollIndicator={false}>
                     <RNView style={styles.setupHeader}>
-                        <Ionicons name="shield-checkmark-outline" size={56} color={p.green} />
-                        <Text style={styles.setupTitle}>{t('profile.setupTitle')}</Text>
-                        <Text style={styles.setupLede}>{t('profile.setupLede')}</Text>
+                        <Ionicons
+                            name={resumingRecovery ? 'refresh-circle-outline' : 'shield-checkmark-outline'}
+                            size={56}
+                            color={p.green}
+                        />
+                        <Text style={styles.setupTitle}>
+                            {t(resumingRecovery ? 'profile.finishRestoreTitle' : 'profile.setupTitle')}
+                        </Text>
+                        <Text style={styles.setupLede}>
+                            {t(resumingRecovery ? 'profile.finishRestoreLede' : 'profile.setupLede')}
+                        </Text>
                     </RNView>
 
                     {/* What this creates — each row ticks green as that step completes. */}

@@ -15,7 +15,6 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
@@ -23,18 +22,19 @@ import {
     Alert,
     Pressable,
     ScrollView,
-    Share,
     StyleSheet,
     View as RNView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { RecoveryPhraseCard } from '@/components/RecoveryPhraseCard';
 import { useTranslation } from 'react-i18next';
 import { ensurePrivasysSession } from '@/services/privasys-id';
 import { getRecoveryPhraseStatus } from '@/services/recovery-api';
 import { establishPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
+import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 
 export default function SecureWalletScreen() {
@@ -76,7 +76,7 @@ export default function SecureWalletScreen() {
             // The session dance (first registration or re-auth) triggers the
             // biometric prompt; the user asked for a phrase, and confirming
             // with biometrics is simply part of delivering it.
-            const sess = await ensurePrivasysSession(profile?.displayName);
+            const sess = await ensurePrivasysSession(profileName(profile));
 
             // Checked after the session because it needs the account id, and
             // best-effort: a status call that fails must not block someone who
@@ -124,44 +124,7 @@ export default function SecureWalletScreen() {
             >
                 {phrase ? (
                     <>
-                        <RNView style={styles.card}>
-                            <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
-                                {t('secureWallet.saveWords')}
-                            </Text>
-                            <RNView style={styles.codesGrid}>
-                                {phrase.split(/\s+/).map((word, i) => (
-                                    <RNView key={i} style={styles.codeItem}>
-                                        <Text style={styles.codeText}>{i + 1}. {word}</Text>
-                                    </RNView>
-                                ))}
-                            </RNView>
-                            <RNView style={{ flexDirection: 'row', gap: 10 }}>
-                                <Pressable
-                                    style={[styles.secondaryButton, { flex: 1 }]}
-                                    onPress={async () => {
-                                        await Clipboard.setStringAsync(phrase);
-                                        Alert.alert(
-                                            t('common.copied'),
-                                            t('secureWallet.copiedWarning'),
-                                        );
-                                    }}
-                                >
-                                    <Text style={styles.secondaryButtonText}>{t('common.copy')}</Text>
-                                </Pressable>
-                                <Pressable
-                                    style={[styles.secondaryButton, { flex: 1 }]}
-                                    onPress={() => {
-                                        void Share.share({ message: phrase });
-                                    }}
-                                >
-                                    <Text style={styles.secondaryButtonText}>{t('secureWallet.sharePrint')}</Text>
-                                </Pressable>
-                            </RNView>
-                            <Text style={styles.helperText}>{t('secureWallet.paperAdvice')}</Text>
-                            <Pressable style={styles.primaryButton} onPress={handleSaved}>
-                                <Text style={styles.primaryButtonText}>{t('secureWallet.savedIt')}</Text>
-                            </Pressable>
-                        </RNView>
+                        <RecoveryPhraseCard phrase={phrase} onSaved={handleSaved} />
                         {backupError && (
                             <RNView style={styles.warnCard}>
                                 <Ionicons name="warning-outline" size={18} color="#F59E0B" />
@@ -269,36 +232,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         color: p.textMuted,
         lineHeight: 18,
     },
-    fieldLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: p.textPrimary,
-    },
-    codesGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 6,
-        marginBottom: 12,
-    },
-    codeItem: {
-        backgroundColor: p.cardAlt,
-        borderRadius: 6,
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-    },
-    codeText: {
-        fontSize: 13,
-        fontFamily: 'Inter',
-        color: p.textPrimary,
-        fontWeight: '500',
-        letterSpacing: 0.5,
-    },
-    helperText: {
-        fontSize: 13,
-        color: p.textMuted,
-        lineHeight: 18,
-        marginVertical: 12,
-    },
     primaryButton: {
         backgroundColor: p.blue,
         borderRadius: 12,
@@ -310,18 +243,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
-    },
-    secondaryButton: {
-        backgroundColor: p.cardAlt,
-        borderRadius: 10,
-        paddingVertical: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    secondaryButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: p.textPrimary,
     },
     laterText: {
         fontSize: 14,

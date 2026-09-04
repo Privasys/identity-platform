@@ -43,7 +43,7 @@ import { ExternalLink } from '@/components/ExternalLink';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import type { AttestationDiff } from '@/services/attestation-diff';
 import type { OsRelease, WorkloadRelease } from '@/services/release-provenance';
-import { sourceLabel, sourceUrl, type StoreListing } from '@/services/store-listing';
+import { sourceRow, type StoreListing } from '@/services/store-listing';
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
 
 /**
@@ -244,7 +244,8 @@ export function AttestationView({
         : hasAttributes ? 'attestation.asksSignInAndDataUnnamed' : 'attestation.asksSignInUnnamed';
 
     const workloadHash = attestation.workload_code_hash;
-    const source = sourceUrl(listing);
+    const source = sourceRow(listing, releases?.workload);
+    const buildRunUrl = listing?.reproducibility?.build_run_url ?? releases?.workload?.build_run_url;
     const tee = teeLabel(attestation.tee_type);
 
     return (
@@ -320,7 +321,7 @@ export function AttestationView({
                         {source ? (
                             <PropRow
                                 label={t('attestation.propSourceCode')}
-                                link={{ url: source, label: sourceLabel(source) }}
+                                link={source}
                                 styles={styles}
                             />
                         ) : null}
@@ -576,12 +577,12 @@ export function AttestationView({
                         {listing?.category ? (
                             <PropRow label={t('attestation.propCategory')} value={listing.category} styles={styles} />
                         ) : null}
-                        {/* The release page for the running build. It carries the
-                            version link when there is one, because for an app built
-                            from a published image that page is the only published
-                            artefact there is, and it is a package page rather than
-                            source. Calling it a version is true; calling it source
-                            code would not be. */}
+                        {/* The release page for the running build: a GitHub
+                            release or GHCR package page for a container app,
+                            the source commit for a wasm app that has no
+                            published package. Calling either a version is true;
+                            calling a package page source code would not be,
+                            which is why source has its own row above. */}
                         {releases?.workload?.label || releases?.workload?.url ? (
                             <PropRow
                                 label={t('attestation.propVersion')}
@@ -596,10 +597,10 @@ export function AttestationView({
                                 styles={styles}
                             />
                         ) : null}
-                        {listing?.reproducibility?.build_run_url ? (
+                        {buildRunUrl ? (
                             <PropRow
                                 label={t('attestation.propBuildRun')}
-                                link={{ url: listing.reproducibility.build_run_url, label: t('attestation.openLink') }}
+                                link={{ url: buildRunUrl, label: t('attestation.openLink') }}
                                 styles={styles}
                             />
                         ) : null}

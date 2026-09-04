@@ -46,7 +46,7 @@ function apiBasesForHost(appHost?: string): string[] {
 
 /** The published container package/release the code was built from. */
 export interface WorkloadRelease {
-    /** GitHub release page (preferred) or GHCR package page. */
+    /** GitHub release page, GHCR package page, or (wasm) the source commit. */
     url?: string;
     /** Version semver, e.g. "v0.1.3". */
     label?: string;
@@ -54,6 +54,20 @@ export interface WorkloadRelease {
     digest?: string;
     /** OID 3.2 (attested/target) == the published digest. Absent when unknown. */
     matches?: boolean;
+    /**
+     * The source commit the build came from, when mgmt has one. A commit page
+     * is permanent and readable signed out, which the build run below is not:
+     * its artifact expires and needs a GitHub login, and the page a signed-out
+     * visitor gets names the builder's own commit. So this is the link the
+     * approval screen shows as source code.
+     */
+    commit_url?: string;
+    /** Full commit SHA for `commit_url`. */
+    commit?: string;
+    /** mgmt verified the commit's GPG signature. */
+    gpg_verified?: boolean;
+    /** The reproducible-app-builder Actions run that produced the artifact. */
+    build_run_url?: string;
 }
 
 /** The enclave-OS GitHub release the measurements were verified against. */

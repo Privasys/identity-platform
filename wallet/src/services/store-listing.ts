@@ -15,7 +15,7 @@
  * screen says so rather than inventing a display name. See the callers.
  */
 
-import { publicApiGet } from '@/services/release-provenance';
+import { publicApiGet, type WorkloadRelease } from '@/services/release-provenance';
 
 /** Reproducible-build provenance the store publishes for an app. */
 export interface StoreReproducibility {
@@ -118,4 +118,26 @@ export function sourceLabel(url: string): string {
     } catch {
         return url;
     }
+}
+
+/**
+ * The Source code row: the store's commit URL when the app is published, else
+ * the commit the running version's own provenance records.
+ *
+ * The second half matters because an unpublished app has no listing at all, so
+ * the row used to vanish for exactly the apps whose code a holder most needs to
+ * look at. The version's commit is the same fact from the other endpoint.
+ *
+ * The label carries the short SHA when we have one: a repository name alone
+ * points at whatever the default branch holds today, not at what was built.
+ */
+export function sourceRow(
+    listing: StoreListing | null | undefined,
+    workload: WorkloadRelease | null | undefined,
+): { url: string; label: string } | undefined {
+    const fromListing = sourceUrl(listing);
+    const url = fromListing ?? workload?.commit_url;
+    if (!url) return undefined;
+    const sha = !fromListing && workload?.commit ? workload.commit.slice(0, 7) : '';
+    return { url, label: sha ? `${sourceLabel(url)}@${sha}` : sourceLabel(url) };
 }

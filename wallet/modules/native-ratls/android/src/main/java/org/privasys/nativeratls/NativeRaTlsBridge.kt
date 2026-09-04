@@ -26,4 +26,10 @@ internal object NativeRaTlsBridge {
         method: String, host: String, port: Int, caCertPath: String?,
         path: String, body: String, headersJson: String?
     ): String
+
+    @JvmStatic
+    external fun nativeRequestWith(
+        method: String, host: String, port: Int, caCertPath: String?,
+        path: String, body: String, headersJson: String?, optionsJson: String?
+    ): String
 }

@@ -28,13 +28,22 @@ export type { AttestationResult, VerificationPolicy };
 export type { VerificationMode };
 
 /**
- * Every Privasys enclave is published under this suffix, and nothing else is.
+ * Every Privasys enclave is published under one of these, and nothing else is.
  *
  * RA-TLS v2 makes the caller state up front whether it expects an attested peer,
  * so the wallet has to decide before it opens the connection rather than
  * inspecting a certificate and finding out. The hostname IS the rule.
+ *
+ * The test fleet is a separate suffix rather than a wildcard over
+ * `privasys.org`, because the difference between "an enclave" and "a Privasys
+ * web property" is exactly what this decides. `privasys.id` and
+ * `api.developer.privasys.org` are ours too and neither is an enclave.
+ *
+ * A host under the test suffix does NOT also match the production one:
+ * `x.apps.test.privasys.org` does not end in `.apps.privasys.org`, so both have
+ * to be listed.
  */
-const ENCLAVE_HOST_SUFFIX = '.apps.privasys.org';
+const ENCLAVE_HOST_SUFFIXES = ['.apps.privasys.org', '.apps.test.privasys.org'];
 
 /**
  * Can this host be expected to present enclave evidence?
@@ -56,7 +65,9 @@ export function isAttestableHost(host: string): boolean {
         .toLowerCase()
         .split(':')[0]
         .replace(/\.$/, '');
-    return bare.length > ENCLAVE_HOST_SUFFIX.length && bare.endsWith(ENCLAVE_HOST_SUFFIX);
+    return ENCLAVE_HOST_SUFFIXES.some(
+        (suffix) => bare.length > suffix.length && bare.endsWith(suffix),
+    );
 }
 
 /** Canonical attestation service endpoint. */

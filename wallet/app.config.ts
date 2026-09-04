@@ -35,6 +35,43 @@ console.log(
 process.env.EXPO_PUBLIC_SENTRY_DSN ??= process.env.SENTRY_DSN;
 process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KEY;
 
+/**
+ * The App ID prefix this app carried before it moved from the Secretarium Apple
+ * account to Privasys Ltd (2026-09-04).
+ *
+ * A transfer was supposed to preserve it. It did not: the new prefix is
+ * HLW68Z8TMZ, and Apple said so on the first delivery from the new account with
+ * ITMS-90076 against all three targets, "This will result in a loss of keychain
+ * access".
+ *
+ * That loss is not a preference or two. Keychain items are addressed by
+ * `<prefix>.<group>`, so everything an installed wallet holds sits under the old
+ * prefix: the profile, credentials, the auth store, the sovereign root, KYC
+ * records, AND the Secure Enclave keys, which are keychain items like any other.
+ * A build that cannot reach them opens as a brand-new wallet on a phone that has
+ * one, and the device signing key and every FIDO2 credential are gone with it.
+ *
+ * So both prefixes are declared. Reads without an explicit group search every
+ * entitled group, which is what lets an updated app find what the old one wrote;
+ * the CURRENT prefix is listed FIRST because the first entry is the default for
+ * new writes, and new data belongs under the new identity.
+ *
+ * Whether Apple will issue a profile carrying a prefix the signing team no
+ * longer owns is the open question, and the build answers it. If it refuses,
+ * the remaining route is Apple Developer Support enabling the previous prefix on
+ * the App ID.
+ *
+ * Removing these entries later strands anyone who has not opened the app since
+ * the transfer.
+ */
+const LEGACY_APP_ID_PREFIX = '3V8YCKN438.';
+
+/** Groups shared between the app and its extensions, current and legacy. */
+const SHARED_KEYCHAIN_GROUPS = [
+    '$(AppIdentifierPrefix)org.privasys.shared',
+    `${LEGACY_APP_ID_PREFIX}org.privasys.shared`,
+];
+
 const envConfig = {
     development: {
         name: 'Privasys Wallet Dev',
@@ -143,7 +180,16 @@ export default (context: ConfigContext): ExpoConfig => {
             // NFC tag reading for the eMRTD (passport/ID chip) KYC flow. Requires
             // the matching capability enabled on the org.privasys.wallet App ID.
             entitlements: {
-                'com.apple.developer.nfc.readersession.formats': ['TAG']
+                'com.apple.developer.nfc.readersession.formats': ['TAG'],
+                // This target declared none before, relying on the implicit
+                // default group `<prefix>.<bundle id>` — the exact string the
+                // transfer changed. Naming both prefixes explicitly is what
+                // keeps an existing wallet readable after the update.
+                'keychain-access-groups': [
+                    '$(AppIdentifierPrefix)org.privasys.wallet',
+                    ...SHARED_KEYCHAIN_GROUPS,
+                    `${LEGACY_APP_ID_PREFIX}org.privasys.wallet`,
+                ]
             }
         },
         android: {
@@ -184,9 +230,7 @@ export default (context: ConfigContext): ExpoConfig => {
                                     targetName: 'NotificationServiceExtension',
                                     bundleIdentifier: `${config.bundle}.NotificationService`,
                                     entitlements: {
-                                        'keychain-access-groups': [
-                                            '$(AppIdentifierPrefix)org.privasys.shared'
-                                        ]
+                                        'keychain-access-groups': SHARED_KEYCHAIN_GROUPS
                                     }
                                 },
                                 {
@@ -194,9 +238,7 @@ export default (context: ConfigContext): ExpoConfig => {
                                     bundleIdentifier: `${config.bundle}.PasskeyProvider`,
                                     entitlements: {
                                         'com.apple.developer.authentication-services.autofill-credential-provider': true,
-                                        'keychain-access-groups': [
-                                            '$(AppIdentifierPrefix)org.privasys.shared'
-                                        ],
+                                        'keychain-access-groups': SHARED_KEYCHAIN_GROUPS,
                                         'com.apple.developer.associated-domains': [
                                             'webcredentials:privasys.id'
                                         ]

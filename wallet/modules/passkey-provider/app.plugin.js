@@ -34,9 +34,26 @@ function withIosMainAppEntitlements(config) {
             IOSConfig.BundleIdentifier.getBundleIdentifier(mod) ||
             'org.privasys.wallet';
 
-        mod.modResults['keychain-access-groups'] = [
+        // MERGED, not assigned, the same way the associated-domains block
+        // below does it. Assigning outright silently discarded anything
+        // app.config.ts declared, which after the Apple account transfer meant
+        // dropping the legacy 3V8YCKN438 groups that keep an existing wallet
+        // readable. The config looked correct and the built app was missing
+        // two entries, with nothing anywhere to say so.
+        //
+        // Order is preserved: the FIRST entry is the default group for new
+        // keychain items, so whatever app.config.ts puts first stays first and
+        // this only appends what is genuinely absent.
+        const required = [
             `$(AppIdentifierPrefix)${bundleId}`,
             '$(AppIdentifierPrefix)org.privasys.shared',
+        ];
+        const existing = Array.isArray(mod.modResults['keychain-access-groups'])
+            ? mod.modResults['keychain-access-groups']
+            : [];
+        mod.modResults['keychain-access-groups'] = [
+            ...existing,
+            ...required.filter((group) => !existing.includes(group)),
         ];
         return mod;
     });

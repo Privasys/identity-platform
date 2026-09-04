@@ -134,6 +134,16 @@ jobs:
       - name: Test the referential
         working-directory: wallet
         run: bunx jest --ci --watchAll=false src/__tests__/canonical-attributes.test.ts
+      # The entitlements that reach the binary, not the ones app.config.ts
+      # declares. A config plugin ASSIGNING keychain-access-groups instead of
+      # merging silently dropped the legacy App ID prefix groups after the Apple
+      # account transfer, and nothing failed: the config read correctly, the
+      # build succeeded, and the first symptom would have been users opening an
+      # empty wallet on a phone that had one.
+      - name: Check iOS entitlements
+        working-directory: wallet
+        run: node scripts/check-ios-entitlements.mjs
+
       - name: Type-check SDK
         working-directory: sdk
         run: |

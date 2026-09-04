@@ -37,10 +37,27 @@ export const withIosPasskeyExtension: ConfigPlugin = (config) => {
             ?? IOSConfig.BundleIdentifier.getBundleIdentifier(mod)
             ?? 'org.privasys.wallet';
 
-        // Shared keychain group for main app + extension credential access
-        mod.modResults['keychain-access-groups'] = [
+        // Shared keychain group for main app + extension credential access.
+        //
+        // MERGED, not assigned. This used to overwrite the key outright, which
+        // silently discarded anything app.config.ts declared — including the
+        // legacy 3V8YCKN438 groups added after the Apple account transfer to
+        // keep existing wallets readable. The config looked right, the built
+        // app was missing two entries, and nothing said so.
+        //
+        // Order is preserved because the FIRST entry is the default group for
+        // new keychain items: whatever app.config.ts puts first stays first,
+        // and this only appends what is genuinely absent.
+        const required = [
             `$(AppIdentifierPrefix)${bundleId}`,
             `$(AppIdentifierPrefix)org.privasys.shared`,
+        ];
+        const existing = Array.isArray(mod.modResults['keychain-access-groups'])
+            ? (mod.modResults['keychain-access-groups'] as string[])
+            : [];
+        mod.modResults['keychain-access-groups'] = [
+            ...existing,
+            ...required.filter((group) => !existing.includes(group)),
         ];
 
         return mod;

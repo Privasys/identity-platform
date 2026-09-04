@@ -754,8 +754,11 @@ func (h *Handler) sendGuardianPush(guardianID, pushToken, recoveringUserID strin
 		{
 			"to":    pushToken,
 			"sound": "default",
-			"title": "Recovery request",
-			"body":  "Someone you protect needs your help to recover their account.",
+			// APNs priority 10. See the note in admin/notify.go: Expo's default
+			// maps to priority 5, which lets iOS defer delivery for power.
+			"priority": "high",
+			"title":    "Recovery request",
+			"body":     "Someone you protect needs your help to recover their account.",
 			"data": map[string]string{
 				"type":    "recovery-request",
 				"user_id": recoveringUserID,

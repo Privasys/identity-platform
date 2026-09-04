@@ -15,6 +15,18 @@ extern char *ratls_post(const char *host, unsigned short port, const char *ca_ce
 extern char *ratls_request(const char *method, const char *host, unsigned short port,
                            const char *ca_cert_path, const char *path, const char *body,
                            const char *headers_json);
+/* options_json: {"attestation":"challenge"|"deterministic"|"none",
+ *                "trust":"auto"|"fleet"|"public"}. NULL or "" is challenge mode
+ * with automatic trust, matching ratls_request.
+ *
+ * Declared here because this file, unlike the iOS side, has no shared header to
+ * include: every Rust symbol is an extern written out by hand, so a new one in
+ * ra-tls-clients is invisible to the compiler until it is added. Omitting it
+ * does not fail at link time, it fails at compile time under C99 with an
+ * implicit-declaration error and a garbage int-to-pointer return. */
+extern char *ratls_request_with(const char *method, const char *host, unsigned short port,
+                                const char *ca_cert_path, const char *path, const char *body,
+                                const char *headers_json, const char *options_json);
 extern void ratls_free_string(char *ptr);
 
 JNIEXPORT jstring JNICALL

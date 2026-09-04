@@ -835,7 +835,7 @@ function ConnectFlow() {
     // Published-release links (best-effort, from mgmt release provenance) so the
     // approval screens can link to the reviewable code behind the measurements.
     const [releases, setReleases] = useState<{ workload?: WorkloadRelease; os?: OsRelease } | null>(null);
-    // Attested cross-enclave dependencies this enclave declares (OID 6.1),
+    // Attested cross-enclave dependencies this enclave declares (OID 7.1),
     // classified against the approval cache + resolved to published-build
     // provenance, for the approval screen.
     const [dependencyItems, setDependencyItems] = useState<DependencyConsentItem[]>([]);
@@ -1060,7 +1060,7 @@ function ConnectFlow() {
 
                 // Published-release links for the approval screens (best-effort,
                 // in parallel with verification). The app id is in the cert's
-                // OID 3.6 whatever the verify outcome, so the user can review
+                // OID 4.1 whatever the verify outcome, so the user can review
                 // the code even when deciding on a changed or failed enclave.
                 const relAppId = appIdFromOids(inspectResult.custom_oids);
                 if (relAppId) {
@@ -1756,7 +1756,7 @@ function ConnectFlow() {
                     await doRegister(qr);
                 }
                 // Approving this enclave also approves the attested cross-enclave
-                // dependencies it declares (OID 6.1), cached by (app-id, identity)
+                // dependencies it declares (OID 7.1), cached by (app-id, identity)
                 // with this app as provenance and reused wherever they recur.
                 try {
                     recordDeclaredDependencies(attestation.custom_oids, 'approved', qr.rpId);

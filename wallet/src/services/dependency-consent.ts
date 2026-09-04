@@ -3,7 +3,7 @@
 
 /**
  * Ties the attested-dependency pieces together for the connect flow: decode an
- * enclave's declared dependencies (OID 6.1), classify each against the approval
+ * enclave's declared dependencies (OID 7.1), classify each against the approval
  * cache, resolve a human name + published-build provenance (the transparency-log
  * gate), and record the user's decisions with provenance.
  *

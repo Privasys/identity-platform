@@ -45,7 +45,7 @@ export function encMeasHash(att: AttestationResult): Uint8Array {
  * SHA-256 over the workload-measurement OIDs (3.1 config-merkle, 3.2 code
  * hash, 3.3 image-ref, 3.4 key-source) of a verified attestation — CBOR
  * field 4 of the voucher. Named `app_id` in the wire format, but it is NOT
- * the static OID 3.6 app-id; it moves with the OID 3.2 code hash. The enclave
+ * the static OID 4.1 app-id; it moves with the OID 4.2 code hash. The enclave
  * re-verifies it at consumption when the host arms the per-app binding
  * (SetExpectedWorkloadDigest, Sc 1 — see enc-pub-plan.md), so it must match
  * the manager's WorkloadDigest byte-for-byte. (Renamed from `appIdHash`,

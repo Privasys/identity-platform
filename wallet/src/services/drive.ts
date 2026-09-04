@@ -6,7 +6,7 @@
  *
  * The wallet resolves the Drive enclave by name (mirroring kyc.ts
  * resolveVerifier), inspects its RA-TLS certificate to pin the published image
- * digest AND read its management app id (OID 3.6), then connects the
+ * digest AND read its management app id (OID 4.1), then connects the
  * @privasys/drive-sdk over the RA-TLS sealed transport (makeRaTlsFetch) with a
  * platform at+jwt, and runs the one-call setupPersonalDrive (ensure tenant +
  * fetch data-key grant from mgmt + provision the tenant MEK on the enclave).
@@ -43,7 +43,7 @@ const DRIVE_APP_NAME = process.env.EXPO_PUBLIC_DRIVE_APP ?? 'drive-demo';
  *  (kyc.ts resolveVerifier): used until the app resolves from the store,
  *  and whenever the resolve API is unreachable — the resolved hostname +
  *  attested digest win when available. Keep the digest pinned to the
- *  live test deployment's image (OID 3.2) so the fallback attests the
+ *  live test deployment's image (OID 4.2) so the fallback attests the
  *  current enclave. drive v0.1.22: chat conversations + Memory + graph.
  *  Both overridable per build. */
 const FALLBACK_DRIVE_ORIGIN =
@@ -66,7 +66,7 @@ let resolved: ResolvedDrive | null = null;
  *  the identity verifier). Never returns null: the fallback pins the
  *  known-good deployment and attestation still gates the connection.
  *  The management app id is NOT taken from here — it is read off the
- *  attested RA-TLS leaf (OID 3.6) in setup(). */
+ *  attested RA-TLS leaf (OID 4.1) in setup(). */
 async function resolveDrive(force = false): Promise<ResolvedDrive> {
     if (resolved && !force) return resolved;
     try {
@@ -105,7 +105,7 @@ export interface DriveAttestation {
     displayName: string;
     /** Full attestation to render in the shared AttestationView. */
     attestation: AttestationResult;
-    /** Management app id (OID 3.6) the data-key grant is keyed by. */
+    /** Management app id (OID 4.1) the data-key grant is keyed by. */
     appId: string;
     /** Verification mode actually used. */
     mode: VerificationMode;
@@ -122,7 +122,7 @@ let lastAttest: { origin: string; appId: string } | null = null;
 /**
  * Resolve + inspect + attest the Drive enclave and return the result for the
  * approval screen, WITHOUT connecting. Mirrors kyc.ts attestVerifier: pins the
- * published image digest (OID 3.2), reads the management app id (OID 3.6) off
+ * published image digest (OID 4.2), reads the management app id (OID 4.1) off
  * the attested leaf, and verifies through the attestation service in the user's
  * mode (or a forced `challenge` when they tap "Challenge this enclave"). Throws
  * on a missing/mismatched digest or a failed verification.
@@ -131,7 +131,7 @@ export async function attestDrive(forceMode?: VerificationMode): Promise<DriveAt
     let d = await resolveDrive();
     const inspected = await inspectAttestation(d.origin);
     const appId = appIdFromOids(inspected.custom_oids);
-    if (!appId) throw new Error('Drive enclave attestation is missing its app id (OID 3.6)');
+    if (!appId) throw new Error('Drive enclave attestation is missing its app id (OID 4.1)');
     if (d.imageDigest) {
         const digestOf = (r: ResolvedDrive) =>
             inspected.custom_oids?.find((o) => o.oid === r.imageOid)?.value_hex?.toLowerCase();

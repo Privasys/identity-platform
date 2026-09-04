@@ -79,7 +79,7 @@ const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.4.2';
  *  both overridable per build.
  *  Verifier v0.6.3: certifies every importable government attribute, portrait
  *  included; fail-closed biometrics since v0.3.11. Keep this pinned to the live
- *  deployment's image digest (OID 3.2) so the fallback attests the current
+ *  deployment's image digest (OID 4.2) so the fallback attests the current
  *  enclave when the resolve API is unreachable. */
 const FALLBACK_VERIFIER_ORIGIN =
     process.env.EXPO_PUBLIC_KYC_VERIFIER_ORIGIN ??
@@ -102,7 +102,7 @@ let resolvedVerifier: ResolvedVerifier | null = null;
 
 /**
  * Resolve the identity-verifier's deployment from the app store by name: its
- * hostname and the attested image digest to pin (OID 3.2). This replaces the
+ * hostname and the attested image digest to pin (OID 4.2). This replaces the
  * hard-coded origin + digest. The values are still only *hints*: verifyVerifierEnclave
  * re-verifies the enclave's RA-TLS attestation against as.privasys.org and pins
  * the digest against the certificate, so the resolve channel cannot direct the

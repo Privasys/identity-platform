@@ -32,6 +32,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { useTranslation } from 'react-i18next';
 import { ensurePrivasysSession } from '@/services/privasys-id';
+import { getRecoveryPhraseStatus } from '@/services/recovery-api';
 import { establishPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
@@ -48,6 +49,27 @@ export default function SecureWalletScreen() {
     const [phrase, setPhrase] = useState<string | null>(null);
     const [backupError, setBackupError] = useState<string | null>(null);
 
+    /**
+     * Ask before making a saved phrase useless.
+     *
+     * Registering a new phrase REPLACES the stored one, so the words someone
+     * wrote down months ago stop working the moment this screen is used again,
+     * with nothing anywhere to tell them. Someone who has since lost access to
+     * this device would find their phrase rejected and no way to know why.
+     */
+    const confirmReplace = () =>
+        new Promise<boolean>((resolve) => {
+            Alert.alert(
+                t('secureWallet.replaceTitle'),
+                t('secureWallet.replaceBody'),
+                [
+                    { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(false) },
+                    { text: t('secureWallet.replaceConfirm'), style: 'destructive', onPress: () => resolve(true) },
+                ],
+                { cancelable: true, onDismiss: () => resolve(false) },
+            );
+        });
+
     const handleCreate = async () => {
         setCreating(true);
         try {
@@ -55,6 +77,15 @@ export default function SecureWalletScreen() {
             // biometric prompt; the user asked for a phrase, and confirming
             // with biometrics is simply part of delivering it.
             const sess = await ensurePrivasysSession(profile?.displayName);
+
+            // Checked after the session because it needs the account id, and
+            // best-effort: a status call that fails must not block someone who
+            // has no phrase at all from getting one.
+            const status = await getRecoveryPhraseStatus(sess.userId).catch(() => null);
+            if (status?.has_phrase && !(await confirmReplace())) {
+                setCreating(false);
+                return;
+            }
             const r = await establishPhraseWithBackup(
                 sess.sessionToken,
                 sess.recoveryPhrase ?? null,

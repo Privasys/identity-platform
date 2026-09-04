@@ -50,7 +50,7 @@ import { FirstConnectExplainer } from '@/components/FirstConnectExplainer';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { getAttestationServerToken } from '@/services/app-attest';
-import { inspectAttestation, attestEnclave } from '@/services/attestation';
+import { inspectAttestation, attestEnclave, isAttestableHost } from '@/services/attestation';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
 import { appIdFromOids, fetchRunningAppReleases, type OsRelease, type WorkloadRelease } from '@/services/release-provenance';
 import {
@@ -954,6 +954,56 @@ function ConnectFlow() {
                 (payload.mode === 'session-relay' || payload.mode === 'voucher-only') && payload.appHost
                     ? payload.appHost
                     : payload.rpId;
+
+            /**
+             * Sign in with no enclave in the picture: an ordinary FIDO2 RP.
+             *
+             * Reached two ways. A host the wallet knows cannot be attested
+             * (the rule is the hostname, see isAttestableHost), and a host that
+             * could have presented measurements and did not.
+             */
+            const proceedWithoutAttestation = async () => {
+                setVerificationLevel('non-enclave');
+                const credential = getCredentialForRp(payload.rpId);
+                if (credential) {
+                    setIsTrusted(true);
+                    if (isFromPush && !checkUnlocked()) {
+                        // Push-initiated outside grace period: show "Sign in?" confirmation
+                        setStep('confirm');
+                        return;
+                    }
+                    await ensureConsentRef.current(payload, () =>
+                        doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId),
+                    );
+                    return;
+                }
+                // First time — register (FIDO2 handles biometric via NativeKeys)
+                await ensureConsentRef.current(payload, () => doRegister(payload));
+            };
+
+            // RA-TLS v2 asks the caller to state whether it expects an attested
+            // peer before it connects, so the decision happens here rather than
+            // by inspecting a certificate and seeing what came back. Under v1
+            // the wallet attested every target: a non-enclave simply returned a
+            // quote-less certificate and the flow carried on. v2 refuses that
+            // handshake outright, which is what broke CLI sign-in with
+            // "invalid peer certificate: UnknownIssuer" against privasys.id.
+            //
+            // The identity provider is not an enclave and never was. Inspecting
+            // it proved nothing then and cannot now.
+            if (!isAttestableHost(attestationTarget)) {
+                console.log(`[CONNECT] ${attestationTarget} is not an enclave host — signing in without attestation`);
+                if (payload.mode === 'session-relay' || payload.mode === 'voucher-only') {
+                    // These bind the FIDO2 challenge to quote_hash, so there is
+                    // nothing to bind to. Fail rather than downgrade silently.
+                    throw new Error(
+                        `${attestationTarget} is not an attestable host. ` +
+                        `Session-relay sign-in requires an enclave.`
+                    );
+                }
+                await proceedWithoutAttestation();
+                return;
+            }
             console.log(`[CONNECT] startFlow — verifying attestation for ${attestationTarget}` +
                 (attestationTarget !== payload.origin ? ` (fido2 origin=${payload.origin})` : ''));
             try {
@@ -1003,22 +1053,7 @@ function ConnectFlow() {
                 // is meant to act as a passkey for sites like github.com too.
                 if (!hasMeasurements) {
                     console.log(`[CONNECT] target ${attestationTarget} is non-enclave (no TEE measurements) — proceeding without attestation`);
-                    setVerificationLevel('non-enclave');
-                    const credential = getCredentialForRp(payload.rpId);
-                    if (credential) {
-                        setIsTrusted(true);
-                        if (isFromPush && !checkUnlocked()) {
-                            // Push-initiated outside grace period: show "Sign in?" confirmation
-                            setStep('confirm');
-                            return;
-                        }
-                        await ensureConsentRef.current(payload, () =>
-                            doAuthenticate(payload, credential.keyAlias, credential.credentialId, credential.serverRpId),
-                        );
-                        return;
-                    }
-                    // First time — register (FIDO2 handles biometric via NativeKeys)
-                    await ensureConsentRef.current(payload, () => doRegister(payload));
+                    await proceedWithoutAttestation();
                     return;
                 }
 

@@ -15,6 +15,7 @@ import { Platform } from 'react-native';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
+import { isAttestableHost } from './attestation';
 import { useSettingsStore } from '@/stores/settings';
 
 // Timestamp of the last actual strong signing biometric — which is what unlocks
@@ -107,9 +108,13 @@ async function fido2Fetch<T extends object>(origin: string, path: string, body?:
     console.log(`[FIDO2] fetch ${path} → ${host}:${port}`);
     if (body) console.log(`[FIDO2] request body: ${JSON.stringify(body).substring(0, 300)}`);
 
-    // The identity provider is not an enclave: an ordinary TLS connection
-    // verified against the public PKI, no evidence exchange (RA-TLS v2 trust
-    // selection). The FIDO2 ceremony itself carries the security.
+    // The same helper serves the identity provider and the enclave-hosted
+    // session bootstrap. An enclave host gets the attested request (evidence
+    // after the handshake, chain to the fleet); the identity provider is not
+    // an enclave and gets an ordinary TLS connection verified against the
+    // public PKI with no evidence exchange (RA-TLS v2 trust selection). The
+    // FIDO2 ceremony itself carries the security on that leg.
+    const options = isAttestableHost(host) ? undefined : { attestation: 'none' as const, trust: 'public' as const };
     let result;
     try {
         result = await NativeRaTls.request(
@@ -120,7 +125,7 @@ async function fido2Fetch<T extends object>(origin: string, path: string, body?:
             body ? JSON.stringify(body) : '{}',
             undefined,
             undefined,
-            { attestation: 'none', trust: 'public' }
+            options
         );
     } catch (e: any) {
         console.error(`[FIDO2] ${path} — NativeRaTls.request threw: ${e.message}`, e);

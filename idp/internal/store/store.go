@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -1137,4 +1138,60 @@ func (db *DB) RecordRecoveryAttempt(deviceKeyHash string) error {
 // CleanupExpiredRateLimits removes old rate limit entries.
 func (db *DB) CleanupExpiredRateLimits() {
 	db.Exec("DELETE FROM recovery_rate_limits WHERE attempted_at < ?", time.Now().Add(-24*time.Hour))
+}
+
+// RecoveryAccountSummary is what a holder is shown BEFORE a recovery is
+// completed, so they can tell whether the phrase they typed matched the
+// account they meant.
+//
+// It exists because recovery finds an account BY PHRASE and used to say
+// nothing about which one it found, while the next step deleted that account's
+// credentials. Someone holding phrases for two accounts recovered the wrong one
+// and only discovered it afterwards, from a relying party showing an identity
+// with no permissions (2026-07-30, again 2026-09-04).
+//
+// Everything here is already implied by holding the phrase, which grants full
+// control of the account, so none of it is a disclosure the phrase did not
+// already make.
+type RecoveryAccountSummary struct {
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name,omitempty"`
+	Email       string `json:"email,omitempty"`
+	CreatedAt   string `json:"created_at,omitempty"`
+	// Registered devices that completing the recovery will revoke.
+	CredentialCount int `json:"credential_count"`
+	// Roles held, as a count only: enough to tell an account that owns things
+	// from one that owns nothing, without listing what.
+	RoleCount int `json:"role_count"`
+}
+
+// GetRecoveryAccountSummary describes an account for the pre-recovery
+// confirmation screen. Missing optional columns are left empty rather than
+// failing: the summary is an aid to recognition, and a partial one still beats
+// the opaque id on its own.
+func (db *DB) GetRecoveryAccountSummary(userID string) (RecoveryAccountSummary, error) {
+	s := RecoveryAccountSummary{UserID: userID}
+
+	var name, email, created sql.NullString
+	err := db.QueryRow(
+		"SELECT display_name, email, created_at FROM users WHERE user_id = ?",
+		userID,
+	).Scan(&name, &email, &created)
+	if err != nil {
+		return s, err
+	}
+	// Suppress the registration artefact. The wallet registers with a user
+	// name of "fido2-<rpId>", which every account created that way carries, so
+	// showing it on the confirmation screen would put the SAME string under
+	// every account and help nobody tell them apart. Verified against the live
+	// data (2026-09-04): the admin account display_name is "fido2-privasys.id".
+	if !strings.HasPrefix(name.String, "fido2-") {
+		s.DisplayName = name.String
+	}
+	s.Email = email.String
+	s.CreatedAt = created.String
+
+	_ = db.QueryRow("SELECT COUNT(*) FROM credentials WHERE user_id = ?", userID).Scan(&s.CredentialCount)
+	_ = db.QueryRow("SELECT COUNT(*) FROM roles WHERE user_id = ?", userID).Scan(&s.RoleCount)
+	return s, nil
 }

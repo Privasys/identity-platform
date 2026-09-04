@@ -45,8 +45,10 @@ import {
     // Declared in the service, not here, so the wallet wipe can clear it too.
     RECOVERY_STATE_KEY,
     type RecoveryBeginResult,
+    type RecoveryAccountSummary,
 } from '@/services/recovery-api';
 import { RecoveryPhraseCard } from '@/components/RecoveryPhraseCard';
+import { shortAccountId } from '@/utils/account-id';
 import { useAuthStore } from '@/stores/auth';
 import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
@@ -62,7 +64,20 @@ interface RecoveryState {
     expiresAt: string;
 }
 
-type FlowStep = 'enter-code' | 'waiting' | 'approved' | 'completed' | 'new-phrase' | 'restored' | 'expired';
+type FlowStep =
+    | 'enter-code'
+    // Between the phrase and anything destructive. A phrase identifies its
+    // account by itself, and until this step existed nothing told the holder
+    // WHICH account it had matched, while the very next call deleted that
+    // account's credentials. Bertrand held phrases for two accounts and
+    // recovered the wrong one twice (2026-07-30, 2026-09-04).
+    | 'confirm-account'
+    | 'waiting'
+    | 'approved'
+    | 'completed'
+    | 'new-phrase'
+    | 'restored'
+    | 'expired';
 
 export default function RecoverAccountScreen() {
     const { t } = useTranslation();
@@ -82,6 +97,9 @@ export default function RecoverAccountScreen() {
      * no way to ever do another one and nothing telling them so.
      */
     const [issuedPhrase, setIssuedPhrase] = useState<string | null>(null);
+    // The account the phrase matched, shown for confirmation before the flow
+    // does anything that cannot be undone.
+    const [matchedAccount, setMatchedAccount] = useState<RecoveryAccountSummary | null>(null);
     const [codeInput, setCodeInput] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [completing, setCompleting] = useState(false);
@@ -264,11 +282,12 @@ export default function RecoverAccountScreen() {
             setRecoveryState(state);
             await Storage.setItemAsync(RECOVERY_STATE_KEY, JSON.stringify(state));
 
-            if (res.status === 'approved') {
-                setStep('approved');
-            } else {
-                setStep('waiting');
-            }
+            // Confirm the account BEFORE anything destructive, whichever path
+            // follows. Completing is what deletes the account's credentials,
+            // and on the no-guardian path that used to happen automatically,
+            // one render after the phrase was accepted.
+            setMatchedAccount(res.account ?? { user_id: res.user_id, credential_count: 0, role_count: 0 });
+            setStep('confirm-account');
             enteredPhraseRef.current = phrase;
             setCodeInput('');
         } catch (e: any) {
@@ -276,6 +295,11 @@ export default function RecoverAccountScreen() {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    /** The holder has recognised the account: carry on into the flow proper. */
+    const confirmAccount = () => {
+        setStep(recoveryState?.status === 'approved' ? 'approved' : 'waiting');
     };
 
     const handleComplete = async () => {
@@ -626,6 +650,60 @@ export default function RecoverAccountScreen() {
                     </>
                 )}
 
+                {/* Step 1b: name the account before anything is destroyed. */}
+                {step === 'confirm-account' && matchedAccount && (
+                    <>
+                        <RNView style={styles.iconContainer}>
+                            <Ionicons name="person-circle-outline" size={48} color={p.blue} />
+                        </RNView>
+                        <Text style={styles.title}>{t('recover.confirmAccountTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('recover.confirmAccountBody')}</Text>
+
+                        <RNView style={styles.card}>
+                            <Text style={styles.fieldLabel}>{t('recover.accountLabel')}</Text>
+                            <Text style={styles.accountId} selectable>
+                                {shortAccountId(matchedAccount.user_id, 16) ?? matchedAccount.user_id}
+                            </Text>
+
+                            {matchedAccount.display_name ? (
+                                <Text style={styles.accountDetail}>{matchedAccount.display_name}</Text>
+                            ) : null}
+                            {matchedAccount.email ? (
+                                <Text style={styles.accountDetail}>{matchedAccount.email}</Text>
+                            ) : null}
+                            {matchedAccount.created_at ? (
+                                <Text style={styles.accountDetail}>
+                                    {t('recover.accountCreated', { when: matchedAccount.created_at })}
+                                </Text>
+                            ) : null}
+                            <Text style={styles.accountDetail}>
+                                {t('recover.accountDevices', { n: matchedAccount.credential_count })}
+                            </Text>
+                            <Text style={styles.accountDetail}>
+                                {t('recover.accountPermissions', { n: matchedAccount.role_count })}
+                            </Text>
+                        </RNView>
+
+                        {/* Said plainly, because it is the part that cannot be
+                            undone: the other devices lose access. */}
+                        <Text style={styles.warningText}>{t('recover.confirmAccountWarning')}</Text>
+
+                        <Pressable style={styles.primaryButton} onPress={confirmAccount}>
+                            <Text style={styles.primaryButtonText}>{t('recover.confirmAccountYes')}</Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.secondaryButton}
+                            onPress={() => {
+                                setMatchedAccount(null);
+                                setRecoveryState(null);
+                                setStep('enter-code');
+                            }}
+                        >
+                            <Text style={styles.secondaryButtonText}>{t('recover.confirmAccountNo')}</Text>
+                        </Pressable>
+                    </>
+                )}
+
                 {/* Step 2: Waiting for guardians */}
                 {step === 'waiting' && recoveryState && (
                     <>
@@ -883,6 +961,23 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     wordChipTextInvalid: {
         color: p.dangerText,
         fontWeight: '600',
+    },
+    accountId: {
+        fontSize: 15,
+        fontFamily: 'SpaceMono',
+        color: p.textPrimary,
+        marginBottom: 10,
+    },
+    accountDetail: {
+        fontSize: 13,
+        color: p.textSecondary,
+        lineHeight: 20,
+    },
+    warningText: {
+        fontSize: 13,
+        color: p.textMuted,
+        lineHeight: 18,
+        marginBottom: 16,
     },
     wordCount: {
         fontSize: 12,

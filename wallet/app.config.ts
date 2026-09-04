@@ -56,20 +56,39 @@ process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KE
  * the CURRENT prefix is listed FIRST because the first entry is the default for
  * new writes, and new data belongs under the new identity.
  *
- * Whether Apple will issue a profile carrying a prefix the signing team no
- * longer owns is the open question, and the build answers it. If it refuses,
- * the remaining route is Apple Developer Support enabling the previous prefix on
- * the App ID.
+ * ANSWERED, and the answer is no. Build 1.3.95 failed at codesign with
+ * "Provisioning profile ... doesn't match the entitlements file's value for the
+ * keychain-access-groups entitlement": Apple will not issue a profile carrying a
+ * prefix the signing team no longer owns, so declaring the legacy groups makes
+ * the app unbuildable rather than compatible.
  *
- * Removing these entries later strands anyone who has not opened the app since
- * the transfer.
+ * The entries are therefore OFF by default and gated behind an environment
+ * variable. The remaining route is Apple Developer Support adding the previous
+ * prefix to the org.privasys.wallet App ID; the moment they do, profiles can
+ * carry it, and this becomes a one-line flip plus a rebuild rather than a
+ * rediscovery of everything above.
+ *
+ * Until then every update loses the keychain, which is recoverable only through
+ * the 24-word phrase and only for holders who kept one. That is a release
+ * decision, not a build setting.
  */
 const LEGACY_APP_ID_PREFIX = '3V8YCKN438.';
 
-/** Groups shared between the app and its extensions, current and legacy. */
+/**
+ * Set WALLET_LEGACY_KEYCHAIN=1 once Apple has enabled the previous prefix on the
+ * App ID. Enabling it before that fails the build at codesign, which is at
+ * least loud; leaving it off ships an app that cannot see an existing wallet,
+ * which is not.
+ */
+const LEGACY_KEYCHAIN_ENABLED = process.env.WALLET_LEGACY_KEYCHAIN === '1';
+
+const legacyGroup = (name: string) =>
+    LEGACY_KEYCHAIN_ENABLED ? [`${LEGACY_APP_ID_PREFIX}${name}`] : [];
+
+/** Groups shared between the app and its extensions. */
 const SHARED_KEYCHAIN_GROUPS = [
     '$(AppIdentifierPrefix)org.privasys.shared',
-    `${LEGACY_APP_ID_PREFIX}org.privasys.shared`,
+    ...legacyGroup('org.privasys.shared'),
 ];
 
 const envConfig = {
@@ -188,7 +207,7 @@ export default (context: ConfigContext): ExpoConfig => {
                 'keychain-access-groups': [
                     '$(AppIdentifierPrefix)org.privasys.wallet',
                     ...SHARED_KEYCHAIN_GROUPS,
-                    `${LEGACY_APP_ID_PREFIX}org.privasys.wallet`,
+                    ...legacyGroup('org.privasys.wallet'),
                 ]
             }
         },

@@ -26,21 +26,26 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 
+// The legacy groups are gated: Apple refuses to sign a profile carrying a
+// prefix the team no longer owns, so they are only declared once Apple has
+// added the previous prefix to the App ID. This check follows the same flag, so
+// it verifies whichever shape the build is actually meant to produce.
+const LEGACY = process.env.WALLET_LEGACY_KEYCHAIN === '1';
+
 /** Groups the main app must carry, and why each one is load-bearing. */
 const REQUIRED_MAIN = [
     // Where this build reads and writes.
     '$(AppIdentifierPrefix)org.privasys.wallet',
     '$(AppIdentifierPrefix)org.privasys.shared',
-    // Where every build before the Apple transfer wrote. Drop these and an
+    // Where every build before the Apple transfer wrote. Without these an
     // updated app cannot see an existing wallet.
-    '3V8YCKN438.org.privasys.wallet',
-    '3V8YCKN438.org.privasys.shared',
+    ...(LEGACY ? ['3V8YCKN438.org.privasys.wallet', '3V8YCKN438.org.privasys.shared'] : []),
 ];
 
-/** Both extensions share only the notification-key group, current and legacy. */
+/** Both extensions share only the notification-key group. */
 const REQUIRED_EXTENSION = [
     '$(AppIdentifierPrefix)org.privasys.shared',
-    '3V8YCKN438.org.privasys.shared',
+    ...(LEGACY ? ['3V8YCKN438.org.privasys.shared'] : []),
 ];
 
 function resolvedConfig() {
@@ -70,6 +75,13 @@ const config = resolvedConfig();
 const errors = [];
 
 const main = check('main app', config.ios?.entitlements?.['keychain-access-groups'], REQUIRED_MAIN, errors);
+
+// Independent of the flag: a plugin that ASSIGNS rather than merges drops
+// whatever app.config.ts declared, and the shared group is the entry that
+// disappears first. It is what the notification key lives under.
+if (!main.includes('$(AppIdentifierPrefix)org.privasys.shared')) {
+    errors.push('main app: the shared group is gone, so a plugin overwrote the list');
+}
 
 // The FIRST entry is the default group for new keychain items. If a legacy
 // group ever sorts first, new data starts landing under the old prefix, which

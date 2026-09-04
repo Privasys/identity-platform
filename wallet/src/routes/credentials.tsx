@@ -33,14 +33,25 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useAuthStore, type Credential } from '@/stores/auth';
+import { shortAccountId } from '@/utils/account-id';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 const IDP_RP = new URL(process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id').hostname;
 
-/** Short, stable account discriminator from the credential's userHandle. */
-function shortAccount(userHandle: string | undefined, t: TFunction): string {
-    if (!userHandle) return t('credentials.unknownAccount');
-    return t('credentials.accountShort', { id: userHandle.slice(0, 8) });
+/**
+ * Short, stable account discriminator.
+ *
+ * Through shortAccountId, because the three call sites hand this three
+ * different encodings of the same account: a credential's WebAuthn userHandle,
+ * the meta-account slot's userId, and on older wallets that slot's raw hex.
+ * Printing whichever arrived labelled the canonical account 'TnpRMU1E' while
+ * the portal, the CLI and the sub claim all called it 'NzQ1MDQz', on the one
+ * screen whose entire job is telling two accounts apart.
+ */
+function shortAccount(handleOrId: string | undefined, t: TFunction): string {
+    const id = shortAccountId(handleOrId);
+    if (!id) return t('credentials.unknownAccount');
+    return t('credentials.accountShort', { id });
 }
 
 export default function CredentialsScreen() {

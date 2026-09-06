@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Demande d'accès",
+    "heading": "Accorder l'accès ?",
+    "verifying": "Vérification de l'auteur de la demande",
+    "whoLabel": "Qui demande",
+    "whatLabel": "Ce qui est demandé",
+    "howLongLabel": "Jusqu'au",
+    "unnamedApp": "Application sans nom",
+    "attested": "Vérifié dans une enclave sécurisée",
+    "resourceAttested": "{{service}} vérifié dans une enclave sécurisée",
+    "resourceLine": "{{permissions}} {{resource}} dans votre {{service}}",
+    "permissionJoin": " et ",
+    "permission": {
+      "read": "Lire",
+      "write": "Créer et modifier",
+      "delete": "Supprimer"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Vos fichiers seront enregistrés dans votre propre espace de stockage, sous vos clés. Sans cela, ils restent dans l'enclave le temps de cette session seulement et sont perdus au redémarrage."
+      }
+    },
+    "approve": "Approuver",
+    "deny": "Refuser",
+    "revokeHint": "Vous pouvez révoquer cet accès à tout moment dans le service qui détient vos données.",
+    "refusedTitle": "Cette demande ne peut pas être vérifiée",
+    "refusedMalformed": "La demande était incomplète, il n'y a donc rien à approuver.",
+    "refusedRequester": "L'application à l'origine de la demande n'a pas pu être vérifiée ; elle ne peut donc pas accéder à vos données.",
+    "refusedResource": "Le service qui détient vos données n'a pas pu être vérifié ; rien n'a été modifié.",
+    "failedTitle": "L'accès n'a pas été accordé",
+    "failedBody": "Rien n'a été modifié. Vous pouvez réessayer.",
+    "doneTitle": "Accès accordé",
+    "doneBody": "{{app}} peut désormais utiliser ce que vous avez approuvé. Vous pouvez le révoquer à tout moment."
+  },
   "credentials": {
     "title": "Identifiants enregistrés",
     "empty": "Aucun identifiant enregistré pour l'instant",

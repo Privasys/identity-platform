@@ -330,6 +330,40 @@
     "alwaysShareHint": "Auto-approve future requests while the enclave code stays the same.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Access request",
+    "heading": "Grant access?",
+    "verifying": "Checking who is asking",
+    "whoLabel": "Who is asking",
+    "whatLabel": "What they want",
+    "howLongLabel": "Until",
+    "unnamedApp": "Unnamed app",
+    "attested": "Verified in a secure enclave",
+    "resourceAttested": "{{service}} verified in a secure enclave",
+    "resourceLine": "{{permissions}} {{resource}} in your {{service}}",
+    "permissionJoin": " and ",
+    "permission": {
+      "read": "Read",
+      "write": "Create and change",
+      "delete": "Delete"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Your files will be saved in your own storage, under your keys. Without this they stay inside the enclave for this session only, and are lost when it restarts."
+      }
+    },
+    "approve": "Approve",
+    "deny": "Deny",
+    "revokeHint": "You can revoke this at any time in the service that holds your data.",
+    "refusedTitle": "This request cannot be verified",
+    "refusedMalformed": "The request was incomplete, so there is nothing to approve.",
+    "refusedRequester": "The app making this request could not be verified, so it cannot be given access to your data.",
+    "refusedResource": "The service that holds your data could not be verified, so nothing was changed.",
+    "failedTitle": "Access was not granted",
+    "failedBody": "Nothing was changed. You can try again.",
+    "doneTitle": "Access granted",
+    "doneBody": "{{app}} can now use what you approved. You can revoke it at any time."
+  },
   "credentials": {
     "title": "Registered Credentials",
     "empty": "No credentials registered yet",

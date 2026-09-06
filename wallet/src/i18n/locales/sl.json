@@ -330,6 +330,40 @@
     "alwaysShareHint": "Samodejno odobri prihodnje zahteve, dokler koda enklave ostaja enaka.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Zahteva za dostop",
+    "heading": "Odobrite dostop?",
+    "verifying": "Preverja se, kdo zahteva",
+    "whoLabel": "Kdo zahteva",
+    "whatLabel": "Kaj želijo",
+    "howLongLabel": "Do",
+    "unnamedApp": "Neimenovana aplikacija",
+    "attested": "Preverjeno v varni enklavi",
+    "resourceAttested": "{{service}} preverjena v varni enklavi",
+    "resourceLine": "{{permissions}} {{resource}} v vašem {{service}}",
+    "permissionJoin": " in ",
+    "permission": {
+      "read": "Branje",
+      "write": "Ustvarjanje in spreminjanje",
+      "delete": "Brisanje"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Vaše datoteke bodo shranjene v vaši lastni shrambi, pod vašimi ključi. Brez tega ostanejo v enklavi samo za to sejo in se ob ponovnem zagonu izgubijo."
+      }
+    },
+    "approve": "Odobri",
+    "deny": "Zavrni",
+    "revokeHint": "To lahko kadar koli prekličete v storitvi, ki hrani vaše podatke.",
+    "refusedTitle": "Te zahteve ni mogoče preveriti",
+    "refusedMalformed": "Zahteva je bila nepopolna, zato ni ničesar za odobriti.",
+    "refusedRequester": "Aplikacije, ki vlaga zahtevo, ni bilo mogoče preveriti, zato ji ni mogoče dati dostopa do vaših podatkov.",
+    "refusedResource": "Storitve, ki hrani vaše podatke, ni bilo mogoče preveriti, zato ni bilo nič spremenjeno.",
+    "failedTitle": "Dostop ni bil odobren",
+    "failedBody": "Nič ni bilo spremenjeno. Lahko poskusite znova.",
+    "doneTitle": "Dostop odobren",
+    "doneBody": "{{app}} zdaj lahko uporablja to, kar ste odobrili. Kadar koli lahko prekličete."
+  },
   "credentials": {
     "title": "Registrirane poverilnice",
     "empty": "Registriranih poverilnic še ni",

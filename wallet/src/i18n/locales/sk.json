@@ -330,6 +330,40 @@
     "alwaysShareHint": "Automaticky schvaľovať budúce žiadosti, kým zostáva kód enklávy rovnaký.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Žiadosť o prístup",
+    "heading": "Udeliť prístup?",
+    "verifying": "Overuje sa, kto žiada",
+    "whoLabel": "Kto žiada",
+    "whatLabel": "Čo požadujú",
+    "howLongLabel": "Do",
+    "unnamedApp": "Nepomenovaná aplikácia",
+    "attested": "Overené v zabezpečenom enkláve",
+    "resourceAttested": "{{service}} overená v zabezpečenom enkláve",
+    "resourceLine": "{{permissions}} {{resource}} vo vašom {{service}}",
+    "permissionJoin": " a ",
+    "permission": {
+      "read": "Čítať",
+      "write": "Vytvárať a meniť",
+      "delete": "Mazať"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Vaše súbory sa uložia do vášho vlastného úložiska pod vašimi kľúčmi. Bez toho zostanú v enkláve len počas tejto relácie a pri reštarte sa stratia."
+      }
+    },
+    "approve": "Schváliť",
+    "deny": "Odmietnuť",
+    "revokeHint": "Kedykoľvek to môžete odvolať v službe, ktorá uchováva vaše údaje.",
+    "refusedTitle": "Túto žiadosť nemožno overiť",
+    "refusedMalformed": "Žiadosť bola neúplná, takže nie je čo schváliť.",
+    "refusedRequester": "Aplikáciu, ktorá žiadosť podáva, sa nepodarilo overiť, preto jej nemožno udeliť prístup k vašim údajom.",
+    "refusedResource": "Službu, ktorá uchováva vaše údaje, sa nepodarilo overiť, preto sa nič nezmenilo.",
+    "failedTitle": "Prístup nebol udelený",
+    "failedBody": "Nič sa nezmenilo. Môžete to skúsiť znova.",
+    "doneTitle": "Prístup udelený",
+    "doneBody": "{{app}} teraz môže používať to, čo ste schválili. Kedykoľvek to môžete odvolať."
+  },
   "credentials": {
     "title": "Registrované poverenia",
     "empty": "Zatiaľ nie sú registrované žiadne poverenia",

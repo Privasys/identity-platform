@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Pedido de acesso",
+    "heading": "Conceder acesso?",
+    "verifying": "A verificar quem está a pedir",
+    "whoLabel": "Quem está a pedir",
+    "whatLabel": "O que pretendem",
+    "howLongLabel": "Até",
+    "unnamedApp": "Aplicação sem nome",
+    "attested": "Verificado num enclave seguro",
+    "resourceAttested": "{{service}} verificado num enclave seguro",
+    "resourceLine": "{{permissions}} {{resource}} no seu {{service}}",
+    "permissionJoin": " e ",
+    "permission": {
+      "read": "Ler",
+      "write": "Criar e alterar",
+      "delete": "Eliminar"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Os seus ficheiros serão guardados no seu próprio armazenamento, sob as suas chaves. Sem isto, ficam no enclave apenas durante esta sessão e perdem-se quando reiniciar."
+      }
+    },
+    "approve": "Aprovar",
+    "deny": "Recusar",
+    "revokeHint": "Pode revogar isto a qualquer momento no serviço que guarda os seus dados.",
+    "refusedTitle": "Este pedido não pode ser verificado",
+    "refusedMalformed": "O pedido estava incompleto, por isso não há nada a aprovar.",
+    "refusedRequester": "Não foi possível verificar a aplicação que faz o pedido, pelo que não lhe pode ser dado acesso aos seus dados.",
+    "refusedResource": "Não foi possível verificar o serviço que guarda os seus dados, pelo que nada foi alterado.",
+    "failedTitle": "O acesso não foi concedido",
+    "failedBody": "Nada foi alterado. Pode tentar novamente.",
+    "doneTitle": "Acesso concedido",
+    "doneBody": "{{app}} pode agora usar o que aprovou. Pode revogar a qualquer momento."
+  },
   "credentials": {
     "title": "Credenciais registadas",
     "empty": "Ainda não há credenciais registadas",

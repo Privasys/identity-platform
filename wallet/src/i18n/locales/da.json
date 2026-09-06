@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Anmodning om adgang",
+    "heading": "Giv adgang?",
+    "verifying": "Kontrollerer hvem der spørger",
+    "whoLabel": "Hvem spørger",
+    "whatLabel": "Hvad de vil have",
+    "howLongLabel": "Indtil",
+    "unnamedApp": "App uden navn",
+    "attested": "Bekræftet i en sikker enklave",
+    "resourceAttested": "{{service}} bekræftet i en sikker enklave",
+    "resourceLine": "{{permissions}} {{resource}} i dit {{service}}",
+    "permissionJoin": " og ",
+    "permission": {
+      "read": "Læse",
+      "write": "Oprette og ændre",
+      "delete": "Slette"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Dine filer gemmes i dit eget lager under dine nøgler. Uden dette bliver de kun i enklaven i denne session og går tabt ved genstart."
+      }
+    },
+    "approve": "Godkend",
+    "deny": "Afvis",
+    "revokeHint": "Du kan til enhver tid tilbagekalde dette i den tjeneste, der opbevarer dine data.",
+    "refusedTitle": "Denne anmodning kan ikke bekræftes",
+    "refusedMalformed": "Anmodningen var ufuldstændig, så der er intet at godkende.",
+    "refusedRequester": "Appen, der anmoder, kunne ikke bekræftes, så den kan ikke få adgang til dine data.",
+    "refusedResource": "Tjenesten, der opbevarer dine data, kunne ikke bekræftes, så intet blev ændret.",
+    "failedTitle": "Adgang blev ikke givet",
+    "failedBody": "Intet blev ændret. Du kan prøve igen.",
+    "doneTitle": "Adgang givet",
+    "doneBody": "{{app}} kan nu bruge det, du godkendte. Du kan tilbagekalde det når som helst."
+  },
   "credentials": {
     "title": "Registrerede legitimationsoplysninger",
     "empty": "Ingen legitimationsoplysninger registreret endnu",

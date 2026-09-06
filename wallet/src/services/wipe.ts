@@ -52,6 +52,7 @@ import { clearSovereignLocalState } from '@/services/sovereign';
 import { clearWia } from '@/services/wia';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
+import { useCapabilitiesStore } from '@/stores/capabilities';
 import { useDependencyApprovalsStore } from '@/stores/dependency-approvals';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useProfileStore } from '@/stores/profile';
@@ -93,6 +94,11 @@ export async function wipeWallet(): Promise<void> {
     useServiceSessionsStore.getState().clearAll();
     useConsentStore.getState().clearAll();
     useDependencyApprovalsStore.getState().clearAll();
+    // Advisory records of what this holder granted to which app. The
+    // capabilities themselves live at the resource services and are revoked
+    // there; a wipe must not leave the next identity on this device reading
+    // the last one's list of who could reach their files.
+    useCapabilitiesStore.getState().clearAll();
     useDriveNotificationsStore.getState().clearAll();
     useVaultApprovalsStore.getState().clearAll();
     useSettingsStore.getState().clearAll();

@@ -330,6 +330,40 @@
     "alwaysShareHint": "Automātiski apstiprināt turpmākos pieprasījumus, kamēr anklāva kods paliek nemainīgs.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Piekļuves pieprasījums",
+    "heading": "Piešķirt piekļuvi?",
+    "verifying": "Tiek pārbaudīts, kas pieprasa",
+    "whoLabel": "Kas pieprasa",
+    "whatLabel": "Ko vēlas",
+    "howLongLabel": "Līdz",
+    "unnamedApp": "Lietotne bez nosaukuma",
+    "attested": "Pārbaudīts drošā anklāvā",
+    "resourceAttested": "{{service}} pārbaudīta drošā anklāvā",
+    "resourceLine": "{{permissions}} {{resource}} jūsu {{service}}",
+    "permissionJoin": " un ",
+    "permission": {
+      "read": "Lasīt",
+      "write": "Veidot un mainīt",
+      "delete": "Dzēst"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Jūsu faili tiks saglabāti jūsu pašu krātuvē, ar jūsu atslēgām. Bez tā tie paliek anklāvā tikai šai sesijai un tiek zaudēti, kad tas tiek restartēts."
+      }
+    },
+    "approve": "Apstiprināt",
+    "deny": "Noraidīt",
+    "revokeHint": "Jūs to varat jebkurā laikā atsaukt pakalpojumā, kas glabā jūsu datus.",
+    "refusedTitle": "Šo pieprasījumu nevar pārbaudīt",
+    "refusedMalformed": "Pieprasījums bija nepilnīgs, tāpēc nav ko apstiprināt.",
+    "refusedRequester": "Lietotni, kas iesniedz pieprasījumu, neizdevās pārbaudīt, tāpēc tai nevar piešķirt piekļuvi jūsu datiem.",
+    "refusedResource": "Pakalpojumu, kas glabā jūsu datus, neizdevās pārbaudīt, tāpēc nekas netika mainīts.",
+    "failedTitle": "Piekļuve netika piešķirta",
+    "failedBody": "Nekas netika mainīts. Varat mēģināt vēlreiz.",
+    "doneTitle": "Piekļuve piešķirta",
+    "doneBody": "{{app}} tagad var izmantot to, ko apstiprinājāt. Jūs to varat jebkurā laikā atsaukt."
+  },
   "credentials": {
     "title": "Reģistrētie akreditācijas dati",
     "empty": "Vēl nav reģistrētu akreditācijas datu",

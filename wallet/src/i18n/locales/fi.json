@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Käyttöoikeuspyyntö",
+    "heading": "Myönnetäänkö käyttöoikeus?",
+    "verifying": "Tarkistetaan, kuka pyytää",
+    "whoLabel": "Kuka pyytää",
+    "whatLabel": "Mitä pyydetään",
+    "howLongLabel": "Asti",
+    "unnamedApp": "Nimetön sovellus",
+    "attested": "Varmennettu turvallisessa enklaavissa",
+    "resourceAttested": "{{service}} varmennettu turvallisessa enklaavissa",
+    "resourceLine": "{{permissions}} {{resource}} omassa {{service}}-palvelussasi",
+    "permissionJoin": " ja ",
+    "permission": {
+      "read": "Lukea",
+      "write": "Luoda ja muuttaa",
+      "delete": "Poistaa"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Tiedostosi tallennetaan omaan tallennustilaasi omilla avaimillasi. Ilman tätä ne pysyvät enklaavissa vain tämän istunnon ajan ja katoavat uudelleenkäynnistyksessä."
+      }
+    },
+    "approve": "Hyväksy",
+    "deny": "Hylkää",
+    "revokeHint": "Voit peruuttaa tämän milloin tahansa palvelussa, joka säilyttää tietosi.",
+    "refusedTitle": "Tätä pyyntöä ei voi varmentaa",
+    "refusedMalformed": "Pyyntö oli puutteellinen, joten hyväksyttävää ei ole.",
+    "refusedRequester": "Pyynnön tekevää sovellusta ei voitu varmentaa, joten sille ei voi antaa pääsyä tietoihisi.",
+    "refusedResource": "Tietosi säilyttävää palvelua ei voitu varmentaa, joten mitään ei muutettu.",
+    "failedTitle": "Käyttöoikeutta ei myönnetty",
+    "failedBody": "Mitään ei muutettu. Voit yrittää uudelleen.",
+    "doneTitle": "Käyttöoikeus myönnetty",
+    "doneBody": "{{app}} voi nyt käyttää hyväksymääsi. Voit peruuttaa sen milloin tahansa."
+  },
   "credentials": {
     "title": "Rekisteröidyt tunnistetiedot",
     "empty": "Ei vielä rekisteröityjä tunnistetietoja",

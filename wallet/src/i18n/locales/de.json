@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Zugriffsanfrage",
+    "heading": "Zugriff gewähren?",
+    "verifying": "Es wird geprüft, wer anfragt",
+    "whoLabel": "Wer anfragt",
+    "whatLabel": "Was gewünscht wird",
+    "howLongLabel": "Bis",
+    "unnamedApp": "App ohne Namen",
+    "attested": "In einer sicheren Enklave geprüft",
+    "resourceAttested": "{{service}} in einer sicheren Enklave geprüft",
+    "resourceLine": "{{permissions}} {{resource}} in Ihrem {{service}}",
+    "permissionJoin": " und ",
+    "permission": {
+      "read": "Lesen",
+      "write": "Erstellen und ändern",
+      "delete": "Löschen"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Ihre Dateien werden in Ihrem eigenen Speicher unter Ihren Schlüsseln gesichert. Ohne dies bleiben sie nur für diese Sitzung in der Enklave und gehen beim Neustart verloren."
+      }
+    },
+    "approve": "Genehmigen",
+    "deny": "Ablehnen",
+    "revokeHint": "Sie können dies jederzeit in dem Dienst widerrufen, der Ihre Daten hält.",
+    "refusedTitle": "Diese Anfrage kann nicht geprüft werden",
+    "refusedMalformed": "Die Anfrage war unvollständig, es gibt also nichts zu genehmigen.",
+    "refusedRequester": "Die anfragende App konnte nicht geprüft werden und kann daher keinen Zugriff auf Ihre Daten erhalten.",
+    "refusedResource": "Der Dienst, der Ihre Daten hält, konnte nicht geprüft werden, daher wurde nichts geändert.",
+    "failedTitle": "Zugriff wurde nicht gewährt",
+    "failedBody": "Es wurde nichts geändert. Sie können es erneut versuchen.",
+    "doneTitle": "Zugriff gewährt",
+    "doneBody": "{{app}} kann jetzt nutzen, was Sie genehmigt haben. Sie können es jederzeit widerrufen."
+  },
   "credentials": {
     "title": "Registrierte Anmeldeinformationen",
     "empty": "Noch keine Anmeldeinformationen registriert",

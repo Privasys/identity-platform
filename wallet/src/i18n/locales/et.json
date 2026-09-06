@@ -330,6 +330,40 @@
     "alwaysShareHint": "Kiida tulevased taotlused automaatselt heaks, kuni anklaavi kood jääb samaks.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Juurdepääsu taotlus",
+    "heading": "Kas anda juurdepääs?",
+    "verifying": "Kontrollitakse, kes küsib",
+    "whoLabel": "Kes küsib",
+    "whatLabel": "Mida soovitakse",
+    "howLongLabel": "Kuni",
+    "unnamedApp": "Nimeta rakendus",
+    "attested": "Kontrollitud turvalises enklaavis",
+    "resourceAttested": "{{service}} kontrollitud turvalises enklaavis",
+    "resourceLine": "{{permissions}} {{resource}} teie {{service}} sees",
+    "permissionJoin": " ja ",
+    "permission": {
+      "read": "Lugeda",
+      "write": "Luua ja muuta",
+      "delete": "Kustutada"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Teie failid salvestatakse teie enda hoidlasse, teie võtmete all. Ilma selleta jäävad need enklaavi ainult selleks seansiks ja kaovad taaskäivitusel."
+      }
+    },
+    "approve": "Kinnita",
+    "deny": "Keeldu",
+    "revokeHint": "Saate selle igal ajal tühistada teenuses, mis teie andmeid hoiab.",
+    "refusedTitle": "Seda taotlust ei saa kontrollida",
+    "refusedMalformed": "Taotlus oli puudulik, seega pole midagi kinnitada.",
+    "refusedRequester": "Taotlust esitavat rakendust ei õnnestunud kontrollida, seega ei saa talle teie andmetele juurdepääsu anda.",
+    "refusedResource": "Teie andmeid hoidvat teenust ei õnnestunud kontrollida, seega ei muudetud midagi.",
+    "failedTitle": "Juurdepääsu ei antud",
+    "failedBody": "Midagi ei muudetud. Võite uuesti proovida.",
+    "doneTitle": "Juurdepääs antud",
+    "doneBody": "{{app}} saab nüüd kasutada seda, mille kinnitasite. Võite selle igal ajal tühistada."
+  },
   "credentials": {
     "title": "Registreeritud mandaadid",
     "empty": "Ühtegi mandaati pole veel registreeritud",

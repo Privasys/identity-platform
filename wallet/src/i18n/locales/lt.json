@@ -330,6 +330,40 @@
     "alwaysShareHint": "Automatiškai patvirtinti būsimus prašymus, kol anklavo kodas nesikeičia.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Prieigos užklausa",
+    "heading": "Suteikti prieigą?",
+    "verifying": "Tikrinama, kas prašo",
+    "whoLabel": "Kas prašo",
+    "whatLabel": "Ko prašoma",
+    "howLongLabel": "Iki",
+    "unnamedApp": "Programėlė be pavadinimo",
+    "attested": "Patikrinta saugiame anklave",
+    "resourceAttested": "{{service}} patikrinta saugiame anklave",
+    "resourceLine": "{{permissions}} {{resource}} jūsų {{service}}",
+    "permissionJoin": " ir ",
+    "permission": {
+      "read": "Skaityti",
+      "write": "Kurti ir keisti",
+      "delete": "Ištrinti"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Jūsų failai bus išsaugoti jūsų pačių saugykloje, po jūsų raktais. Be to jie lieka anklave tik šiai sesijai ir prarandami po perkrovimo."
+      }
+    },
+    "approve": "Patvirtinti",
+    "deny": "Atmesti",
+    "revokeHint": "Tai galite bet kada atšaukti paslaugoje, kuri saugo jūsų duomenis.",
+    "refusedTitle": "Šios užklausos patikrinti negalima",
+    "refusedMalformed": "Užklausa buvo neišsami, todėl nėra ko patvirtinti.",
+    "refusedRequester": "Užklausą teikiančios programėlės nepavyko patikrinti, todėl jai negalima suteikti prieigos prie jūsų duomenų.",
+    "refusedResource": "Paslaugos, kuri saugo jūsų duomenis, nepavyko patikrinti, todėl niekas nepakeista.",
+    "failedTitle": "Prieiga nesuteikta",
+    "failedBody": "Niekas nepakeista. Galite bandyti dar kartą.",
+    "doneTitle": "Prieiga suteikta",
+    "doneBody": "{{app}} dabar gali naudoti tai, ką patvirtinote. Galite tai bet kada atšaukti."
+  },
   "credentials": {
     "title": "Registruoti kredencialai",
     "empty": "Kol kas nėra registruotų kredencialų",

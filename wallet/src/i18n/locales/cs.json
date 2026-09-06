@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Žádost o přístup",
+    "heading": "Udělit přístup?",
+    "verifying": "Ověřuje se, kdo žádá",
+    "whoLabel": "Kdo žádá",
+    "whatLabel": "Co požadují",
+    "howLongLabel": "Do",
+    "unnamedApp": "Nepojmenovaná aplikace",
+    "attested": "Ověřeno v zabezpečeném enklávu",
+    "resourceAttested": "{{service}} ověřena v zabezpečeném enklávu",
+    "resourceLine": "{{permissions}} {{resource}} ve vašem {{service}}",
+    "permissionJoin": " a ",
+    "permission": {
+      "read": "Číst",
+      "write": "Vytvářet a měnit",
+      "delete": "Mazat"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Vaše soubory budou uloženy ve vašem vlastním úložišti pod vašimi klíči. Bez toho zůstanou v enklávu jen po dobu této relace a při restartu se ztratí."
+      }
+    },
+    "approve": "Schválit",
+    "deny": "Odmítnout",
+    "revokeHint": "Kdykoli to můžete odvolat ve službě, která vaše data uchovává.",
+    "refusedTitle": "Tuto žádost nelze ověřit",
+    "refusedMalformed": "Žádost byla neúplná, není tedy co schválit.",
+    "refusedRequester": "Aplikaci, která žádost podává, se nepodařilo ověřit, proto jí nelze udělit přístup k vašim datům.",
+    "refusedResource": "Službu, která uchovává vaše data, se nepodařilo ověřit, proto se nic nezměnilo.",
+    "failedTitle": "Přístup nebyl udělen",
+    "failedBody": "Nic se nezměnilo. Můžete to zkusit znovu.",
+    "doneTitle": "Přístup udělen",
+    "doneBody": "{{app}} nyní může používat to, co jste schválili. Kdykoli to můžete odvolat."
+  },
   "credentials": {
     "title": "Registrované přihlašovací údaje",
     "empty": "Zatím nejsou registrovány žádné přihlašovací údaje",

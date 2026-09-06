@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Åtkomstbegäran",
+    "heading": "Ge åtkomst?",
+    "verifying": "Kontrollerar vem som frågar",
+    "whoLabel": "Vem som frågar",
+    "whatLabel": "Vad de vill ha",
+    "howLongLabel": "Till",
+    "unnamedApp": "App utan namn",
+    "attested": "Verifierad i en säker enklav",
+    "resourceAttested": "{{service}} verifierad i en säker enklav",
+    "resourceLine": "{{permissions}} {{resource}} i ditt {{service}}",
+    "permissionJoin": " och ",
+    "permission": {
+      "read": "Läsa",
+      "write": "Skapa och ändra",
+      "delete": "Ta bort"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Dina filer sparas i ditt eget lagringsutrymme, under dina nycklar. Utan detta stannar de i enklaven bara under den här sessionen och går förlorade vid omstart."
+      }
+    },
+    "approve": "Godkänn",
+    "deny": "Neka",
+    "revokeHint": "Du kan när som helst återkalla detta i tjänsten som håller dina data.",
+    "refusedTitle": "Den här begäran kan inte verifieras",
+    "refusedMalformed": "Begäran var ofullständig, så det finns inget att godkänna.",
+    "refusedRequester": "Appen som gör begäran kunde inte verifieras och kan därför inte få åtkomst till dina data.",
+    "refusedResource": "Tjänsten som håller dina data kunde inte verifieras, så inget ändrades.",
+    "failedTitle": "Åtkomst gavs inte",
+    "failedBody": "Inget ändrades. Du kan försöka igen.",
+    "doneTitle": "Åtkomst given",
+    "doneBody": "{{app}} kan nu använda det du godkände. Du kan återkalla det när som helst."
+  },
   "credentials": {
     "title": "Registrerade inloggningsuppgifter",
     "empty": "Inga inloggningsuppgifter registrerade än",

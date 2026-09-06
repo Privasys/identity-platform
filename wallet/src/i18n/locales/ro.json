@@ -330,6 +330,40 @@
     "alwaysShareHint": "Aprobă automat cererile viitoare cât timp codul enclavei rămâne același.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Cerere de acces",
+    "heading": "Acorzi accesul?",
+    "verifying": "Se verifică cine cere",
+    "whoLabel": "Cine cere",
+    "whatLabel": "Ce vor",
+    "howLongLabel": "Până la",
+    "unnamedApp": "Aplicație fără nume",
+    "attested": "Verificat într-o enclavă securizată",
+    "resourceAttested": "{{service}} verificat într-o enclavă securizată",
+    "resourceLine": "{{permissions}} {{resource}} în {{service}} tău",
+    "permissionJoin": " și ",
+    "permission": {
+      "read": "Citire",
+      "write": "Creare și modificare",
+      "delete": "Ștergere"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Fișierele tale vor fi salvate în propriul tău spațiu de stocare, sub cheile tale. Fără asta rămân în enclavă doar pentru această sesiune și se pierd la repornire."
+      }
+    },
+    "approve": "Aprobă",
+    "deny": "Refuză",
+    "revokeHint": "Poți revoca oricând acest lucru în serviciul care îți păstrează datele.",
+    "refusedTitle": "Această cerere nu poate fi verificată",
+    "refusedMalformed": "Cererea a fost incompletă, deci nu este nimic de aprobat.",
+    "refusedRequester": "Aplicația care face cererea nu a putut fi verificată, deci nu i se poate acorda acces la datele tale.",
+    "refusedResource": "Serviciul care îți păstrează datele nu a putut fi verificat, deci nimic nu a fost modificat.",
+    "failedTitle": "Accesul nu a fost acordat",
+    "failedBody": "Nimic nu a fost modificat. Poți încerca din nou.",
+    "doneTitle": "Acces acordat",
+    "doneBody": "{{app}} poate folosi acum ceea ce ai aprobat. Poți revoca oricând."
+  },
   "credentials": {
     "title": "Credențiale înregistrate",
     "empty": "Niciun credențial înregistrat încă",

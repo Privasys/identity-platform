@@ -330,6 +330,40 @@
     "alwaysShareHint": "Ceadaigh iarratais amach anseo go huathoibríoch fad is a fhanann cód an iamhchlóis mar an gcéanna.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Iarratas rochtana",
+    "heading": "Rochtain a thabhairt?",
+    "verifying": "Á sheiceáil cé atá ag iarraidh",
+    "whoLabel": "Cé atá ag iarraidh",
+    "whatLabel": "Cad atá uathu",
+    "howLongLabel": "Go dtí",
+    "unnamedApp": "Aip gan ainm",
+    "attested": "Fíoraithe in iamhchríoch shlán",
+    "resourceAttested": "{{service}} fíoraithe in iamhchríoch shlán",
+    "resourceLine": "{{permissions}} {{resource}} i do {{service}}",
+    "permissionJoin": " agus ",
+    "permission": {
+      "read": "Léamh",
+      "write": "Cruthú agus athrú",
+      "delete": "Scriosadh"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Sábhálfar do chomhaid i do stóras féin, faoi do chuid eochracha. Gan é seo fanann siad san iamhchríoch don seisiún seo amháin, agus cailltear iad nuair a atosaítear é."
+      }
+    },
+    "approve": "Ceadaigh",
+    "deny": "Diúltaigh",
+    "revokeHint": "Is féidir leat é seo a chúlghairm am ar bith sa tseirbhís a choinníonn do shonraí.",
+    "refusedTitle": "Ní féidir an t-iarratas seo a fhíorú",
+    "refusedMalformed": "Bhí an t-iarratas neamhiomlán, mar sin níl aon rud le ceadú.",
+    "refusedRequester": "Níorbh fhéidir an aip atá ag déanamh an iarratais a fhíorú, mar sin ní féidir rochtain ar do shonraí a thabhairt di.",
+    "refusedResource": "Níorbh fhéidir an tseirbhís a choinníonn do shonraí a fhíorú, mar sin níor athraíodh aon rud.",
+    "failedTitle": "Níor tugadh rochtain",
+    "failedBody": "Níor athraíodh aon rud. Is féidir leat triail eile a bhaint as.",
+    "doneTitle": "Rochtain tugtha",
+    "doneBody": "Is féidir le {{app}} an rud a cheadaigh tú a úsáid anois. Is féidir leat é a chúlghairm am ar bith."
+  },
   "credentials": {
     "title": "Dintiúir chláraithe",
     "empty": "Níl aon dintiúr cláraithe fós",

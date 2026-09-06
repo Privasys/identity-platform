@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Solicitud de acceso",
+    "heading": "¿Conceder acceso?",
+    "verifying": "Comprobando quién lo pide",
+    "whoLabel": "Quién lo pide",
+    "whatLabel": "Qué quieren",
+    "howLongLabel": "Hasta",
+    "unnamedApp": "Aplicación sin nombre",
+    "attested": "Verificado en un enclave seguro",
+    "resourceAttested": "{{service}} verificado en un enclave seguro",
+    "resourceLine": "{{permissions}} {{resource}} en tu {{service}}",
+    "permissionJoin": " y ",
+    "permission": {
+      "read": "Leer",
+      "write": "Crear y modificar",
+      "delete": "Eliminar"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Tus archivos se guardarán en tu propio almacenamiento, bajo tus claves. Sin esto, permanecen dentro del enclave solo durante esta sesión y se pierden al reiniciarse."
+      }
+    },
+    "approve": "Aprobar",
+    "deny": "Denegar",
+    "revokeHint": "Puedes revocarlo en cualquier momento en el servicio que guarda tus datos.",
+    "refusedTitle": "Esta solicitud no se puede verificar",
+    "refusedMalformed": "La solicitud estaba incompleta, así que no hay nada que aprobar.",
+    "refusedRequester": "No se ha podido verificar la aplicación que hace la solicitud, así que no puede acceder a tus datos.",
+    "refusedResource": "No se ha podido verificar el servicio que guarda tus datos, así que no se ha cambiado nada.",
+    "failedTitle": "No se concedió el acceso",
+    "failedBody": "No se ha cambiado nada. Puedes intentarlo de nuevo.",
+    "doneTitle": "Acceso concedido",
+    "doneBody": "{{app}} ya puede usar lo que has aprobado. Puedes revocarlo en cualquier momento."
+  },
   "credentials": {
     "title": "Credenciales registradas",
     "empty": "Todavía no hay credenciales registradas",

@@ -330,6 +330,40 @@
     "alwaysShareHint": "Approva awtomatikament talbiet futuri sakemm il-kodiċi tal-enklavi jibqa' l-istess.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Talba għal aċċess",
+    "heading": "Tagħti l-aċċess?",
+    "verifying": "Qed jiġi vverifikat min qed jitlob",
+    "whoLabel": "Min qed jitlob",
+    "whatLabel": "X'iridu",
+    "howLongLabel": "Sa",
+    "unnamedApp": "App bla isem",
+    "attested": "Ivverifikat f'enklavi sigura",
+    "resourceAttested": "{{service}} ivverifikat f'enklavi sigura",
+    "resourceLine": "{{permissions}} {{resource}} fil-{{service}} tiegħek",
+    "permissionJoin": " u ",
+    "permission": {
+      "read": "Jaqra",
+      "write": "Joħloq u jbiddel",
+      "delete": "Iħassar"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Il-fajls tiegħek jiġu salvati fil-ħażna tiegħek stess, taħt iċ-ċwievet tiegħek. Mingħajr dan jibqgħu fl-enklavi għal din is-sessjoni biss, u jintilfu meta terġa' tibda."
+      }
+    },
+    "approve": "Approva",
+    "deny": "Irrifjuta",
+    "revokeHint": "Tista' tirrevoka dan f'kull ħin fis-servizz li jżomm id-data tiegħek.",
+    "refusedTitle": "Din it-talba ma tistax tiġi vverifikata",
+    "refusedMalformed": "It-talba kienet nieqsa, allura m'hemm xejn x'tapprova.",
+    "refusedRequester": "L-app li qed tagħmel it-talba ma setgħetx tiġi vverifikata, allura ma tistax tingħata aċċess għad-data tiegħek.",
+    "refusedResource": "Is-servizz li jżomm id-data tiegħek ma setax jiġi vverifikat, allura ma nbidel xejn.",
+    "failedTitle": "L-aċċess ma ngħatax",
+    "failedBody": "Ma nbidel xejn. Tista' terġa' tipprova.",
+    "doneTitle": "L-aċċess ingħata",
+    "doneBody": "{{app}} issa jista' juża dak li approvajt. Tista' tirrevokah f'kull ħin."
+  },
   "credentials": {
     "title": "Kredenzjali rreġistrati",
     "empty": "Għad m'hemm l-ebda kredenzjal irreġistrat",

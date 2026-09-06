@@ -31,7 +31,8 @@ async function getNotifications() {
                     data?.type === 'auth-request' ||
                     data?.type === 'voucher-request' ||
                     data?.type === 'vault-approval' ||
-                    data?.type === 'attribute-approval';
+                    data?.type === 'attribute-approval' ||
+                    data?.type === 'capability-request';
                 return {
                     shouldShowAlert: !isAuthRequest,
                     shouldPlaySound: !isAuthRequest,
@@ -153,6 +154,18 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
     if (data?.type === 'share-request' || data?.type === 'share-decision') {
         await fileDriveNotification(data);
         router.push({ pathname: '/drive-requests', params: { source: 'push' } });
+        return;
+    }
+    if (data?.type === 'capability-request') {
+        // An attested app asking for scoped authority over something the holder
+        // owns. The push carries ONLY the nonce and where to fetch: everything
+        // that matters, including the key being authorised, is learned inside
+        // the attested channel, or a push could show a genuine identity while
+        // binding somebody else's key.
+        const host = String(data.app_host ?? '');
+        const nonce = String(data.nonce ?? '');
+        if (!host || !nonce) return;
+        router.push({ pathname: '/capability-request', params: { app_host: host, nonce } });
         return;
     }
     if (data?.type === 'vault-approval') {

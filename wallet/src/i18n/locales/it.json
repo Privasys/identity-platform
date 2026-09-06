@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Richiesta di accesso",
+    "heading": "Concedere l'accesso?",
+    "verifying": "Verifica di chi sta chiedendo",
+    "whoLabel": "Chi sta chiedendo",
+    "whatLabel": "Cosa vogliono",
+    "howLongLabel": "Fino al",
+    "unnamedApp": "App senza nome",
+    "attested": "Verificato in un enclave sicuro",
+    "resourceAttested": "{{service}} verificato in un enclave sicuro",
+    "resourceLine": "{{permissions}} {{resource}} nel tuo {{service}}",
+    "permissionJoin": " e ",
+    "permission": {
+      "read": "Leggere",
+      "write": "Creare e modificare",
+      "delete": "Eliminare"
+    },
+    "explain": {
+      "storage": {
+        "folder": "I tuoi file saranno salvati nel tuo spazio di archiviazione, sotto le tue chiavi. Senza questo restano nell'enclave solo per questa sessione e vanno persi al riavvio."
+      }
+    },
+    "approve": "Approva",
+    "deny": "Rifiuta",
+    "revokeHint": "Puoi revocarlo in qualsiasi momento nel servizio che custodisce i tuoi dati.",
+    "refusedTitle": "Questa richiesta non può essere verificata",
+    "refusedMalformed": "La richiesta era incompleta, quindi non c'è nulla da approvare.",
+    "refusedRequester": "Non è stato possibile verificare l'app che effettua la richiesta, quindi non può accedere ai tuoi dati.",
+    "refusedResource": "Non è stato possibile verificare il servizio che custodisce i tuoi dati, quindi non è stato modificato nulla.",
+    "failedTitle": "Accesso non concesso",
+    "failedBody": "Non è stato modificato nulla. Puoi riprovare.",
+    "doneTitle": "Accesso concesso",
+    "doneBody": "{{app}} ora può usare ciò che hai approvato. Puoi revocarlo in qualsiasi momento."
+  },
   "credentials": {
     "title": "Credenziali registrate",
     "empty": "Nessuna credenziale registrata per ora",

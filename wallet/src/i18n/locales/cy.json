@@ -330,6 +330,40 @@
     "alwaysShareHint": "Cymeradwyo ceisiadau yn y dyfodol yn awtomatig cyhyd â bod cod y cwafell yn aros yr un fath.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Cais am fynediad",
+    "heading": "Rhoi mynediad?",
+    "verifying": "Yn gwirio pwy sy'n gofyn",
+    "whoLabel": "Pwy sy'n gofyn",
+    "whatLabel": "Beth maen nhw eisiau",
+    "howLongLabel": "Hyd at",
+    "unnamedApp": "Ap heb enw",
+    "attested": "Wedi ei wirio mewn cwt diogel",
+    "resourceAttested": "{{service}} wedi ei wirio mewn cwt diogel",
+    "resourceLine": "{{permissions}} {{resource}} yn eich {{service}}",
+    "permissionJoin": " a ",
+    "permission": {
+      "read": "Darllen",
+      "write": "Creu a newid",
+      "delete": "Dileu"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Bydd eich ffeiliau'n cael eu cadw yn eich storfa eich hun, o dan eich allweddi. Hebddo, maen nhw'n aros yn y cwt ar gyfer y sesiwn hon yn unig, ac yn cael eu colli pan fydd yn ailgychwyn."
+      }
+    },
+    "approve": "Cymeradwyo",
+    "deny": "Gwrthod",
+    "revokeHint": "Gallwch ddirymu hyn ar unrhyw adeg yn y gwasanaeth sy'n dal eich data.",
+    "refusedTitle": "Ni ellir gwirio'r cais hwn",
+    "refusedMalformed": "Roedd y cais yn anghyflawn, felly nid oes dim i'w gymeradwyo.",
+    "refusedRequester": "Ni ellid gwirio'r ap sy'n gwneud y cais, felly ni ellir rhoi mynediad iddo at eich data.",
+    "refusedResource": "Ni ellid gwirio'r gwasanaeth sy'n dal eich data, felly ni newidiwyd dim.",
+    "failedTitle": "Ni roddwyd mynediad",
+    "failedBody": "Ni newidiwyd dim. Gallwch geisio eto.",
+    "doneTitle": "Mynediad wedi ei roi",
+    "doneBody": "Gall {{app}} bellach ddefnyddio'r hyn a gymeradwywyd gennych. Gallwch ei ddirymu ar unrhyw adeg."
+  },
   "credentials": {
     "title": "Tystlythyrau cofrestredig",
     "empty": "Dim tystlythyrau wedi'u cofrestru eto",

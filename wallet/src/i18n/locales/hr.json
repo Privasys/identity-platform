@@ -330,6 +330,40 @@
     "alwaysShareHint": "Automatski odobri buduće zahtjeve dok kod enklave ostaje isti.",
     "approveWithCount": "{{label}} ({{count}})"
   },
+  "capability": {
+    "title": "Zahtjev za pristup",
+    "heading": "Odobriti pristup?",
+    "verifying": "Provjerava se tko traži",
+    "whoLabel": "Tko traži",
+    "whatLabel": "Što traže",
+    "howLongLabel": "Do",
+    "unnamedApp": "Aplikacija bez naziva",
+    "attested": "Provjereno u sigurnoj enklavi",
+    "resourceAttested": "{{service}} provjerena u sigurnoj enklavi",
+    "resourceLine": "{{permissions}} {{resource}} u vašem {{service}}",
+    "permissionJoin": " i ",
+    "permission": {
+      "read": "Čitati",
+      "write": "Stvarati i mijenjati",
+      "delete": "Brisati"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Vaše datoteke bit će spremljene u vašu vlastitu pohranu, pod vašim ključevima. Bez toga ostaju u enklavi samo za ovu sesiju i gube se pri ponovnom pokretanju."
+      }
+    },
+    "approve": "Odobri",
+    "deny": "Odbij",
+    "revokeHint": "Ovo možete opozvati u bilo kojem trenutku u usluzi koja čuva vaše podatke.",
+    "refusedTitle": "Ovaj se zahtjev ne može provjeriti",
+    "refusedMalformed": "Zahtjev je bio nepotpun pa nema što odobriti.",
+    "refusedRequester": "Aplikaciju koja podnosi zahtjev nije bilo moguće provjeriti pa joj se ne može dati pristup vašim podacima.",
+    "refusedResource": "Uslugu koja čuva vaše podatke nije bilo moguće provjeriti pa ništa nije promijenjeno.",
+    "failedTitle": "Pristup nije odobren",
+    "failedBody": "Ništa nije promijenjeno. Možete pokušati ponovno.",
+    "doneTitle": "Pristup odobren",
+    "doneBody": "{{app}} sada može koristiti ono što ste odobrili. Možete to opozvati u bilo kojem trenutku."
+  },
   "credentials": {
     "title": "Registrirane vjerodajnice",
     "empty": "Još nema registriranih vjerodajnica",

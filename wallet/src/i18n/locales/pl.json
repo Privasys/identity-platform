@@ -297,6 +297,40 @@
   },
 
 
+  "capability": {
+    "title": "Prośba o dostęp",
+    "heading": "Przyznać dostęp?",
+    "verifying": "Sprawdzanie, kto prosi",
+    "whoLabel": "Kto prosi",
+    "whatLabel": "Czego chcą",
+    "howLongLabel": "Do",
+    "unnamedApp": "Aplikacja bez nazwy",
+    "attested": "Zweryfikowano w bezpiecznej enklawie",
+    "resourceAttested": "{{service}} zweryfikowano w bezpiecznej enklawie",
+    "resourceLine": "{{permissions}} {{resource}} w Twoim {{service}}",
+    "permissionJoin": " i ",
+    "permission": {
+      "read": "Odczyt",
+      "write": "Tworzenie i zmiana",
+      "delete": "Usuwanie"
+    },
+    "explain": {
+      "storage": {
+        "folder": "Twoje pliki będą zapisywane w Twojej własnej przestrzeni, pod Twoimi kluczami. Bez tego pozostają w enklawie tylko na czas tej sesji i giną po restarcie."
+      }
+    },
+    "approve": "Zatwierdź",
+    "deny": "Odmów",
+    "revokeHint": "Możesz to w każdej chwili cofnąć w usłudze, która przechowuje Twoje dane.",
+    "refusedTitle": "Tej prośby nie można zweryfikować",
+    "refusedMalformed": "Prośba była niekompletna, więc nie ma czego zatwierdzać.",
+    "refusedRequester": "Nie udało się zweryfikować aplikacji składającej prośbę, więc nie może ona uzyskać dostępu do Twoich danych.",
+    "refusedResource": "Nie udało się zweryfikować usługi przechowującej Twoje dane, więc nic nie zostało zmienione.",
+    "failedTitle": "Dostęp nie został przyznany",
+    "failedBody": "Nic nie zostało zmienione. Możesz spróbować ponownie.",
+    "doneTitle": "Dostęp przyznany",
+    "doneBody": "{{app}} może teraz korzystać z tego, co zatwierdziłeś. Możesz to w każdej chwili cofnąć."
+  },
   "credentials": {
     "title": "Zarejestrowane poświadczenia",
     "empty": "Nie zarejestrowano jeszcze żadnych poświadczeń",

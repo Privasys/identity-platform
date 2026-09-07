@@ -7,11 +7,13 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/Privasys/idp/internal/push"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -127,6 +129,15 @@ func migrate(db *sql.DB) error {
 			created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (user_id, code_hash)
 		);
+
+		-- Outstanding Expo push tickets awaiting their delivery receipt.
+		CREATE TABLE IF NOT EXISTS push_tickets (
+			ticket_id  TEXT PRIMARY KEY,
+			user_id    TEXT NOT NULL,
+			push_token TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE INDEX IF NOT EXISTS idx_push_tickets_created ON push_tickets(created_at);
 
 		-- Guardian relationships for social recovery.
 		CREATE TABLE IF NOT EXISTS guardians (
@@ -1194,4 +1205,88 @@ func (db *DB) GetRecoveryAccountSummary(userID string) (RecoveryAccountSummary, 
 	_ = db.QueryRow("SELECT COUNT(*) FROM credentials WHERE user_id = ?", userID).Scan(&s.CredentialCount)
 	_ = db.QueryRow("SELECT COUNT(*) FROM roles WHERE user_id = ?", userID).Scan(&s.RoleCount)
 	return s, nil
+}
+
+// --- Push tickets ---------------------------------------------------------
+//
+// Expo answers a send with a TICKET, and the ticket later yields a RECEIPT
+// which is where most delivery failures actually surface. Reading receipts
+// needs the ticket ids to outlive the request that produced them, hence this
+// table. Rows are short-lived: the sweep deletes each one as soon as it has an
+// answer, and drops anything Expo has still not answered for well past the
+// point a receipt could appear.
+
+// RecordPushTicket remembers a ticket so its receipt can be read later. The
+// token is stored alongside because that is what gets retired when Expo says
+// the device is gone, and by then the caller is long out of scope.
+func (db *DB) RecordPushTicket(ticketID, userID, pushToken string) error {
+	_, err := db.Exec(
+		`INSERT OR REPLACE INTO push_tickets (ticket_id, user_id, push_token, created_at)
+		 VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+		ticketID, userID, pushToken,
+	)
+	return err
+}
+
+// DuePushTickets returns tickets old enough that Expo should have a receipt.
+// Expo does not produce one instantly, so asking too early just burns a request
+// and leaves the row for next time.
+func (db *DB) DuePushTickets(minAge time.Duration, limit int) ([]push.PushTicket, error) {
+	rows, err := db.Query(
+		`SELECT ticket_id, user_id, push_token FROM push_tickets
+		 WHERE created_at <= datetime('now', ?)
+		 ORDER BY created_at LIMIT ?`,
+		fmt.Sprintf("-%d seconds", int(minAge.Seconds())), limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []push.PushTicket
+	for rows.Next() {
+		var t push.PushTicket
+		if err := rows.Scan(&t.TicketID, &t.UserID, &t.PushToken); err != nil {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// DeletePushTickets drops tickets that have been answered.
+func (db *DB) DeletePushTickets(ticketIDs []string) error {
+	for _, id := range ticketIDs {
+		if _, err := db.Exec("DELETE FROM push_tickets WHERE ticket_id = ?", id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CleanupStalePushTickets drops tickets Expo never answered. Expo keeps
+// receipts for about 24 hours, so anything older than that will never be
+// answered and would otherwise be retried forever.
+func (db *DB) CleanupStalePushTickets() {
+	if _, err := db.Exec(
+		"DELETE FROM push_tickets WHERE created_at < datetime('now', '-2 days')",
+	); err != nil {
+		log.Printf("[push] cleanup stale tickets: %v", err)
+	}
+}
+
+// DeletePushToken retires a token Expo has reported as permanently unusable.
+//
+// Deleted by TOKEN and not by user, deliberately. The same physical device
+// registers under every identity the holder has used on it, so one dead token
+// can sit on several user rows; retiring only the one that happened to be
+// pushed would leave the others to fail exactly the same way tomorrow.
+func (db *DB) DeletePushToken(pushToken string) error {
+	res, err := db.Exec("DELETE FROM push_tokens WHERE push_token = ?", pushToken)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		log.Printf("[push] retired a dead token from %d registration(s)", n)
+	}
+	return nil
 }

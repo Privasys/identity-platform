@@ -4,8 +4,9 @@
 package recovery
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
+	"github.com/Privasys/idp/internal/push"
 	"io"
 	"log"
 	"net/http"
@@ -763,41 +764,18 @@ func (h *Handler) notifyGuardians(userID string) {
 
 // sendGuardianPush sends a push notification to a guardian via Expo push service.
 func (h *Handler) sendGuardianPush(guardianID, pushToken, recoveringUserID string) {
-	payload, _ := json.Marshal([]map[string]interface{}{
-		{
-			"to":    pushToken,
-			"sound": "default",
-			// APNs priority 10. See the note in admin/notify.go: Expo's default
-			// maps to priority 5, which lets iOS defer delivery for power.
-			"priority": "high",
-			"title":    "Recovery request",
-			"body":     "Someone you protect needs your help to recover their account.",
-			"data": map[string]string{
-				"type":    "recovery-request",
-				"user_id": recoveringUserID,
-			},
+	if err := push.Notify(context.Background(), h.db, guardianID, push.Message{
+		Token: pushToken,
+		Title: "Recovery request",
+		Body:  "Someone you protect needs your help to recover their account.",
+		Data: map[string]string{
+			"type":    "recovery-request",
+			"user_id": recoveringUserID,
 		},
-	})
-
-	req, err := http.NewRequest("POST", "https://exp.host/--/api/v2/push/send", bytes.NewReader(payload))
-	if err != nil {
+	}); err != nil {
 		log.Printf("[recovery] push to guardian %s failed: %v", guardianID, err)
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Printf("[recovery] push to guardian %s failed: %v", guardianID, err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		log.Printf("[recovery] push to guardian %s returned %d: %s", guardianID, resp.StatusCode, body)
-		return
-	}
-	log.Printf("[recovery] push notification sent to guardian %s", guardianID)
+	log.Printf("[recovery] push notification accepted for guardian %s", guardianID)
 }

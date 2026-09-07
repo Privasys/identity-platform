@@ -40,6 +40,7 @@ import (
 	"github.com/Privasys/idp/internal/config"
 	"github.com/Privasys/idp/internal/fido2"
 	"github.com/Privasys/idp/internal/oidc"
+	"github.com/Privasys/idp/internal/push"
 	"github.com/Privasys/idp/internal/recovery"
 	"github.com/Privasys/idp/internal/sessions"
 	"github.com/Privasys/idp/internal/social"
@@ -416,6 +417,19 @@ func main() {
 	// Bootstrap admin user if configured.
 	admin.MaybeBootstrapAdmin(db, cfg.BootstrapAdmin)
 
+	// Push delivery receipts. Separate from the hourly cleanup because a
+	// receipt is the ONLY place most delivery failures surface, and an hour is
+	// far too long to learn that a device stopped accepting notifications. On
+	// 2026-09-07 five hours of undelivered pushes produced no log line at all,
+	// because nothing ever read them.
+	go func() {
+		ticker := time.NewTicker(2 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			push.SweepReceipts(context.Background(), db)
+		}
+	}()
+
 	// Periodic cleanup of expired refresh tokens, recovery records, and invitations.
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
@@ -425,6 +439,7 @@ func main() {
 			db.CleanupExpiredRecoveryRequests()
 			db.CleanupExpiredGuardianInvites()
 			db.CleanupExpiredRateLimits()
+			db.CleanupStalePushTickets()
 			sessionsStore.CleanupExpired()
 		}
 	}()

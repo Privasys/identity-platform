@@ -25,6 +25,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/Privasys/idp/internal/push"
 	"log"
 	"net/http"
 	"sort"
@@ -211,7 +212,7 @@ func (h *Handler) AttributeApprovalPusher() func(sub string, session *oidc.AuthS
 			// longer clock of its own.
 			expiresAt: session.ExpiresAt,
 		})
-		go sendAttributeApprovalPush(pushToken, capability, len(added))
+		go h.sendAttributeApprovalPush(string(user.ID), pushToken, capability, len(added))
 		log.Printf("fido2: attribute-approval pushed to holder of client %s (session %s…, +%d keys)",
 			session.ClientID, session.SessionID[:8], len(added))
 		return true
@@ -223,41 +224,22 @@ func (h *Handler) AttributeApprovalPusher() func(sub string, session *oidc.AuthS
 // capability — the wallet fetches the delta and descriptor from /pending
 // over TLS, so no request material transits third-party push infrastructure.
 // Values in data must be strings (Expo constraint).
-func sendAttributeApprovalPush(pushToken, capability string, addedCount int) {
+func (h *Handler) sendAttributeApprovalPush(userID, pushToken, capability string, addedCount int) {
 	body := "An app you use is asking to receive more of your data — tap to review"
 	if addedCount == 1 {
 		body = "An app you use is asking to receive one more piece of your data — tap to review"
 	}
-	msg := []map[string]interface{}{{
-		"to":    pushToken,
-		"sound": "default",
-		// APNs priority 10. See the note in admin/notify.go: Expo's default
-		// maps to priority 5, which lets iOS defer delivery for power.
-		"priority": "high",
-		"title":    "Data request",
-		"body":     body,
-		"data": map[string]string{
+	if err := push.Notify(context.Background(), h.db, userID, push.Message{
+		Token: pushToken,
+		Title: "Data request",
+		Body:  body,
+		Data: map[string]string{
 			"type":     "attribute-approval",
 			"approval": capability,
 		},
-	}}
-	payload, _ := json.Marshal(msg)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		"https://exp.host/--/api/v2/push/send", bytes.NewReader(payload))
-	if err != nil {
-		log.Printf("fido2/attribute-approval: build push: %v", err)
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
+	}); err != nil {
 		log.Printf("fido2/attribute-approval: push send: %v", err)
-		return
 	}
-	resp.Body.Close()
 }
 
 // AttributeApprovalPending handles GET /fido2/attribute-approval/pending.

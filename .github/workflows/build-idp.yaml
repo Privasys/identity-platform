@@ -30,9 +30,19 @@ jobs:
         run: go generate ./...
       - name: Fail if the embedded copy was stale
         run: git diff --exit-code -- idp/internal/attributes
-      - name: Test the referential
+      - name: Test
         working-directory: idp
-        run: go test ./internal/attributes/...
+        # The WHOLE suite, not just the referential. Until 2026-09-07 this ran
+        # ./internal/attributes/... alone, so the sqlite-backed tests in
+        # clients, oidc, recovery and store never ran anywhere: they needed cgo,
+        # and nobody noticed they were dead.
+        #
+        # CGO_ENABLED=0 deliberately, so CI exercises the same cgo-free driver a
+        # developer gets without a C toolchain. The image still ships
+        # mattn/go-sqlite3: the Dockerfile builds with CGO_ENABLED=1.
+        env:
+          CGO_ENABLED: 0
+        run: go test ./...
 
   build-and-push:
     needs: [referential]

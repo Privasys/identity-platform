@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/Privasys/idp/internal/push"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // DB wraps a SQLite connection with IdP-specific operations.
@@ -30,7 +29,7 @@ func Open(path string) (*DB, error) {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
 
-	db, err := sql.Open("sqlite3", path+"?_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on")
+	db, err := sql.Open(driverName, path+"?_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on")
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}

@@ -15,9 +15,9 @@ package fido2
 // passkey: the wallet credential the owner already holds is the approver.
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/Privasys/idp/internal/push"
 	"log"
 	"net/http"
 	"strings"
@@ -156,13 +156,13 @@ func (h *Handler) recordPendingAndPush(sub, vaultOp string, optionsJS json.RawMe
 	if pushToken == "" {
 		return // no registered wallet token; the wallet can still poll /pending
 	}
-	go sendVaultApprovalPush(pushToken, vaultOp, summary)
+	go h.sendVaultApprovalPush(sub, pushToken, vaultOp, summary)
 }
 
 // sendVaultApprovalPush delivers an Expo push tagged type:"vault-approval" so the
 // wallet routes it to the Vault approvals screen. Mirrors the recovery flow's
 // sendGuardianPush. Values in data must be strings (Expo constraint).
-func sendVaultApprovalPush(pushToken, vaultOp string, summary vaultApprovalSummary) {
+func (h *Handler) sendVaultApprovalPush(userID, pushToken, vaultOp string, summary vaultApprovalSummary) {
 	// Prefer the friendly app name in the push body when the initiator supplied
 	// it; fall back to the truncated handle.
 	who := summary.AppName
@@ -186,36 +186,20 @@ func sendVaultApprovalPush(pushToken, vaultOp string, summary vaultApprovalSumma
 	// Data carries only the routing type + the capability (vault_op). The wallet
 	// fetches the operation details from /pending?challenge= over TLS, so no
 	// operation/identity material transits third-party push infrastructure.
-	msg := []map[string]interface{}{{
-		"to":    pushToken,
-		"sound": "default",
-		// APNs priority 10. See the note in admin/notify.go: Expo's default
-		// maps to priority 5, which lets iOS defer delivery for power.
-		"priority": "high",
-		"title":    "Vault approval",
-		"body":     body,
-		"data": map[string]string{
+	if err := push.Notify(context.Background(), h.db, userID, push.Message{
+		Token: pushToken,
+		Title: "Vault approval",
+		Body:  body,
+		// Only the routing type and the capability. The wallet fetches the
+		// operation details from /pending?challenge= over TLS, so no operation
+		// or identity material transits third-party push infrastructure.
+		Data: map[string]string{
 			"type":     "vault-approval",
 			"vault_op": vaultOp,
 		},
-	}}
-	payload, _ := json.Marshal(msg)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		"https://exp.host/--/api/v2/push/send", bytes.NewReader(payload))
-	if err != nil {
-		log.Printf("fido2/vault-approval: build push: %v", err)
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
+	}); err != nil {
 		log.Printf("fido2/vault-approval: push send: %v", err)
-		return
 	}
-	resp.Body.Close()
 }
 
 // shortHandle renders the app-id segment of a vault handle for a push body.

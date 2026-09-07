@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/Privasys/idp/internal/push"
 	"io"
 	"log"
 	"net/http"
@@ -150,7 +151,9 @@ func HandleNotify(db *store.DB, adminToken string) http.HandlerFunc {
 		}
 
 		title, body := notifyTitleBody(req.Type, req.AppName)
-		if err := sendExpoPush(token, title, body, data); err != nil {
+		if err := push.Notify(r.Context(), db, req.Sub, push.Message{
+			Token: token, Title: title, Body: body, Data: data,
+		}); err != nil {
 			log.Printf("admin/notify: push send failed: %v", err)
 			writeError(w, http.StatusBadGateway, "push delivery failed")
 			return

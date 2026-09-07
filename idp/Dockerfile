@@ -1,4 +1,6 @@
-FROM golang:1.24-alpine AS builder
+# 1.25 to match go.mod, which the cgo-free test driver (modernc.org/libc)
+# requires. CI already takes its version from go.mod; only this was pinned.
+FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache gcc musl-dev
 

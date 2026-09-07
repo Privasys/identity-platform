@@ -88,6 +88,8 @@ func notifyTitleBody(typ, appName string) (string, string) {
 		return appName, "Someone requested access to something you shared."
 	case "share-decision":
 		return appName, "There is an update on your access request."
+	case "capability-request":
+		return appName, "Asks to use a folder in your Drive."
 	default:
 		return appName, "You have a new notification."
 	}
@@ -121,6 +123,20 @@ func HandleNotify(db *store.DB, adminToken string) http.HandlerFunc {
 		}
 
 		data := map[string]string{"type": req.Type, "app_id": req.AppID}
+		// A capability request carries ONLY a nonce and the host to fetch it
+		// from, in the clear: the wallet learns everything that matters (the
+		// key being authorised included) inside the attested channel to that
+		// host. The nonce is single use and expires in minutes.
+		if req.Type == "capability-request" {
+			var capReq struct {
+				Nonce   string `json:"nonce"`
+				AppHost string `json:"app_host"`
+			}
+			if json.Unmarshal(req.Payload, &capReq) == nil && capReq.Nonce != "" && capReq.AppHost != "" {
+				data["nonce"] = capReq.Nonce
+				data["app_host"] = capReq.AppHost
+			}
+		}
 		status := "sent-unsealed"
 		if encPub != "" && len(req.Payload) > 0 {
 			sealed, err := sealToWallet(encPub, req.Type, req.Payload)

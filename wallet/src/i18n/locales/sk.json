@@ -354,7 +354,7 @@
     },
     "approve": "Schváliť",
     "deny": "Odmietnuť",
-    "revokeHint": "Kedykoľvek to môžete odvolať v službe, ktorá uchováva vaše údaje.",
+    "revokeHint": "Kedykoľvek to môžete odvolať v {{service}}.",
     "refusedTitle": "Túto žiadosť nemožno overiť",
     "refusedMalformed": "Žiadosť bola neúplná, takže nie je čo schváliť.",
     "refusedRequester": "Aplikáciu, ktorá žiadosť podáva, sa nepodarilo overiť, preto jej nemožno udeliť prístup k vašim údajom.",

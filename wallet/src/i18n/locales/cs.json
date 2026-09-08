@@ -321,7 +321,7 @@
     },
     "approve": "Schválit",
     "deny": "Odmítnout",
-    "revokeHint": "Kdykoli to můžete odvolat ve službě, která vaše data uchovává.",
+    "revokeHint": "Kdykoli to můžete odvolat v {{service}}.",
     "refusedTitle": "Tuto žádost nelze ověřit",
     "refusedMalformed": "Žádost byla neúplná, není tedy co schválit.",
     "refusedRequester": "Aplikaci, která žádost podává, se nepodařilo ověřit, proto jí nelze udělit přístup k vašim datům.",

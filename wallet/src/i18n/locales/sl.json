@@ -354,7 +354,7 @@
     },
     "approve": "Odobri",
     "deny": "Zavrni",
-    "revokeHint": "To lahko kadar koli prekličete v storitvi, ki hrani vaše podatke.",
+    "revokeHint": "To lahko kadar koli prekličete v {{service}}.",
     "refusedTitle": "Te zahteve ni mogoče preveriti",
     "refusedMalformed": "Zahteva je bila nepopolna, zato ni ničesar za odobriti.",
     "refusedRequester": "Aplikacije, ki vlaga zahtevo, ni bilo mogoče preveriti, zato ji ni mogoče dati dostopa do vaših podatkov.",

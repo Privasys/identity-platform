@@ -354,7 +354,7 @@
     },
     "approve": "Approve",
     "deny": "Deny",
-    "revokeHint": "You can revoke this at any time in the service that holds your data.",
+    "revokeHint": "You can revoke this at any time in {{service}}.",
     "refusedTitle": "This request cannot be verified",
     "refusedMalformed": "The request was incomplete, so there is nothing to approve.",
     "refusedRequester": "The app making this request could not be verified, so it cannot be given access to your data.",

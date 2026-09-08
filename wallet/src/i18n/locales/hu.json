@@ -321,7 +321,7 @@
     },
     "approve": "Jóváhagyás",
     "deny": "Elutasítás",
-    "revokeHint": "Ezt bármikor visszavonhatja abban a szolgáltatásban, amely az adatait tárolja.",
+    "revokeHint": "Ezt bármikor visszavonhatja itt: {{service}}.",
     "refusedTitle": "Ez a kérés nem ellenőrizhető",
     "refusedMalformed": "A kérés hiányos volt, így nincs mit jóváhagyni.",
     "refusedRequester": "A kérést benyújtó alkalmazást nem sikerült ellenőrizni, ezért nem kaphat hozzáférést az adataihoz.",

@@ -271,7 +271,15 @@ export default function CapabilityRequestScreen() {
                             <Text style={styles.value}>
                                 {new Date(expiryFor(pending.capability.kind) * 1000).toLocaleDateString()}
                             </Text>
-                            <Text style={styles.muted}>{t('capability.revokeHint')}</Text>
+                            {/* Name the service that holds the data, which is
+                                where the revoke button lives. Saying "the service
+                                that holds your data" sent someone to the app that
+                                was ASKING, which has no such option. */}
+                            <Text style={styles.muted}>
+                                {t('capability.revokeHint', {
+                                    service: resource.display_name || resource.name,
+                                })}
+                            </Text>
                         </RNView>
 
                         <Pressable
@@ -302,7 +310,9 @@ export default function CapabilityRequestScreen() {
 
 const makeStyles = (p: Palette) => StyleSheet.create({
     screen: { flex: 1, backgroundColor: p.screenBg },
-    content: { paddingHorizontal: 20, paddingTop: 8 },
+    // 20 to match credentials, personal-data and the other sub-pages; this sat
+    // at 8 and read as cramped under the header.
+    content: { paddingHorizontal: 20, paddingTop: 20 },
     centre: { alignItems: 'center', marginVertical: 24, gap: 12 },
     heading: { fontSize: 20, fontWeight: '700', color: p.textPrimary, marginBottom: 12 },
     body: { fontSize: 14, color: p.textSecondary, lineHeight: 21, marginBottom: 16 },

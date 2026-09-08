@@ -31,6 +31,37 @@ const STORE_KEY = 'privasys.service-sessions.v1';
 /** Keep the trail bounded; oldest traces fall off. */
 const MAX_TRACES = 400;
 
+/**
+ * And bounded PER APP, which the global cap does not do.
+ *
+ * One app used daily accumulates a row per ceremony, so the service-detail
+ * trail grew without limit: 33 entries for a single service, in a card the
+ * holder has to scroll past to reach anything below it. The global cap of 400
+ * only stops the store as a whole from growing, and would let one busy app
+ * crowd out every other app's history entirely.
+ *
+ * Ten is what a person can actually read, and the trail answers "what has this
+ * app been doing lately" rather than "everything it has ever done".
+ */
+const MAX_TRACES_PER_SERVICE = 10;
+
+/**
+ * Keep the newest MAX_TRACES_PER_SERVICE for each service. Input must be
+ * newest-first, which is how the store holds it, so this is a single pass and
+ * preserves order.
+ */
+function capPerService(traces: SessionTrace[]): SessionTrace[] {
+    const seen = new Map<string, number>();
+    const kept: SessionTrace[] = [];
+    for (const t of traces) {
+        const n = seen.get(t.serviceKey) ?? 0;
+        if (n >= MAX_TRACES_PER_SERVICE) continue;
+        seen.set(t.serviceKey, n + 1);
+        kept.push(t);
+    }
+    return kept;
+}
+
 export type SessionKind =
     | 'sign-in' // plain OIDC / passkey sign-in (no enclave, no sealed relay)
     | 'enclave' // direct sign-in to an attested enclave app
@@ -138,7 +169,9 @@ export const useServiceSessionsStore = create<ServiceSessionsState>((set, get) =
 
     record: (trace) => {
         const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-        set((s) => ({ traces: [{ ...trace, id }, ...s.traces].slice(0, MAX_TRACES) }));
+        set((s) => ({
+            traces: capPerService([{ ...trace, id }, ...s.traces]).slice(0, MAX_TRACES),
+        }));
         persist(get());
         return id;
     },
@@ -167,7 +200,13 @@ export const useServiceSessionsStore = create<ServiceSessionsState>((set, get) =
         if (!raw) return;
         try {
             const data = JSON.parse(raw);
-            set({ traces: Array.isArray(data?.traces) ? data.traces : [] });
+            const loaded = Array.isArray(data?.traces) ? (data.traces as SessionTrace[]) : [];
+            // Trim on load as well as on write, so a wallet that already holds
+            // an unbounded trail is tidied on its next launch rather than
+            // staying long until each app happens to be used again.
+            const traces = capPerService(loaded);
+            set({ traces });
+            if (traces.length !== loaded.length) persist(get());
         } catch {
             // Corrupted data — start fresh.
         }

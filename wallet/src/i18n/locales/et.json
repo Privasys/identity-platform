@@ -354,7 +354,7 @@
     },
     "approve": "Kinnita",
     "deny": "Keeldu",
-    "revokeHint": "Saate selle igal ajal tühistada teenuses, mis teie andmeid hoiab.",
+    "revokeHint": "Saate selle igal ajal tühistada teenuses {{service}}.",
     "refusedTitle": "Seda taotlust ei saa kontrollida",
     "refusedMalformed": "Taotlus oli puudulik, seega pole midagi kinnitada.",
     "refusedRequester": "Taotlust esitavat rakendust ei õnnestunud kontrollida, seega ei saa talle teie andmetele juurdepääsu anda.",

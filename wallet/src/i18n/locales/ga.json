@@ -354,7 +354,7 @@
     },
     "approve": "Ceadaigh",
     "deny": "Diúltaigh",
-    "revokeHint": "Is féidir leat é seo a chúlghairm am ar bith sa tseirbhís a choinníonn do shonraí.",
+    "revokeHint": "Is féidir leat é seo a chúlghairm am ar bith i {{service}}.",
     "refusedTitle": "Ní féidir an t-iarratas seo a fhíorú",
     "refusedMalformed": "Bhí an t-iarratas neamhiomlán, mar sin níl aon rud le ceadú.",
     "refusedRequester": "Níorbh fhéidir an aip atá ag déanamh an iarratais a fhíorú, mar sin ní féidir rochtain ar do shonraí a thabhairt di.",

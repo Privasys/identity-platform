@@ -321,7 +321,7 @@
     },
     "approve": "Godkänn",
     "deny": "Neka",
-    "revokeHint": "Du kan när som helst återkalla detta i tjänsten som håller dina data.",
+    "revokeHint": "Du kan när som helst återkalla detta i {{service}}.",
     "refusedTitle": "Den här begäran kan inte verifieras",
     "refusedMalformed": "Begäran var ofullständig, så det finns inget att godkänna.",
     "refusedRequester": "Appen som gör begäran kunde inte verifieras och kan därför inte få åtkomst till dina data.",

@@ -5,10 +5,10 @@
  * Capability approval: an attested app asking for scoped, revocable authority
  * over a resource the holder owns.
  *
- * See plans/wallet-resource-capabilities.md. The screen answers three questions
- * in this order: who is asking, what of yours, and for how long. Two identities
- * appear, not one, because the app asking and the service holding the data are
- * different parties and both must be verified.
+ * The screen answers three questions in this order: who is asking, what of
+ * yours, and for how long. Two identities appear, not one, because the app
+ * asking and the service holding the data are different parties, and both must
+ * be verified from attestation rather than taken from the request.
  *
  * Nothing here knows what a tenant or a folder is. The resource service does
  * its own domain work from a request body the wallet forwards without reading.

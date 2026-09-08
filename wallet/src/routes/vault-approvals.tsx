@@ -102,7 +102,7 @@ export default function VaultApprovalsScreen() {
 
     const pending = useVaultApprovalsStore((s) => s.pending);
     const loading = useVaultApprovalsStore((s) => s.loading);
-    const refresh = useVaultApprovalsStore((s) => s.refresh);
+    const discover = useVaultApprovalsStore((s) => s.discover);
     const remember = useVaultApprovalsStore((s) => s.remember);
     const forget = useVaultApprovalsStore((s) => s.forget);
 
@@ -137,11 +137,14 @@ export default function VaultApprovalsScreen() {
         };
     }, [pending, provenance]);
 
-    // Arriving via a push deep-link: register the capability, then refresh.
+    // Arriving via a push deep-link: register that capability. Then ALWAYS ask
+    // the IdP what else is pending for this identity — opening this screen is
+    // the user saying "show me my approvals", and a request whose push never
+    // arrived would otherwise be invisible here until it expired.
     useEffect(() => {
         if (params.vault_op) remember(params.vault_op);
-        void refresh();
-    }, [params.vault_op, remember, refresh]);
+        void discover();
+    }, [params.vault_op, remember, discover]);
 
     // Tick so the expiry countdown stays live.
     useEffect(() => {
@@ -149,11 +152,13 @@ export default function VaultApprovalsScreen() {
         return () => clearInterval(id);
     }, []);
 
+    // Pull-to-refresh discovers too, so a user who was never pushed can simply
+    // pull down to find the request.
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await refresh();
+        await discover();
         setRefreshing(false);
-    }, [refresh]);
+    }, [discover]);
 
     const approve = useCallback(
         async (req: VaultApprovalRequest) => {

@@ -354,7 +354,7 @@
     },
     "approve": "Apstiprināt",
     "deny": "Noraidīt",
-    "revokeHint": "Jūs to varat jebkurā laikā atsaukt pakalpojumā, kas glabā jūsu datus.",
+    "revokeHint": "Jūs to varat jebkurā laikā atsaukt pakalpojumā {{service}}.",
     "refusedTitle": "Šo pieprasījumu nevar pārbaudīt",
     "refusedMalformed": "Pieprasījums bija nepilnīgs, tāpēc nav ko apstiprināt.",
     "refusedRequester": "Lietotni, kas iesniedz pieprasījumu, neizdevās pārbaudīt, tāpēc tai nevar piešķirt piekļuvi jūsu datiem.",

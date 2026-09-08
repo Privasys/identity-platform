@@ -321,7 +321,7 @@
     },
     "approve": "Aprobar",
     "deny": "Denegar",
-    "revokeHint": "Puedes revocarlo en cualquier momento en el servicio que guarda tus datos.",
+    "revokeHint": "Puedes revocarlo en cualquier momento en {{service}}.",
     "refusedTitle": "Esta solicitud no se puede verificar",
     "refusedMalformed": "La solicitud estaba incompleta, así que no hay nada que aprobar.",
     "refusedRequester": "No se ha podido verificar la aplicación que hace la solicitud, así que no puede acceder a tus datos.",

@@ -354,7 +354,7 @@
     },
     "approve": "Cymeradwyo",
     "deny": "Gwrthod",
-    "revokeHint": "Gallwch ddirymu hyn ar unrhyw adeg yn y gwasanaeth sy'n dal eich data.",
+    "revokeHint": "Gallwch ddirymu hyn ar unrhyw adeg yn {{service}}.",
     "refusedTitle": "Ni ellir gwirio'r cais hwn",
     "refusedMalformed": "Roedd y cais yn anghyflawn, felly nid oes dim i'w gymeradwyo.",
     "refusedRequester": "Ni ellid gwirio'r ap sy'n gwneud y cais, felly ni ellir rhoi mynediad iddo at eich data.",

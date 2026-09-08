@@ -354,7 +354,7 @@
     },
     "approve": "Aprobă",
     "deny": "Refuză",
-    "revokeHint": "Poți revoca oricând acest lucru în serviciul care îți păstrează datele.",
+    "revokeHint": "Poți revoca oricând acest lucru în {{service}}.",
     "refusedTitle": "Această cerere nu poate fi verificată",
     "refusedMalformed": "Cererea a fost incompletă, deci nu este nimic de aprobat.",
     "refusedRequester": "Aplicația care face cererea nu a putut fi verificată, deci nu i se poate acorda acces la datele tale.",

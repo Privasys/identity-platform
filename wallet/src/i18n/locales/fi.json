@@ -321,7 +321,7 @@
     },
     "approve": "Hyväksy",
     "deny": "Hylkää",
-    "revokeHint": "Voit peruuttaa tämän milloin tahansa palvelussa, joka säilyttää tietosi.",
+    "revokeHint": "Voit peruuttaa tämän milloin tahansa palvelussa {{service}}.",
     "refusedTitle": "Tätä pyyntöä ei voi varmentaa",
     "refusedMalformed": "Pyyntö oli puutteellinen, joten hyväksyttävää ei ole.",
     "refusedRequester": "Pyynnön tekevää sovellusta ei voitu varmentaa, joten sille ei voi antaa pääsyä tietoihisi.",

@@ -321,7 +321,7 @@
     },
     "approve": "Godkend",
     "deny": "Afvis",
-    "revokeHint": "Du kan til enhver tid tilbagekalde dette i den tjeneste, der opbevarer dine data.",
+    "revokeHint": "Du kan til enhver tid tilbagekalde dette i {{service}}.",
     "refusedTitle": "Denne anmodning kan ikke bekræftes",
     "refusedMalformed": "Anmodningen var ufuldstændig, så der er intet at godkende.",
     "refusedRequester": "Appen, der anmoder, kunne ikke bekræftes, så den kan ikke få adgang til dine data.",

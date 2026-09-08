@@ -354,7 +354,7 @@
     },
     "approve": "Odobri",
     "deny": "Odbij",
-    "revokeHint": "Ovo možete opozvati u bilo kojem trenutku u usluzi koja čuva vaše podatke.",
+    "revokeHint": "Ovo možete opozvati u bilo kojem trenutku u usluzi {{service}}.",
     "refusedTitle": "Ovaj se zahtjev ne može provjeriti",
     "refusedMalformed": "Zahtjev je bio nepotpun pa nema što odobriti.",
     "refusedRequester": "Aplikaciju koja podnosi zahtjev nije bilo moguće provjeriti pa joj se ne može dati pristup vašim podacima.",

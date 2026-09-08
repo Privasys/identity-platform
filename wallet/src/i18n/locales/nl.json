@@ -321,7 +321,7 @@
     },
     "approve": "Goedkeuren",
     "deny": "Weigeren",
-    "revokeHint": "Je kunt dit op elk moment intrekken in de dienst die je gegevens bewaart.",
+    "revokeHint": "Je kunt dit op elk moment intrekken in {{service}}.",
     "refusedTitle": "Dit verzoek kan niet worden geverifieerd",
     "refusedMalformed": "Het verzoek was onvolledig, dus er valt niets goed te keuren.",
     "refusedRequester": "De app die het verzoek doet kon niet worden geverifieerd en kan dus geen toegang tot je gegevens krijgen.",

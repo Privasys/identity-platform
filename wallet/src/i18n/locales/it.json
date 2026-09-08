@@ -321,7 +321,7 @@
     },
     "approve": "Approva",
     "deny": "Rifiuta",
-    "revokeHint": "Puoi revocarlo in qualsiasi momento nel servizio che custodisce i tuoi dati.",
+    "revokeHint": "Puoi revocarlo in qualsiasi momento in {{service}}.",
     "refusedTitle": "Questa richiesta non può essere verificata",
     "refusedMalformed": "La richiesta era incompleta, quindi non c'è nulla da approvare.",
     "refusedRequester": "Non è stato possibile verificare l'app che effettua la richiesta, quindi non può accedere ai tuoi dati.",

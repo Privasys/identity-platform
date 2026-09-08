@@ -354,7 +354,7 @@
     },
     "approve": "Patvirtinti",
     "deny": "Atmesti",
-    "revokeHint": "Tai galite bet kada atšaukti paslaugoje, kuri saugo jūsų duomenis.",
+    "revokeHint": "Tai galite bet kada atšaukti paslaugoje {{service}}.",
     "refusedTitle": "Šios užklausos patikrinti negalima",
     "refusedMalformed": "Užklausa buvo neišsami, todėl nėra ko patvirtinti.",
     "refusedRequester": "Užklausą teikiančios programėlės nepavyko patikrinti, todėl jai negalima suteikti prieigos prie jūsų duomenų.",

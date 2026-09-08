@@ -321,7 +321,7 @@
     },
     "approve": "Approuver",
     "deny": "Refuser",
-    "revokeHint": "Vous pouvez révoquer cet accès à tout moment dans le service qui détient vos données.",
+    "revokeHint": "Vous pouvez révoquer cet accès à tout moment dans {{service}}.",
     "refusedTitle": "Cette demande ne peut pas être vérifiée",
     "refusedMalformed": "La demande était incomplète, il n'y a donc rien à approuver.",
     "refusedRequester": "L'application à l'origine de la demande n'a pas pu être vérifiée ; elle ne peut donc pas accéder à vos données.",

@@ -321,7 +321,7 @@
     },
     "approve": "Genehmigen",
     "deny": "Ablehnen",
-    "revokeHint": "Sie können dies jederzeit in dem Dienst widerrufen, der Ihre Daten hält.",
+    "revokeHint": "Sie können dies jederzeit in {{service}} widerrufen.",
     "refusedTitle": "Diese Anfrage kann nicht geprüft werden",
     "refusedMalformed": "Die Anfrage war unvollständig, es gibt also nichts zu genehmigen.",
     "refusedRequester": "Die anfragende App konnte nicht geprüft werden und kann daher keinen Zugriff auf Ihre Daten erhalten.",

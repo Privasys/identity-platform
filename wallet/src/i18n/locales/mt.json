@@ -354,7 +354,7 @@
     },
     "approve": "Approva",
     "deny": "Irrifjuta",
-    "revokeHint": "Tista' tirrevoka dan f'kull ħin fis-servizz li jżomm id-data tiegħek.",
+    "revokeHint": "Tista' tirrevoka dan f'kull ħin fi {{service}}.",
     "refusedTitle": "Din it-talba ma tistax tiġi vverifikata",
     "refusedMalformed": "It-talba kienet nieqsa, allura m'hemm xejn x'tapprova.",
     "refusedRequester": "L-app li qed tagħmel it-talba ma setgħetx tiġi vverifikata, allura ma tistax tingħata aċċess għad-data tiegħek.",

@@ -5,10 +5,10 @@
  * Capabilities: an attested app asking the holder for scoped, revocable
  * authority over a resource the holder owns.
  *
- * See plans/wallet-resource-capabilities.md. The wallet's job is only ever four
- * things: verify who is asking from attestation rather than from the request,
- * render what is being asked in plain language, capture approve or deny, and
- * bind a public key that was proved inside the attested channel.
+ * The wallet's job here is only ever four things: verify who is asking from
+ * attestation rather than from the request, render what is being asked in plain
+ * language, capture approve or deny, and bind a public key that was proved
+ * inside the attested channel.
  *
  * Nothing here knows what a tenant, a folder or a vault key is. The resource
  * service does its own domain work from `request`, which the wallet forwards

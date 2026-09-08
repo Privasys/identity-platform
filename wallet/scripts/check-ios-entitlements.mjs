@@ -22,6 +22,8 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -98,11 +100,58 @@ for (const ext of extensions) {
     check(ext.targetName, ext.entitlements?.['keychain-access-groups'], REQUIRED_EXTENSION, errors);
 }
 
+// The second half of the same mistake, which the entitlement check above
+// cannot see. Declaring a keychain group correctly is useless if the native
+// code then ASKS for a different one: iOS answers errSecMissingEntitlement
+// and the caller usually reads that as "no such item".
+//
+// The passkey extension asked for "group.org.privasys.wallet", an app group
+// identifier rather than a keychain group, and no app group is entitled
+// anywhere in the project. Every SecItem call failed, so choosing Privasys
+// Wallet in the OS passkey sheet did nothing at all, silently, in a shipped
+// build (2026-09-08).
+//
+// A group is legitimate if an entitlement grants it, with or without the
+// $(AppIdentifierPrefix) prefix: iOS resolves an unprefixed group against the
+// entitled list, which is what the notification-service extension relies on.
+const entitledSuffixes = new Set(
+    [...REQUIRED_MAIN, ...REQUIRED_EXTENSION].map((g) => g.replace('$(AppIdentifierPrefix)', '')),
+);
+
+function swiftFiles(dir) {
+    const out = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name === 'node_modules' || entry.name === 'build') continue;
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) out.push(...swiftFiles(full));
+        else if (entry.name.endsWith('.swift')) out.push(full);
+    }
+    return out;
+}
+
+for (const file of swiftFiles('modules')) {
+    const src = readFileSync(file, 'utf8');
+    // Every access group in this codebase reaches kSecAttrAccessGroup through a
+    // named constant, so the declarations are what to check.
+    for (const m of src.matchAll(/(?:let|var)\s+\w*[Kk]eychainGroup\w*\s*(?::\s*String\s*)?=\s*"([^"]+)"/g)) {
+        const asked = m[1].replace('$(AppIdentifierPrefix)', '');
+        if (!entitledSuffixes.has(asked)) {
+            errors.push(
+                file + ' asks the keychain for group "' + m[1] + '", which no ' +
+                'entitlement grants (entitled: ' + [...entitledSuffixes].join(', ') + ')',
+            );
+        }
+    }
+}
+
 if (errors.length > 0) {
     console.error('iOS entitlements are not what app.config.ts declares:');
     for (const e of errors) console.error(`  ✗ ${e}`);
-    console.error('\nA config plugin that ASSIGNS keychain-access-groups instead of merging');
-    console.error('into them is the usual cause. See modules/passkey-provider/app.plugin.js.');
+    console.error('\nTwo usual causes. A config plugin that ASSIGNS keychain-access-groups');
+    console.error('instead of merging into them (see modules/passkey-provider/app.plugin.js),');
+    console.error('or native code asking for a group no entitlement grants, which iOS answers');
+    console.error('with errSecMissingEntitlement and callers routinely misread as an empty');
+    console.error('keychain rather than a permissions failure.');
     process.exit(1);
 }
 

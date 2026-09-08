@@ -7,8 +7,20 @@ import LocalAuthentication
 import Security
 import UIKit
 
-/// Shared keychain access group — shared between main app and extension.
-private let kKeychainGroupId = "group.org.privasys.wallet"
+/// Shared keychain access group, matching the extension entitlement
+/// `$(AppIdentifierPrefix)org.privasys.shared`.
+///
+/// This read "group.org.privasys.wallet", which is an APP GROUP identifier, not
+/// a keychain access group, and no app group is entitled anywhere in the
+/// project. Every SecItem call therefore failed with errSecMissingEntitlement:
+/// lookupKeyTag found nothing, the assertion path cancelled with
+/// credentialIdentityNotFound, and picking Privasys Wallet in the OS passkey
+/// sheet did visibly nothing at all (2026-09-08).
+///
+/// No team prefix, matching the sibling notification-service extension, which
+/// shares the same entitlement and demonstrably works: iOS resolves an
+/// unprefixed group against the entitled list.
+private let kKeychainGroupId = "org.privasys.shared"
 
 /// Service name for stored credentials in the shared keychain.
 private let kCredentialService = "org.privasys.wallet.credentials"

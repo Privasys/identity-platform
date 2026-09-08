@@ -20,6 +20,7 @@ import (
 	"github.com/Privasys/idp/internal/push"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -145,7 +146,10 @@ func (s *vaultPendingStore) cleanup() {
 // (best-effort). Called from VaultApprovalBegin. optionsJS is the exact WebAuthn
 // options the CLI/browser also receive, so the wallet signs the identical
 // challenge.
-func (h *Handler) recordPendingAndPush(sub, vaultOp string, optionsJS json.RawMessage, summary vaultApprovalSummary, exp int64) {
+// It reports whether a wallet push token is registered for the subject, so the
+// caller can tell the initiator that no push is coming instead of leaving them
+// waiting on a notification that will never arrive.
+func (h *Handler) recordPendingAndPush(sub, vaultOp string, optionsJS json.RawMessage, summary vaultApprovalSummary, exp int64) (pushRegistered bool) {
 	h.vaultPending.put(vaultOp, &vaultPendingEntry{
 		sub:       sub,
 		optionsJS: optionsJS,
@@ -154,9 +158,14 @@ func (h *Handler) recordPendingAndPush(sub, vaultOp string, optionsJS json.RawMe
 	})
 	pushToken := h.db.GetPushToken(sub)
 	if pushToken == "" {
-		return // no registered wallet token; the wallet can still poll /pending
+		// No registered wallet token. The approval is still pending and the
+		// wallet can find it via /pending, but nothing will nudge it — an
+		// operator watching only the log used to see silence here.
+		log.Printf("fido2: vault-approval %s… has NO push token for %s; the wallet must open Vault approvals itself", vaultOp[:12], sub)
+		return false
 	}
 	go h.sendVaultApprovalPush(sub, pushToken, vaultOp, summary)
+	return true
 }
 
 // sendVaultApprovalPush delivers an Expo push tagged type:"vault-approval" so the
@@ -268,3 +277,11 @@ var errWalletSession = &sessionError{"invalid or expired wallet session"}
 type sessionError struct{ msg string }
 
 func (e *sessionError) Error() string { return e.msg }
+
+// walletDeepLink is the link that takes the Privasys Wallet straight to a
+// pending vault approval. It is the same destination the push notification
+// routes to, so a QR of this link is a push-free way to hand the approval from
+// a desktop to the phone that holds the credential.
+func walletDeepLink(vaultOp string) string {
+	return "privasys://vault-approvals?vault_op=" + url.QueryEscape(vaultOp)
+}

@@ -303,7 +303,7 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		// not a system passkey a browser can reach). The wallet fetches these exact
 		// options from /pending and posts the assertion to /complete.
 		optionsJS, _ := json.Marshal(options)
-		h.recordPendingAndPush(sub, vaultOp, optionsJS, vaultApprovalSummary{
+		pushRegistered := h.recordPendingAndPush(sub, vaultOp, optionsJS, vaultApprovalSummary{
 			Operation:     req.Operation,
 			Handle:        req.Handle,
 			Measurement:   req.MeasurementDigest,
@@ -320,9 +320,14 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		// created — so an operator watching the log could not tell an
 		// approval that had succeeded from one that never arrived, and
 		// mistook successful approvals for failures (2026-08-01).
-		log.Printf("fido2: vault-approval requested by %s (op %s, vault_op %s…, ttl %ds)",
-			sub, req.Operation, vaultOp[:12], ttl)
-		writeJSON(w, options)
+		log.Printf("fido2: vault-approval requested by %s (op %s, vault_op %s…, ttl %ds, push_registered=%t)",
+			sub, req.Operation, vaultOp[:12], ttl, pushRegistered)
+		// Return the WebAuthn options plus how the owner can actually approve.
+		// `publicKey` stays at the top level so existing clients (the CLI and the
+		// browser page) keep working; the extra keys are additive.
+		out := map[string]interface{}{"publicKey": options.Response, "vault_op": vaultOp,
+			"push_registered": pushRegistered, "approval_deeplink": walletDeepLink(vaultOp)}
+		writeJSON(w, out)
 	}
 }
 

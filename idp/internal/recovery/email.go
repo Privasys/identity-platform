@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,6 +23,12 @@ import (
 
 	"github.com/tyler-smith/go-bip39"
 )
+
+// mailHTTP bounds every call to Microsoft. Neither the token request nor the
+// send had a timeout, which was survivable only while the send was
+// fire-and-forget in a goroutine. It is called inline now, so an unbounded
+// call would hang the caller's request instead of just leaking a goroutine.
+var mailHTTP = &http.Client{Timeout: 20 * time.Second}
 
 // Mailer sends verification emails via Microsoft Graph API.
 type Mailer struct {
@@ -43,9 +50,17 @@ func (m *Mailer) Enabled() bool {
 // SendGuardianInvite sends an invitation email with a deep link to become a guardian.
 // userName is the inviting user's self-reported display name (from the wallet).
 func (m *Mailer) SendGuardianInvite(guardianEmail, userName, inviteToken string) error {
+	// An unconfigured mailer is a FAILURE, not a quiet success.
+	//
+	// This returned nil, so every caller believed the invitation had been sent.
+	// The IdP ran without Graph credentials for an unknown length of time and
+	// every guardian invitation in that period was discarded while the API,
+	// the wallet and the person inviting were all told it had gone.
+	//
+	// The invite token is deliberately NOT logged: it is a capability that lets
+	// whoever holds it become a guardian on the account.
 	if !m.Enabled() {
-		log.Printf("[email] Graph API not configured — would send guardian invite to %s (token: %s)", guardianEmail, inviteToken)
-		return nil
+		return errors.New("mail is not configured on this server")
 	}
 
 	deepLink := fmt.Sprintf("https://privasys.id/guardian?token=%s", inviteToken)
@@ -87,7 +102,7 @@ func (m *Mailer) getToken() (string, error) {
 		"grant_type":    {"client_credentials"},
 	}
 
-	resp, err := http.PostForm(tokenURL, data)
+	resp, err := mailHTTP.PostForm(tokenURL, data)
 	if err != nil {
 		return "", fmt.Errorf("token request: %w", err)
 	}
@@ -153,7 +168,7 @@ func (m *Mailer) send(to, subject, body string) error {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := mailHTTP.Do(req)
 	if err != nil {
 		return fmt.Errorf("send email: %w", err)
 	}

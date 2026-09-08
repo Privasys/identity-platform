@@ -390,19 +390,36 @@ func (h *Handler) HandleInviteGuardianByEmail(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Send email with deep link.
-	go func() {
-		if err := h.mailer.SendGuardianInvite(req.GuardianEmail, req.UserName, inviteToken); err != nil {
-			log.Printf("[recovery] failed to send guardian invite email: %v", err)
-		}
-	}()
+	// Sent INLINE, and the outcome reported.
+	//
+	// This used to be a goroutine that only logged, under a response that said
+	// "guardian invitation email sent" whether or not it had been. For as long
+	// as the mailer was unconfigured it also returned nil without sending
+	// anything, so the claim was false for every invitation ever issued and
+	// nobody could have known: not the inviter, not the guardian who never
+	// received it, and not us.
+	//
+	// A failed email does NOT fail the invitation. The invite token is valid
+	// either way and can be shared by hand, so the useful thing is to say which
+	// happened rather than to throw the invitation away.
+	emailSent := true
+	if err := h.mailer.SendGuardianInvite(req.GuardianEmail, req.UserName, inviteToken); err != nil {
+		log.Printf("[recovery] failed to send guardian invite email: %v", err)
+		emailSent = false
+	}
+
+	message := "guardian invitation email sent"
+	if !emailSent {
+		message = "invitation created, but the email could not be sent — share the invitation link instead"
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"status":       "invited",
 		"invite_token": inviteToken,
 		"expires_at":   expiresAt.UTC().Format(time.RFC3339),
-		"message":      "guardian invitation email sent",
+		"email_sent":   emailSent,
+		"message":      message,
 	})
 }
 

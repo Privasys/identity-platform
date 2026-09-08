@@ -280,8 +280,14 @@ func (e *sessionError) Error() string { return e.msg }
 
 // walletDeepLink is the link that takes the Privasys Wallet straight to a
 // pending vault approval. It is the same destination the push notification
-// routes to, so a QR of this link is a push-free way to hand the approval from
-// a desktop to the phone that holds the credential.
+// routes to (the wallet's /vault-approvals route, which reads vault_op), so a
+// QR of this link is a push-free way to hand the approval from a desktop to the
+// phone that holds the credential.
+//
+// The scheme must match the wallet's registered one (app.config.ts): the
+// production build is `privasys-wallet` — NOT `privasys`, which opens nothing.
+// Dev/preview builds register privasys-wallet-dev / -preview, so a QR made here
+// targets a production wallet.
 func walletDeepLink(vaultOp string) string {
-	return "privasys://vault-approvals?vault_op=" + url.QueryEscape(vaultOp)
+	return "privasys-wallet://vault-approvals?vault_op=" + url.QueryEscape(vaultOp)
 }

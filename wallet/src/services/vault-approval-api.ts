@@ -75,6 +75,32 @@ export async function fetchVaultApproval(vaultOp: string): Promise<VaultApproval
 }
 
 /**
+ * List every approval currently pending for the identity behind a wallet
+ * session. This is how the wallet finds an approval when no push arrived — a
+ * push is best-effort (it may have no registered token, or be dropped by the
+ * transport with no receipt), and until this existed a lost push meant the
+ * request was simply invisible until it expired.
+ *
+ * It leaks no new linkage: the caller proves a single session, and the IdP
+ * already knows that session's subject — the same basis on which it accepts the
+ * push-token registration. It resolves ONE identity per call, never a join
+ * across the wallet's pairwise identities.
+ */
+export async function listVaultApprovals(
+    walletSessionToken: string,
+): Promise<VaultApprovalRequest[]> {
+    const res = await fetch(`${IDP_BASE}/fido2/vault-approval/pending`, {
+        headers: { Authorization: `Bearer wallet:${walletSessionToken}` },
+    });
+    if (res.status === 401 || res.status === 404) return [];
+    if (!res.ok) {
+        throw new Error(`list vault approvals failed (${res.status}): ${await res.text()}`);
+    }
+    const data = (await res.json()) as { pending?: VaultApprovalRequest[] };
+    return data.pending ?? [];
+}
+
+/**
  * Resolve which of this device's pairwise credentials the request targets, by
  * matching the request's allowCredentials against the on-device credential
  * store. Returns undefined when this device does not hold the owner credential.

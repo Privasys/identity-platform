@@ -308,6 +308,11 @@
     "attested": "Geverifieerd in een beveiligde enclave",
     "resourceAttested": "{{service}} geverifieerd in een beveiligde enclave",
     "resourceLine": "{{permissions}} {{resource}} in je {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} de post in {{resource}}, via {{service}}",
+      "meeting.transcripts": "{{permissions}} de transcripties van je vergaderingen in {{resource}}",
+      "meeting.recording": "Opname en transcriptie inschakelen voor vergaderingen die je organiseert in {{resource}}"
+    },
     "permissionJoin": " en ",
     "permission": {
       "read": "Lezen",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "Je bestanden worden opgeslagen in je eigen opslag, onder jouw sleutels. Zonder dit blijven ze alleen voor deze sessie in de enclave en gaan ze verloren bij een herstart."
+      },
+      "mail": {
+        "mailbox": "Deze app kan de post in dit account lezen en er concepten en labels in achterlaten. Hij kan nooit een bericht versturen. Je post blijft bij je e-mailprovider; hij wordt nergens anders naartoe gekopieerd."
+      },
+      "calendar": {
+        "events": "Deze app kan de afspraken in deze agenda zien en alleen die toevoegen of wijzigen waar je om vraagt. Je agenda blijft bij je provider; hij wordt nergens anders naartoe gekopieerd."
+      },
+      "meeting": {
+        "transcripts": "Deze app kan de transcripties lezen van vergaderingen waaraan je hebt deelgenomen, vanuit je eigen account. Hij neemt nooit deel aan een vergadering en neemt er nooit een op.",
+        "recording": "Deze app kan de opname en transcriptie van je eigen provider inschakelen voor vergaderingen die jij organiseert. De provider vertelt dat aan iedereen in de vergadering, op de gebruikelijke manier. Zonder dit krijgen alleen vergaderingen die je al opneemt een transcriptie."
       }
     },
     "approve": "Goedkeuren",

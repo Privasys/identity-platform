@@ -308,6 +308,11 @@
     "attested": "Verificato in un enclave sicuro",
     "resourceAttested": "{{service}} verificato in un enclave sicuro",
     "resourceLine": "{{permissions}} {{resource}} nel tuo {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} la posta in {{resource}}, tramite {{service}}",
+      "meeting.transcripts": "{{permissions}} le trascrizioni delle tue riunioni in {{resource}}",
+      "meeting.recording": "Attivare registrazione e trascrizione per le riunioni che organizzi in {{resource}}"
+    },
     "permissionJoin": " e ",
     "permission": {
       "read": "Leggere",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "I tuoi file saranno salvati nel tuo spazio di archiviazione, sotto le tue chiavi. Senza questo restano nell'enclave solo per questa sessione e vanno persi al riavvio."
+      },
+      "mail": {
+        "mailbox": "Questa app può leggere la posta di questo account e lasciarci bozze ed etichette. Non può mai inviare un messaggio. La tua posta resta presso il tuo provider di posta; non viene copiata da nessun'altra parte."
+      },
+      "calendar": {
+        "events": "Questa app può vedere gli eventi di questo calendario e aggiungere o modificare solo quelli che le chiedi. Il tuo calendario resta presso il tuo provider; non viene copiato da nessun'altra parte."
+      },
+      "meeting": {
+        "transcripts": "Questa app può leggere le trascrizioni delle riunioni a cui hai partecipato, dal tuo account. Non entra mai in una riunione e non ne registra mai una.",
+        "recording": "Questa app può attivare la registrazione e la trascrizione del tuo provider per le riunioni che organizzi. Il provider lo comunica a tutti i partecipanti, nel modo consueto. Senza questo, avranno una trascrizione solo le riunioni che già registri."
       }
     },
     "approve": "Approva",

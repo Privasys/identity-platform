@@ -341,6 +341,11 @@
     "attested": "Patikrinta saugiame anklave",
     "resourceAttested": "{{service}} patikrinta saugiame anklave",
     "resourceLine": "{{permissions}} {{resource}} jūsų {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} paštą {{resource}} per {{service}}",
+      "meeting.transcripts": "{{permissions}} jūsų susitikimų transkripcijas {{resource}}",
+      "meeting.recording": "Įjungti įrašymą ir transkripciją susitikimuose, kuriuos rengiate {{resource}}"
+    },
     "permissionJoin": " ir ",
     "permission": {
       "read": "Skaityti",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Jūsų failai bus išsaugoti jūsų pačių saugykloje, po jūsų raktais. Be to jie lieka anklave tik šiai sesijai ir prarandami po perkrovimo."
+      },
+      "mail": {
+        "mailbox": "Ši programa gali skaityti šios paskyros paštą ir palikti joje juodraščius bei žymas. Ji niekada negali išsiųsti žinutės. Jūsų paštas lieka pas jūsų pašto teikėją; niekur kitur jis nekopijuojamas."
+      },
+      "calendar": {
+        "events": "Ši programa gali matyti šio kalendoriaus įvykius ir pridėti ar keisti tik tuos, kurių paprašote. Jūsų kalendorius lieka pas jūsų teikėją; niekur kitur jis nekopijuojamas."
+      },
+      "meeting": {
+        "transcripts": "Ši programa gali skaityti susitikimų, kuriuose dalyvavote, transkripcijas iš jūsų pačių paskyros. Ji niekada neprisijungia prie susitikimo ir niekada jo neįrašo.",
+        "recording": "Ši programa gali įjungti jūsų teikėjo įrašymą ir transkripciją susitikimuose, kuriuos rengiate. Teikėjas apie tai praneša visiems dalyviams įprastu būdu. Be to transkripciją turės tik tie susitikimai, kuriuos jau įrašote."
       }
     },
     "approve": "Patvirtinti",

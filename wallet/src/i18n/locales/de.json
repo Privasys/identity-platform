@@ -308,6 +308,11 @@
     "attested": "In einer sicheren Enklave geprüft",
     "resourceAttested": "{{service}} in einer sicheren Enklave geprüft",
     "resourceLine": "{{permissions}} {{resource}} in Ihrem {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} die E-Mails in {{resource}}, über {{service}}",
+      "meeting.transcripts": "{{permissions}} die Transkripte Ihrer Besprechungen in {{resource}}",
+      "meeting.recording": "Aufzeichnung und Transkription für Besprechungen einschalten, die Sie in {{resource}} leiten"
+    },
     "permissionJoin": " und ",
     "permission": {
       "read": "Lesen",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "Ihre Dateien werden in Ihrem eigenen Speicher unter Ihren Schlüsseln gesichert. Ohne dies bleiben sie nur für diese Sitzung in der Enklave und gehen beim Neustart verloren."
+      },
+      "mail": {
+        "mailbox": "Diese App kann die E-Mails in diesem Konto lesen und darin Entwürfe und Labels hinterlassen. Sie kann niemals eine Nachricht senden. Ihre E-Mails bleiben bei Ihrem E-Mail-Anbieter; sie werden nirgendwo anders hin kopiert."
+      },
+      "calendar": {
+        "events": "Diese App kann die Termine in diesem Kalender sehen und nur die hinzufügen oder ändern, um die Sie sie bitten. Ihr Kalender bleibt bei Ihrem Anbieter; er wird nirgendwo anders hin kopiert."
+      },
+      "meeting": {
+        "transcripts": "Diese App kann die Transkripte von Besprechungen lesen, an denen Sie teilgenommen haben, aus Ihrem eigenen Konto. Sie nimmt nie an einer Besprechung teil und zeichnet nie eine auf.",
+        "recording": "Diese App kann die Aufzeichnung und Transkription Ihres Anbieters für Besprechungen einschalten, die Sie leiten. Der Anbieter teilt dies allen Teilnehmenden auf die übliche Weise mit. Ohne dies erhalten nur Besprechungen ein Transkript, die Sie bereits aufzeichnen."
       }
     },
     "approve": "Genehmigen",

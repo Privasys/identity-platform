@@ -308,6 +308,11 @@
     "attested": "Varmennettu turvallisessa enklaavissa",
     "resourceAttested": "{{service}} varmennettu turvallisessa enklaavissa",
     "resourceLine": "{{permissions}} {{resource}} omassa {{service}}-palvelussasi",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} postia tilillä {{resource}} palvelun {{service}} kautta",
+      "meeting.transcripts": "{{permissions}} kokoustesi tekstityksiä tilillä {{resource}}",
+      "meeting.recording": "Ottaa käyttöön tallennus ja tekstitys kokouksissa, jotka järjestät tilillä {{resource}}"
+    },
     "permissionJoin": " ja ",
     "permission": {
       "read": "Lukea",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "Tiedostosi tallennetaan omaan tallennustilaasi omilla avaimillasi. Ilman tätä ne pysyvät enklaavissa vain tämän istunnon ajan ja katoavat uudelleenkäynnistyksessä."
+      },
+      "mail": {
+        "mailbox": "Tämä sovellus voi lukea tämän tilin postia ja jättää siihen luonnoksia ja tunnisteita. Se ei voi koskaan lähettää viestiä. Postisi pysyy sähköpostipalvelusi hallussa; sitä ei kopioida muualle."
+      },
+      "calendar": {
+        "events": "Tämä sovellus näkee tämän kalenterin tapahtumat ja voi lisätä tai muuttaa vain niitä, joita pyydät. Kalenterisi pysyy palveluntarjoajasi hallussa; sitä ei kopioida muualle."
+      },
+      "meeting": {
+        "transcripts": "Tämä sovellus voi lukea niiden kokousten tekstitykset, joihin osallistuit, omalta tililtäsi. Se ei koskaan liity kokoukseen eikä tallenna sitä.",
+        "recording": "Tämä sovellus voi ottaa käyttöön palveluntarjoajasi oman tallennuksen ja tekstityksen kokouksissa, jotka järjestät. Palveluntarjoaja kertoo siitä kaikille kokouksessa tavalliseen tapaan. Ilman tätä vain jo tallentamillasi kokouksilla on tekstitys."
       }
     },
     "approve": "Hyväksy",

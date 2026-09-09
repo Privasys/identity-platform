@@ -308,6 +308,11 @@
     "attested": "Ellenőrizve egy biztonságos enklávéban",
     "resourceAttested": "{{service}} ellenőrizve egy biztonságos enklávéban",
     "resourceLine": "{{permissions}} {{resource}} az Ön {{service}} szolgáltatásában",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} a leveleket itt: {{resource}}, a(z) {{service}} szolgáltatáson keresztül",
+      "meeting.transcripts": "{{permissions}} a megbeszélései átiratait itt: {{resource}}",
+      "meeting.recording": "Rögzítés és átiratkészítés bekapcsolása az Ön által szervezett megbeszélésekhez itt: {{resource}}"
+    },
     "permissionJoin": " és ",
     "permission": {
       "read": "Olvasás",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "A fájljai a saját tárhelyén, az Ön kulcsai alatt lesznek elmentve. Enélkül csak ehhez a munkamenethez maradnak az enklávéban, és újraindításkor elvesznek."
+      },
+      "mail": {
+        "mailbox": "Ez az alkalmazás elolvashatja a fiókban lévő leveleket, és piszkozatokat és címkéket hagyhat benne. Üzenetet soha nem küldhet. A levelei a levelezési szolgáltatójánál maradnak; sehová máshová nem másolódnak."
+      },
+      "calendar": {
+        "events": "Ez az alkalmazás láthatja a naptár eseményeit, és csak azokat adhatja hozzá vagy módosíthatja, amelyeket Ön kér. A naptára a szolgáltatójánál marad; sehová máshová nem másolódik."
+      },
+      "meeting": {
+        "transcripts": "Ez az alkalmazás elolvashatja azoknak a megbeszéléseknek az átiratát, amelyeken Ön részt vett, az Ön saját fiókjából. Soha nem csatlakozik megbeszéléshez, és soha nem rögzít egyet sem.",
+        "recording": "Ez az alkalmazás bekapcsolhatja a szolgáltatója saját rögzítését és átiratkészítését az Ön által szervezett megbeszéléseken. A szolgáltató a szokásos módon értesíti erről a megbeszélés minden résztvevőjét. Enélkül csak azoknak a megbeszéléseknek lesz átirata, amelyeket már rögzít."
       }
     },
     "approve": "Jóváhagyás",

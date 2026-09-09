@@ -308,6 +308,11 @@
     "attested": "Bekræftet i en sikker enklave",
     "resourceAttested": "{{service}} bekræftet i en sikker enklave",
     "resourceLine": "{{permissions}} {{resource}} i dit {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} posten i {{resource}} via {{service}}",
+      "meeting.transcripts": "{{permissions}} udskrifterne af dine møder i {{resource}}",
+      "meeting.recording": "Slå optagelse og transskription til for møder, du er vært for i {{resource}}"
+    },
     "permissionJoin": " og ",
     "permission": {
       "read": "Læse",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "Dine filer gemmes i dit eget lager under dine nøgler. Uden dette bliver de kun i enklaven i denne session og går tabt ved genstart."
+      },
+      "mail": {
+        "mailbox": "Denne app kan læse posten i denne konto og efterlade kladder og etiketter i den. Den kan aldrig sende en besked. Din post bliver hos din e-mailudbyder; den kopieres ikke andre steder hen."
+      },
+      "calendar": {
+        "events": "Denne app kan se begivenhederne i denne kalender og kun tilføje eller ændre dem, du beder om. Din kalender bliver hos din udbyder; den kopieres ikke andre steder hen."
+      },
+      "meeting": {
+        "transcripts": "Denne app kan læse udskrifter af møder, du har deltaget i, fra din egen konto. Den deltager aldrig i et møde og optager aldrig et.",
+        "recording": "Denne app kan slå din udbyders egen optagelse og transskription til for møder, du er vært for. Udbyderen fortæller alle i mødet det på sædvanlig vis. Uden dette får kun møder, du allerede optager, en udskrift."
       }
     },
     "approve": "Godkend",

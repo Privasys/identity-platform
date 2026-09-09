@@ -341,6 +341,11 @@
     "attested": "Pārbaudīts drošā anklāvā",
     "resourceAttested": "{{service}} pārbaudīta drošā anklāvā",
     "resourceLine": "{{permissions}} {{resource}} jūsu {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} pastu kontā {{resource}}, izmantojot {{service}}",
+      "meeting.transcripts": "{{permissions}} jūsu sanāksmju atšifrējumus kontā {{resource}}",
+      "meeting.recording": "Ieslēgt ierakstu un atšifrējumu sanāksmēm, kuras vadāt kontā {{resource}}"
+    },
     "permissionJoin": " un ",
     "permission": {
       "read": "Lasīt",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Jūsu faili tiks saglabāti jūsu pašu krātuvē, ar jūsu atslēgām. Bez tā tie paliek anklāvā tikai šai sesijai un tiek zaudēti, kad tas tiek restartēts."
+      },
+      "mail": {
+        "mailbox": "Šī lietotne var lasīt pastu šajā kontā un atstāt tajā melnrakstus un birkas. Tā nekad nevar nosūtīt ziņu. Jūsu pasts paliek pie jūsu pasta pakalpojuma sniedzēja; tas netiek kopēts nekur citur."
+      },
+      "calendar": {
+        "events": "Šī lietotne var redzēt šī kalendāra notikumus un pievienot vai mainīt tikai tos, ko jūs lūdzat. Jūsu kalendārs paliek pie jūsu pakalpojuma sniedzēja; tas netiek kopēts nekur citur."
+      },
+      "meeting": {
+        "transcripts": "Šī lietotne var lasīt to sanāksmju atšifrējumus, kurās jūs piedalījāties, no jūsu pašu konta. Tā nekad nepievienojas sanāksmei un nekad to neieraksta.",
+        "recording": "Šī lietotne var ieslēgt jūsu pakalpojuma sniedzēja ierakstu un atšifrējumu sanāksmēm, kuras jūs vadāt. Pakalpojuma sniedzējs par to paziņo visiem sanāksmes dalībniekiem ierastajā veidā. Bez tā atšifrējums būs tikai tām sanāksmēm, kuras jūs jau ierakstāt."
       }
     },
     "approve": "Apstiprināt",

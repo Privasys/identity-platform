@@ -341,6 +341,11 @@
     "attested": "Overené v zabezpečenom enkláve",
     "resourceAttested": "{{service}} overená v zabezpečenom enkláve",
     "resourceLine": "{{permissions}} {{resource}} vo vašom {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} poštu v {{resource}} prostredníctvom {{service}}",
+      "meeting.transcripts": "{{permissions}} prepisy vašich stretnutí v {{resource}}",
+      "meeting.recording": "Zapnúť nahrávanie a prepis pri stretnutiach, ktoré organizujete v {{resource}}"
+    },
     "permissionJoin": " a ",
     "permission": {
       "read": "Čítať",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Vaše súbory sa uložia do vášho vlastného úložiska pod vašimi kľúčmi. Bez toho zostanú v enkláve len počas tejto relácie a pri reštarte sa stratia."
+      },
+      "mail": {
+        "mailbox": "Táto aplikácia môže čítať poštu v tomto účte a zanechávať v ňom koncepty a štítky. Nikdy nemôže odoslať správu. Vaša pošta zostáva u vášho poskytovateľa pošty; nikam inam sa nekopíruje."
+      },
+      "calendar": {
+        "events": "Táto aplikácia môže vidieť udalosti v tomto kalendári a pridávať alebo meniť len tie, o ktoré ju požiadate. Váš kalendár zostáva u vášho poskytovateľa; nikam inam sa nekopíruje."
+      },
+      "meeting": {
+        "transcripts": "Táto aplikácia môže čítať prepisy stretnutí, na ktorých ste sa zúčastnili, z vášho vlastného účtu. Nikdy sa k stretnutiu nepripája a nikdy ho nenahráva.",
+        "recording": "Táto aplikácia môže zapnúť vlastné nahrávanie a prepis vášho poskytovateľa pri stretnutiach, ktoré organizujete. Poskytovateľ to oznámi všetkým na stretnutí obvyklým spôsobom. Bez toho budú mať prepis len stretnutia, ktoré už nahrávate."
       }
     },
     "approve": "Schváliť",

@@ -341,6 +341,11 @@
     "attested": "Fíoraithe in iamhchríoch shlán",
     "resourceAttested": "{{service}} fíoraithe in iamhchríoch shlán",
     "resourceLine": "{{permissions}} {{resource}} i do {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} an post i {{resource}}, trí {{service}}",
+      "meeting.transcripts": "{{permissions}} tras-scríbhinní do chruinnithe i {{resource}}",
+      "meeting.recording": "Taifeadadh agus tras-scríobh a chur ar siúl do chruinnithe a eagraíonn tú i {{resource}}"
+    },
     "permissionJoin": " agus ",
     "permission": {
       "read": "Léamh",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Sábhálfar do chomhaid i do stóras féin, faoi do chuid eochracha. Gan é seo fanann siad san iamhchríoch don seisiún seo amháin, agus cailltear iad nuair a atosaítear é."
+      },
+      "mail": {
+        "mailbox": "Is féidir leis an aip seo an post sa chuntas seo a léamh agus dréachtaí agus lipéid a fhágáil ann. Ní féidir léi teachtaireacht a sheoladh riamh. Fanann do phost le do sholáthraí poist; ní chóipeáiltear áit ar bith eile é."
+      },
+      "calendar": {
+        "events": "Is féidir leis an aip seo na himeachtaí san fhéilire seo a fheiceáil, agus gan ach na cinn a iarrann tú uirthi a chur leis nó a athrú. Fanann d'fhéilire le do sholáthraí; ní chóipeáiltear áit ar bith eile é."
+      },
+      "meeting": {
+        "transcripts": "Is féidir leis an aip seo tras-scríbhinní cruinnithe a raibh tú páirteach iontu a léamh, ó do chuntas féin. Ní thagann sí isteach i gcruinniú riamh agus ní thaifeadann sí ceann riamh.",
+        "recording": "Is féidir leis an aip seo taifeadadh agus tras-scríobh do sholáthraí féin a chur ar siúl do chruinnithe a eagraíonn tú. Insíonn an soláthraí do gach duine sa chruinniú é, ar an ngnáthbhealach. Gan é seo, ní bheidh tras-scríbhinn ach ag cruinnithe a thaifeadann tú cheana."
       }
     },
     "approve": "Ceadaigh",

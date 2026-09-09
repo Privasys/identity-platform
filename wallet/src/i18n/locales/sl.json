@@ -341,6 +341,11 @@
     "attested": "Preverjeno v varni enklavi",
     "resourceAttested": "{{service}} preverjena v varni enklavi",
     "resourceLine": "{{permissions}} {{resource}} v vašem {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} pošto v {{resource}} prek {{service}}",
+      "meeting.transcripts": "{{permissions}} prepise vaših sestankov v {{resource}}",
+      "meeting.recording": "Vklopiti snemanje in prepis za sestanke, ki jih vodite v {{resource}}"
+    },
     "permissionJoin": " in ",
     "permission": {
       "read": "Branje",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Vaše datoteke bodo shranjene v vaši lastni shrambi, pod vašimi ključi. Brez tega ostanejo v enklavi samo za to sejo in se ob ponovnem zagonu izgubijo."
+      },
+      "mail": {
+        "mailbox": "Ta aplikacija lahko bere pošto v tem računu in vanj pušča osnutke in oznake. Nikoli ne more poslati sporočila. Vaša pošta ostane pri vašem ponudniku pošte; nikamor drugam se ne kopira."
+      },
+      "calendar": {
+        "events": "Ta aplikacija lahko vidi dogodke v tem koledarju ter doda ali spremeni samo tiste, za katere jo prosite. Vaš koledar ostane pri vašem ponudniku; nikamor drugam se ne kopira."
+      },
+      "meeting": {
+        "transcripts": "Ta aplikacija lahko bere prepise sestankov, ki ste se jih udeležili, iz vašega lastnega računa. Nikoli se ne pridruži sestanku in ga nikoli ne snema.",
+        "recording": "Ta aplikacija lahko vklopi snemanje in prepis vašega ponudnika za sestanke, ki jih vodite. Ponudnik o tem obvesti vse na sestanku, na običajen način. Brez tega bodo prepis imeli samo sestanki, ki jih že snemate."
       }
     },
     "approve": "Odobri",

@@ -308,6 +308,11 @@
     "attested": "Verificado en un enclave seguro",
     "resourceAttested": "{{service}} verificado en un enclave seguro",
     "resourceLine": "{{permissions}} {{resource}} en tu {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} el correo de {{resource}}, a través de {{service}}",
+      "meeting.transcripts": "{{permissions}} las transcripciones de tus reuniones en {{resource}}",
+      "meeting.recording": "Activar la grabación y la transcripción de las reuniones que organizas en {{resource}}"
+    },
     "permissionJoin": " y ",
     "permission": {
       "read": "Leer",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "Tus archivos se guardarán en tu propio almacenamiento, bajo tus claves. Sin esto, permanecen dentro del enclave solo durante esta sesión y se pierden al reiniciarse."
+      },
+      "mail": {
+        "mailbox": "Esta aplicación puede leer el correo de esta cuenta y dejar borradores y etiquetas en ella. Nunca puede enviar un mensaje. Tu correo se queda en tu proveedor de correo; no se copia a ningún otro sitio."
+      },
+      "calendar": {
+        "events": "Esta aplicación puede ver los eventos de este calendario y añadir o cambiar solo los que le pidas. Tu calendario se queda en tu proveedor; no se copia a ningún otro sitio."
+      },
+      "meeting": {
+        "transcripts": "Esta aplicación puede leer las transcripciones de reuniones en las que participaste, desde tu propia cuenta. Nunca se une a una reunión ni graba ninguna.",
+        "recording": "Esta aplicación puede activar la grabación y la transcripción de tu propio proveedor para las reuniones que organizas. El proveedor avisa a todos los asistentes, como de costumbre. Sin esto, solo tendrán transcripción las reuniones que ya grabas."
       }
     },
     "approve": "Aprobar",

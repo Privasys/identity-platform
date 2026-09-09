@@ -341,6 +341,11 @@
     "attested": "Wedi ei wirio mewn cwt diogel",
     "resourceAttested": "{{service}} wedi ei wirio mewn cwt diogel",
     "resourceLine": "{{permissions}} {{resource}} yn eich {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} y post yn {{resource}}, drwy {{service}}",
+      "meeting.transcripts": "{{permissions}} trawsgrifiadau eich cyfarfodydd yn {{resource}}",
+      "meeting.recording": "Troi recordio a thrawsgrifio ymlaen ar gyfer cyfarfodydd rydych chi'n eu cynnal yn {{resource}}"
+    },
     "permissionJoin": " a ",
     "permission": {
       "read": "Darllen",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Bydd eich ffeiliau'n cael eu cadw yn eich storfa eich hun, o dan eich allweddi. Hebddo, maen nhw'n aros yn y cwt ar gyfer y sesiwn hon yn unig, ac yn cael eu colli pan fydd yn ailgychwyn."
+      },
+      "mail": {
+        "mailbox": "Gall yr ap hwn ddarllen y post yn y cyfrif hwn a gadael drafftiau a labeli ynddo. Ni all byth anfon neges. Mae eich post yn aros gyda darparwr eich post; nid yw'n cael ei gopïo i unman arall."
+      },
+      "calendar": {
+        "events": "Gall yr ap hwn weld y digwyddiadau yn y calendr hwn, ac ychwanegu neu newid dim ond y rhai rydych chi'n gofyn amdanynt. Mae eich calendr yn aros gyda'ch darparwr; nid yw'n cael ei gopïo i unman arall."
+      },
+      "meeting": {
+        "transcripts": "Gall yr ap hwn ddarllen trawsgrifiadau cyfarfodydd y buoch chi'n rhan ohonynt, o'ch cyfrif eich hun. Nid yw byth yn ymuno â chyfarfod ac nid yw byth yn recordio un.",
+        "recording": "Gall yr ap hwn droi recordio a thrawsgrifio eich darparwr ei hun ymlaen ar gyfer cyfarfodydd rydych chi'n eu cynnal. Mae'r darparwr yn dweud wrth bawb yn y cyfarfod, yn y ffordd arferol. Hebddo, dim ond cyfarfodydd rydych chi eisoes yn eu recordio fydd â thrawsgrifiad."
       }
     },
     "approve": "Cymeradwyo",

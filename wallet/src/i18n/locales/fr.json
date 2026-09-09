@@ -308,6 +308,11 @@
     "attested": "Vérifié dans une enclave sécurisée",
     "resourceAttested": "{{service}} vérifié dans une enclave sécurisée",
     "resourceLine": "{{permissions}} {{resource}} dans votre {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} le courrier de {{resource}}, via {{service}}",
+      "meeting.transcripts": "{{permissions}} les transcriptions de vos réunions dans {{resource}}",
+      "meeting.recording": "Activer l'enregistrement et la transcription des réunions que vous organisez dans {{resource}}"
+    },
     "permissionJoin": " et ",
     "permission": {
       "read": "Lire",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "Vos fichiers seront enregistrés dans votre propre espace de stockage, sous vos clés. Sans cela, ils restent dans l'enclave le temps de cette session seulement et sont perdus au redémarrage."
+      },
+      "mail": {
+        "mailbox": "Cette application peut lire le courrier de ce compte et y laisser des brouillons et des libellés. Elle ne peut jamais envoyer de message. Votre courrier reste chez votre fournisseur de messagerie ; il n'est copié nulle part ailleurs."
+      },
+      "calendar": {
+        "events": "Cette application peut voir les événements de cet agenda et n'ajouter ou ne modifier que ceux que vous lui demandez. Votre agenda reste chez votre fournisseur ; il n'est copié nulle part ailleurs."
+      },
+      "meeting": {
+        "transcripts": "Cette application peut lire les transcriptions des réunions auxquelles vous avez participé, depuis votre propre compte. Elle ne rejoint jamais une réunion et n'en enregistre jamais aucune.",
+        "recording": "Cette application peut activer l'enregistrement et la transcription de votre propre fournisseur pour les réunions que vous organisez. Le fournisseur en informe tous les participants, comme à l'habitude. Sans cela, seules les réunions que vous enregistrez déjà auront une transcription."
       }
     },
     "approve": "Approuver",

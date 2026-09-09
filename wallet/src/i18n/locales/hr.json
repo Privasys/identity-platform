@@ -341,6 +341,11 @@
     "attested": "Provjereno u sigurnoj enklavi",
     "resourceAttested": "{{service}} provjerena u sigurnoj enklavi",
     "resourceLine": "{{permissions}} {{resource}} u vašem {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} poštu u {{resource}}, putem {{service}}",
+      "meeting.transcripts": "{{permissions}} transkripte vaših sastanaka u {{resource}}",
+      "meeting.recording": "Uključiti snimanje i transkripciju za sastanke koje vodite u {{resource}}"
+    },
     "permissionJoin": " i ",
     "permission": {
       "read": "Čitati",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Vaše datoteke bit će spremljene u vašu vlastitu pohranu, pod vašim ključevima. Bez toga ostaju u enklavi samo za ovu sesiju i gube se pri ponovnom pokretanju."
+      },
+      "mail": {
+        "mailbox": "Ova aplikacija može čitati poštu na ovom računu i ostavljati u njemu skice i oznake. Nikada ne može poslati poruku. Vaša pošta ostaje kod vašeg pružatelja pošte; ne kopira se nigdje drugdje."
+      },
+      "calendar": {
+        "events": "Ova aplikacija može vidjeti događaje u ovom kalendaru te dodavati ili mijenjati samo one koje zatražite. Vaš kalendar ostaje kod vašeg pružatelja; ne kopira se nigdje drugdje."
+      },
+      "meeting": {
+        "transcripts": "Ova aplikacija može čitati transkripte sastanaka na kojima ste sudjelovali, s vašeg vlastitog računa. Nikada se ne pridružuje sastanku i nikada ga ne snima.",
+        "recording": "Ova aplikacija može uključiti snimanje i transkripciju vašeg pružatelja za sastanke koje vodite. Pružatelj o tome obavještava sve na sastanku, na uobičajen način. Bez toga transkript će imati samo sastanci koje već snimate."
       }
     },
     "approve": "Odobri",

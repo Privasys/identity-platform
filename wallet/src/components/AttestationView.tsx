@@ -147,6 +147,7 @@ export function AttestationView({
     releases,
     dependencies,
     attributes,
+    spend,
     onApprove,
     onReject,
     onChallenge,
@@ -193,6 +194,24 @@ export function AttestationView({
         items: AttributeRow[];
         selected: Set<string>;
         onToggle: (key: string) => void;
+    };
+    /**
+     * Spend consent (acting-subject plan v2): the app asked to spend the
+     * holder's platform credits on their behalf (inference, priced tools)
+     * under a monthly cap. One switch and a cap; approving the screen
+     * records it with the identity provider. The services the app calls are
+     * deliberately not enumerated: the cap bounds all of them.
+     */
+    spend?: {
+        appLabel: string;
+        enabled: boolean;
+        /** Monthly cap in credits (0 = no cap). */
+        cap: number;
+        /** The cap rendered for display ("£5.00 / month"). */
+        capLabel: string;
+        onToggle: () => void;
+        /** Step the cap by one unit (+1 / -1 pound). */
+        onStep: (direction: 1 | -1) => void;
     };
     onApprove: () => void;
     onReject: () => void;
@@ -530,6 +549,71 @@ export function AttestationView({
                             </View>
                         </View>
                         <Text style={styles.sectionFootnote}>{t('attestation.dataRemember')}</Text>
+                    </>
+                )}
+
+                {/* ── Spending your credits ──────────────────────────────── */}
+                {spend && (
+                    <>
+                        <Text style={styles.sectionHeader}>{t('attestation.spendHeader')}</Text>
+                        <Text style={styles.sectionNote}>
+                            {t('attestation.spendNote', { app: spend.appLabel })}
+                        </Text>
+                        <View style={styles.card}>
+                            <View style={styles.cardBody}>
+                                <Pressable
+                                    onPress={spend.onToggle}
+                                    accessibilityRole="checkbox"
+                                    accessibilityState={{ checked: spend.enabled }}
+                                    accessibilityLabel={t('attestation.spendAllow', { app: spend.appLabel })}
+                                    style={styles.attrRow}
+                                >
+                                    <Ionicons
+                                        name={spend.enabled ? 'checkbox' : 'square-outline'}
+                                        size={18}
+                                        color={spend.enabled ? p.action : p.textMuted}
+                                    />
+                                    <View style={styles.attrLabelWrap}>
+                                        <Text
+                                            style={[styles.attrLabel, !spend.enabled && styles.attrLabelOff]}
+                                            numberOfLines={2}
+                                        >
+                                            {t('attestation.spendAllow', { app: spend.appLabel })}
+                                        </Text>
+                                    </View>
+                                </Pressable>
+                                <View style={[styles.attrRow, styles.rowLast, !spend.enabled && { opacity: 0.45 }]}>
+                                    <Ionicons name="wallet-outline" size={18} color={p.textMuted} />
+                                    <View style={styles.attrLabelWrap}>
+                                        <Text style={styles.attrLabel} numberOfLines={1}>
+                                            {t('attestation.spendCap')}
+                                        </Text>
+                                    </View>
+                                    <Pressable
+                                        onPress={() => spend.enabled && spend.onStep(-1)}
+                                        disabled={!spend.enabled}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={t('attestation.spendCapLower')}
+                                        hitSlop={8}
+                                    >
+                                        <Ionicons name="remove-circle-outline" size={20} color={p.action} />
+                                    </Pressable>
+                                    <Text style={[styles.attrValue, { minWidth: 96, textAlign: 'center' }]} numberOfLines={1}>
+                                        {spend.capLabel}
+                                    </Text>
+                                    <Pressable
+                                        onPress={() => spend.enabled && spend.onStep(1)}
+                                        disabled={!spend.enabled}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={t('attestation.spendCapRaise')}
+                                        hitSlop={8}
+                                    >
+                                        <Ionicons name="add-circle-outline" size={20} color={p.action} />
+                                    </Pressable>
+                                </View>
+                            </View>
+                        </View>
+                        <Text style={styles.sectionFootnote}>{t('attestation.spendFootnote')}</Text>
                     </>
                 )}
 

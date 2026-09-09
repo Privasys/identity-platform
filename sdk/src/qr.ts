@@ -86,6 +86,10 @@ export interface QRDescriptor {
     extraAppHosts?: string[];
     /** Per-session replay nonce (base64url). Falls back to sessionId. */
     nonce?: string;
+    /** Ask the wallet, at sign-in, to let this app spend the user's credits
+     *  under a monthly cap (credits). The wallet shows the consent row and
+     *  records the answer with the identity provider. */
+    spend?: { cap?: number };
     /** OIDC client_id of the relying party. The wallet uses it to anchor
      *  the EncAuth silent-rebind voucher on the same IdP session row
      *  (`sid`) the issued JWT will carry. */
@@ -187,6 +191,10 @@ export function generateQRPayload(opts: {
     appHost?: string;
     extraAppHosts?: string[];
     nonce?: string;
+    /** Ask the wallet, at sign-in, to let this app spend the user's credits
+     *  under a monthly cap (credits). The wallet shows the consent row and
+     *  records the answer with the identity provider. */
+    spend?: { cap?: number };
     clientId?: string;
     /** Override for the relay base URL (defaults to `brokerUrl`'s host). */
     relayBase?: string;
@@ -226,6 +234,7 @@ export function generateQRPayload(opts: {
         desc.appHost = opts.appHost;
         if (opts.extraAppHosts?.length) desc.extraAppHosts = opts.extraAppHosts;
         if (opts.nonce) desc.nonce = opts.nonce;
+        if (opts.spend) desc.spend = { ...(opts.spend.cap != null ? { cap: opts.spend.cap } : {}) };
     }
 
     const json = JSON.stringify(desc);

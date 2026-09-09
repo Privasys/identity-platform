@@ -37,8 +37,10 @@ import {
     deliverCapabilityOutcome,
     expiryFor,
     fetchPendingCapability,
+    isStaleTenantKey,
     type PendingCapability,
 } from '@/services/capabilities';
+import { rearmTenantKeyAt } from '@/services/drive';
 import { appIdFromOids } from '@/services/release-provenance';
 import { useCapabilitiesStore } from '@/stores/capabilities';
 
@@ -152,12 +154,35 @@ export default function CapabilityRequestScreen() {
         setPhase('working');
         try {
             const expiresUnix = expiryFor(pending.capability.kind);
-            const granted = await createCapability({
-                resourceHost: resource.hostname,
-                subjectAppId: requesterAppId,
-                pending,
-                expiresUnix,
-            });
+            const mint = () =>
+                createCapability({
+                    resourceHost: resource.hostname,
+                    subjectAppId: requesterAppId,
+                    pending,
+                    expiresUnix,
+                });
+            let granted;
+            try {
+                granted = await mint();
+            } catch (e) {
+                // The resource service was upgraded and this holder has not
+                // yet approved its new measurement for their own vault key.
+                // That approval is what a Drive login does; the holder is
+                // right here, so do it now and mint once more, instead of
+                // showing them a vault error they can only fix by signing
+                // in to Drive again.
+                if (!isStaleTenantKey(e) || !resource.app_id) throw e;
+                console.warn(
+                    `[CAPABILITY] ${resource.hostname} reports a stale tenant key (${e.message}); approving its measurement and retrying`,
+                );
+                const key = await rearmTenantKeyAt({
+                    host: resource.hostname,
+                    appId: resource.app_id,
+                    appHost,
+                });
+                console.log(`[CAPABILITY] tenant key ${key.status} on ${resource.hostname}`);
+                granted = await mint();
+            }
             await deliverCapabilityOutcome({ appHost, nonce, status: 'approved', granted });
 
             useCapabilitiesStore.getState().record({
@@ -175,7 +200,13 @@ export default function CapabilityRequestScreen() {
             });
             setPhase('done');
         } catch (e) {
-            // Visibly failed. The app must not be told it succeeded.
+            // Visibly failed. The app must not be told it succeeded. Logged
+            // too: the alert is the only place this used to appear, and a
+            // holder's exported log then said nothing about why the grant
+            // was refused.
+            console.warn(
+                `[CAPABILITY] approval failed for ${requesterAppId} on ${resource.hostname}: ${e instanceof Error ? e.message : String(e)}`,
+            );
             setPhase('ready');
             Alert.alert(
                 t('capability.failedTitle'),

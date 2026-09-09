@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -357,5 +358,70 @@ func HandleSetBilling(reg *Registry, adminToken string) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(client)
+	}
+}
+
+// SpendJWKS returns the spend-key JWKS URI a non-enclave relying party
+// registered (see HandleSetSpendJWKS), with its display name. ok is false
+// when the client is unknown or publishes none. Platform apps never use
+// this path: their keys are fetched from the enclave origin.
+func (reg *Registry) SpendJWKS(clientID string) (uri, name string, ok bool) {
+	err := reg.db.QueryRow(
+		"SELECT spend_jwks_uri, client_name FROM clients WHERE client_id = ?", clientID,
+	).Scan(&uri, &name)
+	if err != nil || uri == "" {
+		return "", "", false
+	}
+	return uri, name, true
+}
+
+// SetSpendJWKS records where a non-enclave relying party publishes its
+// spend keys. An empty URI clears it.
+func (reg *Registry) SetSpendJWKS(clientID, uri string) error {
+	res, err := reg.db.Exec("UPDATE clients SET spend_jwks_uri = ? WHERE client_id = ?", uri, clientID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("client not found")
+	}
+	return nil
+}
+
+// HandleSetSpendJWKS handles POST /clients/{id}/spend — operator-gated like
+// the other client mutations:
+//
+//	{"jwks_uri": "https://rp.example/.well-known/privasys-spend-keys.json"}
+func HandleSetSpendJWKS(reg *Registry, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminToken != "" {
+			auth := r.Header.Get("Authorization")
+			if len(auth) < 8 || auth[7:] != adminToken {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+		}
+		clientID := r.PathValue("id")
+		if clientID == "" {
+			http.Error(w, `{"error":"client id required"}`, http.StatusBadRequest)
+			return
+		}
+		var req struct {
+			JWKSURI string `json:"jwks_uri"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+		if req.JWKSURI != "" && !strings.HasPrefix(req.JWKSURI, "https://") {
+			http.Error(w, `{"error":"jwks_uri must be https"}`, http.StatusBadRequest)
+			return
+		}
+		if err := reg.SetSpendJWKS(clientID, req.JWKSURI); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"client_id": clientID, "spend_jwks_uri": req.JWKSURI})
 	}
 }

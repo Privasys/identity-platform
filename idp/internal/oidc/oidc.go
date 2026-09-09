@@ -250,6 +250,12 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		// nothing it cannot spell as a scope.
 		"privasys_attributes_parameter_supported": true,
 		"privasys_attributes_referential":         issuerURL + "/referential/canonical-attributes.json",
+		// Spend tokens: where an app obtains a sender-constrained token naming
+		// the user who pays for what it calls, and where users manage the
+		// consents behind them.
+		"privasys_spend_token_endpoint":    issuerURL + "/spend/token",
+		"privasys_spend_consents_endpoint": issuerURL + "/spend/consents",
+		"privasys_spend_key_well_known":    "/.well-known/privasys-spend-keys.json",
 	}
 
 	body, _ := json.MarshalIndent(doc, "", "  ")

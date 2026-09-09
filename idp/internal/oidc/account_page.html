@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<!-- Copyright (c) Privasys. All rights reserved. Licensed under AGPL-3.0. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Your account · Privasys ID</title>
+<style>
+  :root { --bg:#1d1d1f; --card:#27272a; --fg:#f5f5f7; --muted:#a1a1a6;
+          --line:#3a3a3d; --g1:#34E89E; --g2:#00BCF2; --warn:#EAB308; --bad:#f87171; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg); padding:24px;
+         font-family:"Inter","InterVariable",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+  .wrap { max-width:720px; margin:0 auto; }
+  .logo { font-weight:700; font-size:14px; letter-spacing:.04em; text-transform:uppercase;
+          background:linear-gradient(90deg,var(--g1),var(--g2)); -webkit-background-clip:text;
+          background-clip:text; color:transparent; margin-bottom:18px; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  h2 { font-size:15px; margin:0 0 10px; color:var(--fg); }
+  .muted { color:var(--muted); font-size:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:22px; margin:16px 0;
+          box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-top:1px solid var(--line); }
+  .row:first-of-type { border-top:0; }
+  .row .name { font-weight:600; }
+  .row .sub { color:var(--muted); font-size:13px; }
+  .big { font-size:34px; font-weight:700; margin:6px 0; }
+  .btn { display:inline-block; text-align:center; text-decoration:none; cursor:pointer; border:0;
+         border-radius:10px; padding:10px 14px; font-size:14px; font-weight:600; color:#0b0b0c;
+         background:linear-gradient(90deg,var(--g1),var(--g2)); }
+  .btn.ghost { background:transparent; color:var(--fg); border:1px solid var(--line); }
+  .btn.small { padding:6px 10px; font-size:13px; }
+  .btn.danger { background:transparent; color:var(--bad); border:1px solid rgba(248,113,113,.4); }
+  .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .warn { margin:14px 0; padding:12px 14px; border-radius:10px; font-size:13px;
+          background:rgba(234,179,8,.12); border:1px solid rgba(234,179,8,.4); color:var(--warn); }
+  .err { color:var(--bad); font-size:13px; margin-top:8px; min-height:1em; }
+  input, select { background:#1a1a1c; color:var(--fg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:14px; }
+  input.cap { width:110px; }
+  .hidden { display:none !important; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td { padding:6px 0; border-top:1px solid var(--line); vertical-align:top; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .spin { display:inline-block; width:12px; height:12px; border:2px solid var(--line); border-top-color:var(--g2);
+          border-radius:50%; animation:s .8s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes s { to { transform:rotate(360deg); } }
+  footer { color:var(--muted); font-size:12px; margin:24px 0; }
+  footer a { color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">Privasys ID</div>
+
+  <div id="signin" class="card">
+    <h1>Your account</h1>
+    <p class="muted">Credits, what your apps spent, and which apps may spend for you. Sign in with your Privasys Wallet to continue.</p>
+    <div class="actions"><button class="btn" id="signinBtn">Sign in</button></div>
+    <div class="err" id="signinErr"></div>
+  </div>
+
+  <div id="main" class="hidden">
+    <div class="card">
+      <h1>Your account</h1>
+      <p class="muted" id="who"></p>
+      <div class="big" id="balance">—</div>
+      <p class="muted" id="balanceNote">Credits available. 1 credit = £0.000001.</p>
+      <div id="frozen" class="warn hidden">Your balance is used up. Apps that spend for you are paused until you top up.</div>
+      <div class="actions">
+        <button class="btn" id="topupBtn">Top up</button>
+        <button class="btn ghost" id="membershipBtn">Membership</button>
+        <button class="btn ghost" id="portalBtn">Invoices &amp; payment</button>
+      </div>
+      <div class="err" id="billingErr"></div>
+    </div>
+
+    <div class="card">
+      <h2>Apps that may spend your credits</h2>
+      <p class="muted">Each app you allowed spends within its monthly cap, for everything it calls on your behalf. You can change a cap or withdraw an app at any time; the change applies within a minute.</p>
+      <div id="consents"></div>
+      <div class="actions">
+        <select id="appPick"><option value="">Allow another app…</option></select>
+        <input class="cap" id="appCap" type="number" min="0" step="1" placeholder="£ / month" title="Monthly cap in pounds (0 = no cap)">
+        <button class="btn small ghost" id="allowBtn">Allow</button>
+      </div>
+      <div class="err" id="consentErr"></div>
+    </div>
+
+    <div class="card">
+      <h2>This month, by app</h2>
+      <div id="spend" class="muted">—</div>
+    </div>
+
+    <div class="card">
+      <h2>Recent activity</h2>
+      <div id="ledger" class="muted">—</div>
+    </div>
+
+    <div class="actions"><button class="btn ghost small" id="signoutBtn">Sign out</button></div>
+  </div>
+
+  <footer>Developers: apps, keys and instances live in the <a href="https://developer.privasys.org/dashboard">developer portal</a>. Questions: <a href="mailto:support@privasys.org">support@privasys.org</a>.</footer>
+</div>
+
+<script src="/auth/privasys-auth-client.iife.js"></script>
+<script>
+(function () {
+  "use strict";
+  var API = "__API_BASE__";
+  var IDP = location.origin;
+  var CREDITS_PER_GBP = 1000000;
+  var $ = function (id) { return document.getElementById(id); };
+  var token = null;
+  var auth = null;
+
+  function gbp(credits) {
+    var n = (credits || 0) / CREDITS_PER_GBP;
+    return "£" + n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function hex(id) { return String(id || "").toLowerCase().replace(/-/g, ""); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  async function call(base, path, opts) {
+    opts = opts || {};
+    var r = await fetch(base + path, {
+      method: opts.method || "GET",
+      headers: Object.assign({ "Authorization": "Bearer " + token }, opts.body ? { "Content-Type": "application/json" } : {}),
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    if (r.status === 204) return null;
+    var body = null;
+    try { body = await r.json(); } catch (e) { body = null; }
+    if (!r.ok) {
+      var msg = (body && (body.error_description || body.error)) || ("Request failed (" + r.status + ")");
+      throw new Error(msg);
+    }
+    return body;
+  }
+  var mgmt = function (p, o) { return call(API, "/api/v1" + p, o); };
+  var idp = function (p, o) { return call(IDP, p, o); };
+
+  function makeAuth() {
+    if (!window.Privasys || !Privasys.AuthFrame) throw new Error("Sign-in unavailable. Please reload the page.");
+    return new Privasys.AuthFrame({
+      apiBase: API,
+      appName: "Privasys ID",
+      clientId: "privasys-platform",
+      authOrigin: IDP,
+      scope: ["openid", "profile", "offline_access"]
+    });
+  }
+
+  async function restore() {
+    try {
+      auth = makeAuth();
+      var s = await auth.getSession();
+      if (s && s.accessToken) { token = s.accessToken; await load(); }
+    } catch (e) { /* no session: show sign-in */ }
+  }
+
+  $("signinBtn").addEventListener("click", async function () {
+    $("signinErr").textContent = "";
+    try {
+      auth = auth || makeAuth();
+      var res = await auth.signIn();
+      if (!res || !res.accessToken) throw new Error("Sign-in did not return a token.");
+      token = res.accessToken;
+      await load();
+    } catch (e) { $("signinErr").textContent = e.message || "Sign-in failed."; }
+  });
+
+  $("signoutBtn").addEventListener("click", function () { token = null; location.reload(); });
+
+  async function load() {
+    $("signin").classList.add("hidden");
+    $("main").classList.remove("hidden");
+    await Promise.all([loadAccount(), loadConsents(), loadSpend(), loadLedger(), loadApps()]);
+  }
+
+  async function loadAccount() {
+    try {
+      var acc = await mgmt("/account");
+      $("who").textContent = (acc.kind === "org" ? "Organisation account: " : "Personal account: ") + (acc.name || acc.id);
+      var bal = await mgmt("/billing/balance");
+      if (!bal || bal.enabled === false) { $("balance").textContent = "—"; $("balanceNote").textContent = "Billing is not enabled on this environment."; return; }
+      var d = bal.data || bal;
+      $("balance").textContent = gbp(d.balance);
+      $("frozen").classList.toggle("hidden", !d.frozen);
+    } catch (e) { $("billingErr").textContent = e.message; }
+  }
+
+  function bind(id, path) {
+    $(id).addEventListener("click", async function () {
+      $("billingErr").textContent = "";
+      try {
+        var r = await mgmt(path, { method: "POST" });
+        if (r && r.url) location.href = r.url; else $("billingErr").textContent = "Not available right now.";
+      } catch (e) { $("billingErr").textContent = e.message; }
+    });
+  }
+  bind("topupBtn", "/billing/checkout/credits");
+  bind("membershipBtn", "/billing/checkout/membership");
+  bind("portalBtn", "/billing/portal");
+
+  var consentsByApp = {};
+  async function loadConsents() {
+    $("consentErr").textContent = "";
+    try {
+      var r = await idp("/spend/consents");
+      var list = (r && r.consents) || [];
+      consentsByApp = {};
+      var box = $("consents");
+      box.innerHTML = "";
+      if (!list.length) { box.innerHTML = '<p class="muted">No app may spend your credits yet. You will be asked when you sign in to an app that needs it, or allow one below.</p>'; return; }
+      list.forEach(function (c) {
+        consentsByApp[hex(c.app_id)] = c;
+        var row = document.createElement("div");
+        row.className = "row";
+        var capGBP = c.cap ? (c.cap / CREDITS_PER_GBP) : 0;
+        row.innerHTML =
+          '<div><div class="name">' + esc(c.app_name || c.app_host || c.app_id) + '</div>' +
+          '<div class="sub">' + esc(c.app_host || "") + (c.cap ? " · cap " + gbp(c.cap) + " / month" : " · no cap") + '</div></div>' +
+          '<div class="actions" style="margin:0">' +
+          '<input class="cap" type="number" min="0" step="1" value="' + esc(String(capGBP)) + '" title="Monthly cap in pounds (0 = no cap)">' +
+          '<button class="btn small ghost" data-act="cap">Save cap</button>' +
+          '<button class="btn small danger" data-act="revoke">Withdraw</button></div>';
+        var input = row.querySelector("input");
+        row.querySelector('[data-act="cap"]').addEventListener("click", async function () {
+          $("consentErr").textContent = "";
+          try {
+            var cap = Math.round(Math.max(0, Number(input.value) || 0) * CREDITS_PER_GBP);
+            await idp("/spend/consents", { method: "POST", body: { app_id: c.app_id, cap: cap } });
+            await loadConsents();
+          } catch (e) { $("consentErr").textContent = e.message; }
+        });
+        row.querySelector('[data-act="revoke"]').addEventListener("click", async function () {
+          if (!confirm("Withdraw " + (c.app_name || c.app_id) + "? It will no longer be able to spend your credits.")) return;
+          $("consentErr").textContent = "";
+          try { await idp("/spend/consents/" + encodeURIComponent(c.app_id), { method: "DELETE" }); await loadConsents(); await loadSpend(); }
+          catch (e) { $("consentErr").textContent = e.message; }
+        });
+        box.appendChild(row);
+      });
+    } catch (e) { $("consentErr").textContent = e.message; }
+  }
+
+  async function loadApps() {
+    try {
+      var r = await fetch(API + "/api/v1/store/apps");
+      if (!r.ok) return;
+      var apps = await r.json();
+      var list = Array.isArray(apps) ? apps : (apps.apps || []);
+      var pick = $("appPick");
+      list.forEach(function (a) {
+        var id = a.app_id || a.id;
+        if (!id) return;
+        var o = document.createElement("option");
+        o.value = id;
+        o.textContent = a.display_name || a.name || a.slug || id;
+        pick.appendChild(o);
+      });
+    } catch (e) { /* the store listing is optional here */ }
+  }
+
+  $("allowBtn").addEventListener("click", async function () {
+    $("consentErr").textContent = "";
+    var id = $("appPick").value;
+    if (!id) { $("consentErr").textContent = "Choose an app first."; return; }
+    try {
+      var cap = Math.round(Math.max(0, Number($("appCap").value) || 0) * CREDITS_PER_GBP);
+      await idp("/spend/consents", { method: "POST", body: { app_id: id, cap: cap } });
+      $("appPick").value = ""; $("appCap").value = "";
+      await loadConsents();
+    } catch (e) { $("consentErr").textContent = e.message; }
+  });
+
+  async function loadSpend() {
+    try {
+      var r = await mgmt("/billing/spend");
+      var rows = (r && r.by_app) || [];
+      if (!rows.length) { $("spend").textContent = "Nothing spent yet this month."; return; }
+      var html = "<table>";
+      rows.forEach(function (s) {
+        var c = consentsByApp[hex(s.app_id)];
+        var name = c ? (c.app_name || c.app_host) : (s.app_id ? s.app_id.slice(0, 8) + "…" : "Direct use (your own API keys and sessions)");
+        html += "<tr><td>" + esc(name) + "</td><td class=\"num\">" + gbp(s.credits) + "</td></tr>";
+      });
+      html += "<tr><td><strong>Total</strong></td><td class=\"num\"><strong>" + gbp(r.total_credits) + "</strong></td></tr></table>";
+      $("spend").innerHTML = html;
+    } catch (e) { $("spend").textContent = e.message; }
+  }
+
+  async function loadLedger() {
+    try {
+      var r = await mgmt("/billing/ledger?limit=15");
+      if (!r || r.enabled === false) { $("ledger").textContent = "—"; return; }
+      var entries = (r.data && r.data.entries) || r.entries || [];
+      if (!entries.length) { $("ledger").textContent = "No activity yet."; return; }
+      var html = "<table>";
+      entries.forEach(function (e) {
+        var when = new Date(e.ts).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+        html += "<tr><td>" + esc(when) + "<div class=\"sub muted\">" + esc(e.reason || e.kind) + "</div></td><td class=\"num\">" + (e.credits >= 0 ? "+" : "") + gbp(e.credits) + "</td></tr>";
+      });
+      $("ledger").innerHTML = html + "</table>";
+    } catch (e) { $("ledger").textContent = e.message; }
+  }
+
+  restore();
+})();
+</script>
+</body>
+</html>

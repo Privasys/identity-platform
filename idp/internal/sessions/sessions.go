@@ -57,6 +57,7 @@ type Session struct {
 type Store struct {
 	db            *store.DB
 	walletSession WalletSessionResolver
+	onRevoke      func(sid string)
 }
 
 // SetWalletSessionResolver wires the FIDO2 wallet-session lookup into
@@ -524,8 +525,25 @@ func (s *Store) HandleRevoke(issuer *tokens.Issuer) http.HandlerFunc {
 			httpErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		if s.onRevoke != nil {
+			s.onRevoke(sid)
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"revoked": sid})
 	}
+}
+
+// SetRevokeHook registers a callback run after a user revokes a session
+// through HandleRevoke (the spend-consent store follows its backing
+// session this way).
+func (s *Store) SetRevokeHook(f func(sid string)) {
+	s.onRevoke = f
+}
+
+// AuthenticateBearer is the exported form of authBearer: it resolves the
+// user behind a request's bearer (wallet session token or OIDC access
+// token). Other packages that gate on "the signed-in user" share it.
+func (s *Store) AuthenticateBearer(r *http.Request, issuer *tokens.Issuer) (userID, sid string, err error) {
+	return s.authBearer(r, issuer)
 }
 
 // authBearer extracts and verifies a Bearer token, returning

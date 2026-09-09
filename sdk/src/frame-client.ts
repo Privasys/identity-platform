@@ -233,6 +233,15 @@ export interface AuthFrameConfig {
      * `authOrigin` and never reaches the adopter's origin.
      */
     sessionRelay?: { appHost: string };
+    /**
+     * Ask the user, at sign-in, to let this app spend their Privasys credits
+     * on their behalf (inference, priced tools) under a monthly cap, in
+     * credits (1 credit = £0.000001). The wallet shows the consent row beside
+     * the attested identity and records the answer with the identity
+     * provider; the app then fetches spend tokens for the user. Requires
+     * `sessionRelay` (the wallet needs the app's attested identity).
+     */
+    spend?: { cap?: number };
 }
 
 export interface SignInResult {

@@ -778,6 +778,16 @@ async function exchangeCode(
     return resp.json();
 }
 
+/** The adopter's spend hint, reduced to a non-negative integer cap. */
+function sanitiseSpend(v: unknown): { cap?: number } {
+    if (!v || typeof v !== 'object') return {};
+    const cap = (v as { cap?: unknown }).cap;
+    if (typeof cap === 'number' && Number.isFinite(cap) && cap >= 0) {
+        return { cap: Math.floor(cap) };
+    }
+    return {};
+}
+
 // ── Message handler ─────────────────────────────────────────────────────
 
 window.addEventListener('message', async (e: MessageEvent) => {
@@ -789,6 +799,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             clientId?: string;
             scope?: string | string[];
             sessionRelay?: { appHost: string; extraAppHosts?: string[] };
+            spend?: { cap?: number };
             connect?: { mode?: string; reason?: string | null; added?: string[] };
             caps?: string[];
             billingGrant?: string;
@@ -942,6 +953,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 ...(config.sessionRelay.extraAppHosts?.length
                     ? { extraAppHosts: config.sessionRelay.extraAppHosts }
                     : {}),
+                // Spend consent rides the attested sign-in: the wallet knows
+                // the app's attested identity (OID 3.6) only on this path.
+                ...(config.spend ? { spend: sanitiseSpend(config.spend) } : {}),
             };
         }
 

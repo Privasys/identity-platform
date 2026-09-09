@@ -50,7 +50,7 @@ export class PrivasysAuth {
      */
     createQR(
         sessionId?: string,
-        sessionRelay?: { sdkPub: string; appHost: string; extraAppHosts?: string[]; nonce?: string },
+        sessionRelay?: { sdkPub: string; appHost: string; extraAppHosts?: string[]; nonce?: string; spend?: { cap?: number } },
     ): { sessionId: string; payload: string; descriptorHash: string; descriptorPublished: Promise<void> } {
         return generateQRPayload({
             rpId: this.config.rpId,
@@ -70,6 +70,7 @@ export class PrivasysAuth {
                     appHost: sessionRelay.appHost,
                     extraAppHosts: sessionRelay.extraAppHosts,
                     nonce: sessionRelay.nonce,
+                    spend: sessionRelay.spend,
                 }
                 : {}),
         });
@@ -145,7 +146,7 @@ export class PrivasysAuth {
     async notifyAndWait(
         pushToken: string,
         sessionId?: string,
-        sessionRelay?: { sdkPub: string; appHost: string; extraAppHosts?: string[]; nonce?: string },
+        sessionRelay?: { sdkPub: string; appHost: string; extraAppHosts?: string[]; nonce?: string; spend?: { cap?: number } },
     ): Promise<AuthResult> {
         // Publish the descriptor even on the push path: Expo push data is
         // size-capped and the broker forwards a fixed field set, so the
@@ -190,6 +191,7 @@ export class PrivasysAuth {
                             ? { extraAppHosts: sessionRelay.extraAppHosts }
                             : {}),
                         nonce: sessionRelay.nonce,
+                        spend: sessionRelay.spend,
                     }
                     : {}),
             }),

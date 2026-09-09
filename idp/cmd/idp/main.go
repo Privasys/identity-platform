@@ -213,7 +213,11 @@ func main() {
 			userID, _, err := sessionsStore.AuthenticateBearer(r, issuer)
 			return userID, err
 		},
-		Resolver: &spend.MgmtResolver{MgmtURL: cfg.MgmtURL, Token: cfg.IdpMgmtToken, ClientJWKS: clientReg.SpendJWKS},
+		Resolver: &spend.MgmtResolver{
+			MgmtURL: cfg.MgmtURL, Token: cfg.IdpMgmtToken,
+			Extra:      []spend.MgmtBase{{URL: cfg.MgmtDevURL, Token: cfg.MgmtDevToken}},
+			ClientJWKS: clientReg.SpendJWKS,
+		},
 		Ensure:   spend.MgmtAccountEnsurer(cfg.MgmtURL, cfg.IdpMgmtToken, nil),
 		TokenTTL: time.Duration(cfg.SpendTokenTTLHours) * time.Hour,
 	})

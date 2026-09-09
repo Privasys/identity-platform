@@ -57,7 +57,39 @@ export interface PendingCapability {
     capability: CapabilityAsk;
 }
 
-export class CapabilityError extends Error {}
+export class CapabilityError extends Error {
+    /** HTTP status of the refusing service, when the failure was an HTTP refusal. */
+    status?: number;
+    /** The service's machine-readable `code`, when its error body carried one. */
+    code?: string;
+
+    constructor(message: string, opts: { status?: number; code?: string } = {}) {
+        super(message);
+        this.status = opts.status;
+        this.code = opts.code;
+    }
+}
+
+/**
+ * A resource service answering that the holder's own vault-held key is stale:
+ * the service was upgraded (image or host) and this data owner has not yet
+ * approved its new measurement for their key. Drive reports it as 409
+ * `vault_key_stale`. It is the holder's key and the holder is right here, so
+ * the wallet can approve in place, exactly as it does on a Drive login.
+ */
+export function isStaleTenantKey(e: unknown): e is CapabilityError {
+    return e instanceof CapabilityError && e.status === 409 && e.code === 'vault_key_stale';
+}
+
+/** The `code` out of a JSON error body, or undefined for anything else. */
+function errorCodeOf(body: string): string | undefined {
+    try {
+        const parsed = JSON.parse(body) as { code?: unknown };
+        return typeof parsed.code === 'string' ? parsed.code : undefined;
+    } catch {
+        return undefined;
+    }
+}
 
 function isPermission(v: unknown): v is Permission {
     return typeof v === 'string' && (PERMISSIONS as readonly string[]).includes(v);
@@ -189,6 +221,7 @@ export async function createCapability(args: {
         const body = await res.text().catch(() => '');
         throw new CapabilityError(
             `the capability could not be created (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`,
+            { status: res.status, code: errorCodeOf(body) },
         );
     }
     return (await res.json()) as GrantedCapability;

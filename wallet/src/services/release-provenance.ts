@@ -35,7 +35,7 @@ const DEFAULT_API_BASE = process.env.EXPO_PUBLIC_PLATFORM_API_URL ?? DEV_API_BAS
  * host, then fall back through the known environments; a wrong base costs one
  * fast 404, nothing else.
  */
-function apiBasesForHost(appHost?: string): string[] {
+export function apiBasesForHost(appHost?: string): string[] {
     const preferred = appHost?.endsWith('.apps-test.privasys.org')
         ? DEV_API_BASE
         : appHost?.endsWith('.apps.privasys.org')

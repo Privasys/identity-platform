@@ -20,7 +20,7 @@ import { PrivasysDrive, type DriveNode, type Tenant } from '@privasys/drive-sdk'
 
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, attestEnclave, type AttestationResult } from '@/services/attestation';
-import { appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
+import { apiBasesForHost, appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
 import { getPlatformToken } from '@/services/platform-token';
 import { useSettingsStore, type VerificationMode } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
@@ -293,6 +293,44 @@ export async function decideShareRequest(
         const body = await res.text().catch(() => '');
         throw new Error(`decision failed (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`);
     }
+}
+
+/**
+ * Approve a Drive service's current measurement for the holder's own
+ * vault-held tenant key, on ANY Drive instance (not only the wallet's own
+ * Drive): the same login-time setup the wallet runs for its Drive — ensure
+ * the personal tenant, mint a data-key grant from the control plane the app
+ * lives on, re-arm the key on the enclave. A Drive whose image or host
+ * rolled answers every request with 409 `vault_key_stale` until the data
+ * owner does this; a capability grant for that Drive (an app asking for a
+ * folder) hits it too, and the holder approving that grant is the owner.
+ *
+ * The app's control plane is probed the way app resolution is (an app exists
+ * on exactly one of them, and a production wallet is routinely shown dev
+ * apps); the first plane that mints the grant wins. `host` must already be
+ * attested by the caller: this sends the holder's bearer to it.
+ */
+export async function rearmTenantKeyAt(args: {
+    host: string;
+    appId: string;
+    appHost?: string;
+}): Promise<{ status: string; handle: string }> {
+    const token = await getPlatformToken();
+    const drive = PrivasysDrive.connect({
+        baseUrl: `https://${args.host}`,
+        token,
+        fetch: makeRaTlsFetch({ enclaveHost: args.host, platformFetch: fetch }),
+    });
+    let lastErr: unknown = new Error('no control plane knows this app');
+    for (const mgmtBaseUrl of apiBasesForHost(args.appHost ?? args.host)) {
+        try {
+            const { key } = await drive.setupPersonalDrive({ mgmtBaseUrl, appId: args.appId });
+            return key;
+        } catch (e) {
+            lastErr = e;
+        }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 /** Drop the cached drive session (e.g. on sign-out). */

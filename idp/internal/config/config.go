@@ -61,6 +61,13 @@ type Config struct {
 	// the RP's credits on the ledger (keeping ledger access solely in mgmt).
 	MgmtURL      string // management-service base URL for the reserve endpoint
 	IdpMgmtToken string // static bearer for the internal reserve endpoint
+
+	// SpendTokenTTLHours bounds a spend token's lifetime (acting-subject
+	// plan v2). A token never outlives the consent session behind it.
+	SpendTokenTTLHours int
+	// AccountAPIBase is the management-service origin privasys.id/account
+	// calls for balance, spend and top-up (the platform's public API).
+	AccountAPIBase string
 }
 
 // ListenAddr returns the formatted listen address.
@@ -121,6 +128,9 @@ func Load() *Config {
 
 		MgmtURL:      envStr("IDP_MGMT_URL", ""),
 		IdpMgmtToken: envStr("IDP_MGMT_TOKEN", ""),
+
+		SpendTokenTTLHours: envInt("IDP_SPEND_TOKEN_TTL_HOURS", 24),
+		AccountAPIBase:     envStr("IDP_ACCOUNT_API_BASE", "https://api.developer.privasys.org"),
 	}
 }
 

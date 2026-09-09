@@ -283,6 +283,9 @@ func migrate(db *sql.DB) error {
 		{"billable_rp", "ALTER TABLE clients ADD COLUMN billable_rp INTEGER NOT NULL DEFAULT 0"},
 		{"billing_account_id", "ALTER TABLE clients ADD COLUMN billing_account_id TEXT NOT NULL DEFAULT ''"},
 		{"rp_id", "ALTER TABLE clients ADD COLUMN rp_id TEXT NOT NULL DEFAULT ''"},
+		// A non-enclave relying party that spends its users' credits publishes
+		// its spend keys here (platform apps publish at their enclave origin).
+		{"spend_jwks_uri", "ALTER TABLE clients ADD COLUMN spend_jwks_uri TEXT NOT NULL DEFAULT ''"},
 	} {
 		if !clientCols[add.col] {
 			if _, err = db.Exec(add.ddl); err != nil {

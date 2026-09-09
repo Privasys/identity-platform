@@ -43,6 +43,7 @@ import (
 	"github.com/Privasys/idp/internal/push"
 	"github.com/Privasys/idp/internal/recovery"
 	"github.com/Privasys/idp/internal/sessions"
+	"github.com/Privasys/idp/internal/spend"
 	"github.com/Privasys/idp/internal/social"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/support"
@@ -195,6 +196,39 @@ func main() {
 	mux.HandleFunc("PUT /sessions/{sid}/encauth", sessionsStore.HandlePutEncAuth(issuer))
 	mux.HandleFunc("GET /sessions/{sid}/encauth", sessionsStore.HandleGetEncAuth(issuer))
 	mux.HandleFunc("POST /sessions/encauth", sessionsStore.HandlePostEncAuth(issuer))
+
+	// Spend tokens (acting-subject plan v2): the user's standing consent for
+	// an app to spend their credits (wallet / privasys.id/account), and the
+	// sender-constrained token an app fetches per signed-in user and carries,
+	// with a per-request proof, to every service it calls for that user.
+	spendStore, err := spend.NewStore(db, sessionsStore)
+	if err != nil {
+		log.Fatalf("failed to open spend store: %v", err)
+	}
+	sessionsStore.SetRevokeHook(func(sid string) { _ = spendStore.RevokeBySID(sid) })
+	spendHandler := spend.New(spend.Config{
+		Store:  spendStore,
+		Issuer: issuer,
+		Auth: func(r *http.Request) (string, error) {
+			userID, _, err := sessionsStore.AuthenticateBearer(r, issuer)
+			return userID, err
+		},
+		Resolver: &spend.MgmtResolver{MgmtURL: cfg.MgmtURL, Token: cfg.IdpMgmtToken, ClientJWKS: clientReg.SpendJWKS},
+		Ensure:   spend.MgmtAccountEnsurer(cfg.MgmtURL, cfg.IdpMgmtToken, nil),
+		TokenTTL: time.Duration(cfg.SpendTokenTTLHours) * time.Hour,
+	})
+	mux.HandleFunc("GET /spend/consents", spendHandler.HandleListConsents)
+	mux.HandleFunc("POST /spend/consents", spendHandler.HandleGrantConsent)
+	mux.HandleFunc("GET /spend/consents/{app_id}", spendHandler.HandleGetConsent)
+	mux.HandleFunc("DELETE /spend/consents/{app_id}", spendHandler.HandleRevokeConsent)
+	mux.HandleFunc("POST /spend/token", spendHandler.HandleToken)
+	// privasys.id/account: the user's account and billing surface (not every
+	// user is a developer). Money stays in the management service; the page
+	// calls it with the user's bearer.
+	mux.HandleFunc("GET /account", oidc.HandleAccountPage(cfg.AccountAPIBase))
+	mux.HandleFunc("GET /account/", oidc.HandleAccountPage(cfg.AccountAPIBase))
+	// A non-enclave relying party registers where it publishes spend keys.
+	mux.HandleFunc("POST /clients/{id}/spend", clients.HandleSetSpendJWKS(clientReg, cfg.AdminToken))
 
 	// Wallet Instance Attestation: the wallet-provider JWKS (verifiers fetch it /
 	// have it provisioned), a fresh challenge, and enrolment → a holder-bound WIA.

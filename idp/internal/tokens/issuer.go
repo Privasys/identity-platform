@@ -353,6 +353,53 @@ func (iss *Issuer) IssueWIA(c WIAClaims) (string, error) {
 	return iss.signTyp(claims, "wia+jwt")
 }
 
+// SpendTokenClaims are the claims of a SPEND TOKEN: the user (`sub`) has
+// allowed the app (`azp`) to spend their credits under `cap` per month, and
+// the token is bound (`cnf.jwk`) to the app's spend key so only the holder
+// of that key can produce the per-request proofs a callee demands. `sid`
+// is the consent session, the revocation handle every callee already polls.
+type SpendTokenClaims struct {
+	Subject  string
+	AppID    string
+	SID      string
+	Cap      int64
+	Cnf      map[string]interface{} // the app's public spend key (EC P-256 JWK)
+	IssuedAt time.Time
+	Expiry   time.Time
+	JTI      string
+}
+
+// IssueSpendToken signs a spend token (typ = "spend+jwt") with the OIDC
+// key, so a callee verifies it against the JWKS it already trusts.
+func (iss *Issuer) IssueSpendToken(c SpendTokenClaims) (string, error) {
+	if c.Subject == "" || c.AppID == "" || c.SID == "" || len(c.Cnf) == 0 {
+		return "", fmt.Errorf("spend token: subject, app, sid and cnf are required")
+	}
+	iat := c.IssuedAt
+	if iat.IsZero() {
+		iat = time.Now()
+	}
+	exp := c.Expiry
+	if exp.IsZero() {
+		exp = iat.Add(24 * time.Hour)
+	}
+	claims := jwt.MapClaims{
+		"iss": iss.issuerURL,
+		"sub": c.Subject,
+		"azp": c.AppID,
+		"sid": c.SID,
+		"cap": c.Cap,
+		"iat": iat.Unix(),
+		"exp": exp.Unix(),
+		"cnf": map[string]interface{}{"jwk": c.Cnf},
+		"v":   1,
+	}
+	if c.JTI != "" {
+		claims["jti"] = c.JTI
+	}
+	return iss.signTyp(claims, "spend+jwt")
+}
+
 // ECPublicJWK renders a P-256 public key as a minimal EC public JWK
 // (kty/crv/x/y with fixed 32-byte coordinates) — the exact `cnf.jwk` shape the
 // verifier compares against the holder key it is handed.

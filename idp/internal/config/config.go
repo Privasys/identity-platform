@@ -65,6 +65,11 @@ type Config struct {
 	// SpendTokenTTLHours bounds a spend token's lifetime (acting-subject
 	// plan v2). A token never outlives the consent session behind it.
 	SpendTokenTTLHours int
+	// MgmtDevURL / MgmtDevToken: the DEV platform's management service,
+	// asked for an app the production one does not know (one IdP serves
+	// both environments; a spend token names an app of either).
+	MgmtDevURL   string
+	MgmtDevToken string
 	// AccountAPIBase is the management-service origin privasys.id/account
 	// calls for balance, spend and top-up (the platform's public API).
 	AccountAPIBase string
@@ -130,6 +135,8 @@ func Load() *Config {
 		IdpMgmtToken: envStr("IDP_MGMT_TOKEN", ""),
 
 		SpendTokenTTLHours: envInt("IDP_SPEND_TOKEN_TTL_HOURS", 24),
+		MgmtDevURL:         envStr("IDP_MGMT_DEV_URL", ""),
+		MgmtDevToken:       envStr("IDP_MGMT_DEV_TOKEN", ""),
 		AccountAPIBase:     envStr("IDP_ACCOUNT_API_BASE", "https://api.developer.privasys.org"),
 	}
 }

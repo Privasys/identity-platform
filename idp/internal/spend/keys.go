@@ -204,10 +204,20 @@ func Thumbprint(k JWK) string {
 type MgmtResolver struct {
 	MgmtURL string
 	Token   string
-	HTTP    *http.Client
+	// Extra management services to ask when the primary does not know the
+	// app: one IdP serves several platform environments (prod and dev), and
+	// an app id belongs to exactly one of them.
+	Extra []MgmtBase
+	HTTP  *http.Client
 	// ClientJWKS, when set, resolves a non-platform spender (an OIDC
 	// client id) to its registered jwks_uri and display name.
 	ClientJWKS func(clientID string) (jwksURI, name string, ok bool)
+}
+
+// MgmtBase is one management-service origin and its internal token.
+type MgmtBase struct {
+	URL   string
+	Token string
 }
 
 // JWKSURL implements AppResolver.
@@ -220,19 +230,42 @@ func (m *MgmtResolver) JWKSURL(ctx context.Context, appID string) (string, strin
 		}
 		return "", "", "", ErrUnknownApp
 	}
-	if m.MgmtURL == "" || m.Token == "" {
+	bases := make([]MgmtBase, 0, 1+len(m.Extra))
+	if m.MgmtURL != "" && m.Token != "" {
+		bases = append(bases, MgmtBase{URL: m.MgmtURL, Token: m.Token})
+	}
+	for _, b := range m.Extra {
+		if b.URL != "" && b.Token != "" {
+			bases = append(bases, b)
+		}
+	}
+	if len(bases) == 0 {
 		return "", "", "", errors.New("spend: management-service not configured")
 	}
+	var lastErr error = ErrUnknownApp
+	for _, b := range bases {
+		jwks, name, host, err := m.resolveAt(ctx, b, appID)
+		if err == nil {
+			return jwks, name, host, nil
+		}
+		if !errors.Is(err, ErrUnknownApp) {
+			lastErr = err
+		}
+	}
+	return "", "", "", lastErr
+}
+
+func (m *MgmtResolver) resolveAt(ctx context.Context, b MgmtBase, appID string) (string, string, string, error) {
 	client := m.HTTP
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		strings.TrimRight(m.MgmtURL, "/")+"/api/v1/internal/apps/"+appID, nil)
+		strings.TrimRight(b.URL, "/")+"/api/v1/internal/apps/"+appID, nil)
 	if err != nil {
 		return "", "", "", err
 	}
-	req.Header.Set("Authorization", "Bearer "+m.Token)
+	req.Header.Set("Authorization", "Bearer "+b.Token)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", "", "", fmt.Errorf("spend: resolve app: %w", err)

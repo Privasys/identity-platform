@@ -281,11 +281,23 @@ export default function CapabilityRequestScreen() {
                         <RNView style={styles.card}>
                             <Text style={styles.label}>{t('capability.whatLabel')}</Text>
                             <Text style={styles.value}>
-                                {t('capability.resourceLine', {
-                                    permissions: permissionLine,
-                                    resource: pending.capability.resource_label,
-                                    service: resource.display_name || resource.name,
-                                })}
+                                {/* The generic line was written for a folder
+                                    ("Read and Create and change X in your Y")
+                                    and reads like storage for everything else.
+                                    A kind may therefore own its own line; the
+                                    generic one is the fallback, so adding a
+                                    kind never requires adding a sentence. */}
+                                {t(
+                                    [
+                                        `capability.resourceLineByKind.${pending.capability.kind}`,
+                                        'capability.resourceLine',
+                                    ],
+                                    {
+                                        permissions: permissionLine,
+                                        resource: pending.capability.resource_label,
+                                        service: resource.display_name || resource.name,
+                                    },
+                                )}
                             </Text>
                             <Text style={styles.attested}>
                                 <Ionicons name="shield-checkmark" size={13} color={p.green} />{' '}

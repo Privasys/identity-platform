@@ -31,8 +31,22 @@ import { getPlatformToken } from '@/services/platform-token';
 export const PERMISSIONS = ['read', 'write', 'delete'] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-/** The closed kind vocabulary. Each selects a wallet-owned explanation. */
-export const CAPABILITY_KINDS = ['storage.folder'] as const;
+/**
+ * The closed kind vocabulary. Each selects a wallet-owned explanation.
+ *
+ * A kind, not a permission verb, is what carries meaning here. That is why
+ * turning on a provider's recording is its own kind rather than a fourth verb
+ * on the transcript kind: reading what a meeting already produced and altering
+ * how future meetings behave are different sentences, and a holder who agrees
+ * to the first must not be taken to have agreed to the second.
+ */
+export const CAPABILITY_KINDS = [
+    'storage.folder',
+    'mail.mailbox',
+    'calendar.events',
+    'meeting.transcripts',
+    'meeting.recording',
+] as const;
 export type CapabilityKind = (typeof CAPABILITY_KINDS)[number];
 
 export interface CapabilityAsk {
@@ -170,8 +184,16 @@ export async function fetchPendingCapability(
 
 /** How long a capability of each kind may live. Chosen HERE, never by the
  *  requester, so nobody can ask for an unbounded one. */
+const DAY = 24 * 60 * 60;
 const LIFETIME_SECONDS: Record<CapabilityKind, number> = {
-    'storage.folder': 90 * 24 * 60 * 60,
+    'storage.folder': 90 * DAY,
+    'mail.mailbox': 90 * DAY,
+    'calendar.events': 90 * DAY,
+    'meeting.transcripts': 90 * DAY,
+    // Shorter deliberately. This one is a standing authority to change how
+    // FUTURE meetings behave, not permission to read something that already
+    // exists, so it should come back round for a fresh decision sooner.
+    'meeting.recording': 30 * DAY,
 };
 
 export function expiryFor(kind: CapabilityKind, now = Date.now()): number {

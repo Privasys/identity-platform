@@ -359,6 +359,16 @@
     "explain": {
       "storage": {
         "folder": "Your files will be saved in your own storage, under your keys. Without this they stay inside the enclave for this session only, and are lost when it restarts."
+      },
+      "mail": {
+        "mailbox": "This app can read the mail in this account and leave drafts and labels in it. It can never send a message. Your mail stays with your mail provider; it is not copied anywhere else."
+      },
+      "calendar": {
+        "events": "This app can see the events in this calendar, and add or change only the ones you ask it to. Your calendar stays with your provider; it is not copied anywhere else."
+      },
+      "meeting": {
+        "transcripts": "This app can read the transcripts of meetings you took part in, from your own account. It never joins a meeting and never records one.",
+        "recording": "This app can switch on your provider's own recording and transcription for meetings you host. Everyone in the meeting is told by the provider, in the usual way. Without this, only meetings you already record will have a transcript."
       }
     },
     "approve": "Approve",
@@ -371,7 +381,12 @@
     "failedTitle": "Access was not granted",
     "failedBody": "Nothing was changed. You can try again.",
     "doneTitle": "Access granted",
-    "doneBody": "{{app}} can now use what you approved. You can revoke it at any time."
+    "doneBody": "{{app}} can now use what you approved. You can revoke it at any time.",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} the mail in {{resource}}, through {{service}}",
+      "meeting.transcripts": "{{permissions}} the transcripts of your meetings in {{resource}}",
+      "meeting.recording": "Switch on recording and transcription for meetings you host in {{resource}}"
+    }
   },
   "credentials": {
     "title": "Registered Credentials",

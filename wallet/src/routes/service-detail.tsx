@@ -30,6 +30,7 @@ import {
     type WorkloadRelease
 } from '@/services/release-provenance';
 import { listMySessions, revokeSession } from '@/services/sessions-api';
+import { revokeSpendConsent } from '@/services/spend-api';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore, type UserProfile } from '@/stores/profile';
@@ -150,6 +151,7 @@ export default function ServiceDetailScreen() {
 
     const [removing, setRemoving] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
+    const [stoppingSpend, setStoppingSpend] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     // Release provenance for the RUNNING app (its live /attest carries os_release
@@ -222,6 +224,61 @@ export default function ServiceDetailScreen() {
                             );
                         } finally {
                             setSigningOut(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    // Spend consent withdrawal (acting-subject plan v2): the app may have
+    // been allowed to spend the holder's credits at sign-in. Withdrawing is
+    // keyed by the app's ATTESTED id from the last verified ceremony and
+    // authenticates with the same credential, like the server sign-out. The
+    // IdP revokes the backing session, so every service the app calls for
+    // this holder refuses within a minute. Caps are changed at
+    // privasys.id/account. Offered whenever an attested app id is known:
+    // withdrawing a consent that never existed is a harmless no-op.
+    const handleStopSpending = () => {
+        if (!runningAppId || !credential) return;
+        Alert.alert(
+            t('serviceDetail.stopSpendingTitle'),
+            t('serviceDetail.stopSpendingBody', { app: name }),
+            [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: t('serviceDetail.stopSpendingConfirm'),
+                    style: 'destructive',
+                    onPress: async () => {
+                        setStoppingSpend(true);
+                        try {
+                            const auth = await fido2.authenticate(
+                                credential.rpId,
+                                credential.keyAlias,
+                                credential.credentialId,
+                                '',
+                                credential.serverRpId
+                            );
+                            if (!auth.sessionToken) {
+                                throw new Error(t('errors.noSessionFromAuth'));
+                            }
+                            try {
+                                await revokeSpendConsent(auth.sessionToken, runningAppId);
+                            } catch (e) {
+                                // "no consent" means there was nothing to withdraw.
+                                if (!(e instanceof Error && /no consent/i.test(e.message))) throw e;
+                            }
+                            Alert.alert(
+                                t('serviceDetail.spendingStoppedTitle'),
+                                t('serviceDetail.spendingStoppedBody', { app: name })
+                            );
+                        } catch (e) {
+                            Alert.alert(
+                                t('serviceDetail.stopSpendingFailedTitle'),
+                                e instanceof Error ? e.message : t('serviceDetail.signOutFailedBody')
+                            );
+                        } finally {
+                            setStoppingSpend(false);
                         }
                     }
                 }
@@ -520,6 +577,20 @@ export default function ServiceDetailScreen() {
                             <Ionicons name="log-out-outline" size={18} color={p.infoText} />
                             <Text style={styles.signOutButtonText}>
                                 {signingOut ? t('serviceDetail.signingOut') : t('serviceDetail.serverSignOut')}
+                            </Text>
+                        </Pressable>
+                    )}
+
+                    {/* Stop this app spending the holder's credits */}
+                    {runningAppId && credential && (
+                        <Pressable
+                            style={[styles.signOutButton, stoppingSpend && styles.removeButtonDisabled]}
+                            onPress={handleStopSpending}
+                            disabled={stoppingSpend}
+                        >
+                            <Ionicons name="wallet-outline" size={18} color={p.infoText} />
+                            <Text style={styles.signOutButtonText}>
+                                {stoppingSpend ? t('serviceDetail.stoppingSpending') : t('serviceDetail.stopSpending')}
                             </Text>
                         </Pressable>
                     )}

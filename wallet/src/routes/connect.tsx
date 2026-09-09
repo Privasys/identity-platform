@@ -71,6 +71,7 @@ import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { issueEncAuthForSignIn } from '@/services/encauth';
+import { CREDITS_PER_GBP, formatCap, grantSpendConsent } from '@/services/spend-api';
 import { ensureWia } from '@/services/wia';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
@@ -152,6 +153,10 @@ function friendlyBrowser(ua?: string): string | null {
 /** Ceremonial presence attribute: proven by a fresh in-flow selfie matched to
  *  the document portrait inside the enclave — never a stored profile value. */
 const PRESENCE_KEY = 'holder_present';
+
+/** Monthly spending cap offered when an app asks to spend without naming
+ *  one: £5 in credits (1 credit = £0.000001). */
+const DEFAULT_SPEND_CAP = 5 * CREDITS_PER_GBP;
 
 async function resolveRequestedAttributes(
     payload: QRPayload,
@@ -755,6 +760,12 @@ interface QRPayload {
      *  issuance: the voucher must land on the same IdP session row (sid)
      *  the issued JWT will carry, and that row is keyed by client_id. */
     clientId?: string;
+    /** Spend consent ask (acting-subject plan v2): the app wants to spend the
+     *  holder's platform credits on their behalf under a monthly cap
+     *  (credits; 1 credit = £0.000001). Shown on the approval screen; the
+     *  answer is recorded with the IdP after a successful sign-in, keyed by
+     *  the app's ATTESTED id (OID 3.6), never by anything in this payload. */
+    spend?: { cap?: number };
 }
 
 /**
@@ -852,6 +863,19 @@ function ConnectFlow() {
     const [consentItems, setConsentItems] = useState<SignInConsentItem[]>([]);
     const [consentSelected, setConsentSelected] = useState<Set<string>>(new Set());
     const [consentRemember, setConsentRemember] = useState(true);
+    // Spend consent: whether the holder lets this app spend their credits,
+    // and under what monthly cap (credits). Seeded from the payload's ask;
+    // recorded with the IdP once the sign-in has succeeded (maybeGrantSpend).
+    const [spendOn, setSpendOn] = useState(false);
+    const [spendCap, setSpendCap] = useState(0);
+    useEffect(() => {
+        if (qr?.spend) {
+            setSpendOn(true);
+            setSpendCap(Math.max(0, Math.floor(qr.spend.cap ?? DEFAULT_SPEND_CAP)));
+        } else {
+            setSpendOn(false);
+        }
+    }, [qr]);
     // Fresh-presence result, so the terminal screen can be honest rather than a
     // blanket "Connected" when a live holder-presence check did not pass.
     const [presenceFail, setPresenceFail] = useState<{ retryable: boolean } | null>(null);
@@ -1961,6 +1985,30 @@ function ConnectFlow() {
             ({ sid }) => console.log(`[CONNECT] EncAuth voucher uploaded (sid=${sid.substring(0, 8)}…)`),
             (err) => console.warn('[CONNECT] EncAuth voucher upload failed (silent rebind disabled):', err),
         );
+        maybeGrantSpend(payload, result.sessionToken, att);
+    };
+
+    /** Record the spend consent the approval screen carried, once the sign-in
+     *  succeeded. Keyed by the app's ATTESTED id (OID 3.6 from the verified
+     *  certificate), so a payload cannot name another app as the spender. A
+     *  declined ask records nothing; an existing consent is left alone (the
+     *  holder manages caps and withdrawal from Service Details or
+     *  privasys.id/account). Failures are logged, never block the sign-in:
+     *  the app then simply cannot spend until the holder allows it. */
+    const maybeGrantSpend = (payload: QRPayload, walletSessionToken: string, att: AttestationResult) => {
+        if (!payload.spend || !spendOn) return;
+        const appId = appIdFromOids(att.custom_oids);
+        if (!appId) {
+            console.warn('[CONNECT] spend consent skipped: the attested certificate carries no app id');
+            return;
+        }
+        void grantSpendConsent(walletSessionToken, appId, spendCap, {
+            appHost: payload.appHost,
+            appName: payload.appName,
+        }).then(
+            (c) => console.log(`[CONNECT] spend consent recorded for ${appId.substring(0, 8)}… (cap ${c.cap})`),
+            (err) => console.warn('[CONNECT] spend consent failed (the app cannot spend until allowed):', err),
+        );
     };
 
     /** Full attestation (inspect + attestation-server verify) of an additional
@@ -2620,6 +2668,16 @@ function ConnectFlow() {
                             })),
                             selected: consentSelected,
                             onToggle: toggleConsentAttr,
+                        } : undefined}
+                        spend={qr.spend ? {
+                            appLabel: listing?.name || qr.appName || appName(qr.appHost ?? qr.rpId),
+                            enabled: spendOn,
+                            cap: spendCap,
+                            capLabel: spendCap
+                                ? t('attestation.spendPerMonth', { amount: formatCap(spendCap, '') })
+                                : t('attestation.spendNoCap'),
+                            onToggle: () => setSpendOn((v) => !v),
+                            onStep: (dir) => setSpendCap((c) => Math.max(0, c + dir * CREDITS_PER_GBP)),
                         } : undefined}
                         onApprove={handleApprove}
                         onReject={handleReject}

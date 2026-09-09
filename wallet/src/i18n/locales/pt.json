@@ -308,6 +308,11 @@
     "attested": "Verificado num enclave seguro",
     "resourceAttested": "{{service}} verificado num enclave seguro",
     "resourceLine": "{{permissions}} {{resource}} no seu {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} o correio em {{resource}}, através de {{service}}",
+      "meeting.transcripts": "{{permissions}} as transcrições das suas reuniões em {{resource}}",
+      "meeting.recording": "Ligar a gravação e a transcrição das reuniões que organiza em {{resource}}"
+    },
     "permissionJoin": " e ",
     "permission": {
       "read": "Ler",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "Os seus ficheiros serão guardados no seu próprio armazenamento, sob as suas chaves. Sem isto, ficam no enclave apenas durante esta sessão e perdem-se quando reiniciar."
+      },
+      "mail": {
+        "mailbox": "Esta aplicação pode ler o correio desta conta e deixar nela rascunhos e etiquetas. Nunca pode enviar uma mensagem. O seu correio fica no seu fornecedor de correio; não é copiado para mais lado nenhum."
+      },
+      "calendar": {
+        "events": "Esta aplicação pode ver os eventos deste calendário e adicionar ou alterar apenas os que lhe pedir. O seu calendário fica no seu fornecedor; não é copiado para mais lado nenhum."
+      },
+      "meeting": {
+        "transcripts": "Esta aplicação pode ler as transcrições de reuniões em que participou, a partir da sua própria conta. Nunca entra numa reunião nem grava nenhuma.",
+        "recording": "Esta aplicação pode ligar a gravação e a transcrição do seu próprio fornecedor nas reuniões que organiza. O fornecedor avisa todos os participantes, da forma habitual. Sem isto, só as reuniões que já grava terão transcrição."
       }
     },
     "approve": "Aprovar",

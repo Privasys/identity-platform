@@ -308,6 +308,11 @@
     "attested": "Verifierad i en säker enklav",
     "resourceAttested": "{{service}} verifierad i en säker enklav",
     "resourceLine": "{{permissions}} {{resource}} i ditt {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} posten i {{resource}}, via {{service}}",
+      "meeting.transcripts": "{{permissions}} utskrifterna från dina möten i {{resource}}",
+      "meeting.recording": "Slå på inspelning och transkribering för möten du är värd för i {{resource}}"
+    },
     "permissionJoin": " och ",
     "permission": {
       "read": "Läsa",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "Dina filer sparas i ditt eget lagringsutrymme, under dina nycklar. Utan detta stannar de i enklaven bara under den här sessionen och går förlorade vid omstart."
+      },
+      "mail": {
+        "mailbox": "Den här appen kan läsa posten i det här kontot och lämna utkast och etiketter i det. Den kan aldrig skicka ett meddelande. Din post stannar hos din e-postleverantör; den kopieras inte någon annanstans."
+      },
+      "calendar": {
+        "events": "Den här appen kan se händelserna i den här kalendern och bara lägga till eller ändra dem du ber om. Din kalender stannar hos din leverantör; den kopieras inte någon annanstans."
+      },
+      "meeting": {
+        "transcripts": "Den här appen kan läsa utskrifter från möten du deltagit i, från ditt eget konto. Den går aldrig med i ett möte och spelar aldrig in något.",
+        "recording": "Den här appen kan slå på din egen leverantörs inspelning och transkribering för möten du är värd för. Leverantören talar om det för alla i mötet, på vanligt sätt. Utan detta får bara möten du redan spelar in en utskrift."
       }
     },
     "approve": "Godkänn",

@@ -341,6 +341,11 @@
     "attested": "Kontrollitud turvalises enklaavis",
     "resourceAttested": "{{service}} kontrollitud turvalises enklaavis",
     "resourceLine": "{{permissions}} {{resource}} teie {{service}} sees",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} posti kontol {{resource}} teenuse {{service}} kaudu",
+      "meeting.transcripts": "{{permissions}} teie koosolekute üleskirjutusi kontol {{resource}}",
+      "meeting.recording": "Lülitada sisse salvestus ja üleskirjutus koosolekutel, mida korraldate kontol {{resource}}"
+    },
     "permissionJoin": " ja ",
     "permission": {
       "read": "Lugeda",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Teie failid salvestatakse teie enda hoidlasse, teie võtmete all. Ilma selleta jäävad need enklaavi ainult selleks seansiks ja kaovad taaskäivitusel."
+      },
+      "mail": {
+        "mailbox": "See rakendus saab lugeda selle konto posti ning jätta sinna mustandeid ja silte. See ei saa kunagi sõnumit saata. Teie post jääb teie postiteenuse pakkuja juurde; seda ei kopeerita kuhugi mujale."
+      },
+      "calendar": {
+        "events": "See rakendus näeb selle kalendri sündmusi ning saab lisada või muuta ainult neid, mida te palute. Teie kalender jääb teie teenusepakkuja juurde; seda ei kopeerita kuhugi mujale."
+      },
+      "meeting": {
+        "transcripts": "See rakendus saab lugeda nende koosolekute üleskirjutusi, millest te osa võtsite, teie enda kontolt. See ei liitu kunagi koosolekuga ega salvesta seda.",
+        "recording": "See rakendus saab sisse lülitada teie teenusepakkuja enda salvestuse ja üleskirjutuse koosolekutel, mida te korraldate. Teenusepakkuja teatab sellest kõigile osalejatele tavapärasel viisil. Ilma selleta on üleskirjutus ainult neil koosolekutel, mida te juba salvestate."
       }
     },
     "approve": "Kinnita",

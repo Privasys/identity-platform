@@ -341,6 +341,11 @@
     "attested": "Verificat într-o enclavă securizată",
     "resourceAttested": "{{service}} verificat într-o enclavă securizată",
     "resourceLine": "{{permissions}} {{resource}} în {{service}} tău",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} corespondența din {{resource}}, prin {{service}}",
+      "meeting.transcripts": "{{permissions}} transcrierile ședințelor tale din {{resource}}",
+      "meeting.recording": "Activarea înregistrării și transcrierii pentru ședințele pe care le organizezi în {{resource}}"
+    },
     "permissionJoin": " și ",
     "permission": {
       "read": "Citire",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Fișierele tale vor fi salvate în propriul tău spațiu de stocare, sub cheile tale. Fără asta rămân în enclavă doar pentru această sesiune și se pierd la repornire."
+      },
+      "mail": {
+        "mailbox": "Această aplicație poate citi corespondența din acest cont și poate lăsa în el ciorne și etichete. Nu poate trimite niciodată un mesaj. Corespondența ta rămâne la furnizorul tău de e-mail; nu este copiată în altă parte."
+      },
+      "calendar": {
+        "events": "Această aplicație poate vedea evenimentele din acest calendar și poate adăuga sau modifica doar pe cele pe care i le ceri. Calendarul tău rămâne la furnizorul tău; nu este copiat în altă parte."
+      },
+      "meeting": {
+        "transcripts": "Această aplicație poate citi transcrierile ședințelor la care ai participat, din propriul tău cont. Nu se alătură niciodată unei ședințe și nu înregistrează niciodată una.",
+        "recording": "Această aplicație poate activa înregistrarea și transcrierea propriului tău furnizor pentru ședințele pe care le organizezi. Furnizorul îi anunță pe toți participanții, în modul obișnuit. Fără asta, doar ședințele pe care le înregistrezi deja vor avea transcriere."
       }
     },
     "approve": "Aprobă",

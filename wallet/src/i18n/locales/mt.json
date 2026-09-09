@@ -341,6 +341,11 @@
     "attested": "Ivverifikat f'enklavi sigura",
     "resourceAttested": "{{service}} ivverifikat f'enklavi sigura",
     "resourceLine": "{{permissions}} {{resource}} fil-{{service}} tiegħek",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} il-posta f'{{resource}}, permezz ta' {{service}}",
+      "meeting.transcripts": "{{permissions}} it-traskrizzjonijiet tal-laqgħat tiegħek f'{{resource}}",
+      "meeting.recording": "Tixgħel ir-reġistrazzjoni u t-traskrizzjoni għal-laqgħat li torganizza f'{{resource}}"
+    },
     "permissionJoin": " u ",
     "permission": {
       "read": "Jaqra",
@@ -350,6 +355,16 @@
     "explain": {
       "storage": {
         "folder": "Il-fajls tiegħek jiġu salvati fil-ħażna tiegħek stess, taħt iċ-ċwievet tiegħek. Mingħajr dan jibqgħu fl-enklavi għal din is-sessjoni biss, u jintilfu meta terġa' tibda."
+      },
+      "mail": {
+        "mailbox": "Din l-app tista' taqra l-posta f'dan il-kont u tħalli fih abbozzi u tikketti. Qatt ma tista' tibgħat messaġġ. Il-posta tiegħek tibqa' għand il-fornitur tal-posta tiegħek; ma tiġi kkupjata mkien ieħor."
+      },
+      "calendar": {
+        "events": "Din l-app tista' tara l-avvenimenti f'dan il-kalendarju, u żżid jew tbiddel biss dawk li titlobha. Il-kalendarju tiegħek jibqa' għand il-fornitur tiegħek; ma jiġix ikkupjat imkien ieħor."
+      },
+      "meeting": {
+        "transcripts": "Din l-app tista' taqra t-traskrizzjonijiet ta' laqgħat li ħadt sehem fihom, mill-kont tiegħek stess. Qatt ma tingħaqad ma' laqgħa u qatt ma tirrekordja waħda.",
+        "recording": "Din l-app tista' tixgħel ir-reġistrazzjoni u t-traskrizzjoni tal-fornitur tiegħek stess għal-laqgħat li torganizza. Il-fornitur jgħid lil kulħadd fil-laqgħa, bil-mod tas-soltu. Mingħajr dan, huma biss il-laqgħat li diġà tirrekordja li jkollhom traskrizzjoni."
       }
     },
     "approve": "Approva",

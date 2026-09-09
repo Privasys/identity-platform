@@ -308,6 +308,11 @@
     "attested": "Zweryfikowano w bezpiecznej enklawie",
     "resourceAttested": "{{service}} zweryfikowano w bezpiecznej enklawie",
     "resourceLine": "{{permissions}} {{resource}} w Twoim {{service}}",
+    "resourceLineByKind": {
+      "mail.mailbox": "{{permissions}} pocztę w {{resource}}, przez {{service}}",
+      "meeting.transcripts": "{{permissions}} transkrypcje Twoich spotkań w {{resource}}",
+      "meeting.recording": "Włączyć nagrywanie i transkrypcję dla spotkań, które prowadzisz w {{resource}}"
+    },
     "permissionJoin": " i ",
     "permission": {
       "read": "Odczyt",
@@ -317,6 +322,16 @@
     "explain": {
       "storage": {
         "folder": "Twoje pliki będą zapisywane w Twojej własnej przestrzeni, pod Twoimi kluczami. Bez tego pozostają w enklawie tylko na czas tej sesji i giną po restarcie."
+      },
+      "mail": {
+        "mailbox": "Ta aplikacja może czytać pocztę na tym koncie i zostawiać w nim wersje robocze oraz etykiety. Nigdy nie może wysłać wiadomości. Twoja poczta pozostaje u Twojego dostawcy poczty; nie jest kopiowana nigdzie indziej."
+      },
+      "calendar": {
+        "events": "Ta aplikacja może widzieć wydarzenia w tym kalendarzu i dodawać lub zmieniać tylko te, o które ją poprosisz. Twój kalendarz pozostaje u Twojego dostawcy; nie jest kopiowany nigdzie indziej."
+      },
+      "meeting": {
+        "transcripts": "Ta aplikacja może czytać transkrypcje spotkań, w których brałeś udział, z Twojego własnego konta. Nigdy nie dołącza do spotkania i nigdy go nie nagrywa.",
+        "recording": "Ta aplikacja może włączyć nagrywanie i transkrypcję Twojego dostawcy dla spotkań, które prowadzisz. Dostawca informuje o tym wszystkich uczestników w zwykły sposób. Bez tego transkrypcję będą miały tylko te spotkania, które już nagrywasz."
       }
     },
     "approve": "Zatwierdź",

@@ -10,6 +10,7 @@ import { fetchAttributeApproval } from '../services/attribute-approval-api';
 import { registerPushTokenWithIdp } from '../services/vault-approval-api';
 import { useDriveNotificationsStore } from '../stores/drive-notifications';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
+import { isRouteActive } from '../utils/active-route';
 
 let _notificationsSetup = false;
 
@@ -153,7 +154,12 @@ async function fileDriveNotification(data: Record<string, unknown>): Promise<boo
 async function dispatchPush(data: Record<string, unknown>, router: Router): Promise<void> {
     if (data?.type === 'share-request' || data?.type === 'share-decision') {
         await fileDriveNotification(data);
-        router.push({ pathname: '/drive-requests', params: { source: 'push' } });
+        // Already filed above, so an open list is showing it: pushing would
+        // only stack a second copy of the same view. See the vault-approval
+        // branch below for what that cost.
+        if (!isRouteActive('/drive-requests')) {
+            router.push({ pathname: '/drive-requests', params: { source: 'push' } });
+        }
         return;
     }
     if (data?.type === 'capability-request') {
@@ -174,10 +180,19 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         // when the user reaches the screen another way (missed banner,
         // foreground arrival).
         useVaultApprovalsStore.getState().remember(vaultOp);
-        router.push({
-            pathname: '/vault-approvals',
-            params: { vault_op: vaultOp, source: 'push' },
-        });
+        // Do NOT push when that screen is already up. It lists everything
+        // pending, and remember() has just added this one, so a push adds no
+        // information and one screen per notification.
+        //
+        // Approving several promotes in a row produced exactly that: a stack of
+        // identical screens, each saying "nothing left to approve" once its turn
+        // came, and a back press needed per approval to get home (2026-09-10).
+        if (!isRouteActive('/vault-approvals')) {
+            router.push({
+                pathname: '/vault-approvals',
+                params: { vault_op: vaultOp, source: 'push' },
+            });
+        }
         return;
     }
     if (data?.type === 'attribute-approval') {

@@ -30,6 +30,7 @@ import {
 } from 'react-native';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { useActiveRoute } from '@/utils/active-route';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { decideShareRequest, listShareRequests } from '@/services/drive';
 import {
@@ -66,6 +67,8 @@ function timeAgo(epochSeconds: number, t: TFunction): string {
 }
 
 export default function DriveRequestsScreen() {
+    // See vault-approvals: a list screen must not be stacked by repeat pushes.
+    useActiveRoute('/drive-requests');
     const { t } = useTranslation();
     const palette = usePalette();
     const styles = makeStyles(palette);

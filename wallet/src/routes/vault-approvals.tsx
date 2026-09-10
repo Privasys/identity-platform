@@ -44,6 +44,7 @@ import {
 } from '@/services/vault-approval-api';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
+import { useActiveRoute } from '@/utils/active-route';
 
 function shortHandle(handle: string): string {
     const parts = handle.split('/');
@@ -95,6 +96,10 @@ function formatRemaining(expiresAtSec: number, nowMs: number, t: TFunction): str
 }
 
 export default function VaultApprovalsScreen() {
+    // A list screen: while it is up, a fresh push has nothing to add beyond the
+    // store update that precedes it, so the dispatcher skips the route push
+    // rather than stacking another copy of this same view.
+    useActiveRoute('/vault-approvals');
     const params = useLocalSearchParams<{ vault_op?: string }>();
     const { t } = useTranslation();
     const p = usePalette();

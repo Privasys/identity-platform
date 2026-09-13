@@ -102,6 +102,23 @@ func (h *Handler) HandleListConsents(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []*Consent{}
 	}
+	// A consent granted before its app could be named (recorded by the
+	// wallet with the id alone, or while the app was not yet deployed) is
+	// named now, so the account page never shows a raw id. Best effort.
+	for _, c := range list {
+		if (c.AppName != "" && c.AppHost != "") || h.resolver == nil {
+			continue
+		}
+		if _, name, host, err := h.resolver.JWKSURL(r.Context(), c.AppID); err == nil {
+			if c.AppName == "" {
+				c.AppName = name
+			}
+			if c.AppHost == "" {
+				c.AppHost = host
+			}
+			_ = h.store.SetDisplay(userID, c.AppID, c.AppHost, c.AppName)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"consents": list})
 }
 

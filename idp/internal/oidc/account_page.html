@@ -216,6 +216,9 @@
   .month { display: grid; grid-template-columns: 1fr; gap: 0.6rem; margin-top: 1.25rem; max-width: 30rem; }
   .month .r { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.95rem; }
   .month .r span { color: var(--text-secondary); overflow-wrap: anywhere; }
+  .month .r.head { margin-top: 0.6rem; }
+  .month .r.head:first-child { margin-top: 0; }
+  .month .r.head span { color: var(--text); font-weight: 600; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; }
   .month .r b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .month .r.total { border-top: 1px solid var(--border); padding-top: 0.6rem; }
   .month .r.total span { color: var(--text); font-weight: 600; }
@@ -531,7 +534,9 @@
     try { spend = await mgmt("/billing/spend"); } catch (e) { errs.push(e.message); }
     consentsByApp = {}; spentByApp = {};
     consents.forEach(function (c) { consentsByApp[hex(c.app_id)] = c; });
-    ((spend && spend.by_app) || []).forEach(function (s) { spentByApp[hex(s.app_id)] = s.credits || 0; });
+    // What each allowed app spent FOR you under its consent. The app's own
+    // bills (if you also run it) are listed separately under your own use.
+    ((spend && spend.by_spender) || []).forEach(function (s) { spentByApp[hex(s.app_id)] = s.credits || 0; });
     renderConsents(consents);
     renderSpend(spend);
     if (errs.length) $("consentErr").textContent = errs.join(" · ");
@@ -579,17 +584,31 @@
     });
   }
 
+  function appName(s) {
+    var c = consentsByApp[hex(s.app_id)];
+    return s.app_name || (c && (c.app_name || c.app_host)) || s.app_host || (s.app_id ? "App " + s.app_id.slice(0, 8) + "…" : "");
+  }
+
   function renderSpend(r) {
     var box = $("spend");
     if (!r) { box.innerHTML = '<span class="hint">Not available right now.</span>'; return; }
-    var rows = r.by_app || [];
-    if (!rows.length) { box.innerHTML = '<span class="hint">Nothing spent yet this month.</span>'; return; }
+    var forYou = r.by_spender || [];
+    var own = r.by_app || [];
+    if (!forYou.length && !own.length) { box.innerHTML = '<span class="hint">Nothing spent yet this month.</span>'; return; }
     var html = "";
-    rows.forEach(function (s) {
-      var c = consentsByApp[hex(s.app_id)];
-      var name = c ? (c.app_name || c.app_host) : (s.app_id ? "App " + s.app_id.slice(0, 8) + "…" : "Your own use (sessions and API keys)");
-      html += '<div class="r"><span>' + esc(name) + '</span><b>' + esc(gbp(s.credits)) + '</b></div>';
-    });
+    if (forYou.length) {
+      html += '<div class="r head"><span>Spent for you by apps you allowed</span></div>';
+      forYou.forEach(function (s) {
+        html += '<div class="r"><span>' + esc(appName(s)) + '</span><b>' + esc(gbp(s.credits)) + '</b></div>';
+      });
+    }
+    if (own.length) {
+      html += '<div class="r head"><span>Your own use</span></div>';
+      own.forEach(function (s) {
+        var name = s.app_id ? appName(s) + " (an app you run)" : "Your sessions and API keys";
+        html += '<div class="r"><span>' + esc(name) + '</span><b>' + esc(gbp(s.credits)) + '</b></div>';
+      });
+    }
     html += '<div class="r total"><span>Total</span><b>' + esc(gbp(r.total_credits)) + '</b></div>';
     box.innerHTML = html;
   }

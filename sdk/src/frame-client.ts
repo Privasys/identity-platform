@@ -1104,7 +1104,19 @@ export class AuthFrame {
 
                 if (data.type === 'privasys:ready') {
                     iframe.contentWindow!.postMessage(
-                        { type: 'privasys:session:resume', id, appHost, rpId: this.rpId },
+                        {
+                            type: 'privasys:session:resume',
+                            id,
+                            appHost,
+                            rpId: this.rpId,
+                            // The spend ask travels with the resume so the host
+                            // can refuse a SILENT one for an app the holder has
+                            // never allowed to spend. Without this the ask only
+                            // ever reaches the wallet on a first sign-in: every
+                            // later visit resumes quietly and the app can never
+                            // be paid for (found 2026-09-13, harness 402s).
+                            ...(this.config.spend ? { spend: this.config.spend } : {}),
+                        },
                         this.authOrigin,
                     );
                     return;

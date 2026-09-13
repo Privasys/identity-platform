@@ -69,6 +69,36 @@ function jwtClaim(token: string, claim: string): string | null {
 }
 
 /**
+ * Does the holder already allow this app to spend their credits?
+ *
+ * Matched by HOST, the only identifier a browser has: the app id is derived
+ * from the attested certificate (OID 3.6) inside the wallet ceremony, which
+ * is precisely the thing that has not happened yet when this is asked.
+ *
+ * Fails OPEN. A consent lookup that cannot be made is not evidence of a
+ * missing consent, and refusing a silent resume on a transport hiccup would
+ * cost the holder their session to answer a question they already answered.
+ */
+async function hasSpendConsent(rpId: string, appHost: string): Promise<boolean> {
+    const session = sessions.get(rpId);
+    if (!session?.token) return true;
+    try {
+        const resp = await fetch(`${globalThis.location.origin}/spend/consents`, {
+            headers: { Authorization: `Bearer ${session.token}` },
+            cache: 'no-store',
+        });
+        if (!resp.ok) return true;
+        const body = await resp.json() as { consents?: { app_host?: string; revoked_at?: string }[] };
+        const host = appHost.toLowerCase();
+        return (body.consents ?? []).some(
+            (c) => !c.revoked_at && (c.app_host ?? '').toLowerCase() === host,
+        );
+    } catch {
+        return true;
+    }
+}
+
+/**
  * Build the EncAuth voucher fetcher for silent rebind / cold resume.
  * Reads the freshest bearer token for `rpId` from this origin's session
  * store at call time (renewal may have rotated it since install) and
@@ -1647,6 +1677,21 @@ window.addEventListener('message', async (e: MessageEvent) => {
         }
         if (activeSession && activeSession.appHost === appHost) {
             reply({ sessionId: activeSession.sessionId, appHost, expiresAt: activeSession.expiresAt });
+            return;
+        }
+        // An app that asks to spend the holder's credits must be ALLOWED to,
+        // and the only screen that asks is the wallet ceremony. A returning
+        // holder resumes silently, so without this a newly deployed app could
+        // never be paid for: it would ask on every sign-in and be asked on
+        // none, and every priced call would fail 402 with nothing to click
+        // (found 2026-09-13). Refusing the SILENT resume hands the gate back
+        // to connect(), which runs the ceremony, the wallet shows the spend
+        // row, and the answer is recorded once.
+        //
+        // Fails OPEN: a consent lookup that cannot be made must never cost
+        // someone their own session.
+        if (data.spend && !(await hasSpendConsent(rpId, appHost))) {
+            reply({ error: 'rejected', reason: 'spend-consent-required' });
             return;
         }
         const getEncAuth = makeGetEncAuth(rpId, appHost);

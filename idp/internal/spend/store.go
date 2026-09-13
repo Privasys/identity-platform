@@ -237,6 +237,14 @@ func (s *Store) Revoke(userID, appID string) error {
 // RevokeBySID is the hook for the generic session revoke path: when the
 // user revokes a "spend:<app>" session from the sessions list, the consent
 // row follows.
+// SetDisplay fills a consent's display fields (host, name) after the fact,
+// for rows granted before the app could be resolved.
+func (s *Store) SetDisplay(userID, appID, appHost, appName string) error {
+	_, err := s.db.Exec(`UPDATE spend_consents SET app_host = ?, app_name = ?
+		WHERE user_id = ? AND app_id = ?`, appHost, appName, userID, appID)
+	return err
+}
+
 func (s *Store) RevokeBySID(sid string) error {
 	now := time.Now().UTC()
 	_, err := s.db.Exec(`UPDATE spend_consents SET revoked_at = ?, updated_at = ?

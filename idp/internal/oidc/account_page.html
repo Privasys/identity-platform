@@ -207,11 +207,6 @@
 
   .add-app { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px dashed var(--border); display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
   .add-app p { font-size: 0.9rem; color: var(--text-secondary); flex: 1 1 18rem; }
-  .add-form { margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-  .add-form select {
-    padding: 0.45rem 2rem 0.45rem 0.9rem; border: 1px solid var(--border); border-radius: 999px; background: var(--bg);
-    font-size: 0.9rem; max-width: 100%;
-  }
 
   .month { display: grid; grid-template-columns: 1fr; gap: 0.6rem; margin-top: 1.25rem; max-width: 30rem; }
   .month .r { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.95rem; }
@@ -335,14 +330,7 @@
       <p class="section-lead">Each app spends within a monthly limit you set, for everything it does on your behalf. Lower the limit or stop an app at any time. <strong>The change applies within a minute.</strong></p>
       <div class="apps" id="consents"><p class="empty"><span class="spin"></span>Loading…</p></div>
       <div class="add-app">
-        <p>Apps ask for this permission when you sign in to them. You can also allow one ahead of time.</p>
-        <button class="btn btn-outline btn-sm" id="allowToggle" type="button">Allow another app</button>
-      </div>
-      <div class="add-form hidden" id="allowForm">
-        <select id="appPick" aria-label="App to allow"><option value="">Choose an app…</option></select>
-        <label class="cap-field"><span class="unit">£</span><input id="appCap" type="number" min="0" step="1" value="5" aria-label="Monthly limit in pounds"><span class="per">/ month</span></label>
-        <button class="btn btn-sm" id="allowBtn" type="button">Allow</button>
-        <span class="hint">0 means no limit.</span>
+        <p>An app asks for this permission on your phone when you sign in to it. A limit of £0 means no limit.</p>
       </div>
       <div class="err" id="consentErr"></div>
     </section>
@@ -486,7 +474,7 @@
     $("main").classList.remove("hidden");
     $("monthLabel").textContent = monthLabel();
     // The ledger names apps through the consents, so it renders after them.
-    await Promise.all([loadAccount(), loadApps(), loadConsentsAndSpend().then(loadLedger)]);
+    await Promise.all([loadAccount(), loadConsentsAndSpend().then(loadLedger)]);
   }
 
   function monthLabel() {
@@ -612,43 +600,6 @@
     html += '<div class="r total"><span>Total</span><b>' + esc(gbp(r.total_credits)) + '</b></div>';
     box.innerHTML = html;
   }
-
-  async function loadApps() {
-    try {
-      var r = await fetch(API + "/api/v1/store/apps");
-      if (!r.ok) return;
-      var apps = await r.json();
-      var list = Array.isArray(apps) ? apps : (apps.apps || []);
-      var pick = $("appPick");
-      list.forEach(function (a) {
-        var id = a.app_id || a.id;
-        if (!id) return;
-        var o = document.createElement("option");
-        o.value = id;
-        o.textContent = a.display_name || a.name || a.slug || id;
-        pick.appendChild(o);
-      });
-    } catch (e) { /* the store listing is optional here */ }
-  }
-
-  $("allowToggle").addEventListener("click", function () {
-    var f = $("allowForm");
-    f.classList.toggle("hidden");
-    if (!f.classList.contains("hidden")) $("appPick").focus();
-  });
-
-  $("allowBtn").addEventListener("click", async function () {
-    $("consentErr").textContent = "";
-    var id = $("appPick").value;
-    if (!id) { $("consentErr").textContent = "Choose an app first."; return; }
-    try {
-      var cap = Math.round(Math.max(0, Number($("appCap").value) || 0) * CREDITS_PER_GBP);
-      await idp("/spend/consents", { method: "POST", body: { app_id: id, cap: cap } });
-      $("appPick").value = "";
-      $("allowForm").classList.add("hidden");
-      await loadConsentsAndSpend();
-    } catch (e) { $("consentErr").textContent = e.message; }
-  });
 
   // Ledger reasons are system words; show them as things a person recognises.
   var LEDGER_LABELS = {

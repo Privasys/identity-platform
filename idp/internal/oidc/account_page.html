@@ -421,6 +421,10 @@
     return new Privasys.AuthFrame({
       apiBase: API,
       appName: "Privasys ID",
+      // Same relying party as the developer portal, Drive and chat: the
+      // wallet derives the pairwise subject per rpId, so this is what makes
+      // the account here the same account as everywhere else on the platform.
+      rpId: "privasys.id",
       clientId: "privasys-platform",
       authOrigin: IDP,
       scope: ["openid", "offline_access"]

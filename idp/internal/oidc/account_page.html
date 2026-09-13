@@ -650,21 +650,44 @@
     } catch (e) { $("consentErr").textContent = e.message; }
   });
 
+  // Ledger reasons are system words; show them as things a person recognises.
+  var LEDGER_LABELS = {
+    container_metering: "App hosting (container time)",
+    instance_metering: "Instance hosting",
+    metering: "App metering",
+    volume_storage: "Storage",
+    ai_inference: "AI answers",
+    api_fee: "API fee",
+    api_fee_revenue: "API fee earned",
+    deploy: "Deploy",
+    topup: "Top up",
+    grant: "Credits added"
+  };
+  function ledgerLabel(reason) {
+    if (LEDGER_LABELS[reason]) return LEDGER_LABELS[reason];
+    if (/^monthly included allowance/.test(reason)) return "Monthly allowance";
+    return reason;
+  }
+
   async function loadLedger() {
     try {
       var r = await mgmt("/billing/ledger?limit=15");
       if (!r || r.enabled === false) { $("ledger").textContent = "—"; return; }
       var entries = (r.data && r.data.entries) || r.entries || [];
       if (!entries.length) { $("ledger").textContent = "No activity yet."; return; }
-      var html = '<div class="table-wrap"><table><thead><tr><th>When</th><th>What</th><th class="num">Amount</th></tr></thead><tbody>';
+      var html = '<div class="table-wrap"><table><thead><tr><th>When</th><th>What</th><th class="num">Credits</th><th class="num">Amount</th></tr></thead><tbody>';
       entries.forEach(function (e) {
         var when = new Date(e.ts).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
         var credits = Number(e.credits) || 0;
         var app = e.app_id && consentsByApp[hex(e.app_id)];
-        var what = app ? (app.app_name || app.app_host) : (e.reason || e.kind || "");
-        var sub = app ? (e.reason || e.kind || "") : "";
+        var reason = ledgerLabel(e.reason || e.kind || "");
+        var what = app ? (app.app_name || app.app_host) : reason;
+        var sub = app ? reason : "";
+        var sign = credits > 0 ? "+" : (credits < 0 ? "−" : "");
+        var cls = credits > 0 ? " plus" : "";
         html += "<tr><td>" + esc(when) + "</td><td>" + esc(what) + (sub ? '<span class="sub">' + esc(sub) + "</span>" : "") + "</td>" +
-          '<td class="num' + (credits > 0 ? " plus" : "") + '">' + (credits > 0 ? "+" : (credits < 0 ? "−" : "")) + esc(gbp(Math.abs(credits))) + "</td></tr>";
+          '<td class="num' + cls + '">' + sign + esc(Math.abs(credits).toLocaleString("en-GB")) + "</td>" +
+          '<td class="num' + cls + '">' + sign + esc(gbp(Math.abs(credits))) + "</td></tr>";
       });
       $("ledger").className = "";
       $("ledger").innerHTML = html + "</tbody></table></div>";

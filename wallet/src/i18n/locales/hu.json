@@ -353,7 +353,20 @@
     "failedTitle": "A hozzáférés nem lett megadva",
     "failedBody": "Semmi sem változott. Újra megpróbálhatja.",
     "doneTitle": "Hozzáférés megadva",
-    "doneBody": "A(z) {{app}} mostantól használhatja azt, amit jóváhagyott. Bármikor visszavonhatja."
+    "doneBody": "A(z) {{app}} mostantól használhatja azt, amit jóváhagyott. Bármikor visszavonhatja.",
+    "setup": {
+      "preparing": "A következő lépés előkészítése",
+      "chainNote": "Erre van szükség először: ott lesznek megőrizve azok az adatok, amelyeket a következő képernyőn ad meg.",
+      "formLabel": "Mire van szüksége ennek a szolgáltatásnak Öntől",
+      "optional": "Nem kötelező",
+      "show": "Megjelenítés",
+      "hide": "Elrejtés",
+      "incomplete": "Töltsön ki mindent, ami nincs nem kötelezőként megjelölve.",
+      "privacyNote": "Amit megad, erről az eszközről közvetlenül a(z) {{service}} szolgáltatáshoz kerül. Itt nem tárolódik, és az azt kérő alkalmazás soha nem látja.",
+      "refusedTitle": "A(z) {{service}} nem tudta használni ezeket az adatokat",
+      "refusedFallback": "Az adatokat nem fogadták el. Ellenőrizze őket, és próbálja újra.",
+      "refusedNested": "Ez a kérés több egymást követő jóváhagyást igényel, mint amennyi lehetséges, ezért semmi nem lett megadva."
+    }
   },
   "credentials": {
     "title": "Regisztrált hitelesítő adatok",

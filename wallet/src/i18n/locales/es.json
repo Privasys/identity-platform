@@ -353,7 +353,20 @@
     "failedTitle": "No se concedió el acceso",
     "failedBody": "No se ha cambiado nada. Puedes intentarlo de nuevo.",
     "doneTitle": "Acceso concedido",
-    "doneBody": "{{app}} ya puede usar lo que has aprobado. Puedes revocarlo en cualquier momento."
+    "doneBody": "{{app}} ya puede usar lo que has aprobado. Puedes revocarlo en cualquier momento.",
+    "setup": {
+      "preparing": "Preparando el siguiente paso",
+      "chainNote": "Esto hace falta primero: es donde se guardarán los datos que introduzcas en la pantalla siguiente.",
+      "formLabel": "Lo que este servicio necesita de ti",
+      "optional": "Opcional",
+      "show": "Mostrar",
+      "hide": "Ocultar",
+      "incomplete": "Rellena todo lo que no esté marcado como opcional.",
+      "privacyNote": "Lo que introduzcas va directamente a {{service}} desde este dispositivo. No se guarda aquí y la aplicación que lo ha pedido nunca lo ve.",
+      "refusedTitle": "{{service}} no ha podido usar estos datos",
+      "refusedFallback": "Los datos no se han aceptado. Compruébalos e inténtalo de nuevo.",
+      "refusedNested": "Esta solicitud pide más aprobaciones seguidas de las que son posibles, así que no se ha concedido nada."
+    }
   },
   "credentials": {
     "title": "Credenciales registradas",

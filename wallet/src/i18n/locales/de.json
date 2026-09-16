@@ -353,7 +353,20 @@
     "failedTitle": "Zugriff wurde nicht gewährt",
     "failedBody": "Es wurde nichts geändert. Sie können es erneut versuchen.",
     "doneTitle": "Zugriff gewährt",
-    "doneBody": "{{app}} kann jetzt nutzen, was Sie genehmigt haben. Sie können es jederzeit widerrufen."
+    "doneBody": "{{app}} kann jetzt nutzen, was Sie genehmigt haben. Sie können es jederzeit widerrufen.",
+    "setup": {
+      "preparing": "Nächster Schritt wird vorbereitet",
+      "chainNote": "Dies wird zuerst benötigt: dort werden die Angaben aufbewahrt, die Sie im nächsten Schritt eingeben.",
+      "formLabel": "Was dieser Dienst von Ihnen benötigt",
+      "optional": "Optional",
+      "show": "Anzeigen",
+      "hide": "Verbergen",
+      "incomplete": "Füllen Sie alles aus, was nicht als optional gekennzeichnet ist.",
+      "privacyNote": "Ihre Eingaben gehen von diesem Gerät direkt an {{service}}. Sie werden hier nicht gespeichert, und die anfragende App sieht sie nie.",
+      "refusedTitle": "{{service}} konnte diese Angaben nicht verwenden",
+      "refusedFallback": "Die Angaben wurden nicht akzeptiert. Prüfen Sie sie und versuchen Sie es erneut.",
+      "refusedNested": "Diese Anfrage verlangt mehr aufeinanderfolgende Freigaben, als möglich sind, daher wurde nichts gewährt."
+    }
   },
   "credentials": {
     "title": "Registrierte Anmeldeinformationen",

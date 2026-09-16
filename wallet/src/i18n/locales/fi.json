@@ -353,7 +353,20 @@
     "failedTitle": "Käyttöoikeutta ei myönnetty",
     "failedBody": "Mitään ei muutettu. Voit yrittää uudelleen.",
     "doneTitle": "Käyttöoikeus myönnetty",
-    "doneBody": "{{app}} voi nyt käyttää hyväksymääsi. Voit peruuttaa sen milloin tahansa."
+    "doneBody": "{{app}} voi nyt käyttää hyväksymääsi. Voit peruuttaa sen milloin tahansa.",
+    "setup": {
+      "preparing": "Valmistellaan seuraavaa vaihetta",
+      "chainNote": "Tämä tarvitaan ensin: siellä säilytetään tiedot, jotka annat seuraavassa näkymässä.",
+      "formLabel": "Mitä tämä palvelu tarvitsee sinulta",
+      "optional": "Valinnainen",
+      "show": "Näytä",
+      "hide": "Piilota",
+      "incomplete": "Täytä kaikki, mitä ei ole merkitty valinnaiseksi.",
+      "privacyNote": "Antamasi tiedot menevät tältä laitteelta suoraan palveluun {{service}}. Niitä ei säilytetä täällä, eikä pyynnön tehnyt sovellus näe niitä koskaan.",
+      "refusedTitle": "Palvelu {{service}} ei voinut käyttää näitä tietoja",
+      "refusedFallback": "Tietoja ei hyväksytty. Tarkista ne ja yritä uudelleen.",
+      "refusedNested": "Tämä pyyntö vaatii enemmän peräkkäisiä hyväksyntöjä kuin on mahdollista, joten mitään ei myönnetty."
+    }
   },
   "credentials": {
     "title": "Rekisteröidyt tunnistetiedot",

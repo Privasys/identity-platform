@@ -386,6 +386,19 @@
       "mail.mailbox": "{{permissions}} the mail in {{resource}}, through {{service}}",
       "meeting.transcripts": "{{permissions}} the transcripts of your meetings in {{resource}}",
       "meeting.recording": "Switch on recording and transcription for meetings you host in {{resource}}"
+    },
+    "setup": {
+      "preparing": "Preparing the next step",
+      "chainNote": "This is needed first: it is where the details you enter on the next screen will be kept.",
+      "formLabel": "What this service needs from you",
+      "optional": "Optional",
+      "show": "Show",
+      "hide": "Hide",
+      "incomplete": "Fill in everything that is not marked optional.",
+      "privacyNote": "What you enter goes straight to {{service}} from this device. It is not stored here, and the app that asked never sees it.",
+      "refusedTitle": "{{service}} could not use these details",
+      "refusedFallback": "The details were not accepted. Check them and try again.",
+      "refusedNested": "This request asks for more approvals than can be chained, so nothing was granted."
     }
   },
   "credentials": {

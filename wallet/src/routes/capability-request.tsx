@@ -10,16 +10,27 @@
  * asking and the service holding the data are different parties, and both must
  * be verified from attestation rather than taken from the request.
  *
- * Nothing here knows what a tenant or a folder is. The resource service does
- * its own domain work from a request body the wallet forwards without reading.
+ * A service may also need something from the holder before the capability can
+ * exist: an approval of its own, and values to type. Both happen here, on the
+ * same tap, because this is the only screen in the chain where the holder can
+ * see the far end being verified, and because what they type then makes one
+ * attested hop to the service that seals it.
+ *
+ * Nothing here knows what a tenant, a folder or a mailbox is. The resource
+ * service does its own domain work from a request body the wallet forwards
+ * without reading, and draws its own form from a schema the wallet renders
+ * without interpreting.
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -28,6 +39,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { SetupForm } from '@/components/SetupForm';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { inspectAttestation, isAttestableHost } from '@/services/attestation';
@@ -37,14 +49,41 @@ import {
     deliverCapabilityOutcome,
     expiryFor,
     fetchPendingCapability,
+    isProviderRefusal,
     isStaleTenantKey,
     type PendingCapability,
 } from '@/services/capabilities';
+import {
+    initialAnswers,
+    missingRequired,
+    setupPayload,
+    type SetupAnswers,
+    type SetupPrerequisite,
+    type SetupRequirement,
+} from '@/services/capability-setup';
 import { rearmTenantKeyAt } from '@/services/drive';
 import { appIdFromOids } from '@/services/release-provenance';
 import { useCapabilitiesStore } from '@/stores/capabilities';
+import { useConsentStore } from '@/stores/consent';
+import { useProfileStore } from '@/stores/profile';
+import { recordChainOutcome, takeChainOutcome } from '@/utils/capability-chain';
 
-type Phase = 'loading' | 'ready' | 'refused' | 'working' | 'done';
+type Phase = 'loading' | 'prerequisite' | 'ready' | 'refused' | 'working' | 'done';
+
+/**
+ * The holder's own address, but only where the app that asked has already been
+ * allowed to see it. An address the holder chose to keep from this app is not
+ * one the wallet volunteers on its behalf.
+ */
+function prefillEmailFor(appHost: string): string {
+    const disclosed = useConsentStore
+        .getState()
+        .getRecordsForApp(appHost)
+        .some((r) => r.approvedAttributes.includes('email'));
+    if (!disclosed) return '';
+    const profile = useProfileStore.getState().profile;
+    return profile?.attributes.find((a) => a.key === 'email')?.value || profile?.email || '';
+}
 
 export default function CapabilityRequestScreen() {
     const { t } = useTranslation();
@@ -52,10 +91,12 @@ export default function CapabilityRequestScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const styles = useMemo(() => makeStyles(p), [p]);
-    const params = useLocalSearchParams<{ app_host?: string; nonce?: string }>();
+    const params = useLocalSearchParams<{ app_host?: string; nonce?: string; chain?: string }>();
 
     const appHost = String(params.app_host ?? '');
     const nonce = String(params.nonce ?? '');
+    /** This screen is a prerequisite of another approval, running under it. */
+    const chained = String(params.chain ?? '') === '1';
 
     const [phase, setPhase] = useState<Phase>('loading');
     const [refusal, setRefusal] = useState<string>('');
@@ -63,6 +104,23 @@ export default function CapabilityRequestScreen() {
     const [requesterAppId, setRequesterAppId] = useState<string>('');
     const [requesterName, setRequesterName] = useState<string>('');
     const [resource, setResource] = useState<ResolvedApp | null>(null);
+
+    // What the service needs from the holder. `setup` is the step being shown;
+    // `answered` is everything accepted by earlier steps, which a later one
+    // must not ask for again. Both live in component state only: they hold a
+    // secret, so they are never persisted and never logged.
+    const [setup, setSetup] = useState<SetupRequirement | null>(null);
+    const [answers, setAnswers] = useState<SetupAnswers>({});
+    const [answered, setAnswered] = useState<Record<string, unknown>>({});
+    const [missing, setMissing] = useState<string[]>([]);
+    const [serviceMessage, setServiceMessage] = useState<string>('');
+
+    // Where the prerequisite chain has got to. Refs, not state, so that the
+    // effect driving it can have no dependencies: it must re-run when this
+    // screen is focused again and at no other time, because "focused again" is
+    // exactly the event it reads as "the screen we pushed has closed".
+    const chain = useRef({ queue: [] as SetupPrerequisite[], index: 0, awaiting: '', running: false });
+    const leftScreen = useRef(false);
 
     const refuse = useCallback((reason: string) => {
         setRefusal(reason);
@@ -87,6 +145,14 @@ export default function CapabilityRequestScreen() {
 
                 const req = await fetchPendingCapability(appHost, nonce);
 
+                // A prerequisite may not have prerequisites of its own. One
+                // level is what the flow needs, and it bounds the stack: a
+                // service that kept naming another approval would otherwise
+                // push screens under the holder without end.
+                if (chained && req.setup?.prerequisites.length) {
+                    return refuse(t('capability.setup.refusedNested'));
+                }
+
                 // Resolve the resource service by IDENTITY, never from a URL in
                 // the request: otherwise the wallet would post a
                 // user-authenticated call wherever it was told.
@@ -108,7 +174,18 @@ export default function CapabilityRequestScreen() {
                 setRequesterName(requester?.display_name || requester?.name || '');
                 setPending(req);
                 setResource(resolved);
-                setPhase('ready');
+                if (req.setup) {
+                    setSetup(req.setup);
+                    setAnswers(
+                        initialAnswers(req.setup.fields, { email: prefillEmailFor(appHost) }),
+                    );
+                }
+                // The service's own approvals come first, so the holder is not
+                // asked to type a credential into a service that has nowhere
+                // to keep it yet.
+                const queue = req.setup?.prerequisites ?? [];
+                chain.current = { queue, index: 0, awaiting: '', running: queue.length > 0 };
+                setPhase(queue.length > 0 ? 'prerequisite' : 'ready');
             } catch (e) {
                 if (!cancelled) refuse(e instanceof Error ? e.message : String(e));
             }
@@ -116,16 +193,14 @@ export default function CapabilityRequestScreen() {
         return () => {
             cancelled = true;
         };
-    }, [appHost, nonce, refuse, t]);
+    }, [appHost, nonce, chained, refuse, t]);
 
-    const permissionLine = useMemo(() => {
-        if (!pending) return '';
-        return pending.capability.permissions
-            .map((perm) => t(`capability.permission.${perm}`))
-            .join(t('capability.permissionJoin'));
-    }, [pending, t]);
-
-    const onDeny = async () => {
+    /**
+     * Deny the whole ask and leave. Used by the Deny button and by a
+     * prerequisite the holder turned down: an approval the service cannot hold
+     * the credential without is not one the wallet can go on to mint.
+     */
+    const denyAndLeave = useCallback(async () => {
         setPhase('working');
         try {
             await deliverCapabilityOutcome({ appHost, nonce, status: 'denied' });
@@ -146,12 +221,107 @@ export default function CapabilityRequestScreen() {
                 grantedAt: Math.floor(Date.now() / 1000),
             });
         }
+        if (chained) recordChainOutcome(nonce, 'denied');
         router.back();
-    };
+    }, [appHost, nonce, chained, pending, resource, requesterAppId, requesterName, router]);
+
+    // Held in refs so `runChain` below can stay dependency-free: its identity
+    // changing would fire the focus effect's cleanup, which is the one signal
+    // that tells the chain this screen was really left.
+    const denyRef = useRef(denyAndLeave);
+    const routerRef = useRef(router);
+    useEffect(() => {
+        denyRef.current = denyAndLeave;
+        routerRef.current = router;
+    });
+
+    /**
+     * Run the service's own approvals, one at a time, on this stack.
+     *
+     * Each is an ordinary capability ask with its own nonce, so it is pushed as
+     * another instance of this screen and reports its decision back under that
+     * nonce. The step is only read once this screen has actually been left and
+     * come back: a push does not blur synchronously, so reading straight after
+     * one would find no decision and mistake it for a refusal.
+     */
+    const runChain = useCallback(() => {
+        const c = chain.current;
+        if (!c.running) return;
+
+        if (c.awaiting) {
+            if (!leftScreen.current) return;
+            // Back from one. No decision recorded means the holder left that
+            // screen without making one, which is a refusal, and a service
+            // that cannot hold the credential cannot be given it.
+            const outcome = takeChainOutcome(c.awaiting);
+            c.awaiting = '';
+            if (outcome !== 'approved') {
+                c.running = false;
+                console.log('[CAPABILITY] a prerequisite approval was not granted; denying the ask');
+                void denyRef.current();
+                return;
+            }
+            c.index += 1;
+        }
+
+        const next = c.queue[c.index];
+        if (!next) {
+            c.running = false;
+            setPhase('ready');
+            return;
+        }
+        c.awaiting = next.nonce;
+        leftScreen.current = false;
+        routerRef.current.push({
+            pathname: '/capability-request',
+            params: { app_host: next.app_host, nonce: next.nonce, chain: '1' },
+        });
+    }, []);
+
+    // The first step. The screen is already focused when the request finishes
+    // loading, so no focus event is coming to start it.
+    useEffect(() => {
+        if (phase === 'prerequisite') runChain();
+    }, [phase, runChain]);
+
+    useFocusEffect(
+        useCallback(() => {
+            runChain();
+            // Only ever on a real blur, because this callback never changes.
+            return () => {
+                leftScreen.current = true;
+            };
+        }, [runChain]),
+    );
+
+    const permissionLine = useMemo(() => {
+        if (!pending) return '';
+        return pending.capability.permissions
+            .map((perm) => t(`capability.permission.${perm}`))
+            .join(t('capability.permissionJoin'));
+    }, [pending, t]);
 
     const onApprove = async () => {
         if (!pending || !resource?.hostname) return;
+
+        // Check what is required before the round trip. The service would
+        // refuse an empty field anyway, and a network error is a poor way to
+        // learn that something was not filled in.
+        if (setup) {
+            const gaps = missingRequired(setup.fields, answers);
+            if (gaps.length > 0) {
+                setMissing(gaps);
+                return;
+            }
+        }
+        setMissing([]);
+        setServiceMessage('');
         setPhase('working');
+
+        // Everything the holder has typed across every step of this approval.
+        // Built here, sent once, and dropped when the screen closes.
+        const payload = setup ? { ...answered, ...setupPayload(setup.fields, answers) } : undefined;
+
         try {
             const expiresUnix = expiryFor(pending.capability.kind);
             const mint = () =>
@@ -160,10 +330,11 @@ export default function CapabilityRequestScreen() {
                     subjectAppId: requesterAppId,
                     pending,
                     expiresUnix,
+                    setup: payload,
                 });
-            let granted;
+            let outcome;
             try {
-                granted = await mint();
+                outcome = await mint();
             } catch (e) {
                 // The resource service was upgraded and this holder has not
                 // yet approved its new measurement for their own vault key.
@@ -181,8 +352,29 @@ export default function CapabilityRequestScreen() {
                     appHost,
                 });
                 console.log(`[CAPABILITY] tenant key ${key.status} on ${resource.hostname}`);
-                granted = await mint();
+                outcome = await mint();
             }
+
+            // One more question: a mail server that could not be found from the
+            // address, say. Keep what was answered, draw the new step, and stay
+            // on this screen. Nothing was granted and nothing failed.
+            if (outcome.status === 'incomplete') {
+                console.log(
+                    `[CAPABILITY] ${resource.hostname} needs more before it can grant this; asking`,
+                );
+                setAnswered(payload ?? {});
+                setSetup(outcome.requirement);
+                setAnswers(
+                    initialAnswers(outcome.requirement.fields, {
+                        previous: answers,
+                        email: prefillEmailFor(appHost),
+                    }),
+                );
+                setPhase('ready');
+                return;
+            }
+
+            const granted = outcome.granted;
             await deliverCapabilityOutcome({ appHost, nonce, status: 'approved', granted });
 
             useCapabilitiesStore.getState().record({
@@ -198,8 +390,26 @@ export default function CapabilityRequestScreen() {
                 grantedAt: Math.floor(Date.now() / 1000),
                 expiresAt: expiresUnix,
             });
+
+            if (chained) {
+                // Running under another approval: report and return to it
+                // rather than making the holder dismiss a screen mid-flow.
+                recordChainOutcome(nonce, 'approved');
+                router.back();
+                return;
+            }
             setPhase('done');
         } catch (e) {
+            // The provider behind the service refused the details themselves.
+            // Not a failure of the wallet or of the service, so the holder
+            // stays on the form and edits. Deliberately not logged: the
+            // service's sentence is the only account of why, and it can quote
+            // back what was typed.
+            if (isProviderRefusal(e)) {
+                setServiceMessage(e.message || t('capability.setup.refusedFallback'));
+                setPhase('ready');
+                return;
+            }
             // Visibly failed. The app must not be told it succeeded. Logged
             // too: the alert is the only place this used to appear, and a
             // holder's exported log then said nothing about why the grant
@@ -215,17 +425,36 @@ export default function CapabilityRequestScreen() {
         }
     };
 
+    const setAnswer = useCallback((name: string, value: string | boolean) => {
+        setAnswers((prev) => ({ ...prev, [name]: value }));
+        setMissing((prev) => prev.filter((n) => n !== name));
+    }, []);
+
+    const serviceName = resource?.display_name || resource?.name || '';
+
     return (
         <RNView style={styles.screen}>
             <SubPageHeader title={t('capability.title')} />
-            <ScrollView
-                contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
-                showsVerticalScrollIndicator={false}
+            {/* The form can put a masked field low on a screen that already
+                carries two identity cards. No offset: this view begins below
+                the header, so its bottom is the screen bottom and the plain
+                keyboard height is exactly right. */}
+            <KeyboardAvoidingView
+                style={styles.fill}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={0}
             >
-                {phase === 'loading' && (
+            <ScrollView
+                contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
+                {(phase === 'loading' || phase === 'prerequisite') && (
                     <RNView style={styles.centre}>
                         <ActivityIndicator size="large" color={p.blue} />
-                        <Text style={styles.muted}>{t('capability.verifying')}</Text>
+                        <Text style={styles.muted}>
+                            {t(phase === 'prerequisite' ? 'capability.setup.preparing' : 'capability.verifying')}
+                        </Text>
                     </RNView>
                 )}
 
@@ -264,6 +493,9 @@ export default function CapabilityRequestScreen() {
                     <>
                         <Text style={styles.heading}>{t('capability.heading')}</Text>
 
+                        {/* Why a second screen appeared under the first one. */}
+                        {chained && <Text style={styles.body}>{t('capability.setup.chainNote')}</Text>}
+
                         {/* Who is asking. Verified, never echoed from the request. */}
                         <RNView style={styles.card}>
                             <Text style={styles.label}>{t('capability.whoLabel')}</Text>
@@ -295,15 +527,13 @@ export default function CapabilityRequestScreen() {
                                     {
                                         permissions: permissionLine,
                                         resource: pending.capability.resource_label,
-                                        service: resource.display_name || resource.name,
+                                        service: serviceName,
                                     },
                                 )}
                             </Text>
                             <Text style={styles.attested}>
                                 <Ionicons name="shield-checkmark" size={13} color={p.green} />{' '}
-                                {t('capability.resourceAttested', {
-                                    service: resource.display_name || resource.name,
-                                })}
+                                {t('capability.resourceAttested', { service: serviceName })}
                             </Text>
                         </RNView>
 
@@ -319,11 +549,49 @@ export default function CapabilityRequestScreen() {
                                 that holds your data" sent someone to the app that
                                 was ASKING, which has no such option. */}
                             <Text style={styles.muted}>
-                                {t('capability.revokeHint', {
-                                    service: resource.display_name || resource.name,
-                                })}
+                                {t('capability.revokeHint', { service: serviceName })}
                             </Text>
                         </RNView>
+
+                        {/* What the service needs from the holder, drawn from
+                            the schema it declared. Under the ask, so the grant
+                            has been read before anything is typed. */}
+                        {setup && setup.fields.length > 0 && (
+                            <RNView style={styles.setup}>
+                                <Text style={styles.label}>{t('capability.setup.formLabel')}</Text>
+                                {!!setup.message && <Text style={styles.body}>{setup.message}</Text>}
+
+                                <SetupForm
+                                    fields={setup.fields}
+                                    answers={answers}
+                                    onChange={setAnswer}
+                                    missing={missing}
+                                    disabled={phase === 'working'}
+                                />
+
+                                {/* Where what is typed goes, and where it does
+                                    not. The holder is entering a credential on
+                                    a screen, and is owed that sentence. */}
+                                <Text style={styles.muted}>
+                                    {t('capability.setup.privacyNote', { service: serviceName })}
+                                </Text>
+
+                                {missing.length > 0 && (
+                                    <Text style={styles.problem}>{t('capability.setup.incomplete')}</Text>
+                                )}
+
+                                {/* The provider's own words about why it said
+                                    no. The fields above stay as they were. */}
+                                {!!serviceMessage && (
+                                    <RNView style={styles.refusal}>
+                                        <Text style={styles.refusalTitle}>
+                                            {t('capability.setup.refusedTitle', { service: serviceName })}
+                                        </Text>
+                                        <Text style={styles.refusalBody}>{serviceMessage}</Text>
+                                    </RNView>
+                                )}
+                            </RNView>
+                        )}
 
                         <Pressable
                             style={[styles.primary, phase === 'working' && styles.busy]}
@@ -339,7 +607,7 @@ export default function CapabilityRequestScreen() {
                         {/* Deny is a first-class action, not a dismissal. */}
                         <Pressable
                             style={styles.secondary}
-                            onPress={onDeny}
+                            onPress={denyAndLeave}
                             disabled={phase === 'working'}
                         >
                             <Text style={styles.secondaryText}>{t('capability.deny')}</Text>
@@ -347,12 +615,14 @@ export default function CapabilityRequestScreen() {
                     </>
                 )}
             </ScrollView>
+            </KeyboardAvoidingView>
         </RNView>
     );
 }
 
 const makeStyles = (p: Palette) => StyleSheet.create({
     screen: { flex: 1, backgroundColor: p.screenBg },
+    fill: { flex: 1 },
     // 20 to match credentials, personal-data and the other sub-pages; this sat
     // at 8 and read as cramped under the header.
     content: { paddingHorizontal: 20, paddingTop: 20 },
@@ -367,10 +637,28 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         marginBottom: 12,
         gap: 4,
     },
+    setup: {
+        backgroundColor: p.card,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        gap: 12,
+    },
     label: { fontSize: 12, color: p.textSecondary, marginBottom: 2 },
     value: { fontSize: 16, fontWeight: '600', color: p.textPrimary, lineHeight: 23 },
     mono: { fontSize: 12, fontFamily: 'SpaceMono', color: p.textMuted },
     attested: { fontSize: 12, color: p.textSecondary, marginTop: 4 },
+    problem: { fontSize: 13, color: p.dangerText, lineHeight: 19 },
+    refusal: {
+        backgroundColor: p.dangerBg,
+        borderWidth: 1,
+        borderColor: p.dangerBorder,
+        borderRadius: 10,
+        padding: 12,
+        gap: 4,
+    },
+    refusalTitle: { fontSize: 13, fontWeight: '600', color: p.dangerText },
+    refusalBody: { fontSize: 13, color: p.dangerText, lineHeight: 19 },
     primary: {
         backgroundColor: p.blue,
         borderRadius: 12,

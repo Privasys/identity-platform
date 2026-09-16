@@ -386,7 +386,20 @@
     "failedTitle": "L-aċċess ma ngħatax",
     "failedBody": "Ma nbidel xejn. Tista' terġa' tipprova.",
     "doneTitle": "L-aċċess ingħata",
-    "doneBody": "{{app}} issa jista' juża dak li approvajt. Tista' tirrevokah f'kull ħin."
+    "doneBody": "{{app}} issa jista' juża dak li approvajt. Tista' tirrevokah f'kull ħin.",
+    "setup": {
+      "preparing": "Qed jitħejja l-pass li jmiss",
+      "chainNote": "Dan huwa meħtieġ l-ewwel: hemm jinżammu d-dettalji li ddaħħal fl-iskrin li jmiss.",
+      "formLabel": "X'jeħtieġ dan is-servizz mingħandek",
+      "optional": "Mhux obbligatorju",
+      "show": "Uri",
+      "hide": "Aħbi",
+      "incomplete": "Imla dak kollu li mhux immarkat bħala mhux obbligatorju.",
+      "privacyNote": "Dak li ddaħħal imur dritt għand {{service}} minn dan l-apparat. Ma jinżammx hawn, u l-app li talbet l-aċċess qatt ma tarah.",
+      "refusedTitle": "{{service}} ma setax juża dawn id-dettalji",
+      "refusedFallback": "Id-dettalji ma ġewx aċċettati. Iċċekkjahom u erġa' pprova.",
+      "refusedNested": "Din it-talba titlob aktar approvazzjonijiet konsekuttivi milli huwa possibbli, għalhekk ma ngħata xejn."
+    }
   },
   "credentials": {
     "title": "Kredenzjali rreġistrati",

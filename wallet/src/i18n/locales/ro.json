@@ -386,7 +386,20 @@
     "failedTitle": "Accesul nu a fost acordat",
     "failedBody": "Nimic nu a fost modificat. Poți încerca din nou.",
     "doneTitle": "Acces acordat",
-    "doneBody": "{{app}} poate folosi acum ceea ce ai aprobat. Poți revoca oricând."
+    "doneBody": "{{app}} poate folosi acum ceea ce ai aprobat. Poți revoca oricând.",
+    "setup": {
+      "preparing": "Se pregătește pasul următor",
+      "chainNote": "Acest lucru este necesar mai întâi: acolo vor fi păstrate datele pe care le introduci pe ecranul următor.",
+      "formLabel": "De ce are nevoie acest serviciu de la tine",
+      "optional": "Opțional",
+      "show": "Arată",
+      "hide": "Ascunde",
+      "incomplete": "Completează tot ce nu este marcat ca opțional.",
+      "privacyNote": "Ce introduci ajunge de pe acest dispozitiv direct la {{service}}. Nu este păstrat aici, iar aplicația care a cerut accesul nu îl vede niciodată.",
+      "refusedTitle": "{{service}} nu a putut folosi aceste date",
+      "refusedFallback": "Datele nu au fost acceptate. Verifică-le și încearcă din nou.",
+      "refusedNested": "Această cerere necesită mai multe aprobări consecutive decât este posibil, așa că nu s-a acordat nimic."
+    }
   },
   "credentials": {
     "title": "Credențiale înregistrate",

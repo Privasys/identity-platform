@@ -20,6 +20,12 @@
  */
 
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
+import {
+    parseElicitation,
+    parseSetupRequirement,
+    SetupSchemaError,
+    type SetupRequirement,
+} from '@/services/capability-setup';
 import { getPlatformToken } from '@/services/platform-token';
 
 /**
@@ -69,6 +75,13 @@ export interface PendingCapability {
     /** The resource service, named by identity so the WALLET resolves it. */
     resource_app: string;
     capability: CapabilityAsk;
+    /**
+     * What the resource service needs from the holder before this capability
+     * can exist: approvals of its own, and values to be typed on the approval
+     * screen. Absent when the holder is already set up, which is the common
+     * case after the first grant.
+     */
+    setup?: SetupRequirement;
 }
 
 export class CapabilityError extends Error {
@@ -143,11 +156,22 @@ export function parsePendingCapability(raw: unknown): PendingCapability {
     const label = typeof cap['resource_label'] === 'string' ? cap['resource_label'].trim() : '';
     if (!label) throw new CapabilityError('request names no resource');
 
+    // A setup block the wallet cannot draw is a refusal, not a form to skip:
+    // minting without it would send the service an answer it never got.
+    let setup: SetupRequirement | undefined;
+    try {
+        setup = parseSetupRequirement(o['setup']);
+    } catch (e) {
+        if (!(e instanceof SetupSchemaError)) throw e;
+        throw new CapabilityError(e.message);
+    }
+
     const request = cap['request'];
     return {
         nonce,
         binding_pubkey: key,
         resource_app: resourceApp,
+        setup,
         capability: {
             kind: kind as CapabilityKind,
             permissions: perms as Permission[],
@@ -209,19 +233,55 @@ export interface GrantedCapability {
 }
 
 /**
+ * The service's answer to a mint. Either the capability exists, or the service
+ * has one more question for the holder before it can.
+ */
+export type MintOutcome =
+    | { status: 'granted'; granted: GrantedCapability }
+    | { status: 'incomplete'; requirement: SetupRequirement };
+
+/**
+ * The provider behind a resource service refused the setup details: a wrong
+ * password, a mailbox that will not accept them. Not a wallet failure and not a
+ * service failure, so the holder stays on the form, edits and retries.
+ */
+export function isProviderRefusal(e: unknown): e is CapabilityError {
+    return e instanceof CapabilityError && e.status === 502;
+}
+
+/** The service's own sentence out of a 502 body, for the holder to read. */
+function refusalMessage(body: string): string {
+    try {
+        const parsed = JSON.parse(body) as { error?: unknown };
+        if (typeof parsed.error === 'string' && parsed.error.trim()) {
+            return parsed.error.trim().slice(0, 300);
+        }
+    } catch {
+        // Not JSON. Fall through: the holder gets the wallet's own wording
+        // rather than a page of HTML.
+    }
+    return '';
+}
+
+/**
  * Create the capability at the RESOURCE service, as the holder.
  *
  * `subjectAppId` is the id the wallet verified from the requesting app's
  * attestation, never a value out of the payload: a screen that echoes a
  * self-declared identity is a phishing surface, and on the data plane this
  * subject is matched against the attested peer.
+ *
+ * `setup` carries what the holder typed on the approval screen. It goes to the
+ * service and nowhere else: this is the only hop it makes, inside the attested
+ * channel, and it is never logged here or held after the call returns.
  */
 export async function createCapability(args: {
     resourceHost: string;
     subjectAppId: string;
     pending: PendingCapability;
     expiresUnix: number;
-}): Promise<GrantedCapability> {
+    setup?: Record<string, unknown>;
+}): Promise<MintOutcome> {
     const token = await getPlatformToken();
     const raFetch = makeRaTlsFetch({ enclaveHost: args.resourceHost, platformFetch: fetch });
     const res = await raFetch(`https://${args.resourceHost}/v1/capabilities`, {
@@ -237,16 +297,42 @@ export async function createCapability(args: {
             permissions: args.pending.capability.permissions,
             kind: args.pending.capability.kind,
             request: args.pending.capability.request,
+            setup: args.setup,
         }),
     });
-    if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new CapabilityError(
-            `the capability could not be created (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`,
-            { status: res.status, code: errorCodeOf(body) },
-        );
+
+    if (res.ok) {
+        return { status: 'granted', granted: (await res.json()) as GrantedCapability };
     }
-    return (await res.json()) as GrantedCapability;
+
+    const body = await res.text().catch(() => '');
+
+    // 428: the service cannot finish from what it was given and says what else
+    // it needs. A question, not a failure, so it does not go down the error
+    // path and the holder does not see "access was not granted".
+    if (res.status === 428) {
+        try {
+            return { status: 'incomplete', requirement: parseElicitation(JSON.parse(body)) };
+        } catch (e) {
+            throw new CapabilityError(
+                e instanceof SetupSchemaError
+                    ? e.message
+                    : 'the service asked for more but did not say what',
+                { status: 428 },
+            );
+        }
+    }
+
+    // 502: the provider refused the details themselves. Carry the service's own
+    // sentence, which is the only party that knows why.
+    if (res.status === 502) {
+        throw new CapabilityError(refusalMessage(body), { status: 502 });
+    }
+
+    throw new CapabilityError(
+        `the capability could not be created (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`,
+        { status: res.status, code: errorCodeOf(body) },
+    );
 }
 
 /**

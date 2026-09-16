@@ -353,7 +353,20 @@
     "failedTitle": "Åtkomst gavs inte",
     "failedBody": "Inget ändrades. Du kan försöka igen.",
     "doneTitle": "Åtkomst given",
-    "doneBody": "{{app}} kan nu använda det du godkände. Du kan återkalla det när som helst."
+    "doneBody": "{{app}} kan nu använda det du godkände. Du kan återkalla det när som helst.",
+    "setup": {
+      "preparing": "Nästa steg förbereds",
+      "chainNote": "Det här behövs först: det är där uppgifterna du anger på nästa skärm kommer att förvaras.",
+      "formLabel": "Vad den här tjänsten behöver från dig",
+      "optional": "Valfritt",
+      "show": "Visa",
+      "hide": "Dölj",
+      "incomplete": "Fyll i allt som inte är markerat som valfritt.",
+      "privacyNote": "Det du anger går direkt till {{service}} från den här enheten. Det sparas inte här, och appen som bad om åtkomst ser det aldrig.",
+      "refusedTitle": "{{service}} kunde inte använda de här uppgifterna",
+      "refusedFallback": "Uppgifterna godtogs inte. Kontrollera dem och försök igen.",
+      "refusedNested": "Den här begäran kräver fler godkännanden i följd än vad som är möjligt, så inget beviljades."
+    }
   },
   "credentials": {
     "title": "Registrerade inloggningsuppgifter",

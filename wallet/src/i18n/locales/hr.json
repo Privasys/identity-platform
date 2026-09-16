@@ -386,7 +386,20 @@
     "failedTitle": "Pristup nije odobren",
     "failedBody": "Ništa nije promijenjeno. Možete pokušati ponovno.",
     "doneTitle": "Pristup odobren",
-    "doneBody": "{{app}} sada može koristiti ono što ste odobrili. Možete to opozvati u bilo kojem trenutku."
+    "doneBody": "{{app}} sada može koristiti ono što ste odobrili. Možete to opozvati u bilo kojem trenutku.",
+    "setup": {
+      "preparing": "Priprema sljedećeg koraka",
+      "chainNote": "Ovo je potrebno prvo: ondje će se čuvati podaci koje unesete na sljedećem zaslonu.",
+      "formLabel": "Što ova usluga treba od vas",
+      "optional": "Neobavezno",
+      "show": "Prikaži",
+      "hide": "Sakrij",
+      "incomplete": "Ispunite sve što nije označeno kao neobavezno.",
+      "privacyNote": "Ono što unesete ide s ovog uređaja izravno usluzi {{service}}. Ovdje se ne pohranjuje, a aplikacija koja je zatražila pristup to nikada ne vidi.",
+      "refusedTitle": "Usluga {{service}} nije mogla upotrijebiti te podatke",
+      "refusedFallback": "Podaci nisu prihvaćeni. Provjerite ih i pokušajte ponovno.",
+      "refusedNested": "Ovaj zahtjev traži više uzastopnih odobrenja nego što je moguće pa ništa nije dodijeljeno."
+    }
   },
   "credentials": {
     "title": "Registrirane vjerodajnice",

@@ -386,7 +386,20 @@
     "failedTitle": "Dostop ni bil odobren",
     "failedBody": "Nič ni bilo spremenjeno. Lahko poskusite znova.",
     "doneTitle": "Dostop odobren",
-    "doneBody": "{{app}} zdaj lahko uporablja to, kar ste odobrili. Kadar koli lahko prekličete."
+    "doneBody": "{{app}} zdaj lahko uporablja to, kar ste odobrili. Kadar koli lahko prekličete.",
+    "setup": {
+      "preparing": "Pripravlja se naslednji korak",
+      "chainNote": "To je potrebno najprej: tam bodo shranjeni podatki, ki jih vnesete na naslednjem zaslonu.",
+      "formLabel": "Kaj ta storitev potrebuje od vas",
+      "optional": "Neobvezno",
+      "show": "Pokaži",
+      "hide": "Skrij",
+      "incomplete": "Izpolnite vse, kar ni označeno kot neobvezno.",
+      "privacyNote": "Kar vnesete, gre s te naprave neposredno v storitev {{service}}. Tu se ne shranjuje, aplikacija, ki je zahtevala dostop, pa tega nikoli ne vidi.",
+      "refusedTitle": "Storitev {{service}} teh podatkov ni mogla uporabiti",
+      "refusedFallback": "Podatki niso bili sprejeti. Preverite jih in poskusite znova.",
+      "refusedNested": "Ta zahteva zahteva več zaporednih odobritev, kot je mogoče, zato ni bilo nič dodeljeno."
+    }
   },
   "credentials": {
     "title": "Registrirane poverilnice",

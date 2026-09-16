@@ -353,7 +353,20 @@
     "failedTitle": "Adgang blev ikke givet",
     "failedBody": "Intet blev ændret. Du kan prøve igen.",
     "doneTitle": "Adgang givet",
-    "doneBody": "{{app}} kan nu bruge det, du godkendte. Du kan tilbagekalde det når som helst."
+    "doneBody": "{{app}} kan nu bruge det, du godkendte. Du kan tilbagekalde det når som helst.",
+    "setup": {
+      "preparing": "Forbereder næste trin",
+      "chainNote": "Dette er nødvendigt først: det er her, de oplysninger, du indtaster på næste skærm, bliver opbevaret.",
+      "formLabel": "Hvad denne tjeneste har brug for fra dig",
+      "optional": "Valgfrit",
+      "show": "Vis",
+      "hide": "Skjul",
+      "incomplete": "Udfyld alt, der ikke er markeret som valgfrit.",
+      "privacyNote": "Det, du indtaster, går direkte til {{service}} fra denne enhed. Det gemmes ikke her, og appen, der bad om adgang, ser det aldrig.",
+      "refusedTitle": "{{service}} kunne ikke bruge disse oplysninger",
+      "refusedFallback": "Oplysningerne blev ikke accepteret. Tjek dem, og prøv igen.",
+      "refusedNested": "Denne anmodning kræver flere godkendelser i træk, end der er muligt, så intet blev givet."
+    }
   },
   "credentials": {
     "title": "Registrerede legitimationsoplysninger",

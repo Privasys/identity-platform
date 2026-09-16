@@ -386,7 +386,20 @@
     "failedTitle": "Prístup nebol udelený",
     "failedBody": "Nič sa nezmenilo. Môžete to skúsiť znova.",
     "doneTitle": "Prístup udelený",
-    "doneBody": "{{app}} teraz môže používať to, čo ste schválili. Kedykoľvek to môžete odvolať."
+    "doneBody": "{{app}} teraz môže používať to, čo ste schválili. Kedykoľvek to môžete odvolať.",
+    "setup": {
+      "preparing": "Pripravuje sa ďalší krok",
+      "chainNote": "Toto je potrebné najskôr: práve tam sa budú uchovávať údaje, ktoré zadáte na ďalšej obrazovke.",
+      "formLabel": "Čo od vás táto služba potrebuje",
+      "optional": "Nepovinné",
+      "show": "Zobraziť",
+      "hide": "Skryť",
+      "incomplete": "Vyplňte všetko, čo nie je označené ako nepovinné.",
+      "privacyNote": "To, čo zadáte, ide z tohto zariadenia priamo do služby {{service}}. Neuchováva sa tu a aplikácia, ktorá o prístup požiadala, to nikdy neuvidí.",
+      "refusedTitle": "Služba {{service}} nemohla tieto údaje použiť",
+      "refusedFallback": "Údaje neboli prijaté. Skontrolujte ich a skúste to znova.",
+      "refusedNested": "Táto požiadavka vyžaduje viac po sebe idúcich schválení, než je možné, preto nebolo nič udelené."
+    }
   },
   "credentials": {
     "title": "Registrované poverenia",

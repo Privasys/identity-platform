@@ -386,7 +386,20 @@
     "failedTitle": "Piekļuve netika piešķirta",
     "failedBody": "Nekas netika mainīts. Varat mēģināt vēlreiz.",
     "doneTitle": "Piekļuve piešķirta",
-    "doneBody": "{{app}} tagad var izmantot to, ko apstiprinājāt. Jūs to varat jebkurā laikā atsaukt."
+    "doneBody": "{{app}} tagad var izmantot to, ko apstiprinājāt. Jūs to varat jebkurā laikā atsaukt.",
+    "setup": {
+      "preparing": "Tiek sagatavots nākamais solis",
+      "chainNote": "Tas vispirms ir nepieciešams: tur tiks glabāti dati, ko ievadīsiet nākamajā ekrānā.",
+      "formLabel": "Kas šim pakalpojumam no jums nepieciešams",
+      "optional": "Neobligāts",
+      "show": "Rādīt",
+      "hide": "Paslēpt",
+      "incomplete": "Aizpildiet visu, kas nav atzīmēts kā neobligāts.",
+      "privacyNote": "Tas, ko ievadīsiet, no šīs ierīces nonāk tieši pakalpojumā {{service}}. Šeit tas netiek glabāts, un lietotne, kas to pieprasīja, to nekad neredz.",
+      "refusedTitle": "Pakalpojums {{service}} nevarēja izmantot šos datus",
+      "refusedFallback": "Dati netika pieņemti. Pārbaudiet tos un mēģiniet vēlreiz.",
+      "refusedNested": "Šis pieprasījums prasa vairāk secīgu apstiprinājumu, nekā iespējams, tāpēc nekas netika piešķirts."
+    }
   },
   "credentials": {
     "title": "Reģistrētie akreditācijas dati",

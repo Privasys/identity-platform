@@ -353,7 +353,20 @@
     "failedTitle": "Přístup nebyl udělen",
     "failedBody": "Nic se nezměnilo. Můžete to zkusit znovu.",
     "doneTitle": "Přístup udělen",
-    "doneBody": "{{app}} nyní může používat to, co jste schválili. Kdykoli to můžete odvolat."
+    "doneBody": "{{app}} nyní může používat to, co jste schválili. Kdykoli to můžete odvolat.",
+    "setup": {
+      "preparing": "Připravuje se další krok",
+      "chainNote": "Toto je potřeba nejdřív: právě tam budou uchovány údaje, které zadáte na další obrazovce.",
+      "formLabel": "Co od vás tato služba potřebuje",
+      "optional": "Nepovinné",
+      "show": "Zobrazit",
+      "hide": "Skrýt",
+      "incomplete": "Vyplňte vše, co není označeno jako nepovinné.",
+      "privacyNote": "To, co zadáte, jde z tohoto zařízení přímo do služby {{service}}. Neuchovává se zde a aplikace, která o přístup požádala, to nikdy neuvidí.",
+      "refusedTitle": "Služba {{service}} nemohla tyto údaje použít",
+      "refusedFallback": "Údaje nebyly přijaty. Zkontrolujte je a zkuste to znovu.",
+      "refusedNested": "Tento požadavek vyžaduje více navazujících schválení, než je možné, proto nebylo nic uděleno."
+    }
   },
   "credentials": {
     "title": "Registrované přihlašovací údaje",

@@ -353,7 +353,20 @@
     "failedTitle": "Accesso non concesso",
     "failedBody": "Non è stato modificato nulla. Puoi riprovare.",
     "doneTitle": "Accesso concesso",
-    "doneBody": "{{app}} ora può usare ciò che hai approvato. Puoi revocarlo in qualsiasi momento."
+    "doneBody": "{{app}} ora può usare ciò che hai approvato. Puoi revocarlo in qualsiasi momento.",
+    "setup": {
+      "preparing": "Preparazione del passaggio successivo",
+      "chainNote": "Questo serve prima: è lì che verranno conservati i dati che inserirai nella schermata successiva.",
+      "formLabel": "Che cosa serve a questo servizio da te",
+      "optional": "Facoltativo",
+      "show": "Mostra",
+      "hide": "Nascondi",
+      "incomplete": "Compila tutto ciò che non è indicato come facoltativo.",
+      "privacyNote": "Ciò che inserisci va da questo dispositivo direttamente a {{service}}. Non viene conservato qui e l'app che lo ha chiesto non lo vede mai.",
+      "refusedTitle": "{{service}} non ha potuto usare questi dati",
+      "refusedFallback": "I dati non sono stati accettati. Controllali e riprova.",
+      "refusedNested": "Questa richiesta prevede più approvazioni consecutive di quante siano possibili, quindi non è stato concesso nulla."
+    }
   },
   "credentials": {
     "title": "Credenziali registrate",

@@ -353,7 +353,20 @@
     "failedTitle": "Toegang niet verleend",
     "failedBody": "Er is niets gewijzigd. Je kunt het opnieuw proberen.",
     "doneTitle": "Toegang verleend",
-    "doneBody": "{{app}} kan nu gebruiken wat je hebt goedgekeurd. Je kunt het op elk moment intrekken."
+    "doneBody": "{{app}} kan nu gebruiken wat je hebt goedgekeurd. Je kunt het op elk moment intrekken.",
+    "setup": {
+      "preparing": "De volgende stap wordt voorbereid",
+      "chainNote": "Dit is eerst nodig: daar worden de gegevens bewaard die je op het volgende scherm invult.",
+      "formLabel": "Wat deze dienst van je nodig heeft",
+      "optional": "Optioneel",
+      "show": "Tonen",
+      "hide": "Verbergen",
+      "incomplete": "Vul alles in wat niet als optioneel is gemarkeerd.",
+      "privacyNote": "Wat je invult gaat vanaf dit apparaat rechtstreeks naar {{service}}. Het wordt hier niet bewaard, en de app die erom vroeg ziet het nooit.",
+      "refusedTitle": "{{service}} kon deze gegevens niet gebruiken",
+      "refusedFallback": "De gegevens zijn niet geaccepteerd. Controleer ze en probeer het opnieuw.",
+      "refusedNested": "Deze aanvraag vraagt om meer opeenvolgende goedkeuringen dan mogelijk is, dus er is niets verleend."
+    }
   },
   "credentials": {
     "title": "Geregistreerde inloggegevens",

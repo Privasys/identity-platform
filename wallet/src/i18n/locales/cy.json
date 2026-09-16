@@ -386,7 +386,20 @@
     "failedTitle": "Ni roddwyd mynediad",
     "failedBody": "Ni newidiwyd dim. Gallwch geisio eto.",
     "doneTitle": "Mynediad wedi ei roi",
-    "doneBody": "Gall {{app}} bellach ddefnyddio'r hyn a gymeradwywyd gennych. Gallwch ei ddirymu ar unrhyw adeg."
+    "doneBody": "Gall {{app}} bellach ddefnyddio'r hyn a gymeradwywyd gennych. Gallwch ei ddirymu ar unrhyw adeg.",
+    "setup": {
+      "preparing": "Yn paratoi'r cam nesaf",
+      "chainNote": "Mae angen hyn yn gyntaf: dyna lle bydd y manylion rydych yn eu rhoi ar y sgrin nesaf yn cael eu cadw.",
+      "formLabel": "Beth mae'r gwasanaeth hwn ei angen gennych",
+      "optional": "Dewisol",
+      "show": "Dangos",
+      "hide": "Cuddio",
+      "incomplete": "Llenwch bopeth nad yw wedi'i farcio'n ddewisol.",
+      "privacyNote": "Mae'r hyn rydych yn ei roi yn mynd yn syth i {{service}} o'r ddyfais hon. Nid yw'n cael ei gadw yma, ac nid yw'r ap a ofynnodd amdano byth yn ei weld.",
+      "refusedTitle": "Ni allai {{service}} ddefnyddio’r manylion hyn",
+      "refusedFallback": "Ni dderbyniwyd y manylion. Gwiriwch nhw a cheisiwch eto.",
+      "refusedNested": "Mae'r cais hwn yn gofyn am fwy o gymeradwyaethau olynol nag sy'n bosibl, felly ni roddwyd dim."
+    }
   },
   "credentials": {
     "title": "Tystlythyrau cofrestredig",

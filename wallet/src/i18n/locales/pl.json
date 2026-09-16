@@ -353,7 +353,20 @@
     "failedTitle": "Dostęp nie został przyznany",
     "failedBody": "Nic nie zostało zmienione. Możesz spróbować ponownie.",
     "doneTitle": "Dostęp przyznany",
-    "doneBody": "{{app}} może teraz korzystać z tego, co zatwierdziłeś. Możesz to w każdej chwili cofnąć."
+    "doneBody": "{{app}} może teraz korzystać z tego, co zatwierdziłeś. Możesz to w każdej chwili cofnąć.",
+    "setup": {
+      "preparing": "Przygotowywanie następnego kroku",
+      "chainNote": "To jest potrzebne najpierw: tam będą przechowywane dane, które podasz na następnym ekranie.",
+      "formLabel": "Czego ta usługa od Ciebie potrzebuje",
+      "optional": "Opcjonalne",
+      "show": "Pokaż",
+      "hide": "Ukryj",
+      "incomplete": "Wypełnij wszystko, co nie jest oznaczone jako opcjonalne.",
+      "privacyNote": "To, co podasz, trafia z tego urządzenia prosto do usługi {{service}}. Nie jest tu przechowywane, a aplikacja, która o to poprosiła, nigdy tego nie widzi.",
+      "refusedTitle": "Usługa {{service}} nie mogła użyć tych danych",
+      "refusedFallback": "Dane nie zostały przyjęte. Sprawdź je i spróbuj ponownie.",
+      "refusedNested": "To żądanie wymaga większej liczby kolejnych zatwierdzeń, niż jest to możliwe, więc nic nie zostało przyznane."
+    }
   },
   "credentials": {
     "title": "Zarejestrowane poświadczenia",

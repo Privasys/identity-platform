@@ -353,7 +353,20 @@
     "failedTitle": "L'accès n'a pas été accordé",
     "failedBody": "Rien n'a été modifié. Vous pouvez réessayer.",
     "doneTitle": "Accès accordé",
-    "doneBody": "{{app}} peut désormais utiliser ce que vous avez approuvé. Vous pouvez le révoquer à tout moment."
+    "doneBody": "{{app}} peut désormais utiliser ce que vous avez approuvé. Vous pouvez le révoquer à tout moment.",
+    "setup": {
+      "preparing": "Préparation de l'étape suivante",
+      "chainNote": "Ceci est nécessaire d'abord : c'est là que seront conservées les informations que vous saisirez à l'écran suivant.",
+      "formLabel": "Ce que ce service attend de vous",
+      "optional": "Facultatif",
+      "show": "Afficher",
+      "hide": "Masquer",
+      "incomplete": "Remplissez tout ce qui n'est pas indiqué comme facultatif.",
+      "privacyNote": "Ce que vous saisissez est transmis directement à {{service}} depuis cet appareil. Rien n'est conservé ici, et l'application qui a fait la demande ne le voit jamais.",
+      "refusedTitle": "{{service}} n'a pas pu utiliser ces informations",
+      "refusedFallback": "Les informations ont été refusées. Vérifiez-les et réessayez.",
+      "refusedNested": "Cette demande exige plus d'approbations successives qu'il n'est possible d'enchaîner ; rien n'a été accordé."
+    }
   },
   "credentials": {
     "title": "Identifiants enregistrés",

@@ -386,7 +386,20 @@
     "failedTitle": "Juurdepääsu ei antud",
     "failedBody": "Midagi ei muudetud. Võite uuesti proovida.",
     "doneTitle": "Juurdepääs antud",
-    "doneBody": "{{app}} saab nüüd kasutada seda, mille kinnitasite. Võite selle igal ajal tühistada."
+    "doneBody": "{{app}} saab nüüd kasutada seda, mille kinnitasite. Võite selle igal ajal tühistada.",
+    "setup": {
+      "preparing": "Järgmise sammu ettevalmistamine",
+      "chainNote": "Seda on vaja esimesena: seal hoitakse andmeid, mille järgmisel ekraanil sisestate.",
+      "formLabel": "Mida see teenus teilt vajab",
+      "optional": "Valikuline",
+      "show": "Näita",
+      "hide": "Peida",
+      "incomplete": "Täitke kõik, mis ei ole märgitud valikuliseks.",
+      "privacyNote": "See, mille sisestate, läheb sellest seadmest otse teenusesse {{service}}. Siia seda ei salvestata ja rakendus, kes seda küsis, ei näe seda kunagi.",
+      "refusedTitle": "Teenus {{service}} ei saanud neid andmeid kasutada",
+      "refusedFallback": "Andmeid ei võetud vastu. Kontrollige neid ja proovige uuesti.",
+      "refusedNested": "See taotlus nõuab rohkem järjestikuseid heakskiite, kui on võimalik, seega ei antud midagi."
+    }
   },
   "credentials": {
     "title": "Registreeritud mandaadid",

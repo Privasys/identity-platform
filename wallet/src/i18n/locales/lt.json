@@ -386,7 +386,20 @@
     "failedTitle": "Prieiga nesuteikta",
     "failedBody": "Niekas nepakeista. Galite bandyti dar kartą.",
     "doneTitle": "Prieiga suteikta",
-    "doneBody": "{{app}} dabar gali naudoti tai, ką patvirtinote. Galite tai bet kada atšaukti."
+    "doneBody": "{{app}} dabar gali naudoti tai, ką patvirtinote. Galite tai bet kada atšaukti.",
+    "setup": {
+      "preparing": "Ruošiamas kitas veiksmas",
+      "chainNote": "To reikia pirmiausia: ten bus saugomi duomenys, kuriuos įvesite kitame ekrane.",
+      "formLabel": "Ko ši paslauga iš jūsų prašo",
+      "optional": "Neprivaloma",
+      "show": "Rodyti",
+      "hide": "Slėpti",
+      "incomplete": "Užpildykite viską, kas nepažymėta kaip neprivaloma.",
+      "privacyNote": "Tai, ką įvesite, iš šio įrenginio keliauja tiesiai į paslaugą {{service}}. Čia tai nesaugoma, o prašiusi programėlė to niekada nemato.",
+      "refusedTitle": "Paslauga {{service}} negalėjo panaudoti šių duomenų",
+      "refusedFallback": "Duomenys nebuvo priimti. Patikrinkite juos ir bandykite dar kartą.",
+      "refusedNested": "Ši užklausa reikalauja daugiau paeiliui einančių patvirtinimų, nei įmanoma, todėl nieko nesuteikta."
+    }
   },
   "credentials": {
     "title": "Registruoti kredencialai",

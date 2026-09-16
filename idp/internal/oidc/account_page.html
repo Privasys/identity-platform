@@ -227,6 +227,23 @@
   td .sub { display: block; font-size: 0.8rem; color: var(--text-secondary); }
   .plus { color: var(--good); font-weight: 600; }
 
+  /* Recent activity: a heading per day, then that day's charges grouped by
+     what they are, each group opening to the individual lines. Metered
+     resources bill hourly per thing, so a day holds hundreds of rows. */
+  #ledgerTable td { border-bottom: 0; border-top: 1px solid var(--border); }
+  #ledgerTable tr.day td { border-top: 0; padding-top: 1.6rem; font-weight: 600; }
+  #ledgerTable tbody tr.day:first-child td { padding-top: 0.7rem; }
+  #ledgerTable tr.day td:first-child { font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  #ledgerTable tr.detail td { border-top: 0; padding: 0.4rem 0; color: var(--text-secondary); }
+  #ledgerTable tr.detail td:first-child { padding-left: 1.5rem; }
+  .disclose {
+    display: inline-flex; align-items: center; gap: 0.4rem; padding: 0; border: 0;
+    background: none; color: var(--text-secondary); font: inherit; text-align: left; cursor: pointer;
+  }
+  .disclose:hover { color: var(--text); }
+  .disclose svg { flex-shrink: 0; transition: transform 0.15s; }
+  .disclose[aria-expanded="true"] svg { transform: rotate(90deg); }
+
   .quiet-links { display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.9rem; padding: 2rem 0 0; }
   .quiet-links a { color: var(--text-secondary); }
   .quiet-links a:hover { color: var(--text); }
@@ -474,7 +491,7 @@
     $("main").classList.remove("hidden");
     $("monthLabel").textContent = monthLabel();
     // The ledger names apps through the consents, so it renders after them.
-    await Promise.all([loadAccount(), loadConsentsAndSpend().then(loadLedger)]);
+    await Promise.all([loadAccount(), loadConsentsAndSpend(), loadLedger()]);
   }
 
   function monthLabel() {
@@ -620,29 +637,115 @@
     return reason;
   }
 
+  // Metered resources are charged per hour, per thing: six volumes bill six
+  // storage lines every hour. Listed one by one they bury everything else, so
+  // the page groups a day's lines by what they are and opens on request.
+  // 500 is the ledger's own cap on a page of entries.
+  var LEDGER_LIMIT = 500;
+
+  function dayKey(d) { return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate(); }
+  function dayLabel(d) {
+    var today = new Date();
+    var yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    if (dayKey(d) === dayKey(today)) return "Today";
+    if (dayKey(d) === dayKey(yesterday)) return "Yesterday";
+    var opts = { day: "numeric", month: "long" };
+    if (d.getFullYear() !== today.getFullYear()) opts.year = "numeric";
+    return d.toLocaleDateString("en-GB", opts);
+  }
+  function signed(credits, asMoney) {
+    var sign = credits > 0 ? "+" : (credits < 0 ? "−" : "");
+    var n = Math.abs(credits);
+    return sign + (asMoney ? gbp(n) : n.toLocaleString("en-GB"));
+  }
+  function amountCells(credits) {
+    var cls = credits > 0 ? " plus" : "";
+    return '<td class="num' + cls + '">' + esc(signed(credits, false)) + '</td>' +
+           '<td class="num' + cls + '">' + esc(signed(credits, true)) + '</td>';
+  }
+
+  function groupLedger(entries) {
+    var days = [], byDay = {};
+    entries.forEach(function (e) {
+      var d = new Date(e.ts);
+      if (isNaN(d.getTime())) return;
+      var k = dayKey(d);
+      var day = byDay[k];
+      if (!day) { day = byDay[k] = { date: d, total: 0, groups: [], byLabel: {} }; days.push(day); }
+      var credits = Number(e.credits) || 0;
+      day.total += credits;
+      var label = ledgerLabel(e.reason || e.kind || "");
+      var g = day.byLabel[label];
+      if (!g) { g = day.byLabel[label] = { label: label, credits: 0, rows: [] }; day.groups.push(g); }
+      g.credits += credits;
+      g.rows.push({ date: d, credits: credits });
+    });
+    days.forEach(function (day) {
+      day.groups.sort(function (a, b) { return Math.abs(b.credits) - Math.abs(a.credits); });
+    });
+    return days;
+  }
+
   async function loadLedger() {
     try {
-      var r = await mgmt("/billing/ledger?limit=15");
+      var r = await mgmt("/billing/ledger?limit=" + LEDGER_LIMIT);
       if (!r || r.enabled === false) { $("ledger").textContent = "—"; return; }
       var entries = (r.data && r.data.entries) || r.entries || [];
       if (!entries.length) { $("ledger").textContent = "No activity yet."; return; }
-      var html = '<div class="table-wrap"><table><thead><tr><th>When</th><th>What</th><th class="num">Credits</th><th class="num">Amount</th></tr></thead><tbody>';
-      entries.forEach(function (e) {
-        var when = new Date(e.ts).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
-        var credits = Number(e.credits) || 0;
-        var app = e.app_id && consentsByApp[hex(e.app_id)];
-        var reason = ledgerLabel(e.reason || e.kind || "");
-        var what = app ? (app.app_name || app.app_host) : reason;
-        var sub = app ? reason : "";
-        var sign = credits > 0 ? "+" : (credits < 0 ? "−" : "");
-        var cls = credits > 0 ? " plus" : "";
-        html += "<tr><td>" + esc(when) + "</td><td>" + esc(what) + (sub ? '<span class="sub">' + esc(sub) + "</span>" : "") + "</td>" +
-          '<td class="num' + cls + '">' + sign + esc(Math.abs(credits).toLocaleString("en-GB")) + "</td>" +
-          '<td class="num' + cls + '">' + sign + esc(gbp(Math.abs(credits))) + "</td></tr>";
-      });
-      $("ledger").className = "";
-      $("ledger").innerHTML = html + "</tbody></table></div>";
+      var days = groupLedger(entries);
+      // The oldest day is cut off by the row limit, so its total would be
+      // short. Drop it rather than show a figure that is wrong.
+      var cut = entries.length >= LEDGER_LIMIT && days.length > 1;
+      if (cut) days.pop();
+      if (!days.length) { $("ledger").textContent = "No activity yet."; return; }
+      renderLedger(days, cut);
     } catch (e) { $("ledger").textContent = e.message; }
+  }
+
+  function renderLedger(days, cut) {
+    var box = $("ledger");
+    box.className = "";
+    box.innerHTML = '<div class="table-wrap"><table id="ledgerTable"><thead><tr>' +
+      '<th>When</th><th>What</th><th class="num">Credits</th><th class="num">Amount</th>' +
+      '</tr></thead><tbody></tbody></table></div>' +
+      (cut ? '<p class="hint" style="margin-top:0.75rem">Older days are not shown.</p>' : "");
+    var body = box.querySelector("tbody");
+
+    days.forEach(function (day, di) {
+      var head = document.createElement("tr");
+      head.className = "day";
+      head.innerHTML = '<td colspan="2">' + esc(dayLabel(day.date)) + "</td>" + amountCells(day.total);
+      body.appendChild(head);
+
+      day.groups.forEach(function (g, gi) {
+        var many = g.rows.length > 1;
+        var row = document.createElement("tr");
+        row.className = "grp";
+        var when = many
+          ? '<button type="button" class="disclose" aria-expanded="false">' +
+            '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" aria-hidden="true">' +
+            '<path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            esc(g.rows.length.toLocaleString("en-GB")) + " times</button>"
+          : esc(g.rows[0].date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
+        row.innerHTML = "<td>" + when + "</td><td>" + esc(g.label) + "</td>" + amountCells(g.credits);
+        body.appendChild(row);
+
+        if (!many) return;
+        var details = g.rows.map(function (e) {
+          var tr = document.createElement("tr");
+          tr.className = "detail hidden";
+          tr.innerHTML = "<td>" + esc(e.date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })) +
+            "</td><td>" + esc(g.label) + "</td>" + amountCells(e.credits);
+          body.appendChild(tr);
+          return tr;
+        });
+        row.querySelector(".disclose").addEventListener("click", function () {
+          var open = this.getAttribute("aria-expanded") === "true";
+          this.setAttribute("aria-expanded", String(!open));
+          details.forEach(function (tr) { tr.classList.toggle("hidden", open); });
+        });
+      });
+    });
   }
 
   restore();

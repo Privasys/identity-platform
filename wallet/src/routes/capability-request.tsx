@@ -445,7 +445,12 @@ export default function CapabilityRequestScreen() {
                 keyboardVerticalOffset={0}
             >
             <ScrollView
-                contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
+                // Room for the last field to scroll clear of the keyboard, but
+                // only when there is a form; otherwise this is empty scroll.
+                contentContainerStyle={[
+                    styles.content,
+                    { paddingBottom: insets.bottom + (setup ? 120 : 24) },
+                ]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >

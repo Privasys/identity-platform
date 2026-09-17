@@ -575,7 +575,7 @@ export default function CapabilityRequestScreen() {
                                 that holds your data" sent someone to the app that
                                 was ASKING, which has no such option. */}
                             <Text style={styles.muted}>
-                                {t('capability.revokeHint', { service: serviceName })}
+                                {t('capability.revokeHint')}
                             </Text>
                         </RNView>
 

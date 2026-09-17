@@ -368,6 +368,55 @@
       "refusedNested": "Este pedido exige mais aprovações consecutivas do que é possível, pelo que nada foi concedido."
     }
   },
+
+  "sessions": {
+    "title": "Sessões ativas",
+    "empty": "Não tem sessão iniciada em lado nenhum."
+  },
+
+  "access": {
+    "summary": "O que o pode alcançar, e como pará-lo",
+    "accountsTitle": "Contas ligadas",
+    "accountsHint": "Serviços que guardam uma credencial para uma conta sua noutro sítio.",
+    "accountsEmpty": "Não ligou nenhuma conta.",
+    "dataTitle": "Acesso aos seus dados",
+    "dataHint": "Aplicações que podem usar dados que guarda na Privasys.",
+    "dataEmpty": "Nada tem acesso aos seus dados.",
+    "sessionsTitle": "Sessões ativas",
+    "sessionsHint": "Aplicações onde tem sessão iniciada neste momento.",
+    "recordTitle": "O seu registo",
+    "credentials": "Aplicações onde inicia sessão",
+    "credentialsNone": "Ainda sem credenciais de início de sessão",
+    "sharingHistory": "Histórico de partilha",
+    "seeAll": "Ver tudo",
+    "inService": "{{resource}} no seu {{service}}",
+    "stateRevoked": "Removeu isto",
+    "stateEnded": "Isto terminou",
+    "stateChecking": "A verificar junto do serviço",
+    "stateConfirmed": "Confirmado pelo serviço agora mesmo",
+    "stateGone": "O serviço já não tem isto",
+    "stateUnsupported": "Este serviço ainda não pode ser consultado a partir da sua carteira. Faça a gestão onde os dados estão.",
+    "stateLocal": "Deste dispositivo e por confirmar. Não foi possível contactar o serviço, por isso isto pode estar desatualizado.",
+    "grantTitle": "Detalhe do acesso",
+    "grantGone": "Este registo já não está neste dispositivo.",
+    "grantedOn": "Concedido a {{when, dateLong}}",
+    "expiresOn": "Até {{when, dateLong}}",
+    "revokedOn": "Removido a {{when, dateLong}}",
+    "credentialLabel": "O que lhes deu",
+    "credentialGiven": "Introduziu: {{what}}",
+    "credentialGivenGeneric": "Introduziu uma credencial quando aprovou isto.",
+    "credentialWider": "Uma credencial destas costuma permitir mais do que o acesso que concedeu. O que a mantém restrita é o serviço correr num enclave verificado e só poder fazer aquilo que aprovou.",
+    "disconnect": "Desligar",
+    "disconnectTitle": "Desligar {{app}}?",
+    "disconnectBody": "{{app}} deixará de usar {{resource}} e destruirá a sua cópia do que introduziu. A credencial em si continua a funcionar até a remover onde a criou.",
+    "disconnectNote": "Desligar para este serviço. Não cancela a credencial junto do fornecedor e não recupera nada que já tenha sido lido.",
+    "remove": "Remover acesso",
+    "removeTitle": "Remover o acesso de {{app}}?",
+    "removeBody": "{{app}} deixará de conseguir chegar a isto.",
+    "removeNote": "Remover o acesso para tudo o resto. Não recupera o que já foi lido.",
+    "revokeFailedTitle": "Nada foi alterado",
+    "revokeFailedBody": "Não foi possível contactar o serviço, por isso o acesso está inalterado. Pode tentar novamente."
+  },
   "credentials": {
     "title": "Credenciais registadas",
     "empty": "Ainda não há credenciais registadas",
@@ -527,7 +576,9 @@
     "revokeBody": "{{app}} terá de pedir os seus dados de cada vez.",
     "boundToMeasurement": "Associado à medição: {{measurement}}…",
     "noReceipts": "Ainda sem recibos",
-    "noReceiptsHint": "Os recibos de computação dos enclaves aparecerão aqui após o processamento de dados."
+    "noReceiptsHint": "Os recibos de computação dos enclaves aparecerão aqui após o processamento de dados.",
+    "valueNotRecorded": "Valor não registado",
+    "valueProofOnly": "Apenas uma prova, o valor não foi enviado"
   },
 
   "home": {
@@ -967,7 +1018,7 @@
   },
 
   "tabs": {
-    "home": "Início",
+    "access": "Acesso",
     "profile": "Perfil",
     "drive": "Drive",
     "settings": "Definições"

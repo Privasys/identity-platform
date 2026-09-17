@@ -401,6 +401,55 @@
       "refusedNested": "Mae'r cais hwn yn gofyn am fwy o gymeradwyaethau olynol nag sy'n bosibl, felly ni roddwyd dim."
     }
   },
+
+  "sessions": {
+    "title": "Sesiynau gweithredol",
+    "empty": "Nid ydych wedi mewngofnodi i unrhyw beth."
+  },
+
+  "access": {
+    "summary": "Beth all eich cyrraedd, a sut i’w atal",
+    "accountsTitle": "Cyfrifon cysylltiedig",
+    "accountsHint": "Gwasanaethau sy’n dal manylion mynediad i gyfrif sydd gennych rywle arall.",
+    "accountsEmpty": "Nid ydych wedi cysylltu unrhyw gyfrifon.",
+    "dataTitle": "Mynediad at eich data",
+    "dataHint": "Apiau sy’n gallu defnyddio data rydych yn ei gadw gyda Privasys.",
+    "dataEmpty": "Nid oes gan unrhyw beth fynediad at eich data.",
+    "sessionsTitle": "Sesiynau gweithredol",
+    "sessionsHint": "Apiau rydych wedi mewngofnodi iddynt ar hyn o bryd.",
+    "recordTitle": "Eich cofnod",
+    "credentials": "Apiau rydych yn mewngofnodi iddynt",
+    "credentialsNone": "Dim manylion mewngofnodi eto",
+    "sharingHistory": "Hanes rhannu",
+    "seeAll": "Gweld y cyfan",
+    "inService": "{{resource}} yn eich {{service}}",
+    "stateRevoked": "Fe wnaethoch dynnu hwn",
+    "stateEnded": "Mae hwn wedi dod i ben",
+    "stateChecking": "Yn gwirio gyda’r gwasanaeth",
+    "stateConfirmed": "Cadarnhawyd gyda’r gwasanaeth nawr",
+    "stateGone": "Nid yw’r gwasanaeth yn dal hwn mwyach",
+    "stateUnsupported": "Ni ellir gofyn i’r gwasanaeth hwn o’ch waled eto. Rheolwch ef lle mae’r data.",
+    "stateLocal": "O’r ddyfais hon, heb ei gadarnhau. Ni ellid cyrraedd y gwasanaeth, felly gall hyn fod yn hen.",
+    "grantTitle": "Manylion mynediad",
+    "grantGone": "Nid yw’r cofnod hwn ar y ddyfais hon mwyach.",
+    "grantedOn": "Rhoddwyd {{when, dateLong}}",
+    "expiresOn": "Tan {{when, dateLong}}",
+    "revokedOn": "Tynnwyd {{when, dateLong}}",
+    "credentialLabel": "Beth roesoch iddynt",
+    "credentialGiven": "Fe wnaethoch nodi: {{what}}",
+    "credentialGivenGeneric": "Fe wnaethoch nodi manylyn mynediad wrth gymeradwyo hyn.",
+    "credentialWider": "Mae manylyn fel hwn fel arfer yn caniatáu mwy na’r mynediad a roesoch. Yr hyn sy’n ei gadw’n gul yw bod y gwasanaeth yn rhedeg mewn cilfach wedi’i gwirio ac ond yn gallu gwneud yr hyn a gymeradwyoch.",
+    "disconnect": "Datgysylltu",
+    "disconnectTitle": "Datgysylltu {{app}}?",
+    "disconnectBody": "Bydd {{app}} yn peidio â defnyddio {{resource}} ac yn dinistrio ei gopi o’r hyn a nodwyd gennych. Mae’r manylyn ei hun yn dal i weithio nes i chi ei dynnu lle’i crëwyd.",
+    "disconnectNote": "Mae datgysylltu’n atal y gwasanaeth hwn. Nid yw’n canslo’r manylyn gyda’r darparwr, ac nid yw’n adalw dim a ddarllenwyd eisoes.",
+    "remove": "Tynnu mynediad",
+    "removeTitle": "Tynnu mynediad {{app}}?",
+    "removeBody": "Ni fydd {{app}} yn gallu cyrraedd hyn mwyach.",
+    "removeNote": "Mae tynnu mynediad yn atal popeth pellach. Nid yw’n adalw’r hyn a ddarllenwyd eisoes.",
+    "revokeFailedTitle": "Ni newidiwyd dim",
+    "revokeFailedBody": "Ni ellid cyrraedd y gwasanaeth, felly mae’r mynediad heb ei newid. Gallwch geisio eto."
+  },
   "credentials": {
     "title": "Tystlythyrau cofrestredig",
     "empty": "Dim tystlythyrau wedi'u cofrestru eto",
@@ -567,7 +616,9 @@
     "revokeBody": "Bydd yn rhaid i {{app}} ofyn am eich data eto bob tro.",
     "boundToMeasurement": "Wedi'i rwymo i'r mesuriad: {{measurement}}…",
     "noReceipts": "Dim derbynebau eto",
-    "noReceiptsHint": "Bydd derbynebau cyfrifiadura o gwafelloedd yn ymddangos yma ar ôl prosesu data."
+    "noReceiptsHint": "Bydd derbynebau cyfrifiadura o gwafelloedd yn ymddangos yma ar ôl prosesu data.",
+    "valueNotRecorded": "Ni chofnodwyd y gwerth",
+    "valueProofOnly": "Prawf yn unig, ni anfonwyd y gwerth"
   },
   "home": {
     "noSessions": "Dim sesiynau gweithredol eto",
@@ -1040,7 +1091,7 @@
     "aboutWebsite": "Gwefan"
   },
   "tabs": {
-    "home": "Hafan",
+    "access": "Mynediad",
     "profile": "Proffil",
     "drive": "Drive",
     "settings": "Gosodiadau"

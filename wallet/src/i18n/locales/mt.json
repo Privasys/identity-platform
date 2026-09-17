@@ -401,6 +401,55 @@
       "refusedNested": "Din it-talba titlob aktar approvazzjonijiet konsekuttivi milli huwa possibbli, għalhekk ma ngħata xejn."
     }
   },
+
+  "sessions": {
+    "title": "Sessjonijiet attivi",
+    "empty": "M’intix illoggjat f’xejn."
+  },
+
+  "access": {
+    "summary": "X’jista’ jilħqek, u kif twaqqfu",
+    "accountsTitle": "Kontijiet konnessi",
+    "accountsHint": "Servizzi li jżommu kredenzjal għal kont tiegħek band’oħra.",
+    "accountsEmpty": "Ma qbadt l-ebda kont.",
+    "dataTitle": "Aċċess għad-data tiegħek",
+    "dataHint": "Apps li jistgħu jużaw data li żżomm ma’ Privasys.",
+    "dataEmpty": "Xejn ma għandu aċċess għad-data tiegħek.",
+    "sessionsTitle": "Sessjonijiet attivi",
+    "sessionsHint": "Apps li bħalissa int illoggjat fihom.",
+    "recordTitle": "Ir-rekord tiegħek",
+    "credentials": "Apps li tilloggja fihom",
+    "credentialsNone": "Għadhom l-ebda kredenzjali tal-illoggjar",
+    "sharingHistory": "Storja tal-qsim",
+    "seeAll": "Ara kollox",
+    "inService": "{{resource}} fis-{{service}} tiegħek",
+    "stateRevoked": "Int neħħejt dan",
+    "stateEnded": "Dan intemm",
+    "stateChecking": "Qed jiġi ċċekkjat mas-servizz",
+    "stateConfirmed": "Ikkonfermat mas-servizz issa",
+    "stateGone": "Is-servizz m’għadux iżommu",
+    "stateUnsupported": "Dan is-servizz għadu ma jistax jiġi mistoqsi mill-kartiera tiegħek. Immaniġġjah fejn tinsab id-data.",
+    "stateLocal": "Minn dan l-apparat u mhux ikkonfermat. Is-servizz ma setax jintlaħaq, allura dan jista’ jkun antikwat.",
+    "grantTitle": "Dettalji tal-aċċess",
+    "grantGone": "Dan ir-rekord m’għadux fuq dan l-apparat.",
+    "grantedOn": "Mogħti fi {{when, dateLong}}",
+    "expiresOn": "Sa {{when, dateLong}}",
+    "revokedOn": "Imneħħi fi {{when, dateLong}}",
+    "credentialLabel": "X’tajthom",
+    "credentialGiven": "Daħħalt: {{what}}",
+    "credentialGivenGeneric": "Daħħalt kredenzjal meta approvajt dan.",
+    "credentialWider": "Kredenzjal bħal dan normalment jippermetti aktar mill-aċċess li tajt. Dak li jżommu dejjaq huwa li s-servizz jaħdem f’enklavi verifikat u jista’ jagħmel biss dak li approvajt.",
+    "disconnect": "Aqta’ l-konnessjoni",
+    "disconnectTitle": "Taqta’ l-konnessjoni ma’ {{app}}?",
+    "disconnectBody": "{{app}} se jieqaf juża {{resource}} u jeqred il-kopja tiegħu ta’ dak li daħħalt. Il-kredenzjal innifsu jibqa’ jaħdem sakemm tneħħih minn fejn ħloqtu.",
+    "disconnectNote": "Il-qtugħ iwaqqaf dan is-servizz. Ma jikkanċellax il-kredenzjal għand il-fornitur, u ma jirkuprax dak li diġà nqara.",
+    "remove": "Neħħi l-aċċess",
+    "removeTitle": "Tneħħi l-aċċess ta’ {{app}}?",
+    "removeBody": "{{app}} mhux se jkun jista’ jilħaq dan aktar.",
+    "removeNote": "It-tneħħija tal-aċċess twaqqaf kull ħaġa oħra. Ma tirkuprax dak li diġà nqara.",
+    "revokeFailedTitle": "Ma nbidel xejn",
+    "revokeFailedBody": "Is-servizz ma setax jintlaħaq, allura l-aċċess baqa’ l-istess. Tista’ terġa’ tipprova."
+  },
   "credentials": {
     "title": "Kredenzjali rreġistrati",
     "empty": "Għad m'hemm l-ebda kredenzjal irreġistrat",
@@ -563,7 +612,9 @@
     "revokeBody": "{{app}} se jkollha terġa' titlob id-data tiegħek kull darba.",
     "boundToMeasurement": "Marbut mal-kejl: {{measurement}}…",
     "noReceipts": "Għad m'hemm l-ebda rċevuta",
-    "noReceiptsHint": "L-irċevuti tal-komputazzjoni mill-enklavi se jidhru hawn wara l-ipproċessar tad-data."
+    "noReceiptsHint": "L-irċevuti tal-komputazzjoni mill-enklavi se jidhru hawn wara l-ipproċessar tad-data.",
+    "valueNotRecorded": "Il-valur ma ġiex irreġistrat",
+    "valueProofOnly": "Prova biss, il-valur ma ntbagħatx"
   },
   "home": {
     "noSessions": "Għad m'hemm l-ebda sessjoni attiva",
@@ -1020,7 +1071,7 @@
     "aboutWebsite": "Websajt"
   },
   "tabs": {
-    "home": "Dar",
+    "access": "Aċċess",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Issettjar"

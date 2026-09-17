@@ -12,6 +12,30 @@ import * as SecureStore from '@/utils/storage';
 import { create } from 'zustand';
 
 /** A single data sharing consent record. */
+/**
+ * One attribute as it was actually disclosed.
+ *
+ * The keys alone were never enough to answer "what did this app get". A holder
+ * who has since changed their display name or their email cannot learn the
+ * answer by reading their profile, because the profile holds what is true now
+ * and this record is about what left the device then.
+ */
+export interface DisclosedAttribute {
+    key: string;
+    /**
+     * The value as sent. Absent when what went was a proof, and absent on
+     * records written before this was captured, which the UI must show as not
+     * recorded rather than as nothing sent.
+     */
+    value?: string;
+    /**
+     * The enclave computed this from the identity receipt, so the wallet never
+     * held a value and none was sent. Distinct from simply having no value: one
+     * says a proof went, the other says we do not know what did.
+     */
+    proofOnly?: boolean;
+}
+
 export interface ConsentRecord {
     /** Unique ID for this consent event. */
     id: string;
@@ -25,6 +49,13 @@ export interface ConsentRecord {
     requestedAttributes: string[];
     /** Attributes the user approved sharing. */
     approvedAttributes: string[];
+    /**
+     * What was actually sent for each approved attribute, captured at the
+     * moment of disclosure. Optional because records written before 1.5.0 do
+     * not have it; `approvedAttributes` remains the authoritative list of what
+     * was approved.
+     */
+    disclosed?: DisclosedAttribute[];
     /** Attributes the user denied. */
     deniedAttributes: string[];
     /** User decision: 'approved' | 'denied' | 'partial' (some approved, some denied). */

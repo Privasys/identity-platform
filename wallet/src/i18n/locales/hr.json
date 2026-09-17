@@ -401,6 +401,55 @@
       "refusedNested": "Ovaj zahtjev traži više uzastopnih odobrenja nego što je moguće pa ništa nije dodijeljeno."
     }
   },
+
+  "sessions": {
+    "title": "Aktivne sesije",
+    "empty": "Niste nigdje prijavljeni."
+  },
+
+  "access": {
+    "summary": "Što vas može doseći i kako to zaustaviti",
+    "accountsTitle": "Povezani računi",
+    "accountsHint": "Usluge koje čuvaju vjerodajnicu za vaš račun negdje drugdje.",
+    "accountsEmpty": "Niste povezali nijedan račun.",
+    "dataTitle": "Pristup vašim podacima",
+    "dataHint": "Aplikacije koje mogu koristiti podatke koje čuvate u Privasysu.",
+    "dataEmpty": "Ništa nema pristup vašim podacima.",
+    "sessionsTitle": "Aktivne sesije",
+    "sessionsHint": "Aplikacije u koje ste trenutačno prijavljeni.",
+    "recordTitle": "Vaša evidencija",
+    "credentials": "Aplikacije u koje se prijavljujete",
+    "credentialsNone": "Još nema vjerodajnica za prijavu",
+    "sharingHistory": "Povijest dijeljenja",
+    "seeAll": "Prikaži sve",
+    "inService": "{{resource}} u vašoj usluzi {{service}}",
+    "stateRevoked": "Ovo ste uklonili",
+    "stateEnded": "Ovo je završilo",
+    "stateChecking": "Provjerava se s uslugom",
+    "stateConfirmed": "Usluga je upravo potvrdila",
+    "stateGone": "Usluga to više nema",
+    "stateUnsupported": "Ovu uslugu još nije moguće upitati iz novčanika. Upravljajte njome ondje gdje su podaci.",
+    "stateLocal": "S ovog uređaja i bez potvrde. Uslugu nije bilo moguće dohvatiti pa ovo može biti zastarjelo.",
+    "grantTitle": "Pojedinosti pristupa",
+    "grantGone": "Ovog zapisa više nema na ovom uređaju.",
+    "grantedOn": "Odobreno {{when, dateLong}}",
+    "expiresOn": "Do {{when, dateLong}}",
+    "revokedOn": "Uklonjeno {{when, dateLong}}",
+    "credentialLabel": "Što ste im dali",
+    "credentialGiven": "Unijeli ste: {{what}}",
+    "credentialGivenGeneric": "Unijeli ste vjerodajnicu kada ste ovo odobrili.",
+    "credentialWider": "Takva vjerodajnica obično dopušta više od pristupa koji ste odobrili. Uskim je drži to što usluga radi u provjerenoj enklavi i može učiniti samo ono što ste odobrili.",
+    "disconnect": "Prekini vezu",
+    "disconnectTitle": "Prekinuti vezu s {{app}}?",
+    "disconnectBody": "{{app}} će prestati koristiti {{resource}} i uništiti svoju kopiju onoga što ste unijeli. Sama vjerodajnica i dalje radi dok je ne uklonite ondje gdje ste je stvorili.",
+    "disconnectNote": "Prekid veze zaustavlja ovu uslugu. Ne poništava vjerodajnicu kod pružatelja i ne vraća ništa što je već pročitano.",
+    "remove": "Ukloni pristup",
+    "removeTitle": "Ukloniti pristup za {{app}}?",
+    "removeBody": "{{app}} više neće moći doći do ovoga.",
+    "removeNote": "Uklanjanje pristupa zaustavlja sve daljnje. Ne vraća ono što je već pročitano.",
+    "revokeFailedTitle": "Ništa nije promijenjeno",
+    "revokeFailedBody": "Uslugu nije bilo moguće dohvatiti pa je pristup nepromijenjen. Možete pokušati ponovno."
+  },
   "credentials": {
     "title": "Registrirane vjerodajnice",
     "empty": "Još nema registriranih vjerodajnica",
@@ -555,7 +604,9 @@
     "revokeBody": "{{app}} će morati svaki put ponovno zatražiti vaše podatke.",
     "boundToMeasurement": "Vezano uz mjerenje: {{measurement}}…",
     "noReceipts": "Još nema potvrda",
-    "noReceiptsHint": "Potvrde o izračunima iz enklava pojavit će se ovdje nakon obrade podataka."
+    "noReceiptsHint": "Potvrde o izračunima iz enklava pojavit će se ovdje nakon obrade podataka.",
+    "valueNotRecorded": "Vrijednost nije zabilježena",
+    "valueProofOnly": "Samo dokaz, vrijednost nije poslana"
   },
   "home": {
     "noSessions": "Još nema aktivnih sesija",
@@ -980,7 +1031,7 @@
     "aboutWebsite": "Web-mjesto"
   },
   "tabs": {
-    "home": "Početna",
+    "access": "Pristup",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Postavke"

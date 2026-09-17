@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePalette } from '@/components/Themed';
+import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 
 /** Bar height above whatever the system draws below it. */
 const TAB_BAR_CONTENT_HEIGHT = 60;
@@ -13,6 +14,7 @@ export default function TabLayout() {
     const p = usePalette();
     const { t } = useTranslation();
     const insets = useSafeAreaInsets();
+    const pending = useVaultApprovalsStore((s) => s.pending.length);
     return (
         <Tabs
             screenOptions={{
@@ -38,12 +40,19 @@ export default function TabLayout() {
                 }
             }}
         >
+            {/* Access leads. The deliberate reasons to open this app are
+                scanning a code and checking or ending what an app can do, and
+                both live here; identity is one tap away. The badge carries
+                anything waiting on a decision, so a pending approval is visible
+                from whichever tab the holder happens to be on. */}
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: t('tabs.home'),
+                    title: t('tabs.access'),
+                    tabBarBadge: pending > 0 ? pending : undefined,
+                    tabBarBadgeStyle: { backgroundColor: p.danger },
                     tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-                        <Ionicons name="home" size={size} color={color} />
+                        <Ionicons name="key" size={size} color={color} />
                     )
                 }}
             />

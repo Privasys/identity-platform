@@ -401,6 +401,55 @@
       "refusedNested": "Šis pieprasījums prasa vairāk secīgu apstiprinājumu, nekā iespējams, tāpēc nekas netika piešķirts."
     }
   },
+
+  "sessions": {
+    "title": "Aktīvās sesijas",
+    "empty": "Jūs nekur neesat pieteicies."
+  },
+
+  "access": {
+    "summary": "Kas var jūs sasniegt un kā to apturēt",
+    "accountsTitle": "Savienotie konti",
+    "accountsHint": "Pakalpojumi, kas glabā akreditācijas datus jūsu kontam citur.",
+    "accountsEmpty": "Jūs neesat savienojis nevienu kontu.",
+    "dataTitle": "Piekļuve jūsu datiem",
+    "dataHint": "Lietotnes, kas var izmantot datus, kurus glabājat Privasys.",
+    "dataEmpty": "Nekam nav piekļuves jūsu datiem.",
+    "sessionsTitle": "Aktīvās sesijas",
+    "sessionsHint": "Lietotnes, kurās šobrīd esat pieteicies.",
+    "recordTitle": "Jūsu uzskaite",
+    "credentials": "Lietotnes, kurās piesakāties",
+    "credentialsNone": "Vēl nav pieteikšanās akreditācijas datu",
+    "sharingHistory": "Kopīgošanas vēsture",
+    "seeAll": "Skatīt visus",
+    "inService": "{{resource}} jūsu pakalpojumā {{service}}",
+    "stateRevoked": "Jūs to noņēmāt",
+    "stateEnded": "Tas ir beidzies",
+    "stateChecking": "Notiek pārbaude pakalpojumā",
+    "stateConfirmed": "Pakalpojums tikko apstiprināja",
+    "stateGone": "Pakalpojumam tā vairs nav",
+    "stateUnsupported": "Šim pakalpojumam vēl nevar jautāt no maka. Pārvaldiet to tur, kur atrodas dati.",
+    "stateLocal": "No šīs ierīces un neapstiprināts. Pakalpojumu nevarēja sasniegt, tāpēc tas var būt novecojis.",
+    "grantTitle": "Piekļuves informācija",
+    "grantGone": "Šī ieraksta šajā ierīcē vairs nav.",
+    "grantedOn": "Piešķirts {{when, dateLong}}",
+    "expiresOn": "Līdz {{when, dateLong}}",
+    "revokedOn": "Noņemts {{when, dateLong}}",
+    "credentialLabel": "Ko jūs viņiem iedevāt",
+    "credentialGiven": "Jūs ievadījāt: {{what}}",
+    "credentialGivenGeneric": "Apstiprinot to, jūs ievadījāt akreditācijas datus.",
+    "credentialWider": "Šādi akreditācijas dati parasti atļauj vairāk nekā piekļuve, ko piešķīrāt. Šauru to notur tas, ka pakalpojums darbojas pārbaudītā anklāvā un var darīt tikai to, ko apstiprinājāt.",
+    "disconnect": "Atvienot",
+    "disconnectTitle": "Atvienot {{app}}?",
+    "disconnectBody": "{{app}} pārtrauks izmantot {{resource}} un iznīcinās savu kopiju no tā, ko ievadījāt. Paši akreditācijas dati turpina darboties, līdz tos noņemat tur, kur tos izveidojāt.",
+    "disconnectNote": "Atvienošana aptur šo pakalpojumu. Tā neatceļ akreditācijas datus pie pakalpojuma sniedzēja un neatsauc neko, kas jau ir izlasīts.",
+    "remove": "Noņemt piekļuvi",
+    "removeTitle": "Noņemt {{app}} piekļuvi?",
+    "removeBody": "{{app}} vairs nevarēs to sasniegt.",
+    "removeNote": "Piekļuves noņemšana aptur visu turpmāko. Tā neatsauc to, kas jau ir izlasīts.",
+    "revokeFailedTitle": "Nekas netika mainīts",
+    "revokeFailedBody": "Pakalpojumu nevarēja sasniegt, tāpēc piekļuve ir nemainīta. Varat mēģināt vēlreiz."
+  },
   "credentials": {
     "title": "Reģistrētie akreditācijas dati",
     "empty": "Vēl nav reģistrētu akreditācijas datu",
@@ -555,7 +604,9 @@
     "revokeBody": "{{app}} katru reizi būs no jauna jāpieprasa jūsu dati.",
     "boundToMeasurement": "Piesaistīts mērījumam: {{measurement}}…",
     "noReceipts": "Vēl nav kvīšu",
-    "noReceiptsHint": "Anklāvu aprēķinu kvītis parādīsies šeit pēc datu apstrādes."
+    "noReceiptsHint": "Anklāvu aprēķinu kvītis parādīsies šeit pēc datu apstrādes.",
+    "valueNotRecorded": "Vērtība nav reģistrēta",
+    "valueProofOnly": "Tikai pierādījums, vērtība netika nosūtīta"
   },
   "home": {
     "noSessions": "Vēl nav aktīvu sesiju",
@@ -980,7 +1031,7 @@
     "aboutWebsite": "Tīmekļa vietne"
   },
   "tabs": {
-    "home": "Sākums",
+    "access": "Piekļuve",
     "profile": "Profils",
     "drive": "Drive",
     "settings": "Iestatījumi"

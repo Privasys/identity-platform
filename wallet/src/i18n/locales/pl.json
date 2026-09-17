@@ -368,6 +368,55 @@
       "refusedNested": "To żądanie wymaga większej liczby kolejnych zatwierdzeń, niż jest to możliwe, więc nic nie zostało przyznane."
     }
   },
+
+  "sessions": {
+    "title": "Aktywne sesje",
+    "empty": "Nigdzie nie jesteś zalogowany."
+  },
+
+  "access": {
+    "summary": "Co może Cię dosięgnąć i jak to zatrzymać",
+    "accountsTitle": "Połączone konta",
+    "accountsHint": "Usługi przechowujące dane logowania do Twojego konta gdzie indziej.",
+    "accountsEmpty": "Nie połączyłeś żadnych kont.",
+    "dataTitle": "Dostęp do Twoich danych",
+    "dataHint": "Aplikacje, które mogą korzystać z danych przechowywanych w Privasys.",
+    "dataEmpty": "Nic nie ma dostępu do Twoich danych.",
+    "sessionsTitle": "Aktywne sesje",
+    "sessionsHint": "Aplikacje, w których jesteś teraz zalogowany.",
+    "recordTitle": "Twój rejestr",
+    "credentials": "Aplikacje, do których się logujesz",
+    "credentialsNone": "Brak danych logowania",
+    "sharingHistory": "Historia udostępniania",
+    "seeAll": "Zobacz wszystkie",
+    "inService": "{{resource}} w Twojej usłudze {{service}}",
+    "stateRevoked": "Usunąłeś to",
+    "stateEnded": "To się zakończyło",
+    "stateChecking": "Sprawdzanie w usłudze",
+    "stateConfirmed": "Usługa właśnie potwierdziła",
+    "stateGone": "Usługa już tego nie ma",
+    "stateUnsupported": "Tej usługi nie można jeszcze zapytać z portfela. Zarządzaj nią tam, gdzie są dane.",
+    "stateLocal": "Z tego urządzenia i niepotwierdzone. Nie udało się połączyć z usługą, więc może to być nieaktualne.",
+    "grantTitle": "Szczegóły dostępu",
+    "grantGone": "Tego wpisu nie ma już na tym urządzeniu.",
+    "grantedOn": "Przyznano {{when, dateLong}}",
+    "expiresOn": "Do {{when, dateLong}}",
+    "revokedOn": "Usunięto {{when, dateLong}}",
+    "credentialLabel": "Co im przekazałeś",
+    "credentialGiven": "Wpisałeś: {{what}}",
+    "credentialGivenGeneric": "Zatwierdzając to, wpisałeś dane logowania.",
+    "credentialWider": "Takie dane zwykle pozwalają na więcej niż przyznany przez Ciebie dostęp. Wąskim utrzymuje je to, że usługa działa w zweryfikowanej enklawie i może robić tylko to, co zatwierdziłeś.",
+    "disconnect": "Odłącz",
+    "disconnectTitle": "Odłączyć {{app}}?",
+    "disconnectBody": "{{app}} przestanie używać {{resource}} i zniszczy swoją kopię tego, co wpisałeś. Same dane logowania działają dalej, dopóki nie usuniesz ich tam, gdzie je utworzyłeś.",
+    "disconnectNote": "Odłączenie zatrzymuje tę usługę. Nie unieważnia danych logowania u dostawcy i nie cofa niczego, co już zostało odczytane.",
+    "remove": "Usuń dostęp",
+    "removeTitle": "Usunąć dostęp dla {{app}}?",
+    "removeBody": "{{app}} nie będzie już mogła tego osiągnąć.",
+    "removeNote": "Usunięcie dostępu zatrzymuje wszystko dalsze. Nie cofa tego, co już zostało odczytane.",
+    "revokeFailedTitle": "Nic nie zostało zmienione",
+    "revokeFailedBody": "Nie udało się połączyć z usługą, więc dostęp jest bez zmian. Możesz spróbować ponownie."
+  },
   "credentials": {
     "title": "Zarejestrowane poświadczenia",
     "empty": "Nie zarejestrowano jeszcze żadnych poświadczeń",
@@ -531,7 +580,9 @@
     "revokeBody": "{{app}} będzie musiała za każdym razem prosić o Twoje dane.",
     "boundToMeasurement": "Powiązane z pomiarem: {{measurement}}…",
     "noReceipts": "Brak potwierdzeń",
-    "noReceiptsHint": "Potwierdzenia obliczeń z enklaw pojawią się tutaj po przetworzeniu danych."
+    "noReceiptsHint": "Potwierdzenia obliczeń z enklaw pojawią się tutaj po przetworzeniu danych.",
+    "valueNotRecorded": "Wartość nie została zapisana",
+    "valueProofOnly": "Tylko dowód, wartość nie została wysłana"
   },
 
   "home": {
@@ -987,7 +1038,7 @@
   },
 
   "tabs": {
-    "home": "Start",
+    "access": "Dostęp",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Ustawienia"

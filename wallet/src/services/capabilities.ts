@@ -335,6 +335,79 @@ export async function createCapability(args: {
     );
 }
 
+/** One capability as the resource service itself reports it. */
+export interface HeldCapability {
+    capability_id: string;
+    kind?: string;
+    permissions?: string[];
+    resource_label?: string;
+    subject_app_id?: string;
+    expires_unix?: number;
+}
+
+/**
+ * What the resource service says the holder currently has with it.
+ *
+ * Returns null, distinctly from an empty list, when the service does not serve
+ * this route. That difference is the whole point: an empty list means "you have
+ * nothing here", and a missing route means "this service cannot be asked from
+ * the wallet", and showing the first when the second is true would tell the
+ * holder their access had gone when it had not.
+ *
+ * It also gates revocation. A DELETE returning 404 from a service that serves
+ * the list means the capability really is not held; the same 404 from a service
+ * that does not serve it means only that the route is absent.
+ */
+export async function listCapabilities(resourceHost: string): Promise<HeldCapability[] | null> {
+    const token = await getPlatformToken();
+    const raFetch = makeRaTlsFetch({ enclaveHost: resourceHost, platformFetch: fetch });
+    const res = await raFetch(`https://${resourceHost}/v1/capabilities`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 404 || res.status === 405) return null;
+    if (!res.ok) {
+        throw new CapabilityError(`the service could not be asked (${res.status})`, {
+            status: res.status,
+        });
+    }
+    const body = (await res.json()) as { capabilities?: unknown };
+    const list = Array.isArray(body?.capabilities) ? body.capabilities : [];
+    return list.filter(
+        (c): c is HeldCapability =>
+            !!c && typeof c === 'object' && typeof (c as HeldCapability).capability_id === 'string',
+    );
+}
+
+/**
+ * Ask the resource service to revoke, as the holder.
+ *
+ * The wallet does not enforce anything. This carries the holder's instruction
+ * over the same attested channel that minted the capability, and the caller
+ * records the revocation only once this returns, never on the strength of the
+ * tap alone.
+ *
+ * A service that sealed setup values for this capability drops them here too: a
+ * credential kept after the grant that justified it is gone is a credential
+ * nobody authorised.
+ */
+export async function revokeCapability(resourceHost: string, capabilityId: string): Promise<void> {
+    const token = await getPlatformToken();
+    const raFetch = makeRaTlsFetch({ enclaveHost: resourceHost, platformFetch: fetch });
+    const res = await raFetch(
+        `https://${resourceHost}/v1/capabilities/${encodeURIComponent(capabilityId)}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+    );
+    // 410 is the service saying it was already gone, which is the outcome the
+    // holder asked for. 404 is not: from a service that serves the list it
+    // means the same thing, and the caller checks that before calling.
+    if (res.ok || res.status === 410 || res.status === 404) return;
+    const body = await res.text().catch(() => '');
+    throw new CapabilityError(
+        `the service refused to revoke (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`,
+        { status: res.status, code: errorCodeOf(body) },
+    );
+}
+
 /**
  * Tell the requesting app the outcome, quoting the nonce. Deny is delivered
  * too, so the app can stop asking rather than re-prompting forever.

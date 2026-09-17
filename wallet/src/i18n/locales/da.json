@@ -368,6 +368,55 @@
       "refusedNested": "Denne anmodning kræver flere godkendelser i træk, end der er muligt, så intet blev givet."
     }
   },
+
+  "sessions": {
+    "title": "Aktive sessioner",
+    "empty": "Du er ikke logget ind nogen steder."
+  },
+
+  "access": {
+    "summary": "Hvad der kan nå dig, og hvordan du stopper det",
+    "accountsTitle": "Forbundne konti",
+    "accountsHint": "Tjenester, der opbevarer loginoplysninger til en konto, du har et andet sted.",
+    "accountsEmpty": "Du har ikke forbundet nogen konti.",
+    "dataTitle": "Adgang til dine data",
+    "dataHint": "Apps, der kan bruge data, du opbevarer hos Privasys.",
+    "dataEmpty": "Intet har adgang til dine data.",
+    "sessionsTitle": "Aktive sessioner",
+    "sessionsHint": "Apps, du er logget ind på lige nu.",
+    "recordTitle": "Din oversigt",
+    "credentials": "Apps, du logger ind på",
+    "credentialsNone": "Ingen loginoplysninger endnu",
+    "sharingHistory": "Delingshistorik",
+    "seeAll": "Se alle",
+    "inService": "{{resource}} i dit {{service}}",
+    "stateRevoked": "Du fjernede dette",
+    "stateEnded": "Dette er ophørt",
+    "stateChecking": "Tjekker med tjenesten",
+    "stateConfirmed": "Bekræftet med tjenesten lige nu",
+    "stateGone": "Tjenesten har det ikke længere",
+    "stateUnsupported": "Denne tjeneste kan endnu ikke spørges fra din wallet. Administrer den, hvor dataene er.",
+    "stateLocal": "Fra denne enhed og ikke bekræftet. Tjenesten kunne ikke nås, så dette kan være forældet.",
+    "grantTitle": "Adgangsdetaljer",
+    "grantGone": "Denne registrering er ikke længere på denne enhed.",
+    "grantedOn": "Givet {{when, dateLong}}",
+    "expiresOn": "Indtil {{when, dateLong}}",
+    "revokedOn": "Fjernet {{when, dateLong}}",
+    "credentialLabel": "Hvad du gav dem",
+    "credentialGiven": "Du indtastede: {{what}}",
+    "credentialGivenGeneric": "Du indtastede en loginoplysning, da du godkendte dette.",
+    "credentialWider": "En loginoplysning som denne tillader normalt mere end den adgang, du gav. Det, der holder den snæver, er, at tjenesten kører i en verificeret enklave og kun kan gøre det, du godkendte.",
+    "disconnect": "Afbryd forbindelsen",
+    "disconnectTitle": "Afbryd forbindelsen til {{app}}?",
+    "disconnectBody": "{{app}} holder op med at bruge {{resource}} og destruerer sin kopi af det, du indtastede. Selve loginoplysningen virker fortsat, indtil du fjerner den der, hvor du oprettede den.",
+    "disconnectNote": "At afbryde stopper denne tjeneste. Det annullerer ikke loginoplysningen hos udbyderen, og det henter ikke noget tilbage, der allerede er læst.",
+    "remove": "Fjern adgang",
+    "removeTitle": "Fjern adgang for {{app}}?",
+    "removeBody": "{{app}} vil ikke længere kunne nå dette.",
+    "removeNote": "At fjerne adgang stopper alt yderligere. Det henter ikke tilbage, hvad der allerede er læst.",
+    "revokeFailedTitle": "Intet blev ændret",
+    "revokeFailedBody": "Tjenesten kunne ikke nås, så adgangen er uændret. Du kan prøve igen."
+  },
   "credentials": {
     "title": "Registrerede legitimationsoplysninger",
     "empty": "Ingen legitimationsoplysninger registreret endnu",
@@ -523,7 +572,9 @@
     "revokeBody": "{{app}} skal så bede om dine data hver gang.",
     "boundToMeasurement": "Bundet til måling: {{measurement}}…",
     "noReceipts": "Ingen kvitteringer endnu",
-    "noReceiptsHint": "Beregningskvitteringer fra enklaver vises her efter databehandlingen."
+    "noReceiptsHint": "Beregningskvitteringer fra enklaver vises her efter databehandlingen.",
+    "valueNotRecorded": "Værdi ikke registreret",
+    "valueProofOnly": "Kun bevis, værdien blev ikke sendt"
   },
 
   "home": {
@@ -947,7 +998,7 @@
   },
 
   "tabs": {
-    "home": "Hjem",
+    "access": "Adgang",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Indstillinger"

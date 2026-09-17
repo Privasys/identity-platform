@@ -36,7 +36,6 @@ import { hasRecoveredPairwiseSeed, takeRecoveredPairwiseSeed } from '@/services/
 import { wipeWallet } from '@/services/wipe';
 import { BIOMETRIC_TIMEOUT_MS, withTimeout } from '@/utils/timeout';
 import { useAuthStore } from '@/stores/auth';
-import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
 
 export default function ProfileScreen() {
@@ -45,9 +44,7 @@ export default function ProfileScreen() {
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const profile = useProfileStore((s) => s.profile);
-    const credentials = useAuthStore((s) => s.credentials);
     const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
-    const consentRecordCount = useConsentStore((s) => s.records.length);
 
     const setOnboarded = useAuthStore((s) => s.setOnboarded);
     // First-run setup progress: 0 = not started, then one tick per milestone
@@ -469,30 +466,9 @@ export default function ProfileScreen() {
                     </RNView>
                 </Pressable>
 
-                {/* Data Sharing — above recovery: reviewing what left the
-                    wallet is the more frequent task. */}
-                <Text style={styles.sectionTitle}>{t('profile.sectionDataSharing')}</Text>
-                <Text style={styles.sectionDescription}>{t('profile.sectionDataSharingHint')}</Text>
-
-                <Pressable
-                    style={styles.sharingCard}
-                    onPress={() => router.push('/consent-history' as never)}
-                >
-                    <RNView style={styles.sharingRow}>
-                        <RNView style={styles.sharingIconContainer}>
-                            <Ionicons name="time-outline" size={20} color={p.blue} />
-                        </RNView>
-                        <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>{t('profile.consentHistory')}</Text>
-                            <Text style={styles.sharingDetail}>
-                                {consentRecordCount === 0
-                                    ? t('profile.noSharingEvents')
-                                    : t('profile.eventCount', { count: consentRecordCount })}
-                            </Text>
-                        </RNView>
-                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-                    </RNView>
-                </Pressable>
+                {/* Sharing history and registered credentials used to sit here.
+                    They answer "who can act on me", which is the Access tab's
+                    question, not "who am I", which is this one's. */}
 
                 {/* Account Recovery */}
                 <Text style={styles.sectionTitle}>{t('profile.sectionRecovery')}</Text>
@@ -568,21 +544,10 @@ export default function ProfileScreen() {
                 <RNView style={styles.dangerSection}>
                     <RNView style={styles.dangerDivider} />
                     <Text style={styles.dangerTitle}>{t('profile.dangerZone')}</Text>
-                    <Text style={styles.dangerDescription}>{t('profile.dangerCredentials')}</Text>
-                    <Pressable
-                        style={styles.dangerButton}
-                        onPress={() => router.push('/credentials' as never)}
-                    >
-                        <Ionicons name="key-outline" size={18} color={p.danger} />
-                        <Text style={styles.dangerButtonText}>
-                            {credentials.length > 0
-                                ? t('profile.registeredCredentialsCount', { count: credentials.length })
-                                : t('profile.registeredCredentials')}
-                        </Text>
-                    </Pressable>
-                    <Text style={[styles.dangerDescription, { marginTop: 16 }]}>
-                        {t('profile.dangerClearHint')}
-                    </Text>
+                    {/* Only the wipe is left here. Removing a credential stops
+                        one app signing in; this destroys the identity itself,
+                        which is why it stays beside who you are. */}
+                    <Text style={styles.dangerDescription}>{t('profile.dangerClearHint')}</Text>
                     <Pressable
                         style={styles.dangerButton}
                         onPress={() => {

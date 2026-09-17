@@ -401,6 +401,55 @@
       "refusedNested": "This request asks for more approvals than can be chained, so nothing was granted."
     }
   },
+
+  "sessions": {
+    "title": "Active sessions",
+    "empty": "You are not signed in to anything."
+  },
+
+  "access": {
+    "summary": "What can reach you, and how to stop it",
+    "accountsTitle": "Connected accounts",
+    "accountsHint": "Services holding a credential for an account of yours somewhere else.",
+    "accountsEmpty": "You have not connected any accounts.",
+    "dataTitle": "Access to your data",
+    "dataHint": "Apps that can use data you keep with Privasys.",
+    "dataEmpty": "Nothing has access to your data.",
+    "sessionsTitle": "Active sessions",
+    "sessionsHint": "Apps you are currently signed in to.",
+    "recordTitle": "Your record",
+    "credentials": "Apps you sign in to",
+    "credentialsNone": "No sign-in credentials yet",
+    "sharingHistory": "Sharing history",
+    "seeAll": "See all",
+    "inService": "{{resource}} in your {{service}}",
+    "stateRevoked": "You removed this",
+    "stateEnded": "This has ended",
+    "stateChecking": "Checking with the service",
+    "stateConfirmed": "Confirmed with the service just now",
+    "stateGone": "The service no longer holds this",
+    "stateUnsupported": "This service cannot be asked from your wallet yet. Manage it where the data lives.",
+    "stateLocal": "From this device, and not confirmed. The service could not be reached, so this may be out of date.",
+    "grantTitle": "Access detail",
+    "grantGone": "This record is no longer on this device.",
+    "grantedOn": "Granted {{when, dateLong}}",
+    "expiresOn": "Until {{when, dateLong}}",
+    "revokedOn": "Removed {{when, dateLong}}",
+    "credentialLabel": "What you gave them",
+    "credentialGiven": "You entered: {{what}}",
+    "credentialGivenGeneric": "You entered a credential when you approved this.",
+    "credentialWider": "A credential like this usually allows more than the access you granted. What keeps it narrow is that the service runs in a verified enclave and can only do what you approved.",
+    "disconnect": "Disconnect",
+    "disconnectTitle": "Disconnect {{app}}?",
+    "disconnectBody": "{{app}} will stop using {{resource}} and will destroy its copy of what you entered. The credential itself keeps working until you remove it where you created it.",
+    "disconnectNote": "Disconnecting stops this service. It does not cancel the credential at the provider, and it does not recall anything already read.",
+    "remove": "Remove access",
+    "removeTitle": "Remove access for {{app}}?",
+    "removeBody": "{{app}} will no longer be able to reach this.",
+    "removeNote": "Removing access stops anything further. It does not recall what has already been read.",
+    "revokeFailedTitle": "Nothing was changed",
+    "revokeFailedBody": "The service could not be reached, so the access is unchanged. You can try again."
+  },
   "credentials": {
     "title": "Registered Credentials",
     "empty": "No credentials registered yet",
@@ -551,7 +600,9 @@
     "revokeBody": "{{app}} will need to request your data again each time.",
     "boundToMeasurement": "Bound to measurement: {{measurement}}…",
     "noReceipts": "No receipts yet",
-    "noReceiptsHint": "Computation receipts from enclaves will appear here after data processing."
+    "noReceiptsHint": "Computation receipts from enclaves will appear here after data processing.",
+    "valueNotRecorded": "Value not recorded",
+    "valueProofOnly": "Proof only, the value was not sent"
   },
   "home": {
     "noSessions": "No active sessions yet",
@@ -960,7 +1011,7 @@
     "aboutWebsite": "Website"
   },
   "tabs": {
-    "home": "Home",
+    "access": "Access",
     "profile": "Profile",
     "drive": "Drive",
     "settings": "Settings"

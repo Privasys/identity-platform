@@ -401,6 +401,55 @@
       "refusedNested": "Táto požiadavka vyžaduje viac po sebe idúcich schválení, než je možné, preto nebolo nič udelené."
     }
   },
+
+  "sessions": {
+    "title": "Aktívne relácie",
+    "empty": "Nikde nie ste prihlásení."
+  },
+
+  "access": {
+    "summary": "Čo sa k vám dostane a ako to zastaviť",
+    "accountsTitle": "Pripojené účty",
+    "accountsHint": "Služby, ktoré uchovávajú prihlasovacie údaje k vášmu účtu inde.",
+    "accountsEmpty": "Nepripojili ste žiadne účty.",
+    "dataTitle": "Prístup k vašim údajom",
+    "dataHint": "Aplikácie, ktoré môžu používať údaje, ktoré máte v Privasyse.",
+    "dataEmpty": "K vašim údajom nemá prístup nič.",
+    "sessionsTitle": "Aktívne relácie",
+    "sessionsHint": "Aplikácie, do ktorých ste práve prihlásení.",
+    "recordTitle": "Váš záznam",
+    "credentials": "Aplikácie, do ktorých sa prihlasujete",
+    "credentialsNone": "Zatiaľ žiadne prihlasovacie údaje",
+    "sharingHistory": "História zdieľania",
+    "seeAll": "Zobraziť všetko",
+    "inService": "{{resource}} vo vašej službe {{service}}",
+    "stateRevoked": "Toto ste odstránili",
+    "stateEnded": "Toto sa skončilo",
+    "stateChecking": "Overuje sa v službe",
+    "stateConfirmed": "Služba to práve potvrdila",
+    "stateGone": "Služba to už nemá",
+    "stateUnsupported": "Túto službu sa zatiaľ nedá opýtať z peňaženky. Spravujte ju tam, kde sú údaje.",
+    "stateLocal": "Z tohto zariadenia a nepotvrdené. Službu sa nepodarilo kontaktovať, takže to môže byť zastarané.",
+    "grantTitle": "Podrobnosti prístupu",
+    "grantGone": "Tento záznam už na tomto zariadení nie je.",
+    "grantedOn": "Udelené {{when, dateLong}}",
+    "expiresOn": "Do {{when, dateLong}}",
+    "revokedOn": "Odstránené {{when, dateLong}}",
+    "credentialLabel": "Čo ste im dali",
+    "credentialGiven": "Zadali ste: {{what}}",
+    "credentialGivenGeneric": "Pri schvaľovaní ste zadali prihlasovací údaj.",
+    "credentialWider": "Takýto údaj zvyčajne umožňuje viac než prístup, ktorý ste udelili. Úzkym ho drží to, že služba beží v overenom enkláve a môže robiť len to, čo ste schválili.",
+    "disconnect": "Odpojiť",
+    "disconnectTitle": "Odpojiť {{app}}?",
+    "disconnectBody": "{{app}} prestane používať {{resource}} a zničí svoju kópiu toho, čo ste zadali. Samotný údaj funguje ďalej, kým ho neodstránite tam, kde ste ho vytvorili.",
+    "disconnectNote": "Odpojenie zastaví túto službu. Nezruší údaj u poskytovateľa a nevráti nič, čo už bolo prečítané.",
+    "remove": "Odstrániť prístup",
+    "removeTitle": "Odstrániť prístup pre {{app}}?",
+    "removeBody": "{{app}} sa k tomu už nedostane.",
+    "removeNote": "Odstránenie prístupu zastaví všetko ďalšie. Nevráti to, čo už bolo prečítané.",
+    "revokeFailedTitle": "Nič sa nezmenilo",
+    "revokeFailedBody": "Službu sa nepodarilo kontaktovať, prístup je preto nezmenený. Môžete to skúsiť znova."
+  },
   "credentials": {
     "title": "Registrované poverenia",
     "empty": "Zatiaľ nie sú registrované žiadne poverenia",
@@ -555,7 +604,9 @@
     "revokeBody": "{{app}} vás bude musieť o údaje požiadať zakaždým znova.",
     "boundToMeasurement": "Viazané na meranie: {{measurement}}…",
     "noReceipts": "Zatiaľ žiadne potvrdenia",
-    "noReceiptsHint": "Potvrdenia o výpočtoch z enkláv sa tu zobrazia po spracovaní údajov."
+    "noReceiptsHint": "Potvrdenia o výpočtoch z enkláv sa tu zobrazia po spracovaní údajov.",
+    "valueNotRecorded": "Hodnota nebola zaznamenaná",
+    "valueProofOnly": "Iba dôkaz, hodnota nebola odoslaná"
   },
   "home": {
     "noSessions": "Zatiaľ žiadne aktívne relácie",
@@ -980,7 +1031,7 @@
     "aboutWebsite": "Webová stránka"
   },
   "tabs": {
-    "home": "Domov",
+    "access": "Prístup",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Nastavenia"

@@ -401,6 +401,55 @@
       "refusedNested": "See taotlus nõuab rohkem järjestikuseid heakskiite, kui on võimalik, seega ei antud midagi."
     }
   },
+
+  "sessions": {
+    "title": "Aktiivsed seansid",
+    "empty": "Te ei ole kuhugi sisse logitud."
+  },
+
+  "access": {
+    "summary": "Mis teieni pääseb ja kuidas see peatada",
+    "accountsTitle": "Ühendatud kontod",
+    "accountsHint": "Teenused, mis hoiavad mandaati teie mujal asuvale kontole.",
+    "accountsEmpty": "Te ei ole ühtegi kontot ühendanud.",
+    "dataTitle": "Juurdepääs teie andmetele",
+    "dataHint": "Rakendused, mis saavad kasutada andmeid, mida hoiate Privasyses.",
+    "dataEmpty": "Millelgi ei ole teie andmetele juurdepääsu.",
+    "sessionsTitle": "Aktiivsed seansid",
+    "sessionsHint": "Rakendused, kuhu olete praegu sisse logitud.",
+    "recordTitle": "Teie ülevaade",
+    "credentials": "Rakendused, kuhu te sisse logite",
+    "credentialsNone": "Sisselogimismandaate veel ei ole",
+    "sharingHistory": "Jagamise ajalugu",
+    "seeAll": "Vaata kõiki",
+    "inService": "{{resource}} teie teenuses {{service}}",
+    "stateRevoked": "Te eemaldasite selle",
+    "stateEnded": "See on lõppenud",
+    "stateChecking": "Kontrollitakse teenusest",
+    "stateConfirmed": "Teenus kinnitas äsja",
+    "stateGone": "Teenusel ei ole seda enam",
+    "stateUnsupported": "Sellelt teenuselt ei saa veel rahakotist küsida. Hallake seda seal, kus andmed on.",
+    "stateLocal": "Sellest seadmest ja kinnitamata. Teenuseni ei jõutud, seega võib see olla vananenud.",
+    "grantTitle": "Juurdepääsu üksikasjad",
+    "grantGone": "Seda kirjet ei ole enam selles seadmes.",
+    "grantedOn": "Antud {{when, dateLong}}",
+    "expiresOn": "Kuni {{when, dateLong}}",
+    "revokedOn": "Eemaldatud {{when, dateLong}}",
+    "credentialLabel": "Mida te neile andsite",
+    "credentialGiven": "Sisestasite: {{what}}",
+    "credentialGivenGeneric": "Sisestasite mandaadi, kui selle heaks kiitsite.",
+    "credentialWider": "Selline mandaat lubab tavaliselt rohkem kui see juurdepääs, mille andsite. Kitsana hoiab seda asjaolu, et teenus töötab kontrollitud anklaavis ja saab teha ainult seda, mille heaks kiitsite.",
+    "disconnect": "Katkesta ühendus",
+    "disconnectTitle": "Katkestada ühendus rakendusega {{app}}?",
+    "disconnectBody": "{{app}} lõpetab {{resource}} kasutamise ja hävitab oma koopia sellest, mille sisestasite. Mandaat ise töötab edasi, kuni eemaldate selle seal, kus selle lõite.",
+    "disconnectNote": "Ühenduse katkestamine peatab selle teenuse. See ei tühista mandaati teenusepakkuja juures ega võta tagasi seda, mida on juba loetud.",
+    "remove": "Eemalda juurdepääs",
+    "removeTitle": "Eemaldada {{app}} juurdepääs?",
+    "removeBody": "{{app}} ei pääse sellele enam ligi.",
+    "removeNote": "Juurdepääsu eemaldamine peatab kõik edasise. See ei võta tagasi seda, mida on juba loetud.",
+    "revokeFailedTitle": "Midagi ei muudetud",
+    "revokeFailedBody": "Teenuseni ei jõutud, seega on juurdepääs muutmata. Võite uuesti proovida."
+  },
   "credentials": {
     "title": "Registreeritud mandaadid",
     "empty": "Ühtegi mandaati pole veel registreeritud",
@@ -551,7 +600,9 @@
     "revokeBody": "{{app}} peab teie andmeid iga kord uuesti küsima.",
     "boundToMeasurement": "Seotud mõõduga: {{measurement}}…",
     "noReceipts": "Kviitungeid veel pole",
-    "noReceiptsHint": "Anklaavide arvutuskviitungid ilmuvad siia pärast andmete töötlemist."
+    "noReceiptsHint": "Anklaavide arvutuskviitungid ilmuvad siia pärast andmete töötlemist.",
+    "valueNotRecorded": "Väärtust ei salvestatud",
+    "valueProofOnly": "Ainult tõend, väärtust ei saadetud"
   },
   "home": {
     "noSessions": "Aktiivseid seansse veel pole",
@@ -960,7 +1011,7 @@
     "aboutWebsite": "Veebisait"
   },
   "tabs": {
-    "home": "Avaleht",
+    "access": "Juurdepääs",
     "profile": "Profiil",
     "drive": "Drive",
     "settings": "Sätted"

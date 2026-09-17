@@ -368,6 +368,55 @@
       "refusedNested": "Deze aanvraag vraagt om meer opeenvolgende goedkeuringen dan mogelijk is, dus er is niets verleend."
     }
   },
+
+  "sessions": {
+    "title": "Actieve sessies",
+    "empty": "Je bent nergens ingelogd."
+  },
+
+  "access": {
+    "summary": "Wat je kan bereiken, en hoe je het stopt",
+    "accountsTitle": "Gekoppelde accounts",
+    "accountsHint": "Diensten die een inloggegeven bewaren voor een account dat je ergens anders hebt.",
+    "accountsEmpty": "Je hebt geen accounts gekoppeld.",
+    "dataTitle": "Toegang tot je gegevens",
+    "dataHint": "Apps die gegevens kunnen gebruiken die je bij Privasys bewaart.",
+    "dataEmpty": "Niets heeft toegang tot je gegevens.",
+    "sessionsTitle": "Actieve sessies",
+    "sessionsHint": "Apps waar je op dit moment bent ingelogd.",
+    "recordTitle": "Jouw overzicht",
+    "credentials": "Apps waar je op inlogt",
+    "credentialsNone": "Nog geen inloggegevens",
+    "sharingHistory": "Deelgeschiedenis",
+    "seeAll": "Alles bekijken",
+    "inService": "{{resource}} in je {{service}}",
+    "stateRevoked": "Je hebt dit verwijderd",
+    "stateEnded": "Dit is beëindigd",
+    "stateChecking": "Wordt bij de dienst gecontroleerd",
+    "stateConfirmed": "Zojuist bevestigd door de dienst",
+    "stateGone": "De dienst heeft dit niet meer",
+    "stateUnsupported": "Deze dienst kan nog niet vanuit je wallet worden bevraagd. Beheer hem waar de gegevens staan.",
+    "stateLocal": "Van dit apparaat en niet bevestigd. De dienst was niet bereikbaar, dus dit kan verouderd zijn.",
+    "grantTitle": "Toegangsdetails",
+    "grantGone": "Deze registratie staat niet meer op dit apparaat.",
+    "grantedOn": "Verleend op {{when, dateLong}}",
+    "expiresOn": "Tot {{when, dateLong}}",
+    "revokedOn": "Verwijderd op {{when, dateLong}}",
+    "credentialLabel": "Wat je ze hebt gegeven",
+    "credentialGiven": "Je hebt ingevoerd: {{what}}",
+    "credentialGivenGeneric": "Je hebt een inloggegeven ingevoerd toen je dit goedkeurde.",
+    "credentialWider": "Zo’n inloggegeven staat meestal meer toe dan de toegang die je hebt verleend. Wat het beperkt houdt, is dat de dienst in een geverifieerde enclave draait en alleen kan doen wat je hebt goedgekeurd.",
+    "disconnect": "Ontkoppelen",
+    "disconnectTitle": "{{app}} ontkoppelen?",
+    "disconnectBody": "{{app}} stopt met het gebruik van {{resource}} en vernietigt zijn kopie van wat je hebt ingevoerd. Het inloggegeven zelf blijft werken totdat je het verwijdert waar je het hebt aangemaakt.",
+    "disconnectNote": "Ontkoppelen stopt deze dienst. Het trekt het inloggegeven bij de aanbieder niet in, en het haalt niets terug dat al is gelezen.",
+    "remove": "Toegang intrekken",
+    "removeTitle": "Toegang van {{app}} intrekken?",
+    "removeBody": "{{app}} kan hier niet meer bij.",
+    "removeNote": "Toegang intrekken stopt al het verdere. Het haalt niet terug wat al is gelezen.",
+    "revokeFailedTitle": "Er is niets gewijzigd",
+    "revokeFailedBody": "De dienst was niet bereikbaar, dus de toegang is ongewijzigd. Je kunt het opnieuw proberen."
+  },
   "credentials": {
     "title": "Geregistreerde inloggegevens",
     "empty": "Nog geen inloggegevens geregistreerd",
@@ -523,7 +572,9 @@
     "revokeBody": "{{app}} moet je gegevens dan elke keer opnieuw opvragen.",
     "boundToMeasurement": "Gebonden aan meting: {{measurement}}…",
     "noReceipts": "Nog geen bewijzen",
-    "noReceiptsHint": "Berekeningsbewijzen van enclaves verschijnen hier na de gegevensverwerking."
+    "noReceiptsHint": "Berekeningsbewijzen van enclaves verschijnen hier na de gegevensverwerking.",
+    "valueNotRecorded": "Waarde niet vastgelegd",
+    "valueProofOnly": "Alleen een bewijs, de waarde is niet verstuurd"
   },
 
   "home": {
@@ -947,7 +998,7 @@
   },
 
   "tabs": {
-    "home": "Start",
+    "access": "Toegang",
     "profile": "Profiel",
     "drive": "Drive",
     "settings": "Instellingen"

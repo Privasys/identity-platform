@@ -1,426 +1,286 @@
+// Copyright (c) Privasys. All rights reserved.
+// SPDX-License-Identifier: AGPL-3.0-only
+
+/**
+ * Access: everything that can currently act on the holder, in one place.
+ *
+ * This tab replaced a list of sessions. A session list is something you
+ * consult, not something you land on, and the answer the holder actually wants
+ * when they open the wallet is "what can reach me, and how do I stop it".
+ *
+ * The order is deliberate. Anything needing a decision comes first. Then the
+ * two kinds of standing access, because those are the ones a holder forgets
+ * they granted, with connected accounts above their own data since a credential
+ * handed to someone else is the one they can least afford to lose track of.
+ * Sign-ins and history sit underneath, as references rather than controls.
+ */
+
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, Pressable, TextInput, View as RNView, Alert } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import {
-    KIND_LABEL_KEYS,
-    serviceHosts,
-    type SessionTrace,
-    useServiceSessionsStore
-} from '@/stores/service-sessions';
 import { useAuthStore } from '@/stores/auth';
+import { useCapabilitiesStore } from '@/stores/capabilities';
+import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
-import { useSessionsStore, type RelaySession } from '@/stores/sessions';
-import { useTrustedAppsStore, type TrustedApp } from '@/stores/trusted-apps';
+import { useServiceSessionsStore } from '@/stores/service-sessions';
+import { useSessionsStore } from '@/stores/sessions';
+import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
+import { isLive, rowsInGroup, type AccessRow } from '@/utils/access-rows';
+import { buildSessionRows, relativeWhen } from '@/utils/session-rows';
 
-/** Threshold above which the search/filter box appears. */
-const SEARCH_THRESHOLD = 10;
+/** How many rows a section shows before it defers to its own screen. */
+const PREVIEW = 3;
 
-/** Extract app name from rpId (e.g., "wasm-app-example" from "wasm-app-example.apps-test.privasys.org"). */
-function appName(rpId: string): string {
-    const dot = rpId.indexOf('.');
-    return dot > 0 ? rpId.substring(0, dot) : rpId;
-}
-
-/**
- * One card in the sessions list — one per APP the user authenticated to
- * (serviceKey = OIDC client id / enclave host), never per shared rpId, so
- * "Privasys Chat" and "Developer Platform" stay separate cards even though
- * both ride the privasys.id RP. A card aggregates that app's session traces,
- * plus its live sealed relay session and legacy trusted-app row when present.
- */
-interface SessionRow {
-    key: string;
-    name: string;
-    /** Latest trace for this app (drives the type label + subtitle). */
-    trace?: SessionTrace;
-    /** Legacy trusted-app row (pre-trace installs) backing this card. */
-    app?: TrustedApp;
-    session?: RelaySession;
-    teeType: TrustedApp['teeType'];
-    /** Sort key: most-recently-active first. */
-    lastActiveMs: number;
-}
-
-function buildRows(
-    traces: SessionTrace[],
-    apps: TrustedApp[],
-    sessions: RelaySession[],
-    now: number
-): SessionRow[] {
-    const live = sessions.filter((s) => s.expiresAt > now);
-    const sessionByHost = new Map<string, RelaySession>();
-    const sessionById = new Map<string, RelaySession>();
-    for (const s of live) {
-        sessionByHost.set(s.rpId, s);
-        sessionById.set(s.sessionId, s);
-    }
-
-    // Group traces per app.
-    const byService = new Map<string, SessionTrace[]>();
-    for (const t of traces) {
-        const list = byService.get(t.serviceKey);
-        if (list) list.push(t);
-        else byService.set(t.serviceKey, [t]);
-    }
-
-    const coveredHosts = new Set<string>();
-    const coveredNames = new Set<string>();
-    const coveredSessions = new Set<string>();
-    const rows: SessionRow[] = [];
-
-    for (const [key, list] of byService) {
-        const latest = list[0]; // store is newest-first
-        const hosts = serviceHosts(list);
-        for (const h of hosts) coveredHosts.add(h);
-        coveredNames.add(latest.displayName ?? appName(key));
-        // Attach the live sealed session. Prefer the exact relay session id the
-        // ceremony recorded on the trace: an IdP-brokered app keys its card by
-        // the OIDC client_id while the relay session is keyed by rpId, so host
-        // matching alone misses it and the session would orphan into a second,
-        // duplicate row. Fall back to host matching for older traces with no id.
-        let session: RelaySession | undefined;
-        for (const t of list) {
-            const s = t.sessionId ? sessionById.get(t.sessionId) : undefined;
-            if (s) {
-                session = s;
-                coveredSessions.add(s.sessionId);
-                break;
-            }
-        }
-        if (!session) {
-            for (const h of hosts) {
-                const s = sessionByHost.get(h);
-                if (s) {
-                    session = s;
-                    coveredSessions.add(s.sessionId);
-                    break;
-                }
-            }
-        }
-        const att = list.find((t) => t.attestations?.length)?.attestations?.[0];
-        rows.push({
-            key,
-            name: latest.displayName ?? appName(key),
-            trace: latest,
-            app: apps.find((a) => hosts.has(a.rpId)),
-            session,
-            teeType: att?.teeType ?? 'none',
-            lastActiveMs: session ? Math.max(session.startedAt, latest.startedAt) : latest.startedAt
-        });
-    }
-
-    // Legacy trusted-app rows not covered by any trace yet (installs that
-    // predate the per-app trail) keep their card so nothing disappears. A row
-    // is covered when a trace touched its host, OR when a trace card carries the
-    // same app name — so an app's OWN legacy row merges into its trace card once
-    // it exists, while an unrelated app's trace (sharing only the privasys.id
-    // rpId, now excluded from hosts) leaves it standing.
-    for (const app of apps) {
-        const appLabel = app.appName ?? appName(app.rpId);
-        if (coveredHosts.has(app.rpId) || coveredNames.has(appLabel)) continue;
-        const session = sessionByHost.get(app.rpId);
-        if (session) coveredSessions.add(session.sessionId);
-        rows.push({
-            key: app.rpId,
-            name: app.appName ?? appName(app.rpId),
-            app,
-            session,
-            teeType: app.teeType,
-            lastActiveMs: session ? session.startedAt : app.lastVerified * 1000
-        });
-    }
-
-    // Orphan live sessions (no trace, no trusted-app row — rare).
-    for (const session of live) {
-        if (coveredSessions.has(session.sessionId)) continue;
-        rows.push({
-            key: session.rpId,
-            name: session.appName ?? appName(session.rpId),
-            session,
-            teeType: 'none',
-            lastActiveMs: session.startedAt
-        });
-    }
-
-    rows.sort((a, b) => b.lastActiveMs - a.lastActiveMs);
-    return rows;
-}
-
-/**
- * Compact "when" for the card subtitle.
- *
- * Counts go through plural keys rather than a bare suffix: "2 minutes" takes a
- * different form from "1 minute" in Polish, Welsh and Irish. Anything older
- * than a day falls back to a date rendered from the locale pack's own pattern,
- * not the device's.
- */
-function relativeWhen(ms: number, now: number, t: TFunction): string {
-    const diff = now - ms;
-    if (diff < 60_000) return t('time.justNow');
-    if (diff < 3_600_000) return t('time.minutesAgo', { count: Math.floor(diff / 60_000) });
-    if (diff < 86_400_000) return t('time.hoursAgo', { count: Math.floor(diff / 3_600_000) });
-    return t('time.onDate', { when: new Date(ms) });
-}
-
-export default function HomeScreen() {
+export default function AccessScreen() {
     const { apps } = useTrustedAppsStore();
     const traces = useServiceSessionsStore((s) => s.traces);
     const sessions = useSessionsStore((s) => s.sessions);
-    const pruneExpired = useSessionsStore((s) => s.pruneExpired);
-    const removeRelaySession = useSessionsStore((s) => s.remove);
-    const pendingApprovals = useVaultApprovalsStore((s) => s.pending);
+    const records = useCapabilitiesStore((s) => s.records);
+    const hydrateCapabilities = useCapabilitiesStore((s) => s.hydrate);
+    const credentials = useAuthStore((s) => s.credentials);
     const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
-    const hasProfile = useProfileStore((s) => !!s.profile);
+    const consentRecordCount = useConsentStore((s) => s.records.length);
+    const pendingApprovals = useVaultApprovalsStore((s) => s.pending);
     const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
+    const hasProfile = useProfileStore((s) => !!s.profile);
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const { t } = useTranslation();
     const [now, setNow] = useState(() => Date.now());
-    const [query, setQuery] = useState('');
 
-    // Tick every second so the "remaining" label and pruning stay live.
     useEffect(() => {
-        const id = setInterval(() => {
-            setNow(Date.now());
-            pruneExpired();
-        }, 1000);
+        void hydrateCapabilities();
+    }, [hydrateCapabilities]);
+
+    // A minute is enough here. Nothing on this screen counts down; the tick
+    // only moves "2 hours ago" along and retires an expired grant.
+    useEffect(() => {
+        const id = setInterval(() => setNow(Date.now()), 60_000);
         return () => clearInterval(id);
-    }, [pruneExpired]);
+    }, []);
 
-    // End an orphaned live sealed session — one with no trace or credential
-    // behind it (so it has no service-detail page). Without this the row can
-    // only clear itself when its TTL expires, which the user cannot hurry.
-    const endOrphanSession = (session: RelaySession) => {
-        Alert.alert(
-            t('home.endSessionTitle'),
-            t('home.endSessionBody', { app: session.appName ?? appName(session.rpId) }),
-            [
-                { text: t('common.cancel'), style: 'cancel' },
-                {
-                    text: t('home.endSessionConfirm'),
-                    style: 'destructive',
-                    onPress: () => removeRelaySession(session.sessionId)
-                }
-            ]
-        );
-    };
-
-    // Keep the pending-approvals banner live: fetch on mount and every 20s so
-    // the count reflects approvals that arrived (tray sweep) or expired.
+    // Keep the pending count live: approvals arrive by push and also expire on
+    // their own, so neither event is something this screen would otherwise see.
     useEffect(() => {
         void refreshApprovals();
-        const id = setInterval(() => void refreshApprovals(), 20000);
+        const id = setInterval(() => void refreshApprovals(), 20_000);
         return () => clearInterval(id);
     }, [refreshApprovals]);
 
-    const rows = useMemo(
-        () => buildRows(traces, apps, sessions, now),
-        [traces, apps, sessions, now]
+    const nowSeconds = Math.floor(now / 1000);
+    const sessionRows = useMemo(
+        () => buildSessionRows(traces, apps, sessions, now),
+        [traces, apps, sessions, now],
     );
-    const showSearch = rows.length > SEARCH_THRESHOLD;
-    const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        if (!q) return rows;
-        return rows.filter(
-            (r) => r.name.toLowerCase().includes(q) || r.key.toLowerCase().includes(q)
-        );
-    }, [rows, query]);
+    const accounts = useMemo(() => rowsInGroup(records, 'account'), [records]);
+    const data = useMemo(() => rowsInGroup(records, 'data'), [records]);
+
+    const openGrant = (row: AccessRow) =>
+        router.push({ pathname: '/access-grant', params: { key: row.key } });
 
     return (
         <RNView style={styles.screen}>
-            {/* Gradient header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
                 {/* Product name: never translated. */}
                 <Text style={styles.headerTitle}>Privasys Wallet</Text>
                 <Text style={styles.headerSubtitle}>
-                    {rows.length === 0
-                        ? t('home.noSessions')
-                        : t('home.activeSessions', { count: rows.length })}
+                    {t('access.summary')}
                 </Text>
             </RNView>
 
-            {/* Content */}
-            <RNView style={styles.content}>
-                {/* Persistent nudge: keep inviting the user to save a recovery
-                    phrase until they confirm it. Reset by any flow that
-                    invalidates the phrase (recovery, regenerate, deactivate). */}
+            <ScrollView
+                style={styles.body}
+                contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + 110 }]}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Anything wanting a decision, before anything to browse. */}
                 {hasProfile && !recoveryPhraseSaved && (
                     <Pressable
-                        style={styles.approvalsBanner}
+                        style={styles.banner}
                         onPress={() => router.push('/account-recovery')}
                         accessibilityLabel={t('home.savePhraseTitle')}
                     >
-                        <RNView style={[styles.approvalsIcon, { backgroundColor: '#FDE68A' }]}>
+                        <RNView style={[styles.bannerIcon, { backgroundColor: '#FDE68A' }]}>
                             <Ionicons name="key-outline" size={18} color="#B45309" />
                         </RNView>
-                        <RNView style={styles.approvalsInfo}>
-                            <Text style={styles.approvalsTitle}>{t('home.savePhraseTitle')}</Text>
-                            <Text style={styles.approvalsMeta}>{t('home.savePhraseBody')}</Text>
+                        <RNView style={styles.bannerInfo}>
+                            <Text style={styles.bannerTitle}>{t('home.savePhraseTitle')}</Text>
+                            <Text style={styles.bannerMeta}>{t('home.savePhraseBody')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </Pressable>
                 )}
+
                 {pendingApprovals.length > 0 && (
                     <Pressable
-                        style={styles.approvalsBanner}
+                        style={styles.banner}
                         onPress={() => router.push('/vault-approvals')}
-                        accessibilityLabel={t('home.pendingVaultApprovals', { count: pendingApprovals.length })}
+                        accessibilityLabel={t('home.pendingVaultApprovals', {
+                            count: pendingApprovals.length,
+                        })}
                     >
-                        <RNView style={styles.approvalsIcon}>
+                        <RNView style={styles.bannerIcon}>
                             <Ionicons name="key" size={18} color={p.infoText} />
                         </RNView>
-                        <RNView style={styles.approvalsInfo}>
-                            <Text style={styles.approvalsTitle}>
+                        <RNView style={styles.bannerInfo}>
+                            <Text style={styles.bannerTitle}>
                                 {t('home.pendingApprovals', { count: pendingApprovals.length })}
                             </Text>
-                            <Text style={styles.approvalsMeta}>{t('home.pendingApprovalsHint')}</Text>
+                            <Text style={styles.bannerMeta}>{t('home.pendingApprovalsHint')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.infoText} />
                     </Pressable>
                 )}
-                {rows.length === 0 ? (
-                    <RNView style={styles.emptyState}>
-                        <RNView style={styles.emptyIconContainer}>
-                            <Ionicons name="qr-code-outline" size={48} color={p.blue} />
-                        </RNView>
-                        <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
-                        <Text style={styles.emptyText}>{t('home.emptyBody')}</Text>
-                    </RNView>
-                ) : (
-                    <ScrollView
-                        style={styles.list}
-                        contentContainerStyle={styles.listContent}
-                        showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
-                    >
-                        {showSearch && (
-                            <RNView style={styles.searchBox}>
-                                <Ionicons
-                                    name="search"
-                                    size={16}
-                                    color={p.textSecondary}
-                                    style={styles.searchIcon}
-                                />
-                                <TextInput
-                                    style={styles.searchInput}
-                                    placeholder={t('home.searchPlaceholder')}
-                                    placeholderTextColor={p.textMuted}
-                                    value={query}
-                                    onChangeText={setQuery}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    returnKeyType="search"
-                                    accessibilityLabel={t('home.searchPlaceholder')}
-                                />
-                                {query.length > 0 && (
-                                    <Pressable
-                                        onPress={() => setQuery('')}
-                                        accessibilityLabel={t('home.clearSearch')}
-                                        hitSlop={8}
-                                    >
-                                        <Ionicons
-                                            name="close-circle"
-                                            size={18}
-                                            color={p.textMuted}
-                                        />
-                                    </Pressable>
-                                )}
-                            </RNView>
-                        )}
 
-                        <Text style={styles.sectionTitle}>{t('home.sectionActiveSessions')}</Text>
+                {/* Connected accounts: a credential of the holder's, held by a
+                    service, for an account somewhere we do not control. */}
+                <Section
+                    title={t('access.accountsTitle')}
+                    hint={t('access.accountsHint')}
+                    styles={styles}
+                >
+                    {accounts.length === 0 ? (
+                        <Text style={styles.empty}>{t('access.accountsEmpty')}</Text>
+                    ) : (
+                        <>
+                            {accounts.slice(0, PREVIEW).map((row) => (
+                                <GrantRow
+                                    key={row.key}
+                                    row={row}
+                                    nowSeconds={nowSeconds}
+                                    onPress={() => openGrant(row)}
+                                    styles={styles}
+                                    p={p}
+                                    subtitle={row.record.resourceLabel}
+                                />
+                            ))}
+                            {accounts.length > PREVIEW && (
+                                <SeeAll
+                                    label={t('access.seeAll')}
+                                    onPress={() =>
+                                        router.push({ pathname: '/access-list', params: { group: 'account' } })
+                                    }
+                                    styles={styles}
+                                    p={p}
+                                />
+                            )}
+                        </>
+                    )}
+                </Section>
 
-                        {filtered.length === 0 ? (
-                            <Text style={styles.noResults}>
-                                {t('home.noResults', { query })}
+                {/* Access to data we hold, where revoking is complete. */}
+                <Section title={t('access.dataTitle')} hint={t('access.dataHint')} styles={styles}>
+                    {data.length === 0 ? (
+                        <Text style={styles.empty}>{t('access.dataEmpty')}</Text>
+                    ) : (
+                        <>
+                            {data.slice(0, PREVIEW).map((row) => (
+                                <GrantRow
+                                    key={row.key}
+                                    row={row}
+                                    nowSeconds={nowSeconds}
+                                    onPress={() => openGrant(row)}
+                                    styles={styles}
+                                    p={p}
+                                    subtitle={t('access.inService', {
+                                        resource: row.record.resourceLabel,
+                                        service: row.record.resourceAppName || t('capability.unnamedApp'),
+                                    })}
+                                />
+                            ))}
+                            {data.length > PREVIEW && (
+                                <SeeAll
+                                    label={t('access.seeAll')}
+                                    onPress={() =>
+                                        router.push({ pathname: '/access-list', params: { group: 'data' } })
+                                    }
+                                    styles={styles}
+                                    p={p}
+                                />
+                            )}
+                        </>
+                    )}
+                </Section>
+
+                {/* Sessions: the three most recent, then the full list. This is
+                    the fix for a box that grew to 33 rows and swallowed the
+                    screen; nothing is hidden, it just is not all here. */}
+                <Section
+                    title={t('access.sessionsTitle')}
+                    hint={t('access.sessionsHint')}
+                    styles={styles}
+                >
+                    {sessionRows.length === 0 ? (
+                        <Text style={styles.empty}>{t('home.noSessions')}</Text>
+                    ) : (
+                        <>
+                            {sessionRows.slice(0, PREVIEW).map((row) => (
+                                <Pressable
+                                    key={row.key}
+                                    style={styles.row}
+                                    onPress={() =>
+                                        router.push({
+                                            pathname: '/service-detail',
+                                            params: { serviceKey: row.key },
+                                        })
+                                    }
+                                >
+                                    <RNView style={styles.rowInfo}>
+                                        <Text style={styles.rowTitle}>{row.name}</Text>
+                                        <Text style={styles.rowMeta}>
+                                            {relativeWhen(row.lastActiveMs, now, t)}
+                                        </Text>
+                                    </RNView>
+                                    {row.session && <RNView style={styles.liveDot} />}
+                                    <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                                </Pressable>
+                            ))}
+                            <SeeAll
+                                label={t('access.seeAll')}
+                                onPress={() => router.push('/sessions')}
+                                styles={styles}
+                                p={p}
+                            />
+                        </>
+                    )}
+                </Section>
+
+                {/* References rather than controls. */}
+                <Section title={t('access.recordTitle')} styles={styles}>
+                    <Pressable style={styles.row} onPress={() => router.push('/credentials')}>
+                        <RNView style={styles.rowInfo}>
+                            <Text style={styles.rowTitle}>{t('access.credentials')}</Text>
+                            <Text style={styles.rowMeta}>
+                                {credentials.length > 0
+                                    ? t('profile.registeredCredentialsCount', { count: credentials.length })
+                                    : t('access.credentialsNone')}
                             </Text>
-                        ) : (
-                            filtered.map((row) => {
-                                // Type/tech differences stay SUBTLE: same card
-                                // anatomy for every session type; only the icon
-                                // tint and the one-line meta text vary, plus a
-                                // small live dot when a sealed session is up.
-                                const teeType = row.teeType;
-                                const iconBg =
-                                    teeType === 'sgx'
-                                        ? p.green
-                                        : teeType === 'tdx'
-                                            ? p.blue
-                                            : '#8B5CF6';
-                                const iconName: keyof typeof Ionicons.glyphMap =
-                                    teeType === 'sgx'
-                                        ? 'lock-closed'
-                                        : teeType === 'tdx'
-                                            ? 'shield-checkmark'
-                                            : 'key';
-                                const kindLabel = row.trace
-                                    ? t(KIND_LABEL_KEYS[row.trace.kind])
-                                    : teeType === 'none'
-                                        ? t('identityKind.passkey')
-                                        : t('sessionKind.enclave');
-                                const meta = t('home.cardMeta', {
-                                    kind: kindLabel,
-                                    when: relativeWhen(row.lastActiveMs, now, t)
-                                });
-                                const onPress =
-                                    row.trace || row.app
-                                        ? () =>
-                                            router.push({
-                                                pathname: '/service-detail',
-                                                params: { serviceKey: row.key }
-                                            })
-                                        : row.session
-                                            ? () => endOrphanSession(row.session!)
-                                            : undefined;
-                                return (
-                                    <Pressable
-                                        key={row.key}
-                                        style={styles.serviceCard}
-                                        onPress={onPress}
-                                        disabled={!onPress}
-                                    >
-                                        <RNView
-                                            style={[styles.serviceIcon, { backgroundColor: iconBg }]}
-                                        >
-                                            <Ionicons name={iconName} size={18} color="#FFFFFF" />
-                                            {/* Live-session badge on the icon corner — a fixed
-                                                spot that stays put no matter how long (or how many
-                                                lines) the service name wraps to. */}
-                                            {row.session && <RNView style={styles.liveDot} />}
-                                        </RNView>
-                                        <RNView style={styles.serviceInfo}>
-                                            <Text style={styles.serviceName}>{row.name}</Text>
-                                            <Text style={styles.serviceMeta}>{meta}</Text>
-                                        </RNView>
-                                        {onPress && (
-                                            <Ionicons
-                                                name={
-                                                    row.trace || row.app
-                                                        ? 'chevron-forward'
-                                                        : 'close-circle-outline'
-                                                }
-                                                size={18}
-                                                color={p.textMuted}
-                                            />
-                                        )}
-                                    </Pressable>
-                                );
-                            })
-                        )}
-                    </ScrollView>
-                )}
-            </RNView>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </Pressable>
+                    <Pressable style={styles.row} onPress={() => router.push('/consent-history')}>
+                        <RNView style={styles.rowInfo}>
+                            <Text style={styles.rowTitle}>{t('access.sharingHistory')}</Text>
+                            <Text style={styles.rowMeta}>
+                                {consentRecordCount === 0
+                                    ? t('profile.noSharingEvents')
+                                    : t('profile.eventCount', { count: consentRecordCount })}
+                            </Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </Pressable>
+                </Section>
+            </ScrollView>
 
-            {/* Floating scan button — replaces the standalone Scan tab. */}
+            {/* Scanning is how a service gets access, so it belongs here. */}
             <Pressable
                 style={styles.scanFab}
                 onPress={() => router.push('/scan')}
@@ -432,158 +292,155 @@ export default function HomeScreen() {
     );
 }
 
+function Section({
+    title,
+    hint,
+    styles,
+    children,
+}: {
+    title: string;
+    hint?: string;
+    styles: ReturnType<typeof makeStyles>;
+    children: React.ReactNode;
+}) {
+    return (
+        <RNView style={styles.section}>
+            <Text style={styles.sectionTitle}>{title}</Text>
+            {!!hint && <Text style={styles.sectionHint}>{hint}</Text>}
+            <RNView style={styles.card}>{children}</RNView>
+        </RNView>
+    );
+}
+
+function SeeAll({
+    label,
+    onPress,
+    styles,
+    p,
+}: {
+    label: string;
+    onPress: () => void;
+    styles: ReturnType<typeof makeStyles>;
+    p: Palette;
+}) {
+    return (
+        <Pressable style={styles.seeAll} onPress={onPress}>
+            <Text style={styles.seeAllText}>{label}</Text>
+            <Ionicons name="chevron-forward" size={16} color={p.blue} />
+        </Pressable>
+    );
+}
+
+function GrantRow({
+    row,
+    subtitle,
+    nowSeconds,
+    onPress,
+    styles,
+    p,
+}: {
+    row: AccessRow;
+    subtitle: string;
+    nowSeconds: number;
+    onPress: () => void;
+    styles: ReturnType<typeof makeStyles>;
+    p: Palette;
+}) {
+    const { t } = useTranslation();
+    const live = isLive(row.record, nowSeconds);
+    return (
+        <Pressable style={styles.row} onPress={onPress}>
+            <RNView style={styles.rowInfo}>
+                <Text style={[styles.rowTitle, !live && styles.rowEnded]}>
+                    {row.record.appName || t('capability.unnamedApp')}
+                </Text>
+                <Text style={styles.rowMeta}>{subtitle}</Text>
+                {!live && (
+                    <Text style={styles.rowEndedNote}>
+                        {row.record.revokedAt ? t('access.stateRevoked') : t('access.stateEnded')}
+                    </Text>
+                )}
+            </RNView>
+            <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+        </Pressable>
+    );
+}
+
 const makeStyles = (p: Palette) => StyleSheet.create({
     screen: { flex: 1, backgroundColor: p.screenBg },
     header: {
         backgroundColor: p.green,
         paddingHorizontal: 24,
-        paddingBottom: 32,
+        paddingBottom: 28,
         borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28
+        borderBottomRightRadius: 28,
     },
     headerTitle: {
         fontSize: 28,
         fontWeight: '700',
         color: '#FFFFFF',
         letterSpacing: -0.5,
-        marginBottom: 4
+        marginBottom: 4,
     },
-    headerSubtitle: {
-        fontSize: 15,
-        color: 'rgba(255,255,255,0.8)'
-    },
-    content: { flex: 1 },
-    approvalsBanner: {
+    headerSubtitle: { fontSize: 15, color: 'rgba(255,255,255,0.8)' },
+    body: { flex: 1 },
+    bodyContent: { paddingHorizontal: 20, paddingTop: 16 },
+    banner: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        marginHorizontal: 20,
-        marginTop: 16,
+        marginBottom: 16,
         backgroundColor: 'rgba(52, 232, 158, 0.12)',
         borderRadius: 14,
         paddingHorizontal: 14,
-        paddingVertical: 14
+        paddingVertical: 14,
     },
-    approvalsIcon: {
+    bannerIcon: {
         width: 36,
         height: 36,
         borderRadius: 18,
         backgroundColor: 'rgba(52, 232, 158, 0.22)',
         alignItems: 'center',
-        justifyContent: 'center'
-    },
-    approvalsInfo: { flex: 1 },
-    approvalsTitle: { fontSize: 15, fontWeight: '700', color: p.textPrimary },
-    approvalsMeta: { fontSize: 12, color: p.infoText, marginTop: 2 },
-    emptyState: {
-        flex: 1,
-        alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 40,
-        paddingBottom: 80
     },
-    emptyIconContainer: {
-        width: 88,
-        height: 88,
-        borderRadius: 44,
-        backgroundColor: 'rgba(0, 188, 242, 0.08)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 24
-    },
-    emptyTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: p.textPrimary,
-        marginBottom: 8
-    },
-    emptyText: {
-        fontSize: 15,
-        textAlign: 'center',
-        color: p.textSecondary,
-        lineHeight: 22
-    },
-    list: { flex: 1 },
-    listContent: { padding: 20, paddingTop: 24, paddingBottom: 96 },
+    bannerInfo: { flex: 1 },
+    bannerTitle: { fontSize: 15, fontWeight: '700', color: p.textPrimary },
+    bannerMeta: { fontSize: 12, color: p.infoText, marginTop: 2 },
+    section: { marginBottom: 20 },
     sectionTitle: {
         fontSize: 12,
         fontWeight: '700',
         color: p.textSecondary,
         letterSpacing: 1,
-        marginBottom: 12
+        marginBottom: 4,
+        textTransform: 'uppercase',
     },
-    serviceCard: {
+    sectionHint: { fontSize: 13, color: p.textMuted, lineHeight: 18, marginBottom: 10 },
+    card: { backgroundColor: p.card, borderRadius: 14, overflow: 'hidden' },
+    row: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: p.card,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2
+        gap: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: p.border,
     },
-    searchBox: {
+    rowInfo: { flex: 1, gap: 2 },
+    rowTitle: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+    rowEnded: { color: p.textMuted },
+    rowEndedNote: { fontSize: 12, color: p.textMuted },
+    rowMeta: { fontSize: 13, color: p.textSecondary },
+    liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: p.green },
+    empty: { fontSize: 13, color: p.textMuted, paddingHorizontal: 16, paddingVertical: 16 },
+    seeAll: {
         flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: p.card,
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 40,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-        elevation: 1
-    },
-    searchIcon: { marginRight: 8 },
-    searchInput: {
-        flex: 1,
-        fontSize: 15,
-        color: p.textPrimary,
-        paddingVertical: 0
-    },
-    noResults: {
-        fontSize: 14,
-        color: p.textSecondary,
-        textAlign: 'center',
-        paddingVertical: 24
-    },
-    serviceIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 14
+        gap: 4,
+        paddingVertical: 13,
     },
-    serviceInfo: { flex: 1 },
-    serviceName: {
-        marginBottom: 2,
-        fontSize: 16,
-        fontWeight: '600',
-        color: p.textPrimary
-    },
-    liveDot: {
-        position: 'absolute',
-        top: -3,
-        right: -3,
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        backgroundColor: p.green,
-        // Ring in the card colour so the dot reads as a floating badge
-        // over the (green/blue/purple) icon.
-        borderWidth: 3,
-        borderColor: p.card
-    },
-    serviceMeta: {
-        fontSize: 12,
-        color: p.textSecondary
-    },
+    seeAllText: { fontSize: 14, fontWeight: '600', color: p.blue },
     scanFab: {
         position: 'absolute',
         right: 24,
@@ -598,6 +455,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.4,
         shadowRadius: 12,
-        elevation: 8
-    }
+        elevation: 8,
+    },
 });

@@ -368,6 +368,55 @@
       "refusedNested": "Cette demande exige plus d'approbations successives qu'il n'est possible d'enchaîner ; rien n'a été accordé."
     }
   },
+
+  "sessions": {
+    "title": "Sessions actives",
+    "empty": "Vous n'êtes connecté à rien."
+  },
+
+  "access": {
+    "summary": "Ce qui peut vous atteindre, et comment l'arrêter",
+    "accountsTitle": "Comptes connectés",
+    "accountsHint": "Services qui détiennent un identifiant pour un compte que vous avez ailleurs.",
+    "accountsEmpty": "Vous n'avez connecté aucun compte.",
+    "dataTitle": "Accès à vos données",
+    "dataHint": "Applications pouvant utiliser les données que vous conservez chez Privasys.",
+    "dataEmpty": "Rien n'a accès à vos données.",
+    "sessionsTitle": "Sessions actives",
+    "sessionsHint": "Applications auxquelles vous êtes actuellement connecté.",
+    "recordTitle": "Votre relevé",
+    "credentials": "Applications où vous vous connectez",
+    "credentialsNone": "Pas encore d'identifiants de connexion",
+    "sharingHistory": "Historique de partage",
+    "seeAll": "Tout afficher",
+    "inService": "{{resource}} dans votre {{service}}",
+    "stateRevoked": "Vous avez retiré ceci",
+    "stateEnded": "Ceci a pris fin",
+    "stateChecking": "Vérification auprès du service",
+    "stateConfirmed": "Confirmé à l'instant par le service",
+    "stateGone": "Le service ne le détient plus",
+    "stateUnsupported": "Ce service ne peut pas encore être interrogé depuis votre portefeuille. Gérez-le là où se trouvent les données.",
+    "stateLocal": "Depuis cet appareil, sans confirmation. Le service n'a pas pu être joint, ceci peut donc être périmé.",
+    "grantTitle": "Détail de l'accès",
+    "grantGone": "Cet enregistrement n'est plus sur cet appareil.",
+    "grantedOn": "Accordé le {{when, dateLong}}",
+    "expiresOn": "Jusqu'au {{when, dateLong}}",
+    "revokedOn": "Retiré le {{when, dateLong}}",
+    "credentialLabel": "Ce que vous leur avez donné",
+    "credentialGiven": "Vous avez saisi : {{what}}",
+    "credentialGivenGeneric": "Vous avez saisi un identifiant lors de l'approbation.",
+    "credentialWider": "Un identifiant de ce type permet généralement plus que l'accès que vous avez accordé. Ce qui le maintient restreint, c'est que le service s'exécute dans une enclave vérifiée et ne peut faire que ce que vous avez approuvé.",
+    "disconnect": "Déconnecter",
+    "disconnectTitle": "Déconnecter {{app}} ?",
+    "disconnectBody": "{{app}} cessera d'utiliser {{resource}} et détruira sa copie de ce que vous avez saisi. L'identifiant lui-même reste valable tant que vous ne le supprimez pas là où vous l'avez créé.",
+    "disconnectNote": "La déconnexion arrête ce service. Elle n'annule pas l'identifiant chez le fournisseur et ne récupère rien de ce qui a déjà été lu.",
+    "remove": "Retirer l'accès",
+    "removeTitle": "Retirer l'accès de {{app}} ?",
+    "removeBody": "{{app}} ne pourra plus y accéder.",
+    "removeNote": "Retirer l'accès arrête tout pour la suite. Cela ne récupère pas ce qui a déjà été lu.",
+    "revokeFailedTitle": "Rien n'a été modifié",
+    "revokeFailedBody": "Le service n'a pas pu être joint, l'accès est donc inchangé. Vous pouvez réessayer."
+  },
   "credentials": {
     "title": "Identifiants enregistrés",
     "empty": "Aucun identifiant enregistré pour l'instant",
@@ -527,7 +576,9 @@
     "revokeBody": "{{app}} devra demander vos données à chaque fois.",
     "boundToMeasurement": "Lié à la mesure : {{measurement}}…",
     "noReceipts": "Aucun reçu pour l'instant",
-    "noReceiptsHint": "Les reçus de calcul émis par les enclaves apparaîtront ici après le traitement des données."
+    "noReceiptsHint": "Les reçus de calcul émis par les enclaves apparaîtront ici après le traitement des données.",
+    "valueNotRecorded": "Valeur non enregistrée",
+    "valueProofOnly": "Preuve uniquement, la valeur n'a pas été envoyée"
   },
 
   "home": {
@@ -967,7 +1018,7 @@
   },
 
   "tabs": {
-    "home": "Accueil",
+    "access": "Accès",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Réglages"

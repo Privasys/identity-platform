@@ -368,6 +368,55 @@
       "refusedNested": "Ez a kérés több egymást követő jóváhagyást igényel, mint amennyi lehetséges, ezért semmi nem lett megadva."
     }
   },
+
+  "sessions": {
+    "title": "Aktív munkamenetek",
+    "empty": "Sehová nincs bejelentkezve."
+  },
+
+  "access": {
+    "summary": "Mi érheti el Önt, és hogyan állítható le",
+    "accountsTitle": "Csatlakoztatott fiókok",
+    "accountsHint": "Szolgáltatások, amelyek egy máshol lévő fiókjához tartozó hitelesítő adatot tárolnak.",
+    "accountsEmpty": "Nem csatlakoztatott fiókot.",
+    "dataTitle": "Hozzáférés az adataihoz",
+    "dataHint": "Alkalmazások, amelyek használhatják a Privasysnál tárolt adatait.",
+    "dataEmpty": "Semmi nem fér hozzá az adataihoz.",
+    "sessionsTitle": "Aktív munkamenetek",
+    "sessionsHint": "Alkalmazások, amelyekbe jelenleg be van jelentkezve.",
+    "recordTitle": "Az Ön nyilvántartása",
+    "credentials": "Alkalmazások, amelyekbe bejelentkezik",
+    "credentialsNone": "Még nincsenek bejelentkezési adatok",
+    "sharingHistory": "Megosztási előzmények",
+    "seeAll": "Összes megtekintése",
+    "inService": "{{resource}} az Ön {{service}} szolgáltatásában",
+    "stateRevoked": "Ezt eltávolította",
+    "stateEnded": "Ez véget ért",
+    "stateChecking": "Ellenőrzés a szolgáltatásnál",
+    "stateConfirmed": "A szolgáltatás az imént megerősítette",
+    "stateGone": "A szolgáltatásnál ez már nincs meg",
+    "stateUnsupported": "Ezt a szolgáltatást a tárcából még nem lehet megkérdezni. Ott kezelje, ahol az adatok vannak.",
+    "stateLocal": "Erről az eszközről, megerősítés nélkül. A szolgáltatás nem volt elérhető, ezért ez elavult lehet.",
+    "grantTitle": "A hozzáférés részletei",
+    "grantGone": "Ez a bejegyzés már nincs ezen az eszközön.",
+    "grantedOn": "Megadva: {{when, dateLong}}",
+    "expiresOn": "Eddig: {{when, dateLong}}",
+    "revokedOn": "Eltávolítva: {{when, dateLong}}",
+    "credentialLabel": "Amit átadott nekik",
+    "credentialGiven": "Ezt adta meg: {{what}}",
+    "credentialGivenGeneric": "A jóváhagyáskor megadott egy hitelesítő adatot.",
+    "credentialWider": "Az ilyen hitelesítő adat általában többet enged, mint amennyi hozzáférést megadott. Azért marad szűk, mert a szolgáltatás ellenőrzött enklávéban fut, és csak azt teheti, amit jóváhagyott.",
+    "disconnect": "Leválasztás",
+    "disconnectTitle": "Leválasztja a(z) {{app}} alkalmazást?",
+    "disconnectBody": "A(z) {{app}} leáll a(z) {{resource}} használatával, és megsemmisíti a megadott adatokról készült másolatát. Maga a hitelesítő adat addig működik, amíg el nem távolítja ott, ahol létrehozta.",
+    "disconnectNote": "A leválasztás leállítja ezt a szolgáltatást. Nem vonja vissza a hitelesítő adatot a szolgáltatónál, és nem hív vissza semmit, amit már elolvastak.",
+    "remove": "Hozzáférés eltávolítása",
+    "removeTitle": "Eltávolítja a(z) {{app}} hozzáférését?",
+    "removeBody": "A(z) {{app}} többé nem fér hozzá ehhez.",
+    "removeNote": "A hozzáférés eltávolítása minden továbbit leállít. Nem hívja vissza azt, amit már elolvastak.",
+    "revokeFailedTitle": "Semmi nem változott",
+    "revokeFailedBody": "A szolgáltatás nem volt elérhető, így a hozzáférés változatlan. Újra megpróbálhatja."
+  },
   "credentials": {
     "title": "Regisztrált hitelesítő adatok",
     "empty": "Még nincsenek regisztrált hitelesítő adatok",
@@ -523,7 +572,9 @@
     "revokeBody": "A(z) {{app}} ezután minden alkalommal kérni fogja az adatait.",
     "boundToMeasurement": "Ehhez a méréshez kötve: {{measurement}}…",
     "noReceipts": "Még nincsenek igazolások",
-    "noReceiptsHint": "Az enklávok számítási igazolásai az adatfeldolgozás után itt jelennek meg."
+    "noReceiptsHint": "Az enklávok számítási igazolásai az adatfeldolgozás után itt jelennek meg.",
+    "valueNotRecorded": "Az érték nincs rögzítve",
+    "valueProofOnly": "Csak bizonyíték, az érték nem lett elküldve"
   },
 
   "home": {
@@ -947,7 +998,7 @@
   },
 
   "tabs": {
-    "home": "Kezdőlap",
+    "access": "Hozzáférés",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Beállítások"

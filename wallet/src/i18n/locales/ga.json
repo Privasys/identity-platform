@@ -401,6 +401,55 @@
       "refusedNested": "Iarrann an t-iarratas seo níos mó ceaduithe as a chéile ná mar is féidir, mar sin níor deonaíodh aon rud."
     }
   },
+
+  "sessions": {
+    "title": "Seisiúin ghníomhacha",
+    "empty": "Níl tú sínithe isteach in aon áit."
+  },
+
+  "access": {
+    "summary": "Cad is féidir teacht ort, agus conas é a stopadh",
+    "accountsTitle": "Cuntais nasctha",
+    "accountsHint": "Seirbhísí a choinníonn dintiúr do chuntas leat in áit eile.",
+    "accountsEmpty": "Níor nasc tú aon chuntas.",
+    "dataTitle": "Rochtain ar do shonraí",
+    "dataHint": "Aipeanna ar féidir leo sonraí a choinníonn tú le Privasys a úsáid.",
+    "dataEmpty": "Níl rochtain ag aon rud ar do shonraí.",
+    "sessionsTitle": "Seisiúin ghníomhacha",
+    "sessionsHint": "Aipeanna a bhfuil tú sínithe isteach iontu faoi láthair.",
+    "recordTitle": "Do thaifead",
+    "credentials": "Aipeanna a shíníonn tú isteach iontu",
+    "credentialsNone": "Gan dintiúir sínithe isteach fós",
+    "sharingHistory": "Stair roinnte",
+    "seeAll": "Féach ar gach ceann",
+    "inService": "{{resource}} i do {{service}}",
+    "stateRevoked": "Bhain tú é seo",
+    "stateEnded": "Tá deireadh leis seo",
+    "stateChecking": "Á sheiceáil leis an tseirbhís",
+    "stateConfirmed": "Deimhnithe ag an tseirbhís anois",
+    "stateGone": "Níl sé seo ag an tseirbhís a thuilleadh",
+    "stateUnsupported": "Ní féidir ceist a chur ar an tseirbhís seo ó do sparán fós. Bainistigh í san áit a bhfuil na sonraí.",
+    "stateLocal": "Ón ngléas seo, gan deimhniú. Níorbh fhéidir teacht ar an tseirbhís, mar sin d’fhéadfadh sé seo a bheith as dáta.",
+    "grantTitle": "Sonraí rochtana",
+    "grantGone": "Níl an taifead seo ar an ngléas seo a thuilleadh.",
+    "grantedOn": "Deonaithe {{when, dateLong}}",
+    "expiresOn": "Go dtí {{when, dateLong}}",
+    "revokedOn": "Bainte {{when, dateLong}}",
+    "credentialLabel": "Cad a thug tú dóibh",
+    "credentialGiven": "Chuir tú isteach: {{what}}",
+    "credentialGivenGeneric": "Chuir tú dintiúr isteach nuair a cheadaigh tú é seo.",
+    "credentialWider": "De ghnáth ceadaíonn dintiúr mar seo níos mó ná an rochtain a dheonaigh tú. Is é a choinníonn cúng é go ritheann an tseirbhís in iamh fíoraithe agus nach féidir léi ach an méid a cheadaigh tú a dhéanamh.",
+    "disconnect": "Dínasc",
+    "disconnectTitle": "Dínasc {{app}}?",
+    "disconnectBody": "Stopfaidh {{app}} ag úsáid {{resource}} agus scriosfaidh sé a chóip den mhéid a chuir tú isteach. Leanann an dintiúr féin ag obair go dtí go mbaineann tú é san áit ar chruthaigh tú é.",
+    "disconnectNote": "Stopann an dínasc an tseirbhís seo. Ní chuireann sé an dintiúr ar ceal ag an soláthraí, agus ní thugann sé ar ais aon rud atá léite cheana.",
+    "remove": "Bain rochtain",
+    "removeTitle": "Bain rochtain {{app}}?",
+    "removeBody": "Ní bheidh {{app}} in ann teacht air seo a thuilleadh.",
+    "removeNote": "Stopann baint na rochtana gach rud eile. Ní thugann sé ar ais an méid atá léite cheana.",
+    "revokeFailedTitle": "Níor athraíodh aon rud",
+    "revokeFailedBody": "Níorbh fhéidir teacht ar an tseirbhís, mar sin tá an rochtain gan athrú. Is féidir leat triail eile a bhaint as."
+  },
   "credentials": {
     "title": "Dintiúir chláraithe",
     "empty": "Níl aon dintiúr cláraithe fós",
@@ -563,7 +612,9 @@
     "revokeBody": "Beidh ar {{app}} do chuid sonraí a iarraidh arís gach uair.",
     "boundToMeasurement": "Ceangailte leis an tomhas: {{measurement}}…",
     "noReceipts": "Níl aon admháil ann fós",
-    "noReceiptsHint": "Taispeánfar admhálacha ríomha ó iamhchlósanna anseo tar éis próiseáil sonraí."
+    "noReceiptsHint": "Taispeánfar admhálacha ríomha ó iamhchlósanna anseo tar éis próiseáil sonraí.",
+    "valueNotRecorded": "Níor taifeadadh an luach",
+    "valueProofOnly": "Cruthúnas amháin, níor seoladh an luach"
   },
   "home": {
     "noSessions": "Níl aon seisiún gníomhach ann fós",
@@ -1020,7 +1071,7 @@
     "aboutWebsite": "Suíomh gréasáin"
   },
   "tabs": {
-    "home": "Baile",
+    "access": "Rochtain",
     "profile": "Próifíl",
     "drive": "Drive",
     "settings": "Socruithe"

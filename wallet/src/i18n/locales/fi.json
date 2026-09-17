@@ -368,6 +368,55 @@
       "refusedNested": "Tämä pyyntö vaatii enemmän peräkkäisiä hyväksyntöjä kuin on mahdollista, joten mitään ei myönnetty."
     }
   },
+
+  "sessions": {
+    "title": "Aktiiviset istunnot",
+    "empty": "Et ole kirjautuneena mihinkään."
+  },
+
+  "access": {
+    "summary": "Mikä pääsee sinuun käsiksi ja miten sen pysäytät",
+    "accountsTitle": "Yhdistetyt tilit",
+    "accountsHint": "Palvelut, jotka säilyttävät tunnuksia muualla olevaan tiliisi.",
+    "accountsEmpty": "Et ole yhdistänyt yhtään tiliä.",
+    "dataTitle": "Pääsy tietoihisi",
+    "dataHint": "Sovellukset, jotka voivat käyttää Privasysissa säilyttämiäsi tietoja.",
+    "dataEmpty": "Millään ei ole pääsyä tietoihisi.",
+    "sessionsTitle": "Aktiiviset istunnot",
+    "sessionsHint": "Sovellukset, joihin olet juuri nyt kirjautuneena.",
+    "recordTitle": "Tietosi",
+    "credentials": "Sovellukset, joihin kirjaudut",
+    "credentialsNone": "Ei vielä kirjautumistunnuksia",
+    "sharingHistory": "Jakamishistoria",
+    "seeAll": "Näytä kaikki",
+    "inService": "{{resource}} palvelussa {{service}}",
+    "stateRevoked": "Poistit tämän",
+    "stateEnded": "Tämä on päättynyt",
+    "stateChecking": "Tarkistetaan palvelusta",
+    "stateConfirmed": "Palvelu vahvisti juuri",
+    "stateGone": "Palvelulla ei ole tätä enää",
+    "stateUnsupported": "Tältä palvelulta ei voi vielä kysyä lompakosta. Hallitse sitä siellä, missä tiedot ovat.",
+    "stateLocal": "Tästä laitteesta eikä vahvistettu. Palveluun ei saatu yhteyttä, joten tämä voi olla vanhentunut.",
+    "grantTitle": "Käyttöoikeuden tiedot",
+    "grantGone": "Tätä merkintää ei ole enää tällä laitteella.",
+    "grantedOn": "Myönnetty {{when, dateLong}}",
+    "expiresOn": "Voimassa {{when, dateLong}} asti",
+    "revokedOn": "Poistettu {{when, dateLong}}",
+    "credentialLabel": "Mitä annoit heille",
+    "credentialGiven": "Syötit: {{what}}",
+    "credentialGivenGeneric": "Syötit tunnuksen, kun hyväksyit tämän.",
+    "credentialWider": "Tällainen tunnus sallii yleensä enemmän kuin myöntämäsi käyttöoikeus. Sen pitää kapeana se, että palvelu toimii varmennetussa enklaavissa eikä voi tehdä muuta kuin mitä hyväksyit.",
+    "disconnect": "Katkaise yhteys",
+    "disconnectTitle": "Katkaistaanko yhteys sovellukseen {{app}}?",
+    "disconnectBody": "{{app}} lopettaa {{resource}}-kohteen käytön ja tuhoaa oman kopionsa syöttämästäsi tiedosta. Itse tunnus toimii edelleen, kunnes poistat sen siellä, missä sen loit.",
+    "disconnectNote": "Yhteyden katkaisu pysäyttää tämän palvelun. Se ei peruuta tunnusta palveluntarjoajalla eikä palauta mitään jo luettua.",
+    "remove": "Poista käyttöoikeus",
+    "removeTitle": "Poistetaanko sovelluksen {{app}} käyttöoikeus?",
+    "removeBody": "{{app}} ei enää pääse tähän käsiksi.",
+    "removeNote": "Käyttöoikeuden poistaminen pysäyttää kaiken jatkossa. Se ei palauta sitä, mikä on jo luettu.",
+    "revokeFailedTitle": "Mitään ei muutettu",
+    "revokeFailedBody": "Palveluun ei saatu yhteyttä, joten käyttöoikeus on ennallaan. Voit yrittää uudelleen."
+  },
   "credentials": {
     "title": "Rekisteröidyt tunnistetiedot",
     "empty": "Ei vielä rekisteröityjä tunnistetietoja",
@@ -523,7 +572,9 @@
     "revokeBody": "{{app}} joutuu pyytämään tietojasi joka kerta.",
     "boundToMeasurement": "Sidottu mittaukseen: {{measurement}}…",
     "noReceipts": "Ei vielä kuitteja",
-    "noReceiptsHint": "Enklaavien laskentakuitit näkyvät täällä tietojen käsittelyn jälkeen."
+    "noReceiptsHint": "Enklaavien laskentakuitit näkyvät täällä tietojen käsittelyn jälkeen.",
+    "valueNotRecorded": "Arvoa ei tallennettu",
+    "valueProofOnly": "Vain todiste, arvoa ei lähetetty"
   },
 
   "home": {
@@ -947,7 +998,7 @@
   },
 
   "tabs": {
-    "home": "Etusivu",
+    "access": "Käyttöoikeudet",
     "profile": "Profiili",
     "drive": "Drive",
     "settings": "Asetukset"

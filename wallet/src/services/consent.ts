@@ -16,7 +16,14 @@
 
 import * as Crypto from 'expo-crypto';
 
-import { useConsentStore, type ConsentRecord, type StandingConsent, type ComputationReceipt } from '@/stores/consent';
+import { isDerived } from '@/services/attributes';
+import {
+    useConsentStore,
+    type ConsentRecord,
+    type DisclosedAttribute,
+    type StandingConsent,
+    type ComputationReceipt,
+} from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
 
 /** A data request from an enclave app. */
@@ -124,6 +131,29 @@ export function getAttributeValues(
 }
 
 /**
+ * What is about to be sent, captured for the record.
+ *
+ * Read through the same resolver the disclosure itself uses, in the same tick,
+ * so the recorded value is the one that left the device rather than whatever
+ * the profile happens to hold when the holder later goes looking.
+ *
+ * A derived attribute is computed by the enclave from the identity receipt and
+ * the wallet never holds a value for it, so what goes out is a proof. Recording
+ * a value there would claim the service received something it never did.
+ */
+export function snapshotDisclosed(approvedAttributes: string[]): DisclosedAttribute[] {
+    const values = getAttributeValues(approvedAttributes);
+    return approvedAttributes.map((key) => {
+        const value = values[key];
+        if (value) return { key, value };
+        if (isDerived(key)) return { key, proofOnly: true };
+        // Nothing resolved: the profile had no value for it, so there is
+        // nothing truthful to show beyond the name.
+        return { key };
+    });
+}
+
+/**
  * Record a consent decision (called after user approves/denies in the UI).
  */
 export async function recordConsent(
@@ -152,6 +182,7 @@ export async function recordConsent(
         appName: request.appName,
         requestedAttributes: request.requestedAttributes,
         approvedAttributes,
+        disclosed: snapshotDisclosed(approvedAttributes),
         deniedAttributes,
         decision,
         persistent,

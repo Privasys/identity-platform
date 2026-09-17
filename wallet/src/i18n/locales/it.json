@@ -368,6 +368,55 @@
       "refusedNested": "Questa richiesta prevede più approvazioni consecutive di quante siano possibili, quindi non è stato concesso nulla."
     }
   },
+
+  "sessions": {
+    "title": "Sessioni attive",
+    "empty": "Non hai effettuato l’accesso da nessuna parte."
+  },
+
+  "access": {
+    "summary": "Che cosa può raggiungerti e come fermarlo",
+    "accountsTitle": "Account collegati",
+    "accountsHint": "Servizi che conservano una credenziale per un tuo account altrove.",
+    "accountsEmpty": "Non hai collegato alcun account.",
+    "dataTitle": "Accesso ai tuoi dati",
+    "dataHint": "App che possono usare i dati che tieni con Privasys.",
+    "dataEmpty": "Niente ha accesso ai tuoi dati.",
+    "sessionsTitle": "Sessioni attive",
+    "sessionsHint": "App a cui hai effettuato l’accesso in questo momento.",
+    "recordTitle": "Il tuo registro",
+    "credentials": "App a cui accedi",
+    "credentialsNone": "Ancora nessuna credenziale di accesso",
+    "sharingHistory": "Cronologia delle condivisioni",
+    "seeAll": "Vedi tutto",
+    "inService": "{{resource}} nel tuo {{service}}",
+    "stateRevoked": "Hai rimosso questo",
+    "stateEnded": "Questo è terminato",
+    "stateChecking": "Verifica con il servizio",
+    "stateConfirmed": "Confermato dal servizio proprio ora",
+    "stateGone": "Il servizio non lo detiene più",
+    "stateUnsupported": "Questo servizio non può ancora essere interrogato dal portafoglio. Gestiscilo dove si trovano i dati.",
+    "stateLocal": "Da questo dispositivo e non confermato. Il servizio non è raggiungibile, quindi potrebbe non essere aggiornato.",
+    "grantTitle": "Dettaglio dell’accesso",
+    "grantGone": "Questa registrazione non è più su questo dispositivo.",
+    "grantedOn": "Concesso il {{when, dateLong}}",
+    "expiresOn": "Fino al {{when, dateLong}}",
+    "revokedOn": "Rimosso il {{when, dateLong}}",
+    "credentialLabel": "Che cosa hai dato loro",
+    "credentialGiven": "Hai inserito: {{what}}",
+    "credentialGivenGeneric": "Hai inserito una credenziale quando hai approvato questo.",
+    "credentialWider": "Una credenziale del genere di solito permette più dell’accesso che hai concesso. A tenerla stretta è il fatto che il servizio gira in un enclave verificato e può fare solo ciò che hai approvato.",
+    "disconnect": "Disconnetti",
+    "disconnectTitle": "Disconnettere {{app}}?",
+    "disconnectBody": "{{app}} smetterà di usare {{resource}} e distruggerà la sua copia di ciò che hai inserito. La credenziale in sé continua a funzionare finché non la rimuovi dove l’hai creata.",
+    "disconnectNote": "Disconnettere ferma questo servizio. Non annulla la credenziale presso il fornitore e non richiama nulla di ciò che è già stato letto.",
+    "remove": "Rimuovi accesso",
+    "removeTitle": "Rimuovere l’accesso di {{app}}?",
+    "removeBody": "{{app}} non potrà più raggiungere questo.",
+    "removeNote": "Rimuovere l’accesso ferma tutto il resto. Non richiama ciò che è già stato letto.",
+    "revokeFailedTitle": "Non è stato modificato nulla",
+    "revokeFailedBody": "Il servizio non è raggiungibile, quindi l’accesso è invariato. Puoi riprovare."
+  },
   "credentials": {
     "title": "Credenziali registrate",
     "empty": "Nessuna credenziale registrata per ora",
@@ -527,7 +576,9 @@
     "revokeBody": "{{app}} dovrà richiedere i tuoi dati ogni volta.",
     "boundToMeasurement": "Vincolato alla misurazione: {{measurement}}…",
     "noReceipts": "Nessuna ricevuta per ora",
-    "noReceiptsHint": "Le ricevute di calcolo delle enclave compariranno qui dopo l'elaborazione dei dati."
+    "noReceiptsHint": "Le ricevute di calcolo delle enclave compariranno qui dopo l'elaborazione dei dati.",
+    "valueNotRecorded": "Valore non registrato",
+    "valueProofOnly": "Solo una prova, il valore non è stato inviato"
   },
 
   "home": {
@@ -967,7 +1018,7 @@
   },
 
   "tabs": {
-    "home": "Home",
+    "access": "Accesso",
     "profile": "Profilo",
     "drive": "Drive",
     "settings": "Impostazioni"

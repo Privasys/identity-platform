@@ -114,6 +114,13 @@ export default function CapabilityRequestScreen() {
     const [answered, setAnswered] = useState<Record<string, unknown>>({});
     const [missing, setMissing] = useState<string[]>([]);
     const [serviceMessage, setServiceMessage] = useState<string>('');
+    /**
+     * The service's labels for the secret fields the holder has filled in so
+     * far, across every step. Labels, never values: this is what lets the
+     * Access screen later say "you gave this service an app password" without
+     * the wallet ever having kept one.
+     */
+    const [secretsSoFar, setSecretsSoFar] = useState<string[]>([]);
 
     // Where the prerequisite chain has got to. Refs, not state, so that the
     // effect driving it can have no dependencies: it must re-run when this
@@ -322,6 +329,14 @@ export default function CapabilityRequestScreen() {
         // Built here, sent once, and dropped when the screen closes.
         const payload = setup ? { ...answered, ...setupPayload(setup.fields, answers) } : undefined;
 
+        const stepSecrets = (setup?.fields ?? [])
+            .filter((f) => f.kind === 'secret' && String(answers[f.name] ?? '').length > 0)
+            .map((f) => f.title);
+        const secretsGiven = [
+            ...secretsSoFar,
+            ...stepSecrets.filter((s) => !secretsSoFar.includes(s)),
+        ];
+
         try {
             const expiresUnix = expiryFor(pending.capability.kind);
             const mint = () =>
@@ -363,6 +378,7 @@ export default function CapabilityRequestScreen() {
                     `[CAPABILITY] ${resource.hostname} needs more before it can grant this; asking`,
                 );
                 setAnswered(payload ?? {});
+                setSecretsSoFar(secretsGiven);
                 setSetup(outcome.requirement);
                 setAnswers(
                     initialAnswers(outcome.requirement.fields, {
@@ -389,6 +405,11 @@ export default function CapabilityRequestScreen() {
                 capabilityId: granted.capability_id,
                 grantedAt: Math.floor(Date.now() / 1000),
                 expiresAt: expiresUnix,
+                // That a credential was handed over, and what the service
+                // called it. Never what it was: the values made one hop to the
+                // service and are gone from here the moment this screen closes.
+                setupProvided: secretsGiven.length > 0,
+                secretLabels: secretsGiven.length > 0 ? secretsGiven : undefined,
             });
 
             if (chained) {

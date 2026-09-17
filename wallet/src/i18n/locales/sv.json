@@ -368,6 +368,55 @@
       "refusedNested": "Den här begäran kräver fler godkännanden i följd än vad som är möjligt, så inget beviljades."
     }
   },
+
+  "sessions": {
+    "title": "Aktiva sessioner",
+    "empty": "Du är inte inloggad någonstans."
+  },
+
+  "access": {
+    "summary": "Vad som kan nå dig, och hur du stoppar det",
+    "accountsTitle": "Anslutna konton",
+    "accountsHint": "Tjänster som håller en inloggningsuppgift till ett konto du har någon annanstans.",
+    "accountsEmpty": "Du har inte anslutit några konton.",
+    "dataTitle": "Åtkomst till dina data",
+    "dataHint": "Appar som kan använda data du förvarar hos Privasys.",
+    "dataEmpty": "Inget har åtkomst till dina data.",
+    "sessionsTitle": "Aktiva sessioner",
+    "sessionsHint": "Appar du är inloggad i just nu.",
+    "recordTitle": "Din översikt",
+    "credentials": "Appar du loggar in på",
+    "credentialsNone": "Inga inloggningsuppgifter än",
+    "sharingHistory": "Delningshistorik",
+    "seeAll": "Visa alla",
+    "inService": "{{resource}} i din {{service}}",
+    "stateRevoked": "Du tog bort detta",
+    "stateEnded": "Detta har upphört",
+    "stateChecking": "Kontrollerar med tjänsten",
+    "stateConfirmed": "Bekräftat av tjänsten nyss",
+    "stateGone": "Tjänsten har inte längre detta",
+    "stateUnsupported": "Den här tjänsten går ännu inte att fråga från din plånbok. Hantera den där data finns.",
+    "stateLocal": "Från den här enheten och obekräftat. Tjänsten gick inte att nå, så detta kan vara inaktuellt.",
+    "grantTitle": "Åtkomstdetaljer",
+    "grantGone": "Den här posten finns inte längre på den här enheten.",
+    "grantedOn": "Beviljad {{when, dateLong}}",
+    "expiresOn": "Till {{when, dateLong}}",
+    "revokedOn": "Borttagen {{when, dateLong}}",
+    "credentialLabel": "Vad du gav dem",
+    "credentialGiven": "Du angav: {{what}}",
+    "credentialGivenGeneric": "Du angav en inloggningsuppgift när du godkände detta.",
+    "credentialWider": "En sådan uppgift tillåter oftast mer än den åtkomst du gav. Det som håller den smal är att tjänsten körs i en verifierad enklav och bara kan göra det du godkände.",
+    "disconnect": "Koppla från",
+    "disconnectTitle": "Koppla från {{app}}?",
+    "disconnectBody": "{{app}} slutar använda {{resource}} och förstör sin kopia av det du angav. Själva uppgiften fortsätter att fungera tills du tar bort den där du skapade den.",
+    "disconnectNote": "Att koppla från stoppar den här tjänsten. Det återkallar inte uppgiften hos leverantören, och det hämtar inte tillbaka något som redan lästs.",
+    "remove": "Ta bort åtkomst",
+    "removeTitle": "Ta bort åtkomst för {{app}}?",
+    "removeBody": "{{app}} kommer inte längre åt detta.",
+    "removeNote": "Att ta bort åtkomst stoppar allt vidare. Det hämtar inte tillbaka det som redan lästs.",
+    "revokeFailedTitle": "Inget ändrades",
+    "revokeFailedBody": "Tjänsten gick inte att nå, så åtkomsten är oförändrad. Du kan försöka igen."
+  },
   "credentials": {
     "title": "Registrerade inloggningsuppgifter",
     "empty": "Inga inloggningsuppgifter registrerade än",
@@ -523,7 +572,9 @@
     "revokeBody": "{{app}} måste då be om dina uppgifter varje gång.",
     "boundToMeasurement": "Bunden till mätvärde: {{measurement}}…",
     "noReceipts": "Inga kvitton än",
-    "noReceiptsHint": "Beräkningskvitton från enklaver visas här efter databehandlingen."
+    "noReceiptsHint": "Beräkningskvitton från enklaver visas här efter databehandlingen.",
+    "valueNotRecorded": "Värdet registrerades inte",
+    "valueProofOnly": "Endast ett bevis, värdet skickades inte"
   },
 
   "home": {
@@ -947,7 +998,7 @@
   },
 
   "tabs": {
-    "home": "Hem",
+    "access": "Åtkomst",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Inställningar"

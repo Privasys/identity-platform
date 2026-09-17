@@ -79,6 +79,7 @@ import { selfAssertedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, discl
 import { discloseAttribute, provePresence, voucherForAttribute } from '@/services/kyc';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
+import { snapshotDisclosed } from '@/services/consent';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
@@ -1524,6 +1525,7 @@ function ConnectFlow() {
             ? (consent.getStandingConsent(key, meas, codeHash)?.attributes ??
                 priorLatest?.approvedAttributes ?? [])
             : [];
+        const approvedSet = isStepUp ? mergeStepUpConsent(priorApproved, approved) : approved;
         consent.addRecord({
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
             rpId: key,
@@ -1532,7 +1534,10 @@ function ConnectFlow() {
             requestedAttributes: isStepUp
                 ? mergeStepUpConsent(priorLatest?.requestedAttributes, items.map((i) => i.key))
                 : items.map((i) => i.key),
-            approvedAttributes: isStepUp ? mergeStepUpConsent(priorApproved, approved) : approved,
+            approvedAttributes: approvedSet,
+            // What is going out, captured now: the profile is the source for
+            // both, and it can change before the holder ever reads this back.
+            disclosed: snapshotDisclosed(approvedSet),
             deniedAttributes: denied,
             decision: denied.length === 0 ? 'approved' : approved.length === 0 ? 'denied' : 'partial',
             persistent: remember,
@@ -3254,6 +3259,7 @@ function AttributeAcquisitionView({
             appName: displayAppName,
             requestedAttributes: missingAttributes,
             approvedAttributes: missingAttributes,
+            disclosed: snapshotDisclosed(missingAttributes),
             deniedAttributes: [],
             decision: 'approved',
             persistent: false,

@@ -401,6 +401,55 @@
       "refusedNested": "Această cerere necesită mai multe aprobări consecutive decât este posibil, așa că nu s-a acordat nimic."
     }
   },
+
+  "sessions": {
+    "title": "Sesiuni active",
+    "empty": "Nu ești conectat nicăieri."
+  },
+
+  "access": {
+    "summary": "Ce poate ajunge la tine și cum să oprești",
+    "accountsTitle": "Conturi conectate",
+    "accountsHint": "Servicii care păstrează o credențială pentru un cont de-al tău din altă parte.",
+    "accountsEmpty": "Nu ai conectat niciun cont.",
+    "dataTitle": "Acces la datele tale",
+    "dataHint": "Aplicații care pot folosi datele pe care le păstrezi la Privasys.",
+    "dataEmpty": "Nimic nu are acces la datele tale.",
+    "sessionsTitle": "Sesiuni active",
+    "sessionsHint": "Aplicații în care ești conectat acum.",
+    "recordTitle": "Evidența ta",
+    "credentials": "Aplicații în care te conectezi",
+    "credentialsNone": "Încă nu există credențiale de conectare",
+    "sharingHistory": "Istoric de partajare",
+    "seeAll": "Vezi tot",
+    "inService": "{{resource}} în {{service}} al tău",
+    "stateRevoked": "Ai eliminat acest lucru",
+    "stateEnded": "Acest lucru s-a încheiat",
+    "stateChecking": "Se verifică la serviciu",
+    "stateConfirmed": "Confirmat de serviciu chiar acum",
+    "stateGone": "Serviciul nu mai are acest lucru",
+    "stateUnsupported": "Acest serviciu nu poate fi încă interogat din portofel. Gestionează-l acolo unde sunt datele.",
+    "stateLocal": "De pe acest dispozitiv și neconfirmat. Serviciul nu a putut fi contactat, deci poate fi depășit.",
+    "grantTitle": "Detalii despre acces",
+    "grantGone": "Această înregistrare nu mai este pe acest dispozitiv.",
+    "grantedOn": "Acordat la {{when, dateLong}}",
+    "expiresOn": "Până la {{when, dateLong}}",
+    "revokedOn": "Eliminat la {{when, dateLong}}",
+    "credentialLabel": "Ce le-ai dat",
+    "credentialGiven": "Ai introdus: {{what}}",
+    "credentialGivenGeneric": "Ai introdus o credențială când ai aprobat acest lucru.",
+    "credentialWider": "O astfel de credențială permite de obicei mai mult decât accesul pe care l-ai acordat. Ce o ține îngustă este că serviciul rulează într-o enclavă verificată și poate face doar ce ai aprobat.",
+    "disconnect": "Deconectează",
+    "disconnectTitle": "Deconectezi {{app}}?",
+    "disconnectBody": "{{app}} va înceta să folosească {{resource}} și își va distruge copia a ceea ce ai introdus. Credențiala în sine continuă să funcționeze până o elimini de acolo de unde ai creat-o.",
+    "disconnectNote": "Deconectarea oprește acest serviciu. Nu anulează credențiala la furnizor și nu recuperează nimic din ce a fost deja citit.",
+    "remove": "Elimină accesul",
+    "removeTitle": "Elimini accesul pentru {{app}}?",
+    "removeBody": "{{app}} nu va mai putea ajunge la acest lucru.",
+    "removeNote": "Eliminarea accesului oprește tot ce urmează. Nu recuperează ce a fost deja citit.",
+    "revokeFailedTitle": "Nimic nu a fost modificat",
+    "revokeFailedBody": "Serviciul nu a putut fi contactat, deci accesul este neschimbat. Poți încerca din nou."
+  },
   "credentials": {
     "title": "Credențiale înregistrate",
     "empty": "Niciun credențial înregistrat încă",
@@ -555,7 +604,9 @@
     "revokeBody": "{{app}} va trebui să îți ceară datele din nou de fiecare dată.",
     "boundToMeasurement": "Legat de măsurătoarea: {{measurement}}…",
     "noReceipts": "Nicio chitanță încă",
-    "noReceiptsHint": "Chitanțele de calcul din enclave vor apărea aici după procesarea datelor."
+    "noReceiptsHint": "Chitanțele de calcul din enclave vor apărea aici după procesarea datelor.",
+    "valueNotRecorded": "Valoarea nu a fost înregistrată",
+    "valueProofOnly": "Doar o dovadă, valoarea nu a fost trimisă"
   },
   "home": {
     "noSessions": "Nicio sesiune activă încă",
@@ -980,7 +1031,7 @@
     "aboutWebsite": "Site web"
   },
   "tabs": {
-    "home": "Acasă",
+    "access": "Acces",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Setări"

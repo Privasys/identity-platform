@@ -368,6 +368,55 @@
       "refusedNested": "Tento požadavek vyžaduje více navazujících schválení, než je možné, proto nebylo nic uděleno."
     }
   },
+
+  "sessions": {
+    "title": "Aktivní relace",
+    "empty": "Nejste nikde přihlášeni."
+  },
+
+  "access": {
+    "summary": "Co se k vám dostane a jak to zastavit",
+    "accountsTitle": "Připojené účty",
+    "accountsHint": "Služby, které uchovávají přihlašovací údaje k vašemu účtu jinde.",
+    "accountsEmpty": "Nepřipojili jste žádné účty.",
+    "dataTitle": "Přístup k vašim datům",
+    "dataHint": "Aplikace, které mohou používat data, jež máte u Privasys.",
+    "dataEmpty": "K vašim datům nemá přístup nic.",
+    "sessionsTitle": "Aktivní relace",
+    "sessionsHint": "Aplikace, do kterých jste právě přihlášeni.",
+    "recordTitle": "Váš záznam",
+    "credentials": "Aplikace, do kterých se přihlašujete",
+    "credentialsNone": "Zatím žádné přihlašovací údaje",
+    "sharingHistory": "Historie sdílení",
+    "seeAll": "Zobrazit vše",
+    "inService": "{{resource}} ve vaší službě {{service}}",
+    "stateRevoked": "Toto jste odebrali",
+    "stateEnded": "Toto skončilo",
+    "stateChecking": "Ověřuje se u služby",
+    "stateConfirmed": "Právě potvrzeno službou",
+    "stateGone": "Služba to již nemá",
+    "stateUnsupported": "Tuto službu zatím nelze z peněženky dotázat. Spravujte ji tam, kde jsou data.",
+    "stateLocal": "Z tohoto zařízení a nepotvrzeno. Službu se nepodařilo kontaktovat, takže to může být zastaralé.",
+    "grantTitle": "Podrobnosti přístupu",
+    "grantGone": "Tento záznam už na tomto zařízení není.",
+    "grantedOn": "Uděleno {{when, dateLong}}",
+    "expiresOn": "Do {{when, dateLong}}",
+    "revokedOn": "Odebráno {{when, dateLong}}",
+    "credentialLabel": "Co jste jim dali",
+    "credentialGiven": "Zadali jste: {{what}}",
+    "credentialGivenGeneric": "Při schválení jste zadali přihlašovací údaj.",
+    "credentialWider": "Takový údaj obvykle umožňuje víc než přístup, který jste udělili. Omezuje ho to, že služba běží v ověřeném enklávu a může dělat jen to, co jste schválili.",
+    "disconnect": "Odpojit",
+    "disconnectTitle": "Odpojit {{app}}?",
+    "disconnectBody": "{{app}} přestane používat {{resource}} a zničí svou kopii toho, co jste zadali. Samotný údaj funguje dál, dokud jej neodeberete tam, kde jste jej vytvořili.",
+    "disconnectNote": "Odpojení zastaví tuto službu. Nezruší údaj u poskytovatele a nevrátí nic, co už bylo přečteno.",
+    "remove": "Odebrat přístup",
+    "removeTitle": "Odebrat přístup pro {{app}}?",
+    "removeBody": "{{app}} se k tomu už nedostane.",
+    "removeNote": "Odebrání přístupu zastaví vše další. Nevrátí to, co už bylo přečteno.",
+    "revokeFailedTitle": "Nic se nezměnilo",
+    "revokeFailedBody": "Službu se nepodařilo kontaktovat, přístup je proto beze změny. Můžete to zkusit znovu."
+  },
   "credentials": {
     "title": "Registrované přihlašovací údaje",
     "empty": "Zatím nejsou registrovány žádné přihlašovací údaje",
@@ -527,7 +576,9 @@
     "revokeBody": "{{app}} bude muset o vaše údaje žádat pokaždé znovu.",
     "boundToMeasurement": "Navázáno na měření: {{measurement}}…",
     "noReceipts": "Zatím žádná potvrzení",
-    "noReceiptsHint": "Potvrzení o výpočtech z enkláv se zde zobrazí po zpracování dat."
+    "noReceiptsHint": "Potvrzení o výpočtech z enkláv se zde zobrazí po zpracování dat.",
+    "valueNotRecorded": "Hodnota nebyla zaznamenána",
+    "valueProofOnly": "Pouze důkaz, hodnota nebyla odeslána"
   },
 
   "home": {
@@ -967,7 +1018,7 @@
   },
 
   "tabs": {
-    "home": "Domů",
+    "access": "Přístup",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Nastavení"

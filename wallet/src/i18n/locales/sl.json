@@ -401,6 +401,55 @@
       "refusedNested": "Ta zahteva zahteva več zaporednih odobritev, kot je mogoče, zato ni bilo nič dodeljeno."
     }
   },
+
+  "sessions": {
+    "title": "Aktivne seje",
+    "empty": "Nikjer niste prijavljeni."
+  },
+
+  "access": {
+    "summary": "Kaj vas lahko doseže in kako to ustaviti",
+    "accountsTitle": "Povezani računi",
+    "accountsHint": "Storitve, ki hranijo poverilnico za vaš račun drugje.",
+    "accountsEmpty": "Niste povezali nobenega računa.",
+    "dataTitle": "Dostop do vaših podatkov",
+    "dataHint": "Aplikacije, ki lahko uporabljajo podatke, ki jih hranite pri Privasysu.",
+    "dataEmpty": "Nič nima dostopa do vaših podatkov.",
+    "sessionsTitle": "Aktivne seje",
+    "sessionsHint": "Aplikacije, v katere ste trenutno prijavljeni.",
+    "recordTitle": "Vaša evidenca",
+    "credentials": "Aplikacije, v katere se prijavljate",
+    "credentialsNone": "Še ni poverilnic za prijavo",
+    "sharingHistory": "Zgodovina deljenja",
+    "seeAll": "Prikaži vse",
+    "inService": "{{resource}} v vaši storitvi {{service}}",
+    "stateRevoked": "To ste odstranili",
+    "stateEnded": "To se je končalo",
+    "stateChecking": "Preverjanje pri storitvi",
+    "stateConfirmed": "Storitev je pravkar potrdila",
+    "stateGone": "Storitev tega nima več",
+    "stateUnsupported": "Te storitve iz denarnice še ni mogoče vprašati. Upravljajte jo tam, kjer so podatki.",
+    "stateLocal": "S te naprave in nepotrjeno. Storitve ni bilo mogoče doseči, zato je to lahko zastarelo.",
+    "grantTitle": "Podrobnosti dostopa",
+    "grantGone": "Tega zapisa v tej napravi ni več.",
+    "grantedOn": "Odobreno {{when, dateLong}}",
+    "expiresOn": "Do {{when, dateLong}}",
+    "revokedOn": "Odstranjeno {{when, dateLong}}",
+    "credentialLabel": "Kaj ste jim dali",
+    "credentialGiven": "Vnesli ste: {{what}}",
+    "credentialGivenGeneric": "Ob odobritvi ste vnesli poverilnico.",
+    "credentialWider": "Taka poverilnica običajno dovoljuje več kot dostop, ki ste ga odobrili. Ozko jo drži to, da storitev teče v preverjeni enklavi in lahko počne le tisto, kar ste odobrili.",
+    "disconnect": "Prekini povezavo",
+    "disconnectTitle": "Prekinem povezavo z {{app}}?",
+    "disconnectBody": "{{app}} bo prenehala uporabljati {{resource}} in uničila svojo kopijo tega, kar ste vnesli. Sama poverilnica deluje naprej, dokler je ne odstranite tam, kjer ste jo ustvarili.",
+    "disconnectNote": "Prekinitev ustavi to storitev. Ne prekliče poverilnice pri ponudniku in ne prikliče nazaj ničesar, kar je že bilo prebrano.",
+    "remove": "Odstrani dostop",
+    "removeTitle": "Odstranim dostop za {{app}}?",
+    "removeBody": "{{app}} do tega ne bo več mogla.",
+    "removeNote": "Odstranitev dostopa ustavi vse nadaljnje. Ne prikliče nazaj tega, kar je že bilo prebrano.",
+    "revokeFailedTitle": "Nič ni bilo spremenjeno",
+    "revokeFailedBody": "Storitve ni bilo mogoče doseči, zato je dostop nespremenjen. Lahko poskusite znova."
+  },
   "credentials": {
     "title": "Registrirane poverilnice",
     "empty": "Registriranih poverilnic še ni",
@@ -559,7 +608,9 @@
     "revokeBody": "{{app}} bo morala vaše podatke vsakič znova zahtevati.",
     "boundToMeasurement": "Vezano na meritev: {{measurement}}…",
     "noReceipts": "Potrdil še ni",
-    "noReceiptsHint": "Potrdila o izračunih iz enklav se bodo prikazala tukaj po obdelavi podatkov."
+    "noReceiptsHint": "Potrdila o izračunih iz enklav se bodo prikazala tukaj po obdelavi podatkov.",
+    "valueNotRecorded": "Vrednost ni zabeležena",
+    "valueProofOnly": "Samo dokaz, vrednost ni bila poslana"
   },
   "home": {
     "noSessions": "Aktivnih sej še ni",
@@ -1000,7 +1051,7 @@
     "aboutWebsite": "Spletno mesto"
   },
   "tabs": {
-    "home": "Domov",
+    "access": "Dostop",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Nastavitve"

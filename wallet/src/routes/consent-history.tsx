@@ -392,9 +392,32 @@ function ConsentRecordCard({
                     {record.approvedAttributes.length > 0 && (
                         <>
                             <Text style={styles.detailLabel}>{t('history.labelShared')}</Text>
-                            {record.approvedAttributes.map((a) => (
-                                <Text key={a} style={styles.detailItem}>✓ {attributeLabel(a)}</Text>
-                            ))}
+                            {record.approvedAttributes.map((a) => {
+                                // The value AS SENT, not as the profile reads
+                                // now. Someone who has since changed their
+                                // email cannot answer "what did this app get"
+                                // from their profile, which is the whole reason
+                                // this is recorded at disclosure time.
+                                const d = record.disclosed?.find((x) => x.key === a);
+                                const note = d?.value
+                                    ? d.value
+                                    : d?.proofOnly
+                                        ? t('history.valueProofOnly')
+                                        : t('history.valueNotRecorded');
+                                return (
+                                    <RNView key={a} style={styles.sharedItem}>
+                                        <Text style={styles.detailItem}>✓ {attributeLabel(a)}</Text>
+                                        <Text
+                                            style={[
+                                                styles.detailValue,
+                                                !d?.value && styles.detailValueAbsent,
+                                            ]}
+                                        >
+                                            {note}
+                                        </Text>
+                                    </RNView>
+                                );
+                            })}
                         </>
                     )}
                     {record.deniedAttributes.length > 0 && (
@@ -663,6 +686,9 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         marginBottom: 4
     },
     detailItem: { fontSize: 13, color: p.textPrimary, marginBottom: 2 },
+    sharedItem: { marginBottom: 6 },
+    detailValue: { fontSize: 13, color: p.textSecondary, marginLeft: 14 },
+    detailValueAbsent: { fontStyle: 'italic', color: p.textMuted },
     detailMono: {
         fontSize: 11,
         fontFamily: 'Inter',

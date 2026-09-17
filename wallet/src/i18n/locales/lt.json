@@ -401,6 +401,55 @@
       "refusedNested": "Ši užklausa reikalauja daugiau paeiliui einančių patvirtinimų, nei įmanoma, todėl nieko nesuteikta."
     }
   },
+
+  "sessions": {
+    "title": "Aktyvūs seansai",
+    "empty": "Niekur neesate prisijungę."
+  },
+
+  "access": {
+    "summary": "Kas gali jus pasiekti ir kaip tai sustabdyti",
+    "accountsTitle": "Prijungtos paskyros",
+    "accountsHint": "Paslaugos, saugančios prisijungimo duomenis prie jūsų paskyros kitur.",
+    "accountsEmpty": "Neprijungėte jokių paskyrų.",
+    "dataTitle": "Prieiga prie jūsų duomenų",
+    "dataHint": "Programėlės, galinčios naudoti duomenis, kuriuos laikote Privasys.",
+    "dataEmpty": "Niekas neturi prieigos prie jūsų duomenų.",
+    "sessionsTitle": "Aktyvūs seansai",
+    "sessionsHint": "Programėlės, prie kurių šiuo metu esate prisijungę.",
+    "recordTitle": "Jūsų įrašai",
+    "credentials": "Programėlės, prie kurių jungiatės",
+    "credentialsNone": "Prisijungimo duomenų dar nėra",
+    "sharingHistory": "Dalijimosi istorija",
+    "seeAll": "Žiūrėti visus",
+    "inService": "{{resource}} jūsų paslaugoje {{service}}",
+    "stateRevoked": "Jūs tai pašalinote",
+    "stateEnded": "Tai pasibaigė",
+    "stateChecking": "Tikrinama paslaugoje",
+    "stateConfirmed": "Paslauga ką tik patvirtino",
+    "stateGone": "Paslauga to nebeturi",
+    "stateUnsupported": "Šios paslaugos dar negalima paklausti iš piniginės. Tvarkykite ją ten, kur yra duomenys.",
+    "stateLocal": "Iš šio įrenginio ir nepatvirtinta. Paslaugos nepavyko pasiekti, todėl tai gali būti pasenę.",
+    "grantTitle": "Prieigos informacija",
+    "grantGone": "Šio įrašo šiame įrenginyje nebėra.",
+    "grantedOn": "Suteikta {{when, dateLong}}",
+    "expiresOn": "Iki {{when, dateLong}}",
+    "revokedOn": "Pašalinta {{when, dateLong}}",
+    "credentialLabel": "Ką jiems davėte",
+    "credentialGiven": "Įvedėte: {{what}}",
+    "credentialGivenGeneric": "Patvirtindami tai įvedėte prisijungimo duomenis.",
+    "credentialWider": "Tokie duomenys paprastai leidžia daugiau nei jūsų suteikta prieiga. Siaurai juos laiko tai, kad paslauga veikia patvirtintame anklave ir gali daryti tik tai, ką patvirtinote.",
+    "disconnect": "Atjungti",
+    "disconnectTitle": "Atjungti {{app}}?",
+    "disconnectBody": "{{app}} nustos naudoti {{resource}} ir sunaikins savo kopiją to, ką įvedėte. Patys duomenys veiks toliau, kol jų nepašalinsite ten, kur juos sukūrėte.",
+    "disconnectNote": "Atjungimas sustabdo šią paslaugą. Jis nepanaikina duomenų pas tiekėją ir negrąžina nieko, kas jau perskaityta.",
+    "remove": "Pašalinti prieigą",
+    "removeTitle": "Pašalinti {{app}} prieigą?",
+    "removeBody": "{{app}} nebegalės to pasiekti.",
+    "removeNote": "Prieigos pašalinimas sustabdo viską toliau. Jis negrąžina to, kas jau perskaityta.",
+    "revokeFailedTitle": "Niekas nepakeista",
+    "revokeFailedBody": "Paslaugos nepavyko pasiekti, todėl prieiga nepakitusi. Galite bandyti dar kartą."
+  },
   "credentials": {
     "title": "Registruoti kredencialai",
     "empty": "Kol kas nėra registruotų kredencialų",
@@ -555,7 +604,9 @@
     "revokeBody": "{{app}} turės kaskart iš naujo prašyti jūsų duomenų.",
     "boundToMeasurement": "Susieta su matavimu: {{measurement}}…",
     "noReceipts": "Kvitų kol kas nėra",
-    "noReceiptsHint": "Anklavų skaičiavimo kvitai bus rodomi čia po duomenų apdorojimo."
+    "noReceiptsHint": "Anklavų skaičiavimo kvitai bus rodomi čia po duomenų apdorojimo.",
+    "valueNotRecorded": "Reikšmė neįrašyta",
+    "valueProofOnly": "Tik įrodymas, reikšmė nebuvo išsiųsta"
   },
   "home": {
     "noSessions": "Aktyvių sesijų dar nėra",
@@ -980,7 +1031,7 @@
     "aboutWebsite": "Svetainė"
   },
   "tabs": {
-    "home": "Pradžia",
+    "access": "Prieiga",
     "profile": "Profilis",
     "drive": "Drive",
     "settings": "Nustatymai"

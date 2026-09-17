@@ -368,6 +368,55 @@
       "refusedNested": "Diese Anfrage verlangt mehr aufeinanderfolgende Freigaben, als möglich sind, daher wurde nichts gewährt."
     }
   },
+
+  "sessions": {
+    "title": "Aktive Sitzungen",
+    "empty": "Sie sind nirgendwo angemeldet."
+  },
+
+  "access": {
+    "summary": "Was Sie erreichen kann, und wie Sie es beenden",
+    "accountsTitle": "Verbundene Konten",
+    "accountsHint": "Dienste, die Zugangsdaten für ein Konto von Ihnen anderswo aufbewahren.",
+    "accountsEmpty": "Sie haben keine Konten verbunden.",
+    "dataTitle": "Zugriff auf Ihre Daten",
+    "dataHint": "Apps, die Daten nutzen können, die Sie bei Privasys halten.",
+    "dataEmpty": "Nichts hat Zugriff auf Ihre Daten.",
+    "sessionsTitle": "Aktive Sitzungen",
+    "sessionsHint": "Apps, bei denen Sie gerade angemeldet sind.",
+    "recordTitle": "Ihre Aufzeichnung",
+    "credentials": "Apps, bei denen Sie sich anmelden",
+    "credentialsNone": "Noch keine Anmeldedaten",
+    "sharingHistory": "Freigabeverlauf",
+    "seeAll": "Alle anzeigen",
+    "inService": "{{resource}} in Ihrem {{service}}",
+    "stateRevoked": "Sie haben dies entfernt",
+    "stateEnded": "Dies ist beendet",
+    "stateChecking": "Wird beim Dienst geprüft",
+    "stateConfirmed": "Soeben vom Dienst bestätigt",
+    "stateGone": "Der Dienst hat dies nicht mehr",
+    "stateUnsupported": "Dieser Dienst kann noch nicht aus Ihrer Wallet befragt werden. Verwalten Sie ihn dort, wo die Daten liegen.",
+    "stateLocal": "Von diesem Gerät und nicht bestätigt. Der Dienst war nicht erreichbar, daher kann dies veraltet sein.",
+    "grantTitle": "Zugriffsdetails",
+    "grantGone": "Dieser Eintrag ist nicht mehr auf diesem Gerät.",
+    "grantedOn": "Erteilt am {{when, dateLong}}",
+    "expiresOn": "Bis {{when, dateLong}}",
+    "revokedOn": "Entfernt am {{when, dateLong}}",
+    "credentialLabel": "Was Sie ihnen gegeben haben",
+    "credentialGiven": "Sie haben eingegeben: {{what}}",
+    "credentialGivenGeneric": "Sie haben bei der Genehmigung Zugangsdaten eingegeben.",
+    "credentialWider": "Solche Zugangsdaten erlauben meist mehr als den Zugriff, den Sie erteilt haben. Eng gehalten werden sie dadurch, dass der Dienst in einer geprüften Enklave läuft und nur das tun kann, was Sie genehmigt haben.",
+    "disconnect": "Trennen",
+    "disconnectTitle": "{{app}} trennen?",
+    "disconnectBody": "{{app}} wird {{resource}} nicht mehr nutzen und seine Kopie Ihrer Eingaben vernichten. Die Zugangsdaten selbst funktionieren weiter, bis Sie sie dort entfernen, wo Sie sie erstellt haben.",
+    "disconnectNote": "Das Trennen stoppt diesen Dienst. Es hebt die Zugangsdaten beim Anbieter nicht auf und holt nichts zurück, was bereits gelesen wurde.",
+    "remove": "Zugriff entfernen",
+    "removeTitle": "Zugriff für {{app}} entfernen?",
+    "removeBody": "{{app}} wird dies nicht mehr erreichen können.",
+    "removeNote": "Das Entfernen stoppt alles Weitere. Es holt nicht zurück, was bereits gelesen wurde.",
+    "revokeFailedTitle": "Es wurde nichts geändert",
+    "revokeFailedBody": "Der Dienst war nicht erreichbar, der Zugriff ist daher unverändert. Sie können es erneut versuchen."
+  },
   "credentials": {
     "title": "Registrierte Anmeldeinformationen",
     "empty": "Noch keine Anmeldeinformationen registriert",
@@ -523,7 +572,9 @@
     "revokeBody": "{{app}} muss Ihre Daten dann jedes Mal erneut anfragen.",
     "boundToMeasurement": "An Messwert gebunden: {{measurement}}…",
     "noReceipts": "Noch keine Belege",
-    "noReceiptsHint": "Berechnungsbelege aus Enklaven erscheinen hier nach der Datenverarbeitung."
+    "noReceiptsHint": "Berechnungsbelege aus Enklaven erscheinen hier nach der Datenverarbeitung.",
+    "valueNotRecorded": "Wert nicht erfasst",
+    "valueProofOnly": "Nur ein Nachweis, der Wert wurde nicht gesendet"
   },
 
   "home": {
@@ -947,7 +998,7 @@
   },
 
   "tabs": {
-    "home": "Start",
+    "access": "Zugriff",
     "profile": "Profil",
     "drive": "Drive",
     "settings": "Einstellungen"

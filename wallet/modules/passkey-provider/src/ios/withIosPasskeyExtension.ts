@@ -40,10 +40,9 @@ export const withIosPasskeyExtension: ConfigPlugin = (config) => {
         // Shared keychain group for main app + extension credential access.
         //
         // MERGED, not assigned. This used to overwrite the key outright, which
-        // silently discarded anything app.config.ts declared — including the
-        // legacy 3V8YCKN438 groups added after the Apple account transfer to
-        // keep existing wallets readable. The config looked right, the built
-        // app was missing two entries, and nothing said so.
+        // silently discarded anything app.config.ts declared. The config looked
+        // right, the built app was missing entries, and nothing said so; the
+        // entitlement check in scripts/ exists because of that.
         //
         // Order is preserved because the FIRST entry is the default group for
         // new keychain items: whatever app.config.ts puts first stays first,

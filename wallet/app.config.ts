@@ -36,60 +36,31 @@ process.env.EXPO_PUBLIC_SENTRY_DSN ??= process.env.SENTRY_DSN;
 process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KEY;
 
 /**
- * The App ID prefix this app carried before it moved from the Secretarium Apple
- * account to Privasys Ltd (2026-09-04).
+ * Keychain access groups, named here rather than inferred.
  *
- * A transfer was supposed to preserve it. It did not: the new prefix is
- * HLW68Z8TMZ, and Apple said so on the first delivery from the new account with
- * ITMS-90076 against all three targets, "This will result in a loss of keychain
- * access".
+ * Keychain items are addressed by `<prefix>.<group>`, where the prefix is the
+ * signing team. When the app moved from the Secretarium Apple account to
+ * Privasys Ltd (2026-09-04) that prefix changed from 3V8YCKN438 to HLW68Z8TMZ,
+ * and everything an installed wallet held went out of reach with it: the
+ * profile, credentials, the auth store, the sovereign root, KYC records, and
+ * the Secure Enclave keys, which are keychain items like any other.
  *
- * That loss is not a preference or two. Keychain items are addressed by
- * `<prefix>.<group>`, so everything an installed wallet holds sits under the old
- * prefix: the profile, credentials, the auth store, the sovereign root, KYC
- * records, AND the Secure Enclave keys, which are keychain items like any other.
- * A build that cannot reach them opens as a brand-new wallet on a phone that has
- * one, and the device signing key and every FIDO2 credential are gone with it.
+ * Nothing brings that back, and it is not worth trying again. Declaring the old
+ * groups alongside the new ones was tried in 1.3.95 and failed at codesign,
+ * because Apple will not issue a profile carrying a prefix the signing team no
+ * longer owns. Apple Developer Support confirmed on 2026-09-17 that a transfer
+ * converts the prefix and the first update after it loses the previous keychain
+ * data, and that the old prefix is not re-enabled on request. Accepted as a
+ * release decision the same day.
  *
- * So both prefixes are declared. Reads without an explicit group search every
- * entitled group, which is what lets an updated app find what the old one wrote;
- * the CURRENT prefix is listed FIRST because the first entry is the default for
- * new writes, and new data belongs under the new identity.
- *
- * ANSWERED, and the answer is no. Build 1.3.95 failed at codesign with
- * "Provisioning profile ... doesn't match the entitlements file's value for the
- * keychain-access-groups entitlement": Apple will not issue a profile carrying a
- * prefix the signing team no longer owns, so declaring the legacy groups makes
- * the app unbuildable rather than compatible.
- *
- * The entries are therefore OFF by default and gated behind an environment
- * variable. The remaining route is Apple Developer Support adding the previous
- * prefix to the org.privasys.wallet App ID; the moment they do, profiles can
- * carry it, and this becomes a one-line flip plus a rebuild rather than a
- * rediscovery of everything above.
- *
- * Until then every update loses the keychain, which is recoverable only through
- * the 24-word phrase and only for holders who kept one. That is a release
- * decision, not a build setting.
+ * What is still load-bearing is that the groups are written out at all. The
+ * main target used to declare none and rely on the implicit
+ * `<prefix>.<bundle id>`, which is exactly the string a transfer changes, so
+ * what the app and its extensions share is stated rather than assumed.
  */
-const LEGACY_APP_ID_PREFIX = '3V8YCKN438.';
-
-/**
- * Set WALLET_LEGACY_KEYCHAIN=1 once Apple has enabled the previous prefix on the
- * App ID. Enabling it before that fails the build at codesign, which is at
- * least loud; leaving it off ships an app that cannot see an existing wallet,
- * which is not.
- */
-const LEGACY_KEYCHAIN_ENABLED = process.env.WALLET_LEGACY_KEYCHAIN === '1';
-
-const legacyGroup = (name: string) =>
-    LEGACY_KEYCHAIN_ENABLED ? [`${LEGACY_APP_ID_PREFIX}${name}`] : [];
 
 /** Groups shared between the app and its extensions. */
-const SHARED_KEYCHAIN_GROUPS = [
-    '$(AppIdentifierPrefix)org.privasys.shared',
-    ...legacyGroup('org.privasys.shared'),
-];
+const SHARED_KEYCHAIN_GROUPS = ['$(AppIdentifierPrefix)org.privasys.shared'];
 
 const envConfig = {
     development: {
@@ -201,13 +172,11 @@ export default (context: ConfigContext): ExpoConfig => {
             entitlements: {
                 'com.apple.developer.nfc.readersession.formats': ['TAG'],
                 // This target declared none before, relying on the implicit
-                // default group `<prefix>.<bundle id>` — the exact string the
-                // transfer changed. Naming both prefixes explicitly is what
-                // keeps an existing wallet readable after the update.
+                // default group `<prefix>.<bundle id>`. The first entry is the
+                // default for new writes, so the app's own group leads.
                 'keychain-access-groups': [
                     '$(AppIdentifierPrefix)org.privasys.wallet',
                     ...SHARED_KEYCHAIN_GROUPS,
-                    ...legacyGroup('org.privasys.wallet'),
                 ]
             }
         },

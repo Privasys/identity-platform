@@ -28,27 +28,15 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 
-// The legacy groups are gated: Apple refuses to sign a profile carrying a
-// prefix the team no longer owns, so they are only declared once Apple has
-// added the previous prefix to the App ID. This check follows the same flag, so
-// it verifies whichever shape the build is actually meant to produce.
-const LEGACY = process.env.WALLET_LEGACY_KEYCHAIN === '1';
-
 /** Groups the main app must carry, and why each one is load-bearing. */
 const REQUIRED_MAIN = [
     // Where this build reads and writes.
     '$(AppIdentifierPrefix)org.privasys.wallet',
     '$(AppIdentifierPrefix)org.privasys.shared',
-    // Where every build before the Apple transfer wrote. Without these an
-    // updated app cannot see an existing wallet.
-    ...(LEGACY ? ['3V8YCKN438.org.privasys.wallet', '3V8YCKN438.org.privasys.shared'] : []),
 ];
 
 /** Both extensions share only the notification-key group. */
-const REQUIRED_EXTENSION = [
-    '$(AppIdentifierPrefix)org.privasys.shared',
-    ...(LEGACY ? ['3V8YCKN438.org.privasys.shared'] : []),
-];
+const REQUIRED_EXTENSION = ['$(AppIdentifierPrefix)org.privasys.shared'];
 
 function resolvedConfig() {
     // The CLI is invoked through node rather than npx: Windows refuses to

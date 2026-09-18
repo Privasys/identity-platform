@@ -200,6 +200,17 @@ func migrate(db *sql.DB) error {
 			blob       TEXT NOT NULL,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
+
+		-- Grants index: where the holder has standing capabilities, so a
+		-- recovered wallet knows which services to ask. Encrypted client-side
+		-- under a key derived from the sovereign data root, so it can be
+		-- written at approval time (the root is on the phone then, the
+		-- recovery phrase is not). Opaque base64url ciphertext to the IdP.
+		CREATE TABLE IF NOT EXISTS grants_indexes (
+			user_id    TEXT PRIMARY KEY REFERENCES users(user_id),
+			blob       TEXT NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
 	`)
 	if err != nil {
 		return err
@@ -658,6 +669,33 @@ func (db *DB) GetSovereignBackup(userID string) (string, error) {
 	var blob string
 	err := db.QueryRow(
 		"SELECT blob FROM sovereign_backups WHERE user_id = ?", userID,
+	).Scan(&blob)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return blob, err
+}
+
+// --- Grants index operations ---
+
+// PutGrantsIndex stores (or replaces) a user's encrypted grants index.
+func (db *DB) PutGrantsIndex(userID, blob string) error {
+	_, err := db.Exec(`
+		INSERT INTO grants_indexes (user_id, blob, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(user_id) DO UPDATE SET
+			blob = excluded.blob, updated_at = CURRENT_TIMESTAMP`,
+		userID, blob,
+	)
+	return err
+}
+
+// GetGrantsIndex returns a user's encrypted grants index, or "" when none
+// is stored.
+func (db *DB) GetGrantsIndex(userID string) (string, error) {
+	var blob string
+	err := db.QueryRow(
+		"SELECT blob FROM grants_indexes WHERE user_id = ?", userID,
 	).Scan(&blob)
 	if err == sql.ErrNoRows {
 		return "", nil

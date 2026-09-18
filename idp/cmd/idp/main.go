@@ -429,6 +429,10 @@ func main() {
 	// secrets, wrapped under recovery-phrase-derived material.
 	mux.HandleFunc("PUT /recovery/backup", recoveryHandler.HandlePutBackup)
 	mux.HandleFunc("GET /recovery/backup", recoveryHandler.HandleGetBackup)
+	// Where the holder's standing capabilities are, encrypted under a key the
+	// wallet derives from its data root. See internal/recovery/grants_index.go.
+	mux.HandleFunc("PUT /recovery/grants-index", recoveryHandler.HandlePutGrantsIndex)
+	mux.HandleFunc("GET /recovery/grants-index", recoveryHandler.HandleGetGrantsIndex)
 	mux.HandleFunc("POST /recovery/begin", recoveryHandler.HandleBeginRecovery)
 	mux.HandleFunc("GET /recovery/status", recoveryHandler.HandleRecoveryStatus)
 	mux.HandleFunc("POST /recovery/complete", recoveryHandler.HandleCompleteRecovery)

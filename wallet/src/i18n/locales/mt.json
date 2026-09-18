@@ -789,6 +789,8 @@
     "method": "Metodu"
   },
   "profile": {
+    "identities": "L-identifikaturi tiegħek",
+    "identitiesHint": "Il-kont Privasys tiegħek u l-identifikaturi wara din il-kartiera",
     "defaultDisplayName": "Utent ta' Privasys",
     "setupTitle": "Issettja l-kartiera tiegħek",
     "setupLede": "Jieħu ftit sekondi, u kollox jinħoloq hawn fuq it-telefon tiegħek. M'hemm l-ebda kont u l-ebda password.",

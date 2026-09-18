@@ -753,6 +753,8 @@
     "method": "Meetod"
   },
   "profile": {
+    "identities": "Teie identifikaatorid",
+    "identitiesHint": "Teie Privasyse konto ja selle rahakoti taga olevad identifikaatorid",
     "defaultDisplayName": "Privasyse kasutaja",
     "setupTitle": "Seadistage oma rahakott",
     "setupLede": "See võtab paar sekundit ja kõik luuakse siin, teie telefonis. Kontot ega parooli pole.",

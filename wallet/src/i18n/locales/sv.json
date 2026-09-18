@@ -732,6 +732,8 @@
   },
 
   "profile": {
+    "identities": "Dina identifierare",
+    "identitiesHint": "Ditt Privasys-konto och identifierarna bakom den här plånboken",
     "defaultDisplayName": "Privasys-användare",
     "setupTitle": "Ställ in din plånbok",
     "setupLede": "Det tar några sekunder, och allt skapas här på din telefon. Det finns inget konto och inget lösenord.",

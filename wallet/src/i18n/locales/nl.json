@@ -732,6 +732,8 @@
   },
 
   "profile": {
+    "identities": "Je identificatoren",
+    "identitiesHint": "Je Privasys-account en de identificatoren achter deze wallet",
     "defaultDisplayName": "Privasys-gebruiker",
     "setupTitle": "Stel je wallet in",
     "setupLede": "Het duurt een paar seconden, en alles wordt hier op je telefoon aangemaakt. Er is geen account en geen wachtwoord.",

@@ -744,6 +744,8 @@
   },
 
   "profile": {
+    "identities": "Tus identificadores",
+    "identitiesHint": "Tu cuenta de Privasys y los identificadores de esta cartera",
     "defaultDisplayName": "Usuario de Privasys",
     "setupTitle": "Configura tu monedero",
     "setupLede": "Tarda unos segundos, y todo se crea aquí, en tu teléfono. No hay cuenta ni contraseña.",

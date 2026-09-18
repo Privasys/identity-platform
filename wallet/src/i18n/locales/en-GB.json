@@ -753,6 +753,8 @@
     "method": "Method"
   },
   "profile": {
+    "identities": "Your identifiers",
+    "identitiesHint": "Your Privasys account and the IDs behind this wallet",
     "defaultDisplayName": "Privasys User",
     "setupTitle": "Set up your wallet",
     "setupLede": "It takes a few seconds, and everything is created here on your phone. There is no account and no password.",

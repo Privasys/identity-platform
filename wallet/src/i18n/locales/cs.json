@@ -744,6 +744,8 @@
   },
 
   "profile": {
+    "identities": "Vaše identifikátory",
+    "identitiesHint": "Váš účet Privasys a identifikátory za touto peněženkou",
     "defaultDisplayName": "Uživatel Privasys",
     "setupTitle": "Nastavte si peněženku",
     "setupLede": "Zabere to pár sekund a vše vzniká tady, ve vašem telefonu. Není zde žádný účet ani heslo.",

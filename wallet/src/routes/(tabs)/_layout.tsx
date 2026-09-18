@@ -40,28 +40,29 @@ export default function TabLayout() {
                 }
             }}
         >
-            {/* Access leads. The deliberate reasons to open this app are
-                scanning a code and checking or ending what an app can do, and
-                both live here; identity is one tap away. The badge carries
-                anything waiting on a decision, so a pending approval is visible
-                from whichever tab the holder happens to be on. */}
+            {/* Profile leads and is the landing tab: it is `index`, which is
+                what the launch URL and every router.replace('/(tabs)') resolve
+                to. An initialRouteName would reorder the bar but not change
+                where the app opens. */}
             <Tabs.Screen
                 name="index"
+                options={{
+                    title: t('tabs.profile'),
+                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+                        <Ionicons name="person-circle" size={size} color={color} />
+                    )
+                }}
+            />
+            {/* The badge carries anything waiting on a decision, so a pending
+                approval is visible from whichever tab the holder is on. */}
+            <Tabs.Screen
+                name="access"
                 options={{
                     title: t('tabs.access'),
                     tabBarBadge: pending > 0 ? pending : undefined,
                     tabBarBadgeStyle: { backgroundColor: p.danger },
                     tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                         <Ionicons name="key" size={size} color={color} />
-                    )
-                }}
-            />
-            <Tabs.Screen
-                name="profile"
-                options={{
-                    title: t('tabs.profile'),
-                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-                        <Ionicons name="person-circle" size={size} color={color} />
                     )
                 }}
             />

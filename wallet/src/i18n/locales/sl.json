@@ -777,6 +777,8 @@
     "method": "Metoda"
   },
   "profile": {
+    "identities": "Vaši identifikatorji",
+    "identitiesHint": "Vaš račun Privasys in identifikatorji za to denarnico",
     "defaultDisplayName": "Uporabnik Privasys",
     "setupTitle": "Nastavite svojo denarnico",
     "setupLede": "Traja nekaj sekund, vse pa se ustvari tukaj, na vašem telefonu. Ni računa in ni gesla.",

@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ExternalLink } from '@/components/ExternalLink';
 import { LanguagePicker } from '@/components/LanguagePicker';
+import { sectionTitleStyle } from '@/components/section-title';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
@@ -196,13 +197,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     scroll: { flex: 1 },
     content: { padding: 20, paddingTop: 16, paddingBottom: 40 },
-    sectionTitle: {
-        fontSize: 17,
-        fontWeight: '600',
-        color: p.textPrimary,
-        marginTop: 24,
-        marginBottom: 6
-    },
+    sectionTitle: { ...sectionTitleStyle(p), marginTop: 24, marginBottom: 6 },
     sectionDescription: {
         fontSize: 14,
         color: p.textSecondary,

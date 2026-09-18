@@ -765,6 +765,8 @@
     "method": "Metodă"
   },
   "profile": {
+    "identities": "Identificatorii tăi",
+    "identitiesHint": "Contul tău Privasys și identificatorii din spatele acestui portofel",
     "defaultDisplayName": "Utilizator Privasys",
     "setupTitle": "Configurează-ți portofelul",
     "setupLede": "Durează câteva secunde, iar totul se creează aici, pe telefonul tău. Nu există niciun cont și nicio parolă.",

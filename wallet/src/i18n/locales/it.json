@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Lavora per te mentre sei via: conserva una copia chiusa di quella chiave per poter continuare senza il tuo telefono, finché non lo revochi.",
+    "untilRevoked": "Finché non lo revochi",
     "title": "Richiesta di accesso",
     "heading": "Concedere l'accesso?",
     "verifying": "Verifica di chi sta chiedendo",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} verificato in un enclave sicuro",
     "resourceLine": "{{permissions}} {{resource}} nel tuo {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} la posta in {{resource}}, tramite {{service}}",
       "meeting.transcripts": "{{permissions}} le trascrizioni delle tue riunioni in {{resource}}",
       "meeting.recording": "Attivare registrazione e trascrizione per le riunioni che organizzi in {{resource}}"
@@ -329,6 +332,7 @@
       "delete": "Eliminare"
     },
     "explain": {
+      "app_storage": "{{app}} conserva questi file nel proprio spazio di archiviazione, chiusi con una chiave che tiene il tuo telefono. Può leggerli solo finché lo permetti.",
       "storage": {
         "folder": "I tuoi file saranno salvati nel tuo spazio di archiviazione, sotto le tue chiavi. Senza questo restano nell'enclave solo per questa sessione e vanno persi al riavvio."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "Ci sono ancora file aperti in questa app, quindi non è cambiato nulla. Riprova tra un momento.",
     "summary": "Che cosa può raggiungerti e come fermarlo",
     "accountsTitle": "Account collegati",
     "accountsHint": "Servizi che conservano una credenziale per un tuo account altrove.",

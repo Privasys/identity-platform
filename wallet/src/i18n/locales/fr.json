@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Il travaille pour vous pendant votre absence : il garde une copie verrouillée de cette clé pour continuer sans votre téléphone, jusqu'à ce que vous révoquiez l'accès.",
+    "untilRevoked": "Jusqu'à ce que vous le révoquiez",
     "title": "Demande d'accès",
     "heading": "Accorder l'accès ?",
     "verifying": "Vérification de l'auteur de la demande",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} vérifié dans une enclave sécurisée",
     "resourceLine": "{{permissions}} {{resource}} dans votre {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} le courrier de {{resource}}, via {{service}}",
       "meeting.transcripts": "{{permissions}} les transcriptions de vos réunions dans {{resource}}",
       "meeting.recording": "Activer l'enregistrement et la transcription des réunions que vous organisez dans {{resource}}"
@@ -329,6 +332,7 @@
       "delete": "Supprimer"
     },
     "explain": {
+      "app_storage": "{{app}} conserve ces fichiers dans son propre stockage, verrouillés par une clé que détient votre téléphone. Il ne peut les lire que tant que vous l'autorisez.",
       "storage": {
         "folder": "Vos fichiers seront enregistrés dans votre propre espace de stockage, sous vos clés. Sans cela, ils restent dans l'enclave le temps de cette session seulement et sont perdus au redémarrage."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "Des fichiers sont encore ouverts dans cette application, rien n'a donc été modifié. Réessayez dans un instant.",
     "summary": "Ce qui peut vous atteindre, et comment l'arrêter",
     "accountsTitle": "Comptes connectés",
     "accountsHint": "Services qui détiennent un identifiant pour un compte que vous avez ailleurs.",

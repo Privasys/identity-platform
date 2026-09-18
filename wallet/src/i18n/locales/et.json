@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "See töötab teie heaks ka siis, kui te eemal olete: hoiab sellest võtmest lukustatud koopiat, et jätkata ilma teie telefonita, kuni te selle tühistate.",
+    "untilRevoked": "Kuni te selle tühistate",
     "title": "Juurdepääsu taotlus",
     "heading": "Kas anda juurdepääs?",
     "verifying": "Kontrollitakse, kes küsib",
@@ -351,6 +353,7 @@
     "resourceAttested": "{{service}} kontrollitud turvalises enklaavis",
     "resourceLine": "{{permissions}} {{resource}} teie {{service}} sees",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} posti kontol {{resource}} teenuse {{service}} kaudu",
       "meeting.transcripts": "{{permissions}} teie koosolekute üleskirjutusi kontol {{resource}}",
       "meeting.recording": "Lülitada sisse salvestus ja üleskirjutus koosolekutel, mida korraldate kontol {{resource}}"
@@ -362,6 +365,7 @@
       "delete": "Kustutada"
     },
     "explain": {
+      "app_storage": "{{app}} hoiab neid faile oma salvestusruumis, lukustatuna võtmega, mis on teie telefonis. See saab neid lugeda ainult siis, kui te seda lubate.",
       "storage": {
         "folder": "Teie failid salvestatakse teie enda hoidlasse, teie võtmete all. Ilma selleta jäävad need enklaavi ainult selleks seansiks ja kaovad taaskäivitusel."
       },
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "Selles rakenduses on failid veel avatud, seega ei muudetud midagi. Proovige hetke pärast uuesti.",
     "summary": "Mis teieni pääseb ja kuidas see peatada",
     "accountsTitle": "Ühendatud kontod",
     "accountsHint": "Teenused, mis hoiavad mandaati teie mujal asuvale kontole.",

@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Trabalha por si enquanto está ausente: guarda uma cópia trancada dessa chave para poder continuar sem o seu telemóvel, até revogar o acesso.",
+    "untilRevoked": "Até o revogar",
     "title": "Pedido de acesso",
     "heading": "Conceder acesso?",
     "verifying": "A verificar quem está a pedir",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} verificado num enclave seguro",
     "resourceLine": "{{permissions}} {{resource}} no seu {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} o correio em {{resource}}, através de {{service}}",
       "meeting.transcripts": "{{permissions}} as transcrições das suas reuniões em {{resource}}",
       "meeting.recording": "Ligar a gravação e a transcrição das reuniões que organiza em {{resource}}"
@@ -329,6 +332,7 @@
       "delete": "Eliminar"
     },
     "explain": {
+      "app_storage": "{{app}} guarda estes ficheiros no seu próprio armazenamento, trancados com uma chave que o seu telemóvel detém. Só os pode ler enquanto o permitir.",
       "storage": {
         "folder": "Os seus ficheiros serão guardados no seu próprio armazenamento, sob as suas chaves. Sem isto, ficam no enclave apenas durante esta sessão e perdem-se quando reiniciar."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "Ainda há ficheiros abertos nesta aplicação, por isso nada foi alterado. Tente novamente dentro de momentos.",
     "summary": "O que o pode alcançar, e como pará-lo",
     "accountsTitle": "Contas ligadas",
     "accountsHint": "Serviços que guardam uma credencial para uma conta sua noutro sítio.",

@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "Ji dirba jums, kol esate išvykę: laiko užrakintą to rakto kopiją, kad galėtų tęsti be jūsų telefono, kol neatšauksite.",
+    "untilRevoked": "Kol neatšauksite",
     "title": "Prieigos užklausa",
     "heading": "Suteikti prieigą?",
     "verifying": "Tikrinama, kas prašo",
@@ -351,6 +353,7 @@
     "resourceAttested": "{{service}} patikrinta saugiame anklave",
     "resourceLine": "{{permissions}} {{resource}} jūsų {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} paštą {{resource}} per {{service}}",
       "meeting.transcripts": "{{permissions}} jūsų susitikimų transkripcijas {{resource}}",
       "meeting.recording": "Įjungti įrašymą ir transkripciją susitikimuose, kuriuos rengiate {{resource}}"
@@ -362,6 +365,7 @@
       "delete": "Ištrinti"
     },
     "explain": {
+      "app_storage": "{{app}} laiko šiuos failus savo saugykloje, užrakintus raktu, kurį turi jūsų telefonas. Skaityti juos ji gali tik tol, kol leidžiate.",
       "storage": {
         "folder": "Jūsų failai bus išsaugoti jūsų pačių saugykloje, po jūsų raktais. Be to jie lieka anklave tik šiai sesijai ir prarandami po perkrovimo."
       },
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "Šioje programėlėje dar yra atidarytų failų, todėl niekas nepakeista. Pabandykite po akimirkos.",
     "summary": "Kas gali jus pasiekti ir kaip tai sustabdyti",
     "accountsTitle": "Prijungtos paskyros",
     "accountsHint": "Paslaugos, saugančios prisijungimo duomenis prie jūsų paskyros kitur.",

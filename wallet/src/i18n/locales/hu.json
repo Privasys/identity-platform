@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Az Ön távollétében is dolgozik: megőrzi a kulcs egy lezárt másolatát, hogy telefon nélkül is folytathassa, amíg vissza nem vonja.",
+    "untilRevoked": "Amíg vissza nem vonja",
     "title": "Hozzáférési kérés",
     "heading": "Megadja a hozzáférést?",
     "verifying": "Ellenőrzés, hogy ki kéri",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} ellenőrizve egy biztonságos enklávéban",
     "resourceLine": "{{permissions}} {{resource}} az Ön {{service}} szolgáltatásában",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} a leveleket itt: {{resource}}, a(z) {{service}} szolgáltatáson keresztül",
       "meeting.transcripts": "{{permissions}} a megbeszélései átiratait itt: {{resource}}",
       "meeting.recording": "Rögzítés és átiratkészítés bekapcsolása az Ön által szervezett megbeszélésekhez itt: {{resource}}"
@@ -329,6 +332,7 @@
       "delete": "Törlés"
     },
     "explain": {
+      "app_storage": "A(z) {{app}} a saját tárhelyén őrzi ezeket a fájlokat, egy olyan kulccsal lezárva, amely a telefonján van. Csak addig olvashatja őket, amíg Ön engedi.",
       "storage": {
         "folder": "A fájljai a saját tárhelyén, az Ön kulcsai alatt lesznek elmentve. Enélkül csak ehhez a munkamenethez maradnak az enklávéban, és újraindításkor elvesznek."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "Ebben az alkalmazásban még nyitva vannak fájlok, ezért semmi sem változott. Próbálja újra egy pillanat múlva.",
     "summary": "Mi érheti el Önt, és hogyan állítható le",
     "accountsTitle": "Csatlakoztatott fiókok",
     "accountsHint": "Szolgáltatások, amelyek egy máshol lévő fiókjához tartozó hitelesítő adatot tárolnak.",

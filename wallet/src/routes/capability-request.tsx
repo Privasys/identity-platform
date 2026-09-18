@@ -62,6 +62,7 @@ import {
     type SetupRequirement,
 } from '@/services/capability-setup';
 import { rearmTenantKeyAt } from '@/services/drive';
+import { holderFolderKeyB64 } from '@/services/holder-folder';
 import { appIdFromOids } from '@/services/release-provenance';
 import { useCapabilitiesStore } from '@/stores/capabilities';
 import { useConsentStore } from '@/stores/consent';
@@ -160,23 +161,41 @@ export default function CapabilityRequestScreen() {
                     return refuse(t('capability.setup.refusedNested'));
                 }
 
-                // Resolve the resource service by IDENTITY, never from a URL in
-                // the request: otherwise the wallet would post a
-                // user-authenticated call wherever it was told.
-                const resolved = await resolveApp(req.resource_app, appHost);
-                if (!resolved?.hostname) return refuse(t('capability.refusedResource'));
-                if (!isAttestableHost(resolved.hostname)) {
-                    return refuse(t('capability.refusedResource'));
-                }
+                const requester = await resolveApp(appId, appHost);
 
-                // And check the host that answered IS the app we resolved.
-                const resourceAtt = await inspectAttestation(resolved.hostname);
-                if (!attestationMatchesResolution(resourceAtt, resolved)) {
-                    return refuse(t('capability.refusedResource'));
+                let resolved: ResolvedApp | null;
+                if (req.service_url) {
+                    // The resource service IS the asking app: it names its own
+                    // storage, on the host just attested (fetchPendingCapability
+                    // refuses any other host). Nothing more to resolve or
+                    // attest; the mint goes back to that host over RA-TLS,
+                    // which attests it again.
+                    resolved = {
+                        app_id: appId,
+                        name: requester?.name ?? '',
+                        display_name: requester?.display_name ?? '',
+                        hostname: appHost,
+                        image_digest: requester?.image_digest ?? '',
+                        is_enclave: true,
+                    };
+                } else {
+                    // Resolve the resource service by IDENTITY, never from a URL
+                    // in the request: otherwise the wallet would post a
+                    // user-authenticated call wherever it was told.
+                    resolved = await resolveApp(req.resource_app, appHost);
+                    if (!resolved?.hostname) return refuse(t('capability.refusedResource'));
+                    if (!isAttestableHost(resolved.hostname)) {
+                        return refuse(t('capability.refusedResource'));
+                    }
+
+                    // And check the host that answered IS the app we resolved.
+                    const resourceAtt = await inspectAttestation(resolved.hostname);
+                    if (!attestationMatchesResolution(resourceAtt, resolved)) {
+                        return refuse(t('capability.refusedResource'));
+                    }
                 }
 
                 if (cancelled) return;
-                const requester = await resolveApp(appId, appHost);
                 setRequesterAppId(appId);
                 setRequesterName(requester?.display_name || requester?.name || '');
                 setPending(req);
@@ -339,13 +358,28 @@ export default function CapabilityRequestScreen() {
 
         try {
             const expiresUnix = expiryFor(pending.capability.kind);
+
+            // A holder folder is opened with a key the WALLET supplies, derived
+            // for the app it attested (never an id from the request, or one app
+            // could ask for another's folder). Added only to what is sent, not
+            // to `payload`: that is kept in state for a follow-up question, and
+            // the key has no reason to sit there. Never logged.
+            const mintSetup =
+                pending.capability.kind === 'app_storage'
+                    ? {
+                        ...payload,
+                        key_b64: await holderFolderKeyB64(requesterAppId),
+                        unattended: pending.capability.options.unattended === true,
+                    }
+                    : payload;
+
             const mint = () =>
                 createCapability({
                     resourceHost: resource.hostname,
                     subjectAppId: requesterAppId,
                     pending,
                     expiresUnix,
-                    setup: payload,
+                    setup: mintSetup,
                 });
             let outcome;
             try {
@@ -410,6 +444,11 @@ export default function CapabilityRequestScreen() {
                 // service and are gone from here the moment this screen closes.
                 setupProvided: secretsGiven.length > 0,
                 secretLabels: secretsGiven.length > 0 ? secretsGiven : undefined,
+                // Where to list and revoke it later: exactly where it was
+                // minted. Resolving `resource_app` again would find the app,
+                // not its storage.
+                serviceUrl: pending.service_url,
+                unattended: pending.capability.options.unattended === true || undefined,
             });
 
             if (chained) {
@@ -563,12 +602,28 @@ export default function CapabilityRequestScreen() {
                             </Text>
                         </RNView>
 
-                        <Text style={styles.body}>{t(`capability.explain.${pending.capability.kind}`)}</Text>
+                        <Text style={styles.body}>
+                            {t(`capability.explain.${pending.capability.kind}`, {
+                                app: requesterName || t('capability.unnamedApp'),
+                            })}
+                        </Text>
+                        {/* Said in its own sentence, not folded into the one
+                            above: an app that keeps a copy of the key and works
+                            without the phone is a different thing to agree to,
+                            and the holder should see that it is. */}
+                        {pending.capability.kind === 'app_storage' &&
+                            pending.capability.options.unattended && (
+                            <Text style={styles.body}>{t('capability.appStorageUnattended')}</Text>
+                        )}
 
                         <RNView style={styles.card}>
                             <Text style={styles.label}>{t('capability.howLongLabel')}</Text>
                             <Text style={styles.value}>
-                                {new Date(expiryFor(pending.capability.kind) * 1000).toLocaleDateString()}
+                                {/* 0 means it stands until revoked. Rendered as a
+                                    date it would read 1 January 1970. */}
+                                {expiryFor(pending.capability.kind) === 0
+                                    ? t('capability.untilRevoked')
+                                    : new Date(expiryFor(pending.capability.kind) * 1000).toLocaleDateString()}
                             </Text>
                             {/* Name the service that holds the data, which is
                                 where the revoke button lives. Saying "the service

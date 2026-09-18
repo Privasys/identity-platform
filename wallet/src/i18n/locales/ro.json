@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "Lucrează pentru tine cât timp lipsești: păstrează o copie încuiată a acelei chei ca să poată continua fără telefonul tău, până când revoci accesul.",
+    "untilRevoked": "Până când revoci",
     "title": "Cerere de acces",
     "heading": "Acorzi accesul?",
     "verifying": "Se verifică cine cere",
@@ -351,6 +353,7 @@
     "resourceAttested": "{{service}} verificat într-o enclavă securizată",
     "resourceLine": "{{permissions}} {{resource}} în {{service}} tău",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} corespondența din {{resource}}, prin {{service}}",
       "meeting.transcripts": "{{permissions}} transcrierile ședințelor tale din {{resource}}",
       "meeting.recording": "Activarea înregistrării și transcrierii pentru ședințele pe care le organizezi în {{resource}}"
@@ -362,6 +365,7 @@
       "delete": "Ștergere"
     },
     "explain": {
+      "app_storage": "{{app}} păstrează aceste fișiere în propriul spațiu de stocare, încuiate cu o cheie pe care o are telefonul tău. Le poate citi doar cât timp îi permiți.",
       "storage": {
         "folder": "Fișierele tale vor fi salvate în propriul tău spațiu de stocare, sub cheile tale. Fără asta rămân în enclavă doar pentru această sesiune și se pierd la repornire."
       },
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "În această aplicație sunt încă fișiere deschise, așa că nimic nu a fost modificat. Încearcă din nou peste câteva momente.",
     "summary": "Ce poate ajunge la tine și cum să oprești",
     "accountsTitle": "Conturi conectate",
     "accountsHint": "Servicii care păstrează o credențială pentru un cont de-al tău din altă parte.",

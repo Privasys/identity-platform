@@ -14,6 +14,11 @@
  * W is released ONLY to an app whose enclave attestation verified
  * (status === 'verified'); there is deliberately no override path.
  *
+ * R also derives the key to every holder folder (services/holder-folder.ts).
+ * Those folders hold the holder's files in an app's own storage, and a lost
+ * key is a folder nobody can open, so losing or replacing R without restoring
+ * it from the backup now costs files as well as per-app keys.
+ *
  * Backup: R (and the pairwise seed, whose promised backup this file is
  * the first real implementation of) are wrapped under material derived
  * from the 24-word recovery phrase and stored IdP-side as one opaque

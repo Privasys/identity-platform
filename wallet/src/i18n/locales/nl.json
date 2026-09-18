@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Het werkt voor je terwijl je weg bent: het houdt een afgesloten kopie van die sleutel zodat het zonder je telefoon verder kan, totdat je het intrekt.",
+    "untilRevoked": "Totdat je het intrekt",
     "title": "Toegangsverzoek",
     "heading": "Toegang verlenen?",
     "verifying": "Controleren wie het vraagt",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} geverifieerd in een beveiligde enclave",
     "resourceLine": "{{permissions}} {{resource}} in je {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} de post in {{resource}}, via {{service}}",
       "meeting.transcripts": "{{permissions}} de transcripties van je vergaderingen in {{resource}}",
       "meeting.recording": "Opname en transcriptie inschakelen voor vergaderingen die je organiseert in {{resource}}"
@@ -329,6 +332,7 @@
       "delete": "Verwijderen"
     },
     "explain": {
+      "app_storage": "{{app}} bewaart deze bestanden in zijn eigen opslag, afgesloten met een sleutel die je telefoon heeft. Het kan ze alleen lezen zolang jij dat toestaat.",
       "storage": {
         "folder": "Je bestanden worden opgeslagen in je eigen opslag, onder jouw sleutels. Zonder dit blijven ze alleen voor deze sessie in de enclave en gaan ze verloren bij een herstart."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "Er zijn nog bestanden open in deze app, dus er is niets gewijzigd. Probeer het zo meteen opnieuw.",
     "summary": "Wat je kan bereiken, en hoe je het stopt",
     "accountsTitle": "Gekoppelde accounts",
     "accountsHint": "Diensten die een inloggegeven bewaren voor een account dat je ergens anders hebt.",

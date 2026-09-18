@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "Mae’n gweithio i chi tra byddwch i ffwrdd: mae’n cadw copi wedi’i gloi o’r allwedd honno er mwyn gallu parhau heb eich ffôn, nes i chi ei ddirymu.",
+    "untilRevoked": "Nes i chi ei ddirymu",
     "title": "Cais am fynediad",
     "heading": "Rhoi mynediad?",
     "verifying": "Yn gwirio pwy sy'n gofyn",
@@ -351,6 +353,7 @@
     "resourceAttested": "{{service}} wedi ei wirio mewn cwt diogel",
     "resourceLine": "{{permissions}} {{resource}} yn eich {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} y post yn {{resource}}, drwy {{service}}",
       "meeting.transcripts": "{{permissions}} trawsgrifiadau eich cyfarfodydd yn {{resource}}",
       "meeting.recording": "Troi recordio a thrawsgrifio ymlaen ar gyfer cyfarfodydd rydych chi'n eu cynnal yn {{resource}}"
@@ -362,6 +365,7 @@
       "delete": "Dileu"
     },
     "explain": {
+      "app_storage": "Mae {{app}} yn cadw’r ffeiliau hyn yn ei storfa ei hun, wedi’u cloi ag allwedd sydd gan eich ffôn. Dim ond tra byddwch yn caniatáu hynny y gall eu darllen.",
       "storage": {
         "folder": "Bydd eich ffeiliau'n cael eu cadw yn eich storfa eich hun, o dan eich allweddi. Hebddo, maen nhw'n aros yn y cwt ar gyfer y sesiwn hon yn unig, ac yn cael eu colli pan fydd yn ailgychwyn."
       },
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "Mae ffeiliau’n dal ar agor yn yr ap hwn, felly ni newidiwyd dim. Rhowch gynnig arall arni mewn ennyd.",
     "summary": "Beth all eich cyrraedd, a sut i’w atal",
     "accountsTitle": "Cyfrifon cysylltiedig",
     "accountsHint": "Gwasanaethau sy’n dal manylion mynediad i gyfrif sydd gennych rywle arall.",

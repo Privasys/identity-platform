@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "It works for you while you are away: it keeps a locked copy of that key so it can carry on without your phone, until you revoke it.",
+    "untilRevoked": "Until you revoke it",
     "title": "Access request",
     "heading": "Grant access?",
     "verifying": "Checking who is asking",
@@ -357,6 +359,7 @@
       "delete": "Delete"
     },
     "explain": {
+      "app_storage": "{{app}} keeps these files in its own storage, locked with a key your phone holds. It can read them only while you allow it.",
       "storage": {
         "folder": "Your files will be saved in your own storage, under your keys. Without this they stay inside the enclave for this session only, and are lost when it restarts."
       },
@@ -383,6 +386,7 @@
     "doneTitle": "Access granted",
     "doneBody": "{{app}} can now use what you approved. You can revoke it at any time.",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} the mail in {{resource}}, through {{service}}",
       "meeting.transcripts": "{{permissions}} the transcripts of your meetings in {{resource}}",
       "meeting.recording": "Switch on recording and transcription for meetings you host in {{resource}}"
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "Files are still open in this app, so nothing was changed. Try again in a moment.",
     "summary": "What can reach you, and how to stop it",
     "accountsTitle": "Connected accounts",
     "accountsHint": "Services holding a credential for an account of yours somewhere else.",

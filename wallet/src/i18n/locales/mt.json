@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "Jaħdem għalik waqt li m’intix hemm: iżomm kopja msakkra ta’ dik iċ-ċavetta biex ikun jista’ jkompli mingħajr it-telefon tiegħek, sakemm tirrevokah.",
+    "untilRevoked": "Sakemm tirrevokah",
     "title": "Talba għal aċċess",
     "heading": "Tagħti l-aċċess?",
     "verifying": "Qed jiġi vverifikat min qed jitlob",
@@ -351,6 +353,7 @@
     "resourceAttested": "{{service}} ivverifikat f'enklavi sigura",
     "resourceLine": "{{permissions}} {{resource}} fil-{{service}} tiegħek",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} il-posta f'{{resource}}, permezz ta' {{service}}",
       "meeting.transcripts": "{{permissions}} it-traskrizzjonijiet tal-laqgħat tiegħek f'{{resource}}",
       "meeting.recording": "Tixgħel ir-reġistrazzjoni u t-traskrizzjoni għal-laqgħat li torganizza f'{{resource}}"
@@ -362,6 +365,7 @@
       "delete": "Iħassar"
     },
     "explain": {
+      "app_storage": "{{app}} iżomm dawn il-fajls fil-ħażna tiegħu stess, imsakkra b’ċavetta li għandu t-telefon tiegħek. Jista’ jaqrahom biss sakemm tippermettilu.",
       "storage": {
         "folder": "Il-fajls tiegħek jiġu salvati fil-ħażna tiegħek stess, taħt iċ-ċwievet tiegħek. Mingħajr dan jibqgħu fl-enklavi għal din is-sessjoni biss, u jintilfu meta terġa' tibda."
       },
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "Għad hemm fajls miftuħa f’din l-app, allura ma nbidel xejn. Erġa’ pprova fi ftit.",
     "summary": "X’jista’ jilħqek, u kif twaqqfu",
     "accountsTitle": "Kontijiet konnessi",
     "accountsHint": "Servizzi li jżommu kredenzjal għal kont tiegħek band’oħra.",

@@ -62,6 +62,7 @@ import {
     type SetupRequirement,
 } from '@/services/capability-setup';
 import { rearmTenantKeyAt } from '@/services/drive';
+import { syncGrantsIndex } from '@/services/grants-index';
 import { holderFolderKeyB64 } from '@/services/holder-folder';
 import { appIdFromOids } from '@/services/release-provenance';
 import { useCapabilitiesStore } from '@/stores/capabilities';
@@ -450,6 +451,10 @@ export default function CapabilityRequestScreen() {
                 serviceUrl: pending.service_url,
                 unattended: pending.capability.options.unattended === true || undefined,
             });
+            // So a recovered phone knows to ask this service what it holds.
+            // Best effort, off the holder's path: it never throws, and a failed
+            // upload is retried the next time the Access tab opens.
+            void syncGrantsIndex();
 
             if (chained) {
                 // Running under another approval: report and return to it

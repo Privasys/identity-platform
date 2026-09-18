@@ -461,7 +461,10 @@ export interface HeldCapability {
     permissions?: string[];
     resource_label?: string;
     subject_app_id?: string;
+    created_unix?: number;
     expires_unix?: number;
+    /** Holder folders only: the app keeps a locked copy of the key. */
+    unattended?: boolean;
 }
 
 /**
@@ -538,6 +541,58 @@ export async function revokeCapability(
         `the service refused to revoke (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`,
         { status: res.status, code: errorCodeOf(body) },
     );
+}
+
+/**
+ * The capabilities collection the enclave OS serves on EVERY app host, under a
+ * prefix the manager reserves for itself, so an app's own code cannot answer
+ * on it. Holder folders mint here; for every other kind it is where the
+ * calling app's record of a grant is kept.
+ */
+export const APP_CAPABILITIES_PATH = '/__privasys/v1/capabilities';
+
+export function appCapabilitiesUrl(appHost: string): string {
+    return `https://${appHost}${APP_CAPABILITIES_PATH}`;
+}
+
+/**
+ * Tell the app that ASKED that the holder revoked, after the resource service
+ * has confirmed it.
+ *
+ * Revoking at the resource service ends the access. It does not tell the app
+ * that asked for it, which keeps its own record of the approval and goes on
+ * saying "approved" (the harness did exactly that). The enclave OS on the
+ * calling app's host drops that record for any kind and tells the app.
+ *
+ * Only after the resource service has confirmed, never instead of it: telling
+ * an app "revoked" while its access still stands would be wrong the other way.
+ * Skipped when the calling app IS the resource service, as for a holder
+ * folder, where the one DELETE already did both. A grant from before the
+ * runtime recorded subjects answers 404, which is fine: there is nothing there
+ * to drop.
+ *
+ * Carries the wallet-instance proof, so it prompts. Never throws: the holder's
+ * access is already gone, and a failure here is the app's view lagging, which
+ * is logged rather than put in front of them.
+ */
+export async function revokeAtCallingApp(args: {
+    callingAppId: string;
+    capabilityId: string;
+    resourceHost: string;
+    resolve: (appId: string) => Promise<{ hostname?: string } | null>;
+}): Promise<'told' | 'same-host' | 'skipped'> {
+    try {
+        const caller = await args.resolve(args.callingAppId);
+        if (!caller?.hostname) return 'skipped';
+        if (caller.hostname === args.resourceHost) return 'same-host';
+        await revokeCapability(caller.hostname, args.capabilityId, appCapabilitiesUrl(caller.hostname));
+        return 'told';
+    } catch (e) {
+        console.warn(
+            `[CAPABILITY] revoked, but the calling app could not be told: ${e instanceof Error ? e.message : String(e)}`,
+        );
+        return 'skipped';
+    }
 }
 
 /**

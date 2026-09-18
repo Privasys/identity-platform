@@ -45,6 +45,7 @@
 
 import { deleteDeviceKey } from '@/services/did';
 import { clearKycRecords } from '@/services/kyc';
+import { clearGrantsIndexLocalState } from '@/services/grants-index';
 import { clearNotifySealKey } from '@/services/notify-seal';
 import { clearPlatformToken } from '@/services/platform-token';
 import { RECOVERY_STATE_KEY } from '@/services/recovery-api';
@@ -105,6 +106,7 @@ export async function wipeWallet(): Promise<void> {
 
     await Promise.all([
         settle('sovereign state', clearSovereignLocalState()),
+        settle('grants index', clearGrantsIndexLocalState()),
         settle('KYC records', clearKycRecords()),
         settle('wallet instance attestation', clearWia()),
         settle('platform token', clearPlatformToken()),

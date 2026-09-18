@@ -31,9 +31,11 @@ import { resolveApp } from '@/services/app-resolve';
 import {
     isFolderBusy,
     listCapabilities,
+    revokeAtCallingApp,
     revokeCapability,
     serviceUrlHost,
 } from '@/services/capabilities';
+import { syncGrantsIndex } from '@/services/grants-index';
 import { capabilityKey, useCapabilitiesStore, type CapabilityRecord } from '@/stores/capabilities';
 import { groupOf, isLive } from '@/utils/access-rows';
 
@@ -133,6 +135,15 @@ export default function AccessGrantScreen() {
                             // Only now. The service has confirmed.
                             markRevoked(key);
                             setChecked('gone');
+                            // Then the app that asked, so it stops saying
+                            // "approved". After, not before, and never instead.
+                            await revokeAtCallingApp({
+                                callingAppId: record.appId,
+                                capabilityId: record.capabilityId!,
+                                resourceHost: host,
+                                resolve: resolveApp,
+                            });
+                            void syncGrantsIndex();
                         } catch (e) {
                             // Files still open: nothing was revoked and nothing
                             // is wrong. Say that, rather than a status code.

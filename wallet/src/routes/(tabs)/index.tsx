@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { rebuildFromGrantsIndex, syncGrantsIndex } from '@/services/grants-index';
 import { useAuthStore } from '@/stores/auth';
 import { useCapabilitiesStore } from '@/stores/capabilities';
 import { useConsentStore } from '@/stores/consent';
@@ -57,7 +58,14 @@ export default function AccessScreen() {
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
-        void hydrateCapabilities();
+        // Local rows first, then any this phone is missing from the services
+        // the grants index names (a recovered or a second phone), then make
+        // sure the index reflects what this phone now holds. Once per launch,
+        // off the render path, and silent: a service that cannot be reached
+        // leaves the rows the phone already had.
+        void hydrateCapabilities()
+            .then(() => rebuildFromGrantsIndex())
+            .then(() => syncGrantsIndex());
     }, [hydrateCapabilities]);
 
     // A minute is enough here. Nothing on this screen counts down; the tick

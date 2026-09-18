@@ -48,6 +48,11 @@ jest.mock('@/services/platform-token', () => ({
         delete storage['privasys.platform-token'];
     }),
 }));
+jest.mock('@/services/grants-index', () => ({
+    clearGrantsIndexLocalState: jest.fn(async () => {
+        delete storage['privasys.grants-index.synced'];
+    }),
+}));
 
 // Hardware keys live outside SecureStore, so they get their own ledger.
 const mockHardwareKeys = new Set<string>();

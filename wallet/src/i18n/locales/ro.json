@@ -413,7 +413,6 @@
 
   "access": {
     "revokeBusy": "În această aplicație sunt încă fișiere deschise, așa că nimic nu a fost modificat. Încearcă din nou peste câteva momente.",
-    "summary": "Ce poate ajunge la tine și cum să oprești",
     "accountsTitle": "Conturi conectate",
     "accountsHint": "Servicii care păstrează o credențială pentru un cont de-al tău din altă parte.",
     "accountsEmpty": "Nu ai conectat niciun cont.",
@@ -808,6 +807,14 @@
     "importDataHint": "Importă din Google, LinkedIn, Microsoft sau GitHub",
     "exportData": "Exportă date",
     "exportDataHint": "Alege ce să exporți sau exportă tot ca JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Răsfoiește fișierele tale",
+    "addPhoto": "Adaugă o fotografie",
+    "photoTitle": "Fotografie de profil",
+    "photoTakeSelfie": "Fă un selfie",
+    "photoChoose": "Alege o fotografie",
+    "photoCameraDenied": "Permite accesul la cameră pentru Privasys Wallet din setările telefonului, apoi încearcă din nou.",
+    "photoFailed": "Fotografia nu a putut fi folosită. Încearcă alta.",
     "sectionDataSharing": "PARTAJAREA DATELOR",
     "sectionDataSharingHint": "Vezi ce ai împărtășit cu serviciile.",
     "consentHistory": "Istoricul consimțămintelor",

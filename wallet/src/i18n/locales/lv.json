@@ -413,7 +413,6 @@
 
   "access": {
     "revokeBusy": "Šajā lietotnē joprojām ir atvērti faili, tāpēc nekas netika mainīts. Mēģiniet vēlreiz pēc brīža.",
-    "summary": "Kas var jūs sasniegt un kā to apturēt",
     "accountsTitle": "Savienotie konti",
     "accountsHint": "Pakalpojumi, kas glabā akreditācijas datus jūsu kontam citur.",
     "accountsEmpty": "Jūs neesat savienojis nevienu kontu.",
@@ -808,6 +807,14 @@
     "importDataHint": "Importējiet no Google, LinkedIn, Microsoft vai GitHub",
     "exportData": "Eksportēt datus",
     "exportDataHint": "Izvēlieties, ko eksportēt, vai eksportējiet visu kā JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Pārlūkot savus failus",
+    "addPhoto": "Pievienot fotoattēlu",
+    "photoTitle": "Profila fotoattēls",
+    "photoTakeSelfie": "Uzņemt pašbildi",
+    "photoChoose": "Izvēlēties fotoattēlu",
+    "photoCameraDenied": "Tālruņa iestatījumos atļaujiet Privasys Wallet piekļuvi kamerai un mēģiniet vēlreiz.",
+    "photoFailed": "Šo fotoattēlu nevarēja izmantot. Izmēģiniet citu.",
     "sectionDataSharing": "DATU KOPĪGOŠANA",
     "sectionDataSharingHint": "Pārskatiet, ko esat kopīgojis ar pakalpojumiem.",
     "consentHistory": "Piekrišanu vēsture",

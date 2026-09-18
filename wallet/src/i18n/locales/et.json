@@ -413,7 +413,6 @@
 
   "access": {
     "revokeBusy": "Selles rakenduses on failid veel avatud, seega ei muudetud midagi. Proovige hetke pärast uuesti.",
-    "summary": "Mis teieni pääseb ja kuidas see peatada",
     "accountsTitle": "Ühendatud kontod",
     "accountsHint": "Teenused, mis hoiavad mandaati teie mujal asuvale kontole.",
     "accountsEmpty": "Te ei ole ühtegi kontot ühendanud.",
@@ -795,6 +794,14 @@
     "importDataHint": "Importige teenustest Google, LinkedIn, Microsoft või GitHub",
     "exportData": "Ekspordi andmed",
     "exportDataHint": "Valige, mida eksportida, või eksportige kõik JSON-ina",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Sirvige oma faile",
+    "addPhoto": "Lisage foto",
+    "photoTitle": "Profiilifoto",
+    "photoTakeSelfie": "Tehke selfi",
+    "photoChoose": "Valige foto",
+    "photoCameraDenied": "Lubage telefoni seadetes Privasys Walletil kaamerat kasutada ja proovige uuesti.",
+    "photoFailed": "Seda fotot ei saanud kasutada. Proovige mõnda teist.",
     "sectionDataSharing": "ANDMETE JAGAMINE",
     "sectionDataSharingHint": "Vaadake üle, mida olete teenustega jaganud.",
     "consentHistory": "Nõusolekute ajalugu",

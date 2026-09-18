@@ -413,7 +413,6 @@
 
   "access": {
     "revokeBusy": "Mae ffeiliau’n dal ar agor yn yr ap hwn, felly ni newidiwyd dim. Rhowch gynnig arall arni mewn ennyd.",
-    "summary": "Beth all eich cyrraedd, a sut i’w atal",
     "accountsTitle": "Cyfrifon cysylltiedig",
     "accountsHint": "Gwasanaethau sy’n dal manylion mynediad i gyfrif sydd gennych rywle arall.",
     "accountsEmpty": "Nid ydych wedi cysylltu unrhyw gyfrifon.",
@@ -847,6 +846,14 @@
     "importDataHint": "Mewnforio o Google, LinkedIn, Microsoft neu GitHub",
     "exportData": "Allforio data",
     "exportDataHint": "Dewiswch beth i'w allforio, neu allforiwch bopeth fel JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Pori eich ffeiliau",
+    "addPhoto": "Ychwanegu llun",
+    "photoTitle": "Llun proffil",
+    "photoTakeSelfie": "Tynnu hunlun",
+    "photoChoose": "Dewis llun",
+    "photoCameraDenied": "Caniatewch i Privasys Wallet ddefnyddio'r camera yng ngosodiadau eich ffôn, yna rhowch gynnig arall arni.",
+    "photoFailed": "Doedd dim modd defnyddio'r llun hwnnw. Rhowch gynnig ar un arall.",
     "sectionDataSharing": "RHANNU DATA",
     "sectionDataSharingHint": "Adolygwch yr hyn rydych wedi'i rannu â gwasanaethau.",
     "consentHistory": "Hanes caniatâd",

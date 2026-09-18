@@ -38,7 +38,9 @@ import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDi
 import { hasRecoveredPairwiseSeed, takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { wipeWallet } from '@/services/wipe';
 import { BIOMETRIC_TIMEOUT_MS, withTimeout } from '@/utils/timeout';
+import { useAvatarChooser } from '@/hooks/useAvatarChooser';
 import { useAuthStore } from '@/stores/auth';
+import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useProfileStore } from '@/stores/profile';
 
 export default function ProfileScreen() {
@@ -48,6 +50,15 @@ export default function ProfileScreen() {
     const styles = useMemo(() => makeStyles(p), [p]);
     const profile = useProfileStore((s) => s.profile);
     const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
+    const chooseAvatar = useAvatarChooser();
+    // Share requests waiting on the holder, shown on the Drive row now that
+    // Drive has no tab of its own to carry them.
+    const driveRequests = useDriveNotificationsStore(
+        (s) => s.requests.filter((r) => !r.decision).length
+    );
+    useEffect(() => {
+        void useDriveNotificationsStore.getState().hydrate();
+    }, []);
 
     const setOnboarded = useAuthStore((s) => s.setOnboarded);
     // First-run setup progress: 0 = not started, then one tick per milestone
@@ -308,7 +319,7 @@ export default function ProfileScreen() {
         <RNView style={styles.screen}>
             {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
-                <Text style={styles.headerTitle}>Profile</Text>
+                <Text style={styles.headerTitle}>{t('tabs.profile')}</Text>
             </RNView>
 
             <ScrollView
@@ -320,9 +331,15 @@ export default function ProfileScreen() {
                 <RNView style={styles.profileCard}>
                     {/* A picture only when there is one: the avatar the holder
                         set, or failing that the photo from their ID. No initial
-                        in a circle and no placeholder silhouette. */}
+                        in a circle and no placeholder silhouette. Tapping it
+                        sets the avatar; with no picture, a line of text does. */}
                     {avatarSource ? (
-                        <RNView style={styles.avatarContainer}>
+                        <Pressable
+                            style={styles.avatarContainer}
+                            onPress={chooseAvatar}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('profile.photoTitle')}
+                        >
                             <Image
                                 source={{ uri: avatarSource }}
                                 style={styles.avatarImage}
@@ -330,12 +347,17 @@ export default function ProfileScreen() {
                                     console.warn('[avatar] failed to load', e.nativeEvent?.error)
                                 }
                             />
-                        </RNView>
+                        </Pressable>
                     ) : null}
                     <Text style={styles.profileName}>{shownName}</Text>
                     {profile.email ? (
                         <Text style={styles.profileEmail}>{profile.email}</Text>
                     ) : null}
+                    {avatarSource ? null : (
+                        <Pressable onPress={chooseAvatar} hitSlop={8} style={styles.addPhoto}>
+                            <Text style={styles.addPhotoText}>{t('profile.addPhoto')}</Text>
+                        </Pressable>
+                    )}
                 </RNView>
 
                 {/* DID */}
@@ -430,6 +452,35 @@ export default function ProfileScreen() {
                             <Text style={styles.sharingLabel}>{t('profile.exportData')}</Text>
                             <Text style={styles.sharingDetail}>{t('profile.exportDataHint')}</Text>
                         </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </RNView>
+                </Pressable>
+
+                {/* Drive: the holder's files, which is their data too. It was a
+                    tab; one row here is all it needs. */}
+                <Text style={styles.sectionTitle}>{t('profile.sectionDrive')}</Text>
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/drive')}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="folder-outline" size={20} color={p.blue} />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>{t('profile.driveRow')}</Text>
+                            <Text style={styles.sharingDetail}>{t('drive.subtitle')}</Text>
+                        </RNView>
+                        {driveRequests > 0 ? (
+                            <RNView
+                                style={styles.countBadge}
+                                accessibilityLabel={t('drive.shareRequests')}
+                            >
+                                <Text style={styles.countBadgeText}>
+                                    {driveRequests > 9 ? '9+' : String(driveRequests)}
+                                </Text>
+                            </RNView>
+                        ) : null}
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
@@ -677,6 +728,19 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     profileName: { fontSize: 22, fontWeight: '700', color: p.textPrimary, marginBottom: 4 },
     profileEmail: { fontSize: 15, color: p.textSecondary },
+    addPhoto: { marginTop: 10 },
+    addPhotoText: { fontSize: 15, fontWeight: '600', color: p.blue },
+    countBadge: {
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: p.danger,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 5,
+        marginRight: 8,
+    },
+    countBadgeText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
 
     sectionTitle: { ...sectionTitleStyle(p), marginTop: 24, marginBottom: 8 },
     sectionDescription: {

@@ -380,7 +380,6 @@
 
   "access": {
     "revokeBusy": "Ebben az alkalmazásban még nyitva vannak fájlok, ezért semmi sem változott. Próbálja újra egy pillanat múlva.",
-    "summary": "Mi érheti el Önt, és hogyan állítható le",
     "accountsTitle": "Csatlakoztatott fiókok",
     "accountsHint": "Szolgáltatások, amelyek egy máshol lévő fiókjához tartozó hitelesítő adatot tárolnak.",
     "accountsEmpty": "Nem csatlakoztatott fiókot.",
@@ -774,6 +773,14 @@
     "importDataHint": "Importálás Google, LinkedIn, Microsoft vagy GitHub fiókból",
     "exportData": "Adatok exportálása",
     "exportDataHint": "Válassza ki, mit exportál, vagy exportáljon mindent JSON formátumban",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Fájljai böngészése",
+    "addPhoto": "Fénykép hozzáadása",
+    "photoTitle": "Profilkép",
+    "photoTakeSelfie": "Szelfi készítése",
+    "photoChoose": "Fénykép kiválasztása",
+    "photoCameraDenied": "Engedélyezze a kamera használatát a Privasys Wallet számára a telefon beállításaiban, majd próbálja újra.",
+    "photoFailed": "Ezt a fényképet nem lehetett használni. Próbáljon meg egy másikat.",
     "sectionDataSharing": "ADATMEGOSZTÁS",
     "sectionDataSharingHint": "Tekintse át, mit osztott meg szolgáltatásokkal.",
     "consentHistory": "Hozzájárulási előzmények",

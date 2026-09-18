@@ -380,7 +380,6 @@
 
   "access": {
     "revokeBusy": "Er zijn nog bestanden open in deze app, dus er is niets gewijzigd. Probeer het zo meteen opnieuw.",
-    "summary": "Wat je kan bereiken, en hoe je het stopt",
     "accountsTitle": "Gekoppelde accounts",
     "accountsHint": "Diensten die een inloggegeven bewaren voor een account dat je ergens anders hebt.",
     "accountsEmpty": "Je hebt geen accounts gekoppeld.",
@@ -774,6 +773,14 @@
     "importDataHint": "Importeren uit Google, LinkedIn, Microsoft of GitHub",
     "exportData": "Gegevens exporteren",
     "exportDataHint": "Kies wat je exporteert, of exporteer alles als JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Blader door je bestanden",
+    "addPhoto": "Foto toevoegen",
+    "photoTitle": "Profielfoto",
+    "photoTakeSelfie": "Selfie maken",
+    "photoChoose": "Foto kiezen",
+    "photoCameraDenied": "Geef Privasys Wallet toegang tot de camera in de instellingen van je telefoon en probeer het opnieuw.",
+    "photoFailed": "Die foto kon niet worden gebruikt. Probeer een andere.",
     "sectionDataSharing": "GEGEVENS DELEN",
     "sectionDataSharingHint": "Bekijk wat je met diensten hebt gedeeld.",
     "consentHistory": "Toestemmingsgeschiedenis",

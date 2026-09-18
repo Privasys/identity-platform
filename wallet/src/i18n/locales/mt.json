@@ -413,7 +413,6 @@
 
   "access": {
     "revokeBusy": "Għad hemm fajls miftuħa f’din l-app, allura ma nbidel xejn. Erġa’ pprova fi ftit.",
-    "summary": "X’jista’ jilħqek, u kif twaqqfu",
     "accountsTitle": "Kontijiet konnessi",
     "accountsHint": "Servizzi li jżommu kredenzjal għal kont tiegħek band’oħra.",
     "accountsEmpty": "Ma qbadt l-ebda kont.",
@@ -834,6 +833,14 @@
     "importDataHint": "Importa minn Google, LinkedIn, Microsoft jew GitHub",
     "exportData": "Esporta data",
     "exportDataHint": "Agħżel x'tesporta, jew esporta kollox bħala JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Ibbrawżja l-fajls tiegħek",
+    "addPhoto": "Żid ritratt",
+    "photoTitle": "Ritratt tal-profil",
+    "photoTakeSelfie": "Ieħu selfie",
+    "photoChoose": "Agħżel ritratt",
+    "photoCameraDenied": "Ippermetti lil Privasys Wallet juża l-kamera fis-settings tat-telefon, imbagħad erġa' pprova.",
+    "photoFailed": "Dak ir-ritratt ma setax jintuża. Ipprova b'ieħor.",
     "sectionDataSharing": "QSIM TAD-DATA",
     "sectionDataSharingHint": "Irrevedi dak li qsamt ma' servizzi.",
     "consentHistory": "Storja tal-kunsens",

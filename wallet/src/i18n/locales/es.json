@@ -380,7 +380,6 @@
 
   "access": {
     "revokeBusy": "Todavía hay archivos abiertos en esta aplicación, así que no se ha cambiado nada. Inténtalo de nuevo en un momento.",
-    "summary": "Qué puede llegar hasta ti y cómo detenerlo",
     "accountsTitle": "Cuentas conectadas",
     "accountsHint": "Servicios que guardan una credencial de una cuenta tuya en otro sitio.",
     "accountsEmpty": "No has conectado ninguna cuenta.",
@@ -787,6 +786,14 @@
     "importDataHint": "Importar desde Google, LinkedIn, Microsoft o GitHub",
     "exportData": "Exportar datos",
     "exportDataHint": "Elige qué exportar, o exporta todo en formato JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Explorar tus archivos",
+    "addPhoto": "Añadir una foto",
+    "photoTitle": "Foto de perfil",
+    "photoTakeSelfie": "Hacerte un selfi",
+    "photoChoose": "Elegir una foto",
+    "photoCameraDenied": "Permite el acceso a la cámara para Privasys Wallet en los ajustes del teléfono y vuelve a intentarlo.",
+    "photoFailed": "No se ha podido usar esa foto. Prueba con otra.",
     "sectionDataSharing": "COMPARTICIÓN DE DATOS",
     "sectionDataSharingHint": "Revisa lo que has compartido con los servicios.",
     "consentHistory": "Historial de consentimientos",

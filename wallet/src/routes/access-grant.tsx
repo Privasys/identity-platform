@@ -95,6 +95,7 @@ export default function AccessGrantScreen() {
             } else {
                 const resolved = await resolveApp(current.resourceAppId);
                 if (!resolved?.hostname) {
+                    console.warn(`[ACCESS] the control plane could not resolve ${current.resourceAppId}`);
                     setChecked('unreachable');
                     return;
                 }
@@ -111,9 +112,15 @@ export default function AccessGrantScreen() {
             const found = held.some((c) => c.capability_id === current.capabilityId);
             setChecked(found ? 'held' : 'gone');
             markChecked(key, found ? 'held' : 'gone');
-        } catch {
-            // Offline, or the service is down. The row stays as this device's
-            // record, which is what it has always been.
+        } catch (e) {
+            // Offline, the service is down, or it refused the wallet. The row
+            // stays as this device's record. Logged with the reason, because
+            // "could not be reached" on the screen is all the holder needs and
+            // not all anyone diagnosing it does (2026-09-18: a Remove access
+            // that did nothing, and nothing in the log to say why).
+            console.warn(
+                `[ACCESS] could not ask the service about ${current.capabilityId}: ${e instanceof Error ? e.message : String(e)}`,
+            );
             setChecked('unreachable');
         }
     }, [key, markChecked]);
@@ -130,7 +137,13 @@ export default function AccessGrantScreen() {
     }, [record, live, key, check]);
 
     const onRevoke = () => {
-        if (!record?.capabilityId || !host) return;
+        // Never a silent return behind a button that looks live. The button is
+        // only drawn once the service has answered, so this should not happen;
+        // if it does, the holder is told nothing was changed.
+        if (!record?.capabilityId || !host) {
+            Alert.alert(t('access.revokeFailedTitle'), t('access.revokeFailedBody'));
+            return;
+        }
         const app = record.appName || t('capability.unnamedApp');
         Alert.alert(
             t(group === 'account' ? 'access.disconnectTitle' : 'access.removeTitle', { app }),
@@ -271,11 +284,20 @@ export default function AccessGrantScreen() {
                     </RNView>
                 )}
 
-                {live && checked !== 'unsupported' && (
+                {/* Remove only once the service has said it holds this grant.
+                    That is also what makes the revoke's answer readable: from
+                    a service whose list just answered, a 404 means "not held";
+                    from one the wallet could not reach, the same 404 might mean
+                    the route is absent, and recording that as "you removed
+                    this" would claim a revocation that never happened. The
+                    button used to show whenever the check had not said
+                    "unsupported", looked live, and did nothing when the service
+                    had not answered (2026-09-18). */}
+                {live && checked === 'held' && (
                     <Pressable
                         style={[styles.danger, busy && styles.busy]}
                         onPress={onRevoke}
-                        disabled={busy || checked === 'checking' || !host}
+                        disabled={busy}
                     >
                         {busy ? (
                             <ActivityIndicator color="#FFFFFF" />
@@ -284,6 +306,12 @@ export default function AccessGrantScreen() {
                                 {t(group === 'account' ? 'access.disconnect' : 'access.remove')}
                             </Text>
                         )}
+                    </Pressable>
+                )}
+                {/* Could not ask: say so, and offer the one thing that can help. */}
+                {live && checked === 'unreachable' && (
+                    <Pressable style={styles.retry} onPress={() => void check()}>
+                        <Text style={styles.retryText}>{t('common.retry')}</Text>
                     </Pressable>
                 )}
 
@@ -384,6 +412,16 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         marginTop: 8,
     },
     dangerText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+    retry: {
+        backgroundColor: p.card,
+        borderWidth: 1,
+        borderColor: p.border,
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    retryText: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
     busy: { opacity: 0.7 },
     secondary: {
         backgroundColor: p.card,

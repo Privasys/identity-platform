@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "Pracuje pre vás, aj keď nie ste pri telefóne: uchováva si zamknutú kópiu toho kľúča, aby mohol pokračovať bez vášho telefónu, kým prístup neodvoláte.",
+    "untilRevoked": "Kým to neodvoláte",
     "title": "Žiadosť o prístup",
     "heading": "Udeliť prístup?",
     "verifying": "Overuje sa, kto žiada",
@@ -351,6 +353,7 @@
     "resourceAttested": "{{service}} overená v zabezpečenom enkláve",
     "resourceLine": "{{permissions}} {{resource}} vo vašom {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} poštu v {{resource}} prostredníctvom {{service}}",
       "meeting.transcripts": "{{permissions}} prepisy vašich stretnutí v {{resource}}",
       "meeting.recording": "Zapnúť nahrávanie a prepis pri stretnutiach, ktoré organizujete v {{resource}}"
@@ -362,6 +365,7 @@
       "delete": "Mazať"
     },
     "explain": {
+      "app_storage": "{{app}} uchováva tieto súbory vo vlastnom úložisku, zamknuté kľúčom, ktorý má váš telefón. Môže ich čítať len vtedy, keď mu to dovolíte.",
       "storage": {
         "folder": "Vaše súbory sa uložia do vášho vlastného úložiska pod vašimi kľúčmi. Bez toho zostanú v enkláve len počas tejto relácie a pri reštarte sa stratia."
       },
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "V tejto aplikácii sú stále otvorené súbory, preto sa nič nezmenilo. Skúste to o chvíľu znova.",
     "summary": "Čo sa k vám dostane a ako to zastaviť",
     "accountsTitle": "Pripojené účty",
     "accountsHint": "Služby, ktoré uchovávajú prihlasovacie údaje k vášmu účtu inde.",

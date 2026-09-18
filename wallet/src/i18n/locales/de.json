@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Es arbeitet für Sie, während Sie nicht da sind: Es behält eine verschlossene Kopie dieses Schlüssels, um ohne Ihr Telefon weiterzumachen, bis Sie den Zugriff widerrufen.",
+    "untilRevoked": "Bis Sie es widerrufen",
     "title": "Zugriffsanfrage",
     "heading": "Zugriff gewähren?",
     "verifying": "Es wird geprüft, wer anfragt",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} in einer sicheren Enklave geprüft",
     "resourceLine": "{{permissions}} {{resource}} in Ihrem {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} die E-Mails in {{resource}}, über {{service}}",
       "meeting.transcripts": "{{permissions}} die Transkripte Ihrer Besprechungen in {{resource}}",
       "meeting.recording": "Aufzeichnung und Transkription für Besprechungen einschalten, die Sie in {{resource}} leiten"
@@ -329,6 +332,7 @@
       "delete": "Löschen"
     },
     "explain": {
+      "app_storage": "{{app}} bewahrt diese Dateien in seinem eigenen Speicher auf, verschlossen mit einem Schlüssel, den Ihr Telefon hält. Es kann sie nur lesen, solange Sie es erlauben.",
       "storage": {
         "folder": "Ihre Dateien werden in Ihrem eigenen Speicher unter Ihren Schlüsseln gesichert. Ohne dies bleiben sie nur für diese Sitzung in der Enklave und gehen beim Neustart verloren."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "In dieser App sind noch Dateien geöffnet, daher wurde nichts geändert. Versuchen Sie es gleich noch einmal.",
     "summary": "Was Sie erreichen kann, und wie Sie es beenden",
     "accountsTitle": "Verbundene Konten",
     "accountsHint": "Dienste, die Zugangsdaten für ein Konto von Ihnen anderswo aufbewahren.",

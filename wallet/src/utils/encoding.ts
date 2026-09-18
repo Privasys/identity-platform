@@ -14,6 +14,17 @@ export function bytesToBase64url(bytes: Uint8Array): string {
     return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/**
+ * Encode bytes as STANDARD base64 (RFC 4648 §4, `+/`, padded). For the few
+ * wire fields a server decodes with a standard decoder, where base64url would
+ * be refused or, worse, silently misread.
+ */
+export function bytesToBase64(bytes: Uint8Array): string {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i] ?? 0);
+    return btoa(bin);
+}
+
 /** Decode a base64url string (padding optional) to bytes. */
 export function base64urlToBytes(s: string): Uint8Array {
     const std = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4);

@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Se toimii puolestasi, kun olet poissa: se säilyttää lukitun kopion avaimesta voidakseen jatkaa ilman puhelintasi, kunnes peruutat sen.",
+    "untilRevoked": "Kunnes peruutat sen",
     "title": "Käyttöoikeuspyyntö",
     "heading": "Myönnetäänkö käyttöoikeus?",
     "verifying": "Tarkistetaan, kuka pyytää",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} varmennettu turvallisessa enklaavissa",
     "resourceLine": "{{permissions}} {{resource}} omassa {{service}}-palvelussasi",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} postia tilillä {{resource}} palvelun {{service}} kautta",
       "meeting.transcripts": "{{permissions}} kokoustesi tekstityksiä tilillä {{resource}}",
       "meeting.recording": "Ottaa käyttöön tallennus ja tekstitys kokouksissa, jotka järjestät tilillä {{resource}}"
@@ -329,6 +332,7 @@
       "delete": "Poistaa"
     },
     "explain": {
+      "app_storage": "{{app}} säilyttää nämä tiedostot omassa tallennustilassaan lukittuna avaimella, joka on puhelimessasi. Se voi lukea niitä vain niin kauan kuin sallit.",
       "storage": {
         "folder": "Tiedostosi tallennetaan omaan tallennustilaasi omilla avaimillasi. Ilman tätä ne pysyvät enklaavissa vain tämän istunnon ajan ja katoavat uudelleenkäynnistyksessä."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "Tiedostoja on vielä auki tässä sovelluksessa, joten mitään ei muutettu. Yritä hetken päästä uudelleen.",
     "summary": "Mikä pääsee sinuun käsiksi ja miten sen pysäytät",
     "accountsTitle": "Yhdistetyt tilit",
     "accountsHint": "Palvelut, jotka säilyttävät tunnuksia muualla olevaan tiliisi.",

@@ -28,7 +28,12 @@ import { useTranslation } from 'react-i18next';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { resolveApp } from '@/services/app-resolve';
-import { listCapabilities, revokeCapability } from '@/services/capabilities';
+import {
+    isFolderBusy,
+    listCapabilities,
+    revokeCapability,
+    serviceUrlHost,
+} from '@/services/capabilities';
 import { capabilityKey, useCapabilitiesStore, type CapabilityRecord } from '@/stores/capabilities';
 import { groupOf, isLive } from '@/utils/access-rows';
 
@@ -71,13 +76,22 @@ export default function AccessGrantScreen() {
         }
         setChecked('checking');
         try {
-            const resolved = await resolveApp(record.resourceAppId);
-            if (!resolved?.hostname) {
-                setChecked('unreachable');
-                return;
+            // A capability minted at a service_url is asked about there, on the
+            // host that was attested when it was minted. Resolving the app id
+            // again would find the app, not the storage the grant lives in.
+            let targetHost: string;
+            if (record.serviceUrl) {
+                targetHost = serviceUrlHost(record.serviceUrl);
+            } else {
+                const resolved = await resolveApp(record.resourceAppId);
+                if (!resolved?.hostname) {
+                    setChecked('unreachable');
+                    return;
+                }
+                targetHost = resolved.hostname;
             }
-            setHost(resolved.hostname);
-            const held = await listCapabilities(resolved.hostname);
+            setHost(targetHost);
+            const held = await listCapabilities(targetHost, record.serviceUrl);
             if (held === null) {
                 // The service does not serve the list, so it cannot be asked
                 // and must not be revoked from here either.
@@ -115,11 +129,17 @@ export default function AccessGrantScreen() {
                     onPress: async () => {
                         setBusy(true);
                         try {
-                            await revokeCapability(host, record.capabilityId!);
+                            await revokeCapability(host, record.capabilityId!, record.serviceUrl);
                             // Only now. The service has confirmed.
                             markRevoked(key);
                             setChecked('gone');
                         } catch (e) {
+                            // Files still open: nothing was revoked and nothing
+                            // is wrong. Say that, rather than a status code.
+                            if (isFolderBusy(e)) {
+                                Alert.alert(t('access.revokeFailedTitle'), t('access.revokeBusy'));
+                                return;
+                            }
                             console.warn(
                                 `[ACCESS] revoke failed for ${record.capabilityId} on ${host}: ${e instanceof Error ? e.message : String(e)}`,
                             );
@@ -199,6 +219,11 @@ export default function AccessGrantScreen() {
                         <Text style={styles.muted}>
                             {t('access.revokedOn', { when: new Date(record.revokedAt * 1000) })}
                         </Text>
+                    )}
+                    {/* The part of a holder-folder approval most worth being
+                        reminded of: the app can carry on without the phone. */}
+                    {record.kind === 'app_storage' && record.unattended && (
+                        <Text style={styles.muted}>{t('capability.appStorageUnattended')}</Text>
                     )}
                 </RNView>
 

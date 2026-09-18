@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "Tā strādā jūsu labā, kamēr esat prom: glabā šīs atslēgas aizslēgtu kopiju, lai varētu turpināt bez jūsu tālruņa, līdz jūs to atsaucat.",
+    "untilRevoked": "Līdz jūs to atsaucat",
     "title": "Piekļuves pieprasījums",
     "heading": "Piešķirt piekļuvi?",
     "verifying": "Tiek pārbaudīts, kas pieprasa",
@@ -351,6 +353,7 @@
     "resourceAttested": "{{service}} pārbaudīta drošā anklāvā",
     "resourceLine": "{{permissions}} {{resource}} jūsu {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} pastu kontā {{resource}}, izmantojot {{service}}",
       "meeting.transcripts": "{{permissions}} jūsu sanāksmju atšifrējumus kontā {{resource}}",
       "meeting.recording": "Ieslēgt ierakstu un atšifrējumu sanāksmēm, kuras vadāt kontā {{resource}}"
@@ -362,6 +365,7 @@
       "delete": "Dzēst"
     },
     "explain": {
+      "app_storage": "{{app}} glabā šos failus savā krātuvē, aizslēgtus ar atslēgu, kas ir jūsu tālrunī. Tā var tos lasīt tikai tik ilgi, kamēr jūs to atļaujat.",
       "storage": {
         "folder": "Jūsu faili tiks saglabāti jūsu pašu krātuvē, ar jūsu atslēgām. Bez tā tie paliek anklāvā tikai šai sesijai un tiek zaudēti, kad tas tiek restartēts."
       },
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "Šajā lietotnē joprojām ir atvērti faili, tāpēc nekas netika mainīts. Mēģiniet vēlreiz pēc brīža.",
     "summary": "Kas var jūs sasniegt un kā to apturēt",
     "accountsTitle": "Savienotie konti",
     "accountsHint": "Pakalpojumi, kas glabā akreditācijas datus jūsu kontam citur.",

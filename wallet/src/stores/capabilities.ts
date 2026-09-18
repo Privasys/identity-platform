@@ -60,6 +60,18 @@ export interface CapabilityRecord {
      */
     secretLabels?: string[];
 
+    /**
+     * Where this capability lives when the resource service is the asking app
+     * itself: the `service_url` its ask named, already checked to be on the
+     * attested app host. List and revoke go back to exactly this. Absent for a
+     * service resolved by identity, which is resolved again each time.
+     */
+    serviceUrl?: string;
+    /** The app said it works while the holder is away, keeping a locked copy
+     *  of the folder key. Shown again on the detail screen, since it is the
+     *  part of the approval most worth being reminded of. */
+    unattended?: boolean;
+
     /** Epoch seconds when the holder revoked it, if they have. */
     revokedAt?: number;
     /**

@@ -13,6 +13,13 @@
 
 jest.mock('../../modules/native-ratls/src/index', () => ({ makeRaTlsFetch: jest.fn() }));
 jest.mock('@/services/platform-token', () => ({ getPlatformToken: jest.fn(async () => 'tok') }));
+// The instance proof signs with the biometric-gated device key; here it is a
+// recognisable stand-in so a test can see where it was, and was not, attached.
+jest.mock('@/services/wallet-call', () => ({
+    walletCallHeaders: jest.fn(async (method: string, path: string) => ({
+        'X-Privasys-Wallet-Proof': `proof:${method}:${path}`,
+    })),
+}));
 
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 import {

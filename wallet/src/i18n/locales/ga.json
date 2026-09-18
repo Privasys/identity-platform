@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "Oibríonn sé duit agus tú as láthair: coinníonn sé cóip faoi ghlas den eochair sin ionas gur féidir leis leanúint ar aghaidh gan do ghuthán, go dtí go gcúlghairfidh tú é.",
+    "untilRevoked": "Go dtí go gcúlghairfidh tú é",
     "title": "Iarratas rochtana",
     "heading": "Rochtain a thabhairt?",
     "verifying": "Á sheiceáil cé atá ag iarraidh",
@@ -351,6 +353,7 @@
     "resourceAttested": "{{service}} fíoraithe in iamhchríoch shlán",
     "resourceLine": "{{permissions}} {{resource}} i do {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} an post i {{resource}}, trí {{service}}",
       "meeting.transcripts": "{{permissions}} tras-scríbhinní do chruinnithe i {{resource}}",
       "meeting.recording": "Taifeadadh agus tras-scríobh a chur ar siúl do chruinnithe a eagraíonn tú i {{resource}}"
@@ -362,6 +365,7 @@
       "delete": "Scriosadh"
     },
     "explain": {
+      "app_storage": "Coinníonn {{app}} na comhaid seo ina stóras féin, faoi ghlas le heochair atá ag do ghuthán. Ní féidir leis iad a léamh ach fad a cheadaíonn tú é.",
       "storage": {
         "folder": "Sábhálfar do chomhaid i do stóras féin, faoi do chuid eochracha. Gan é seo fanann siad san iamhchríoch don seisiún seo amháin, agus cailltear iad nuair a atosaítear é."
       },
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "Tá comhaid fós ar oscailt san aip seo, mar sin níor athraíodh aon rud. Bain triail eile as i gceann nóiméid.",
     "summary": "Cad is féidir teacht ort, agus conas é a stopadh",
     "accountsTitle": "Cuntais nasctha",
     "accountsHint": "Seirbhísí a choinníonn dintiúr do chuntas leat in áit eile.",

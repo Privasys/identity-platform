@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Pracuje pro vás i v době, kdy nejste u telefonu: uchovává si zamčenou kopii toho klíče, aby mohl pokračovat bez vašeho telefonu, dokud přístup neodvoláte.",
+    "untilRevoked": "Dokud to neodvoláte",
     "title": "Žádost o přístup",
     "heading": "Udělit přístup?",
     "verifying": "Ověřuje se, kdo žádá",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} ověřena v zabezpečeném enklávu",
     "resourceLine": "{{permissions}} {{resource}} ve vašem {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} poštu v {{resource}} prostřednictvím {{service}}",
       "meeting.transcripts": "{{permissions}} přepisy vašich schůzek v {{resource}}",
       "meeting.recording": "Zapnout nahrávání a přepis u schůzek, které pořádáte v {{resource}}"
@@ -329,6 +332,7 @@
       "delete": "Mazat"
     },
     "explain": {
+      "app_storage": "{{app}} uchovává tyto soubory ve vlastním úložišti, zamčené klíčem, který má váš telefon. Může je číst jen tehdy, když mu to dovolíte.",
       "storage": {
         "folder": "Vaše soubory budou uloženy ve vašem vlastním úložišti pod vašimi klíči. Bez toho zůstanou v enklávu jen po dobu této relace a při restartu se ztratí."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "Soubory jsou v této aplikaci stále otevřené, proto se nic nezměnilo. Zkuste to za chvíli znovu.",
     "summary": "Co se k vám dostane a jak to zastavit",
     "accountsTitle": "Připojené účty",
     "accountsHint": "Služby, které uchovávají přihlašovací údaje k vašemu účtu jinde.",

@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Działa dla Ciebie, gdy Cię nie ma: przechowuje zamkniętą kopię tego klucza, aby móc działać bez Twojego telefonu, dopóki tego nie cofniesz.",
+    "untilRevoked": "Dopóki tego nie cofniesz",
     "title": "Prośba o dostęp",
     "heading": "Przyznać dostęp?",
     "verifying": "Sprawdzanie, kto prosi",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} zweryfikowano w bezpiecznej enklawie",
     "resourceLine": "{{permissions}} {{resource}} w Twoim {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} pocztę w {{resource}}, przez {{service}}",
       "meeting.transcripts": "{{permissions}} transkrypcje Twoich spotkań w {{resource}}",
       "meeting.recording": "Włączyć nagrywanie i transkrypcję dla spotkań, które prowadzisz w {{resource}}"
@@ -329,6 +332,7 @@
       "delete": "Usuwanie"
     },
     "explain": {
+      "app_storage": "{{app}} przechowuje te pliki we własnej pamięci, zamknięte kluczem, który ma Twój telefon. Może je czytać tylko wtedy, gdy na to pozwalasz.",
       "storage": {
         "folder": "Twoje pliki będą zapisywane w Twojej własnej przestrzeni, pod Twoimi kluczami. Bez tego pozostają w enklawie tylko na czas tej sesji i giną po restarcie."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "W tej aplikacji są nadal otwarte pliki, więc nic nie zostało zmienione. Spróbuj ponownie za chwilę.",
     "summary": "Co może Cię dosięgnąć i jak to zatrzymać",
     "accountsTitle": "Połączone konta",
     "accountsHint": "Usługi przechowujące dane logowania do Twojego konta gdzie indziej.",

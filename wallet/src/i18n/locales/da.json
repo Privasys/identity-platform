@@ -307,6 +307,8 @@
 
 
   "capability": {
+    "appStorageUnattended": "Den arbejder for dig, mens du er væk: den gemmer en låst kopi af nøglen, så den kan fortsætte uden din telefon, indtil du tilbagekalder det.",
+    "untilRevoked": "Indtil du tilbagekalder det",
     "title": "Anmodning om adgang",
     "heading": "Giv adgang?",
     "verifying": "Kontrollerer hvem der spørger",
@@ -318,6 +320,7 @@
     "resourceAttested": "{{service}} bekræftet i en sikker enklave",
     "resourceLine": "{{permissions}} {{resource}} i dit {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} posten i {{resource}} via {{service}}",
       "meeting.transcripts": "{{permissions}} udskrifterne af dine møder i {{resource}}",
       "meeting.recording": "Slå optagelse og transskription til for møder, du er vært for i {{resource}}"
@@ -329,6 +332,7 @@
       "delete": "Slette"
     },
     "explain": {
+      "app_storage": "{{app}} opbevarer disse filer i sit eget lager, låst med en nøgle, som din telefon har. Den kan kun læse dem, så længe du tillader det.",
       "storage": {
         "folder": "Dine filer gemmes i dit eget lager under dine nøgler. Uden dette bliver de kun i enklaven i denne session og går tabt ved genstart."
       },
@@ -375,6 +379,7 @@
   },
 
   "access": {
+    "revokeBusy": "Filer er stadig åbne i denne app, så intet blev ændret. Prøv igen om lidt.",
     "summary": "Hvad der kan nå dig, og hvordan du stopper det",
     "accountsTitle": "Forbundne konti",
     "accountsHint": "Tjenester, der opbevarer loginoplysninger til en konto, du har et andet sted.",

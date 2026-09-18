@@ -340,6 +340,8 @@
     "approveWithCount": "{{label}} ({{count}})"
   },
   "capability": {
+    "appStorageUnattended": "Dela za vas, ko vas ni: hrani zaklenjeno kopijo tega ključa, da lahko nadaljuje brez vašega telefona, dokler tega ne prekličete.",
+    "untilRevoked": "Dokler tega ne prekličete",
     "title": "Zahteva za dostop",
     "heading": "Odobrite dostop?",
     "verifying": "Preverja se, kdo zahteva",
@@ -351,6 +353,7 @@
     "resourceAttested": "{{service}} preverjena v varni enklavi",
     "resourceLine": "{{permissions}} {{resource}} v vašem {{service}}",
     "resourceLineByKind": {
+      "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} pošto v {{resource}} prek {{service}}",
       "meeting.transcripts": "{{permissions}} prepise vaših sestankov v {{resource}}",
       "meeting.recording": "Vklopiti snemanje in prepis za sestanke, ki jih vodite v {{resource}}"
@@ -362,6 +365,7 @@
       "delete": "Brisanje"
     },
     "explain": {
+      "app_storage": "{{app}} hrani te datoteke v lastni shrambi, zaklenjene s ključem, ki ga ima vaš telefon. Brati jih lahko le, dokler mu to dovolite.",
       "storage": {
         "folder": "Vaše datoteke bodo shranjene v vaši lastni shrambi, pod vašimi ključi. Brez tega ostanejo v enklavi samo za to sejo in se ob ponovnem zagonu izgubijo."
       },
@@ -408,6 +412,7 @@
   },
 
   "access": {
+    "revokeBusy": "V tej aplikaciji so še odprte datoteke, zato ni bilo nič spremenjeno. Poskusite znova čez trenutek.",
     "summary": "Kaj vas lahko doseže in kako to ustaviti",
     "accountsTitle": "Povezani računi",
     "accountsHint": "Storitve, ki hranijo poverilnico za vaš račun drugje.",

@@ -27,6 +27,7 @@ import {
     type SetupRequirement,
 } from '@/services/capability-setup';
 import { getPlatformToken } from '@/services/platform-token';
+import { walletCallHeaders } from '@/services/wallet-call';
 
 /**
  * The closed permission vocabulary. The wallet renders only these and refuses
@@ -52,8 +53,23 @@ export const CAPABILITY_KINDS = [
     'calendar.events',
     'meeting.transcripts',
     'meeting.recording',
+    // The holder's files in the asking app's OWN storage, locked with a key the
+    // wallet holds. Unlike every kind above, the resource service is the app
+    // itself, reached at the `service_url` its ask names, and the wallet sends
+    // the key with the mint.
+    'app_storage',
 ] as const;
 export type CapabilityKind = (typeof CAPABILITY_KINDS)[number];
+
+/** Choices the asking app declares about a capability, rendered by the wallet. */
+export interface CapabilityOptions {
+    /**
+     * The app works while the holder is away: it keeps a locked copy of the
+     * folder key so it can carry on without the phone, until revoked. A real
+     * difference in what is being agreed to, so it changes the screen's words.
+     */
+    unattended?: boolean;
+}
 
 export interface CapabilityAsk {
     kind: CapabilityKind;
@@ -63,6 +79,7 @@ export interface CapabilityAsk {
     /** Opaque to the wallet. Forwarded verbatim to the resource service, which
      *  must refuse anything in it that names an ownership boundary (S4). */
     request: Record<string, unknown>;
+    options: CapabilityOptions;
 }
 
 /** What the requesting app returns inside its attested channel. */
@@ -74,6 +91,14 @@ export interface PendingCapability {
     binding_pubkey: string;
     /** The resource service, named by identity so the WALLET resolves it. */
     resource_app: string;
+    /**
+     * Where to mint, list and revoke, when the resource service is the asking
+     * app itself rather than a service resolved from `resource_app`. Accepted
+     * only on the host the wallet attested and read this ask from (see
+     * fetchPendingCapability), so it cannot point a holder-authenticated call
+     * anywhere else: the same guarantee S5 gives by resolving by identity.
+     */
+    service_url?: string;
     capability: CapabilityAsk;
     /**
      * What the resource service needs from the holder before this capability
@@ -166,19 +191,59 @@ export function parsePendingCapability(raw: unknown): PendingCapability {
         throw new CapabilityError(e.message);
     }
 
+    // Options change the words on the screen, so an option the wallet does not
+    // understand is ignored rather than guessed at, and a known one must be the
+    // right type: "unattended": "yes" is not a yes.
+    const rawOptions = cap['options'] as Record<string, unknown> | undefined;
+    const options: CapabilityOptions = {};
+    if (rawOptions && typeof rawOptions === 'object' && rawOptions['unattended'] === true) {
+        options.unattended = true;
+    }
+
+    const serviceUrl = parseServiceUrl(o['service_url']);
+
     const request = cap['request'];
     return {
         nonce,
         binding_pubkey: key,
         resource_app: resourceApp,
+        service_url: serviceUrl,
         setup,
         capability: {
             kind: kind as CapabilityKind,
             permissions: perms as Permission[],
             resource_label: label,
             request: (request && typeof request === 'object' ? request : {}) as Record<string, unknown>,
+            options,
         },
     };
+}
+
+/**
+ * A `service_url` the wallet will dial, or a refusal. Absent is fine; present
+ * and unusable is not, because an ask that names a service the wallet cannot
+ * reach is an ask it cannot honour.
+ */
+function parseServiceUrl(raw: unknown): string | undefined {
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    if (typeof raw !== 'string') throw new CapabilityError('request names its service in a form the wallet cannot use');
+    let u: URL;
+    try {
+        u = new URL(raw);
+    } catch {
+        throw new CapabilityError('request names its service in a form the wallet cannot use');
+    }
+    // A user-authenticated call over anything but TLS is not one to make, and
+    // credentials or a query in the URL have no business in a capability call.
+    if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash) {
+        throw new CapabilityError('request names its service in a form the wallet cannot use');
+    }
+    return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
+}
+
+/** The host a `service_url` points at, which must be the attested app host. */
+export function serviceUrlHost(serviceUrl: string): string {
+    return new URL(serviceUrl).host;
 }
 
 /**
@@ -203,13 +268,21 @@ export async function fetchPendingCapability(
     if (parsed.nonce !== nonce) {
         throw new CapabilityError('the request does not match the notification');
     }
+    // A service_url is only acceptable on the host just attested and read from.
+    // Anywhere else and the request would be choosing where the wallet posts a
+    // holder-authenticated call, which is precisely what resolving by identity
+    // (S5) exists to prevent. On the same host it is the attested app naming
+    // its own storage, which it is entitled to do.
+    if (parsed.service_url && serviceUrlHost(parsed.service_url) !== appHost) {
+        throw new CapabilityError('the request names a service on a host other than the one that asked');
+    }
     return parsed;
 }
 
 /** How long a capability of each kind may live. Chosen HERE, never by the
  *  requester, so nobody can ask for an unbounded one. */
 const DAY = 24 * 60 * 60;
-const LIFETIME_SECONDS: Record<CapabilityKind, number> = {
+const LIFETIME_SECONDS: Record<CapabilityKind, number | null> = {
     'storage.folder': 90 * DAY,
     'mail.mailbox': 90 * DAY,
     'calendar.events': 90 * DAY,
@@ -218,10 +291,20 @@ const LIFETIME_SECONDS: Record<CapabilityKind, number> = {
     // FUTURE meetings behave, not permission to read something that already
     // exists, so it should come back round for a fresh decision sooner.
     'meeting.recording': 30 * DAY,
+    // No expiry: it stands until revoked. An expiry here would not end the
+    // app's access to anything the holder cares about; it would lock the
+    // holder's own files away from the app they put them with, on a date they
+    // never chose. Revocation is the way it ends.
+    app_storage: null,
 };
 
+/**
+ * When a capability of this kind ends, in epoch seconds, or 0 for one that
+ * stands until revoked. 0 is also the wire value the service expects for that.
+ */
 export function expiryFor(kind: CapabilityKind, now = Date.now()): number {
-    return Math.floor(now / 1000) + LIFETIME_SECONDS[kind];
+    const lifetime = LIFETIME_SECONDS[kind];
+    return lifetime === null ? 0 : Math.floor(now / 1000) + lifetime;
 }
 
 export interface GrantedCapability {
@@ -230,6 +313,37 @@ export interface GrantedCapability {
     /** Opaque to the wallet; forwarded verbatim to the requesting app so it can
      *  address the resource service. Deliberately never interpreted here. */
     service_result?: Record<string, string>;
+}
+
+/**
+ * The capabilities collection at a service: the `service_url` an ask named, or
+ * the shared path on a host resolved by identity. Mint POSTs here, list GETs it,
+ * revoke DELETEs `<this>/<id>`.
+ */
+export function capabilitiesUrl(resourceHost: string, serviceUrl?: string): string {
+    return serviceUrl ?? `https://${resourceHost}/v1/capabilities`;
+}
+
+/**
+ * The wallet-instance proof, for calls to a `service_url`.
+ *
+ * The enclave OS behind a `service_url` mints only for the wallet app itself,
+ * proved per request. Signing that proof uses the biometric-gated device key,
+ * so it prompts, and it is attached only where the service requires it and a
+ * prompt makes sense: minting and revoking, each the holder's own deliberate
+ * tap. Never to a list, which runs whenever a screen opens, and never to the
+ * resolved services (Drive, the mail connector), which do not ask for it.
+ *
+ * Absent when the device has no usable attestation; the service then refuses
+ * with its own sentence, which is the honest outcome.
+ */
+async function instanceProof(
+    method: string,
+    url: string,
+    serviceUrl: string | undefined,
+): Promise<Record<string, string>> {
+    if (!serviceUrl) return {};
+    return (await walletCallHeaders(method, new URL(url).pathname)) ?? {};
 }
 
 /**
@@ -283,10 +397,15 @@ export async function createCapability(args: {
     setup?: Record<string, unknown>;
 }): Promise<MintOutcome> {
     const token = await getPlatformToken();
+    const url = capabilitiesUrl(args.resourceHost, args.pending.service_url);
     const raFetch = makeRaTlsFetch({ enclaveHost: args.resourceHost, platformFetch: fetch });
-    const res = await raFetch(`https://${args.resourceHost}/v1/capabilities`, {
+    const res = await raFetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            ...(await instanceProof('POST', url, args.pending.service_url)),
+        },
         body: JSON.stringify({
             nonce: args.pending.nonce,
             subject_app_id: args.subjectAppId,
@@ -358,10 +477,15 @@ export interface HeldCapability {
  * the list means the capability really is not held; the same 404 from a service
  * that does not serve it means only that the route is absent.
  */
-export async function listCapabilities(resourceHost: string): Promise<HeldCapability[] | null> {
+export async function listCapabilities(
+    resourceHost: string,
+    serviceUrl?: string,
+): Promise<HeldCapability[] | null> {
     const token = await getPlatformToken();
     const raFetch = makeRaTlsFetch({ enclaveHost: resourceHost, platformFetch: fetch });
-    const res = await raFetch(`https://${resourceHost}/v1/capabilities`, {
+    // Bearer only, deliberately: this runs whenever a detail screen opens, and
+    // a Face ID prompt to LOOK at your own grants would be hostile.
+    const res = await raFetch(capabilitiesUrl(resourceHost, serviceUrl), {
         headers: { Authorization: `Bearer ${token}` },
     });
     if (res.status === 404 || res.status === 405) return null;
@@ -390,13 +514,21 @@ export async function listCapabilities(resourceHost: string): Promise<HeldCapabi
  * credential kept after the grant that justified it is gone is a credential
  * nobody authorised.
  */
-export async function revokeCapability(resourceHost: string, capabilityId: string): Promise<void> {
+export async function revokeCapability(
+    resourceHost: string,
+    capabilityId: string,
+    serviceUrl?: string,
+): Promise<void> {
     const token = await getPlatformToken();
     const raFetch = makeRaTlsFetch({ enclaveHost: resourceHost, platformFetch: fetch });
-    const res = await raFetch(
-        `https://${resourceHost}/v1/capabilities/${encodeURIComponent(capabilityId)}`,
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-    );
+    const url = `${capabilitiesUrl(resourceHost, serviceUrl)}/${encodeURIComponent(capabilityId)}`;
+    const res = await raFetch(url, {
+        method: 'DELETE',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            ...(await instanceProof('DELETE', url, serviceUrl)),
+        },
+    });
     // 410 is the service saying it was already gone, which is the outcome the
     // holder asked for. 404 is not: from a service that serves the list it
     // means the same thing, and the caller checks that before calling.
@@ -406,6 +538,15 @@ export async function revokeCapability(resourceHost: string, capabilityId: strin
         `the service refused to revoke (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`,
         { status: res.status, code: errorCodeOf(body) },
     );
+}
+
+/**
+ * A holder folder cannot be closed while its files are in use. Nothing was
+ * revoked and nothing is wrong: the holder tries again in a moment, and the
+ * screen says that rather than showing a status code.
+ */
+export function isFolderBusy(e: unknown): e is CapabilityError {
+    return e instanceof CapabilityError && e.status === 409 && e.code !== 'vault_key_stale';
 }
 
 /**

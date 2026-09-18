@@ -62,6 +62,10 @@ process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KE
 /** Groups shared between the app and its extensions. */
 const SHARED_KEYCHAIN_GROUPS = ['$(AppIdentifierPrefix)org.privasys.shared'];
 
+/** Every use of the camera, in one sentence (see the camera plugins below). */
+const CAMERA_USAGE =
+    '$(PRODUCT_NAME) uses your camera to scan sign-in QR codes, photograph your ID document and take your profile picture.';
+
 const envConfig = {
     development: {
         name: 'Privasys Wallet Dev',
@@ -296,11 +300,22 @@ export default (context: ConfigContext): ExpoConfig => {
                     ios: { deploymentTarget: '16.0' }
                 }
             ],
+            // Both plugins write NSCameraUsageDescription, so they carry the
+            // same sentence; whichever runs last wins, and it must say every
+            // use. The picker never records video, so no microphone.
             [
                 'expo-camera',
                 {
-                    cameraPermission: '$(PRODUCT_NAME) needs your camera to scan login QR codes.',
+                    cameraPermission: CAMERA_USAGE,
                     recordAudioAndroid: false
+                }
+            ],
+            [
+                'expo-image-picker',
+                {
+                    cameraPermission: CAMERA_USAGE,
+                    photosPermission: '$(PRODUCT_NAME) lets you choose a photo from your library as your profile picture.',
+                    microphonePermission: false
                 }
             ],
             ['expo-router', { root: './src/routes' }],

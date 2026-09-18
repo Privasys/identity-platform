@@ -19,6 +19,7 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { sectionTitleStyle } from '@/components/section-title';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { localeMeta } from '@/i18n/locales';
 import { useSettingsStore } from '@/stores/settings';
@@ -62,13 +63,9 @@ export function LanguagePicker() {
 }
 
 const makeStyles = (p: Palette) => StyleSheet.create({
-    sectionTitle: {
-        fontSize: 17,
-        fontWeight: '600',
-        color: p.textPrimary,
-        marginTop: 24,
-        marginBottom: 10,
-    },
+    // The shared section-title style, with Settings' spacing: this title sits
+    // among Settings' own and must not look like a different kind of heading.
+    sectionTitle: { ...sectionTitleStyle(p), marginTop: 24, marginBottom: 6 },
     row: {
         flexDirection: 'row',
         alignItems: 'center',

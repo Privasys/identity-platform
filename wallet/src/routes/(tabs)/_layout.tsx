@@ -66,15 +66,8 @@ export default function TabLayout() {
                     )
                 }}
             />
-            <Tabs.Screen
-                name="drive"
-                options={{
-                    title: t('tabs.drive'),
-                    tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-                        <Ionicons name="folder" size={size} color={color} />
-                    )
-                }}
-            />
+            {/* Drive is not a tab: it is the holder's own data, so it opens
+                from Profile, under Personal Data. */}
             <Tabs.Screen
                 name="settings"
                 options={{

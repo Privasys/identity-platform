@@ -98,11 +98,7 @@ export default function AccessScreen() {
     return (
         <RNView style={styles.screen}>
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
-                {/* Product name: never translated. */}
-                <Text style={styles.headerTitle}>Privasys Wallet</Text>
-                <Text style={styles.headerSubtitle}>
-                    {t('access.summary')}
-                </Text>
+                <Text style={styles.headerTitle}>{t('tabs.access')}</Text>
             </RNView>
 
             <ScrollView
@@ -379,18 +375,17 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     header: {
         backgroundColor: p.green,
         paddingHorizontal: 24,
-        paddingBottom: 28,
+        paddingBottom: 24,
         borderBottomLeftRadius: 28,
         borderBottomRightRadius: 28,
     },
+    // The same header as Profile and Settings: the tab's name, nothing else.
     headerTitle: {
         fontSize: 28,
         fontWeight: '700',
         color: '#FFFFFF',
         letterSpacing: -0.5,
-        marginBottom: 4,
     },
-    headerSubtitle: { fontSize: 15, color: 'rgba(255,255,255,0.8)' },
     body: { flex: 1 },
     bodyContent: { paddingHorizontal: 20, paddingTop: 16 },
     banner: {

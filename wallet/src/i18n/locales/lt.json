@@ -413,7 +413,6 @@
 
   "access": {
     "revokeBusy": "Šioje programėlėje dar yra atidarytų failų, todėl niekas nepakeista. Pabandykite po akimirkos.",
-    "summary": "Kas gali jus pasiekti ir kaip tai sustabdyti",
     "accountsTitle": "Prijungtos paskyros",
     "accountsHint": "Paslaugos, saugančios prisijungimo duomenis prie jūsų paskyros kitur.",
     "accountsEmpty": "Neprijungėte jokių paskyrų.",
@@ -808,6 +807,14 @@
     "importDataHint": "Importuokite iš Google, LinkedIn, Microsoft ar GitHub",
     "exportData": "Eksportuoti duomenis",
     "exportDataHint": "Pasirinkite, ką eksportuoti, arba eksportuokite viską kaip JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Naršyti failus",
+    "addPhoto": "Pridėti nuotrauką",
+    "photoTitle": "Profilio nuotrauka",
+    "photoTakeSelfie": "Nusifotografuoti asmenukę",
+    "photoChoose": "Pasirinkti nuotrauką",
+    "photoCameraDenied": "Telefono nustatymuose leiskite Privasys Wallet naudoti kamerą ir bandykite dar kartą.",
+    "photoFailed": "Šios nuotraukos nepavyko panaudoti. Pabandykite kitą.",
     "sectionDataSharing": "DALIJIMASIS DUOMENIMIS",
     "sectionDataSharingHint": "Peržiūrėkite, kuo pasidalijote su paslaugomis.",
     "consentHistory": "Sutikimų istorija",

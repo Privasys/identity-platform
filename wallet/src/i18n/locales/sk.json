@@ -413,7 +413,6 @@
 
   "access": {
     "revokeBusy": "V tejto aplikácii sú stále otvorené súbory, preto sa nič nezmenilo. Skúste to o chvíľu znova.",
-    "summary": "Čo sa k vám dostane a ako to zastaviť",
     "accountsTitle": "Pripojené účty",
     "accountsHint": "Služby, ktoré uchovávajú prihlasovacie údaje k vášmu účtu inde.",
     "accountsEmpty": "Nepripojili ste žiadne účty.",
@@ -808,6 +807,14 @@
     "importDataHint": "Importujte z Google, LinkedIn, Microsoft alebo GitHub",
     "exportData": "Exportovať údaje",
     "exportDataHint": "Vyberte, čo exportovať, alebo exportujte všetko ako JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Prehliadať súbory",
+    "addPhoto": "Pridať fotku",
+    "photoTitle": "Profilová fotka",
+    "photoTakeSelfie": "Urobiť selfie",
+    "photoChoose": "Vybrať fotku",
+    "photoCameraDenied": "Povoľte aplikácii Privasys Wallet prístup ku kamere v nastaveniach telefónu a skúste to znova.",
+    "photoFailed": "Túto fotku nebolo možné použiť. Skúste inú.",
     "sectionDataSharing": "ZDIEĽANIE ÚDAJOV",
     "sectionDataSharingHint": "Pozrite si, čo ste zdieľali so službami.",
     "consentHistory": "História súhlasov",

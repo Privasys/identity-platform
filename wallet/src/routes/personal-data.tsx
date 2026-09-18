@@ -30,6 +30,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { useAvatarChooser } from '@/hooks/useAvatarChooser';
 import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES, isGovVerified } from '@/services/attributes';
@@ -45,6 +46,7 @@ export default function PersonalDataScreen() {
 
     const [addingAttribute, setAddingAttribute] = useState<string | null>(null);
     const [newAttrValue, setNewAttrValue] = useState('');
+    const chooseAvatar = useAvatarChooser();
 
     if (!profile) {
         router.back();
@@ -79,6 +81,12 @@ export default function PersonalDataScreen() {
     };
 
     const handleAddAttribute = (key: string) => {
+        // The avatar is a picture, not a line of text: it opens the camera or
+        // the library instead of the text field.
+        if (key === 'picture') {
+            chooseAvatar();
+            return;
+        }
         setAddingAttribute(key);
         setNewAttrValue('');
     };
@@ -118,7 +126,7 @@ export default function PersonalDataScreen() {
     // keys with gov-verified twins (birthdate_id, nationality_id), and the
     // disclosure path already knows the difference.
     const missingAttributes = CANONICAL_ATTRIBUTES.filter(
-        (a) => !existingKeys.has(a.key) && a.key !== 'picture' && !isGovVerified(a.key),
+        (a) => !existingKeys.has(a.key) && !isGovVerified(a.key),
     );
 
     // Logical display order, not insertion order: keep related attributes together
@@ -182,6 +190,7 @@ export default function PersonalDataScreen() {
                             key={`${attr.key}:${attr.value}`}
                             attr={attr}
                             onRemove={() => handleRemoveAttribute(attr)}
+                            onChangePicture={attr.key === 'picture' ? chooseAvatar : undefined}
                             onEdit={(newValue) => {
                                 const now = Math.floor(Date.now() / 1000);
                                 // Editing makes the value self-asserted again: reset
@@ -261,7 +270,18 @@ export default function PersonalDataScreen() {
 
 // ── Attribute card with provenance details ──────────────────────────────
 
-function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onRemove: () => void; onEdit: (newValue: string) => void }) {
+function AttributeCard({
+    attr,
+    onRemove,
+    onEdit,
+    onChangePicture,
+}: {
+    attr: ProfileAttribute;
+    onRemove: () => void;
+    onEdit: (newValue: string) => void;
+    /** Set for the holder's own avatar; the ID portrait cannot be replaced. */
+    onChangePicture?: () => void;
+}) {
     const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
@@ -384,10 +404,18 @@ function AttributeCard({ attr, onRemove, onEdit }: { attr: ProfileAttribute; onR
                                 </Pressable>
                             </RNView>
                         ) : isImage && attr.value ? (
-                            <Image
-                                source={{ uri: attr.value }}
-                                style={styles.attributeAvatar}
-                            />
+                            <Pressable
+                                onPress={onChangePicture}
+                                disabled={!onChangePicture}
+                                accessibilityRole={onChangePicture ? 'button' : 'image'}
+                                accessibilityLabel={onChangePicture ? t('profile.photoTitle') : attr.label}
+                                style={{ alignSelf: 'flex-start' }}
+                            >
+                                <Image
+                                    source={{ uri: attr.value }}
+                                    style={styles.attributeAvatar}
+                                />
+                            </Pressable>
                         ) : (
                             <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Text style={[styles.attributeValue, { flex: 1 }]} numberOfLines={2}>{attr.value}</Text>

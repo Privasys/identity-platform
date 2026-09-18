@@ -380,7 +380,6 @@
 
   "access": {
     "revokeBusy": "Filer er stadig åbne i denne app, så intet blev ændret. Prøv igen om lidt.",
-    "summary": "Hvad der kan nå dig, og hvordan du stopper det",
     "accountsTitle": "Forbundne konti",
     "accountsHint": "Tjenester, der opbevarer loginoplysninger til en konto, du har et andet sted.",
     "accountsEmpty": "Du har ikke forbundet nogen konti.",
@@ -774,6 +773,14 @@
     "importDataHint": "Importer fra Google, LinkedIn, Microsoft eller GitHub",
     "exportData": "Eksporter data",
     "exportDataHint": "Vælg, hvad du eksporterer, eller eksporter alt som JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Gennemse dine filer",
+    "addPhoto": "Tilføj et foto",
+    "photoTitle": "Profilfoto",
+    "photoTakeSelfie": "Tag en selfie",
+    "photoChoose": "Vælg et foto",
+    "photoCameraDenied": "Giv Privasys Wallet adgang til kameraet i telefonens indstillinger, og prøv igen.",
+    "photoFailed": "Det foto kunne ikke bruges. Prøv et andet.",
     "sectionDataSharing": "DATADELING",
     "sectionDataSharingHint": "Se, hvad du har delt med tjenester.",
     "consentHistory": "Samtykkehistorik",

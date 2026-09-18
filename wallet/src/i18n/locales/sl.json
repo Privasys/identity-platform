@@ -413,7 +413,6 @@
 
   "access": {
     "revokeBusy": "V tej aplikaciji so še odprte datoteke, zato ni bilo nič spremenjeno. Poskusite znova čez trenutek.",
-    "summary": "Kaj vas lahko doseže in kako to ustaviti",
     "accountsTitle": "Povezani računi",
     "accountsHint": "Storitve, ki hranijo poverilnico za vaš račun drugje.",
     "accountsEmpty": "Niste povezali nobenega računa.",
@@ -821,6 +820,14 @@
     "importDataHint": "Uvozite iz Google, LinkedIn, Microsoft ali GitHub",
     "exportData": "Izvozi podatke",
     "exportDataHint": "Izberite, kaj izvoziti, ali izvozite vse kot JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Prebrskajte svoje datoteke",
+    "addPhoto": "Dodajte fotografijo",
+    "photoTitle": "Profilna fotografija",
+    "photoTakeSelfie": "Posnemite selfi",
+    "photoChoose": "Izberite fotografijo",
+    "photoCameraDenied": "V nastavitvah telefona dovolite aplikaciji Privasys Wallet dostop do kamere in poskusite znova.",
+    "photoFailed": "Te fotografije ni bilo mogoče uporabiti. Poskusite z drugo.",
     "sectionDataSharing": "DELJENJE PODATKOV",
     "sectionDataSharingHint": "Preglejte, kaj ste delili s storitvami.",
     "consentHistory": "Zgodovina soglasij",

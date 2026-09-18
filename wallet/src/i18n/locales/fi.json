@@ -380,7 +380,6 @@
 
   "access": {
     "revokeBusy": "Tiedostoja on vielä auki tässä sovelluksessa, joten mitään ei muutettu. Yritä hetken päästä uudelleen.",
-    "summary": "Mikä pääsee sinuun käsiksi ja miten sen pysäytät",
     "accountsTitle": "Yhdistetyt tilit",
     "accountsHint": "Palvelut, jotka säilyttävät tunnuksia muualla olevaan tiliisi.",
     "accountsEmpty": "Et ole yhdistänyt yhtään tiliä.",
@@ -774,6 +773,14 @@
     "importDataHint": "Tuo palveluista Google, LinkedIn, Microsoft tai GitHub",
     "exportData": "Vie tietoja",
     "exportDataHint": "Valitse, mitä viet, tai vie kaikki JSON-muodossa",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Selaa tiedostojasi",
+    "addPhoto": "Lisää kuva",
+    "photoTitle": "Profiilikuva",
+    "photoTakeSelfie": "Ota selfie",
+    "photoChoose": "Valitse kuva",
+    "photoCameraDenied": "Salli Privasys Walletille kameran käyttö puhelimen asetuksista ja yritä uudelleen.",
+    "photoFailed": "Kuvaa ei voitu käyttää. Kokeile toista.",
     "sectionDataSharing": "TIETOJEN JAKAMINEN",
     "sectionDataSharingHint": "Tarkastele, mitä olet jakanut palveluille.",
     "consentHistory": "Suostumushistoria",

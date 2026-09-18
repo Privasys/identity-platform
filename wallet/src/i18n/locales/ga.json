@@ -413,7 +413,6 @@
 
   "access": {
     "revokeBusy": "Tá comhaid fós ar oscailt san aip seo, mar sin níor athraíodh aon rud. Bain triail eile as i gceann nóiméid.",
-    "summary": "Cad is féidir teacht ort, agus conas é a stopadh",
     "accountsTitle": "Cuntais nasctha",
     "accountsHint": "Seirbhísí a choinníonn dintiúr do chuntas leat in áit eile.",
     "accountsEmpty": "Níor nasc tú aon chuntas.",
@@ -834,6 +833,14 @@
     "importDataHint": "Iompórtáil ó Google, LinkedIn, Microsoft nó GitHub",
     "exportData": "Easpórtáil sonraí",
     "exportDataHint": "Roghnaigh cad a easpórtálfar, nó easpórtáil gach rud mar JSON",
+    "sectionDrive": "DRIVE",
+    "driveRow": "Brabhsáil do chomhaid",
+    "addPhoto": "Cuir grianghraf leis",
+    "photoTitle": "Grianghraf próifíle",
+    "photoTakeSelfie": "Glac féinín",
+    "photoChoose": "Roghnaigh grianghraf",
+    "photoCameraDenied": "Tabhair cead do Privasys Wallet an ceamara a úsáid i socruithe an fhóin, ansin bain triail eile as.",
+    "photoFailed": "Níorbh fhéidir an grianghraf sin a úsáid. Bain triail as ceann eile.",
     "sectionDataSharing": "ROINNT SONRAÍ",
     "sectionDataSharingHint": "Déan athbhreithniú ar ar roinn tú le seirbhísí.",
     "consentHistory": "Stair thoilithe",

@@ -20,7 +20,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -72,7 +72,15 @@ export default function AccessGrantScreen() {
      * dial it later.
      */
     const check = useCallback(async () => {
-        if (!record?.capabilityId || !record.resourceAppId) {
+        // Read at call time, not from a render. This ends by writing the
+        // answer into the store (markChecked), which makes a new record
+        // object; a check that depended on that object re-ran on its own
+        // write and flapped "checking" forever while asking the service in a
+        // loop (2026-09-18).
+        const current = useCapabilitiesStore
+            .getState()
+            .records.find((r) => capabilityKey(r) === key);
+        if (!current?.capabilityId || !current.resourceAppId) {
             setChecked('unreachable');
             return;
         }
@@ -82,10 +90,10 @@ export default function AccessGrantScreen() {
             // host that was attested when it was minted. Resolving the app id
             // again would find the app, not the storage the grant lives in.
             let targetHost: string;
-            if (record.serviceUrl) {
-                targetHost = serviceUrlHost(record.serviceUrl);
+            if (current.serviceUrl) {
+                targetHost = serviceUrlHost(current.serviceUrl);
             } else {
-                const resolved = await resolveApp(record.resourceAppId);
+                const resolved = await resolveApp(current.resourceAppId);
                 if (!resolved?.hostname) {
                     setChecked('unreachable');
                     return;
@@ -93,14 +101,14 @@ export default function AccessGrantScreen() {
                 targetHost = resolved.hostname;
             }
             setHost(targetHost);
-            const held = await listCapabilities(targetHost, record.serviceUrl);
+            const held = await listCapabilities(targetHost, current.serviceUrl);
             if (held === null) {
                 // The service does not serve the list, so it cannot be asked
                 // and must not be revoked from here either.
                 setChecked('unsupported');
                 return;
             }
-            const found = held.some((c) => c.capability_id === record.capabilityId);
+            const found = held.some((c) => c.capability_id === current.capabilityId);
             setChecked(found ? 'held' : 'gone');
             markChecked(key, found ? 'held' : 'gone');
         } catch {
@@ -108,12 +116,18 @@ export default function AccessGrantScreen() {
             // record, which is what it has always been.
             setChecked('unreachable');
         }
-    }, [record, key, markChecked]);
+    }, [key, markChecked]);
 
+    // Once per grant opened. Deliberately not on every change to the record:
+    // the check itself changes the record.
+    const startedFor = useRef<string | null>(null);
     useEffect(() => {
-        if (record && live) void check();
-        else setChecked(record?.revokedAt ? 'gone' : 'unreachable');
-    }, [record, live, check]);
+        if (!record) return;
+        if (startedFor.current === key) return;
+        startedFor.current = key;
+        if (live) void check();
+        else setChecked(record.revokedAt ? 'gone' : 'unreachable');
+    }, [record, live, key, check]);
 
     const onRevoke = () => {
         if (!record?.capabilityId || !host) return;

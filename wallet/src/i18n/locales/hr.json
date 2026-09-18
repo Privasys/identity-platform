@@ -765,6 +765,8 @@
     "method": "Metoda"
   },
   "profile": {
+    "identities": "Vaši identifikatori",
+    "identitiesHint": "Vaš Privasys račun i identifikatori iza ovog novčanika",
     "defaultDisplayName": "Korisnik Privasys",
     "setupTitle": "Postavite svoj novčanik",
     "setupLede": "Traje nekoliko sekundi, a sve se stvara ovdje, na vašem telefonu. Nema računa ni lozinke.",

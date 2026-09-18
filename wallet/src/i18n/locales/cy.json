@@ -801,6 +801,8 @@
     "method": "Dull"
   },
   "profile": {
+    "identities": "Eich dynodwyr",
+    "identitiesHint": "Eich cyfrif Privasys a’r dynodwyr y tu ôl i’r waled hon",
     "defaultDisplayName": "Defnyddiwr Privasys",
     "setupTitle": "Sefydlwch eich waled",
     "setupLede": "Mae'n cymryd ychydig eiliadau, ac mae popeth yn cael ei greu yma ar eich ffôn. Does dim cyfrif a dim cyfrinair.",

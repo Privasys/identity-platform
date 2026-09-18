@@ -2,375 +2,561 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Access: everything that can currently act on the holder, in one place.
+ * Profile: who the holder is. The first tab and the one the app opens on.
  *
- * This tab replaced a list of sessions. A session list is something you
- * consult, not something you land on, and the answer the holder actually wants
- * when they open the wallet is "what can reach me, and how do I stop it".
- *
- * The order is deliberate. Anything needing a decision comes first. Then the
- * two kinds of standing access, because those are the ones a holder forgets
- * they granted, with connected accounts above their own data since a credential
- * handed to someone else is the one they can least afford to lose track of.
- * Sign-ins and history sit underneath, as references rather than controls.
+ * Identity, personal data and recovery. What can act on the holder (sessions,
+ * grants, sign-in credentials, sharing history) is the Access tab's question.
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
+import {
+    StyleSheet,
+    ScrollView,
+    Pressable,
+    View as RNView,
+    Alert,
+    ActivityIndicator,
+    Image,
+    Platform,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { sectionTitleStyle } from '@/components/section-title';
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { rebuildFromGrantsIndex, syncGrantsIndex } from '@/services/grants-index';
+import {
+    biometricLabelKey,
+    titleiseBiometric,
+    DEFAULT_BIOMETRIC_LABEL_KEY,
+} from '@/services/biometrics';
+import { profileDisplayName } from '@/services/attributes';
+import { getDeviceLocale } from '@/services/device-locale';
+import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
+import { hasRecoveredPairwiseSeed, takeRecoveredPairwiseSeed } from '@/services/sovereign';
+import { wipeWallet } from '@/services/wipe';
+import { BIOMETRIC_TIMEOUT_MS, withTimeout } from '@/utils/timeout';
 import { useAuthStore } from '@/stores/auth';
-import { useCapabilitiesStore } from '@/stores/capabilities';
-import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
-import { useServiceSessionsStore } from '@/stores/service-sessions';
-import { useSessionsStore } from '@/stores/sessions';
-import { useTrustedAppsStore } from '@/stores/trusted-apps';
-import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
-import { isLive, rowsInGroup, type AccessRow } from '@/utils/access-rows';
-import { buildSessionRows, relativeWhen } from '@/utils/session-rows';
 
-/** How many rows a section shows before it defers to its own screen. */
-const PREVIEW = 3;
-
-export default function AccessScreen() {
-    const { apps } = useTrustedAppsStore();
-    const traces = useServiceSessionsStore((s) => s.traces);
-    const sessions = useSessionsStore((s) => s.sessions);
-    const records = useCapabilitiesStore((s) => s.records);
-    const hydrateCapabilities = useCapabilitiesStore((s) => s.hydrate);
-    const credentials = useAuthStore((s) => s.credentials);
-    const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
-    const consentRecordCount = useConsentStore((s) => s.records.length);
-    const pendingApprovals = useVaultApprovalsStore((s) => s.pending);
-    const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
-    const hasProfile = useProfileStore((s) => !!s.profile);
+export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
+    const profile = useProfileStore((s) => s.profile);
+    const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
+
+    const setOnboarded = useAuthStore((s) => s.setOnboarded);
+    // First-run setup progress: 0 = not started, then one tick per milestone
+    // (biometric confirmed → key created → identity ready).
+    const [setupBusy, setSetupBusy] = useState(false);
+    const [setupDone, setSetupDone] = useState(0);
+    // A wipe deletes the sovereign root asynchronously. Setup must not start
+    // until that lands, or the fresh identity can pick the old pairwise seed
+    // back up out of the not-yet-deleted stash.
+    const [wiping, setWiping] = useState(false);
+    /**
+     * True when a recovery finished but no local profile exists yet.
+     *
+     * Recovery restores the account server-side and stashes the pairwise seed;
+     * creating the profile that adopts it is a separate step, and landing on
+     * this screen is how that step is reached. Unmarked, someone who has just
+     * recovered is greeted by "Set up your wallet", which reads as the recovery
+     * having failed. It did not: pressing the button finishes it, and the seed
+     * below is what carries the original identity forward.
+     */
+    const [resumingRecovery, setResumingRecovery] = useState(false);
+    useEffect(() => {
+        let alive = true;
+        void hasRecoveredPairwiseSeed().then((has) => {
+            if (alive) setResumingRecovery(has);
+        });
+        return () => {
+            alive = false;
+        };
+    }, [profile]);
+    // Platform-appropriate name for the device unlock ("Face ID", "fingerprint",
+    // ...), so Android fingerprint users are never told to "Set up Face ID".
     const { t } = useTranslation();
-    const [now, setNow] = useState(() => Date.now());
-
+    // The KEY is held in state, not the resolved string: a language change
+    // must re-render this label, and a stored string would not.
+    const [bioKey, setBioKey] = useState(DEFAULT_BIOMETRIC_LABEL_KEY);
+    const bioLabel = t(bioKey);
+    // Derived, not the stored field: displayName is seeded with the placeholder
+    // at setup and only an explicit Display Name overwrites it, so a wallet that
+    // imported a first and last name still called its owner "Privasys User".
+    const shownName = profile ? profileDisplayName(profile, t('profile.defaultDisplayName')) : '';
+    // The avatar the holder set; failing that, the photo imported from their
+    // ID (`picture_id`, a data URI of the chip's DG2 portrait); otherwise none.
+    // The ID photo is theirs and already on this device, so showing it to them
+    // discloses nothing, and it is a better likeness than an initial.
+    const avatarSource =
+        profile?.avatarUri ||
+        profile?.attributes.find((a) => a.key === 'picture_id' && a.value)?.value ||
+        '';
     useEffect(() => {
-        // Local rows first, then any this phone is missing from the services
-        // the grants index names (a recovered or a second phone), then make
-        // sure the index reflects what this phone now holds. Once per launch,
-        // off the render path, and silent: a service that cannot be reached
-        // leaves the rows the phone already had.
-        void hydrateCapabilities()
-            .then(() => rebuildFromGrantsIndex())
-            .then(() => syncGrantsIndex());
-    }, [hydrateCapabilities]);
-
-    // A minute is enough here. Nothing on this screen counts down; the tick
-    // only moves "2 hours ago" along and retires an expired grant.
-    useEffect(() => {
-        const id = setInterval(() => setNow(Date.now()), 60_000);
-        return () => clearInterval(id);
+        let alive = true;
+        void biometricLabelKey().then((l) => {
+            if (alive) setBioKey(l);
+        });
+        return () => {
+            alive = false;
+        };
     }, []);
 
-    // Keep the pending count live: approvals arrive by push and also expire on
-    // their own, so neither event is something this screen would otherwise see.
-    useEffect(() => {
-        void refreshApprovals();
-        const id = setInterval(() => void refreshApprovals(), 20_000);
-        return () => clearInterval(id);
-    }, [refreshApprovals]);
+    /**
+     * First-run wallet setup: confirm the user's biometrics, create the
+     * hardware-backed device key (the one that signs the DID and all KYC / WIA
+     * proofs), then derive the identity and the local profile. This is the only
+     * guaranteed key-creation point now that the standalone onboarding screen is
+     * gone, so it runs here and, lazily, on the sign-in path.
+     */
+    const handleSetup = async () => {
+        if (setupBusy) return;
+        setSetupBusy(true);
+        setSetupDone(0);
+        try {
+            // 1 — Confirm biometrics exist, are enrolled, and actually work.
+            const hasHardware = await LocalAuthentication.hasHardwareAsync();
+            const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
+            if (!enrolled) {
+                Alert.alert(
+                    t('profile.setupBiometricFirstTitle', { method: bioLabel }),
+                    t(
+                        Platform.OS === 'ios'
+                            ? 'profile.setupBiometricFirstBodyIos'
+                            : 'profile.setupBiometricFirstBodyAndroid',
+                        { method: bioLabel }
+                    )
+                );
+                return;
+            }
+            // Bounded, because a wedged prompt is otherwise unrecoverable: the
+            // promise from authenticateAsync can simply never settle (seen on
+            // iOS on a second run-through, 2026-08-26), and with the spinner
+            // owned by this function the wallet froze until the user force-quit
+            // the app. A timeout turns that into an error they can retry.
+            const auth = await withTimeout(
+                LocalAuthentication.authenticateAsync({
+                    promptMessage: t('profile.setupPrompt'),
+                    fallbackLabel: t('profile.usePasscode'),
+                    cancelLabel: t('common.cancel')
+                }),
+                BIOMETRIC_TIMEOUT_MS,
+                'device unlock prompt'
+            );
+            if (!auth.success) {
+                return;
+            }
+            setSetupDone(1);
 
-    const nowSeconds = Math.floor(now / 1000);
-    const sessionRows = useMemo(
-        () => buildSessionRows(traces, apps, sessions, now),
-        [traces, apps, sessions, now],
-    );
-    const accounts = useMemo(() => rowsInGroup(records, 'account'), [records]);
-    const data = useMemo(() => rowsInGroup(records, 'data'), [records]);
+            // 2 — Create the biometric-gated signing key inside secure hardware.
+            await ensureDeviceKey();
+            setSetupDone(2);
 
-    const openGrant = (row: AccessRow) =>
-        router.push({ pathname: '/access-grant', params: { key: row.key } });
+            // 3 — Derive the identity and create the on-device profile. A
+            // seed recovered from the sovereign backup (account recovery on
+            // this device) takes precedence over minting a fresh one — that
+            // is what carries pairwise identities across devices.
+            const did = await generateDid();
+            const pairwiseSeed = (await takeRecoveredPairwiseSeed()) ?? (await generatePairwiseSeed());
+            const canonicalDid = await generateCanonicalDid(pairwiseSeed);
+            useProfileStore.getState().createProfile({
+                // EMPTY, not the placeholder. Storing the placeholder made it
+                // indistinguishable from a name the holder had chosen, and it
+                // was disclosed to relying parties as one. The Profile screen
+                // supplies it for display instead.
+                displayName: '',
+                email: '',
+                avatarUri: '',
+                locale: getDeviceLocale(),
+                did,
+                canonicalDid,
+                pairwiseSeed,
+                linkedProviders: [],
+                attributes: []
+            });
+            setOnboarded();
+            setSetupDone(3);
+            // The setup flow continues onto its second page: the dedicated
+            // recovery-phrase step (a real screen, not a popup). It carries its
+            // own "later" escape for users who insist. Reaching it is not
+            // load-bearing: the Home tab shows a standing "save your recovery
+            // phrase" banner for as long as recoveryPhraseSaved is false, and
+            // the wipe now resets that flag so a cleared wallet asks again.
+            router.push('/secure-wallet');
+        } catch (e: any) {
+            Alert.alert(
+                t('profile.setupFailedTitle'),
+                t('profile.setupFailedBody', { reason: e?.message ?? String(e) })
+            );
+            setSetupDone(0);
+        } finally {
+            // ALWAYS release the ceremony state: the component stays MOUNTED
+            // after setup succeeds, so a later "Clear All Data" brings this
+            // screen back, and a stale busy=true left the button spinning with
+            // the wallet unusable (2026-08-22, and again 2026-08-26).
+            setSetupBusy(false);
+        }
+    };
+
+    if (!profile) {
+        const setupItems = [
+            {
+                icon: 'scan-outline' as const,
+                title: t('profile.setupUnlockTitle'),
+                body: t(
+                    Platform.OS === 'ios'
+                        ? 'profile.setupUnlockBodyIos'
+                        : 'profile.setupUnlockBodyAndroid',
+                    { method: titleiseBiometric(bioLabel) }
+                )
+            },
+            {
+                icon: 'hardware-chip-outline' as const,
+                title: t('profile.setupHardwareTitle'),
+                body: t('profile.setupHardwareBody')
+            },
+            {
+                icon: 'finger-print-outline' as const,
+                title: t('profile.setupIdentityTitle'),
+                body: t('profile.setupIdentityBody')
+            }
+        ];
+        return (
+            <RNView style={[styles.screen, { paddingTop: insets.top }]}>
+                <ScrollView contentContainerStyle={styles.setupScroll} showsVerticalScrollIndicator={false}>
+                    <RNView style={styles.setupHeader}>
+                        <Ionicons
+                            name={resumingRecovery ? 'refresh-circle-outline' : 'shield-checkmark-outline'}
+                            size={56}
+                            color={p.green}
+                        />
+                        <Text style={styles.setupTitle}>
+                            {t(resumingRecovery ? 'profile.finishRestoreTitle' : 'profile.setupTitle')}
+                        </Text>
+                        <Text style={styles.setupLede}>
+                            {t(resumingRecovery ? 'profile.finishRestoreLede' : 'profile.setupLede')}
+                        </Text>
+                    </RNView>
+
+                    {/* What this creates — each row ticks green as that step completes. */}
+                    <RNView style={styles.setupCard}>
+                        {setupItems.map((it, i) => {
+                            const done = i < setupDone;
+                            const active = setupBusy && i === setupDone;
+                            return (
+                                <RNView key={it.title} style={styles.setupRow}>
+                                    <RNView style={[styles.setupBubble, done && styles.setupBubbleDone]}>
+                                        {done ? (
+                                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                                        ) : active ? (
+                                            <ActivityIndicator size="small" color={p.green} />
+                                        ) : (
+                                            <Ionicons name={it.icon} size={16} color={p.textMuted} />
+                                        )}
+                                    </RNView>
+                                    <RNView style={styles.setupRowText}>
+                                        <Text style={styles.setupRowTitle}>{it.title}</Text>
+                                        <Text style={styles.setupRowBody}>{it.body}</Text>
+                                    </RNView>
+                                </RNView>
+                            );
+                        })}
+                    </RNView>
+
+                    <Pressable
+                        style={[
+                            styles.createProfileButton,
+                            styles.setupButton,
+                            (setupBusy || wiping) && { opacity: 0.6 }
+                        ]}
+                        onPress={handleSetup}
+                        disabled={setupBusy || wiping}
+                    >
+                        {setupBusy || wiping ? (
+                            <ActivityIndicator color="#FFFFFF" size="small" />
+                        ) : (
+                            <>
+                                <Ionicons name="scan" size={18} color="#FFFFFF" />
+                                <Text style={styles.createProfileButtonText}>
+                                    {t('profile.setupWith', { method: bioLabel })}
+                                </Text>
+                            </>
+                        )}
+                    </Pressable>
+
+                    <Pressable
+                        style={styles.recoverButton}
+                        onPress={() => router.push('/recover-account' as never)}
+                    >
+                        <Ionicons name="key-outline" size={16} color={p.blue} />
+                        <Text style={styles.recoverButtonText}>{t('profile.recoverExisting')}</Text>
+                    </Pressable>
+                </ScrollView>
+            </RNView>
+        );
+    }
+
+
+
 
     return (
         <RNView style={styles.screen}>
+            {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
-                {/* Product name: never translated. */}
-                <Text style={styles.headerTitle}>Privasys Wallet</Text>
-                <Text style={styles.headerSubtitle}>
-                    {t('access.summary')}
-                </Text>
+                <Text style={styles.headerTitle}>Profile</Text>
             </RNView>
 
             <ScrollView
-                style={styles.body}
-                contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + 110 }]}
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Anything wanting a decision, before anything to browse. */}
-                {hasProfile && !recoveryPhraseSaved && (
-                    <Pressable
-                        style={styles.banner}
-                        onPress={() => router.push('/account-recovery')}
-                        accessibilityLabel={t('home.savePhraseTitle')}
-                    >
-                        <RNView style={[styles.bannerIcon, { backgroundColor: '#FDE68A' }]}>
-                            <Ionicons name="key-outline" size={18} color="#B45309" />
-                        </RNView>
-                        <RNView style={styles.bannerInfo}>
-                            <Text style={styles.bannerTitle}>{t('home.savePhraseTitle')}</Text>
-                            <Text style={styles.bannerMeta}>{t('home.savePhraseBody')}</Text>
-                        </RNView>
-                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-                    </Pressable>
-                )}
-
-                {pendingApprovals.length > 0 && (
-                    <Pressable
-                        style={styles.banner}
-                        onPress={() => router.push('/vault-approvals')}
-                        accessibilityLabel={t('home.pendingVaultApprovals', {
-                            count: pendingApprovals.length,
-                        })}
-                    >
-                        <RNView style={styles.bannerIcon}>
-                            <Ionicons name="key" size={18} color={p.infoText} />
-                        </RNView>
-                        <RNView style={styles.bannerInfo}>
-                            <Text style={styles.bannerTitle}>
-                                {t('home.pendingApprovals', { count: pendingApprovals.length })}
-                            </Text>
-                            <Text style={styles.bannerMeta}>{t('home.pendingApprovalsHint')}</Text>
-                        </RNView>
-                        <Ionicons name="chevron-forward" size={18} color={p.infoText} />
-                    </Pressable>
-                )}
-
-                {/* Connected accounts: a credential of the holder's, held by a
-                    service, for an account somewhere we do not control. */}
-                <Section
-                    title={t('access.accountsTitle')}
-                    hint={t('access.accountsHint')}
-                    styles={styles}
-                >
-                    {accounts.length === 0 ? (
-                        <Text style={styles.empty}>{t('access.accountsEmpty')}</Text>
-                    ) : (
-                        <>
-                            {accounts.slice(0, PREVIEW).map((row) => (
-                                <GrantRow
-                                    key={row.key}
-                                    row={row}
-                                    nowSeconds={nowSeconds}
-                                    onPress={() => openGrant(row)}
-                                    styles={styles}
-                                    p={p}
-                                    subtitle={row.record.resourceLabel}
-                                />
-                            ))}
-                            {accounts.length > PREVIEW && (
-                                <SeeAll
-                                    label={t('access.seeAll')}
-                                    onPress={() =>
-                                        router.push({ pathname: '/access-list', params: { group: 'account' } })
-                                    }
-                                    styles={styles}
-                                    p={p}
-                                />
-                            )}
-                        </>
-                    )}
-                </Section>
-
-                {/* Access to data we hold, where revoking is complete. */}
-                <Section title={t('access.dataTitle')} hint={t('access.dataHint')} styles={styles}>
-                    {data.length === 0 ? (
-                        <Text style={styles.empty}>{t('access.dataEmpty')}</Text>
-                    ) : (
-                        <>
-                            {data.slice(0, PREVIEW).map((row) => (
-                                <GrantRow
-                                    key={row.key}
-                                    row={row}
-                                    nowSeconds={nowSeconds}
-                                    onPress={() => openGrant(row)}
-                                    styles={styles}
-                                    p={p}
-                                    subtitle={t('access.inService', {
-                                        resource: row.record.resourceLabel,
-                                        service: row.record.resourceAppName || t('capability.unnamedApp'),
-                                    })}
-                                />
-                            ))}
-                            {data.length > PREVIEW && (
-                                <SeeAll
-                                    label={t('access.seeAll')}
-                                    onPress={() =>
-                                        router.push({ pathname: '/access-list', params: { group: 'data' } })
-                                    }
-                                    styles={styles}
-                                    p={p}
-                                />
-                            )}
-                        </>
-                    )}
-                </Section>
-
-                {/* Sessions: the three most recent, then the full list. This is
-                    the fix for a box that grew to 33 rows and swallowed the
-                    screen; nothing is hidden, it just is not all here. */}
-                <Section
-                    title={t('access.sessionsTitle')}
-                    hint={t('access.sessionsHint')}
-                    styles={styles}
-                >
-                    {sessionRows.length === 0 ? (
-                        <Text style={styles.empty}>{t('home.noSessions')}</Text>
-                    ) : (
-                        <>
-                            {sessionRows.slice(0, PREVIEW).map((row) => (
-                                <Pressable
-                                    key={row.key}
-                                    style={styles.row}
-                                    onPress={() =>
-                                        router.push({
-                                            pathname: '/service-detail',
-                                            params: { serviceKey: row.key },
-                                        })
-                                    }
-                                >
-                                    <RNView style={styles.rowInfo}>
-                                        <Text style={styles.rowTitle}>{row.name}</Text>
-                                        <Text style={styles.rowMeta}>
-                                            {relativeWhen(row.lastActiveMs, now, t)}
-                                        </Text>
-                                    </RNView>
-                                    {row.session && <RNView style={styles.liveDot} />}
-                                    <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-                                </Pressable>
-                            ))}
-                            <SeeAll
-                                label={t('access.seeAll')}
-                                onPress={() => router.push('/sessions')}
-                                styles={styles}
-                                p={p}
+                {/* Avatar + Name */}
+                <RNView style={styles.profileCard}>
+                    {/* A picture only when there is one: the avatar the holder
+                        set, or failing that the photo from their ID. No initial
+                        in a circle and no placeholder silhouette. */}
+                    {avatarSource ? (
+                        <RNView style={styles.avatarContainer}>
+                            <Image
+                                source={{ uri: avatarSource }}
+                                style={styles.avatarImage}
+                                onError={(e) =>
+                                    console.warn('[avatar] failed to load', e.nativeEvent?.error)
+                                }
                             />
-                        </>
-                    )}
-                </Section>
+                        </RNView>
+                    ) : null}
+                    <Text style={styles.profileName}>{shownName}</Text>
+                    {profile.email ? (
+                        <Text style={styles.profileEmail}>{profile.email}</Text>
+                    ) : null}
+                </RNView>
 
-                {/* References rather than controls. */}
-                <Section title={t('access.recordTitle')} styles={styles}>
-                    <Pressable style={styles.row} onPress={() => router.push('/credentials')}>
-                        <RNView style={styles.rowInfo}>
-                            <Text style={styles.rowTitle}>{t('access.credentials')}</Text>
-                            <Text style={styles.rowMeta}>
-                                {credentials.length > 0
-                                    ? t('profile.registeredCredentialsCount', { count: credentials.length })
-                                    : t('access.credentialsNone')}
+                {/* DID */}
+                {/* The three identifiers live one tap away. Three long strings
+                    here pushed the holder's own data down the screen. */}
+                <Text style={styles.sectionTitle}>{t('profile.sectionIdentity')}</Text>
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/identities')}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="finger-print" size={20} color={p.blue} />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>{t('profile.identities')}</Text>
+                            <Text style={styles.sharingDetail}>{t('profile.identitiesHint')}</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </RNView>
+                </Pressable>
+
+                {/* Personal Data */}
+                <Text style={styles.sectionTitle}>{t('profile.sectionPersonalData')}</Text>
+                <Text style={styles.sectionDescription}>{t('profile.sectionPersonalDataHint')}</Text>
+
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/personal-data' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="document-text-outline" size={20} color={p.blue} />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>{t('profile.manageAttributes')}</Text>
+                            <Text style={styles.sharingDetail}>
+                                {profile.attributes.length === 0
+                                    ? t('profile.noAttributes')
+                                    : t('profile.attributeCount', { count: profile.attributes.length })}
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-                    </Pressable>
-                    <Pressable style={styles.row} onPress={() => router.push('/consent-history')}>
-                        <RNView style={styles.rowInfo}>
-                            <Text style={styles.rowTitle}>{t('access.sharingHistory')}</Text>
-                            <Text style={styles.rowMeta}>
-                                {consentRecordCount === 0
-                                    ? t('profile.noSharingEvents')
-                                    : t('profile.eventCount', { count: consentRecordCount })}
+                    </RNView>
+                </Pressable>
+
+                {/* Government-verified ID scan (highest assurance) */}
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/kyc-capture' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="shield-checkmark-outline" size={20} color={p.blue} />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>{t('profile.idVerify')}</Text>
+                            <Text style={styles.sharingDetail}>{t('profile.idVerifyHint')}</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </RNView>
+                </Pressable>
+
+                {/* Import data (external IdPs) */}
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/import' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="cloud-download-outline" size={20} color={p.blue} />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>{t('profile.importData')}</Text>
+                            {/* Provider names are brands and stay as they are. */}
+                            <Text style={styles.sharingDetail}>{t('profile.importDataHint')}</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </RNView>
+                </Pressable>
+
+                {/* Export data */}
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/export' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="share-outline" size={20} color={p.blue} />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>{t('profile.exportData')}</Text>
+                            <Text style={styles.sharingDetail}>{t('profile.exportDataHint')}</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </RNView>
+                </Pressable>
+
+                {/* Sharing history and registered credentials used to sit here.
+                    They answer "who can act on me", which is the Access tab's
+                    question, not "who am I", which is this one's. */}
+
+                {/* Account Recovery */}
+                <Text style={styles.sectionTitle}>{t('profile.sectionRecovery')}</Text>
+                <Text style={styles.sectionDescription}>{t('profile.sectionRecoveryHint')}</Text>
+
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/account-recovery' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons
+                                name={recoveryPhraseSaved ? 'shield-checkmark-outline' : 'warning-outline'}
+                                size={20}
+                                color={recoveryPhraseSaved ? p.blue : '#F59E0B'}
+                            />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>{t('profile.recoverySettings')}</Text>
+                            <Text
+                                style={[
+                                    styles.sharingDetail,
+                                    !recoveryPhraseSaved && { color: '#B45309', fontWeight: '600' },
+                                ]}
+                            >
+                                {recoveryPhraseSaved
+                                    ? t('profile.recoveryConfigured')
+                                    : t('home.savePhraseTitle')}
                             </Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </RNView>
+                </Pressable>
+
+                <Pressable
+                    style={styles.sharingCard}
+                    onPress={() => router.push('/recover-account' as never)}
+                >
+                    <RNView style={styles.sharingRow}>
+                        <RNView style={styles.sharingIconContainer}>
+                            <Ionicons name="key-outline" size={20} color={p.warnText} />
+                        </RNView>
+                        <RNView style={{ flex: 1 }}>
+                            <Text style={styles.sharingLabel}>{t('profile.recoverAccount')}</Text>
+                            <Text style={styles.sharingDetail}>{t('profile.recoverAccountHint')}</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </RNView>
+                </Pressable>
+
+                {/* Profile metadata */}
+                <Text style={styles.sectionTitle}>{t('profile.sectionDetails')}</Text>
+                <RNView style={styles.metaCard}>
+                    <RNView style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>{t('profile.created')}</Text>
+                        <Text style={styles.metaValue}>
+                            {t('time.onDate', { when: new Date(profile.createdAt * 1000) })}
+                        </Text>
+                    </RNView>
+                    <RNView style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>{t('profile.lastUpdated')}</Text>
+                        <Text style={styles.metaValue}>
+                            {t('time.onDate', { when: new Date(profile.updatedAt * 1000) })}
+                        </Text>
+                    </RNView>
+                    <RNView style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>{t('profile.dataAttributes')}</Text>
+                        <Text style={styles.metaValue}>{profile.attributes.length}</Text>
+                    </RNView>
+                </RNView>
+
+                {/* Danger Zone */}
+                <RNView style={styles.dangerSection}>
+                    <RNView style={styles.dangerDivider} />
+                    <Text style={styles.dangerTitle}>{t('profile.dangerZone')}</Text>
+                    {/* Only the wipe is left here. Removing a credential stops
+                        one app signing in; this destroys the identity itself,
+                        which is why it stays beside who you are. */}
+                    <Text style={styles.dangerDescription}>{t('profile.dangerClearHint')}</Text>
+                    <Pressable
+                        style={styles.dangerButton}
+                        onPress={() => {
+                            Alert.alert(
+                                t('profile.clearAllData'),
+                                t('profile.clearAllDataBody'),
+                                [
+                                    { text: t('common.cancel'), style: 'cancel' },
+                                    {
+                                        text: t('profile.clearEverything'),
+                                        style: 'destructive',
+                                        onPress: () => {
+                                            // Everything the wipe touches lives in
+                                            // services/wipe.ts, which is covered by a test
+                                            // that fails when a new persisted key appears
+                                            // without a clear. Enumerating stores here is
+                                            // what let sessions, consent history, KYC
+                                            // records and the recovery-phrase flag survive
+                                            // a "Clear All Data" (2026-08-26).
+                                            setWiping(true);
+                                            void wipeWallet().finally(() => {
+                                                // Reset the setup ceremony so the re-shown
+                                                // setup screen starts clean (stale
+                                                // busy/done state froze the button,
+                                                // 2026-08-22).
+                                                setSetupBusy(false);
+                                                setSetupDone(0);
+                                                setWiping(false);
+                                            });
+                                        }
+                                    }
+                                ]
+                            );
+                        }}
+                    >
+                        <Ionicons name="trash-outline" size={18} color={p.danger} />
+                        <Text style={styles.dangerButtonText}>{t('profile.clearAllData')}</Text>
                     </Pressable>
-                </Section>
+                </RNView>
             </ScrollView>
-
-            {/* Scanning is how a service gets access, so it belongs here. */}
-            <Pressable
-                style={styles.scanFab}
-                onPress={() => router.push('/scan')}
-                accessibilityLabel={t('home.scanQrCode')}
-            >
-                <Ionicons name="qr-code-outline" size={26} color="#FFFFFF" />
-            </Pressable>
         </RNView>
-    );
-}
-
-function Section({
-    title,
-    hint,
-    styles,
-    children,
-}: {
-    title: string;
-    hint?: string;
-    styles: ReturnType<typeof makeStyles>;
-    children: React.ReactNode;
-}) {
-    return (
-        <RNView style={styles.section}>
-            <Text style={styles.sectionTitle}>{title}</Text>
-            {!!hint && <Text style={styles.sectionHint}>{hint}</Text>}
-            <RNView style={styles.card}>{children}</RNView>
-        </RNView>
-    );
-}
-
-function SeeAll({
-    label,
-    onPress,
-    styles,
-    p,
-}: {
-    label: string;
-    onPress: () => void;
-    styles: ReturnType<typeof makeStyles>;
-    p: Palette;
-}) {
-    return (
-        <Pressable style={styles.seeAll} onPress={onPress}>
-            <Text style={styles.seeAllText}>{label}</Text>
-            <Ionicons name="chevron-forward" size={16} color={p.blue} />
-        </Pressable>
-    );
-}
-
-function GrantRow({
-    row,
-    subtitle,
-    nowSeconds,
-    onPress,
-    styles,
-    p,
-}: {
-    row: AccessRow;
-    subtitle: string;
-    nowSeconds: number;
-    onPress: () => void;
-    styles: ReturnType<typeof makeStyles>;
-    p: Palette;
-}) {
-    const { t } = useTranslation();
-    const live = isLive(row.record, nowSeconds);
-    return (
-        <Pressable style={styles.row} onPress={onPress}>
-            <RNView style={styles.rowInfo}>
-                <Text style={[styles.rowTitle, !live && styles.rowEnded]}>
-                    {row.record.appName || t('capability.unnamedApp')}
-                </Text>
-                <Text style={styles.rowMeta}>{subtitle}</Text>
-                {!live && (
-                    <Text style={styles.rowEndedNote}>
-                        {row.record.revokedAt ? t('access.stateRevoked') : t('access.stateEnded')}
-                    </Text>
-                )}
-            </RNView>
-            <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-        </Pressable>
     );
 }
 
@@ -379,90 +565,219 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     header: {
         backgroundColor: p.green,
         paddingHorizontal: 24,
-        paddingBottom: 28,
+        paddingBottom: 24,
         borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28,
+        borderBottomRightRadius: 28
     },
     headerTitle: {
         fontSize: 28,
         fontWeight: '700',
         color: '#FFFFFF',
-        letterSpacing: -0.5,
-        marginBottom: 4,
+        letterSpacing: -0.5
     },
-    headerSubtitle: { fontSize: 15, color: 'rgba(255,255,255,0.8)' },
-    body: { flex: 1 },
-    bodyContent: { paddingHorizontal: 20, paddingTop: 16 },
-    banner: {
+    scrollView: { flex: 1 },
+    scrollContent: { padding: 20, paddingBottom: 40 },
+    emptyState: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        paddingHorizontal: 40
+    },
+    emptyTitle: { fontSize: 20, fontWeight: '600', color: p.textPrimary },
+    emptyText: { fontSize: 15, color: p.textSecondary, textAlign: 'center', lineHeight: 22 },
+
+    setupScroll: {
+        flexGrow: 1,
+        justifyContent: 'center',
+        paddingHorizontal: 28,
+        paddingVertical: 32,
+        gap: 24
+    },
+    setupHeader: { alignItems: 'center', gap: 12 },
+    setupTitle: { fontSize: 24, fontWeight: '700', color: p.textPrimary, letterSpacing: -0.3 },
+    setupLede: {
+        fontSize: 15,
+        color: p.textSecondary,
+        textAlign: 'center',
+        lineHeight: 22,
+        maxWidth: 340
+    },
+    setupCard: {
+        backgroundColor: p.card,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: p.border,
+        padding: 18,
+        gap: 16
+    },
+    setupRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+    setupBubble: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: p.cardAlt,
+        borderWidth: 1,
+        borderColor: p.border,
+        marginTop: 1
+    },
+    setupBubbleDone: { backgroundColor: p.green, borderColor: p.green },
+    setupRowText: { flex: 1, gap: 2 },
+    setupRowTitle: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+    setupRowBody: { fontSize: 13.5, color: p.textSecondary, lineHeight: 19 },
+    setupButton: {
+        flexDirection: 'row',
+        gap: 8,
+        justifyContent: 'center',
+        alignSelf: 'stretch',
+        marginTop: 4
+    },
+
+    createProfileButton: {
+        backgroundColor: p.blue,
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        marginTop: 8,
+        alignItems: 'center' as const,
+        minWidth: 180
+    },
+    createProfileButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600' as const
+    },
+    recoverButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: 16,
-        backgroundColor: 'rgba(52, 232, 158, 0.12)',
-        borderRadius: 14,
-        paddingHorizontal: 14,
-        paddingVertical: 14,
+        gap: 6,
+        paddingVertical: 10,
+        marginTop: 4,
     },
-    bannerIcon: {
+    recoverButtonText: {
+        color: p.blue,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+
+    profileCard: {
+        alignItems: 'center',
+        backgroundColor: p.card,
+        borderRadius: 16,
+        padding: 24,
+        marginBottom: 24
+    },
+    avatarContainer: { marginBottom: 16 },
+    avatarImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+    },
+    profileName: { fontSize: 22, fontWeight: '700', color: p.textPrimary, marginBottom: 4 },
+    profileEmail: { fontSize: 15, color: p.textSecondary },
+
+    sectionTitle: { ...sectionTitleStyle(p), marginTop: 24, marginBottom: 8 },
+    sectionDescription: {
+        fontSize: 13,
+        color: p.textMuted,
+        marginBottom: 12,
+        lineHeight: 18
+    },
+
+
+    exportButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: p.card,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: p.border,
+        padding: 14,
+        marginTop: 8,
+    },
+    exportButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: p.blue,
+    },
+
+    metaCard: {
+        backgroundColor: p.card,
+        borderRadius: 12,
+        padding: 16
+    },
+    metaRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderBottomWidth: 0.5,
+        borderBottomColor: p.cardAlt
+    },
+    metaLabel: { fontSize: 14, color: p.textSecondary },
+    metaValue: { fontSize: 14, fontWeight: '500', color: p.textPrimary },
+
+    sharingCard: {
+        backgroundColor: p.card,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 8
+    },
+    sharingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14
+    },
+    sharingIconContainer: {
         width: 36,
         height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(52, 232, 158, 0.22)',
+        borderRadius: 10,
+        backgroundColor: p.cardAlt,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'center'
     },
-    bannerInfo: { flex: 1 },
-    bannerTitle: { fontSize: 15, fontWeight: '700', color: p.textPrimary },
-    bannerMeta: { fontSize: 12, color: p.infoText, marginTop: 2 },
-    section: { marginBottom: 20 },
-    sectionTitle: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: p.textSecondary,
-        letterSpacing: 1,
-        marginBottom: 4,
-        textTransform: 'uppercase',
-    },
-    sectionHint: { fontSize: 13, color: p.textMuted, lineHeight: 18, marginBottom: 10 },
-    card: { backgroundColor: p.card, borderRadius: 14, overflow: 'hidden' },
-    row: {
-        flexDirection: 'row',
+    sharingLabel: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
+    sharingDetail: { fontSize: 13, color: p.textSecondary },
+
+    dangerSection: {
+        marginTop: 40,
         alignItems: 'center',
         gap: 10,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: p.border,
+        paddingBottom: 20,
     },
-    rowInfo: { flex: 1, gap: 2 },
-    rowTitle: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
-    rowEnded: { color: p.textMuted },
-    rowEndedNote: { fontSize: 12, color: p.textMuted },
-    rowMeta: { fontSize: 13, color: p.textSecondary },
-    liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: p.green },
-    empty: { fontSize: 13, color: p.textMuted, paddingHorizontal: 16, paddingVertical: 16 },
-    seeAll: {
+    dangerDivider: {
+        width: 40,
+        height: 1,
+        backgroundColor: p.border,
+        marginBottom: 4,
+    },
+    dangerTitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: p.textMuted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    dangerDescription: {
+        fontSize: 13,
+        color: p.textMuted,
+        textAlign: 'center',
+        lineHeight: 18,
+        maxWidth: 280,
+        marginBottom: 4,
+    },
+    dangerButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        paddingVertical: 13,
+        gap: 8,
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderWidth: 1,
+        borderColor: p.border,
     },
-    seeAllText: { fontSize: 14, fontWeight: '600', color: p.blue },
-    scanFab: {
-        position: 'absolute',
-        right: 24,
-        bottom: 24,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: p.blue,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: p.blue,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 8,
-    },
+    dangerButtonText: { color: p.danger, fontSize: 14, fontWeight: '500' },
 });

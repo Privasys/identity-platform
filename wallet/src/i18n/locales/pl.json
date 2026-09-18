@@ -756,6 +756,8 @@
   },
 
   "profile": {
+    "identities": "Twoje identyfikatory",
+    "identitiesHint": "Twoje konto Privasys i identyfikatory tego portfela",
     "defaultDisplayName": "Użytkownik Privasys",
     "setupTitle": "Skonfiguruj swój portfel",
     "setupLede": "Zajmie to kilka sekund, a wszystko powstaje tutaj, w Twoim telefonie. Nie ma konta ani hasła.",

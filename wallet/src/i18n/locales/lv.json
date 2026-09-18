@@ -765,6 +765,8 @@
     "method": "Metode"
   },
   "profile": {
+    "identities": "Jūsu identifikatori",
+    "identitiesHint": "Jūsu Privasys konts un šī maka identifikatori",
     "defaultDisplayName": "Privasys lietotājs",
     "setupTitle": "Iestatiet savu maku",
     "setupLede": "Tas aizņem dažas sekundes, un viss tiek izveidots šeit, jūsu tālrunī. Nav ne konta, ne paroles.",

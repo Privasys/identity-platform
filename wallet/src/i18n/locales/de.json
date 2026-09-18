@@ -732,6 +732,8 @@
   },
 
   "profile": {
+    "identities": "Ihre Kennungen",
+    "identitiesHint": "Ihr Privasys-Konto und die Kennungen hinter dieser Wallet",
     "defaultDisplayName": "Privasys-Nutzer",
     "setupTitle": "Richten Sie Ihr Wallet ein",
     "setupLede": "Es dauert nur wenige Sekunden, und alles wird hier auf Ihrem Telefon erstellt. Es gibt weder Konto noch Passwort.",

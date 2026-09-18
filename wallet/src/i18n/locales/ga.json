@@ -789,6 +789,8 @@
     "method": "Modh"
   },
   "profile": {
+    "identities": "Do chuid aitheantóirí",
+    "identitiesHint": "Do chuntas Privasys agus na haitheantóirí taobh thiar den sparán seo",
     "defaultDisplayName": "Úsáideoir Privasys",
     "setupTitle": "Socraigh do sparán",
     "setupLede": "Tógann sé cúpla soicind, agus cruthaítear gach rud anseo ar do ghuthán. Níl aon chuntas ná pasfhocal ann.",

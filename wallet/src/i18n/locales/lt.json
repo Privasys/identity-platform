@@ -765,6 +765,8 @@
     "method": "Metodas"
   },
   "profile": {
+    "identities": "Jūsų identifikatoriai",
+    "identitiesHint": "Jūsų Privasys paskyra ir šios piniginės identifikatoriai",
     "defaultDisplayName": "Privasys naudotojas",
     "setupTitle": "Nustatykite savo piniginę",
     "setupLede": "Tai užtrunka kelias sekundes, ir viskas sukuriama čia, jūsų telefone. Nėra nei paskyros, nei slaptažodžio.",

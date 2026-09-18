@@ -166,7 +166,7 @@ function RootLayoutNav({ hasProfile }: { hasProfile: boolean }) {
     // the standalone gradient onboarding screen, which has been removed.
     useEffect(() => {
         if (!hasProfile) {
-            router.replace('/(tabs)/profile');
+            router.replace('/(tabs)');
         }
     }, [hasProfile]);
 

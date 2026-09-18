@@ -732,6 +732,8 @@
   },
 
   "profile": {
+    "identities": "Dine identifikatorer",
+    "identitiesHint": "Din Privasys-konto og de id’er, der ligger bag denne wallet",
     "defaultDisplayName": "Privasys-bruger",
     "setupTitle": "Opsæt din wallet",
     "setupLede": "Det tager få sekunder, og alt oprettes her på din telefon. Der er ingen konto og ingen adgangskode.",

@@ -732,6 +732,8 @@
   },
 
   "profile": {
+    "identities": "Tunnisteesi",
+    "identitiesHint": "Privasys-tilisi ja tämän lompakon taustalla olevat tunnisteet",
     "defaultDisplayName": "Privasys-käyttäjä",
     "setupTitle": "Ota lompakkosi käyttöön",
     "setupLede": "Se vie muutaman sekunnin, ja kaikki luodaan tässä puhelimessasi. Tiliä tai salasanaa ei ole.",

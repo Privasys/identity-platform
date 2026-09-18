@@ -744,6 +744,8 @@
   },
 
   "profile": {
+    "identities": "Os seus identificadores",
+    "identitiesHint": "A sua conta Privasys e os identificadores desta carteira",
     "defaultDisplayName": "Utilizador Privasys",
     "setupTitle": "Configure a sua carteira",
     "setupLede": "Demora alguns segundos, e tudo é criado aqui, no seu telemóvel. Não há conta nem palavra-passe.",

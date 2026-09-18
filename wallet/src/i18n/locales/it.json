@@ -744,6 +744,8 @@
   },
 
   "profile": {
+    "identities": "I tuoi identificativi",
+    "identitiesHint": "Il tuo account Privasys e gli identificativi di questo portafoglio",
     "defaultDisplayName": "Utente Privasys",
     "setupTitle": "Configura il tuo portafoglio",
     "setupLede": "Bastano pochi secondi, e tutto viene creato qui, sul tuo telefono. Non c'è alcun account né password.",

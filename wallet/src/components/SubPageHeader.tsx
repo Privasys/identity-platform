@@ -23,7 +23,7 @@ export function SubPageHeader({ title, right }: { title: string; right?: ReactNo
     const router = useRouter();
     const goBack = () => {
         if (router.canGoBack()) router.back();
-        else router.replace('/(tabs)/profile');
+        else router.replace('/(tabs)');
     };
     return (
         <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>

@@ -3152,7 +3152,7 @@ function AttributeAcquisitionView({
                 await ensureDeviceKey();
                 const did = await generateDid();
                 // A seed recovered from the sovereign backup takes precedence
-                // over minting a fresh one (see routes/(tabs)/profile.tsx).
+                // over minting a fresh one (see routes/(tabs)/index.tsx).
                 const pairwiseSeed = (await takeRecoveredPairwiseSeed()) ?? (await generatePairwiseSeed());
                 const canonicalDid = await generateCanonicalDid(pairwiseSeed);
                 useProfileStore.getState().createProfile({

@@ -36,6 +36,7 @@ import (
 
 	"github.com/Privasys/idp/internal/admin"
 	"github.com/Privasys/idp/internal/attributes"
+	"github.com/Privasys/idp/internal/capasks"
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/config"
 	"github.com/Privasys/idp/internal/fido2"
@@ -386,7 +387,11 @@ func main() {
 	mux.HandleFunc("GET /admin/metrics", admin.HandleGetMetrics(db, cfg.AdminToken))
 	// App-initiated wallet notifications (mgmt forwards on behalf of an
 	// attested confidential app; payload sealed to the wallet's key).
-	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken))
+	// Capability requests are also remembered for the holder's wallet to
+	// list (routes beside the grants index below), so a swiped-away push
+	// does not strand the ask.
+	capabilityAsks := capasks.New()
+	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken, capabilityAsks))
 	mux.HandleFunc("POST /admin/roles", admin.HandleGrantRole(db, cfg.AdminToken))
 	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
 	mux.HandleFunc("GET /admin/roles", admin.HandleListRoles(db, cfg.AdminToken))
@@ -433,6 +438,12 @@ func main() {
 	// wallet derives from its data root. See internal/recovery/grants_index.go.
 	mux.HandleFunc("PUT /recovery/grants-index", recoveryHandler.HandlePutGrantsIndex)
 	mux.HandleFunc("GET /recovery/grants-index", recoveryHandler.HandleGetGrantsIndex)
+	// The capability requests relayed to this holder and still open, and the
+	// wallet's "decided" once the holder has answered one.
+	mux.HandleFunc("GET /capability-requests/pending",
+		capasks.HandleList(capabilityAsks, recoveryHandler.AuthenticateBearer))
+	mux.HandleFunc("DELETE /capability-requests/pending/{nonce}",
+		capasks.HandleDismiss(capabilityAsks, recoveryHandler.AuthenticateBearer))
 	mux.HandleFunc("POST /recovery/begin", recoveryHandler.HandleBeginRecovery)
 	mux.HandleFunc("GET /recovery/status", recoveryHandler.HandleRecoveryStatus)
 	mux.HandleFunc("POST /recovery/complete", recoveryHandler.HandleCompleteRecovery)

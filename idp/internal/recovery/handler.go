@@ -721,6 +721,12 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 
 // --- Helpers ---
 
+// AuthenticateBearer is authenticateBearer for other packages' wallet-facing
+// endpoints, so they accept the same two bearers the recovery API does.
+func (h *Handler) AuthenticateBearer(w http.ResponseWriter, r *http.Request) string {
+	return h.authenticateBearer(w, r)
+}
+
 // authenticateBearer extracts and validates the Bearer token, returning the user ID.
 // Accepts two forms:
 //   - "Bearer <jwt>"           — OIDC access token (verified via tokens.Issuer)

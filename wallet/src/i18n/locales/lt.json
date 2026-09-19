@@ -408,7 +408,12 @@
       "savedBody": "Duomenys, kuriuos praėjusį kartą įvedėte {{label}}, saugomi šiame telefone ir bus išsiųsti {{service}}, kai patvirtinsite.",
       "savedBodyNoLabel": "Duomenys, kuriuos įvedėte praėjusį kartą, saugomi šiame telefone ir bus išsiųsti {{service}}, kai patvirtinsite.",
       "keptNote": "Niekas kitas jų nemato. Šis telefonas juos pamiršta, kai atjungiate paskutinę juos naudojančią programėlę.",
-      "useOther": "Įvesti kitus duomenis"
+      "useOther": "Įvesti kitus duomenis",
+      "oauthButton": "Tęsti su {{provider}}",
+      "oauthWorking": "Laukiama {{provider}}",
+      "oauthDone": "Prisijungta per {{provider}}. Palieskite, kad prisijungtumėte iš naujo.",
+      "oauthFailed": "Prisijungimas per {{provider}} nebuvo užbaigtas. Bandykite dar kartą.",
+      "oauthGiven": "prisijungimas per {{provider}}"
     }
   },
 

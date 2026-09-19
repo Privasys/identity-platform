@@ -375,7 +375,12 @@
       "savedBody": "De gegevens die u de vorige keer voor {{label}} hebt ingevoerd, staan op deze telefoon en worden naar {{service}} gestuurd wanneer u goedkeurt.",
       "savedBodyNoLabel": "De gegevens die u de vorige keer hebt ingevoerd, staan op deze telefoon en worden naar {{service}} gestuurd wanneer u goedkeurt.",
       "keptNote": "Niemand anders ziet ze. Deze telefoon vergeet ze zodra u de laatste app loskoppelt die ze gebruikt.",
-      "useOther": "Andere gegevens invoeren"
+      "useOther": "Andere gegevens invoeren",
+      "oauthButton": "Doorgaan met {{provider}}",
+      "oauthWorking": "Wachten op {{provider}}",
+      "oauthDone": "Aangemeld met {{provider}}. Tik om opnieuw aan te melden.",
+      "oauthFailed": "Het aanmelden bij {{provider}} is niet voltooid. Probeer het opnieuw.",
+      "oauthGiven": "een aanmelding bij {{provider}}"
     }
   },
 

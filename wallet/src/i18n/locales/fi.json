@@ -375,7 +375,12 @@
       "savedBody": "Tiedot, jotka syötit viimeksi kohteelle {{label}}, on tallennettu tähän puhelimeen ja lähetetään palvelulle {{service}}, kun hyväksyt.",
       "savedBodyNoLabel": "Tiedot, jotka syötit viimeksi, on tallennettu tähän puhelimeen ja lähetetään palvelulle {{service}}, kun hyväksyt.",
       "keptNote": "Kukaan muu ei näe niitä. Tämä puhelin unohtaa ne, kun katkaiset viimeisen niitä käyttävän sovelluksen yhteyden.",
-      "useOther": "Syötä eri tiedot"
+      "useOther": "Syötä eri tiedot",
+      "oauthButton": "Jatka palvelulla {{provider}}",
+      "oauthWorking": "Odotetaan palvelua {{provider}}",
+      "oauthDone": "Kirjauduttu palvelulla {{provider}}. Napauta kirjautuaksesi uudelleen.",
+      "oauthFailed": "Kirjautuminen palvelulla {{provider}} ei onnistunut. Yritä uudelleen.",
+      "oauthGiven": "kirjautuminen palvelulla {{provider}}"
     }
   },
 

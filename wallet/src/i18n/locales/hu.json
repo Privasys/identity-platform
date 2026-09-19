@@ -375,7 +375,12 @@
       "savedBody": "A(z) {{label}} számára legutóbb megadott adatokat ez a telefon őrzi, és jóváhagyáskor elküldi a(z) {{service}} részére.",
       "savedBodyNoLabel": "A legutóbb megadott adatokat ez a telefon őrzi, és jóváhagyáskor elküldi a(z) {{service}} részére.",
       "keptNote": "Senki más nem látja őket. Ez a telefon elfelejti őket, amikor leválasztja az utolsó alkalmazást, amely használja őket.",
-      "useOther": "Más adatok megadása"
+      "useOther": "Más adatok megadása",
+      "oauthButton": "Folytatás ezzel: {{provider}}",
+      "oauthWorking": "Várakozás erre: {{provider}}",
+      "oauthDone": "Bejelentkezve ezzel: {{provider}}. Koppintson az újbóli bejelentkezéshez.",
+      "oauthFailed": "A bejelentkezés ({{provider}}) nem fejeződött be. Próbálja újra.",
+      "oauthGiven": "bejelentkezés ezzel: {{provider}}"
     }
   },
 

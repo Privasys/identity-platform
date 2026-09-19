@@ -408,7 +408,12 @@
       "savedBody": "Mae’r manylion a roesoch ar gyfer {{label}} y tro diwethaf yn cael eu cadw ar y ffôn hwn ac fe’u hanfonir at {{service}} pan fyddwch yn cymeradwyo.",
       "savedBodyNoLabel": "Mae’r manylion a roesoch y tro diwethaf yn cael eu cadw ar y ffôn hwn ac fe’u hanfonir at {{service}} pan fyddwch yn cymeradwyo.",
       "keptNote": "Nid oes neb arall yn eu gweld. Mae’r ffôn hwn yn eu hanghofio pan fyddwch yn datgysylltu’r ap olaf sy’n eu defnyddio.",
-      "useOther": "Rhoi manylion gwahanol"
+      "useOther": "Rhoi manylion gwahanol",
+      "oauthButton": "Parhau gyda {{provider}}",
+      "oauthWorking": "Yn aros am {{provider}}",
+      "oauthDone": "Wedi mewngofnodi gyda {{provider}}. Tapiwch i fewngofnodi eto.",
+      "oauthFailed": "Ni chwblhawyd y mewngofnodi gyda {{provider}}. Rhowch gynnig arall arni.",
+      "oauthGiven": "mewngofnodi gyda {{provider}}"
     }
   },
 

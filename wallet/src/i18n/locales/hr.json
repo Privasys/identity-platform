@@ -408,7 +408,12 @@
       "savedBody": "Podaci koje ste prošli put unijeli za {{label}} čuvaju se na ovom telefonu i bit će poslani usluzi {{service}} kada odobrite.",
       "savedBodyNoLabel": "Podaci koje ste prošli put unijeli čuvaju se na ovom telefonu i bit će poslani usluzi {{service}} kada odobrite.",
       "keptNote": "Nitko ih drugi ne vidi. Ovaj ih telefon zaboravlja kada odspojite posljednju aplikaciju koja ih koristi.",
-      "useOther": "Unesite druge podatke"
+      "useOther": "Unesite druge podatke",
+      "oauthButton": "Nastavi s {{provider}}",
+      "oauthWorking": "Čekanje na {{provider}}",
+      "oauthDone": "Prijavljeni putem {{provider}}. Dodirnite za ponovnu prijavu.",
+      "oauthFailed": "Prijava putem {{provider}} nije dovršena. Pokušajte ponovno.",
+      "oauthGiven": "prijava putem {{provider}}"
     }
   },
 

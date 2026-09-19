@@ -2646,6 +2646,7 @@ function ConnectFlow() {
                         releases={releases}
                         dependencies={dependencyItems.map((d) => ({
                             name: d.provenance.name,
+                            named: d.provenance.named,
                             label: d.provenance.label,
                             url: d.provenance.url,
                             status: d.status,

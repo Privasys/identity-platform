@@ -181,7 +181,15 @@ export function AttestationView({
      * `published` is the transparency-log gate; `status` reflects the approval
      * cache (approved/denied/new).
      */
-    dependencies?: Array<{ name: string; label?: string; url?: string; status: string; published: boolean }>;
+    dependencies?: Array<{
+        name: string;
+        /** `name` is the app's display name; otherwise it is the start of its id. */
+        named?: boolean;
+        label?: string;
+        url?: string;
+        status: string;
+        published: boolean;
+    }>;
     /**
      * The requested-attribute checklist. Supplying this makes the approval
      * screen the consent gate for the ceremony, so the caller must NOT then
@@ -624,26 +632,25 @@ export function AttestationView({
                         <View style={styles.card}>
                             <View style={styles.cardBody}>
                                 {dependencies.map((d, i) => {
-                                    const badge = !d.published
-                                        ? t('attestation.depBadgeVerify')
-                                        : d.status === 'approved'
-                                            ? t('attestation.depBadgeApproved')
-                                            : d.status === 'denied'
-                                                ? t('attestation.depBadgeDenied')
-                                                : t('attestation.depBadgeNew');
-                                    // `name`, never `label`. `label` is the
-                                    // dependency's VERSION, so preferring it
-                                    // produced a list reading "v0.1.0 / v0.1.27"
-                                    // with no indication of what those were.
-                                    const version = d.label && d.label !== d.name ? d.label : undefined;
+                                    // What the holder can use: which app, which
+                                    // version, and whether that build is one
+                                    // anybody can look at. Whether this wallet
+                                    // has seen it before ("new", "approved") is
+                                    // the wallet's bookkeeping, not theirs.
+                                    const name = d.named ? d.name : t('attestation.depUnnamed', { id: d.name });
+                                    const right = d.status === 'denied'
+                                        ? { value: t('attestation.depBadgeDenied') }
+                                        : d.published && d.url
+                                            ? { link: { url: d.url, label: t('attestation.depPublished') } }
+                                            : d.published
+                                                ? { value: t('attestation.depPublished') }
+                                                : { value: t('attestation.depNotPublished'), muted: true };
                                     return (
                                         <PropRow
                                             key={`${d.name}-${i}`}
-                                            label={d.name}
-                                            sublabel={version}
-                                            {...(d.url
-                                                ? { link: { url: d.url, label: badge } }
-                                                : { value: badge })}
+                                            label={name}
+                                            sublabel={d.label || undefined}
+                                            {...right}
                                             last={i === dependencies.length - 1}
                                             styles={styles}
                                         />
@@ -651,6 +658,7 @@ export function AttestationView({
                                 })}
                             </View>
                         </View>
+                        <Text style={styles.sectionFootnote}>{t('attestation.dependenciesFootnote')}</Text>
                     </>
                 )}
 

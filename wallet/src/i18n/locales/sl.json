@@ -400,10 +400,15 @@
       "show": "Pokaži",
       "hide": "Skrij",
       "incomplete": "Izpolnite vse, kar ni označeno kot neobvezno.",
-      "privacyNote": "Kar vnesete, gre s te naprave neposredno v storitev {{service}}. Tu se ne shranjuje, aplikacija, ki je zahtevala dostop, pa tega nikoli ne vidi.",
+      "privacyNote": "Kar vnesete, gre s te naprave neposredno storitvi {{service}}; aplikacija, ki je zaprosila, tega nikoli ne vidi. Ta telefon hrani kopijo, da vas ne vpraša znova, in jo pozabi, ko odklopite zadnjo aplikacijo, ki jo uporablja.",
       "refusedTitle": "Storitev {{service}} teh podatkov ni mogla uporabiti",
       "refusedFallback": "Podatki niso bili sprejeti. Preverite jih in poskusite znova.",
-      "refusedNested": "Ta zahteva zahteva več zaporednih odobritev, kot je mogoče, zato ni bilo nič dodeljeno."
+      "refusedNested": "Ta zahteva zahteva več zaporednih odobritev, kot je mogoče, zato ni bilo nič dodeljeno.",
+      "savedLabel": "Vaši shranjeni podatki",
+      "savedBody": "Podatki, ki ste jih zadnjič vnesli za {{label}}, so shranjeni v tem telefonu in bodo ob odobritvi poslani storitvi {{service}}.",
+      "savedBodyNoLabel": "Podatki, ki ste jih zadnjič vnesli, so shranjeni v tem telefonu in bodo ob odobritvi poslani storitvi {{service}}.",
+      "keptNote": "Nihče drug jih ne vidi. Ta telefon jih pozabi, ko odklopite zadnjo aplikacijo, ki jih uporablja.",
+      "useOther": "Vnesite druge podatke"
     }
   },
 
@@ -449,7 +454,7 @@
     "disconnect": "Prekini povezavo",
     "disconnectTitle": "Prekinem povezavo z {{app}}?",
     "disconnectBody": "{{app}} bo prenehala uporabljati {{resource}}. Sama poverilnica deluje naprej, dokler je ne odstranite tam, kjer ste jo ustvarili.",
-    "disconnectNote": "Prekinitev ustavi to aplikacijo. Storitev uniči to, kar ste vnesli, takoj ko nič drugega ni več odobreno za uporabo. Nič, kar je bilo že prebrano, se ne prikliče nazaj.",
+    "disconnectNote": "Odklop ustavi to aplikacijo. Ko nič drugega ne sme več uporabljati tega, kar ste vnesli, storitev uniči svojo kopijo in ta telefon jo pozabi. Kar je že bilo prebrano, se ne prikliče nazaj.",
     "remove": "Odstrani dostop",
     "removeTitle": "Odstranim dostop za {{app}}?",
     "removeBody": "{{app}} do tega ne bo več mogla.",

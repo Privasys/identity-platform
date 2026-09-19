@@ -367,10 +367,15 @@
       "show": "Megjelenítés",
       "hide": "Elrejtés",
       "incomplete": "Töltsön ki mindent, ami nincs nem kötelezőként megjelölve.",
-      "privacyNote": "Amit megad, erről az eszközről közvetlenül a(z) {{service}} szolgáltatáshoz kerül. Itt nem tárolódik, és az azt kérő alkalmazás soha nem látja.",
+      "privacyNote": "Amit megad, erről az eszközről közvetlenül a(z) {{service}} részére megy; a kérő alkalmazás sosem látja. Ez a telefon megőriz egy másolatot, hogy ne kérdezze újra, és elfelejti, amikor leválasztja az utolsó alkalmazást, amely használja.",
       "refusedTitle": "A(z) {{service}} nem tudta használni ezeket az adatokat",
       "refusedFallback": "Az adatokat nem fogadták el. Ellenőrizze őket, és próbálja újra.",
-      "refusedNested": "Ez a kérés több egymást követő jóváhagyást igényel, mint amennyi lehetséges, ezért semmi nem lett megadva."
+      "refusedNested": "Ez a kérés több egymást követő jóváhagyást igényel, mint amennyi lehetséges, ezért semmi nem lett megadva.",
+      "savedLabel": "Mentett adatai",
+      "savedBody": "A(z) {{label}} számára legutóbb megadott adatokat ez a telefon őrzi, és jóváhagyáskor elküldi a(z) {{service}} részére.",
+      "savedBodyNoLabel": "A legutóbb megadott adatokat ez a telefon őrzi, és jóváhagyáskor elküldi a(z) {{service}} részére.",
+      "keptNote": "Senki más nem látja őket. Ez a telefon elfelejti őket, amikor leválasztja az utolsó alkalmazást, amely használja őket.",
+      "useOther": "Más adatok megadása"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Leválasztás",
     "disconnectTitle": "Leválasztja a(z) {{app}} alkalmazást?",
     "disconnectBody": "A(z) {{app}} leáll a(z) {{resource}} használatával. Maga a hitelesítő adat addig működik, amíg el nem távolítja ott, ahol létrehozta.",
-    "disconnectNote": "A leválasztás leállítja ezt az alkalmazást. A szolgáltatás megsemmisíti a megadott adatokat, amint semmi más nem jogosult a használatukra. Ami már elolvasásra került, nem hívható vissza.",
+    "disconnectNote": "A leválasztás leállítja ezt az alkalmazást. Amint semmi más nem jogosult használni, amit megadott, a szolgáltatás megsemmisíti a másolatát, és ez a telefon elfelejti. Amit már elolvastak, nem hívható vissza.",
     "remove": "Hozzáférés eltávolítása",
     "removeTitle": "Eltávolítja a(z) {{app}} hozzáférését?",
     "removeBody": "A(z) {{app}} többé nem fér hozzá ehhez.",

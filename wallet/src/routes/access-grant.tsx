@@ -36,11 +36,30 @@ import {
     serviceUrlHost,
 } from '@/services/capabilities';
 import { syncGrantsIndex } from '@/services/grants-index';
+import { forgetSetup } from '@/services/setup-keep';
 import { capabilityKey, useCapabilitiesStore, type CapabilityRecord } from '@/stores/capabilities';
 import { groupOf, isLive } from '@/utils/access-rows';
 
 /** What the wallet has managed to learn about this grant from the service. */
 type Checked = 'checking' | 'held' | 'gone' | 'unreachable' | 'unsupported';
+
+/**
+ * Whether any OTHER record on this phone still stands for the same service
+ * and kind: another app the holder approved to use the same account. Read at
+ * call time, after the revoked one has been marked.
+ */
+function othersStillLive(revoked: CapabilityRecord, nowSeconds: number): boolean {
+    const mine = capabilityKey(revoked);
+    return useCapabilitiesStore
+        .getState()
+        .records.some(
+            (r) =>
+                capabilityKey(r) !== mine &&
+                r.resourceAppId === revoked.resourceAppId &&
+                r.kind === revoked.kind &&
+                isLive(r, nowSeconds),
+        );
+}
 
 export default function AccessGrantScreen() {
     const params = useLocalSearchParams<{ key?: string }>();
@@ -162,6 +181,16 @@ export default function AccessGrantScreen() {
                             // Only now. The service has confirmed.
                             markRevoked(key);
                             setChecked('gone');
+                            // The details this phone kept for that service go
+                            // with the LAST live grant over them, at the same
+                            // moment the service destroys its own copy. While
+                            // another app is still approved they stay: the
+                            // credential serves every app the holder approved,
+                            // and dropping it sooner would cut off access they
+                            // never withdrew.
+                            if (record.setupProvided && !othersStillLive(record, nowSeconds)) {
+                                await forgetSetup(record.resourceAppId, record.kind);
+                            }
                             // Then the app that asked, so it stops saying
                             // "approved". After, not before, and never instead.
                             await revokeAtCallingApp({

@@ -367,10 +367,15 @@
       "show": "Visa",
       "hide": "Dölj",
       "incomplete": "Fyll i allt som inte är markerat som valfritt.",
-      "privacyNote": "Det du anger går direkt till {{service}} från den här enheten. Det sparas inte här, och appen som bad om åtkomst ser det aldrig.",
+      "privacyNote": "Det du anger går direkt från den här enheten till {{service}}; appen som bad om det ser det aldrig. Den här telefonen sparar en kopia så att du slipper frågan igen, och glömmer den när du kopplar bort den sista appen som använder den.",
       "refusedTitle": "{{service}} kunde inte använda de här uppgifterna",
       "refusedFallback": "Uppgifterna godtogs inte. Kontrollera dem och försök igen.",
-      "refusedNested": "Den här begäran kräver fler godkännanden i följd än vad som är möjligt, så inget beviljades."
+      "refusedNested": "Den här begäran kräver fler godkännanden i följd än vad som är möjligt, så inget beviljades.",
+      "savedLabel": "Dina sparade uppgifter",
+      "savedBody": "Uppgifterna du angav för {{label}} förra gången finns på den här telefonen och skickas till {{service}} när du godkänner.",
+      "savedBodyNoLabel": "Uppgifterna du angav förra gången finns på den här telefonen och skickas till {{service}} när du godkänner.",
+      "keptNote": "Ingen annan ser dem. Den här telefonen glömmer dem när du kopplar bort den sista appen som använder dem.",
+      "useOther": "Ange andra uppgifter"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Koppla från",
     "disconnectTitle": "Koppla från {{app}}?",
     "disconnectBody": "{{app}} slutar använda {{resource}}. Själva uppgiften fortsätter att fungera tills du tar bort den där du skapade den.",
-    "disconnectNote": "Att koppla från stoppar den här appen. Tjänsten förstör det du angav så snart inget annat är godkänt att använda det. Inget som redan lästs hämtas tillbaka.",
+    "disconnectNote": "Att koppla bort stoppar den här appen. När inget annat längre får använda det du angav förstör tjänsten sin kopia och den här telefonen glömmer den. Det som redan lästs tas inte tillbaka.",
     "remove": "Ta bort åtkomst",
     "removeTitle": "Ta bort åtkomst för {{app}}?",
     "removeBody": "{{app}} kommer inte längre åt detta.",

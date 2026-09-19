@@ -16,6 +16,12 @@
  * see the far end being verified, and because what they type then makes one
  * attested hop to the service that seals it.
  *
+ * What the holder typed is kept on this phone (services/setup-keep.ts): a
+ * service that needs a credential holds it only in its enclave's memory, so
+ * the next ask for the same service sends the saved details on the holder's
+ * tap instead of drawing the form again. The form comes back only when the
+ * service refuses what was kept, or when the holder asks for it.
+ *
  * Nothing here knows what a tenant, a folder or a mailbox is. The resource
  * service does its own domain work from a request body the wallet forwards
  * without reading, and draws its own form from a schema the wallet renders
@@ -66,6 +72,13 @@ import { rearmTenantKeyAt } from '@/services/drive';
 import { syncGrantsIndex } from '@/services/grants-index';
 import { holderFolderKeyB64 } from '@/services/holder-folder';
 import { appIdFromOids } from '@/services/release-provenance';
+import {
+    keepSetup,
+    keptSetup,
+    nonSecretAnswers,
+    resupplyPayload,
+    type KeptSetup,
+} from '@/services/setup-keep';
 import { useCapabilitiesStore } from '@/stores/capabilities';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useConsentStore } from '@/stores/consent';
@@ -125,6 +138,15 @@ export default function CapabilityRequestScreen() {
      * the wallet ever having kept one.
      */
     const [secretsSoFar, setSecretsSoFar] = useState<string[]>([]);
+    /** The property names of those secrets, for what this phone keeps. */
+    const [secretNamesSoFar, setSecretNamesSoFar] = useState<string[]>([]);
+    /**
+     * What this phone kept from an earlier approval of the same service and
+     * kind, and whether the holder wants it sent. `useKept` false with a
+     * `kept` record is the holder having asked to enter different details.
+     */
+    const [kept, setKept] = useState<KeptSetup | null>(null);
+    const [useKept, setUseKept] = useState(false);
 
     // Where the prerequisite chain has got to. Refs, not state, so that the
     // effect driving it can have no dependencies: it must re-run when this
@@ -198,6 +220,15 @@ export default function CapabilityRequestScreen() {
                     }
                 }
 
+                // Saved details for this service and kind, if the holder gave
+                // some before. Looked up by the service's ATTESTED id. A
+                // holder folder's setup is a key the wallet derives, never
+                // something kept here.
+                const saved =
+                    !req.setup && req.capability.kind !== 'app_storage' && resolved?.app_id
+                        ? await keptSetup(resolved.app_id, req.capability.kind)
+                        : null;
+
                 if (cancelled) return;
                 setRequesterAppId(appId);
                 setRequesterName(requester?.display_name || requester?.name || '');
@@ -209,6 +240,8 @@ export default function CapabilityRequestScreen() {
                         initialAnswers(req.setup.fields, { email: prefillEmailFor(appHost) }),
                     );
                 }
+                setKept(saved);
+                setUseKept(!!saved);
                 // The service's own approvals come first, so the holder is not
                 // asked to type a credential into a service that has nowhere
                 // to keep it yet.
@@ -354,17 +387,28 @@ export default function CapabilityRequestScreen() {
         setServiceMessage('');
         setPhase('working');
 
-        // Everything the holder has typed across every step of this approval.
-        // Built here, sent once, and dropped when the screen closes.
-        const payload = setup ? { ...answered, ...setupPayload(setup.fields, answers) } : undefined;
+        // Everything the holder has typed across every step of this approval,
+        // or what this phone kept from an earlier one. Built here, sent once.
+        const resupplying = !setup && useKept && !!kept;
+        const payload = setup
+            ? { ...answered, ...setupPayload(setup.fields, answers) }
+            : resupplying
+              ? resupplyPayload(kept)
+              : undefined;
 
-        const stepSecrets = (setup?.fields ?? [])
-            .filter((f) => f.kind === 'secret' && String(answers[f.name] ?? '').length > 0)
-            .map((f) => f.title);
-        const secretsGiven = [
-            ...secretsSoFar,
-            ...stepSecrets.filter((s) => !secretsSoFar.includes(s)),
-        ];
+        const stepSecretFields = (setup?.fields ?? []).filter(
+            (f) => f.kind === 'secret' && String(answers[f.name] ?? '').length > 0,
+        );
+        const stepSecrets = stepSecretFields.map((f) => f.title);
+        const secretsGiven = resupplying
+            ? (kept.secretLabels ?? [])
+            : [...secretsSoFar, ...stepSecrets.filter((s) => !secretsSoFar.includes(s))];
+        const secretNames = resupplying
+            ? kept.secrets
+            : [
+                ...secretNamesSoFar,
+                ...stepSecretFields.map((f) => f.name).filter((n) => !secretNamesSoFar.includes(n)),
+            ];
 
         try {
             const expiresUnix = expiryFor(pending.capability.kind);
@@ -383,50 +427,84 @@ export default function CapabilityRequestScreen() {
                     }
                     : payload;
 
-            const mint = () =>
+            const mint = (withSetup: Record<string, unknown> | undefined = mintSetup) =>
                 createCapability({
                     resourceHost: resource.hostname,
                     subjectAppId: requesterAppId,
                     pending,
                     expiresUnix,
-                    setup: mintSetup,
+                    setup: withSetup,
                 });
             let outcome;
             try {
                 outcome = await mint();
             } catch (e) {
-                // The resource service was upgraded and this holder has not
-                // yet approved its new measurement for their own vault key.
-                // That approval is what a Drive login does; the holder is
-                // right here, so do it now and mint once more, instead of
-                // showing them a vault error they can only fix by signing
-                // in to Drive again.
-                if (!isStaleTenantKey(e) || !resource.app_id) throw e;
-                console.warn(
-                    `[CAPABILITY] ${resource.hostname} reports a stale tenant key (${e.message}); approving its measurement and retrying`,
-                );
-                const key = await rearmTenantKeyAt({
-                    host: resource.hostname,
-                    appId: resource.app_id,
-                    appHost,
-                });
-                console.log(`[CAPABILITY] tenant key ${key.status} on ${resource.hostname}`);
-                outcome = await mint();
+                // The service refused the details this phone had kept (the
+                // password was changed at the provider, say). There is no form
+                // on screen to edit, so ask the service what it needs, which
+                // it answers with the form, and draw that with the saved
+                // non-secret answers and the service's own sentence. If the
+                // service turns out to still hold a credential, the mint
+                // simply goes through.
+                if (resupplying && isProviderRefusal(e)) {
+                    console.log(
+                        `[CAPABILITY] ${resource.hostname} refused the saved details; asking for them again`,
+                    );
+                    const again = await mint(undefined);
+                    if (again.status === 'incomplete') {
+                        setUseKept(false);
+                        setServiceMessage(e.message || t('capability.setup.refusedFallback'));
+                        setSetup(again.requirement);
+                        setAnswers(
+                            initialAnswers(again.requirement.fields, {
+                                previous: nonSecretAnswers(kept),
+                                email: prefillEmailFor(appHost),
+                            }),
+                        );
+                        setPhase('ready');
+                        return;
+                    }
+                    outcome = again;
+                } else if (!isStaleTenantKey(e) || !resource.app_id) {
+                    throw e;
+                } else {
+                    // The resource service was upgraded and this holder has
+                    // not yet approved its new measurement for their own vault
+                    // key. That approval is what a Drive login does; the
+                    // holder is right here, so do it now and mint once more,
+                    // instead of showing them a vault error they can only fix
+                    // by signing in to Drive again.
+                    console.warn(
+                        `[CAPABILITY] ${resource.hostname} reports a stale tenant key (${e.message}); approving its measurement and retrying`,
+                    );
+                    const key = await rearmTenantKeyAt({
+                        host: resource.hostname,
+                        appId: resource.app_id,
+                        appHost,
+                    });
+                    console.log(`[CAPABILITY] tenant key ${key.status} on ${resource.hostname}`);
+                    outcome = await mint();
+                }
             }
 
             // One more question: a mail server that could not be found from the
             // address, say. Keep what was answered, draw the new step, and stay
-            // on this screen. Nothing was granted and nothing failed.
+            // on this screen. Nothing was granted and nothing failed. After a
+            // re-supply the question means the kept answers were not enough
+            // (the service asks afresh after a restart with a changed schema):
+            // the saved non-secret answers start the form, the secrets do not.
             if (outcome.status === 'incomplete') {
                 console.log(
                     `[CAPABILITY] ${resource.hostname} needs more before it can grant this; asking`,
                 );
-                setAnswered(payload ?? {});
-                setSecretsSoFar(secretsGiven);
+                setUseKept(false);
+                setAnswered(resupplying ? {} : (payload ?? {}));
+                setSecretsSoFar(resupplying ? [] : secretsGiven);
+                setSecretNamesSoFar(resupplying ? [] : secretNames);
                 setSetup(outcome.requirement);
                 setAnswers(
                     initialAnswers(outcome.requirement.fields, {
-                        previous: answers,
+                        previous: resupplying ? nonSecretAnswers(kept) : answers,
                         email: prefillEmailFor(appHost),
                     }),
                 );
@@ -435,6 +513,30 @@ export default function CapabilityRequestScreen() {
             }
 
             const granted = outcome.granted;
+
+            // Keep what worked, so the next ask for this service sends it on a
+            // tap. Only when something was sent: an approval that needed no
+            // setup has nothing to keep, and a holder folder's key is derived,
+            // not kept. Replaces an earlier record, which is how a changed
+            // password is corrected. Best effort: a failed keep costs one form
+            // next time, not this approval.
+            if (payload && Object.keys(payload).length > 0 && resource.app_id &&
+                pending.capability.kind !== 'app_storage') {
+                try {
+                    await keepSetup({
+                        serviceAppId: resource.app_id,
+                        kind: pending.capability.kind,
+                        answers: payload,
+                        secrets: secretNames,
+                        secretLabels: secretsGiven.length > 0 ? secretsGiven : undefined,
+                        kept: granted.keep ?? (resupplying ? kept.kept : undefined),
+                    });
+                } catch (e) {
+                    console.warn(
+                        `[CAPABILITY] the details could not be kept on this device: ${e instanceof Error ? e.message : String(e)}`,
+                    );
+                }
+            }
 
             // The mint is what the holder approved: the record comes first,
             // whatever the app then hears. On 2026-09-18 the report below
@@ -452,8 +554,9 @@ export default function CapabilityRequestScreen() {
                 grantedAt: Math.floor(Date.now() / 1000),
                 expiresAt: expiresUnix,
                 // That a credential was handed over, and what the service
-                // called it. Never what it was: the values made one hop to the
-                // service and are gone from here the moment this screen closes.
+                // called it. Never what it was: the values are in the secure
+                // store under the service's key (setup-keep), not on a record
+                // the Access tab reads and the grants index describes.
                 setupProvided: secretsGiven.length > 0,
                 secretLabels: secretsGiven.length > 0 ? secretsGiven : undefined,
                 // Where to list and revoke it later: exactly where it was
@@ -664,6 +767,32 @@ export default function CapabilityRequestScreen() {
                             </Text>
                         </RNView>
 
+                        {/* What this phone kept from an earlier approval of
+                            the same service: sent on the tap, unless the
+                            holder wants to enter different details, in which
+                            case the service asks with its form. */}
+                        {!setup && kept && useKept && (
+                            <RNView style={styles.setup}>
+                                <Text style={styles.label}>{t('capability.setup.savedLabel')}</Text>
+                                <Text style={styles.body}>
+                                    {kept.label
+                                        ? t('capability.setup.savedBody', {
+                                            label: kept.label,
+                                            service: serviceName,
+                                        })
+                                        : t('capability.setup.savedBodyNoLabel', { service: serviceName })}
+                                </Text>
+                                <Text style={styles.muted}>{t('capability.setup.keptNote')}</Text>
+                                <Pressable
+                                    onPress={() => setUseKept(false)}
+                                    disabled={phase === 'working'}
+                                    hitSlop={8}
+                                >
+                                    <Text style={styles.link}>{t('capability.setup.useOther')}</Text>
+                                </Pressable>
+                            </RNView>
+                        )}
+
                         {/* What the service needs from the holder, drawn from
                             the schema it declared. Under the ask, so the grant
                             has been read before anything is typed. */}
@@ -790,4 +919,5 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         marginTop: 10,
     },
     secondaryText: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+    link: { fontSize: 15, fontWeight: '600', color: p.blue, marginTop: 8 },
 });

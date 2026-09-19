@@ -46,6 +46,7 @@
 import { deleteDeviceKey } from '@/services/did';
 import { clearKycRecords } from '@/services/kyc';
 import { clearGrantsIndexLocalState } from '@/services/grants-index';
+import { clearKeptSetups } from '@/services/setup-keep';
 import { clearNotifySealKey } from '@/services/notify-seal';
 import { clearPlatformToken } from '@/services/platform-token';
 import { RECOVERY_STATE_KEY } from '@/services/recovery-api';
@@ -114,6 +115,10 @@ export async function wipeWallet(): Promise<void> {
         settle('platform token', clearPlatformToken()),
         settle('notification sealing key', clearNotifySealKey()),
         settle('recovery state', SecureStore.deleteItemAsync(RECOVERY_STATE_KEY)),
+        // The details the holder typed for resource services (a mailbox
+        // password), kept for re-supply. The next identity must not inherit
+        // them.
+        settle('kept setup details', clearKeptSetups()),
         // The device signing key: root of the device DID and of every holder
         // proof. First-run setup mints a fresh one, so the next identity starts
         // with a key this device has never used before.

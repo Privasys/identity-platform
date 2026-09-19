@@ -367,10 +367,15 @@
       "show": "Tonen",
       "hide": "Verbergen",
       "incomplete": "Vul alles in wat niet als optioneel is gemarkeerd.",
-      "privacyNote": "Wat je invult gaat vanaf dit apparaat rechtstreeks naar {{service}}. Het wordt hier niet bewaard, en de app die erom vroeg ziet het nooit.",
+      "privacyNote": "Wat u invoert gaat rechtstreeks van dit apparaat naar {{service}}; de app die erom vroeg ziet het nooit. Deze telefoon bewaart een kopie zodat u het niet opnieuw hoeft in te voeren, en vergeet die zodra u de laatste app loskoppelt die hem gebruikt.",
       "refusedTitle": "{{service}} kon deze gegevens niet gebruiken",
       "refusedFallback": "De gegevens zijn niet geaccepteerd. Controleer ze en probeer het opnieuw.",
-      "refusedNested": "Deze aanvraag vraagt om meer opeenvolgende goedkeuringen dan mogelijk is, dus er is niets verleend."
+      "refusedNested": "Deze aanvraag vraagt om meer opeenvolgende goedkeuringen dan mogelijk is, dus er is niets verleend.",
+      "savedLabel": "Uw opgeslagen gegevens",
+      "savedBody": "De gegevens die u de vorige keer voor {{label}} hebt ingevoerd, staan op deze telefoon en worden naar {{service}} gestuurd wanneer u goedkeurt.",
+      "savedBodyNoLabel": "De gegevens die u de vorige keer hebt ingevoerd, staan op deze telefoon en worden naar {{service}} gestuurd wanneer u goedkeurt.",
+      "keptNote": "Niemand anders ziet ze. Deze telefoon vergeet ze zodra u de laatste app loskoppelt die ze gebruikt.",
+      "useOther": "Andere gegevens invoeren"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Ontkoppelen",
     "disconnectTitle": "{{app}} ontkoppelen?",
     "disconnectBody": "{{app}} stopt met het gebruik van {{resource}}. Het inloggegeven zelf blijft werken totdat je het verwijdert waar je het hebt aangemaakt.",
-    "disconnectNote": "Ontkoppelen stopt deze app. De dienst vernietigt wat je hebt ingevoerd zodra niets anders er nog toestemming voor heeft. Niets dat al is gelezen wordt teruggehaald.",
+    "disconnectNote": "Loskoppelen stopt deze app. Zodra niets anders meer gemachtigd is om te gebruiken wat u hebt ingevoerd, vernietigt de dienst zijn kopie en vergeet deze telefoon hem. Wat al gelezen is, wordt niet teruggehaald.",
     "remove": "Toegang intrekken",
     "removeTitle": "Toegang van {{app}} intrekken?",
     "removeBody": "{{app}} kan hier niet meer bij.",

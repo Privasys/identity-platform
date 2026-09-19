@@ -367,10 +367,15 @@
       "show": "Mostrar",
       "hide": "Ocultar",
       "incomplete": "Preencha tudo o que não esteja marcado como opcional.",
-      "privacyNote": "O que introduzir segue deste dispositivo diretamente para {{service}}. Não fica guardado aqui, e a aplicação que fez o pedido nunca o vê.",
+      "privacyNote": "O que introduz vai diretamente deste dispositivo para {{service}}; a aplicação que pediu nunca o vê. Este telemóvel guarda uma cópia para não voltar a pedir e esquece-a quando desligar a última aplicação que a usa.",
       "refusedTitle": "{{service}} não conseguiu usar estes dados",
       "refusedFallback": "Os dados não foram aceites. Verifique-os e tente novamente.",
-      "refusedNested": "Este pedido exige mais aprovações consecutivas do que é possível, pelo que nada foi concedido."
+      "refusedNested": "Este pedido exige mais aprovações consecutivas do que é possível, pelo que nada foi concedido.",
+      "savedLabel": "Os seus dados guardados",
+      "savedBody": "Os dados que introduziu da última vez para {{label}} estão guardados neste telemóvel e serão enviados a {{service}} quando aprovar.",
+      "savedBodyNoLabel": "Os dados que introduziu da última vez estão guardados neste telemóvel e serão enviados a {{service}} quando aprovar.",
+      "keptNote": "Mais ninguém os vê. Este telemóvel esquece-os quando desligar a última aplicação que os usa.",
+      "useOther": "Introduzir outros dados"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Desligar",
     "disconnectTitle": "Desligar {{app}}?",
     "disconnectBody": "{{app}} deixará de usar {{resource}}. A credencial em si continua a funcionar até a remover onde a criou.",
-    "disconnectNote": "Desligar interrompe esta aplicação. O serviço destrói o que introduziu assim que mais nada estiver aprovado para o usar. Nada que já tenha sido lido é recuperado.",
+    "disconnectNote": "Desligar para esta aplicação. Quando mais nada estiver autorizado a usar o que introduziu, o serviço destrói a sua cópia e este telemóvel esquece-a. O que já foi lido não é recuperado.",
     "remove": "Remover acesso",
     "removeTitle": "Remover o acesso de {{app}}?",
     "removeBody": "{{app}} deixará de conseguir chegar a isto.",

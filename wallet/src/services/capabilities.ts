@@ -313,6 +313,13 @@ export interface GrantedCapability {
     /** Opaque to the wallet; forwarded verbatim to the requesting app so it can
      *  address the resource service. Deliberately never interpreted here. */
     service_result?: Record<string, string>;
+    /**
+     * Values the service asks THIS PHONE to hold for it, because it keeps
+     * nothing at rest: a refresh token it exchanged, say. Kept beside the
+     * holder's answers (services/setup-keep.ts) and sent back as `setup.kept`
+     * on the next mint. Opaque here, never read, never logged.
+     */
+    keep?: Record<string, unknown>;
 }
 
 /**

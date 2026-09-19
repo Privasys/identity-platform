@@ -367,10 +367,15 @@
       "show": "Näytä",
       "hide": "Piilota",
       "incomplete": "Täytä kaikki, mitä ei ole merkitty valinnaiseksi.",
-      "privacyNote": "Antamasi tiedot menevät tältä laitteelta suoraan palveluun {{service}}. Niitä ei säilytetä täällä, eikä pyynnön tehnyt sovellus näe niitä koskaan.",
+      "privacyNote": "Syöttämäsi tiedot menevät tältä laitteelta suoraan palvelulle {{service}}; pyynnön tehnyt sovellus ei näe niitä koskaan. Tämä puhelin säilyttää kopion, jotta niitä ei kysytä uudelleen, ja unohtaa sen, kun katkaiset viimeisen sitä käyttävän sovelluksen yhteyden.",
       "refusedTitle": "Palvelu {{service}} ei voinut käyttää näitä tietoja",
       "refusedFallback": "Tietoja ei hyväksytty. Tarkista ne ja yritä uudelleen.",
-      "refusedNested": "Tämä pyyntö vaatii enemmän peräkkäisiä hyväksyntöjä kuin on mahdollista, joten mitään ei myönnetty."
+      "refusedNested": "Tämä pyyntö vaatii enemmän peräkkäisiä hyväksyntöjä kuin on mahdollista, joten mitään ei myönnetty.",
+      "savedLabel": "Tallennetut tietosi",
+      "savedBody": "Tiedot, jotka syötit viimeksi kohteelle {{label}}, on tallennettu tähän puhelimeen ja lähetetään palvelulle {{service}}, kun hyväksyt.",
+      "savedBodyNoLabel": "Tiedot, jotka syötit viimeksi, on tallennettu tähän puhelimeen ja lähetetään palvelulle {{service}}, kun hyväksyt.",
+      "keptNote": "Kukaan muu ei näe niitä. Tämä puhelin unohtaa ne, kun katkaiset viimeisen niitä käyttävän sovelluksen yhteyden.",
+      "useOther": "Syötä eri tiedot"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Katkaise yhteys",
     "disconnectTitle": "Katkaistaanko yhteys sovellukseen {{app}}?",
     "disconnectBody": "{{app}} lopettaa {{resource}}-kohteen käytön. Itse tunnus toimii edelleen, kunnes poistat sen siellä, missä sen loit.",
-    "disconnectNote": "Yhteyden katkaisu pysäyttää tämän sovelluksen. Palvelu tuhoaa antamasi tiedot, kun mikään muu ei ole enää hyväksytty käyttämään niitä. Mitään jo luettua ei palauteta.",
+    "disconnectNote": "Yhteyden katkaiseminen pysäyttää tämän sovelluksen. Kun mikään muu ei enää saa käyttää syöttämiäsi tietoja, palvelu tuhoaa kopionsa ja tämä puhelin unohtaa sen. Jo luettua ei palauteta.",
     "remove": "Poista käyttöoikeus",
     "removeTitle": "Poistetaanko sovelluksen {{app}} käyttöoikeus?",
     "removeBody": "{{app}} ei enää pääse tähän käsiksi.",

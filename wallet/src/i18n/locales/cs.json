@@ -367,10 +367,15 @@
       "show": "Zobrazit",
       "hide": "Skrýt",
       "incomplete": "Vyplňte vše, co není označeno jako nepovinné.",
-      "privacyNote": "To, co zadáte, jde z tohoto zařízení přímo do služby {{service}}. Neuchovává se zde a aplikace, která o přístup požádala, to nikdy neuvidí.",
+      "privacyNote": "Co zadáte, jde z tohoto zařízení přímo službě {{service}}; aplikace, která o to požádala, to nikdy nevidí. Tento telefon si uchová kopii, aby se vás neptal znovu, a zapomene ji, jakmile odpojíte poslední aplikaci, která ji používá.",
       "refusedTitle": "Služba {{service}} nemohla tyto údaje použít",
       "refusedFallback": "Údaje nebyly přijaty. Zkontrolujte je a zkuste to znovu.",
-      "refusedNested": "Tento požadavek vyžaduje více navazujících schválení, než je možné, proto nebylo nic uděleno."
+      "refusedNested": "Tento požadavek vyžaduje více navazujících schválení, než je možné, proto nebylo nic uděleno.",
+      "savedLabel": "Vaše uložené údaje",
+      "savedBody": "Údaje, které jste minule zadali pro {{label}}, jsou uloženy v tomto telefonu a při schválení budou odeslány službě {{service}}.",
+      "savedBodyNoLabel": "Údaje, které jste minule zadali, jsou uloženy v tomto telefonu a při schválení budou odeslány službě {{service}}.",
+      "keptNote": "Nikdo jiný je nevidí. Tento telefon je zapomene, jakmile odpojíte poslední aplikaci, která je používá.",
+      "useOther": "Zadat jiné údaje"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Odpojit",
     "disconnectTitle": "Odpojit {{app}}?",
     "disconnectBody": "{{app}} přestane používat {{resource}}. Samotný údaj funguje dál, dokud jej neodeberete tam, kde jste jej vytvořili.",
-    "disconnectNote": "Odpojení zastaví tuto aplikaci. Služba zničí to, co jste zadali, jakmile to už nic jiného nesmí používat. Nic, co už bylo přečteno, se nevrací.",
+    "disconnectNote": "Odpojení tuto aplikaci zastaví. Jakmile už nic jiného nesmí používat to, co jste zadali, služba zničí svou kopii a tento telefon ji zapomene. Co už bylo přečteno, se nevrací.",
     "remove": "Odebrat přístup",
     "removeTitle": "Odebrat přístup pro {{app}}?",
     "removeBody": "{{app}} se k tomu už nedostane.",

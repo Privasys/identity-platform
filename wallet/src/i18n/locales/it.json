@@ -367,10 +367,15 @@
       "show": "Mostra",
       "hide": "Nascondi",
       "incomplete": "Compila tutto ciò che non è indicato come facoltativo.",
-      "privacyNote": "Ciò che inserisci va da questo dispositivo direttamente a {{service}}. Non viene conservato qui e l'app che lo ha chiesto non lo vede mai.",
+      "privacyNote": "Ciò che inserisci va direttamente da questo dispositivo a {{service}}; l’app che lo ha chiesto non lo vede mai. Questo telefono ne conserva una copia per non chiedertelo di nuovo e la dimentica quando scolleghi l’ultima app che la usa.",
       "refusedTitle": "{{service}} non ha potuto usare questi dati",
       "refusedFallback": "I dati non sono stati accettati. Controllali e riprova.",
-      "refusedNested": "Questa richiesta prevede più approvazioni consecutive di quante siano possibili, quindi non è stato concesso nulla."
+      "refusedNested": "Questa richiesta prevede più approvazioni consecutive di quante siano possibili, quindi non è stato concesso nulla.",
+      "savedLabel": "I tuoi dati salvati",
+      "savedBody": "I dati che hai inserito l’ultima volta per {{label}} sono conservati su questo telefono e saranno inviati a {{service}} quando approvi.",
+      "savedBodyNoLabel": "I dati che hai inserito l’ultima volta sono conservati su questo telefono e saranno inviati a {{service}} quando approvi.",
+      "keptNote": "Nessun altro li vede. Questo telefono li dimentica quando scolleghi l’ultima app che li usa.",
+      "useOther": "Inserisci altri dati"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Disconnetti",
     "disconnectTitle": "Disconnettere {{app}}?",
     "disconnectBody": "{{app}} smetterà di usare {{resource}}. La credenziale in sé continua a funzionare finché non la rimuovi dove l’hai creata.",
-    "disconnectNote": "Disconnettere ferma questa app. Il servizio distrugge ciò che hai inserito non appena nient’altro è approvato a usarlo. Nulla di già letto viene richiamato.",
+    "disconnectNote": "Scollegare ferma questa app. Quando nient’altro è autorizzato a usare ciò che hai inserito, il servizio distrugge la sua copia e questo telefono la dimentica. Ciò che è già stato letto non viene richiamato.",
     "remove": "Rimuovi accesso",
     "removeTitle": "Rimuovere l’accesso di {{app}}?",
     "removeBody": "{{app}} non potrà più raggiungere questo.",

@@ -400,10 +400,15 @@
       "show": "Näita",
       "hide": "Peida",
       "incomplete": "Täitke kõik, mis ei ole märgitud valikuliseks.",
-      "privacyNote": "See, mille sisestate, läheb sellest seadmest otse teenusesse {{service}}. Siia seda ei salvestata ja rakendus, kes seda küsis, ei näe seda kunagi.",
+      "privacyNote": "See, mida sisestate, läheb sellest seadmest otse teenusele {{service}}; küsinud rakendus ei näe seda kunagi. See telefon hoiab koopiat, et teilt uuesti ei küsitaks, ja unustab selle, kui katkestate viimase rakenduse, mis seda kasutab.",
       "refusedTitle": "Teenus {{service}} ei saanud neid andmeid kasutada",
       "refusedFallback": "Andmeid ei võetud vastu. Kontrollige neid ja proovige uuesti.",
-      "refusedNested": "See taotlus nõuab rohkem järjestikuseid heakskiite, kui on võimalik, seega ei antud midagi."
+      "refusedNested": "See taotlus nõuab rohkem järjestikuseid heakskiite, kui on võimalik, seega ei antud midagi.",
+      "savedLabel": "Teie salvestatud andmed",
+      "savedBody": "Andmed, mille sisestasite viimati {{label}} jaoks, on selles telefonis alles ja saadetakse teenusele {{service}}, kui kinnitate.",
+      "savedBodyNoLabel": "Andmed, mille viimati sisestasite, on selles telefonis alles ja saadetakse teenusele {{service}}, kui kinnitate.",
+      "keptNote": "Keegi teine neid ei näe. See telefon unustab need, kui katkestate viimase rakenduse, mis neid kasutab.",
+      "useOther": "Sisesta teised andmed"
     }
   },
 
@@ -449,7 +454,7 @@
     "disconnect": "Katkesta ühendus",
     "disconnectTitle": "Katkestada ühendus rakendusega {{app}}?",
     "disconnectBody": "{{app}} lõpetab {{resource}} kasutamise. Mandaat ise töötab edasi, kuni eemaldate selle seal, kus selle lõite.",
-    "disconnectNote": "Ühenduse katkestamine peatab selle rakenduse. Teenus hävitab teie sisestatu, kui miski muu ei ole enam selle kasutamiseks heaks kiidetud. Juba loetut tagasi ei võeta.",
+    "disconnectNote": "Katkestamine peatab selle rakenduse. Kui miski muu ei tohi enam teie sisestatut kasutada, hävitab teenus oma koopia ja see telefon unustab selle. Juba loetut tagasi ei võeta.",
     "remove": "Eemalda juurdepääs",
     "removeTitle": "Eemaldada {{app}} juurdepääs?",
     "removeBody": "{{app}} ei pääse sellele enam ligi.",

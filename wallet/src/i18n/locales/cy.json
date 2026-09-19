@@ -400,10 +400,15 @@
       "show": "Dangos",
       "hide": "Cuddio",
       "incomplete": "Llenwch bopeth nad yw wedi'i farcio'n ddewisol.",
-      "privacyNote": "Mae'r hyn rydych yn ei roi yn mynd yn syth i {{service}} o'r ddyfais hon. Nid yw'n cael ei gadw yma, ac nid yw'r ap a ofynnodd amdano byth yn ei weld.",
+      "privacyNote": "Mae’r hyn a roddwch yn mynd yn syth o’r ddyfais hon at {{service}}; nid yw’r ap a ofynnodd byth yn ei weld. Mae’r ffôn hwn yn cadw copi fel na ofynnir i chi eto, ac yn ei anghofio pan fyddwch yn datgysylltu’r ap olaf sy’n ei ddefnyddio.",
       "refusedTitle": "Ni allai {{service}} ddefnyddio’r manylion hyn",
       "refusedFallback": "Ni dderbyniwyd y manylion. Gwiriwch nhw a cheisiwch eto.",
-      "refusedNested": "Mae'r cais hwn yn gofyn am fwy o gymeradwyaethau olynol nag sy'n bosibl, felly ni roddwyd dim."
+      "refusedNested": "Mae'r cais hwn yn gofyn am fwy o gymeradwyaethau olynol nag sy'n bosibl, felly ni roddwyd dim.",
+      "savedLabel": "Eich manylion sydd wedi’u cadw",
+      "savedBody": "Mae’r manylion a roesoch ar gyfer {{label}} y tro diwethaf yn cael eu cadw ar y ffôn hwn ac fe’u hanfonir at {{service}} pan fyddwch yn cymeradwyo.",
+      "savedBodyNoLabel": "Mae’r manylion a roesoch y tro diwethaf yn cael eu cadw ar y ffôn hwn ac fe’u hanfonir at {{service}} pan fyddwch yn cymeradwyo.",
+      "keptNote": "Nid oes neb arall yn eu gweld. Mae’r ffôn hwn yn eu hanghofio pan fyddwch yn datgysylltu’r ap olaf sy’n eu defnyddio.",
+      "useOther": "Rhoi manylion gwahanol"
     }
   },
 
@@ -449,7 +454,7 @@
     "disconnect": "Datgysylltu",
     "disconnectTitle": "Datgysylltu {{app}}?",
     "disconnectBody": "Bydd {{app}} yn peidio â defnyddio {{resource}}. Mae’r manylyn ei hun yn dal i weithio nes i chi ei dynnu lle’i crëwyd.",
-    "disconnectNote": "Mae datgysylltu’n atal yr ap hwn. Mae’r gwasanaeth yn dinistrio’r hyn a nodwyd gennych unwaith nad oes dim arall wedi’i gymeradwyo i’w ddefnyddio. Nid yw dim a ddarllenwyd eisoes yn cael ei adalw.",
+    "disconnectNote": "Mae datgysylltu yn atal yr ap hwn. Unwaith nad oes dim byd arall wedi’i gymeradwyo i ddefnyddio’r hyn a roesoch, mae’r gwasanaeth yn dinistrio ei gopi ac mae’r ffôn hwn yn ei anghofio. Nid yw’r hyn sydd eisoes wedi’i ddarllen yn cael ei alw’n ôl.",
     "remove": "Tynnu mynediad",
     "removeTitle": "Tynnu mynediad {{app}}?",
     "removeBody": "Ni fydd {{app}} yn gallu cyrraedd hyn mwyach.",

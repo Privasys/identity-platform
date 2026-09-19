@@ -400,10 +400,15 @@
       "show": "Taispeáin",
       "hide": "Folaigh",
       "incomplete": "Líon isteach gach rud nach bhfuil marcáilte mar roghnach.",
-      "privacyNote": "Téann a gcuireann tú isteach díreach chuig {{service}} ón ngléas seo. Ní choinnítear anseo é, agus ní fheiceann an aip a d'iarr é riamh é.",
+      "privacyNote": "Téann a n-iontrálann tú díreach ón ngléas seo chuig {{service}}; ní fheiceann an aip a d’iarr é go deo. Coinníonn an fón seo cóip ionas nach gcuirfear an cheist ort arís, agus déanann sé dearmad uirthi nuair a dhícheanglaíonn tú an aip dheireanach a úsáideann í.",
       "refusedTitle": "Níorbh fhéidir le {{service}} na sonraí seo a úsáid",
       "refusedFallback": "Níor glacadh leis na sonraí. Seiceáil iad agus bain triail eile as.",
-      "refusedNested": "Iarrann an t-iarratas seo níos mó ceaduithe as a chéile ná mar is féidir, mar sin níor deonaíodh aon rud."
+      "refusedNested": "Iarrann an t-iarratas seo níos mó ceaduithe as a chéile ná mar is féidir, mar sin níor deonaíodh aon rud.",
+      "savedLabel": "Do shonraí sábháilte",
+      "savedBody": "Coinnítear na sonraí a d’iontráil tú do {{label}} an uair dheireanach ar an bhfón seo agus seolfar chuig {{service}} iad nuair a cheadaíonn tú.",
+      "savedBodyNoLabel": "Coinnítear na sonraí a d’iontráil tú an uair dheireanach ar an bhfón seo agus seolfar chuig {{service}} iad nuair a cheadaíonn tú.",
+      "keptNote": "Ní fheiceann aon duine eile iad. Déanann an fón seo dearmad orthu nuair a dhícheanglaíonn tú an aip dheireanach a úsáideann iad.",
+      "useOther": "Iontráil sonraí eile"
     }
   },
 
@@ -449,7 +454,7 @@
     "disconnect": "Dínasc",
     "disconnectTitle": "Dínasc {{app}}?",
     "disconnectBody": "Stopfaidh {{app}} ag úsáid {{resource}}. Leanann an dintiúr féin ag obair go dtí go mbaineann tú é san áit ar chruthaigh tú é.",
-    "disconnectNote": "Stopann an dínasc an aip seo. Scriosann an tseirbhís an méid a chuir tú isteach nuair nach bhfuil aon rud eile ceadaithe chun é a úsáid. Ní thugtar ar ais aon rud atá léite cheana.",
+    "disconnectNote": "Stopann dícheangal an aip seo. Nuair nach bhfuil aon rud eile ceadaithe a thuilleadh chun a n-iontráil tú a úsáid, scriosann an tseirbhís a cóip agus déanann an fón seo dearmad uirthi. Ní ghlaoitear siar ar a bhfuil léite cheana.",
     "remove": "Bain rochtain",
     "removeTitle": "Bain rochtain {{app}}?",
     "removeBody": "Ní bheidh {{app}} in ann teacht air seo a thuilleadh.",

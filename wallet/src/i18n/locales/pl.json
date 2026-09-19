@@ -367,10 +367,15 @@
       "show": "Pokaż",
       "hide": "Ukryj",
       "incomplete": "Wypełnij wszystko, co nie jest oznaczone jako opcjonalne.",
-      "privacyNote": "To, co podasz, trafia z tego urządzenia prosto do usługi {{service}}. Nie jest tu przechowywane, a aplikacja, która o to poprosiła, nigdy tego nie widzi.",
+      "privacyNote": "To, co wpisujesz, trafia z tego urządzenia bezpośrednio do {{service}}; aplikacja, która o to poprosiła, nigdy tego nie widzi. Ten telefon zachowuje kopię, aby nie pytać ponownie, i zapomina ją, gdy odłączysz ostatnią aplikację, która z niej korzysta.",
       "refusedTitle": "Usługa {{service}} nie mogła użyć tych danych",
       "refusedFallback": "Dane nie zostały przyjęte. Sprawdź je i spróbuj ponownie.",
-      "refusedNested": "To żądanie wymaga większej liczby kolejnych zatwierdzeń, niż jest to możliwe, więc nic nie zostało przyznane."
+      "refusedNested": "To żądanie wymaga większej liczby kolejnych zatwierdzeń, niż jest to możliwe, więc nic nie zostało przyznane.",
+      "savedLabel": "Twoje zapisane dane",
+      "savedBody": "Dane, które ostatnio wpisałeś dla {{label}}, są przechowywane na tym telefonie i zostaną wysłane do {{service}}, gdy zatwierdzisz.",
+      "savedBodyNoLabel": "Dane, które ostatnio wpisałeś, są przechowywane na tym telefonie i zostaną wysłane do {{service}}, gdy zatwierdzisz.",
+      "keptNote": "Nikt inny ich nie widzi. Ten telefon zapomina je, gdy odłączysz ostatnią aplikację, która z nich korzysta.",
+      "useOther": "Wpisz inne dane"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Odłącz",
     "disconnectTitle": "Odłączyć {{app}}?",
     "disconnectBody": "{{app}} przestanie używać {{resource}}. Same dane logowania działają dalej, dopóki nie usuniesz ich tam, gdzie je utworzyłeś.",
-    "disconnectNote": "Odłączenie zatrzymuje tę aplikację. Usługa niszczy to, co podałeś, gdy tylko nic innego nie ma już na to zgody. Nic, co zostało już odczytane, nie jest cofane.",
+    "disconnectNote": "Odłączenie zatrzymuje tę aplikację. Gdy nic innego nie będzie już uprawnione do korzystania z tego, co wpisałeś, usługa niszczy swoją kopię, a ten telefon ją zapomina. To, co już przeczytano, nie jest cofane.",
     "remove": "Usuń dostęp",
     "removeTitle": "Usunąć dostęp dla {{app}}?",
     "removeBody": "{{app}} nie będzie już mogła tego osiągnąć.",

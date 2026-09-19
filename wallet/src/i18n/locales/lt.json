@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "Šioje programėlėje dar yra atidarytų failų, todėl niekas nepakeista. Pabandykite po akimirkos.",
     "accountsTitle": "Prijungtos paskyros",
+    "askTitle": "{{app}} prašo prieigos",
+    "askHint": "Palieskite, kad pamatytumėte, ko prašoma, tada patvirtinkite arba atmeskite.",
     "accountsHint": "Paslaugos, saugančios prisijungimo duomenis prie jūsų paskyros kitur.",
     "accountsEmpty": "Neprijungėte jokių paskyrų.",
     "dataTitle": "Prieiga prie jūsų duomenų",

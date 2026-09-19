@@ -381,6 +381,8 @@
   "access": {
     "revokeBusy": "Filer er stadig åbne i denne app, så intet blev ændret. Prøv igen om lidt.",
     "accountsTitle": "Forbundne konti",
+    "askTitle": "{{app}} beder om adgang",
+    "askHint": "Tryk for at se, hvad den vil have, og godkend eller afvis.",
     "accountsHint": "Tjenester, der opbevarer loginoplysninger til en konto, du har et andet sted.",
     "accountsEmpty": "Du har ikke forbundet nogen konti.",
     "dataTitle": "Adgang til dine data",

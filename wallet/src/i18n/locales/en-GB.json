@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "Files are still open in this app, so nothing was changed. Try again in a moment.",
     "accountsTitle": "Connected accounts",
+    "askTitle": "{{app}} is asking for access",
+    "askHint": "Tap to see what it wants, then approve or deny.",
     "accountsHint": "Services holding a credential for an account of yours somewhere else.",
     "accountsEmpty": "You have not connected any accounts.",
     "dataTitle": "Access to your data",

@@ -381,6 +381,8 @@
   "access": {
     "revokeBusy": "Ebben az alkalmazásban még nyitva vannak fájlok, ezért semmi sem változott. Próbálja újra egy pillanat múlva.",
     "accountsTitle": "Csatlakoztatott fiókok",
+    "askTitle": "A(z) {{app}} hozzáférést kér",
+    "askHint": "Koppintson, hogy lássa, mit kér, majd hagyja jóvá vagy utasítsa el.",
     "accountsHint": "Szolgáltatások, amelyek egy máshol lévő fiókjához tartozó hitelesítő adatot tárolnak.",
     "accountsEmpty": "Nem csatlakoztatott fiókot.",
     "dataTitle": "Hozzáférés az adataihoz",

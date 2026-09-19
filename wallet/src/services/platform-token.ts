@@ -74,6 +74,15 @@ export async function getPlatformToken(audience = PLATFORM_AUDIENCE): Promise<st
     return inflight;
 }
 
+/**
+ * The cached platform token, or null when there is none worth using. Never
+ * mints, so never prompts: for background checks that must not put a Face ID
+ * sheet in front of someone who did not ask for anything.
+ */
+export async function getCachedPlatformToken(audience = PLATFORM_AUDIENCE): Promise<string | null> {
+    return readCached(audience);
+}
+
 /** Drop the cached platform token (e.g. on sign-out). */
 export async function clearPlatformToken(): Promise<void> {
     try {

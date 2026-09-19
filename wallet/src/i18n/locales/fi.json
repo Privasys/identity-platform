@@ -381,6 +381,8 @@
   "access": {
     "revokeBusy": "Tiedostoja on vielä auki tässä sovelluksessa, joten mitään ei muutettu. Yritä hetken päästä uudelleen.",
     "accountsTitle": "Yhdistetyt tilit",
+    "askTitle": "{{app}} pyytää käyttöoikeutta",
+    "askHint": "Napauta nähdäksesi, mitä se pyytää, ja hyväksy tai hylkää.",
     "accountsHint": "Palvelut, jotka säilyttävät tunnuksia muualla olevaan tiliisi.",
     "accountsEmpty": "Et ole yhdistänyt yhtään tiliä.",
     "dataTitle": "Pääsy tietoihisi",

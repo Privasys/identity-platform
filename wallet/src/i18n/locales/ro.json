@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "În această aplicație sunt încă fișiere deschise, așa că nimic nu a fost modificat. Încearcă din nou peste câteva momente.",
     "accountsTitle": "Conturi conectate",
+    "askTitle": "{{app}} solicită acces",
+    "askHint": "Atinge pentru a vedea ce solicită, apoi aprobă sau refuză.",
     "accountsHint": "Servicii care păstrează o credențială pentru un cont de-al tău din altă parte.",
     "accountsEmpty": "Nu ai conectat niciun cont.",
     "dataTitle": "Acces la datele tale",

@@ -45,6 +45,7 @@ import { Text, usePalette, type Palette } from '@/components/Themed';
 import { inspectAttestation, isAttestableHost } from '@/services/attestation';
 import { attestationMatchesResolution, resolveApp, type ResolvedApp } from '@/services/app-resolve';
 import {
+    CapabilityError,
     createCapability,
     deliverCapabilityOutcome,
     expiryFor,
@@ -66,6 +67,7 @@ import { syncGrantsIndex } from '@/services/grants-index';
 import { holderFolderKeyB64 } from '@/services/holder-folder';
 import { appIdFromOids } from '@/services/release-provenance';
 import { useCapabilitiesStore } from '@/stores/capabilities';
+import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
 import { recordChainOutcome, takeChainOutcome } from '@/utils/capability-chain';
@@ -214,6 +216,12 @@ export default function CapabilityRequestScreen() {
                 chain.current = { queue, index: 0, awaiting: '', running: queue.length > 0 };
                 setPhase(queue.length > 0 ? 'prerequisite' : 'ready');
             } catch (e) {
+                // The app no longer has this ask (answered elsewhere, or it
+                // expired): stop listing it on Access. Anything else, such as
+                // no signal, leaves it listed for another go.
+                if (e instanceof CapabilityError && (e.status === 404 || e.status === 410)) {
+                    void useCapabilityAsksStore.getState().dismiss(nonce);
+                }
                 if (!cancelled) refuse(e instanceof Error ? e.message : String(e));
             }
         })();
@@ -248,6 +256,7 @@ export default function CapabilityRequestScreen() {
                 grantedAt: Math.floor(Date.now() / 1000),
             });
         }
+        void useCapabilityAsksStore.getState().dismiss(nonce);
         if (chained) recordChainOutcome(nonce, 'denied');
         router.back();
     }, [appHost, nonce, chained, pending, resource, requesterAppId, requesterName, router]);
@@ -455,6 +464,7 @@ export default function CapabilityRequestScreen() {
             // Best effort, off the holder's path: it never throws, and a failed
             // upload is retried the next time the Access tab opens.
             void syncGrantsIndex();
+            void useCapabilityAsksStore.getState().dismiss(nonce);
 
             if (chained) {
                 // Running under another approval: report and return to it

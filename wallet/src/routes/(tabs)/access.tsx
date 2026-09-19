@@ -27,6 +27,7 @@ import { Text, usePalette, type Palette } from '@/components/Themed';
 import { rebuildFromGrantsIndex, syncGrantsIndex } from '@/services/grants-index';
 import { useAuthStore } from '@/stores/auth';
 import { useCapabilitiesStore } from '@/stores/capabilities';
+import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
@@ -50,6 +51,8 @@ export default function AccessScreen() {
     const consentRecordCount = useConsentStore((s) => s.records.length);
     const pendingApprovals = useVaultApprovalsStore((s) => s.pending);
     const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
+    const asks = useCapabilityAsksStore((s) => s.asks);
+    const refreshAsks = useCapabilityAsksStore((s) => s.refresh);
     const hasProfile = useProfileStore((s) => !!s.profile);
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -78,11 +81,16 @@ export default function AccessScreen() {
 
     // Keep the pending count live: approvals arrive by push and also expire on
     // their own, so neither event is something this screen would otherwise see.
+    // Open access requests the same way: they also arrive by push and expire.
     useEffect(() => {
         void refreshApprovals();
-        const id = setInterval(() => void refreshApprovals(), 20_000);
+        void refreshAsks();
+        const id = setInterval(() => {
+            void refreshApprovals();
+            void refreshAsks();
+        }, 20_000);
         return () => clearInterval(id);
-    }, [refreshApprovals]);
+    }, [refreshApprovals, refreshAsks]);
 
     const nowSeconds = Math.floor(now / 1000);
     const sessionRows = useMemo(
@@ -144,6 +152,35 @@ export default function AccessScreen() {
                         <Ionicons name="chevron-forward" size={18} color={p.infoText} />
                     </Pressable>
                 )}
+
+                {/* Access requests still open. Listed from the IdP, so one whose
+                    push was swiped away or never came can still be answered.
+                    Tapping runs the same screen the push opens, which attests
+                    the app before reading anything. */}
+                {asks.map((ask) => (
+                    <Pressable
+                        key={ask.nonce}
+                        style={styles.banner}
+                        onPress={() =>
+                            router.push({
+                                pathname: '/capability-request',
+                                params: { app_host: ask.app_host, nonce: ask.nonce },
+                            })
+                        }
+                        accessibilityLabel={t('access.askTitle', { app: ask.app_name || ask.app_host })}
+                    >
+                        <RNView style={styles.bannerIcon}>
+                            <Ionicons name="hand-left-outline" size={18} color={p.infoText} />
+                        </RNView>
+                        <RNView style={styles.bannerInfo}>
+                            <Text style={styles.bannerTitle}>
+                                {t('access.askTitle', { app: ask.app_name || ask.app_host })}
+                            </Text>
+                            <Text style={styles.bannerMeta}>{t('access.askHint')}</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.infoText} />
+                    </Pressable>
+                ))}
 
                 {/* Connected accounts: a credential of the holder's, held by a
                     service, for an account somewhere we do not control. Only

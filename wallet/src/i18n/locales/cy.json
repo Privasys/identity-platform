@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "Mae ffeiliau’n dal ar agor yn yr ap hwn, felly ni newidiwyd dim. Rhowch gynnig arall arni mewn ennyd.",
     "accountsTitle": "Cyfrifon cysylltiedig",
+    "askTitle": "Mae {{app}} yn gofyn am fynediad",
+    "askHint": "Tapiwch i weld beth mae'n ei ofyn, yna cymeradwywch neu gwrthodwch.",
     "accountsHint": "Gwasanaethau sy’n dal manylion mynediad i gyfrif sydd gennych rywle arall.",
     "accountsEmpty": "Nid ydych wedi cysylltu unrhyw gyfrifon.",
     "dataTitle": "Mynediad at eich data",

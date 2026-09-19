@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "Tá comhaid fós ar oscailt san aip seo, mar sin níor athraíodh aon rud. Bain triail eile as i gceann nóiméid.",
     "accountsTitle": "Cuntais nasctha",
+    "askTitle": "Tá {{app}} ag iarraidh rochtana",
+    "askHint": "Tapáil chun a fheiceáil cad atá á iarraidh, ansin ceadaigh nó diúltaigh.",
     "accountsHint": "Seirbhísí a choinníonn dintiúr do chuntas leat in áit eile.",
     "accountsEmpty": "Níor nasc tú aon chuntas.",
     "dataTitle": "Rochtain ar do shonraí",

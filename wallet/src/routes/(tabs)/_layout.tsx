@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePalette } from '@/components/Themed';
+import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 
 /** Bar height above whatever the system draws below it. */
@@ -15,6 +17,18 @@ export default function TabLayout() {
     const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const pending = useVaultApprovalsStore((s) => s.pending.length);
+    const asks = useCapabilityAsksStore((s) => s.asks.length);
+    const waiting = pending + asks;
+    // Look for open access requests whenever the wallet comes to the front,
+    // not only when Access is open: the badge is how the holder learns of one
+    // whose push they swiped away, from whichever tab they are on.
+    useEffect(() => {
+        void useCapabilityAsksStore.getState().refresh();
+        const sub = AppState.addEventListener('change', (state) => {
+            if (state === 'active') void useCapabilityAsksStore.getState().refresh();
+        });
+        return () => sub.remove();
+    }, []);
     return (
         <Tabs
             screenOptions={{
@@ -59,7 +73,7 @@ export default function TabLayout() {
                 name="access"
                 options={{
                     title: t('tabs.access'),
-                    tabBarBadge: pending > 0 ? pending : undefined,
+                    tabBarBadge: waiting > 0 ? waiting : undefined,
                     tabBarBadgeStyle: { backgroundColor: p.danger },
                     tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                         <Ionicons name="key" size={size} color={color} />

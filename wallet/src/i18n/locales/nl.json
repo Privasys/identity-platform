@@ -381,6 +381,8 @@
   "access": {
     "revokeBusy": "Er zijn nog bestanden open in deze app, dus er is niets gewijzigd. Probeer het zo meteen opnieuw.",
     "accountsTitle": "Gekoppelde accounts",
+    "askTitle": "{{app}} vraagt om toegang",
+    "askHint": "Tik om te zien wat er wordt gevraagd en keur het goed of wijs het af.",
     "accountsHint": "Diensten die een inloggegeven bewaren voor een account dat je ergens anders hebt.",
     "accountsEmpty": "Je hebt geen accounts gekoppeld.",
     "dataTitle": "Toegang tot je gegevens",

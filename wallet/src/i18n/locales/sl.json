@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "V tej aplikaciji so še odprte datoteke, zato ni bilo nič spremenjeno. Poskusite znova čez trenutek.",
     "accountsTitle": "Povezani računi",
+    "askTitle": "{{app}} prosi za dostop",
+    "askHint": "Tapnite, da vidite, kaj želi, nato odobrite ali zavrnite.",
     "accountsHint": "Storitve, ki hranijo poverilnico za vaš račun drugje.",
     "accountsEmpty": "Niste povezali nobenega računa.",
     "dataTitle": "Dostop do vaših podatkov",

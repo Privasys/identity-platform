@@ -62,6 +62,7 @@ import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
+import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import * as SecureStore from '@/utils/storage';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -102,6 +103,7 @@ export async function wipeWallet(): Promise<void> {
     useCapabilitiesStore.getState().clearAll();
     useDriveNotificationsStore.getState().clearAll();
     useVaultApprovalsStore.getState().clearAll();
+    useCapabilityAsksStore.getState().clearAll();
     useSettingsStore.getState().clearAll();
 
     await Promise.all([

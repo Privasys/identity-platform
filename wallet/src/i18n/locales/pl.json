@@ -381,6 +381,8 @@
   "access": {
     "revokeBusy": "W tej aplikacji są nadal otwarte pliki, więc nic nie zostało zmienione. Spróbuj ponownie za chwilę.",
     "accountsTitle": "Połączone konta",
+    "askTitle": "{{app}} prosi o dostęp",
+    "askHint": "Stuknij, aby zobaczyć, o co prosi, a potem zatwierdź lub odrzuć.",
     "accountsHint": "Usługi przechowujące dane logowania do Twojego konta gdzie indziej.",
     "accountsEmpty": "Nie połączyłeś żadnych kont.",
     "dataTitle": "Dostęp do Twoich danych",

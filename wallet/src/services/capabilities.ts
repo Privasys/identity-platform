@@ -260,7 +260,7 @@ export async function fetchPendingCapability(
         `https://${appHost}/.well-known/privasys/capability-request?nonce=${encodeURIComponent(nonce)}`,
     );
     if (!res.ok) {
-        throw new CapabilityError(`the request could not be read (${res.status})`);
+        throw new CapabilityError(`the request could not be read (${res.status})`, { status: res.status });
     }
     const parsed = parsePendingCapability(await res.json());
     // The nonce that comes back must be the one that was pushed, or the wallet

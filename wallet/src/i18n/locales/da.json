@@ -375,7 +375,12 @@
       "savedBody": "De oplysninger, du indtastede for {{label}} sidste gang, ligger på denne telefon og sendes til {{service}}, når du godkender.",
       "savedBodyNoLabel": "De oplysninger, du indtastede sidste gang, ligger på denne telefon og sendes til {{service}}, når du godkender.",
       "keptNote": "Ingen andre ser dem. Denne telefon glemmer dem, når du afbryder den sidste app, der bruger dem.",
-      "useOther": "Indtast andre oplysninger"
+      "useOther": "Indtast andre oplysninger",
+      "oauthButton": "Fortsæt med {{provider}}",
+      "oauthWorking": "Venter på {{provider}}",
+      "oauthDone": "Logget ind med {{provider}}. Tryk for at logge ind igen.",
+      "oauthFailed": "Login med {{provider}} blev ikke fuldført. Prøv igen.",
+      "oauthGiven": "et login med {{provider}}"
     }
   },
 

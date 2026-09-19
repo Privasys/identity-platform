@@ -375,7 +375,12 @@
       "savedBody": "Údaje, které jste minule zadali pro {{label}}, jsou uloženy v tomto telefonu a při schválení budou odeslány službě {{service}}.",
       "savedBodyNoLabel": "Údaje, které jste minule zadali, jsou uloženy v tomto telefonu a při schválení budou odeslány službě {{service}}.",
       "keptNote": "Nikdo jiný je nevidí. Tento telefon je zapomene, jakmile odpojíte poslední aplikaci, která je používá.",
-      "useOther": "Zadat jiné údaje"
+      "useOther": "Zadat jiné údaje",
+      "oauthButton": "Pokračovat přes {{provider}}",
+      "oauthWorking": "Čekání na {{provider}}",
+      "oauthDone": "Přihlášeno přes {{provider}}. Klepnutím se přihlásíte znovu.",
+      "oauthFailed": "Přihlášení přes {{provider}} se nedokončilo. Zkuste to znovu.",
+      "oauthGiven": "přihlášení přes {{provider}}"
     }
   },
 

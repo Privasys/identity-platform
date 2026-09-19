@@ -26,7 +26,29 @@
 export class SetupSchemaError extends Error {}
 
 /** The field kinds the wallet can render. Anything else is refused. */
-export type SetupFieldKind = 'text' | 'email' | 'secret' | 'choice' | 'switch';
+export type SetupFieldKind = 'text' | 'email' | 'secret' | 'choice' | 'switch' | 'oauth';
+
+/**
+ * A field answered by signing in at a provider rather than by typing.
+ *
+ * The service runs the provider's OAuth flow itself (its own client, its own
+ * secret, its own redirect) and only asks the wallet to open its start URL in
+ * an authentication session and bring back the one-time grant code the
+ * service hands out at the end (services/setup-oauth.ts). The wallet learns
+ * nothing about the provider beyond a name to put on the button, and no token
+ * ever passes through it in the clear: what the service wants kept comes back
+ * on the mint as `keep`, opaque.
+ */
+export interface SetupOAuth {
+    /** The provider's name for the button ("Google"). The service's words. */
+    provider: string;
+    /**
+     * Where the wallet sends the browser. Checked at press time to be on the
+     * resource service's own attested host, over https: a URL out of a schema
+     * is exactly what the wallet must not dial blindly.
+     */
+    startUrl: string;
+}
 
 export interface SetupField {
     /** Property name; the key the answer is sent back under. */
@@ -44,6 +66,8 @@ export interface SetupField {
     initial?: string | boolean;
     /** The closed set of values, for `choice`. */
     options?: string[];
+    /** How to obtain the answer, for `oauth`. */
+    oauth?: SetupOAuth;
 }
 
 export interface SetupPrerequisite {
@@ -137,6 +161,19 @@ function parseField(
             required: isRequired,
             initial: typeof p['default'] === 'boolean' ? p['default'] : false,
         };
+    }
+
+    if (type === 'string' && p['x-privasys-oauth'] !== undefined) {
+        const o = p['x-privasys-oauth'] as Record<string, unknown> | null;
+        const provider = o && typeof o === 'object' ? text(o['provider'], 60) : '';
+        const startUrl = o && typeof o === 'object' ? text(o['start_url'], 2000) : '';
+        if (!provider || !startUrl || !/^https:\/\/[^/?#]+\/[^\s]*$/i.test(startUrl)) {
+            throw new SetupSchemaError(`the service described the sign-in for "${name}" in a way the wallet cannot follow`);
+        }
+        // A grant code is a secret in every way that matters: single use,
+        // never shown, never prefilled, never kept (the service's `keep` is
+        // what survives).
+        return { name, kind: 'oauth', title, description, required: isRequired, oauth: { provider, startUrl } };
     }
 
     if (type === 'string') {
@@ -273,7 +310,10 @@ export function initialAnswers(
     for (const f of fields) {
         const wanted = f.kind === 'switch' ? 'boolean' : 'string';
         const carried = opts.previous?.[f.name];
-        if (carried !== undefined && typeof carried === wanted) {
+        if (f.kind === 'oauth') {
+            // A grant code is single use: a second step signs in again.
+            out[f.name] = '';
+        } else if (carried !== undefined && typeof carried === wanted) {
             out[f.name] = carried;
         } else if (f.initial !== undefined) {
             out[f.name] = f.initial;

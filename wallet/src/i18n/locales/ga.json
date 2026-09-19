@@ -408,7 +408,12 @@
       "savedBody": "Coinnítear na sonraí a d’iontráil tú do {{label}} an uair dheireanach ar an bhfón seo agus seolfar chuig {{service}} iad nuair a cheadaíonn tú.",
       "savedBodyNoLabel": "Coinnítear na sonraí a d’iontráil tú an uair dheireanach ar an bhfón seo agus seolfar chuig {{service}} iad nuair a cheadaíonn tú.",
       "keptNote": "Ní fheiceann aon duine eile iad. Déanann an fón seo dearmad orthu nuair a dhícheanglaíonn tú an aip dheireanach a úsáideann iad.",
-      "useOther": "Iontráil sonraí eile"
+      "useOther": "Iontráil sonraí eile",
+      "oauthButton": "Lean ar aghaidh le {{provider}}",
+      "oauthWorking": "Ag fanacht le {{provider}}",
+      "oauthDone": "Sínithe isteach le {{provider}}. Tapáil chun síniú isteach arís.",
+      "oauthFailed": "Níor críochnaíodh an síniú isteach le {{provider}}. Bain triail eile as.",
+      "oauthGiven": "síniú isteach le {{provider}}"
     }
   },
 

@@ -36,9 +36,15 @@ interface Props {
     /** Field names that are required and still empty, marked after a submit. */
     missing?: string[];
     disabled?: boolean;
+    /**
+     * Runs a field's sign-in at the provider and resolves to the answer, or
+     * throws. Supplied by the screen, which knows the service's attested host;
+     * without it an `oauth` field is drawn but cannot be answered.
+     */
+    onOAuth?: (field: SetupField) => Promise<string>;
 }
 
-export function SetupForm({ fields, answers, onChange, missing = [], disabled }: Props) {
+export function SetupForm({ fields, answers, onChange, missing = [], disabled, onOAuth }: Props) {
     const { t } = useTranslation();
     const p = usePalette();
     const styles = makeStyles(p);
@@ -53,6 +59,7 @@ export function SetupForm({ fields, answers, onChange, missing = [], disabled }:
                     onChange={(v) => onChange(f.name, v)}
                     flagged={missing.includes(f.name)}
                     disabled={disabled}
+                    onOAuth={onOAuth}
                     styles={styles}
                     p={p}
                     t={t}
@@ -68,15 +75,65 @@ interface FieldProps {
     onChange: (v: string | boolean) => void;
     flagged: boolean;
     disabled?: boolean;
+    onOAuth?: (field: SetupField) => Promise<string>;
     styles: ReturnType<typeof makeStyles>;
     p: Palette;
-    t: (key: string) => string;
+    t: (key: string, opts?: Record<string, unknown>) => string;
 }
 
-function Field({ field, value, onChange, flagged, disabled, styles, p, t }: FieldProps) {
+function Field({ field, value, onChange, flagged, disabled, onOAuth, styles, p, t }: FieldProps) {
     // Only ever affects whether the dots are drawn as characters. The value
     // itself is the same string the service will be sent either way.
     const [revealed, setRevealed] = useState(false);
+    // The sign-in step: in progress, or the reason it did not complete.
+    const [signingIn, setSigningIn] = useState(false);
+    const [signInProblem, setSignInProblem] = useState('');
+
+    if (field.kind === 'oauth') {
+        const provider = field.oauth?.provider ?? '';
+        const done = typeof value === 'string' && value.length > 0;
+        const signIn = async () => {
+            if (!onOAuth) return;
+            setSignInProblem('');
+            setSigningIn(true);
+            try {
+                onChange(await onOAuth(field));
+            } catch (e) {
+                // A cancelled sign-in is not a problem to report; anything
+                // else is said under the button, in the wallet's words.
+                const cancelled = !!(e as { cancelled?: boolean })?.cancelled;
+                if (!cancelled) {
+                    setSignInProblem(t('capability.setup.oauthFailed', { provider }));
+                }
+            } finally {
+                setSigningIn(false);
+            }
+        };
+        return (
+            <RNView style={styles.field}>
+                <RNView style={styles.labelRow}>
+                    <Text style={styles.label}>{field.title}</Text>
+                    {!field.required && <Text style={styles.optional}>{t('capability.setup.optional')}</Text>}
+                </RNView>
+                <Pressable
+                    style={[styles.oauth, done && styles.oauthDone, flagged && styles.inputFlagged]}
+                    onPress={signIn}
+                    disabled={disabled || signingIn || !onOAuth}
+                    accessibilityRole="button"
+                >
+                    <Text style={[styles.oauthText, done && styles.oauthTextDone]}>
+                        {signingIn
+                            ? t('capability.setup.oauthWorking', { provider })
+                            : done
+                              ? t('capability.setup.oauthDone', { provider })
+                              : t('capability.setup.oauthButton', { provider })}
+                    </Text>
+                </Pressable>
+                {!!field.description && <Text style={styles.hint}>{field.description}</Text>}
+                {!!signInProblem && <Text style={styles.problem}>{signInProblem}</Text>}
+            </RNView>
+        );
+    }
 
     if (field.kind === 'switch') {
         return (
@@ -209,4 +266,17 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     choiceOn: { backgroundColor: p.blue, borderColor: p.blue },
     choiceText: { fontSize: 14, color: p.textPrimary },
     choiceTextOn: { color: '#FFFFFF', fontWeight: '600' },
+    oauth: {
+        backgroundColor: p.blue,
+        borderWidth: 1,
+        borderColor: p.blue,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    oauthDone: { backgroundColor: p.cardAlt, borderColor: p.green },
+    oauthText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+    oauthTextDone: { color: p.green },
+    problem: { fontSize: 13, color: p.dangerText, lineHeight: 18 },
 });

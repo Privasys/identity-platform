@@ -408,7 +408,12 @@
       "savedBody": "Datele pe care le-ați introdus data trecută pentru {{label}} sunt păstrate pe acest telefon și vor fi trimise către {{service}} când aprobați.",
       "savedBodyNoLabel": "Datele pe care le-ați introdus data trecută sunt păstrate pe acest telefon și vor fi trimise către {{service}} când aprobați.",
       "keptNote": "Nimeni altcineva nu le vede. Acest telefon le uită când deconectați ultima aplicație care le folosește.",
-      "useOther": "Introduceți alte date"
+      "useOther": "Introduceți alte date",
+      "oauthButton": "Continuați cu {{provider}}",
+      "oauthWorking": "Se așteaptă {{provider}}",
+      "oauthDone": "Autentificat cu {{provider}}. Atingeți pentru a vă autentifica din nou.",
+      "oauthFailed": "Autentificarea cu {{provider}} nu s-a finalizat. Încercați din nou.",
+      "oauthGiven": "o autentificare cu {{provider}}"
     }
   },
 

@@ -408,7 +408,12 @@
       "savedBody": "Id-dettalji li daħħalt għal {{label}} l-aħħar darba jinżammu fuq dan it-telefown u jintbagħtu lil {{service}} meta tapprova.",
       "savedBodyNoLabel": "Id-dettalji li daħħalt l-aħħar darba jinżammu fuq dan it-telefown u jintbagħtu lil {{service}} meta tapprova.",
       "keptNote": "Ħadd iktar ma jarahom. Dan it-telefown jinsihom meta taqta’ l-aħħar app li tużahom.",
-      "useOther": "Daħħal dettalji differenti"
+      "useOther": "Daħħal dettalji differenti",
+      "oauthButton": "Kompli ma' {{provider}}",
+      "oauthWorking": "Qed nistenna lil {{provider}}",
+      "oauthDone": "Dħalt ma' {{provider}}. Għafas biex terġa' tidħol.",
+      "oauthFailed": "Id-dħul ma' {{provider}} ma tlestiex. Erġa' pprova.",
+      "oauthGiven": "dħul ma' {{provider}}"
     }
   },
 

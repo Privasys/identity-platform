@@ -375,7 +375,12 @@
       "savedBody": "Uppgifterna du angav för {{label}} förra gången finns på den här telefonen och skickas till {{service}} när du godkänner.",
       "savedBodyNoLabel": "Uppgifterna du angav förra gången finns på den här telefonen och skickas till {{service}} när du godkänner.",
       "keptNote": "Ingen annan ser dem. Den här telefonen glömmer dem när du kopplar bort den sista appen som använder dem.",
-      "useOther": "Ange andra uppgifter"
+      "useOther": "Ange andra uppgifter",
+      "oauthButton": "Fortsätt med {{provider}}",
+      "oauthWorking": "Väntar på {{provider}}",
+      "oauthDone": "Inloggad med {{provider}}. Tryck för att logga in igen.",
+      "oauthFailed": "Inloggningen med {{provider}} slutfördes inte. Försök igen.",
+      "oauthGiven": "en inloggning med {{provider}}"
     }
   },
 

@@ -375,7 +375,12 @@
       "savedBody": "Dane, które ostatnio wpisałeś dla {{label}}, są przechowywane na tym telefonie i zostaną wysłane do {{service}}, gdy zatwierdzisz.",
       "savedBodyNoLabel": "Dane, które ostatnio wpisałeś, są przechowywane na tym telefonie i zostaną wysłane do {{service}}, gdy zatwierdzisz.",
       "keptNote": "Nikt inny ich nie widzi. Ten telefon zapomina je, gdy odłączysz ostatnią aplikację, która z nich korzysta.",
-      "useOther": "Wpisz inne dane"
+      "useOther": "Wpisz inne dane",
+      "oauthButton": "Kontynuuj z {{provider}}",
+      "oauthWorking": "Oczekiwanie na {{provider}}",
+      "oauthDone": "Zalogowano przez {{provider}}. Dotknij, aby zalogować się ponownie.",
+      "oauthFailed": "Logowanie przez {{provider}} nie zostało ukończone. Spróbuj ponownie.",
+      "oauthGiven": "logowanie przez {{provider}}"
     }
   },
 

@@ -408,7 +408,12 @@
       "savedBody": "The details you entered for {{label}} last time are kept on this phone and will be sent to {{service}} when you approve.",
       "savedBodyNoLabel": "The details you entered last time are kept on this phone and will be sent to {{service}} when you approve.",
       "keptNote": "Nothing else sees them. This phone forgets them when you disconnect the last app that uses them.",
-      "useOther": "Enter different details"
+      "useOther": "Enter different details",
+      "oauthButton": "Continue with {{provider}}",
+      "oauthWorking": "Waiting for {{provider}}",
+      "oauthDone": "Signed in with {{provider}}. Tap to sign in again.",
+      "oauthFailed": "The sign-in with {{provider}} did not complete. Try again.",
+      "oauthGiven": "a sign-in with {{provider}}"
     }
   },
 

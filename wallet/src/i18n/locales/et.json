@@ -408,7 +408,12 @@
       "savedBody": "Andmed, mille sisestasite viimati {{label}} jaoks, on selles telefonis alles ja saadetakse teenusele {{service}}, kui kinnitate.",
       "savedBodyNoLabel": "Andmed, mille viimati sisestasite, on selles telefonis alles ja saadetakse teenusele {{service}}, kui kinnitate.",
       "keptNote": "Keegi teine neid ei näe. See telefon unustab need, kui katkestate viimase rakenduse, mis neid kasutab.",
-      "useOther": "Sisesta teised andmed"
+      "useOther": "Sisesta teised andmed",
+      "oauthButton": "Jätka teenusega {{provider}}",
+      "oauthWorking": "Ootan teenust {{provider}}",
+      "oauthDone": "Sisse logitud teenusega {{provider}}. Puudutage, et uuesti sisse logida.",
+      "oauthFailed": "Sisselogimine teenusega {{provider}} ei õnnestunud. Proovige uuesti.",
+      "oauthGiven": "sisselogimine teenusega {{provider}}"
     }
   },
 

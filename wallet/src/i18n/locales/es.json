@@ -375,7 +375,12 @@
       "savedBody": "Los datos que introdujiste la última vez para {{label}} se guardan en este teléfono y se enviarán a {{service}} cuando apruebes.",
       "savedBodyNoLabel": "Los datos que introdujiste la última vez se guardan en este teléfono y se enviarán a {{service}} cuando apruebes.",
       "keptNote": "Nadie más los ve. Este teléfono los olvida cuando desconectas la última aplicación que los usa.",
-      "useOther": "Introducir otros datos"
+      "useOther": "Introducir otros datos",
+      "oauthButton": "Continuar con {{provider}}",
+      "oauthWorking": "Esperando a {{provider}}",
+      "oauthDone": "Sesión iniciada con {{provider}}. Toca para iniciarla de nuevo.",
+      "oauthFailed": "El inicio de sesión con {{provider}} no se completó. Inténtalo de nuevo.",
+      "oauthGiven": "un inicio de sesión con {{provider}}"
     }
   },
 

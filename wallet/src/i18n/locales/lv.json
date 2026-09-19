@@ -408,7 +408,12 @@
       "savedBody": "Dati, ko pagājušajā reizē ievadījāt {{label}}, tiek glabāti šajā tālrunī un tiks nosūtīti {{service}}, kad apstiprināsiet.",
       "savedBodyNoLabel": "Dati, ko ievadījāt pagājušajā reizē, tiek glabāti šajā tālrunī un tiks nosūtīti {{service}}, kad apstiprināsiet.",
       "keptNote": "Neviens cits tos neredz. Šis tālrunis tos aizmirst, kad atvienojat pēdējo lietotni, kas tos izmanto.",
-      "useOther": "Ievadīt citus datus"
+      "useOther": "Ievadīt citus datus",
+      "oauthButton": "Turpināt ar {{provider}}",
+      "oauthWorking": "Gaida {{provider}}",
+      "oauthDone": "Pierakstījies ar {{provider}}. Pieskarieties, lai pierakstītos vēlreiz.",
+      "oauthFailed": "Pierakstīšanās ar {{provider}} netika pabeigta. Mēģiniet vēlreiz.",
+      "oauthGiven": "pierakstīšanās ar {{provider}}"
     }
   },
 

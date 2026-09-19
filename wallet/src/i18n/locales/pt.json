@@ -375,7 +375,12 @@
       "savedBody": "Os dados que introduziu da última vez para {{label}} estão guardados neste telemóvel e serão enviados a {{service}} quando aprovar.",
       "savedBodyNoLabel": "Os dados que introduziu da última vez estão guardados neste telemóvel e serão enviados a {{service}} quando aprovar.",
       "keptNote": "Mais ninguém os vê. Este telemóvel esquece-os quando desligar a última aplicação que os usa.",
-      "useOther": "Introduzir outros dados"
+      "useOther": "Introduzir outros dados",
+      "oauthButton": "Continuar com {{provider}}",
+      "oauthWorking": "A aguardar {{provider}}",
+      "oauthDone": "Sessão iniciada com {{provider}}. Toque para iniciar de novo.",
+      "oauthFailed": "O início de sessão com {{provider}} não foi concluído. Tente de novo.",
+      "oauthGiven": "um início de sessão com {{provider}}"
     }
   },
 

@@ -65,9 +65,11 @@ import {
     missingRequired,
     setupPayload,
     type SetupAnswers,
+    type SetupField,
     type SetupPrerequisite,
     type SetupRequirement,
 } from '@/services/capability-setup';
+import { runSetupOAuth, SetupOAuthError } from '@/services/setup-oauth';
 import { rearmTenantKeyAt } from '@/services/drive';
 import { syncGrantsIndex } from '@/services/grants-index';
 import { holderFolderKeyB64 } from '@/services/holder-folder';
@@ -396,10 +398,17 @@ export default function CapabilityRequestScreen() {
               ? resupplyPayload(kept)
               : undefined;
 
+        // A grant code from a sign-in is a secret too: single use, so it is
+        // never prefilled or re-supplied; what the service returns as `keep`
+        // is what stands in for it next time.
         const stepSecretFields = (setup?.fields ?? []).filter(
-            (f) => f.kind === 'secret' && String(answers[f.name] ?? '').length > 0,
+            (f) => (f.kind === 'secret' || f.kind === 'oauth') && String(answers[f.name] ?? '').length > 0,
         );
-        const stepSecrets = stepSecretFields.map((f) => f.title);
+        const stepSecrets = stepSecretFields.map((f) =>
+            f.kind === 'oauth'
+                ? t('capability.setup.oauthGiven', { provider: f.oauth?.provider ?? '' })
+                : f.title,
+        );
         const secretsGiven = resupplying
             ? (kept.secretLabels ?? [])
             : [...secretsSoFar, ...stepSecrets.filter((s) => !secretsSoFar.includes(s))];
@@ -623,6 +632,19 @@ export default function CapabilityRequestScreen() {
         setMissing((prev) => prev.filter((n) => n !== name));
     }, []);
 
+    // A field answered by signing in at a provider: the service runs the
+    // flow on its own attested host (checked here, against the host the
+    // wallet resolved and attested) and hands back a one-time grant code.
+    const onOAuth = useCallback(
+        async (field: SetupField) => {
+            if (!field.oauth || !resource?.hostname) {
+                throw new SetupOAuthError('the sign-in cannot start');
+            }
+            return runSetupOAuth(field.oauth, resource.hostname);
+        },
+        [resource],
+    );
+
     const serviceName = resource?.display_name || resource?.name || '';
 
     return (
@@ -807,6 +829,7 @@ export default function CapabilityRequestScreen() {
                                     onChange={setAnswer}
                                     missing={missing}
                                     disabled={phase === 'working'}
+                                    onOAuth={onOAuth}
                                 />
 
                                 {/* Where what is typed goes, and where it does

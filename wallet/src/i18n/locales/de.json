@@ -375,7 +375,12 @@
       "savedBody": "Die Angaben, die Sie beim letzten Mal für {{label}} eingegeben haben, sind auf diesem Telefon gespeichert und werden an {{service}} gesendet, wenn Sie zustimmen.",
       "savedBodyNoLabel": "Die Angaben, die Sie beim letzten Mal eingegeben haben, sind auf diesem Telefon gespeichert und werden an {{service}} gesendet, wenn Sie zustimmen.",
       "keptNote": "Niemand sonst sieht sie. Dieses Telefon vergisst sie, sobald Sie die letzte App trennen, die sie verwendet.",
-      "useOther": "Andere Angaben eingeben"
+      "useOther": "Andere Angaben eingeben",
+      "oauthButton": "Weiter mit {{provider}}",
+      "oauthWorking": "Warten auf {{provider}}",
+      "oauthDone": "Mit {{provider}} angemeldet. Tippen, um sich erneut anzumelden.",
+      "oauthFailed": "Die Anmeldung bei {{provider}} wurde nicht abgeschlossen. Versuchen Sie es erneut.",
+      "oauthGiven": "eine Anmeldung bei {{provider}}"
     }
   },
 

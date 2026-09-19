@@ -375,7 +375,12 @@
       "savedBody": "Les informations que vous avez saisies pour {{label}} la dernière fois sont conservées sur ce téléphone et seront envoyées à {{service}} lorsque vous approuverez.",
       "savedBodyNoLabel": "Les informations que vous avez saisies la dernière fois sont conservées sur ce téléphone et seront envoyées à {{service}} lorsque vous approuverez.",
       "keptNote": "Personne d'autre ne les voit. Ce téléphone les oublie lorsque vous déconnectez la dernière application qui les utilise.",
-      "useOther": "Saisir d'autres informations"
+      "useOther": "Saisir d'autres informations",
+      "oauthButton": "Continuer avec {{provider}}",
+      "oauthWorking": "En attente de {{provider}}",
+      "oauthDone": "Connecté avec {{provider}}. Touchez pour vous reconnecter.",
+      "oauthFailed": "La connexion avec {{provider}} n'a pas abouti. Réessayez.",
+      "oauthGiven": "une connexion avec {{provider}}"
     }
   },
 

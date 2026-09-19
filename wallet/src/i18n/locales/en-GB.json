@@ -400,10 +400,15 @@
       "show": "Show",
       "hide": "Hide",
       "incomplete": "Fill in everything that is not marked optional.",
-      "privacyNote": "What you enter goes straight to {{service}} from this device. It is not stored here, and the app that asked never sees it.",
+      "privacyNote": "What you enter goes straight to {{service}} from this device; the app that asked never sees it. This phone keeps a copy so you are not asked again, and forgets it when you disconnect the last app that uses it.",
       "refusedTitle": "{{service}} could not use these details",
       "refusedFallback": "The details were not accepted. Check them and try again.",
-      "refusedNested": "This request asks for more approvals than can be chained, so nothing was granted."
+      "refusedNested": "This request asks for more approvals than can be chained, so nothing was granted.",
+      "savedLabel": "Your saved details",
+      "savedBody": "The details you entered for {{label}} last time are kept on this phone and will be sent to {{service}} when you approve.",
+      "savedBodyNoLabel": "The details you entered last time are kept on this phone and will be sent to {{service}} when you approve.",
+      "keptNote": "Nothing else sees them. This phone forgets them when you disconnect the last app that uses them.",
+      "useOther": "Enter different details"
     }
   },
 
@@ -449,7 +454,7 @@
     "disconnect": "Disconnect",
     "disconnectTitle": "Disconnect {{app}}?",
     "disconnectBody": "{{app}} will stop using {{resource}}. The credential itself keeps working until you remove it where you created it.",
-    "disconnectNote": "Disconnecting stops this app. The service destroys what you entered once nothing else is approved to use it. Nothing already read is recalled.",
+    "disconnectNote": "Disconnecting stops this app. Once nothing else is approved to use what you entered, the service destroys its copy and this phone forgets it. Nothing already read is recalled.",
     "remove": "Remove access",
     "removeTitle": "Remove access for {{app}}?",
     "removeBody": "{{app}} will no longer be able to reach this.",

@@ -400,10 +400,15 @@
       "show": "Arată",
       "hide": "Ascunde",
       "incomplete": "Completează tot ce nu este marcat ca opțional.",
-      "privacyNote": "Ce introduci ajunge de pe acest dispozitiv direct la {{service}}. Nu este păstrat aici, iar aplicația care a cerut accesul nu îl vede niciodată.",
+      "privacyNote": "Ce introduceți merge direct de pe acest dispozitiv către {{service}}; aplicația care a cerut nu le vede niciodată. Acest telefon păstrează o copie ca să nu vi se ceară din nou și o uită când deconectați ultima aplicație care o folosește.",
       "refusedTitle": "{{service}} nu a putut folosi aceste date",
       "refusedFallback": "Datele nu au fost acceptate. Verifică-le și încearcă din nou.",
-      "refusedNested": "Această cerere necesită mai multe aprobări consecutive decât este posibil, așa că nu s-a acordat nimic."
+      "refusedNested": "Această cerere necesită mai multe aprobări consecutive decât este posibil, așa că nu s-a acordat nimic.",
+      "savedLabel": "Datele dvs. salvate",
+      "savedBody": "Datele pe care le-ați introdus data trecută pentru {{label}} sunt păstrate pe acest telefon și vor fi trimise către {{service}} când aprobați.",
+      "savedBodyNoLabel": "Datele pe care le-ați introdus data trecută sunt păstrate pe acest telefon și vor fi trimise către {{service}} când aprobați.",
+      "keptNote": "Nimeni altcineva nu le vede. Acest telefon le uită când deconectați ultima aplicație care le folosește.",
+      "useOther": "Introduceți alte date"
     }
   },
 
@@ -449,7 +454,7 @@
     "disconnect": "Deconectează",
     "disconnectTitle": "Deconectezi {{app}}?",
     "disconnectBody": "{{app}} va înceta să folosească {{resource}}. Credențiala în sine continuă să funcționeze până o elimini de acolo de unde ai creat-o.",
-    "disconnectNote": "Deconectarea oprește această aplicație. Serviciul distruge ce ai introdus de îndată ce nimic altceva nu mai are aprobare să îl folosească. Nimic din ce a fost deja citit nu este recuperat.",
+    "disconnectNote": "Deconectarea oprește această aplicație. Când nimic altceva nu mai este aprobat să folosească ce ați introdus, serviciul își distruge copia și acest telefon o uită. Ce a fost deja citit nu se retrage.",
     "remove": "Elimină accesul",
     "removeTitle": "Elimini accesul pentru {{app}}?",
     "removeBody": "{{app}} nu va mai putea ajunge la acest lucru.",

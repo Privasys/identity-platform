@@ -400,10 +400,15 @@
       "show": "Uri",
       "hide": "Aħbi",
       "incomplete": "Imla dak kollu li mhux immarkat bħala mhux obbligatorju.",
-      "privacyNote": "Dak li ddaħħal imur dritt għand {{service}} minn dan l-apparat. Ma jinżammx hawn, u l-app li talbet l-aċċess qatt ma tarah.",
+      "privacyNote": "Dak li ddaħħal imur dritt minn dan l-apparat għal {{service}}; l-app li talbitu qatt ma tarah. Dan it-telefown iżomm kopja biex ma terġax tiġi mistoqsi, u jinsiha meta taqta’ l-aħħar app li tużaha.",
       "refusedTitle": "{{service}} ma setax juża dawn id-dettalji",
       "refusedFallback": "Id-dettalji ma ġewx aċċettati. Iċċekkjahom u erġa' pprova.",
-      "refusedNested": "Din it-talba titlob aktar approvazzjonijiet konsekuttivi milli huwa possibbli, għalhekk ma ngħata xejn."
+      "refusedNested": "Din it-talba titlob aktar approvazzjonijiet konsekuttivi milli huwa possibbli, għalhekk ma ngħata xejn.",
+      "savedLabel": "Id-dettalji tiegħek issejvjati",
+      "savedBody": "Id-dettalji li daħħalt għal {{label}} l-aħħar darba jinżammu fuq dan it-telefown u jintbagħtu lil {{service}} meta tapprova.",
+      "savedBodyNoLabel": "Id-dettalji li daħħalt l-aħħar darba jinżammu fuq dan it-telefown u jintbagħtu lil {{service}} meta tapprova.",
+      "keptNote": "Ħadd iktar ma jarahom. Dan it-telefown jinsihom meta taqta’ l-aħħar app li tużahom.",
+      "useOther": "Daħħal dettalji differenti"
     }
   },
 
@@ -449,7 +454,7 @@
     "disconnect": "Aqta’ l-konnessjoni",
     "disconnectTitle": "Taqta’ l-konnessjoni ma’ {{app}}?",
     "disconnectBody": "{{app}} se jieqaf juża {{resource}}. Il-kredenzjal innifsu jibqa’ jaħdem sakemm tneħħih minn fejn ħloqtu.",
-    "disconnectNote": "Il-qtugħ iwaqqaf din l-app. Is-servizz jeqred dak li daħħalt malli xejn iżjed ma jkun approvat biex jużah. Xejn li diġà nqara ma jiġi rkuprat.",
+    "disconnectNote": "Il-qtugħ iwaqqaf din l-app. Ladarba xejn iktar ma jkun approvat li juża dak li daħħalt, is-servizz jeqred il-kopja tiegħu u dan it-telefown jinsiha. Dak li diġà nqara ma jiġix irtirat.",
     "remove": "Neħħi l-aċċess",
     "removeTitle": "Tneħħi l-aċċess ta’ {{app}}?",
     "removeBody": "{{app}} mhux se jkun jista’ jilħaq dan aktar.",

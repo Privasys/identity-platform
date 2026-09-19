@@ -400,10 +400,15 @@
       "show": "Rodyti",
       "hide": "Slėpti",
       "incomplete": "Užpildykite viską, kas nepažymėta kaip neprivaloma.",
-      "privacyNote": "Tai, ką įvesite, iš šio įrenginio keliauja tiesiai į paslaugą {{service}}. Čia tai nesaugoma, o prašiusi programėlė to niekada nemato.",
+      "privacyNote": "Tai, ką įvedate, iš šio įrenginio keliauja tiesiai į {{service}}; prašiusi programėlė to niekada nemato. Šis telefonas saugo kopiją, kad nereikėtų klausti dar kartą, ir ją pamiršta, kai atjungiate paskutinę ją naudojančią programėlę.",
       "refusedTitle": "Paslauga {{service}} negalėjo panaudoti šių duomenų",
       "refusedFallback": "Duomenys nebuvo priimti. Patikrinkite juos ir bandykite dar kartą.",
-      "refusedNested": "Ši užklausa reikalauja daugiau paeiliui einančių patvirtinimų, nei įmanoma, todėl nieko nesuteikta."
+      "refusedNested": "Ši užklausa reikalauja daugiau paeiliui einančių patvirtinimų, nei įmanoma, todėl nieko nesuteikta.",
+      "savedLabel": "Jūsų išsaugoti duomenys",
+      "savedBody": "Duomenys, kuriuos praėjusį kartą įvedėte {{label}}, saugomi šiame telefone ir bus išsiųsti {{service}}, kai patvirtinsite.",
+      "savedBodyNoLabel": "Duomenys, kuriuos įvedėte praėjusį kartą, saugomi šiame telefone ir bus išsiųsti {{service}}, kai patvirtinsite.",
+      "keptNote": "Niekas kitas jų nemato. Šis telefonas juos pamiršta, kai atjungiate paskutinę juos naudojančią programėlę.",
+      "useOther": "Įvesti kitus duomenis"
     }
   },
 
@@ -449,7 +454,7 @@
     "disconnect": "Atjungti",
     "disconnectTitle": "Atjungti {{app}}?",
     "disconnectBody": "{{app}} nustos naudoti {{resource}}. Patys duomenys veiks toliau, kol jų nepašalinsite ten, kur juos sukūrėte.",
-    "disconnectNote": "Atjungimas sustabdo šią programėlę. Paslauga sunaikina tai, ką įvedėte, kai tik niekam kitam nebeleidžiama to naudoti. Niekas, kas jau perskaityta, negrąžinama.",
+    "disconnectNote": "Atjungimas sustabdo šią programėlę. Kai niekam kitam nebeleidžiama naudoti to, ką įvedėte, paslauga sunaikina savo kopiją, o šis telefonas ją pamiršta. Tai, kas jau perskaityta, neatšaukiama.",
     "remove": "Pašalinti prieigą",
     "removeTitle": "Pašalinti {{app}} prieigą?",
     "removeBody": "{{app}} nebegalės to pasiekti.",

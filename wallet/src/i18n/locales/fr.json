@@ -367,10 +367,15 @@
       "show": "Afficher",
       "hide": "Masquer",
       "incomplete": "Remplissez tout ce qui n'est pas indiqué comme facultatif.",
-      "privacyNote": "Ce que vous saisissez est transmis directement à {{service}} depuis cet appareil. Rien n'est conservé ici, et l'application qui a fait la demande ne le voit jamais.",
+      "privacyNote": "Ce que vous saisissez va directement de cet appareil à {{service}} ; l’application qui a fait la demande ne le voit jamais. Ce téléphone en garde une copie pour ne pas vous le redemander, et l’oublie lorsque vous déconnectez la dernière application qui l’utilise.",
       "refusedTitle": "{{service}} n'a pas pu utiliser ces informations",
       "refusedFallback": "Les informations ont été refusées. Vérifiez-les et réessayez.",
-      "refusedNested": "Cette demande exige plus d'approbations successives qu'il n'est possible d'enchaîner ; rien n'a été accordé."
+      "refusedNested": "Cette demande exige plus d'approbations successives qu'il n'est possible d'enchaîner ; rien n'a été accordé.",
+      "savedLabel": "Vos informations enregistrées",
+      "savedBody": "Les informations que vous avez saisies pour {{label}} la dernière fois sont conservées sur ce téléphone et seront envoyées à {{service}} lorsque vous approuverez.",
+      "savedBodyNoLabel": "Les informations que vous avez saisies la dernière fois sont conservées sur ce téléphone et seront envoyées à {{service}} lorsque vous approuverez.",
+      "keptNote": "Personne d'autre ne les voit. Ce téléphone les oublie lorsque vous déconnectez la dernière application qui les utilise.",
+      "useOther": "Saisir d'autres informations"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Déconnecter",
     "disconnectTitle": "Déconnecter {{app}} ?",
     "disconnectBody": "{{app}} cessera d'utiliser {{resource}}. L'identifiant lui-même reste valable tant que vous ne le supprimez pas là où vous l'avez créé.",
-    "disconnectNote": "La déconnexion arrête cette application. Le service détruit ce que vous avez saisi dès que plus rien d'autre n'est autorisé à l'utiliser. Rien de ce qui a déjà été lu n'est récupéré.",
+    "disconnectNote": "Déconnecter arrête cette application. Dès que plus rien n’est autorisé à utiliser ce que vous avez saisi, le service détruit sa copie et ce téléphone l’oublie. Ce qui a déjà été lu n’est pas rappelé.",
     "remove": "Retirer l'accès",
     "removeTitle": "Retirer l'accès de {{app}} ?",
     "removeBody": "{{app}} ne pourra plus y accéder.",

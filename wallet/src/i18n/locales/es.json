@@ -367,10 +367,15 @@
       "show": "Mostrar",
       "hide": "Ocultar",
       "incomplete": "Rellena todo lo que no esté marcado como opcional.",
-      "privacyNote": "Lo que introduzcas va directamente a {{service}} desde este dispositivo. No se guarda aquí y la aplicación que lo ha pedido nunca lo ve.",
+      "privacyNote": "Lo que introduces va directamente de este dispositivo a {{service}}; la aplicación que lo pidió nunca lo ve. Este teléfono guarda una copia para no volver a pedírtelo y la olvida cuando desconectas la última aplicación que la usa.",
       "refusedTitle": "{{service}} no ha podido usar estos datos",
       "refusedFallback": "Los datos no se han aceptado. Compruébalos e inténtalo de nuevo.",
-      "refusedNested": "Esta solicitud pide más aprobaciones seguidas de las que son posibles, así que no se ha concedido nada."
+      "refusedNested": "Esta solicitud pide más aprobaciones seguidas de las que son posibles, así que no se ha concedido nada.",
+      "savedLabel": "Tus datos guardados",
+      "savedBody": "Los datos que introdujiste la última vez para {{label}} se guardan en este teléfono y se enviarán a {{service}} cuando apruebes.",
+      "savedBodyNoLabel": "Los datos que introdujiste la última vez se guardan en este teléfono y se enviarán a {{service}} cuando apruebes.",
+      "keptNote": "Nadie más los ve. Este teléfono los olvida cuando desconectas la última aplicación que los usa.",
+      "useOther": "Introducir otros datos"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Desconectar",
     "disconnectTitle": "¿Desconectar {{app}}?",
     "disconnectBody": "{{app}} dejará de usar {{resource}}. La credencial en sí sigue funcionando hasta que la quites donde la creaste.",
-    "disconnectNote": "Desconectar detiene esta aplicación. El servicio destruye lo que introdujiste en cuanto nada más esté aprobado para usarlo. No se recupera nada que ya se haya leído.",
+    "disconnectNote": "Desconectar detiene esta aplicación. Cuando nada más esté autorizado a usar lo que introdujiste, el servicio destruye su copia y este teléfono la olvida. Lo ya leído no se recupera.",
     "remove": "Quitar acceso",
     "removeTitle": "¿Quitar el acceso de {{app}}?",
     "removeBody": "{{app}} ya no podrá llegar a esto.",

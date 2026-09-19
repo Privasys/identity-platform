@@ -367,10 +367,15 @@
       "show": "Anzeigen",
       "hide": "Verbergen",
       "incomplete": "Füllen Sie alles aus, was nicht als optional gekennzeichnet ist.",
-      "privacyNote": "Ihre Eingaben gehen von diesem Gerät direkt an {{service}}. Sie werden hier nicht gespeichert, und die anfragende App sieht sie nie.",
+      "privacyNote": "Was Sie eingeben, geht von diesem Gerät direkt an {{service}}; die anfragende App sieht es nie. Dieses Telefon behält eine Kopie, damit Sie nicht erneut gefragt werden, und vergisst sie, sobald Sie die letzte App trennen, die sie verwendet.",
       "refusedTitle": "{{service}} konnte diese Angaben nicht verwenden",
       "refusedFallback": "Die Angaben wurden nicht akzeptiert. Prüfen Sie sie und versuchen Sie es erneut.",
-      "refusedNested": "Diese Anfrage verlangt mehr aufeinanderfolgende Freigaben, als möglich sind, daher wurde nichts gewährt."
+      "refusedNested": "Diese Anfrage verlangt mehr aufeinanderfolgende Freigaben, als möglich sind, daher wurde nichts gewährt.",
+      "savedLabel": "Ihre gespeicherten Angaben",
+      "savedBody": "Die Angaben, die Sie beim letzten Mal für {{label}} eingegeben haben, sind auf diesem Telefon gespeichert und werden an {{service}} gesendet, wenn Sie zustimmen.",
+      "savedBodyNoLabel": "Die Angaben, die Sie beim letzten Mal eingegeben haben, sind auf diesem Telefon gespeichert und werden an {{service}} gesendet, wenn Sie zustimmen.",
+      "keptNote": "Niemand sonst sieht sie. Dieses Telefon vergisst sie, sobald Sie die letzte App trennen, die sie verwendet.",
+      "useOther": "Andere Angaben eingeben"
     }
   },
 
@@ -416,7 +421,7 @@
     "disconnect": "Trennen",
     "disconnectTitle": "{{app}} trennen?",
     "disconnectBody": "{{app}} wird {{resource}} nicht mehr nutzen. Die Zugangsdaten selbst funktionieren weiter, bis Sie sie dort entfernen, wo Sie sie erstellt haben.",
-    "disconnectNote": "Das Trennen stoppt diese App. Der Dienst vernichtet Ihre Eingaben, sobald nichts anderes mehr zu ihrer Nutzung berechtigt ist. Bereits Gelesenes wird nicht zurückgeholt.",
+    "disconnectNote": "Trennen stoppt diese App. Sobald nichts mehr berechtigt ist, Ihre Angaben zu verwenden, löscht der Dienst seine Kopie und dieses Telefon vergisst sie. Bereits Gelesenes wird nicht zurückgeholt.",
     "remove": "Zugriff entfernen",
     "removeTitle": "Zugriff für {{app}} entfernen?",
     "removeBody": "{{app}} wird dies nicht mehr erreichen können.",

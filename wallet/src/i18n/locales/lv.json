@@ -400,10 +400,15 @@
       "show": "Rādīt",
       "hide": "Paslēpt",
       "incomplete": "Aizpildiet visu, kas nav atzīmēts kā neobligāts.",
-      "privacyNote": "Tas, ko ievadīsiet, no šīs ierīces nonāk tieši pakalpojumā {{service}}. Šeit tas netiek glabāts, un lietotne, kas to pieprasīja, to nekad neredz.",
+      "privacyNote": "Tas, ko ievadāt, no šīs ierīces nonāk tieši pie {{service}}; lietotne, kas to pieprasīja, to nekad neredz. Šis tālrunis patur kopiju, lai jums nejautātu vēlreiz, un to aizmirst, kad atvienojat pēdējo lietotni, kas to izmanto.",
       "refusedTitle": "Pakalpojums {{service}} nevarēja izmantot šos datus",
       "refusedFallback": "Dati netika pieņemti. Pārbaudiet tos un mēģiniet vēlreiz.",
-      "refusedNested": "Šis pieprasījums prasa vairāk secīgu apstiprinājumu, nekā iespējams, tāpēc nekas netika piešķirts."
+      "refusedNested": "Šis pieprasījums prasa vairāk secīgu apstiprinājumu, nekā iespējams, tāpēc nekas netika piešķirts.",
+      "savedLabel": "Jūsu saglabātie dati",
+      "savedBody": "Dati, ko pagājušajā reizē ievadījāt {{label}}, tiek glabāti šajā tālrunī un tiks nosūtīti {{service}}, kad apstiprināsiet.",
+      "savedBodyNoLabel": "Dati, ko ievadījāt pagājušajā reizē, tiek glabāti šajā tālrunī un tiks nosūtīti {{service}}, kad apstiprināsiet.",
+      "keptNote": "Neviens cits tos neredz. Šis tālrunis tos aizmirst, kad atvienojat pēdējo lietotni, kas tos izmanto.",
+      "useOther": "Ievadīt citus datus"
     }
   },
 
@@ -449,7 +454,7 @@
     "disconnect": "Atvienot",
     "disconnectTitle": "Atvienot {{app}}?",
     "disconnectBody": "{{app}} pārtrauks izmantot {{resource}}. Paši akreditācijas dati turpina darboties, līdz tos noņemat tur, kur tos izveidojāt.",
-    "disconnectNote": "Atvienošana aptur šo lietotni. Pakalpojums iznīcina jūsu ievadīto, tiklīdz nekas cits vairs nav apstiprināts to izmantot. Nekas jau izlasītais netiek atsaukts.",
+    "disconnectNote": "Atvienošana aptur šo lietotni. Kad nekam citam vairs nav atļauts izmantot ievadīto, pakalpojums iznīcina savu kopiju, un šis tālrunis to aizmirst. Jau izlasītais netiek atsaukts.",
     "remove": "Noņemt piekļuvi",
     "removeTitle": "Noņemt {{app}} piekļuvi?",
     "removeBody": "{{app}} vairs nevarēs to sasniegt.",

@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "Selles rakenduses on failid veel avatud, seega ei muudetud midagi. Proovige hetke pärast uuesti.",
     "accountsTitle": "Ühendatud kontod",
+    "askTitle": "{{app}} palub juurdepääsu",
+    "askHint": "Puudutage, et näha, mida see soovib, ning seejärel kinnitage või keelduge.",
     "accountsHint": "Teenused, mis hoiavad mandaati teie mujal asuvale kontole.",
     "accountsEmpty": "Te ei ole ühtegi kontot ühendanud.",
     "dataTitle": "Juurdepääs teie andmetele",

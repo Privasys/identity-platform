@@ -381,6 +381,8 @@
   "access": {
     "revokeBusy": "In dieser App sind noch Dateien geöffnet, daher wurde nichts geändert. Versuchen Sie es gleich noch einmal.",
     "accountsTitle": "Verbundene Konten",
+    "askTitle": "{{app}} bittet um Zugriff",
+    "askHint": "Tippen Sie, um zu sehen, was angefragt wird, und genehmigen oder lehnen Sie ab.",
     "accountsHint": "Dienste, die Zugangsdaten für ein Konto von Ihnen anderswo aufbewahren.",
     "accountsEmpty": "Sie haben keine Konten verbunden.",
     "dataTitle": "Zugriff auf Ihre Daten",

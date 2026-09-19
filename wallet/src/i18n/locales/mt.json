@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "Għad hemm fajls miftuħa f’din l-app, allura ma nbidel xejn. Erġa’ pprova fi ftit.",
     "accountsTitle": "Kontijiet konnessi",
+    "askTitle": "{{app}} qed titlob aċċess",
+    "askHint": "Agħfas biex tara x'qed titlob, imbagħad approva jew iċħad.",
     "accountsHint": "Servizzi li jżommu kredenzjal għal kont tiegħek band’oħra.",
     "accountsEmpty": "Ma qbadt l-ebda kont.",
     "dataTitle": "Aċċess għad-data tiegħek",

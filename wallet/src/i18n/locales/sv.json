@@ -381,6 +381,8 @@
   "access": {
     "revokeBusy": "Filer är fortfarande öppna i den här appen, så inget ändrades. Försök igen om en stund.",
     "accountsTitle": "Anslutna konton",
+    "askTitle": "{{app}} begär åtkomst",
+    "askHint": "Tryck för att se vad som begärs och godkänn eller neka sedan.",
     "accountsHint": "Tjänster som håller en inloggningsuppgift till ett konto du har någon annanstans.",
     "accountsEmpty": "Du har inte anslutit några konton.",
     "dataTitle": "Åtkomst till dina data",

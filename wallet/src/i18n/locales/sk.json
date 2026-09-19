@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "V tejto aplikácii sú stále otvorené súbory, preto sa nič nezmenilo. Skúste to o chvíľu znova.",
     "accountsTitle": "Pripojené účty",
+    "askTitle": "{{app}} žiada o prístup",
+    "askHint": "Ťuknutím zobrazíte, o čo žiada, a potom schválite alebo zamietnete.",
     "accountsHint": "Služby, ktoré uchovávajú prihlasovacie údaje k vášmu účtu inde.",
     "accountsEmpty": "Nepripojili ste žiadne účty.",
     "dataTitle": "Prístup k vašim údajom",

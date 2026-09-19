@@ -414,6 +414,8 @@
   "access": {
     "revokeBusy": "Šajā lietotnē joprojām ir atvērti faili, tāpēc nekas netika mainīts. Mēģiniet vēlreiz pēc brīža.",
     "accountsTitle": "Savienotie konti",
+    "askTitle": "{{app}} lūdz piekļuvi",
+    "askHint": "Pieskarieties, lai redzētu, ko tā lūdz, un pēc tam apstipriniet vai noraidiet.",
     "accountsHint": "Pakalpojumi, kas glabā akreditācijas datus jūsu kontam citur.",
     "accountsEmpty": "Jūs neesat savienojis nevienu kontu.",
     "dataTitle": "Piekļuve jūsu datiem",

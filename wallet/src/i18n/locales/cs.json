@@ -381,6 +381,8 @@
   "access": {
     "revokeBusy": "Soubory jsou v této aplikaci stále otevřené, proto se nic nezměnilo. Zkuste to za chvíli znovu.",
     "accountsTitle": "Připojené účty",
+    "askTitle": "{{app}} žádá o přístup",
+    "askHint": "Klepnutím zobrazíte, co žádá, a pak schválíte nebo odmítnete.",
     "accountsHint": "Služby, které uchovávají přihlašovací údaje k vašemu účtu jinde.",
     "accountsEmpty": "Nepřipojili jste žádné účty.",
     "dataTitle": "Přístup k vašim datům",

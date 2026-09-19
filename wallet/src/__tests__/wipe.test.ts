@@ -82,6 +82,13 @@ jest.mock('@/stores/vaultApprovals', () => {
     return { useVaultApprovalsStore: { getState: () => state } };
 });
 
+// Open access requests: in memory only, refilled from the IdP. Stubbed for the
+// same reason, its token helper pulls in the FIDO2 stack.
+jest.mock('@/stores/capability-asks', () => {
+    const state = { asks: [] as unknown[], clearAll: jest.fn() };
+    return { useCapabilityAsksStore: { getState: () => state } };
+});
+
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 

@@ -381,6 +381,8 @@
   "access": {
     "revokeBusy": "Ainda há ficheiros abertos nesta aplicação, por isso nada foi alterado. Tente novamente dentro de momentos.",
     "accountsTitle": "Contas ligadas",
+    "askTitle": "{{app}} está a pedir acesso",
+    "askHint": "Toque para ver o que pede e, depois, aprove ou recuse.",
     "accountsHint": "Serviços que guardam uma credencial para uma conta sua noutro sítio.",
     "accountsEmpty": "Não ligou nenhuma conta.",
     "dataTitle": "Acesso aos seus dados",

@@ -15,12 +15,19 @@ import {
     dependenciesFromCustomOids,
     dependencyIdentity,
 } from '@/services/dependencies';
+import { resolveApp } from '@/services/app-resolve';
 import { fetchRunningAppReleases, WorkloadRelease } from '@/services/release-provenance';
 import { DependencyStatus, useDependencyApprovalsStore } from '@/stores/dependency-approvals';
 
 export interface DependencyProvenance {
-    /** Human app name (release label / app-id fallback). */
+    /**
+     * What the holder can recognise: the app's display name from the control
+     * plane, or failing that the start of its id. Never the id and version run
+     * together: "02104572 v0.1.45" told nobody anything.
+     */
     name: string;
+    /** True when `name` came from the control plane rather than the id. */
+    named: boolean;
     /** GitHub release / package page for the pinned build, if any. */
     url?: string;
     /** Version label, e.g. "v0.1.3". */
@@ -43,10 +50,11 @@ export interface DependencyConsentItem {
     provenance: DependencyProvenance;
 }
 
-function provenanceFromRelease(appId: string, wr?: WorkloadRelease): DependencyProvenance {
+function provenanceFromRelease(appId: string, wr?: WorkloadRelease, displayName?: string): DependencyProvenance {
     const published = !!(wr && (wr.url || wr.matches));
     return {
-        name: wr?.label ? `${appId.slice(0, 8)} ${wr.label}` : appId,
+        name: displayName || appId.slice(0, 8),
+        named: !!displayName,
         url: wr?.url,
         label: wr?.label,
         published,
@@ -71,19 +79,24 @@ export async function resolveDependencyConsent(
 
     return Promise.all(
         decisions.map(async (d) => {
-            let wr: WorkloadRelease | undefined;
-            try {
-                const releases = await fetchRunningAppReleases(d.dependency.appId, appHost);
-                wr = releases?.workload_release;
-            } catch {
-                wr = undefined;
-            }
+            // The name and the published build side by side. Either can fail
+            // on its own; the row then falls back rather than disappearing.
+            const [wr, resolved] = await Promise.all([
+                fetchRunningAppReleases(d.dependency.appId, appHost)
+                    .then((r) => r?.workload_release)
+                    .catch(() => undefined),
+                resolveApp(d.dependency.appId, appHost).catch(() => null),
+            ]);
             return {
                 dependency: d.dependency,
                 identity: d.identity,
                 status: d.status,
                 previouslyDenied: d.previouslyDenied,
-                provenance: provenanceFromRelease(d.dependency.appId, wr),
+                provenance: provenanceFromRelease(
+                    d.dependency.appId,
+                    wr,
+                    resolved?.display_name || resolved?.name || undefined,
+                ),
             };
         })
     );

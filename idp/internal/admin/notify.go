@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/Privasys/idp/internal/capasks"
 	"github.com/Privasys/idp/internal/push"
 	"io"
 	"log"
@@ -101,7 +102,11 @@ func notifyTitleBody(typ, appName string) (string, string) {
 //
 //	Request:  {"sub","type","payload":{...},"app_id","app_name"}
 //	Response: 200 {"status":"sent"|"sent-unsealed"} | 404 no push target
-func HandleNotify(db *store.DB, adminToken string) http.HandlerFunc {
+//
+// asks, when non-nil, remembers each capability request for the holder's
+// wallet to list, so an ask survives a push that never arrived or was swiped
+// away (internal/capasks).
+func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !checkAdmin(w, r, adminToken) {
 			return
@@ -117,6 +122,19 @@ func HandleNotify(db *store.DB, adminToken string) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "sub and type are required")
 			return
 		}
+		// Recorded before the push target is looked up: a holder whose push
+		// token is missing is exactly the one who can only find the ask by
+		// listing it.
+		var capReq struct {
+			Nonce   string `json:"nonce"`
+			AppHost string `json:"app_host"`
+		}
+		isCapReq := req.Type == "capability-request" &&
+			json.Unmarshal(req.Payload, &capReq) == nil && capReq.Nonce != "" && capReq.AppHost != ""
+		if isCapReq && asks != nil {
+			asks.Put(req.Sub, capReq.Nonce, capReq.AppHost, req.AppID, req.AppName)
+		}
+
 		token, encPub := db.GetPushTarget(req.Sub)
 		if token == "" {
 			writeError(w, http.StatusNotFound, "no push target for user")
@@ -128,15 +146,9 @@ func HandleNotify(db *store.DB, adminToken string) http.HandlerFunc {
 		// from, in the clear: the wallet learns everything that matters (the
 		// key being authorised included) inside the attested channel to that
 		// host. The nonce is single use and expires in minutes.
-		if req.Type == "capability-request" {
-			var capReq struct {
-				Nonce   string `json:"nonce"`
-				AppHost string `json:"app_host"`
-			}
-			if json.Unmarshal(req.Payload, &capReq) == nil && capReq.Nonce != "" && capReq.AppHost != "" {
-				data["nonce"] = capReq.Nonce
-				data["app_host"] = capReq.AppHost
-			}
+		if isCapReq {
+			data["nonce"] = capReq.Nonce
+			data["app_host"] = capReq.AppHost
 		}
 		status := "sent-unsealed"
 		if encPub != "" && len(req.Payload) > 0 {

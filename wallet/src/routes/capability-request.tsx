@@ -435,8 +435,10 @@ export default function CapabilityRequestScreen() {
             }
 
             const granted = outcome.granted;
-            await deliverCapabilityOutcome({ appHost, nonce, status: 'approved', granted });
 
+            // The mint is what the holder approved: the record comes first,
+            // whatever the app then hears. On 2026-09-18 the report below
+            // failed and the wallet kept no trace of a grant that stood.
             useCapabilitiesStore.getState().record({
                 appId: requesterAppId,
                 appName: requesterName || undefined,
@@ -465,6 +467,19 @@ export default function CapabilityRequestScreen() {
             // upload is retried the next time the Access tab opens.
             void syncGrantsIndex();
             void useCapabilityAsksStore.getState().dismiss(nonce);
+
+            // Tell the app that asked. A capability minted at a service_url
+            // was minted at that app's own host: the mint is the report, and
+            // the nonce route has nothing more to learn (the runtime consumed
+            // the nonce with the mint). Elsewhere the report is best effort:
+            // the grant stands whether or not the app could be told.
+            if (!pending.service_url) {
+                try {
+                    await deliverCapabilityOutcome({ appHost, nonce, status: 'approved', granted });
+                } catch (e) {
+                    console.warn(`[CAPABILITY] the app could not be told the outcome: ${e instanceof Error ? e.message : String(e)}`);
+                }
+            }
 
             if (chained) {
                 // Running under another approval: report and return to it

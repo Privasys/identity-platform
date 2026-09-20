@@ -324,7 +324,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} el correo de {{resource}}, a través de {{service}}",
       "meeting.transcripts": "{{permissions}} las transcripciones de tus reuniones en {{resource}}",
-      "meeting.recording": "Activar la grabación y la transcripción de las reuniones que organizas en {{resource}}"
+      "meeting.recording": "Activar la grabación y la transcripción de las reuniones que organizas en {{resource}}",
+      "files.cloud": "{{permissions}} los archivos de {{resource}}, a través de {{service}}"
     },
     "permissionJoin": " y ",
     "permission": {
@@ -346,6 +347,9 @@
       "meeting": {
         "transcripts": "Esta aplicación puede leer las transcripciones de reuniones en las que participaste, desde tu propia cuenta. Nunca se une a una reunión ni graba ninguna.",
         "recording": "Esta aplicación puede activar la grabación y la transcripción de tu propio proveedor para las reuniones que organizas. El proveedor avisa a todos los asistentes, como de costumbre. Sin esto, solo tendrán transcripción las reuniones que ya grabas."
+      },
+      "files": {
+        "cloud": "Esta aplicación puede leer y buscar los archivos de esta cuenta y guardar lo que produce en una sola carpeta que crea allí. No puede eliminar, mover ni compartir nada. Tus archivos se quedan con tu proveedor; no se copian a ningún otro sitio."
       }
     },
     "approve": "Aprobar",

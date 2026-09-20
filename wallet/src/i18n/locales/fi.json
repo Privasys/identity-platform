@@ -324,7 +324,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} postia tilillä {{resource}} palvelun {{service}} kautta",
       "meeting.transcripts": "{{permissions}} kokoustesi tekstityksiä tilillä {{resource}}",
-      "meeting.recording": "Ottaa käyttöön tallennus ja tekstitys kokouksissa, jotka järjestät tilillä {{resource}}"
+      "meeting.recording": "Ottaa käyttöön tallennus ja tekstitys kokouksissa, jotka järjestät tilillä {{resource}}",
+      "files.cloud": "{{permissions}} tiedostot kohteessa {{resource}} palvelun {{service}} kautta"
     },
     "permissionJoin": " ja ",
     "permission": {
@@ -346,6 +347,9 @@
       "meeting": {
         "transcripts": "Tämä sovellus voi lukea niiden kokousten tekstitykset, joihin osallistuit, omalta tililtäsi. Se ei koskaan liity kokoukseen eikä tallenna sitä.",
         "recording": "Tämä sovellus voi ottaa käyttöön palveluntarjoajasi oman tallennuksen ja tekstityksen kokouksissa, jotka järjestät. Palveluntarjoaja kertoo siitä kaikille kokouksessa tavalliseen tapaan. Ilman tätä vain jo tallentamillasi kokouksilla on tekstitys."
+      },
+      "files": {
+        "cloud": "Tämä sovellus voi lukea tämän tilin tiedostoja ja hakea niistä sekä tallentaa tuottamansa yhteen kansioon, jonka se luo sinne. Se ei voi poistaa, siirtää tai jakaa mitään. Tiedostosi pysyvät palveluntarjoajallasi; niitä ei kopioida muualle."
       }
     },
     "approve": "Hyväksy",

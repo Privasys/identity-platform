@@ -357,7 +357,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} corespondența din {{resource}}, prin {{service}}",
       "meeting.transcripts": "{{permissions}} transcrierile ședințelor tale din {{resource}}",
-      "meeting.recording": "Activarea înregistrării și transcrierii pentru ședințele pe care le organizezi în {{resource}}"
+      "meeting.recording": "Activarea înregistrării și transcrierii pentru ședințele pe care le organizezi în {{resource}}",
+      "files.cloud": "{{permissions}} fișierele din {{resource}}, prin {{service}}"
     },
     "permissionJoin": " și ",
     "permission": {
@@ -379,6 +380,9 @@
       "meeting": {
         "transcripts": "Această aplicație poate citi transcrierile ședințelor la care ai participat, din propriul tău cont. Nu se alătură niciodată unei ședințe și nu înregistrează niciodată una.",
         "recording": "Această aplicație poate activa înregistrarea și transcrierea propriului tău furnizor pentru ședințele pe care le organizezi. Furnizorul îi anunță pe toți participanții, în modul obișnuit. Fără asta, doar ședințele pe care le înregistrezi deja vor avea transcriere."
+      },
+      "files": {
+        "cloud": "Această aplicație poate citi și căuta fișierele din acest cont și poate salva ce produce într-un singur dosar pe care îl creează acolo. Nu poate șterge, muta sau partaja nimic. Fișierele dvs. rămân la furnizorul dvs.; nu sunt copiate nicăieri altundeva."
       }
     },
     "approve": "Aprobă",

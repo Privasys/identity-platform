@@ -357,7 +357,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} pastu kontā {{resource}}, izmantojot {{service}}",
       "meeting.transcripts": "{{permissions}} jūsu sanāksmju atšifrējumus kontā {{resource}}",
-      "meeting.recording": "Ieslēgt ierakstu un atšifrējumu sanāksmēm, kuras vadāt kontā {{resource}}"
+      "meeting.recording": "Ieslēgt ierakstu un atšifrējumu sanāksmēm, kuras vadāt kontā {{resource}}",
+      "files.cloud": "{{permissions}} failus vietnē {{resource}}, izmantojot {{service}}"
     },
     "permissionJoin": " un ",
     "permission": {
@@ -379,6 +380,9 @@
       "meeting": {
         "transcripts": "Šī lietotne var lasīt to sanāksmju atšifrējumus, kurās jūs piedalījāties, no jūsu pašu konta. Tā nekad nepievienojas sanāksmei un nekad to neieraksta.",
         "recording": "Šī lietotne var ieslēgt jūsu pakalpojuma sniedzēja ierakstu un atšifrējumu sanāksmēm, kuras jūs vadāt. Pakalpojuma sniedzējs par to paziņo visiem sanāksmes dalībniekiem ierastajā veidā. Bez tā atšifrējums būs tikai tām sanāksmēm, kuras jūs jau ierakstāt."
+      },
+      "files": {
+        "cloud": "Šī lietotne var lasīt un meklēt šī konta failus un saglabāt savu veikumu vienā mapē, ko tā tur izveido. Tā neko nevar dzēst, pārvietot vai koplietot. Jūsu faili paliek pie jūsu pakalpojuma sniedzēja; tie netiek kopēti nekur citur."
       }
     },
     "approve": "Apstiprināt",

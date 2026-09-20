@@ -357,7 +357,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} an post i {{resource}}, trí {{service}}",
       "meeting.transcripts": "{{permissions}} tras-scríbhinní do chruinnithe i {{resource}}",
-      "meeting.recording": "Taifeadadh agus tras-scríobh a chur ar siúl do chruinnithe a eagraíonn tú i {{resource}}"
+      "meeting.recording": "Taifeadadh agus tras-scríobh a chur ar siúl do chruinnithe a eagraíonn tú i {{resource}}",
+      "files.cloud": "{{permissions}} na comhaid in {{resource}}, trí {{service}}"
     },
     "permissionJoin": " agus ",
     "permission": {
@@ -379,6 +380,9 @@
       "meeting": {
         "transcripts": "Is féidir leis an aip seo tras-scríbhinní cruinnithe a raibh tú páirteach iontu a léamh, ó do chuntas féin. Ní thagann sí isteach i gcruinniú riamh agus ní thaifeadann sí ceann riamh.",
         "recording": "Is féidir leis an aip seo taifeadadh agus tras-scríobh do sholáthraí féin a chur ar siúl do chruinnithe a eagraíonn tú. Insíonn an soláthraí do gach duine sa chruinniú é, ar an ngnáthbhealach. Gan é seo, ní bheidh tras-scríbhinn ach ag cruinnithe a thaifeadann tú cheana."
+      },
+      "files": {
+        "cloud": "Is féidir leis an aip seo na comhaid sa chuntas seo a léamh agus a chuardach, agus a dtáirgeann sí a shábháil in aon fhillteán amháin a chruthaíonn sí ann. Ní féidir léi aon rud a scriosadh, a bhogadh ná a roinnt. Fanann do chomhaid le do sholáthraí; ní chóipeáiltear áit ar bith eile iad."
       }
     },
     "approve": "Ceadaigh",

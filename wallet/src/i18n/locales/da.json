@@ -324,7 +324,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} posten i {{resource}} via {{service}}",
       "meeting.transcripts": "{{permissions}} udskrifterne af dine møder i {{resource}}",
-      "meeting.recording": "Slå optagelse og transskription til for møder, du er vært for i {{resource}}"
+      "meeting.recording": "Slå optagelse og transskription til for møder, du er vært for i {{resource}}",
+      "files.cloud": "{{permissions}} filerne i {{resource}}, via {{service}}"
     },
     "permissionJoin": " og ",
     "permission": {
@@ -346,6 +347,9 @@
       "meeting": {
         "transcripts": "Denne app kan læse udskrifter af møder, du har deltaget i, fra din egen konto. Den deltager aldrig i et møde og optager aldrig et.",
         "recording": "Denne app kan slå din udbyders egen optagelse og transskription til for møder, du er vært for. Udbyderen fortæller alle i mødet det på sædvanlig vis. Uden dette får kun møder, du allerede optager, en udskrift."
+      },
+      "files": {
+        "cloud": "Denne app kan læse og søge i filerne på denne konto og gemme det, den laver, i én mappe, den selv opretter der. Den kan ikke slette, flytte eller dele noget. Dine filer bliver hos din udbyder; de kopieres ikke andre steder hen."
       }
     },
     "approve": "Godkend",

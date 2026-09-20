@@ -357,7 +357,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} pošto v {{resource}} prek {{service}}",
       "meeting.transcripts": "{{permissions}} prepise vaših sestankov v {{resource}}",
-      "meeting.recording": "Vklopiti snemanje in prepis za sestanke, ki jih vodite v {{resource}}"
+      "meeting.recording": "Vklopiti snemanje in prepis za sestanke, ki jih vodite v {{resource}}",
+      "files.cloud": "{{permissions}} datoteke v {{resource}}, prek {{service}}"
     },
     "permissionJoin": " in ",
     "permission": {
@@ -379,6 +380,9 @@
       "meeting": {
         "transcripts": "Ta aplikacija lahko bere prepise sestankov, ki ste se jih udeležili, iz vašega lastnega računa. Nikoli se ne pridruži sestanku in ga nikoli ne snema.",
         "recording": "Ta aplikacija lahko vklopi snemanje in prepis vašega ponudnika za sestanke, ki jih vodite. Ponudnik o tem obvesti vse na sestanku, na običajen način. Brez tega bodo prepis imeli samo sestanki, ki jih že snemate."
+      },
+      "files": {
+        "cloud": "Ta aplikacija lahko bere in išče datoteke v tem računu ter shranjuje, kar ustvari, v eno mapo, ki jo tam ustvari. Ničesar ne more izbrisati, premakniti ali deliti. Vaše datoteke ostanejo pri vašem ponudniku; nikamor drugam se ne kopirajo."
       }
     },
     "approve": "Odobri",

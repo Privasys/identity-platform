@@ -53,6 +53,11 @@ export const CAPABILITY_KINDS = [
     'calendar.events',
     'meeting.transcripts',
     'meeting.recording',
+    // The holder's files at a cloud storage provider (a document library, a
+    // personal drive elsewhere): read and searched on demand, with one folder
+    // the service may write into. Distinct from storage.folder, which is the
+    // holder's own Privasys Drive.
+    'files.cloud',
     // The holder's files in the asking app's OWN storage, locked with a key the
     // wallet holds. Unlike every kind above, the resource service is the app
     // itself, reached at the `service_url` its ask names, and the wallet sends
@@ -291,6 +296,7 @@ const LIFETIME_SECONDS: Record<CapabilityKind, number | null> = {
     // FUTURE meetings behave, not permission to read something that already
     // exists, so it should come back round for a fresh decision sooner.
     'meeting.recording': 30 * DAY,
+    'files.cloud': 90 * DAY,
     // No expiry: it stands until revoked. An expiry here would not end the
     // app's access to anything the holder cares about; it would lock the
     // holder's own files away from the app they put them with, on a date they

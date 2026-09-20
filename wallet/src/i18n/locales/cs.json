@@ -324,7 +324,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} poštu v {{resource}} prostřednictvím {{service}}",
       "meeting.transcripts": "{{permissions}} přepisy vašich schůzek v {{resource}}",
-      "meeting.recording": "Zapnout nahrávání a přepis u schůzek, které pořádáte v {{resource}}"
+      "meeting.recording": "Zapnout nahrávání a přepis u schůzek, které pořádáte v {{resource}}",
+      "files.cloud": "{{permissions}} soubory v {{resource}}, přes {{service}}"
     },
     "permissionJoin": " a ",
     "permission": {
@@ -346,6 +347,9 @@
       "meeting": {
         "transcripts": "Tato aplikace může číst přepisy schůzek, kterých jste se zúčastnili, z vašeho vlastního účtu. Nikdy se ke schůzce nepřipojuje a nikdy ji nenahrává.",
         "recording": "Tato aplikace může zapnout vlastní nahrávání a přepis vašeho poskytovatele u schůzek, které pořádáte. Všem na schůzce to poskytovatel oznámí obvyklým způsobem. Bez toho budou mít přepis jen schůzky, které už nahráváte."
+      },
+      "files": {
+        "cloud": "Tato aplikace může číst a prohledávat soubory v tomto účtu a ukládat, co vytvoří, do jediné složky, kterou tam založí. Nemůže nic mazat, přesouvat ani sdílet. Vaše soubory zůstávají u vašeho poskytovatele; nikam jinam se nekopírují."
       }
     },
     "approve": "Schválit",

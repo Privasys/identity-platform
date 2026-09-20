@@ -357,7 +357,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} paštą {{resource}} per {{service}}",
       "meeting.transcripts": "{{permissions}} jūsų susitikimų transkripcijas {{resource}}",
-      "meeting.recording": "Įjungti įrašymą ir transkripciją susitikimuose, kuriuos rengiate {{resource}}"
+      "meeting.recording": "Įjungti įrašymą ir transkripciją susitikimuose, kuriuos rengiate {{resource}}",
+      "files.cloud": "{{permissions}} failus {{resource}}, per {{service}}"
     },
     "permissionJoin": " ir ",
     "permission": {
@@ -379,6 +380,9 @@
       "meeting": {
         "transcripts": "Ši programa gali skaityti susitikimų, kuriuose dalyvavote, transkripcijas iš jūsų pačių paskyros. Ji niekada neprisijungia prie susitikimo ir niekada jo neįrašo.",
         "recording": "Ši programa gali įjungti jūsų teikėjo įrašymą ir transkripciją susitikimuose, kuriuos rengiate. Teikėjas apie tai praneša visiems dalyviams įprastu būdu. Be to transkripciją turės tik tie susitikimai, kuriuos jau įrašote."
+      },
+      "files": {
+        "cloud": "Ši programėlė gali skaityti ir ieškoti šios paskyros failų bei išsaugoti tai, ką sukuria, viename aplanke, kurį ten sukuria. Ji negali nieko ištrinti, perkelti ar bendrinti. Jūsų failai lieka pas jūsų paslaugų teikėją; jie niekur kitur nekopijuojami."
       }
     },
     "approve": "Patvirtinti",

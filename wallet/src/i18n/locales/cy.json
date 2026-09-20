@@ -357,7 +357,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} y post yn {{resource}}, drwy {{service}}",
       "meeting.transcripts": "{{permissions}} trawsgrifiadau eich cyfarfodydd yn {{resource}}",
-      "meeting.recording": "Troi recordio a thrawsgrifio ymlaen ar gyfer cyfarfodydd rydych chi'n eu cynnal yn {{resource}}"
+      "meeting.recording": "Troi recordio a thrawsgrifio ymlaen ar gyfer cyfarfodydd rydych chi'n eu cynnal yn {{resource}}",
+      "files.cloud": "{{permissions}} y ffeiliau yn {{resource}}, drwy {{service}}"
     },
     "permissionJoin": " a ",
     "permission": {
@@ -379,6 +380,9 @@
       "meeting": {
         "transcripts": "Gall yr ap hwn ddarllen trawsgrifiadau cyfarfodydd y buoch chi'n rhan ohonynt, o'ch cyfrif eich hun. Nid yw byth yn ymuno â chyfarfod ac nid yw byth yn recordio un.",
         "recording": "Gall yr ap hwn droi recordio a thrawsgrifio eich darparwr ei hun ymlaen ar gyfer cyfarfodydd rydych chi'n eu cynnal. Mae'r darparwr yn dweud wrth bawb yn y cyfarfod, yn y ffordd arferol. Hebddo, dim ond cyfarfodydd rydych chi eisoes yn eu recordio fydd â thrawsgrifiad."
+      },
+      "files": {
+        "cloud": "Gall yr ap hwn ddarllen a chwilio'r ffeiliau yn y cyfrif hwn, a chadw'r hyn y mae'n ei gynhyrchu mewn un ffolder y mae'n ei chreu yno. Ni all ddileu, symud na rhannu dim. Mae eich ffeiliau'n aros gyda'ch darparwr; ni chânt eu copïo i unman arall."
       }
     },
     "approve": "Cymeradwyo",

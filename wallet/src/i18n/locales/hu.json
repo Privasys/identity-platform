@@ -324,7 +324,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} a leveleket itt: {{resource}}, a(z) {{service}} szolgáltatáson keresztül",
       "meeting.transcripts": "{{permissions}} a megbeszélései átiratait itt: {{resource}}",
-      "meeting.recording": "Rögzítés és átiratkészítés bekapcsolása az Ön által szervezett megbeszélésekhez itt: {{resource}}"
+      "meeting.recording": "Rögzítés és átiratkészítés bekapcsolása az Ön által szervezett megbeszélésekhez itt: {{resource}}",
+      "files.cloud": "{{permissions}}: a(z) {{resource}} fájljai, a(z) {{service}} révén"
     },
     "permissionJoin": " és ",
     "permission": {
@@ -346,6 +347,9 @@
       "meeting": {
         "transcripts": "Ez az alkalmazás elolvashatja azoknak a megbeszéléseknek az átiratát, amelyeken Ön részt vett, az Ön saját fiókjából. Soha nem csatlakozik megbeszéléshez, és soha nem rögzít egyet sem.",
         "recording": "Ez az alkalmazás bekapcsolhatja a szolgáltatója saját rögzítését és átiratkészítését az Ön által szervezett megbeszéléseken. A szolgáltató a szokásos módon értesíti erről a megbeszélés minden résztvevőjét. Enélkül csak azoknak a megbeszéléseknek lesz átirata, amelyeket már rögzít."
+      },
+      "files": {
+        "cloud": "Ez az alkalmazás olvashatja és kereshet a fiók fájljai között, és amit létrehoz, egyetlen, általa ott létrehozott mappába mentheti. Nem törölhet, nem helyezhet át és nem oszthat meg semmit. A fájljai a szolgáltatójánál maradnak; máshová nem másolódnak."
       }
     },
     "approve": "Jóváhagyás",

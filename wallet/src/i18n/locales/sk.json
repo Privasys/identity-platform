@@ -357,7 +357,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} poštu v {{resource}} prostredníctvom {{service}}",
       "meeting.transcripts": "{{permissions}} prepisy vašich stretnutí v {{resource}}",
-      "meeting.recording": "Zapnúť nahrávanie a prepis pri stretnutiach, ktoré organizujete v {{resource}}"
+      "meeting.recording": "Zapnúť nahrávanie a prepis pri stretnutiach, ktoré organizujete v {{resource}}",
+      "files.cloud": "{{permissions}} súbory v {{resource}}, cez {{service}}"
     },
     "permissionJoin": " a ",
     "permission": {
@@ -379,6 +380,9 @@
       "meeting": {
         "transcripts": "Táto aplikácia môže čítať prepisy stretnutí, na ktorých ste sa zúčastnili, z vášho vlastného účtu. Nikdy sa k stretnutiu nepripája a nikdy ho nenahráva.",
         "recording": "Táto aplikácia môže zapnúť vlastné nahrávanie a prepis vášho poskytovateľa pri stretnutiach, ktoré organizujete. Poskytovateľ to oznámi všetkým na stretnutí obvyklým spôsobom. Bez toho budú mať prepis len stretnutia, ktoré už nahrávate."
+      },
+      "files": {
+        "cloud": "Táto aplikácia môže čítať a prehľadávať súbory v tomto účte a ukladať, čo vytvorí, do jediného priečinka, ktorý tam založí. Nemôže nič mazať, presúvať ani zdieľať. Vaše súbory zostávajú u vášho poskytovateľa; nikam inam sa nekopírujú."
       }
     },
     "approve": "Schváliť",

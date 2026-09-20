@@ -357,7 +357,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} poštu u {{resource}}, putem {{service}}",
       "meeting.transcripts": "{{permissions}} transkripte vaših sastanaka u {{resource}}",
-      "meeting.recording": "Uključiti snimanje i transkripciju za sastanke koje vodite u {{resource}}"
+      "meeting.recording": "Uključiti snimanje i transkripciju za sastanke koje vodite u {{resource}}",
+      "files.cloud": "{{permissions}} datoteke u {{resource}}, putem {{service}}"
     },
     "permissionJoin": " i ",
     "permission": {
@@ -379,6 +380,9 @@
       "meeting": {
         "transcripts": "Ova aplikacija može čitati transkripte sastanaka na kojima ste sudjelovali, s vašeg vlastitog računa. Nikada se ne pridružuje sastanku i nikada ga ne snima.",
         "recording": "Ova aplikacija može uključiti snimanje i transkripciju vašeg pružatelja za sastanke koje vodite. Pružatelj o tome obavještava sve na sastanku, na uobičajen način. Bez toga transkript će imati samo sastanci koje već snimate."
+      },
+      "files": {
+        "cloud": "Ova aplikacija može čitati i pretraživati datoteke na ovom računu i spremati ono što proizvede u jednu mapu koju ondje stvori. Ne može ništa brisati, premještati ni dijeliti. Vaše datoteke ostaju kod vašeg pružatelja; nigdje se drugdje ne kopiraju."
       }
     },
     "approve": "Odobri",

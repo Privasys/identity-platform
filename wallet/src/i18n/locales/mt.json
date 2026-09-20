@@ -357,7 +357,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} il-posta f'{{resource}}, permezz ta' {{service}}",
       "meeting.transcripts": "{{permissions}} it-traskrizzjonijiet tal-laqgħat tiegħek f'{{resource}}",
-      "meeting.recording": "Tixgħel ir-reġistrazzjoni u t-traskrizzjoni għal-laqgħat li torganizza f'{{resource}}"
+      "meeting.recording": "Tixgħel ir-reġistrazzjoni u t-traskrizzjoni għal-laqgħat li torganizza f'{{resource}}",
+      "files.cloud": "{{permissions}} il-fajls f'{{resource}}, permezz ta' {{service}}"
     },
     "permissionJoin": " u ",
     "permission": {
@@ -379,6 +380,9 @@
       "meeting": {
         "transcripts": "Din l-app tista' taqra t-traskrizzjonijiet ta' laqgħat li ħadt sehem fihom, mill-kont tiegħek stess. Qatt ma tingħaqad ma' laqgħa u qatt ma tirrekordja waħda.",
         "recording": "Din l-app tista' tixgħel ir-reġistrazzjoni u t-traskrizzjoni tal-fornitur tiegħek stess għal-laqgħat li torganizza. Il-fornitur jgħid lil kulħadd fil-laqgħa, bil-mod tas-soltu. Mingħajr dan, huma biss il-laqgħat li diġà tirrekordja li jkollhom traskrizzjoni."
+      },
+      "files": {
+        "cloud": "Din l-app tista' taqra u tfittex il-fajls f'dan il-kont, u ssejvja dak li tipproduċi f'folder wieħed li toħloq hemm. Ma tista' tħassar, tmexxi jew taqsam xejn. Il-fajls tiegħek jibqgħu għand il-fornitur tiegħek; ma jiġux ikkupjati mkien ieħor."
       }
     },
     "approve": "Approva",

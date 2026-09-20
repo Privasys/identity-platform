@@ -373,6 +373,9 @@
       "meeting": {
         "transcripts": "This app can read the transcripts of meetings you took part in, from your own account. It never joins a meeting and never records one.",
         "recording": "This app can switch on your provider's own recording and transcription for meetings you host. Everyone in the meeting is told by the provider, in the usual way. Without this, only meetings you already record will have a transcript."
+      },
+      "files": {
+        "cloud": "This app can read and search the files in this account, and save what it produces into one folder it creates there. It cannot delete, move or share anything. Your files stay with your provider; they are not copied anywhere else."
       }
     },
     "approve": "Approve",
@@ -390,7 +393,8 @@
       "app_storage": "{{resource}}",
       "mail.mailbox": "{{permissions}} the mail in {{resource}}, through {{service}}",
       "meeting.transcripts": "{{permissions}} the transcripts of your meetings in {{resource}}",
-      "meeting.recording": "Switch on recording and transcription for meetings you host in {{resource}}"
+      "meeting.recording": "Switch on recording and transcription for meetings you host in {{resource}}",
+      "files.cloud": "{{permissions}} the files in {{resource}}, through {{service}}"
     },
     "setup": {
       "preparing": "Preparing the next step",

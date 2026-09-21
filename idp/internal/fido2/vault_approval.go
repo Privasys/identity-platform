@@ -222,6 +222,21 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				errorJSON(w, http.StatusBadRequest, "measurement_digest required for promote")
 				return
 			}
+		case "app-policy":
+			// An app's owner approving its policy document: who owns the app,
+			// which peers it may call and who may call it. The runtime
+			// recomputes this binding from the document in front of it, as the
+			// vault does for promote, so an approval installs one document and
+			// no other. handle is "app:<app-id>:policy", measurement_digest
+			// the SHA-256 of the document bytes, policy_version its seq.
+			if req.MeasurementDigest == "" {
+				errorJSON(w, http.StatusBadRequest, "measurement_digest (the policy document digest) required for app-policy")
+				return
+			}
+			if !strings.HasPrefix(req.Handle, "app:") || !strings.HasSuffix(req.Handle, ":policy") {
+				errorJSON(w, http.StatusBadRequest, "app-policy handle must be app:<app-id>:policy")
+				return
+			}
 		case "app-recovery":
 			// An app-defined recovery approval (e.g. Privasys Drive
 			// recover_tenant): the app computes a digest over its recovery

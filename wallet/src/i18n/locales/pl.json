@@ -384,7 +384,11 @@
       "oauthWorking": "Oczekiwanie na {{provider}}",
       "oauthDone": "Zalogowano przez {{provider}}. Dotknij, aby zalogować się ponownie.",
       "oauthFailed": "Logowanie przez {{provider}} nie zostało ukończone. Spróbuj ponownie.",
-      "oauthGiven": "logowanie przez {{provider}}"
+      "oauthGiven": "logowanie przez {{provider}}",
+      "fromWallet": "Z Twojego portfela",
+      "addEmailBody": "Zachować {{email}} w portfelu, aby został zaproponowany następnym razem?",
+      "addEmail": "Dodaj do mojego portfela",
+      "emailAdded": "{{email}} jest teraz w Twoim portfelu."
     }
   },
 

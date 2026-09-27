@@ -17,8 +17,10 @@ import {
     parseElicitation,
     parseSetupFields,
     parseSetupRequirement,
+    newEmails,
     SetupSchemaError,
     setupPayload,
+    walletEmails,
 } from '@/services/capability-setup';
 
 const mailbox = () => ({
@@ -273,5 +275,49 @@ describe('setupPayload', () => {
     it('omits an optional field the holder left empty', () => {
         const out = setupPayload(fields, { user: 'a@b.org', password: 'p', note: '', keep: false });
         expect('note' in out).toBe(false);
+    });
+});
+
+describe('walletEmails', () => {
+    // A holder keeps several addresses, and the one they connect is not always
+    // the one they sign in with: every one is offered, each once.
+    it('lists every address, verified first, then the most recent, each once', () => {
+        const profile = {
+            email: 'main@example.org',
+            attributes: [
+                { key: 'email', value: 'old@example.org', verified: false, updatedAt: 100 },
+                { key: 'email', value: 'Work@Corp.example', verified: true, updatedAt: 50 },
+                { key: 'email', value: 'new@example.org', verified: false, updatedAt: 300 },
+                { key: 'email', value: 'work@corp.example', verified: false, updatedAt: 400 },
+                { key: 'name', value: 'Ada', verified: true },
+            ],
+        };
+        expect(walletEmails(profile)).toEqual([
+            'Work@Corp.example', 'new@example.org', 'old@example.org', 'main@example.org',
+        ]);
+    });
+
+    it('adds the profile address only when no attribute carries it, and copes with nothing', () => {
+        expect(walletEmails({ email: 'A@x.org', attributes: [{ key: 'email', value: 'a@x.org' }] })).toEqual(['a@x.org']);
+        expect(walletEmails(null)).toEqual([]);
+        expect(walletEmails({ email: '', attributes: [{ key: 'email', value: '  ' }] })).toEqual([]);
+    });
+});
+
+describe('newEmails', () => {
+    const fields = parseSetupFields(
+        { type: 'object', properties: { user: { type: 'string', format: 'email' }, note: { type: 'string' } } },
+        [],
+    );
+    const profile = { email: 'me@x.org', attributes: [{ key: 'email', value: 'work@corp.example' }] };
+
+    it('offers an address typed by hand that the wallet does not hold', () => {
+        expect(newEmails(fields, { user: ' other@y.org ', note: 'x@z.org' }, profile)).toEqual(['other@y.org']);
+    });
+
+    it('offers nothing for an address the wallet already holds, whatever its case, or for no address', () => {
+        expect(newEmails(fields, { user: 'WORK@corp.example' }, profile)).toEqual([]);
+        expect(newEmails(fields, { user: 'me@x.org' }, profile)).toEqual([]);
+        expect(newEmails(fields, { user: '' }, profile)).toEqual([]);
     });
 });

@@ -384,7 +384,11 @@
       "oauthWorking": "Wachten op {{provider}}",
       "oauthDone": "Aangemeld met {{provider}}. Tik om opnieuw aan te melden.",
       "oauthFailed": "Het aanmelden bij {{provider}} is niet voltooid. Probeer het opnieuw.",
-      "oauthGiven": "een aanmelding bij {{provider}}"
+      "oauthGiven": "een aanmelding bij {{provider}}",
+      "fromWallet": "Uit je wallet",
+      "addEmailBody": "{{email}} in je wallet bewaren, zodat het de volgende keer wordt aangeboden?",
+      "addEmail": "Toevoegen aan mijn wallet",
+      "emailAdded": "{{email}} staat nu in je wallet."
     }
   },
 

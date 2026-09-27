@@ -417,7 +417,11 @@
       "oauthWorking": "Qed nistenna lil {{provider}}",
       "oauthDone": "Dħalt ma' {{provider}}. Għafas biex terġa' tidħol.",
       "oauthFailed": "Id-dħul ma' {{provider}} ma tlestiex. Erġa' pprova.",
-      "oauthGiven": "dħul ma' {{provider}}"
+      "oauthGiven": "dħul ma' {{provider}}",
+      "fromWallet": "Mill-kartiera tiegħek",
+      "addEmailBody": "Iżżomm {{email}} fil-kartiera tiegħek, biex jiġi offrut id-darba li jmiss?",
+      "addEmail": "Żid mal-kartiera tiegħi",
+      "emailAdded": "{{email}} issa jinsab fil-kartiera tiegħek."
     }
   },
 

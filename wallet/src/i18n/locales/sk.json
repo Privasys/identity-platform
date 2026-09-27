@@ -417,7 +417,11 @@
       "oauthWorking": "Čaká sa na {{provider}}",
       "oauthDone": "Prihlásené cez {{provider}}. Ťuknutím sa prihlásite znova.",
       "oauthFailed": "Prihlásenie cez {{provider}} sa nedokončilo. Skúste to znova.",
-      "oauthGiven": "prihlásenie cez {{provider}}"
+      "oauthGiven": "prihlásenie cez {{provider}}",
+      "fromWallet": "Z vašej peňaženky",
+      "addEmailBody": "Uložiť {{email}} do svojej peňaženky, aby bola nabudúce ponúknutá?",
+      "addEmail": "Pridať do mojej peňaženky",
+      "emailAdded": "{{email}} je teraz vo vašej peňaženke."
     }
   },
 

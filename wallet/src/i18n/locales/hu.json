@@ -384,7 +384,11 @@
       "oauthWorking": "Várakozás erre: {{provider}}",
       "oauthDone": "Bejelentkezve ezzel: {{provider}}. Koppintson az újbóli bejelentkezéshez.",
       "oauthFailed": "A bejelentkezés ({{provider}}) nem fejeződött be. Próbálja újra.",
-      "oauthGiven": "bejelentkezés ezzel: {{provider}}"
+      "oauthGiven": "bejelentkezés ezzel: {{provider}}",
+      "fromWallet": "A tárcájából",
+      "addEmailBody": "Megőrzi a(z) {{email}} címet a tárcájában, hogy legközelebb felajánlhassuk?",
+      "addEmail": "Hozzáadás a tárcámhoz",
+      "emailAdded": "A(z) {{email}} cím most már a tárcájában van."
     }
   },
 

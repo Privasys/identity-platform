@@ -356,3 +356,62 @@ export function setupPayload(fields: SetupField[], answers: SetupAnswers): Recor
     }
     return out;
 }
+
+/** The part of a profile the email helpers read. */
+export interface EmailSource {
+    email?: string;
+    attributes?: { key: string; value: string; verified?: boolean; updatedAt?: number; acquiredAt?: number }[];
+}
+
+const sameAddress = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * Every email address the holder keeps in their wallet, offered under an
+ * email field as a choice to tap. Offered, never filled in: a value already in
+ * the field goes out with a reflexive tap, and this screen sends it to a
+ * service the holder may never have given it to. A holder has more than one
+ * address (personal, work, an old one), and the mailbox they connect is not
+ * always the one they sign in with, so all of them are listed: verified ones
+ * first, then the most recently updated, each once whatever its case, with the
+ * profile's own address last if no attribute carries it.
+ */
+export function walletEmails(profile: EmailSource | null | undefined): string[] {
+    if (!profile) return [];
+    const attrs = (profile.attributes ?? [])
+        .filter((a) => a.key === 'email' && a.value.trim().length > 0)
+        .slice()
+        .sort((a, b) => {
+            if (!!a.verified !== !!b.verified) return a.verified ? -1 : 1;
+            return (b.updatedAt ?? b.acquiredAt ?? 0) - (a.updatedAt ?? a.acquiredAt ?? 0);
+        });
+    const out: string[] = [];
+    for (const a of attrs) {
+        const v = a.value.trim();
+        if (!out.some((o) => sameAddress(o, v))) out.push(v);
+    }
+    const own = (profile.email ?? '').trim();
+    if (own && !out.some((o) => sameAddress(o, own))) out.push(own);
+    return out;
+}
+
+/**
+ * The addresses the holder typed into email fields that their wallet does not
+ * hold yet. Asked only after the connection succeeded, so what is offered for
+ * keeping is an address that just worked, not one mistyped on the way.
+ */
+export function newEmails(
+    fields: SetupField[],
+    answers: Readonly<Record<string, unknown>>,
+    profile: EmailSource | null | undefined,
+): string[] {
+    const known = walletEmails(profile);
+    const out: string[] = [];
+    for (const f of fields) {
+        if (f.kind !== 'email') continue;
+        const v = String(answers[f.name] ?? '').trim();
+        if (!v || !v.includes('@')) continue;
+        if (known.some((k) => sameAddress(k, v)) || out.some((o) => sameAddress(o, v))) continue;
+        out.push(v);
+    }
+    return out;
+}

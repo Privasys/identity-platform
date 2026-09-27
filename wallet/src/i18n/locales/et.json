@@ -417,7 +417,11 @@
       "oauthWorking": "Ootan teenust {{provider}}",
       "oauthDone": "Sisse logitud teenusega {{provider}}. Puudutage, et uuesti sisse logida.",
       "oauthFailed": "Sisselogimine teenusega {{provider}} ei õnnestunud. Proovige uuesti.",
-      "oauthGiven": "sisselogimine teenusega {{provider}}"
+      "oauthGiven": "sisselogimine teenusega {{provider}}",
+      "fromWallet": "Teie rahakotist",
+      "addEmailBody": "Kas salvestada {{email}} oma rahakotti, et seda järgmisel korral pakutaks?",
+      "addEmail": "Lisa minu rahakotti",
+      "emailAdded": "{{email}} on nüüd teie rahakotis."
     }
   },
 

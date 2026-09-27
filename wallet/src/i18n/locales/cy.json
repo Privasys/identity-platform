@@ -417,7 +417,11 @@
       "oauthWorking": "Yn aros am {{provider}}",
       "oauthDone": "Wedi mewngofnodi gyda {{provider}}. Tapiwch i fewngofnodi eto.",
       "oauthFailed": "Ni chwblhawyd y mewngofnodi gyda {{provider}}. Rhowch gynnig arall arni.",
-      "oauthGiven": "mewngofnodi gyda {{provider}}"
+      "oauthGiven": "mewngofnodi gyda {{provider}}",
+      "fromWallet": "O’ch waled",
+      "addEmailBody": "Cadw {{email}} yn eich waled, fel ei fod yn cael ei gynnig y tro nesaf?",
+      "addEmail": "Ychwanegu at fy waled",
+      "emailAdded": "Mae {{email}} yn eich waled nawr."
     }
   },
 

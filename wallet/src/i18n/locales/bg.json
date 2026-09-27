@@ -417,7 +417,11 @@
       "oauthWorking": "Изчакване на {{provider}}",
       "oauthDone": "Влязохте с {{provider}}. Докоснете, за да влезете отново.",
       "oauthFailed": "Влизането с {{provider}} не беше завършено. Опитайте отново.",
-      "oauthGiven": "влизане с {{provider}}"
+      "oauthGiven": "влизане с {{provider}}",
+      "fromWallet": "От вашия портфейл",
+      "addEmailBody": "Да запазите ли {{email}} във вашия портфейл, за да бъде предложен следващия път?",
+      "addEmail": "Добави в моя портфейл",
+      "emailAdded": "{{email}} вече е във вашия портфейл."
     }
   },
 

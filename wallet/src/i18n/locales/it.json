@@ -384,7 +384,11 @@
       "oauthWorking": "In attesa di {{provider}}",
       "oauthDone": "Accesso eseguito con {{provider}}. Tocca per accedere di nuovo.",
       "oauthFailed": "L'accesso con {{provider}} non è stato completato. Riprova.",
-      "oauthGiven": "un accesso con {{provider}}"
+      "oauthGiven": "un accesso con {{provider}}",
+      "fromWallet": "Dal tuo portafoglio",
+      "addEmailBody": "Conservare {{email}} nel tuo portafoglio, così ti verrà proposto la prossima volta?",
+      "addEmail": "Aggiungi al mio portafoglio",
+      "emailAdded": "{{email}} ora è nel tuo portafoglio."
     }
   },
 

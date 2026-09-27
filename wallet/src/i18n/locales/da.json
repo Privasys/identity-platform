@@ -384,7 +384,11 @@
       "oauthWorking": "Venter på {{provider}}",
       "oauthDone": "Logget ind med {{provider}}. Tryk for at logge ind igen.",
       "oauthFailed": "Login med {{provider}} blev ikke fuldført. Prøv igen.",
-      "oauthGiven": "et login med {{provider}}"
+      "oauthGiven": "et login med {{provider}}",
+      "fromWallet": "Fra din wallet",
+      "addEmailBody": "Vil du gemme {{email}} i din wallet, så den tilbydes næste gang?",
+      "addEmail": "Føj til min wallet",
+      "emailAdded": "{{email}} er nu i din wallet."
     }
   },
 

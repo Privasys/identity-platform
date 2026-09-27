@@ -384,7 +384,11 @@
       "oauthWorking": "En attente de {{provider}}",
       "oauthDone": "Connecté avec {{provider}}. Touchez pour vous reconnecter.",
       "oauthFailed": "La connexion avec {{provider}} n'a pas abouti. Réessayez.",
-      "oauthGiven": "une connexion avec {{provider}}"
+      "oauthGiven": "une connexion avec {{provider}}",
+      "fromWallet": "Depuis votre portefeuille",
+      "addEmailBody": "Conserver {{email}} dans votre portefeuille pour qu'elle vous soit proposée la prochaine fois ?",
+      "addEmail": "Ajouter à mon portefeuille",
+      "emailAdded": "{{email}} est maintenant dans votre portefeuille."
     }
   },
 

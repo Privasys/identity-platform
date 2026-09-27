@@ -417,7 +417,11 @@
       "oauthWorking": "Gaida {{provider}}",
       "oauthDone": "Pierakstījies ar {{provider}}. Pieskarieties, lai pierakstītos vēlreiz.",
       "oauthFailed": "Pierakstīšanās ar {{provider}} netika pabeigta. Mēģiniet vēlreiz.",
-      "oauthGiven": "pierakstīšanās ar {{provider}}"
+      "oauthGiven": "pierakstīšanās ar {{provider}}",
+      "fromWallet": "No jūsu maka",
+      "addEmailBody": "Saglabāt {{email}} savā makā, lai nākamreiz to piedāvātu?",
+      "addEmail": "Pievienot manam makam",
+      "emailAdded": "{{email}} tagad ir jūsu makā."
     }
   },
 

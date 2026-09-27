@@ -417,7 +417,11 @@
       "oauthWorking": "Čekanje na {{provider}}",
       "oauthDone": "Prijavljeni putem {{provider}}. Dodirnite za ponovnu prijavu.",
       "oauthFailed": "Prijava putem {{provider}} nije dovršena. Pokušajte ponovno.",
-      "oauthGiven": "prijava putem {{provider}}"
+      "oauthGiven": "prijava putem {{provider}}",
+      "fromWallet": "Iz vašeg novčanika",
+      "addEmailBody": "Spremiti {{email}} u svoj novčanik kako bi bila ponuđena sljedeći put?",
+      "addEmail": "Dodaj u moj novčanik",
+      "emailAdded": "{{email}} sada je u vašem novčaniku."
     }
   },
 

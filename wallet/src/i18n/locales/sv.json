@@ -384,7 +384,11 @@
       "oauthWorking": "Väntar på {{provider}}",
       "oauthDone": "Inloggad med {{provider}}. Tryck för att logga in igen.",
       "oauthFailed": "Inloggningen med {{provider}} slutfördes inte. Försök igen.",
-      "oauthGiven": "en inloggning med {{provider}}"
+      "oauthGiven": "en inloggning med {{provider}}",
+      "fromWallet": "Från din plånbok",
+      "addEmailBody": "Spara {{email}} i din plånbok, så att den erbjuds nästa gång?",
+      "addEmail": "Lägg till i min plånbok",
+      "emailAdded": "{{email}} finns nu i din plånbok."
     }
   },
 

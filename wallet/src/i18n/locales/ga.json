@@ -417,7 +417,11 @@
       "oauthWorking": "Ag fanacht le {{provider}}",
       "oauthDone": "Sínithe isteach le {{provider}}. Tapáil chun síniú isteach arís.",
       "oauthFailed": "Níor críochnaíodh an síniú isteach le {{provider}}. Bain triail eile as.",
-      "oauthGiven": "síniú isteach le {{provider}}"
+      "oauthGiven": "síniú isteach le {{provider}}",
+      "fromWallet": "Ó do sparán",
+      "addEmailBody": "An gcoinneofar {{email}} i do sparán, ionas go dtairgfear é an chéad uair eile?",
+      "addEmail": "Cuir le mo sparán",
+      "emailAdded": "Tá {{email}} i do sparán anois."
     }
   },
 

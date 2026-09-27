@@ -63,7 +63,9 @@ import {
 import {
     initialAnswers,
     missingRequired,
+    newEmails,
     setupPayload,
+    walletEmails,
     type SetupAnswers,
     type SetupField,
     type SetupPrerequisite,
@@ -85,6 +87,7 @@ import { useCapabilitiesStore } from '@/stores/capabilities';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useConsentStore } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
+import { ATTRIBUTE_MAP, attributeLabel } from '@/services/attributes';
 import { recordChainOutcome, takeChainOutcome } from '@/utils/capability-chain';
 
 type Phase = 'loading' | 'prerequisite' | 'ready' | 'refused' | 'working' | 'done';
@@ -133,6 +136,13 @@ export default function CapabilityRequestScreen() {
     const [answered, setAnswered] = useState<Record<string, unknown>>({});
     const [missing, setMissing] = useState<string[]>([]);
     const [serviceMessage, setServiceMessage] = useState<string>('');
+    // Every address this wallet keeps, offered as a tap under an email field,
+    // and, once a connection has worked, the ones typed by hand that it does
+    // not keep yet, offered for keeping.
+    const profile = useProfileStore((s) => s.profile);
+    const emailSuggestions = useMemo(() => walletEmails(profile), [profile]);
+    const [offerEmails, setOfferEmails] = useState<string[]>([]);
+    const [addedEmails, setAddedEmails] = useState<string[]>([]);
     /**
      * The service's labels for the secret fields the holder has filled in so
      * far, across every step. Labels, never values: this is what lets the
@@ -600,6 +610,12 @@ export default function CapabilityRequestScreen() {
                 router.back();
                 return;
             }
+            // An address typed by hand that just connected is worth keeping,
+            // so the next approval offers it. Asked, never assumed, and not
+            // on a re-supply, where nothing new was typed.
+            if (!resupplying && setup) {
+                setOfferEmails(newEmails(setup.fields, { ...payload, ...answers }, useProfileStore.getState().profile));
+            }
             setPhase('done');
         } catch (e) {
             // The provider behind the service refused the details themselves.
@@ -635,6 +651,26 @@ export default function CapabilityRequestScreen() {
     // A field answered by signing in at a provider: the service runs the
     // flow on its own attested host (checked here, against the host the
     // wallet resolved and attested) and hands back a one-time grant code.
+    // Kept as the holder's own statement, not a verified one: the service
+    // checked the sign-in against this address, but that is its word, and the
+    // wallet records as verified only what it verified itself.
+    const addEmail = useCallback((email: string) => {
+        const now = Math.floor(Date.now() / 1000);
+        const res = useProfileStore.getState().mergeAttribute(
+            {
+                key: 'email',
+                label: attributeLabel('email'),
+                value: email,
+                source: 'manual',
+                verified: false,
+                acquiredAt: now,
+                updatedAt: now,
+            },
+            ATTRIBUTE_MAP.email?.multiValued ?? true,
+        );
+        if (res.status !== 'conflict') setAddedEmails((a) => [...a, email]);
+    }, []);
+
     const onOAuth = useCallback(
         async (field: SetupField) => {
             if (!field.oauth || !resource?.hostname) {
@@ -703,6 +739,23 @@ export default function CapabilityRequestScreen() {
                         <Text style={styles.body}>
                             {t('capability.doneBody', { app: requesterName || requesterAppId.slice(0, 8) })}
                         </Text>
+                        {offerEmails.map((email) => {
+                            const added = addedEmails.includes(email);
+                            return (
+                                <RNView key={email} style={styles.offer}>
+                                    <Text style={styles.body}>
+                                        {added
+                                            ? t('capability.setup.emailAdded', { email })
+                                            : t('capability.setup.addEmailBody', { email })}
+                                    </Text>
+                                    {!added && (
+                                        <Pressable style={styles.secondary} onPress={() => addEmail(email)}>
+                                            <Text style={styles.secondaryText}>{t('capability.setup.addEmail')}</Text>
+                                        </Pressable>
+                                    )}
+                                </RNView>
+                            );
+                        })}
                         <Pressable style={styles.primary} onPress={() => router.back()}>
                             <Text style={styles.primaryText}>{t('common.done')}</Text>
                         </Pressable>
@@ -830,6 +883,7 @@ export default function CapabilityRequestScreen() {
                                     missing={missing}
                                     disabled={phase === 'working'}
                                     onOAuth={onOAuth}
+                                    emailSuggestions={emailSuggestions}
                                 />
 
                                 {/* Where what is typed goes, and where it does
@@ -890,6 +944,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     // at 8 and read as cramped under the header.
     content: { paddingHorizontal: 20, paddingTop: 20 },
     centre: { alignItems: 'center', marginVertical: 24, gap: 12 },
+    offer: { marginBottom: 8 },
     heading: { fontSize: 20, fontWeight: '700', color: p.textPrimary, marginBottom: 12 },
     body: { fontSize: 14, color: p.textSecondary, lineHeight: 21, marginBottom: 16 },
     muted: { fontSize: 13, color: p.textMuted, lineHeight: 19 },

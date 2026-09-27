@@ -384,7 +384,11 @@
       "oauthWorking": "A aguardar {{provider}}",
       "oauthDone": "Sessão iniciada com {{provider}}. Toque para iniciar de novo.",
       "oauthFailed": "O início de sessão com {{provider}} não foi concluído. Tente de novo.",
-      "oauthGiven": "um início de sessão com {{provider}}"
+      "oauthGiven": "um início de sessão com {{provider}}",
+      "fromWallet": "Da sua carteira",
+      "addEmailBody": "Guardar {{email}} na sua carteira, para que seja sugerido da próxima vez?",
+      "addEmail": "Adicionar à minha carteira",
+      "emailAdded": "{{email}} está agora na sua carteira."
     }
   },
 

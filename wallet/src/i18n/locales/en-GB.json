@@ -417,7 +417,11 @@
       "oauthWorking": "Waiting for {{provider}}",
       "oauthDone": "Signed in with {{provider}}. Tap to sign in again.",
       "oauthFailed": "The sign-in with {{provider}} did not complete. Try again.",
-      "oauthGiven": "a sign-in with {{provider}}"
+      "oauthGiven": "a sign-in with {{provider}}",
+      "fromWallet": "From your wallet",
+      "addEmailBody": "Keep {{email}} in your wallet, so it is offered next time?",
+      "addEmail": "Add to my wallet",
+      "emailAdded": "{{email}} is now in your wallet."
     }
   },
 

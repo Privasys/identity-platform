@@ -384,7 +384,11 @@
       "oauthWorking": "Odotetaan palvelua {{provider}}",
       "oauthDone": "Kirjauduttu palvelulla {{provider}}. Napauta kirjautuaksesi uudelleen.",
       "oauthFailed": "Kirjautuminen palvelulla {{provider}} ei onnistunut. Yritä uudelleen.",
-      "oauthGiven": "kirjautuminen palvelulla {{provider}}"
+      "oauthGiven": "kirjautuminen palvelulla {{provider}}",
+      "fromWallet": "Lompakostasi",
+      "addEmailBody": "Tallennetaanko {{email}} lompakkoosi, jotta sitä tarjotaan ensi kerralla?",
+      "addEmail": "Lisää lompakkooni",
+      "emailAdded": "{{email}} on nyt lompakossasi."
     }
   },
 

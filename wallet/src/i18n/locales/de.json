@@ -384,7 +384,11 @@
       "oauthWorking": "Warten auf {{provider}}",
       "oauthDone": "Mit {{provider}} angemeldet. Tippen, um sich erneut anzumelden.",
       "oauthFailed": "Die Anmeldung bei {{provider}} wurde nicht abgeschlossen. Versuchen Sie es erneut.",
-      "oauthGiven": "eine Anmeldung bei {{provider}}"
+      "oauthGiven": "eine Anmeldung bei {{provider}}",
+      "fromWallet": "Aus Ihrer Wallet",
+      "addEmailBody": "{{email}} in Ihrer Wallet speichern, damit sie beim nächsten Mal angeboten wird?",
+      "addEmail": "Zu meiner Wallet hinzufügen",
+      "emailAdded": "{{email}} ist jetzt in Ihrer Wallet."
     }
   },
 

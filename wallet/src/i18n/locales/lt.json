@@ -417,7 +417,11 @@
       "oauthWorking": "Laukiama {{provider}}",
       "oauthDone": "Prisijungta per {{provider}}. Palieskite, kad prisijungtumėte iš naujo.",
       "oauthFailed": "Prisijungimas per {{provider}} nebuvo užbaigtas. Bandykite dar kartą.",
-      "oauthGiven": "prisijungimas per {{provider}}"
+      "oauthGiven": "prisijungimas per {{provider}}",
+      "fromWallet": "Iš jūsų piniginės",
+      "addEmailBody": "Išsaugoti {{email}} savo piniginėje, kad kitą kartą būtų pasiūlytas?",
+      "addEmail": "Pridėti į mano piniginę",
+      "emailAdded": "{{email}} dabar yra jūsų piniginėje."
     }
   },
 

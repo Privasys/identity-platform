@@ -42,9 +42,16 @@ interface Props {
      * without it an `oauth` field is drawn but cannot be answered.
      */
     onOAuth?: (field: SetupField) => Promise<string>;
+    /**
+     * The addresses the holder keeps in this wallet, offered as a choice under
+     * every email field. Offered, never filled in: tapping one is the holder
+     * choosing to send it, exactly as typing it would be. Typing another
+     * address stays open.
+     */
+    emailSuggestions?: string[];
 }
 
-export function SetupForm({ fields, answers, onChange, missing = [], disabled, onOAuth }: Props) {
+export function SetupForm({ fields, answers, onChange, missing = [], disabled, onOAuth, emailSuggestions = [] }: Props) {
     const { t } = useTranslation();
     const p = usePalette();
     const styles = makeStyles(p);
@@ -60,6 +67,7 @@ export function SetupForm({ fields, answers, onChange, missing = [], disabled, o
                     flagged={missing.includes(f.name)}
                     disabled={disabled}
                     onOAuth={onOAuth}
+                    emailSuggestions={emailSuggestions}
                     styles={styles}
                     p={p}
                     t={t}
@@ -76,12 +84,13 @@ interface FieldProps {
     flagged: boolean;
     disabled?: boolean;
     onOAuth?: (field: SetupField) => Promise<string>;
+    emailSuggestions: string[];
     styles: ReturnType<typeof makeStyles>;
     p: Palette;
     t: (key: string, opts?: Record<string, unknown>) => string;
 }
 
-function Field({ field, value, onChange, flagged, disabled, onOAuth, styles, p, t }: FieldProps) {
+function Field({ field, value, onChange, flagged, disabled, onOAuth, emailSuggestions, styles, p, t }: FieldProps) {
     // Only ever affects whether the dots are drawn as characters. The value
     // itself is the same string the service will be sent either way.
     const [revealed, setRevealed] = useState(false);
@@ -225,6 +234,30 @@ function Field({ field, value, onChange, flagged, disabled, onOAuth, styles, p, 
                 </RNView>
             )}
 
+            {field.kind === 'email' && emailSuggestions.length > 0 && (
+                <RNView style={styles.suggestions}>
+                    <Text style={styles.suggestionsLabel}>{t('capability.setup.fromWallet')}</Text>
+                    <RNView style={styles.choices}>
+                        {emailSuggestions.map((address) => {
+                            const on = typeof value === 'string'
+                                && value.trim().toLowerCase() === address.toLowerCase();
+                            return (
+                                <Pressable
+                                    key={address}
+                                    style={[styles.choice, on && styles.choiceOn]}
+                                    onPress={() => onChange(address)}
+                                    disabled={disabled}
+                                    accessibilityRole="button"
+                                    accessibilityState={{ selected: on }}
+                                >
+                                    <Text style={[styles.choiceText, on && styles.choiceTextOn]}>{address}</Text>
+                                </Pressable>
+                            );
+                        })}
+                    </RNView>
+                </RNView>
+            )}
+
             {!!field.description && <Text style={styles.hint}>{field.description}</Text>}
         </RNView>
     );
@@ -255,6 +288,8 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     switchText: { flex: 1, gap: 4 },
     choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    suggestions: { gap: 6 },
+    suggestionsLabel: { fontSize: 12, color: p.textSecondary },
     choice: {
         backgroundColor: p.cardAlt,
         borderWidth: 1,

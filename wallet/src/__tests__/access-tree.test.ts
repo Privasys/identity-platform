@@ -74,11 +74,21 @@ describe('by provider', () => {
         expect(names).toEqual(['Google', 'Microsoft']);
     });
 
-    it('falls back to the service and the resource it described when nothing was declared', () => {
+    it('names a grant that declared nothing after its service, with no account level', () => {
         const [p] = providerTree([grant()]);
         expect(p.name).toBe('Privasys Mail Connector');
-        expect(p.accounts[0].account).toBe('Inbox');
-        expect(p.accounts[0].products[0].product).toBe('Privasys Mail Connector');
+        expect(p.accounts[0].account).toBe('');
+        expect(p.accounts[0].products[0].product).toBe('Inbox');
+    });
+
+    it('shows only what still stands: a revoked or expired grant is gone', () => {
+        const tree = providerTree([
+            gmail('me@gmail.com', { revokedAt: NOW - 10 }),
+            gmail('old@gmail.com', { expiresAt: NOW - 10 }),
+            gmail('live@gmail.com'),
+        ], NOW);
+        expect(tree[0].accounts.map((a) => a.account)).toEqual(['live@gmail.com']);
+        expect(appTree([grant({ revokedAt: NOW - 10 })], NOW)).toEqual([]);
     });
 
     it('leaves out grants over the holder’s own data, and denials', () => {

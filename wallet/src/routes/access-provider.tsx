@@ -127,7 +127,7 @@ export default function AccessProviderScreen() {
             >
                 {/* One account: its address under the provider's name, not a
                     level of its own. */}
-                {!several && provider.accounts[0] && (
+                {!several && !!provider.accounts[0]?.account && (
                     <Text style={styles.lead}>{provider.accounts[0].account}</Text>
                 )}
 
@@ -152,7 +152,7 @@ export default function AccessProviderScreen() {
                     const accountLive = liveIn(recordsIn(account), nowSeconds) > 0;
                     return (
                         <RNView key={account.account} style={styles.account}>
-                            {several && <Text style={styles.accountTitle}>{account.account}</Text>}
+                            {several && <Text style={styles.accountTitle}>{account.account || provider.name}</Text>}
                             {account.products.map((product) => {
                                 const productLive = liveIn(recordsIn(product), nowSeconds) > 0;
                                 return (

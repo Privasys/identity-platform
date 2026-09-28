@@ -50,8 +50,10 @@ export function ProviderRow({
     const { t } = useTranslation();
     const records = recordsIn(provider);
     const ended = records.length > 0 && liveIn(records, nowSeconds) === 0 && !provider.signIn;
-    const accounts = provider.accounts.map((a) => a.account).join(', ');
-    const products = productNames(provider);
+    const accounts = provider.accounts.map((a) => a.account).filter(Boolean).join(', ');
+    // A product named like its provider (a service that declared nothing)
+    // would only repeat the title.
+    const products = productNames(provider).filter((name) => name !== provider.name);
     if (provider.signIn) products.push(t('access.signInTitle'));
     return (
         <Pressable style={styles.row} onPress={onPress}>

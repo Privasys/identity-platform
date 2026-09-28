@@ -77,9 +77,18 @@ function sortByName<T>(items: T[], name: (t: T) => string): T[] {
  * Connected accounts, by provider. Only connections: a grant over the holder's
  * own Privasys data is not an account somewhere else, and appears by app.
  */
-export function providerTree(records: CapabilityRecord[]): ProviderNode[] {
+/**
+ * The grants that still stand. A revoked, expired or withdrawn grant reaches
+ * nothing, so it has no place on a screen about what can reach the holder;
+ * its detail stays reachable from the grant itself.
+ */
+function liveRows(records: CapabilityRecord[], nowSeconds: number): AccessRow[] {
+    return accessRows(records).filter((row) => isLive(row.record, nowSeconds));
+}
+
+export function providerTree(records: CapabilityRecord[], nowSeconds = Math.floor(Date.now() / 1000)): ProviderNode[] {
     const providers = new Map<string, ProviderNode>();
-    for (const row of accessRows(records)) {
+    for (const row of liveRows(records, nowSeconds)) {
         const r = row.record;
         if (!isConnection(r)) continue;
         const pkey = providerKeyOf(r);
@@ -93,7 +102,9 @@ export function providerTree(records: CapabilityRecord[]): ProviderNode[] {
             };
             providers.set(pkey, provider);
         }
-        const accountName = r.account || r.resourceLabel;
+        // A grant made before services declared the account names none; it
+        // is then one unnamed account under its service.
+        const accountName = r.account || '';
         let account = provider.accounts.find((a) => a.account === accountName);
         if (!account) {
             account = { account: accountName, products: [] };
@@ -104,7 +115,7 @@ export function providerTree(records: CapabilityRecord[]): ProviderNode[] {
         if (!product) {
             product = {
                 key: productKey,
-                product: r.product || r.resourceAppName || r.kind,
+                product: r.product || r.resourceLabel || r.resourceAppName || r.kind,
                 category: r.category,
                 rows: [],
             };
@@ -140,9 +151,9 @@ export function withSignIns(tree: ProviderNode[], linked: LinkedProvider[]): Pro
 }
 
 /** Everything each app may use, by app. */
-export function appTree(records: CapabilityRecord[]): AppNode[] {
+export function appTree(records: CapabilityRecord[], nowSeconds = Math.floor(Date.now() / 1000)): AppNode[] {
     const apps = new Map<string, AppNode>();
-    for (const row of accessRows(records)) {
+    for (const row of liveRows(records, nowSeconds)) {
         const r = row.record;
         let app = apps.get(r.appId);
         if (!app) {

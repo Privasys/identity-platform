@@ -56,9 +56,15 @@ export function SetupForm({ fields, answers, onChange, missing = [], disabled, o
     const p = usePalette();
     const styles = makeStyles(p);
 
+    // A sign-in is the action that completes a step, so it comes after the
+    // fields it depends on (the address it signs in for), whatever order the
+    // schema listed them in: a service written in Go lists them
+    // alphabetically, which put the button above the address.
+    const ordered = [...fields.filter((f) => f.kind !== 'oauth'), ...fields.filter((f) => f.kind === 'oauth')];
+
     return (
         <RNView style={styles.form}>
-            {fields.map((f) => (
+            {ordered.map((f) => (
                 <Field
                     key={f.name}
                     field={f}
@@ -118,12 +124,17 @@ function Field({ field, value, onChange, flagged, disabled, onOAuth, emailSugges
                 setSigningIn(false);
             }
         };
+        // The button already says what it does; a heading repeating it word
+        // for word is noise.
+        const heading = field.title && field.title !== t('capability.setup.oauthButton', { provider });
         return (
             <RNView style={styles.field}>
-                <RNView style={styles.labelRow}>
-                    <Text style={styles.label}>{field.title}</Text>
-                    {!field.required && <Text style={styles.optional}>{t('capability.setup.optional')}</Text>}
-                </RNView>
+                {(heading || !field.required) && (
+                    <RNView style={styles.labelRow}>
+                        {heading && <Text style={styles.label}>{field.title}</Text>}
+                        {!field.required && <Text style={styles.optional}>{t('capability.setup.optional')}</Text>}
+                    </RNView>
+                )}
                 <Pressable
                     style={[styles.oauth, done && styles.oauthDone, flagged && styles.inputFlagged]}
                     onPress={signIn}

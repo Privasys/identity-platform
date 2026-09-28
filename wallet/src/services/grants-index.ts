@@ -41,6 +41,7 @@ import * as Crypto from 'expo-crypto';
 import { resolveApp } from '@/services/app-resolve';
 import {
     CAPABILITY_KINDS,
+    declaredConnection,
     listCapabilities,
     PERMISSIONS,
     serviceUrlHost,
@@ -261,6 +262,7 @@ export function recordFromHeld(
         setupProvided: extras?.setupProvided,
         secretLabels: extras?.secretLabels,
         unattended: held.unattended || extras?.unattended || undefined,
+        ...declaredConnection(held as unknown as Record<string, unknown>),
         serviceUrl: service.serviceUrl,
         lastCheckedAt: nowSeconds,
         checkResult: 'held',

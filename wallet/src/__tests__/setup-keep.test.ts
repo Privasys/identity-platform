@@ -6,12 +6,22 @@
  */
 
 const mockMemory = new Map<string, string>();
+// The device store throws on a key outside [\w.-]; so does this one, or a key
+// spelling that works only in tests ships again (v1 carried ":").
+const mockValid = (k: string) => {
+    if (!/^[\w.-]+$/.test(k)) throw new Error(`Invalid key provided to SecureStore: ${k}`);
+};
 jest.mock('@/utils/storage', () => ({
-    getItemAsync: jest.fn(async (k: string) => mockMemory.get(k) ?? null),
+    getItemAsync: jest.fn(async (k: string) => {
+        mockValid(k);
+        return mockMemory.get(k) ?? null;
+    }),
     setItemAsync: jest.fn(async (k: string, v: string) => {
+        mockValid(k);
         mockMemory.set(k, v);
     }),
     deleteItemAsync: jest.fn(async (k: string) => {
+        mockValid(k);
         mockMemory.delete(k);
     }),
 }));
@@ -22,6 +32,7 @@ import {
     keepKey,
     keepSetup,
     keptSetup,
+    keptSetups,
     labelOf,
     nonSecretAnswers,
     resupplyPayload,
@@ -54,6 +65,7 @@ describe('keep and re-supply', () => {
         });
         const k = await keptSetup(SERVICE, 'mail.mailbox');
         expect(k).toEqual({
+            account: '',
             answers: { user: 'alice@example.org', password: 'hunter2' },
             secrets: ['password'],
             secretLabels: ['App password'],
@@ -117,5 +129,44 @@ describe('forget', () => {
         await keepSetup({ serviceAppId: SERVICE, kind: 'calendar.events', answers: { user: 'b' }, secrets: [] });
         await clearKeptSetups();
         expect(mockMemory.size).toBe(0);
+    });
+});
+
+describe('several accounts at one service', () => {
+    const keep = (account: string, now: number) =>
+        keepSetup({
+            serviceAppId: SERVICE,
+            kind: 'mail.mailbox',
+            account,
+            answers: { user: account },
+            secrets: [],
+            kept: { refresh_token: `rt-${account}` },
+            now,
+        });
+
+    it('keeps each account apart, under keys the device store accepts', async () => {
+        await keep('Me@Home.example', 1000);
+        await keep('work@corp.example', 2000);
+        for (const k of mockMemory.keys()) expect(k).toMatch(/^[\w.-]+$/);
+        const all = await keptSetups(SERVICE, 'mail.mailbox');
+        expect(all.map((k) => k.account)).toEqual(['work@corp.example', 'me@home.example']);
+        expect((await keptSetup(SERVICE, 'mail.mailbox', 'ME@home.example'))?.kept).toEqual({
+            refresh_token: 'rt-Me@Home.example',
+        });
+    });
+
+    it('with no account named, gives the one kept most recently', async () => {
+        await keep('me@home.example', 1000);
+        await keep('work@corp.example', 2000);
+        expect((await keptSetup(SERVICE, 'mail.mailbox'))?.account).toBe('work@corp.example');
+    });
+
+    it('forgets one account and leaves the other', async () => {
+        await keep('me@home.example', 1000);
+        await keep('work@corp.example', 2000);
+        await forgetSetup(SERVICE, 'mail.mailbox', 'me@home.example');
+        expect((await keptSetups(SERVICE, 'mail.mailbox')).map((k) => k.account)).toEqual(['work@corp.example']);
+        await forgetSetup(SERVICE, 'mail.mailbox');
+        expect(await keptSetups(SERVICE, 'mail.mailbox')).toEqual([]);
     });
 });

@@ -27,46 +27,21 @@ import { useTranslation } from 'react-i18next';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { revokeRecord } from '@/services/access-revoke';
 import { resolveApp } from '@/services/app-resolve';
-import {
-    isFolderBusy,
-    listCapabilities,
-    revokeAtCallingApp,
-    revokeCapability,
-    serviceUrlHost,
-} from '@/services/capabilities';
+import { isFolderBusy, listCapabilities, serviceUrlHost } from '@/services/capabilities';
 import { syncGrantsIndex } from '@/services/grants-index';
-import { forgetSetup } from '@/services/setup-keep';
 import { capabilityKey, useCapabilitiesStore, type CapabilityRecord } from '@/stores/capabilities';
 import { groupOf, isLive } from '@/utils/access-rows';
 
 /** What the wallet has managed to learn about this grant from the service. */
 type Checked = 'checking' | 'held' | 'gone' | 'unreachable' | 'unsupported';
 
-/**
- * Whether any OTHER record on this phone still stands for the same service
- * and kind: another app the holder approved to use the same account. Read at
- * call time, after the revoked one has been marked.
- */
-function othersStillLive(revoked: CapabilityRecord, nowSeconds: number): boolean {
-    const mine = capabilityKey(revoked);
-    return useCapabilitiesStore
-        .getState()
-        .records.some(
-            (r) =>
-                capabilityKey(r) !== mine &&
-                r.resourceAppId === revoked.resourceAppId &&
-                r.kind === revoked.kind &&
-                isLive(r, nowSeconds),
-        );
-}
-
 export default function AccessGrantScreen() {
     const params = useLocalSearchParams<{ key?: string }>();
     const key = String(params.key ?? '');
     const records = useCapabilitiesStore((s) => s.records);
     const markChecked = useCapabilitiesStore((s) => s.markChecked);
-    const markRevoked = useCapabilitiesStore((s) => s.markRevoked);
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const p = usePalette();
@@ -177,28 +152,11 @@ export default function AccessGrantScreen() {
                     onPress: async () => {
                         setBusy(true);
                         try {
-                            await revokeCapability(host, record.capabilityId!, record.serviceUrl);
-                            // Only now. The service has confirmed.
-                            markRevoked(key);
+                            // Marked ended only once the service confirms;
+                            // the saved details go with the last app over
+                            // that account (services/access-revoke).
+                            await revokeRecord(record, host);
                             setChecked('gone');
-                            // The details this phone kept for that service go
-                            // with the LAST live grant over them, at the same
-                            // moment the service destroys its own copy. While
-                            // another app is still approved they stay: the
-                            // credential serves every app the holder approved,
-                            // and dropping it sooner would cut off access they
-                            // never withdrew.
-                            if (record.setupProvided && !othersStillLive(record, nowSeconds)) {
-                                await forgetSetup(record.resourceAppId, record.kind);
-                            }
-                            // Then the app that asked, so it stops saying
-                            // "approved". After, not before, and never instead.
-                            await revokeAtCallingApp({
-                                callingAppId: record.appId,
-                                capabilityId: record.capabilityId!,
-                                resourceHost: host,
-                                resolve: resolveApp,
-                            });
                             void syncGrantsIndex();
                         } catch (e) {
                             // Files still open: nothing was revoked and nothing
@@ -274,6 +232,13 @@ export default function AccessGrantScreen() {
                             },
                         )}
                     </Text>
+                    {/* Which account, at whose product, as the service
+                        declared it at the mint. */}
+                    {!!record.account && (
+                        <Text style={styles.value}>
+                            {record.product ? `${record.product} · ${record.account}` : record.account}
+                        </Text>
+                    )}
                     <Text style={styles.muted}>
                         {t('access.grantedOn', { when: new Date(record.grantedAt * 1000) })}
                     </Text>

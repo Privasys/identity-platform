@@ -2,96 +2,79 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * One group of standing grants in full, when the Access tab's preview of three
- * is not all of them.
+ * Every provider, or every app, when the Access tab's preview of three is not
+ * all of them.
  *
- * Parameterised by group rather than split into two screens: connected accounts
- * and access to the holder's own data differ in what revoking means, which is a
- * matter for the detail screen and the wording, not for the list.
+ * Parameterised by group rather than split into two screens: the two lists are
+ * two ways in to the same grants, and each row opens its own screen.
  */
 
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
+import { ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { AppRow, ProviderRow } from '@/components/AccessRows';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { useCapabilitiesStore } from '@/stores/capabilities';
-import { isLive, rowsInGroup, type AccessGroup } from '@/utils/access-rows';
+import { useProfileStore } from '@/stores/profile';
+import { appTree, providerTree, withSignIns } from '@/utils/access-tree';
 
 export default function AccessListScreen() {
     const params = useLocalSearchParams<{ group?: string }>();
-    const group: AccessGroup = params.group === 'account' ? 'account' : 'data';
+    const byProvider = params.group === 'account';
     const records = useCapabilitiesStore((s) => s.records);
+    const linked = useProfileStore((s) => s.profile?.linkedProviders);
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const { t } = useTranslation();
 
-    const rows = useMemo(() => rowsInGroup(records, group), [records, group]);
+    const providers = useMemo(() => withSignIns(providerTree(records), linked ?? []), [records, linked]);
+    const apps = useMemo(() => appTree(records), [records]);
     const nowSeconds = Math.floor(Date.now() / 1000);
+    const empty = byProvider ? providers.length === 0 : apps.length === 0;
 
     return (
         <RNView style={styles.screen}>
-            <SubPageHeader
-                title={t(group === 'account' ? 'access.accountsTitle' : 'access.dataTitle')}
-            />
+            <SubPageHeader title={t(byProvider ? 'access.accountsTitle' : 'access.dataTitle')} />
             <ScrollView
                 contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
                 showsVerticalScrollIndicator={false}
             >
-                <Text style={styles.hint}>
-                    {t(group === 'account' ? 'access.accountsHint' : 'access.dataHint')}
-                </Text>
+                <Text style={styles.hint}>{t(byProvider ? 'access.providersHint' : 'access.appsHint')}</Text>
                 <RNView style={styles.card}>
-                    {rows.length === 0 ? (
+                    {empty ? (
                         <Text style={styles.empty}>
-                            {t(group === 'account' ? 'access.accountsEmpty' : 'access.dataEmpty')}
+                            {t(byProvider ? 'access.accountsEmpty' : 'access.dataEmpty')}
                         </Text>
+                    ) : byProvider ? (
+                        providers.map((provider) => (
+                            <ProviderRow
+                                key={provider.key}
+                                provider={provider}
+                                nowSeconds={nowSeconds}
+                                onPress={() =>
+                                    router.push({ pathname: '/access-provider', params: { key: provider.key } })
+                                }
+                                styles={styles}
+                                p={p}
+                            />
+                        ))
                     ) : (
-                        rows.map((row) => {
-                            const live = isLive(row.record, nowSeconds);
-                            return (
-                                <Pressable
-                                    key={row.key}
-                                    style={styles.row}
-                                    onPress={() =>
-                                        router.push({
-                                            pathname: '/access-grant',
-                                            params: { key: row.key },
-                                        })
-                                    }
-                                >
-                                    <RNView style={styles.rowInfo}>
-                                        <Text style={[styles.rowTitle, !live && styles.ended]}>
-                                            {row.record.appName || t('capability.unnamedApp')}
-                                        </Text>
-                                        <Text style={styles.rowMeta}>
-                                            {group === 'account'
-                                                ? row.record.resourceLabel
-                                                : t('access.inService', {
-                                                    resource: row.record.resourceLabel,
-                                                    service:
-                                                        row.record.resourceAppName ||
-                                                        t('capability.unnamedApp'),
-                                                })}
-                                        </Text>
-                                        {!live && (
-                                            <Text style={styles.endedNote}>
-                                                {row.record.revokedAt
-                                                    ? t('access.stateRevoked')
-                                                    : t('access.stateEnded')}
-                                            </Text>
-                                        )}
-                                    </RNView>
-                                    <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-                                </Pressable>
-                            );
-                        })
+                        apps.map((app) => (
+                            <AppRow
+                                key={app.appId}
+                                app={app}
+                                nowSeconds={nowSeconds}
+                                onPress={() => router.push({ pathname: '/access-app', params: { appId: app.appId } })}
+                                styles={styles}
+                                p={p}
+                            />
+                        ))
                     )}
                 </RNView>
             </ScrollView>
@@ -116,7 +99,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     rowInfo: { flex: 1, gap: 2 },
     rowTitle: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
     rowMeta: { fontSize: 13, color: p.textSecondary },
-    ended: { color: p.textMuted },
-    endedNote: { fontSize: 12, color: p.textMuted },
+    rowEnded: { color: p.textMuted },
+    rowEndedNote: { fontSize: 12, color: p.textMuted },
     empty: { fontSize: 13, color: p.textMuted, padding: 16 },
 });

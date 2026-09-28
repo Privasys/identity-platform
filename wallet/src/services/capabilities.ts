@@ -27,6 +27,7 @@ import {
     type SetupRequirement,
 } from '@/services/capability-setup';
 import { getPlatformToken } from '@/services/platform-token';
+import type { DeclaredConnection } from '@/stores/capabilities';
 import { walletCallHeaders } from '@/services/wallet-call';
 
 /**
@@ -74,6 +75,12 @@ export interface CapabilityOptions {
      * difference in what is being agreed to, so it changes the screen's words.
      */
     unattended?: boolean;
+    /**
+     * Which of the holder's accounts the app is asking about, when the holder
+     * has said ("my work mailbox"). A hint only: the wallet starts from the
+     * details it saved for that account, and the holder can pick another.
+     */
+    account?: string;
 }
 
 export interface CapabilityAsk {
@@ -203,6 +210,10 @@ export function parsePendingCapability(raw: unknown): PendingCapability {
     const options: CapabilityOptions = {};
     if (rawOptions && typeof rawOptions === 'object' && rawOptions['unattended'] === true) {
         options.unattended = true;
+    }
+    const account = rawOptions && typeof rawOptions === 'object' ? rawOptions['account'] : undefined;
+    if (typeof account === 'string' && account.trim() && account.trim().length <= 254) {
+        options.account = account.trim().toLowerCase();
     }
 
     const serviceUrl = parseServiceUrl(o['service_url']);
@@ -478,6 +489,37 @@ export interface HeldCapability {
     expires_unix?: number;
     /** Holder folders only: the app keeps a locked copy of the key. */
     unattended?: boolean;
+    /** What the service declares about the account this covers. */
+    account?: string;
+    provider_id?: string;
+    provider?: string;
+    product?: string;
+    category?: string;
+}
+
+/**
+ * The account, provider, product and category a service declared, from a mint's
+ * `service_result` or an entry in its list. Strings only, trimmed, bounded;
+ * anything else is left out, so a service that declares nothing gives a record
+ * exactly like the ones made before services declared anything.
+ */
+export function declaredConnection(src: Record<string, unknown> | undefined): DeclaredConnection {
+    const pick = (k: string) => {
+        const v = src?.[k];
+        return typeof v === 'string' && v.trim() ? v.trim().slice(0, 120) : undefined;
+    };
+    const out: DeclaredConnection = {};
+    const account = pick('account');
+    if (account) out.account = account.toLowerCase();
+    const providerId = pick('provider_id');
+    if (providerId) out.providerId = providerId.toLowerCase();
+    const providerName = pick('provider');
+    if (providerName) out.providerName = providerName;
+    const product = pick('product');
+    if (product) out.product = product;
+    const category = pick('category');
+    if (category) out.category = category;
+    return out;
 }
 
 /**

@@ -53,6 +53,7 @@ import { attestationMatchesResolution, resolveApp, type ResolvedApp } from '@/se
 import {
     CapabilityError,
     createCapability,
+    declaredConnection,
     deliverCapabilityOutcome,
     expiryFor,
     fetchPendingCapability,
@@ -78,7 +79,7 @@ import { holderFolderKeyB64 } from '@/services/holder-folder';
 import { appIdFromOids } from '@/services/release-provenance';
 import {
     keepSetup,
-    keptSetup,
+    keptSetups,
     nonSecretAnswers,
     resupplyPayload,
     type KeptSetup,
@@ -159,6 +160,12 @@ export default function CapabilityRequestScreen() {
      */
     const [kept, setKept] = useState<KeptSetup | null>(null);
     const [useKept, setUseKept] = useState(false);
+    /**
+     * Every account this phone kept details for at this service and kind. More
+     * than one is a holder with, say, a personal and a work mailbox there: the
+     * screen lets them pick which one this app gets.
+     */
+    const [keptChoices, setKeptChoices] = useState<KeptSetup[]>([]);
 
     // Where the prerequisite chain has got to. Refs, not state, so that the
     // effect driving it can have no dependencies: it must re-run when this
@@ -232,14 +239,18 @@ export default function CapabilityRequestScreen() {
                     }
                 }
 
-                // Saved details for this service and kind, if the holder gave
-                // some before. Looked up by the service's ATTESTED id. A
-                // holder folder's setup is a key the wallet derives, never
-                // something kept here.
-                const saved =
+                // Saved details for this service and kind, one per account, if
+                // the holder gave some before. Looked up by the service's
+                // ATTESTED id. A holder folder's setup is a key the wallet
+                // derives, never something kept here. The account the app
+                // named, when it named one, is the one offered first;
+                // otherwise the one used most recently.
+                const choices =
                     !req.setup && req.capability.kind !== 'app_storage' && resolved?.app_id
-                        ? await keptSetup(resolved.app_id, req.capability.kind)
-                        : null;
+                        ? await keptSetups(resolved.app_id, req.capability.kind)
+                        : [];
+                const hinted = req.capability.options.account;
+                const saved = (hinted && choices.find((k) => k.account === hinted)) || choices[0] || null;
 
                 if (cancelled) return;
                 setRequesterAppId(appId);
@@ -253,6 +264,7 @@ export default function CapabilityRequestScreen() {
                     );
                 }
                 setKept(saved);
+                setKeptChoices(choices);
                 setUseKept(!!saved);
                 // The service's own approvals come first, so the holder is not
                 // asked to type a credential into a service that has nowhere
@@ -532,6 +544,10 @@ export default function CapabilityRequestScreen() {
             }
 
             const granted = outcome.granted;
+            // What the service says it connected: the account, and whose and
+            // which product it is. The wallet groups by it and never names
+            // any of it itself.
+            const declared = declaredConnection(granted.service_result);
 
             // Keep what worked, so the next ask for this service sends it on a
             // tap. Only when something was sent: an approval that needed no
@@ -545,6 +561,7 @@ export default function CapabilityRequestScreen() {
                     await keepSetup({
                         serviceAppId: resource.app_id,
                         kind: pending.capability.kind,
+                        account: declared.account ?? (resupplying ? kept.account : undefined),
                         answers: payload,
                         secrets: secretNames,
                         secretLabels: secretsGiven.length > 0 ? secretsGiven : undefined,
@@ -583,6 +600,7 @@ export default function CapabilityRequestScreen() {
                 // not its storage.
                 serviceUrl: pending.service_url,
                 unattended: pending.capability.options.unattended === true || undefined,
+                ...declared,
             });
             // So a recovered phone knows to ask this service what it holds.
             // Best effort, off the holder's path: it never throws, and a failed
@@ -849,6 +867,36 @@ export default function CapabilityRequestScreen() {
                         {!setup && kept && useKept && (
                             <RNView style={styles.setup}>
                                 <Text style={styles.label}>{t('capability.setup.savedLabel')}</Text>
+                                {/* Several accounts saved here: which one this
+                                    app gets is the holder's pick, never a
+                                    guess. */}
+                                {keptChoices.length > 1 && (
+                                    <RNView style={styles.choices}>
+                                        <Text style={styles.muted}>{t('capability.setup.whichAccount')}</Text>
+                                        {keptChoices.map((choice) => {
+                                            const on = choice === kept;
+                                            return (
+                                                <Pressable
+                                                    key={choice.account || choice.label || String(choice.keptAt)}
+                                                    style={[styles.choice, on && styles.choiceOn]}
+                                                    onPress={() => setKept(choice)}
+                                                    disabled={phase === 'working'}
+                                                    accessibilityRole="radio"
+                                                    accessibilityState={{ selected: on }}
+                                                >
+                                                    <Ionicons
+                                                        name={on ? 'radio-button-on' : 'radio-button-off'}
+                                                        size={18}
+                                                        color={on ? p.blue : p.textMuted}
+                                                    />
+                                                    <Text style={styles.choiceText}>
+                                                        {choice.account || choice.label || serviceName}
+                                                    </Text>
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </RNView>
+                                )}
                                 <Text style={styles.body}>
                                     {kept.label
                                         ? t('capability.setup.savedBody', {
@@ -945,6 +993,19 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     content: { paddingHorizontal: 20, paddingTop: 20 },
     centre: { alignItems: 'center', marginVertical: 24, gap: 12 },
     offer: { marginBottom: 8 },
+    choices: { gap: 6, marginBottom: 12 },
+    choice: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: p.border,
+    },
+    choiceOn: { borderColor: p.blue },
+    choiceText: { fontSize: 14, color: p.textPrimary, flex: 1 },
     heading: { fontSize: 20, fontWeight: '700', color: p.textPrimary, marginBottom: 12 },
     body: { fontSize: 14, color: p.textSecondary, lineHeight: 21, marginBottom: 16 },
     muted: { fontSize: 13, color: p.textMuted, lineHeight: 19 },

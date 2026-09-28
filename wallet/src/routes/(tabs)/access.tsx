@@ -9,10 +9,12 @@
  * when they open the wallet is "what can reach me, and how do I stop it".
  *
  * The order is deliberate. Anything needing a decision comes first. Then the
- * two kinds of standing access, because those are the ones a holder forgets
- * they granted, with connected accounts above their own data since a credential
- * handed to someone else is the one they can least afford to lose track of.
- * Sign-ins and history sit underneath, as references rather than controls.
+ * standing access, two ways in to the same grants: connected accounts by
+ * provider ("what have I connected at Google?"), and every app with what it
+ * can use ("what can this assistant reach?"). Connected accounts come first,
+ * since a credential handed to someone else is the one a holder can least
+ * afford to lose track of. Sign-ins and history sit underneath, as references
+ * rather than controls.
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -34,7 +36,8 @@ import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
-import { isLive, rowsInGroup, type AccessRow } from '@/utils/access-rows';
+import { AppRow, ProviderRow } from '@/components/AccessRows';
+import { appTree, providerTree, withSignIns } from '@/utils/access-tree';
 import { buildSessionRows, relativeWhen } from '@/utils/session-rows';
 
 /** How many rows a section shows before it defers to its own screen. */
@@ -54,6 +57,7 @@ export default function AccessScreen() {
     const asks = useCapabilityAsksStore((s) => s.asks);
     const refreshAsks = useCapabilityAsksStore((s) => s.refresh);
     const hasProfile = useProfileStore((s) => !!s.profile);
+    const linked = useProfileStore((s) => s.profile?.linkedProviders);
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const p = usePalette();
@@ -97,11 +101,8 @@ export default function AccessScreen() {
         () => buildSessionRows(traces, apps, sessions, now),
         [traces, apps, sessions, now],
     );
-    const accounts = useMemo(() => rowsInGroup(records, 'account'), [records]);
-    const data = useMemo(() => rowsInGroup(records, 'data'), [records]);
-
-    const openGrant = (row: AccessRow) =>
-        router.push({ pathname: '/access-grant', params: { key: row.key } });
+    const providers = useMemo(() => withSignIns(providerTree(records), linked ?? []), [records, linked]);
+    const grantApps = useMemo(() => appTree(records), [records]);
 
     return (
         <RNView style={styles.screen}>
@@ -182,29 +183,31 @@ export default function AccessScreen() {
                     </Pressable>
                 ))}
 
-                {/* Connected accounts: a credential of the holder's, held by a
-                    service, for an account somewhere we do not control. Only
-                    when there is one: an empty section explaining a concept
-                    the holder has not met is noise. */}
-                {accounts.length > 0 && (
+                {/* Connected accounts, one entry per provider: an account of
+                    the holder's somewhere we do not control, and the sign-in
+                    that imported their details from it. Only when there is
+                    one: an empty section explaining a concept the holder has
+                    not met is noise. */}
+                {providers.length > 0 && (
                     <Section
                         title={t('access.accountsTitle')}
-                        hint={t('access.accountsHint')}
+                        hint={t('access.providersHint')}
                         styles={styles}
                     >
                         <>
-                            {accounts.slice(0, PREVIEW).map((row) => (
-                                <GrantRow
-                                    key={row.key}
-                                    row={row}
+                            {providers.slice(0, PREVIEW).map((provider) => (
+                                <ProviderRow
+                                    key={provider.key}
+                                    provider={provider}
                                     nowSeconds={nowSeconds}
-                                    onPress={() => openGrant(row)}
+                                    onPress={() =>
+                                        router.push({ pathname: '/access-provider', params: { key: provider.key } })
+                                    }
                                     styles={styles}
                                     p={p}
-                                    subtitle={row.record.resourceLabel}
                                 />
                             ))}
-                            {accounts.length > PREVIEW && (
+                            {providers.length > PREVIEW && (
                                 <SeeAll
                                     label={t('access.seeAll')}
                                     onPress={() =>
@@ -218,26 +221,25 @@ export default function AccessScreen() {
                     </Section>
                 )}
 
-                {/* Access to data we hold, where revoking is complete. Same
-                    rule: shown once something has it. */}
-                {data.length > 0 && (
-                    <Section title={t('access.dataTitle')} hint={t('access.dataHint')} styles={styles}>
+                {/* Every app, and everything it can use: connected accounts
+                    and the holder's own data alike. Same rule: shown once
+                    something has access. */}
+                {grantApps.length > 0 && (
+                    <Section title={t('access.dataTitle')} hint={t('access.appsHint')} styles={styles}>
                         <>
-                            {data.slice(0, PREVIEW).map((row) => (
-                                <GrantRow
-                                    key={row.key}
-                                    row={row}
+                            {grantApps.slice(0, PREVIEW).map((app) => (
+                                <AppRow
+                                    key={app.appId}
+                                    app={app}
                                     nowSeconds={nowSeconds}
-                                    onPress={() => openGrant(row)}
+                                    onPress={() =>
+                                        router.push({ pathname: '/access-app', params: { appId: app.appId } })
+                                    }
                                     styles={styles}
                                     p={p}
-                                    subtitle={t('access.inService', {
-                                        resource: row.record.resourceLabel,
-                                        service: row.record.resourceAppName || t('capability.unnamedApp'),
-                                    })}
                                 />
                             ))}
-                            {data.length > PREVIEW && (
+                            {grantApps.length > PREVIEW && (
                                 <SeeAll
                                     label={t('access.seeAll')}
                                     onPress={() =>
@@ -372,40 +374,7 @@ function SeeAll({
     );
 }
 
-function GrantRow({
-    row,
-    subtitle,
-    nowSeconds,
-    onPress,
-    styles,
-    p,
-}: {
-    row: AccessRow;
-    subtitle: string;
-    nowSeconds: number;
-    onPress: () => void;
-    styles: ReturnType<typeof makeStyles>;
-    p: Palette;
-}) {
-    const { t } = useTranslation();
-    const live = isLive(row.record, nowSeconds);
-    return (
-        <Pressable style={styles.row} onPress={onPress}>
-            <RNView style={styles.rowInfo}>
-                <Text style={[styles.rowTitle, !live && styles.rowEnded]}>
-                    {row.record.appName || t('capability.unnamedApp')}
-                </Text>
-                <Text style={styles.rowMeta}>{subtitle}</Text>
-                {!live && (
-                    <Text style={styles.rowEndedNote}>
-                        {row.record.revokedAt ? t('access.stateRevoked') : t('access.stateEnded')}
-                    </Text>
-                )}
-            </RNView>
-            <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-        </Pressable>
-    );
-}
+
 
 const makeStyles = (p: Palette) => StyleSheet.create({
     screen: { flex: 1, backgroundColor: p.screenBg },

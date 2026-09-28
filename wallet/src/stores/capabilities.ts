@@ -18,11 +18,29 @@ import type { CapabilityKind, Permission } from '@/services/capabilities';
  * in everything but name: keyed decisions, provenance, and a remembered denial
  * so a re-prompt can say the holder declined before.
  *
- * Keyed by (appId, resourceAppId, kind, resourceLabel). The same app may hold
- * several capabilities over different resources, and they are separate grants
- * that expire and are revoked separately.
+ * Keyed by (appId, resourceAppId, kind, resourceLabel, account). The same app
+ * may hold several capabilities over different resources, or over several of
+ * the holder's accounts at one service, and they are separate grants that
+ * expire and are revoked separately.
  */
-export interface CapabilityRecord {
+/**
+ * What a service declares about the account a grant covers, at the mint
+ * (`service_result`) and in its list. The wallet groups by it and shows it;
+ * it never names a provider or a product itself.
+ */
+export interface DeclaredConnection {
+    /** The holder's account there ("alice@gmail.com"), normalised. */
+    account?: string;
+    /** Who hosts it: an id to group by ("google") and a name to show. */
+    providerId?: string;
+    providerName?: string;
+    /** The provider's product ("Gmail"). */
+    product?: string;
+    /** What sort of thing it is ("Mail"). */
+    category?: string;
+}
+
+export interface CapabilityRecord extends DeclaredConnection {
     /** The requesting app's verified app id (OID 4.1). */
     appId: string;
     /** Best-known human name, resolved at approval time. */
@@ -105,8 +123,12 @@ export function capabilityKey(r: {
     resourceAppId: string;
     kind: string;
     resourceLabel: string;
+    account?: string;
 }): string {
-    return `${r.appId}|${r.resourceAppId}|${r.kind}|${r.resourceLabel}`;
+    // A grant with no account keeps the key it always had, so records made
+    // before accounts existed are still found.
+    const base = `${r.appId}|${r.resourceAppId}|${r.kind}|${r.resourceLabel}`;
+    return r.account ? `${base}|${r.account}` : base;
 }
 
 interface CapabilitiesState {
@@ -120,6 +142,7 @@ interface CapabilitiesState {
         resourceAppId: string;
         kind: string;
         resourceLabel: string;
+        account?: string;
     }) => CapabilityRecord | undefined;
     /** Forget one record. Does NOT revoke: only the resource service can. */
     forget: (key: string) => void;

@@ -792,6 +792,7 @@
     "fromDocument": "din document",
     "verified": "Verificat",
     "unverified": "Neverificat",
+    "verifyNow": "Verifică",
     "confirmedBy_one": "Confirmat de {{count}} sursă",
     "confirmedBy_few": "Confirmat de {{count}} surse",
     "confirmedBy_other": "Confirmat de {{count}} de surse",
@@ -801,6 +802,28 @@
     "verificationRecords": "Înregistrări de verificare",
     "verifier": "Verificator",
     "method": "Metodă"
+  },
+
+  "verifyEmail": {
+    "title": "Verifică-ți emailul",
+    "lede": "Vom trimite un cod la această adresă. Scrie-l aici, iar portofelul va reține adresa ca fiind a ta.",
+    "ledeSent": "Am trimis un cod la această adresă. Este valabil în următoarele minute.",
+    "send": "Trimite un cod",
+    "resend": "Trimite alt cod",
+    "resendIn": "Alt cod peste {{seconds}} s",
+    "confirm": "Confirmă",
+    "codeLabel": "Cod de verificare",
+    "triesLeft": "Încercări rămase: {{tries}}.",
+    "doneTitle": "Adresă verificată",
+    "doneBody": "{{email}} este acum o adresă verificată în portofelul tău.",
+    "note": "Privasys păstrează adresa doar cât timp codul este valabil și după aceea nu reține nimic despre ea. Rezultatul rămâne pe telefonul tău.",
+    "errorAddress": "Aceasta nu pare o adresă de email.",
+    "errorWrongCode": "Codul nu este corect.",
+    "errorExpired": "Codul a expirat. Cere unul nou.",
+    "errorTooSoon": "Tocmai a fost trimis un cod. Așteaptă puțin înainte de a cere altul.",
+    "errorNoMail": "Acest server nu poate trimite email momentan.",
+    "errorOffline": "Portofelul nu a putut contacta Privasys. Verifică-ți conexiunea.",
+    "errorSend": "Codul nu a putut fi trimis. Încearcă din nou."
   },
   "profile": {
     "identities": "Identificatorii tăi",

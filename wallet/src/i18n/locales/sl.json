@@ -803,6 +803,7 @@
     "fromDocument": "z dokumenta",
     "verified": "Preverjeno",
     "unverified": "Nepreverjeno",
+    "verifyNow": "Potrdi",
     "confirmedBy_one": "Potrdil {{count}} vir",
     "confirmedBy_two": "Potrdila {{count}} vira",
     "confirmedBy_few": "Potrdili {{count}} viri",
@@ -813,6 +814,28 @@
     "verificationRecords": "Zapisi o preverjanju",
     "verifier": "Preverjevalnik",
     "method": "Metoda"
+  },
+
+  "verifyEmail": {
+    "title": "Potrdite svoj e-naslov",
+    "lede": "Na ta naslov bomo poslali kodo. Vnesite jo tukaj in denarnica bo naslov zabeležila kot vaš.",
+    "ledeSent": "Na ta naslov smo poslali kodo. Velja naslednjih nekaj minut.",
+    "send": "Pošlji kodo",
+    "resend": "Pošlji novo kodo",
+    "resendIn": "Nova koda čez {{seconds}} s",
+    "confirm": "Potrdi",
+    "codeLabel": "Koda za potrditev",
+    "triesLeft": "Preostali poskusi: {{tries}}.",
+    "doneTitle": "Naslov potrjen",
+    "doneBody": "{{email}} je zdaj potrjen naslov v vaši denarnici.",
+    "note": "Privasys hrani naslov samo, dokler koda velja, potem pa o njem ne obdrži ničesar. Rezultat ostane v vašem telefonu.",
+    "errorAddress": "To ni videti kot e-naslov.",
+    "errorWrongCode": "Ta koda ni pravilna.",
+    "errorExpired": "Ta koda je potekla. Zahtevajte novo.",
+    "errorTooSoon": "Koda je bila pravkar poslana. Počakajte trenutek, preden zahtevate novo.",
+    "errorNoMail": "Ta strežnik trenutno ne more pošiljati e-pošte.",
+    "errorOffline": "Denarnica ni mogla doseči Privasysa. Preverite povezavo.",
+    "errorSend": "Kode ni bilo mogoče poslati. Poskusite znova."
   },
   "profile": {
     "identities": "Vaši identifikatorji",

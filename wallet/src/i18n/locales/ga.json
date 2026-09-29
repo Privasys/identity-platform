@@ -814,6 +814,7 @@
     "fromDocument": "ón gcáipéis",
     "verified": "Fíoraithe",
     "unverified": "Neamhfhíoraithe",
+    "verifyNow": "Fíoraigh",
     "confirmedBy_one": "Deimhnithe ag {{count}} fhoinse",
     "confirmedBy_two": "Deimhnithe ag {{count}} fhoinse",
     "confirmedBy_few": "Deimhnithe ag {{count}} fhoinse",
@@ -825,6 +826,28 @@
     "verificationRecords": "Taifid fhíoraithe",
     "verifier": "Fíoraitheoir",
     "method": "Modh"
+  },
+
+  "verifyEmail": {
+    "title": "Fíoraigh do ríomhphost",
+    "lede": "Seolfaimid cód chuig an seoladh seo. Clóscríobh ar ais anseo é agus taifeadfaidh do sparán an seoladh mar do cheannsa.",
+    "ledeSent": "Sheolamar cód chuig an seoladh seo. Oibríonn sé ar feadh cúpla nóiméad eile.",
+    "send": "Seol cód",
+    "resend": "Seol cód eile",
+    "resendIn": "Cód eile i gceann {{seconds}} soicind",
+    "confirm": "Deimhnigh",
+    "codeLabel": "Cód fíoraithe",
+    "triesLeft": "Iarrachtaí fágtha: {{tries}}.",
+    "doneTitle": "Seoladh fíoraithe",
+    "doneBody": "Is seoladh fíoraithe i do sparán é {{email}} anois.",
+    "note": "Ní choinníonn Privasys an seoladh ach fad a bhíonn an cód bailí agus ní choinníonn sé aon rud ina dhiaidh sin. Fanann an toradh ar do ghuthán.",
+    "errorAddress": "Ní cosúil gur seoladh ríomhphoist é sin.",
+    "errorWrongCode": "Níl an cód sin ceart.",
+    "errorExpired": "Tá an cód sin imithe in éag. Iarr ceann nua.",
+    "errorTooSoon": "Seoladh cód díreach anois. Fan nóiméad sula n-iarrann tú ceann eile.",
+    "errorNoMail": "Ní féidir leis an bhfreastalaí seo ríomhphost a sheoladh faoi láthair.",
+    "errorOffline": "Níorbh fhéidir leis an sparán teacht ar Privasys. Seiceáil do nasc.",
+    "errorSend": "Níorbh fhéidir an cód a sheoladh. Bain triail eile as."
   },
   "profile": {
     "identities": "Do chuid aitheantóirí",

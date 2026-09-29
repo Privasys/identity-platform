@@ -792,6 +792,7 @@
     "fromDocument": "s dokumenta",
     "verified": "Provjereno",
     "unverified": "Neprovjereno",
+    "verifyNow": "Potvrdi",
     "confirmedBy_one": "Potvrdio {{count}} izvor",
     "confirmedBy_few": "Potvrdila {{count}} izvora",
     "confirmedBy_other": "Potvrdilo {{count}} izvora",
@@ -801,6 +802,28 @@
     "verificationRecords": "Zapisi o provjeri",
     "verifier": "Provjeritelj",
     "method": "Metoda"
+  },
+
+  "verifyEmail": {
+    "title": "Potvrdite svoju e-poštu",
+    "lede": "Poslat ćemo kod na ovu adresu. Upišite ga ovdje i novčanik će zabilježiti adresu kao vašu.",
+    "ledeSent": "Poslali smo kod na ovu adresu. Vrijedi sljedećih nekoliko minuta.",
+    "send": "Pošalji kod",
+    "resend": "Pošalji novi kod",
+    "resendIn": "Novi kod za {{seconds}} s",
+    "confirm": "Potvrdi",
+    "codeLabel": "Kod za potvrdu",
+    "triesLeft": "Preostalo pokušaja: {{tries}}.",
+    "doneTitle": "Adresa potvrđena",
+    "doneBody": "{{email}} je sada potvrđena adresa u vašem novčaniku.",
+    "note": "Privasys čuva adresu samo dok kod vrijedi i nakon toga ne zadržava ništa o njoj. Rezultat ostaje na vašem telefonu.",
+    "errorAddress": "To ne izgleda kao adresa e-pošte.",
+    "errorWrongCode": "Taj kod nije točan.",
+    "errorExpired": "Taj je kod istekao. Zatražite novi.",
+    "errorTooSoon": "Kod je upravo poslan. Pričekajte trenutak prije nego zatražite novi.",
+    "errorNoMail": "Ovaj poslužitelj trenutačno ne može slati e-poštu.",
+    "errorOffline": "Novčanik nije mogao doći do Privasysa. Provjerite vezu.",
+    "errorSend": "Kod nije bilo moguće poslati. Pokušajte ponovno."
   },
   "profile": {
     "identities": "Vaši identifikatori",

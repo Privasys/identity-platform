@@ -759,6 +759,7 @@
     "fromDocument": "från en handling",
     "verified": "Verifierat",
     "unverified": "Overifierat",
+    "verifyNow": "Verifiera",
     "confirmedBy_one": "Bekräftat av {{count}} källa",
     "confirmedBy_other": "Bekräftat av {{count}} källor",
     "acquired": "Inhämtat",
@@ -767,6 +768,28 @@
     "verificationRecords": "Verifieringsuppgifter",
     "verifier": "Verifierare",
     "method": "Metod"
+  },
+
+  "verifyEmail": {
+    "title": "Verifiera din e-post",
+    "lede": "Vi skickar en kod till den här adressen. Skriv in den här, så noterar din plånbok adressen som din.",
+    "ledeSent": "Vi har skickat en kod till den här adressen. Den fungerar de närmaste minuterna.",
+    "send": "Skicka en kod",
+    "resend": "Skicka en ny kod",
+    "resendIn": "Ny kod om {{seconds}} s",
+    "confirm": "Bekräfta",
+    "codeLabel": "Verifieringskod",
+    "triesLeft": "Försök kvar: {{tries}}.",
+    "doneTitle": "Adressen är verifierad",
+    "doneBody": "{{email}} är nu en verifierad adress i din plånbok.",
+    "note": "Privasys har adressen bara så länge koden gäller och sparar inget om den efteråt. Resultatet stannar i din telefon.",
+    "errorAddress": "Det ser inte ut som en e-postadress.",
+    "errorWrongCode": "Koden stämmer inte.",
+    "errorExpired": "Koden har gått ut. Begär en ny.",
+    "errorTooSoon": "En kod skickades nyss. Vänta en stund innan du begär en ny.",
+    "errorNoMail": "Den här servern kan inte skicka e-post just nu.",
+    "errorOffline": "Plånboken kunde inte nå Privasys. Kontrollera din anslutning.",
+    "errorSend": "Koden kunde inte skickas. Försök igen."
   },
 
   "profile": {

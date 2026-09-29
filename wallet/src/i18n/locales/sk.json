@@ -792,6 +792,7 @@
     "fromDocument": "z dokladu",
     "verified": "Overené",
     "unverified": "Neoverené",
+    "verifyNow": "Overiť",
     "confirmedBy_one": "Potvrdené {{count}} zdrojom",
     "confirmedBy_few": "Potvrdené {{count}} zdrojmi",
     "confirmedBy_other": "Potvrdené {{count}} zdrojmi",
@@ -801,6 +802,28 @@
     "verificationRecords": "Záznamy o overení",
     "verifier": "Overovateľ",
     "method": "Metóda"
+  },
+
+  "verifyEmail": {
+    "title": "Overte svoj e-mail",
+    "lede": "Na túto adresu pošleme kód. Zadajte ho sem a peňaženka si adresu zaznamená ako vašu.",
+    "ledeSent": "Na túto adresu sme poslali kód. Platí niekoľko najbližších minút.",
+    "send": "Poslať kód",
+    "resend": "Poslať nový kód",
+    "resendIn": "Nový kód o {{seconds}} s",
+    "confirm": "Potvrdiť",
+    "codeLabel": "Overovací kód",
+    "triesLeft": "Zostávajúce pokusy: {{tries}}.",
+    "doneTitle": "Adresa overená",
+    "doneBody": "{{email}} je teraz overená adresa vo vašej peňaženke.",
+    "note": "Privasys drží adresu len počas platnosti kódu a potom si o nej nenecháva nič. Výsledok zostáva vo vašom telefóne.",
+    "errorAddress": "Toto nevyzerá ako e-mailová adresa.",
+    "errorWrongCode": "Tento kód nie je správny.",
+    "errorExpired": "Platnosť kódu vypršala. Vyžiadajte si nový.",
+    "errorTooSoon": "Kód bol práve odoslaný. Pred vyžiadaním ďalšieho chvíľu počkajte.",
+    "errorNoMail": "Tento server teraz nemôže odosielať e-maily.",
+    "errorOffline": "Peňaženka sa nedokázala spojiť s Privasys. Skontrolujte pripojenie.",
+    "errorSend": "Kód sa nepodarilo odoslať. Skúste to znova."
   },
   "profile": {
     "identities": "Vaše identifikátory",

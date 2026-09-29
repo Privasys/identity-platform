@@ -254,6 +254,26 @@ async function resolveRequestedAttributes(
     return Object.keys(attrs).length > 0 ? attrs : undefined;
 }
 
+/**
+ * The receipt privasys.id signed for this address, if this wallet holds one.
+ *
+ * Only privasys.id's own receipt counts here: a provider's `email_verified`
+ * claim is that provider's word, and privasys.id cannot check it, so sending
+ * it would not make the claim it feeds any truer.
+ */
+function emailReceiptFor(
+    profile: import('@/stores/profile').UserProfile | null,
+    email: string,
+): string | undefined {
+    const attr = profile?.attributes.find(
+        (a) => a.key === 'email' && a.value.toLowerCase() === email.toLowerCase(),
+    );
+    if (!attr?.verified) return undefined;
+    return attr.verifications?.find(
+        (v) => v.verifier === 'privasys.id' && v.method === 'email_code' && v.evidence,
+    )?.evidence;
+}
+
 /** Outcome of a fresh-presence ceremony, for honest wallet UX.
  *  - null: presence was not part of this sign-in (or the user skipped it).
  *  - 'affirmed': the enclave confirmed the document holder is present.
@@ -314,11 +334,23 @@ async function patchSessionAttributes(
 ): Promise<void> {
     if (!payload.clientId || !attributes || Object.keys(attributes).length === 0) return;
     if (!payload.origin?.includes('privasys.id')) return;
+    // The proof that the address was ever checked rides HERE and nowhere else.
+    // privasys.id signed this receipt when it mailed a code, and reads it back
+    // to decide `email_verified`; without it that claim is false, which is the
+    // truth about an address the holder simply typed. It names the holder's
+    // account id, so it goes on this direct call to privasys.id rather than
+    // through the relay, which the browser can read: an identifier the same on
+    // every app is exactly what the pairwise sub exists to avoid.
+    let body = attributes;
+    if (attributes.email) {
+        const receipt = emailReceiptFor(useProfileStore.getState().profile, attributes.email);
+        if (receipt) body = { ...attributes, email_receipt: receipt };
+    }
     try {
         await fetch(`https://${payload.origin}/session/complete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: payload.sessionId, attributes }),
+            body: JSON.stringify({ session_id: payload.sessionId, attributes: body }),
         });
     } catch (e: any) {
         console.warn('[CONNECT] session attribute patch failed:', e?.message);

@@ -770,6 +770,7 @@
     "fromDocument": "z dokladu",
     "verified": "Ověřeno",
     "unverified": "Neověřeno",
+    "verifyNow": "Ověřit",
     "confirmedBy_one": "Potvrzeno {{count}} zdrojem",
     "confirmedBy_few": "Potvrzeno {{count}} zdroji",
     "confirmedBy_other": "Potvrzeno {{count}} zdroji",
@@ -779,6 +780,28 @@
     "verificationRecords": "Záznamy o ověření",
     "verifier": "Ověřovatel",
     "method": "Metoda"
+  },
+
+  "verifyEmail": {
+    "title": "Ověřte svůj e-mail",
+    "lede": "Na tuto adresu pošleme kód. Zadejte ho zde a peněženka adresu zaznamená jako vaši.",
+    "ledeSent": "Na tuto adresu jsme poslali kód. Platí několik následujících minut.",
+    "send": "Poslat kód",
+    "resend": "Poslat další kód",
+    "resendIn": "Další kód za {{seconds}} s",
+    "confirm": "Potvrdit",
+    "codeLabel": "Ověřovací kód",
+    "triesLeft": "Zbývá pokusů: {{tries}}.",
+    "doneTitle": "Adresa ověřena",
+    "doneBody": "{{email}} je nyní ověřená adresa ve vaší peněžence.",
+    "note": "Privasys uchovává adresu jen po dobu platnosti kódu a poté si o ní nic nenechává. Výsledek zůstává ve vašem telefonu.",
+    "errorAddress": "Toto nevypadá jako e-mailová adresa.",
+    "errorWrongCode": "Tento kód není správný.",
+    "errorExpired": "Platnost kódu vypršela. Vyžádejte si nový.",
+    "errorTooSoon": "Kód byl právě odeslán. Než si vyžádáte další, chvíli počkejte.",
+    "errorNoMail": "Tento server teď nemůže odesílat e-maily.",
+    "errorOffline": "Peněženka se nemohla spojit s Privasys. Zkontrolujte připojení.",
+    "errorSend": "Kód se nepodařilo odeslat. Zkuste to prosím znovu."
   },
 
   "profile": {

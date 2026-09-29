@@ -792,6 +792,7 @@
     "fromDocument": "no dokumenta",
     "verified": "Pārbaudīts",
     "unverified": "Nepārbaudīts",
+    "verifyNow": "Apstiprināt",
     "confirmedBy_zero": "Apstiprinājuši {{count}} avoti",
     "confirmedBy_one": "Apstiprinājis {{count}} avots",
     "confirmedBy_other": "Apstiprinājuši {{count}} avoti",
@@ -801,6 +802,28 @@
     "verificationRecords": "Pārbaudes ieraksti",
     "verifier": "Pārbaudītājs",
     "method": "Metode"
+  },
+
+  "verifyEmail": {
+    "title": "Apstipriniet savu e-pastu",
+    "lede": "Nosūtīsim kodu uz šo adresi. Ievadiet to šeit, un maks pierakstīs adresi kā jūsējo.",
+    "ledeSent": "Nosūtījām kodu uz šo adresi. Tas darbojas dažas tuvākās minūtes.",
+    "send": "Nosūtīt kodu",
+    "resend": "Nosūtīt jaunu kodu",
+    "resendIn": "Jauns kods pēc {{seconds}} s",
+    "confirm": "Apstiprināt",
+    "codeLabel": "Apstiprinājuma kods",
+    "triesLeft": "Atlikuši mēģinājumi: {{tries}}.",
+    "doneTitle": "Adrese apstiprināta",
+    "doneBody": "{{email}} tagad ir apstiprināta adrese jūsu makā.",
+    "note": "Privasys patur adresi tikai tik ilgi, kamēr kods ir derīgs, un pēc tam par to neko nesaglabā. Rezultāts paliek jūsu tālrunī.",
+    "errorAddress": "Tā neizskatās pēc e-pasta adreses.",
+    "errorWrongCode": "Šis kods nav pareizs.",
+    "errorExpired": "Šim kodam beidzies termiņš. Pieprasiet jaunu.",
+    "errorTooSoon": "Kods tikko tika nosūtīts. Nedaudz uzgaidiet, pirms pieprasāt citu.",
+    "errorNoMail": "Šis serveris pašlaik nevar sūtīt e-pastu.",
+    "errorOffline": "Maks nevarēja sasniegt Privasys. Pārbaudiet savienojumu.",
+    "errorSend": "Kodu neizdevās nosūtīt. Mēģiniet vēlreiz."
   },
   "profile": {
     "identities": "Jūsu identifikatori",

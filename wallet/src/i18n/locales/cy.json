@@ -825,6 +825,7 @@
     "fromDocument": "o'r ddogfen",
     "verified": "Wedi'i wirio",
     "unverified": "Heb ei wirio",
+    "verifyNow": "Gwirio",
     "confirmedBy_zero": "Cadarnhawyd gan {{count}} ffynhonnell",
     "confirmedBy_one": "Cadarnhawyd gan {{count}} ffynhonnell",
     "confirmedBy_two": "Cadarnhawyd gan {{count}} ffynhonnell",
@@ -837,6 +838,28 @@
     "verificationRecords": "Cofnodion gwirio",
     "verifier": "Gwiriwr",
     "method": "Dull"
+  },
+
+  "verifyEmail": {
+    "title": "Gwirio eich e-bost",
+    "lede": "Byddwn yn anfon cod i'r cyfeiriad hwn. Teipiwch ef yma a bydd eich waled yn cofnodi'r cyfeiriad fel un chi.",
+    "ledeSent": "Anfonwyd cod i'r cyfeiriad hwn. Mae'n gweithio am yr ychydig funudau nesaf.",
+    "send": "Anfon cod",
+    "resend": "Anfon cod arall",
+    "resendIn": "Anfon cod arall ymhen {{seconds}} eiliad",
+    "confirm": "Cadarnhau",
+    "codeLabel": "Cod gwirio",
+    "triesLeft": "Cynigion ar ôl: {{tries}}.",
+    "doneTitle": "Cyfeiriad wedi'i wirio",
+    "doneBody": "Mae {{email}} bellach yn gyfeiriad wedi'i wirio yn eich waled.",
+    "note": "Dim ond tra bo'r cod yn ddilys y mae Privasys yn dal y cyfeiriad, ac nid yw'n cadw dim amdano wedyn. Mae'r canlyniad yn aros ar eich ffôn.",
+    "errorAddress": "Nid yw hwnnw'n edrych fel cyfeiriad e-bost.",
+    "errorWrongCode": "Nid yw'r cod hwnnw'n gywir.",
+    "errorExpired": "Mae'r cod hwnnw wedi dod i ben. Gofynnwch am un newydd.",
+    "errorTooSoon": "Anfonwyd cod newydd sbon. Arhoswch eiliad cyn gofyn am un arall.",
+    "errorNoMail": "Ni all y gweinydd hwn anfon e-bost ar hyn o bryd.",
+    "errorOffline": "Ni allai’r waled gyrraedd Privasys. Gwiriwch eich cysylltiad.",
+    "errorSend": "Ni ellid anfon y cod. Rhowch gynnig arall arni."
   },
   "profile": {
     "identities": "Eich dynodwyr",

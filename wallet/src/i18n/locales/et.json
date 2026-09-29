@@ -781,6 +781,7 @@
     "fromDocument": "dokumendist",
     "verified": "Kontrollitud",
     "unverified": "Kontrollimata",
+    "verifyNow": "Kinnita",
     "confirmedBy_one": "Kinnitatud {{count}} allika poolt",
     "confirmedBy_other": "Kinnitatud {{count}} allika poolt",
     "acquired": "Omandatud",
@@ -789,6 +790,28 @@
     "verificationRecords": "Kontrollikirjed",
     "verifier": "Kontrollija",
     "method": "Meetod"
+  },
+
+  "verifyEmail": {
+    "title": "Kinnitage oma e-post",
+    "lede": "Saadame sellele aadressile koodi. Sisestage see siia ja rahakott märgib aadressi teie omaks.",
+    "ledeSent": "Saatsime sellele aadressile koodi. See kehtib järgmised minutid.",
+    "send": "Saada kood",
+    "resend": "Saada uus kood",
+    "resendIn": "Uus kood {{seconds}} s pärast",
+    "confirm": "Kinnita",
+    "codeLabel": "Kinnituskood",
+    "triesLeft": "Katseid jäänud: {{tries}}.",
+    "doneTitle": "Aadress kinnitatud",
+    "doneBody": "{{email}} on nüüd teie rahakotis kinnitatud aadress.",
+    "note": "Privasys hoiab aadressi ainult koodi kehtivuse ajal ja ei säilita sellest pärast midagi. Tulemus jääb teie telefoni.",
+    "errorAddress": "See ei näe välja nagu e-posti aadress.",
+    "errorWrongCode": "See kood ei ole õige.",
+    "errorExpired": "Kood on aegunud. Küsige uut.",
+    "errorTooSoon": "Kood saadeti just. Oodake hetk, enne kui küsite uut.",
+    "errorNoMail": "See server ei saa praegu e-kirju saata.",
+    "errorOffline": "Rahakott ei saanud Privasysiga ühendust. Kontrollige ühendust.",
+    "errorSend": "Koodi ei õnnestunud saata. Proovige uuesti."
   },
   "profile": {
     "identities": "Teie identifikaatorid",

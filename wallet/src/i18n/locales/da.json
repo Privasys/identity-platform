@@ -759,6 +759,7 @@
     "fromDocument": "fra et dokument",
     "verified": "Verificeret",
     "unverified": "Ikke verificeret",
+    "verifyNow": "Bekræft",
     "confirmedBy_one": "Bekræftet af {{count}} kilde",
     "confirmedBy_other": "Bekræftet af {{count}} kilder",
     "acquired": "Indhentet",
@@ -767,6 +768,28 @@
     "verificationRecords": "Verificeringsoplysninger",
     "verifier": "Verifikator",
     "method": "Metode"
+  },
+
+  "verifyEmail": {
+    "title": "Bekræft din e-mail",
+    "lede": "Vi sender en kode til denne adresse. Skriv den her, så noterer din tegnebog adressen som din.",
+    "ledeSent": "Vi har sendt en kode til denne adresse. Den virker de næste par minutter.",
+    "send": "Send en kode",
+    "resend": "Send en ny kode",
+    "resendIn": "Send en ny kode om {{seconds}} s",
+    "confirm": "Bekræft",
+    "codeLabel": "Bekræftelseskode",
+    "triesLeft": "Forsøg tilbage: {{tries}}.",
+    "doneTitle": "Adressen er bekræftet",
+    "doneBody": "{{email}} er nu en bekræftet adresse i din tegnebog.",
+    "note": "Privasys har kun adressen, mens koden gælder, og gemmer intet om den bagefter. Resultatet bliver på din telefon.",
+    "errorAddress": "Det ligner ikke en e-mailadresse.",
+    "errorWrongCode": "Den kode er ikke rigtig.",
+    "errorExpired": "Koden er udløbet. Bed om en ny.",
+    "errorTooSoon": "Der blev lige sendt en kode. Vent et øjeblik, før du beder om en ny.",
+    "errorNoMail": "Denne server kan ikke sende mail lige nu.",
+    "errorOffline": "Tegnebogen kunne ikke nå Privasys. Tjek din forbindelse.",
+    "errorSend": "Koden kunne ikke sendes. Prøv igen."
   },
 
   "profile": {

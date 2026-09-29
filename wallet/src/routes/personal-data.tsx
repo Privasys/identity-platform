@@ -111,9 +111,18 @@ export default function PersonalDataScreen() {
         if (def.profileField === 'displayName') updateProfile({ displayName: newAttrValue.trim() });
         if (def.profileField === 'locale') updateProfile({ locale: newAttrValue.trim() });
 
+        const saved = newAttrValue.trim();
         setAddingAttribute(null);
         setNewAttrValue('');
+
+        // An address typed here is one nobody has checked, so the check is
+        // offered at once rather than left as a badge to notice later.
+        if (addingAttribute === 'email') verifyEmail(saved);
     };
+
+    /** Prove an address: privasys.id mails a code and the wallet takes the receipt. */
+    const verifyEmail = (email: string) =>
+        router.push({ pathname: '/verify-email', params: { email } });
 
     const existingKeys = new Set(profile.attributes.map((a) => a.key));
     // Government-verified keys are NOT offered for manual entry. A passport
@@ -191,6 +200,11 @@ export default function PersonalDataScreen() {
                             attr={attr}
                             onRemove={() => handleRemoveAttribute(attr)}
                             onChangePicture={attr.key === 'picture' ? chooseAvatar : undefined}
+                            onVerify={
+                                attr.key === 'email' && !attr.verified
+                                    ? () => verifyEmail(attr.value)
+                                    : undefined
+                            }
                             onEdit={(newValue) => {
                                 const now = Math.floor(Date.now() / 1000);
                                 // Editing makes the value self-asserted again: reset
@@ -275,12 +289,15 @@ function AttributeCard({
     onRemove,
     onEdit,
     onChangePicture,
+    onVerify,
 }: {
     attr: ProfileAttribute;
     onRemove: () => void;
     onEdit: (newValue: string) => void;
     /** Set for the holder's own avatar; the ID portrait cannot be replaced. */
     onChangePicture?: () => void;
+    /** Set when this value can be proved from here, i.e. an unverified email. */
+    onVerify?: () => void;
 }) {
     const { t } = useTranslation();
     const p = usePalette();
@@ -438,6 +455,15 @@ function AttributeCard({
                                     <Text style={[styles.verifiedText, { color: p.warnText }]}>
                                         {t('personalData.unverified')}
                                     </Text>
+                                    {/* An address nobody has checked is one the
+                                        holder can have checked here and then. */}
+                                    {onVerify ? (
+                                        <Pressable onPress={onVerify} hitSlop={8}>
+                                            <Text style={styles.verifyNow}>
+                                                {t('personalData.verifyNow')}
+                                            </Text>
+                                        </Pressable>
+                                    ) : null}
                                 </RNView>
                             )}
                             {confirmed ? (
@@ -576,6 +602,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     attributeMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     verifiedText: { fontSize: 11, color: p.green, fontWeight: '600' },
+    verifyNow: { fontSize: 11, color: p.blue, fontWeight: '700', marginLeft: 4 },
     sourceText: { fontSize: 11, color: p.textMuted },
     confirmBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     confirmText: { fontSize: 11, color: p.blue, fontWeight: '600' },

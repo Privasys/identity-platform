@@ -46,13 +46,17 @@ describe('canonical attribute referential', () => {
             'age_over_21',
             'birthdate_id',
             'doc_expiry',
+            'document_number',
+            'document_type',
             'document_valid',
             'family_name_id',
             'given_name_id',
+            'issuing_state',
             'nationality_id',
             'personal_number',
             'picture_id',
             'place_of_birth',
+            'sex',
         ]);
         for (const a of paid) {
             expect(attributeAssurance(a.key)).toBe(GOV_VERIFIED);
@@ -73,15 +77,17 @@ describe('canonical attribute referential', () => {
         }
     });
 
-    it('leaves the unpriced document fields without a marketplace entry', () => {
-        // These come off the chip alongside a priced insight. Naming one in a
-        // reservation fails the whole authorization as an unknown attribute, so
-        // an attribute the enclave certifies but the registry has not priced
-        // must stay unnamed here until a migration seeds its row.
+    it('sells every document field a government document certifies, on request only', () => {
+        // These four were free while the registry had no row for them, and a
+        // sharer saw a passport number listed as free beside an expiry date
+        // that cost a penny. Registry migration 094 prices them; like 076's
+        // fields they are request-only, so a bare identity request is never
+        // charged for one.
         for (const key of ['document_number', 'document_type', 'issuing_state', 'sex']) {
             expect(CANONICAL_KEYS.has(key)).toBe(true);
             expect(ATTRIBUTE_MAP[key].scope).toBe('identity');
-            expect(ATTRIBUTE_MAP[key].marketplace).toBeUndefined();
+            expect(ATTRIBUTE_MAP[key].marketplace?.key).toBe(`privasys:${key}`);
+            expect(ATTRIBUTE_MAP[key].requestOnly).toBe(true);
         }
     });
 

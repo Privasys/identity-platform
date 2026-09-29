@@ -759,6 +759,7 @@
     "fromDocument": "okmányból",
     "verified": "Ellenőrzött",
     "unverified": "Nem ellenőrzött",
+    "verifyNow": "Ellenőrzés",
     "confirmedBy_one": "{{count}} forrás erősítette meg",
     "confirmedBy_other": "{{count}} forrás erősítette meg",
     "acquired": "Megszerezve",
@@ -767,6 +768,28 @@
     "verificationRecords": "Ellenőrzési nyilvántartások",
     "verifier": "Ellenőrző",
     "method": "Módszer"
+  },
+
+  "verifyEmail": {
+    "title": "Erősítse meg e-mail-címét",
+    "lede": "Küldünk egy kódot erre a címre. Írja be ide, és a tárca a címet az Önéként jegyzi fel.",
+    "ledeSent": "Küldtünk egy kódot erre a címre. A következő néhány percben érvényes.",
+    "send": "Kód küldése",
+    "resend": "Új kód küldése",
+    "resendIn": "Új kód {{seconds}} mp múlva",
+    "confirm": "Megerősítés",
+    "codeLabel": "Ellenőrző kód",
+    "triesLeft": "Hátralévő próbálkozások: {{tries}}.",
+    "doneTitle": "A cím megerősítve",
+    "doneBody": "A(z) {{email}} mostantól megerősített cím a tárcájában.",
+    "note": "A Privasys csak a kód érvényességéig tartja a címet, utána semmit sem őriz meg róla. Az eredmény a telefonján marad.",
+    "errorAddress": "Ez nem úgy néz ki, mint egy e-mail-cím.",
+    "errorWrongCode": "Ez a kód nem helyes.",
+    "errorExpired": "Ez a kód lejárt. Kérjen újat.",
+    "errorTooSoon": "Épp most küldtünk egy kódot. Várjon egy kicsit, mielőtt újat kér.",
+    "errorNoMail": "Ez a kiszolgáló most nem tud levelet küldeni.",
+    "errorOffline": "A tárca nem érte el a Privasyst. Ellenőrizze a kapcsolatot.",
+    "errorSend": "A kódot nem sikerült elküldeni. Próbálja újra."
   },
 
   "profile": {

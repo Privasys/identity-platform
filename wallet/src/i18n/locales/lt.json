@@ -792,6 +792,7 @@
     "fromDocument": "iš dokumento",
     "verified": "Patikrinta",
     "unverified": "Nepatikrinta",
+    "verifyNow": "Patvirtinti",
     "confirmedBy_one": "Patvirtino {{count}} šaltinis",
     "confirmedBy_few": "Patvirtino {{count}} šaltiniai",
     "confirmedBy_other": "Patvirtino {{count}} šaltinių",
@@ -801,6 +802,28 @@
     "verificationRecords": "Patikros įrašai",
     "verifier": "Tikrintuvas",
     "method": "Metodas"
+  },
+
+  "verifyEmail": {
+    "title": "Patvirtinkite savo el. paštą",
+    "lede": "Išsiųsime kodą šiuo adresu. Įveskite jį čia ir piniginė užfiksuos adresą kaip jūsų.",
+    "ledeSent": "Išsiuntėme kodą šiuo adresu. Jis galioja kelias artimiausias minutes.",
+    "send": "Siųsti kodą",
+    "resend": "Siųsti naują kodą",
+    "resendIn": "Naujas kodas po {{seconds}} s",
+    "confirm": "Patvirtinti",
+    "codeLabel": "Patvirtinimo kodas",
+    "triesLeft": "Liko bandymų: {{tries}}.",
+    "doneTitle": "Adresas patvirtintas",
+    "doneBody": "{{email}} dabar yra patvirtintas adresas jūsų piniginėje.",
+    "note": "Privasys saugo adresą tik tol, kol galioja kodas, o paskui nieko apie jį nepalieka. Rezultatas lieka jūsų telefone.",
+    "errorAddress": "Tai nepanašu į el. pašto adresą.",
+    "errorWrongCode": "Šis kodas neteisingas.",
+    "errorExpired": "Šio kodo galiojimas baigėsi. Paprašykite naujo.",
+    "errorTooSoon": "Kodas ką tik išsiųstas. Prieš prašydami naujo, šiek tiek palaukite.",
+    "errorNoMail": "Šis serveris dabar negali siųsti el. laiškų.",
+    "errorOffline": "Piniginei nepavyko pasiekti Privasys. Patikrinkite ryšį.",
+    "errorSend": "Kodo išsiųsti nepavyko. Bandykite dar kartą."
   },
   "profile": {
     "identities": "Jūsų identifikatoriai",

@@ -814,6 +814,7 @@
     "fromDocument": "mid-dokument",
     "verified": "Ivverifikat",
     "unverified": "Mhux ivverifikat",
+    "verifyNow": "Ivverifika",
     "confirmedBy_one": "Ikkonfermat minn {{count}} sors",
     "confirmedBy_two": "Ikkonfermat minn {{count}} sorsi",
     "confirmedBy_few": "Ikkonfermat minn {{count}} sorsi",
@@ -825,6 +826,28 @@
     "verificationRecords": "Rekords ta' verifika",
     "verifier": "Verifikatur",
     "method": "Metodu"
+  },
+
+  "verifyEmail": {
+    "title": "Ivverifika l-email tiegħek",
+    "lede": "Se nibagħtu kodiċi lil dan l-indirizz. Ittajpjah hawn u l-kartiera tiegħek tniżżel l-indirizz bħala tiegħek.",
+    "ledeSent": "Bgħatna kodiċi lil dan l-indirizz. Jaħdem għall-ftit minuti li ġejjin.",
+    "send": "Ibgħat kodiċi",
+    "resend": "Ibgħat kodiċi ieħor",
+    "resendIn": "Kodiċi ieħor fi {{seconds}} sek",
+    "confirm": "Ikkonferma",
+    "codeLabel": "Kodiċi ta’ verifika",
+    "triesLeft": "Tentattivi li fadal: {{tries}}.",
+    "doneTitle": "L-indirizz ġie vverifikat",
+    "doneBody": "{{email}} issa huwa indirizz verifikat fil-kartiera tiegħek.",
+    "note": "Privasys iżomm l-indirizz biss sakemm il-kodiċi jkun validu u wara ma jżomm xejn dwaru. Ir-riżultat jibqa’ fuq it-telefon tiegħek.",
+    "errorAddress": "Dak ma jidhirx li huwa indirizz tal-email.",
+    "errorWrongCode": "Dak il-kodiċi mhuwiex tajjeb.",
+    "errorExpired": "Dak il-kodiċi skada. Itlob wieħed ġdid.",
+    "errorTooSoon": "Għadu kif intbagħat kodiċi. Stenna ftit qabel titlob ieħor.",
+    "errorNoMail": "Dan is-server ma jistax jibgħat email bħalissa.",
+    "errorOffline": "Il-kartiera ma setgħetx tilħaq lil Privasys. Iċċekkja l-konnessjoni tiegħek.",
+    "errorSend": "Il-kodiċi ma setax jintbagħat. Erġa’ pprova."
   },
   "profile": {
     "identities": "L-identifikaturi tiegħek",

@@ -781,6 +781,7 @@
     "fromDocument": "z dokumentu",
     "verified": "Zweryfikowane",
     "unverified": "Niezweryfikowane",
+    "verifyNow": "Zweryfikuj",
     "confirmedBy_one": "Potwierdzone przez {{count}} źródło",
     "confirmedBy_few": "Potwierdzone przez {{count}} źródła",
     "confirmedBy_many": "Potwierdzone przez {{count}} źródeł",
@@ -791,6 +792,28 @@
     "verificationRecords": "Zapisy weryfikacji",
     "verifier": "Weryfikator",
     "method": "Metoda"
+  },
+
+  "verifyEmail": {
+    "title": "Zweryfikuj swój e-mail",
+    "lede": "Wyślemy kod na ten adres. Wpisz go tutaj, a portfel zapisze adres jako twój.",
+    "ledeSent": "Wysłaliśmy kod na ten adres. Działa przez kilka najbliższych minut.",
+    "send": "Wyślij kod",
+    "resend": "Wyślij nowy kod",
+    "resendIn": "Nowy kod za {{seconds}} s",
+    "confirm": "Potwierdź",
+    "codeLabel": "Kod weryfikacyjny",
+    "triesLeft": "Pozostałe próby: {{tries}}.",
+    "doneTitle": "Adres zweryfikowany",
+    "doneBody": "{{email}} jest teraz zweryfikowanym adresem w twoim portfelu.",
+    "note": "Privasys przechowuje adres tylko przez czas ważności kodu i potem nic o nim nie zachowuje. Wynik zostaje na twoim telefonie.",
+    "errorAddress": "To nie wygląda na adres e-mail.",
+    "errorWrongCode": "Ten kod jest nieprawidłowy.",
+    "errorExpired": "Ten kod wygasł. Poproś o nowy.",
+    "errorTooSoon": "Kod został właśnie wysłany. Odczekaj chwilę przed prośbą o kolejny.",
+    "errorNoMail": "Ten serwer nie może teraz wysyłać poczty.",
+    "errorOffline": "Portfel nie mógł połączyć się z Privasys. Sprawdź połączenie.",
+    "errorSend": "Nie udało się wysłać kodu. Spróbuj ponownie."
   },
 
   "profile": {

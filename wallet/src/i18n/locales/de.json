@@ -759,6 +759,7 @@
     "fromDocument": "aus einem Dokument",
     "verified": "Geprüft",
     "unverified": "Ungeprüft",
+    "verifyNow": "Bestätigen",
     "confirmedBy_one": "Bestätigt durch {{count}} Quelle",
     "confirmedBy_other": "Bestätigt durch {{count}} Quellen",
     "acquired": "Erhalten",
@@ -767,6 +768,28 @@
     "verificationRecords": "Prüfnachweise",
     "verifier": "Prüfer",
     "method": "Methode"
+  },
+
+  "verifyEmail": {
+    "title": "E-Mail-Adresse bestätigen",
+    "lede": "Wir senden einen Code an diese Adresse. Geben Sie ihn hier ein, und Ihre Wallet hält die Adresse als Ihre fest.",
+    "ledeSent": "Wir haben einen Code an diese Adresse gesendet. Er gilt für die nächsten Minuten.",
+    "send": "Code senden",
+    "resend": "Neuen Code senden",
+    "resendIn": "Neuer Code in {{seconds}} s",
+    "confirm": "Bestätigen",
+    "codeLabel": "Bestätigungscode",
+    "triesLeft": "Verbleibende Versuche: {{tries}}.",
+    "doneTitle": "Adresse bestätigt",
+    "doneBody": "{{email}} ist jetzt eine bestätigte Adresse in Ihrer Wallet.",
+    "note": "Privasys hält die Adresse nur, solange der Code gilt, und behält danach nichts davon. Das Ergebnis bleibt auf Ihrem Telefon.",
+    "errorAddress": "Das sieht nicht nach einer E-Mail-Adresse aus.",
+    "errorWrongCode": "Dieser Code stimmt nicht.",
+    "errorExpired": "Dieser Code ist abgelaufen. Fordern Sie einen neuen an.",
+    "errorTooSoon": "Gerade wurde ein Code gesendet. Warten Sie kurz, bevor Sie einen weiteren anfordern.",
+    "errorNoMail": "Dieser Server kann derzeit keine E-Mails senden.",
+    "errorOffline": "Die Wallet konnte Privasys nicht erreichen. Prüfen Sie Ihre Verbindung.",
+    "errorSend": "Der Code konnte nicht gesendet werden. Bitte versuchen Sie es erneut."
   },
 
   "profile": {

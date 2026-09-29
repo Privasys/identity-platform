@@ -781,6 +781,7 @@
     "fromDocument": "from document",
     "verified": "Verified",
     "unverified": "Unverified",
+    "verifyNow": "Verify",
     "confirmedBy_one": "Confirmed by {{count}} source",
     "confirmedBy_other": "Confirmed by {{count}} sources",
     "acquired": "Acquired",
@@ -789,6 +790,28 @@
     "verificationRecords": "Verification Records",
     "verifier": "Verifier",
     "method": "Method"
+  },
+
+  "verifyEmail": {
+    "title": "Verify your email",
+    "lede": "We will send a code to this address. Type it back here and your wallet records the address as yours.",
+    "ledeSent": "We sent a code to this address. It works for the next few minutes.",
+    "send": "Send a code",
+    "resend": "Send another code",
+    "resendIn": "Send another code in {{seconds}}s",
+    "confirm": "Confirm",
+    "codeLabel": "Verification code",
+    "triesLeft": "Tries left: {{tries}}.",
+    "doneTitle": "Address verified",
+    "doneBody": "{{email}} is now a verified address in your wallet.",
+    "note": "Privasys holds the address only while the code is valid and keeps no record of it afterwards. The result stays on your phone.",
+    "errorAddress": "That does not look like an email address.",
+    "errorWrongCode": "That code is not right.",
+    "errorExpired": "That code has expired. Ask for a new one.",
+    "errorTooSoon": "A code was just sent. Wait a moment before asking for another.",
+    "errorNoMail": "This server cannot send mail at the moment.",
+    "errorOffline": "The wallet could not reach Privasys. Check your connection.",
+    "errorSend": "The code could not be sent. Please try again."
   },
   "profile": {
     "identities": "Your identifiers",

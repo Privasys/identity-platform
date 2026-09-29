@@ -770,6 +770,7 @@
     "fromDocument": "depuis un document",
     "verified": "Vérifié",
     "unverified": "Non vérifié",
+    "verifyNow": "Vérifier",
     "confirmedBy_one": "Confirmé par {{count}} source",
     "confirmedBy_many": "Confirmé par {{count}} sources",
     "confirmedBy_other": "Confirmé par {{count}} sources",
@@ -779,6 +780,28 @@
     "verificationRecords": "Registres de vérification",
     "verifier": "Vérificateur",
     "method": "Méthode"
+  },
+
+  "verifyEmail": {
+    "title": "Vérifiez votre adresse e-mail",
+    "lede": "Nous enverrons un code à cette adresse. Saisissez-le ici et votre portefeuille retiendra l'adresse comme étant la vôtre.",
+    "ledeSent": "Nous avons envoyé un code à cette adresse. Il est valable quelques minutes.",
+    "send": "Envoyer un code",
+    "resend": "Envoyer un autre code",
+    "resendIn": "Autre code dans {{seconds}} s",
+    "confirm": "Confirmer",
+    "codeLabel": "Code de vérification",
+    "triesLeft": "Essais restants : {{tries}}.",
+    "doneTitle": "Adresse vérifiée",
+    "doneBody": "{{email}} est désormais une adresse vérifiée dans votre portefeuille.",
+    "note": "Privasys ne conserve l'adresse que pendant la validité du code et n'en garde rien ensuite. Le résultat reste sur votre téléphone.",
+    "errorAddress": "Cela ne ressemble pas à une adresse e-mail.",
+    "errorWrongCode": "Ce code n'est pas le bon.",
+    "errorExpired": "Ce code a expiré. Demandez-en un nouveau.",
+    "errorTooSoon": "Un code vient d'être envoyé. Patientez un instant avant d'en demander un autre.",
+    "errorNoMail": "Ce serveur ne peut pas envoyer d'e-mail pour le moment.",
+    "errorOffline": "Le portefeuille n'a pas pu joindre Privasys. Vérifiez votre connexion.",
+    "errorSend": "Le code n'a pas pu être envoyé. Réessayez."
   },
 
   "profile": {

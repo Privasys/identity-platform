@@ -759,6 +759,7 @@
     "fromDocument": "asiakirjasta",
     "verified": "Vahvistettu",
     "unverified": "Vahvistamaton",
+    "verifyNow": "Vahvista",
     "confirmedBy_one": "Vahvistanut {{count}} lähde",
     "confirmedBy_other": "Vahvistanut {{count}} lähdettä",
     "acquired": "Hankittu",
@@ -767,6 +768,28 @@
     "verificationRecords": "Vahvistustietueet",
     "verifier": "Vahvistaja",
     "method": "Menetelmä"
+  },
+
+  "verifyEmail": {
+    "title": "Vahvista sähköpostisi",
+    "lede": "Lähetämme koodin tähän osoitteeseen. Kirjoita se tähän, niin lompakko merkitsee osoitteen sinun osoitteeksesi.",
+    "ledeSent": "Lähetimme koodin tähän osoitteeseen. Se toimii muutaman minuutin ajan.",
+    "send": "Lähetä koodi",
+    "resend": "Lähetä uusi koodi",
+    "resendIn": "Uusi koodi {{seconds}} s kuluttua",
+    "confirm": "Vahvista",
+    "codeLabel": "Vahvistuskoodi",
+    "triesLeft": "Yrityksiä jäljellä: {{tries}}.",
+    "doneTitle": "Osoite vahvistettu",
+    "doneBody": "{{email}} on nyt vahvistettu osoite lompakossasi.",
+    "note": "Privasys säilyttää osoitteen vain koodin voimassaoloajan eikä jätä siitä jälkeenpäin mitään. Tulos jää puhelimeesi.",
+    "errorAddress": "Tuo ei näytä sähköpostiosoitteelta.",
+    "errorWrongCode": "Koodi ei ole oikein.",
+    "errorExpired": "Koodi on vanhentunut. Pyydä uusi.",
+    "errorTooSoon": "Koodi lähetettiin juuri. Odota hetki ennen uuden pyytämistä.",
+    "errorNoMail": "Tämä palvelin ei pysty lähettämään sähköpostia juuri nyt.",
+    "errorOffline": "Lompakko ei saanut yhteyttä Privasysiin. Tarkista yhteytesi.",
+    "errorSend": "Koodia ei voitu lähettää. Yritä uudelleen."
   },
 
   "profile": {

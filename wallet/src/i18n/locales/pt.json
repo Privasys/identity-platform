@@ -770,6 +770,7 @@
     "fromDocument": "a partir de um documento",
     "verified": "Verificado",
     "unverified": "Não verificado",
+    "verifyNow": "Verificar",
     "confirmedBy_one": "Confirmado por {{count}} fonte",
     "confirmedBy_many": "Confirmado por {{count}} fontes",
     "confirmedBy_other": "Confirmado por {{count}} fontes",
@@ -779,6 +780,28 @@
     "verificationRecords": "Registos de verificação",
     "verifier": "Verificador",
     "method": "Método"
+  },
+
+  "verifyEmail": {
+    "title": "Verifique o seu email",
+    "lede": "Vamos enviar um código para este endereço. Escreva-o aqui e a sua carteira regista o endereço como seu.",
+    "ledeSent": "Enviámos um código para este endereço. É válido nos próximos minutos.",
+    "send": "Enviar um código",
+    "resend": "Enviar outro código",
+    "resendIn": "Outro código dentro de {{seconds}} s",
+    "confirm": "Confirmar",
+    "codeLabel": "Código de verificação",
+    "triesLeft": "Tentativas restantes: {{tries}}.",
+    "doneTitle": "Endereço verificado",
+    "doneBody": "{{email}} é agora um endereço verificado na sua carteira.",
+    "note": "A Privasys guarda o endereço apenas enquanto o código é válido e depois não mantém nada sobre ele. O resultado fica no seu telemóvel.",
+    "errorAddress": "Isso não parece um endereço de email.",
+    "errorWrongCode": "Esse código não está certo.",
+    "errorExpired": "Esse código expirou. Peça um novo.",
+    "errorTooSoon": "Acabámos de enviar um código. Aguarde um momento antes de pedir outro.",
+    "errorNoMail": "Este servidor não consegue enviar email de momento.",
+    "errorOffline": "A carteira não conseguiu contactar a Privasys. Verifique a ligação.",
+    "errorSend": "Não foi possível enviar o código. Tente novamente."
   },
 
   "profile": {

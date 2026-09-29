@@ -39,6 +39,7 @@ import (
 	"github.com/Privasys/idp/internal/capasks"
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/config"
+	"github.com/Privasys/idp/internal/emailverify"
 	"github.com/Privasys/idp/internal/fido2"
 	"github.com/Privasys/idp/internal/oidc"
 	"github.com/Privasys/idp/internal/push"
@@ -420,6 +421,11 @@ func main() {
 	mux.HandleFunc("POST /wallet/report", supportHandler.HandleReport)
 
 	recoveryHandler := recovery.NewHandler(db, recoveryMailer, issuer)
+	// Proving an address: the IdP mails a code and signs a receipt for the
+	// wallet to keep. It stores nothing; see internal/emailverify.
+	emailVerify := emailverify.New(recoveryMailer, issuer, recoveryHandler.AuthenticateBearer)
+	mux.HandleFunc("POST /wallet/email/verify/begin", emailVerify.HandleBegin)
+	mux.HandleFunc("POST /wallet/email/verify/complete", emailVerify.HandleComplete)
 	recoveryHandler.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	// Recovery phrase (BIP39) endpoints — preferred names.
 	mux.HandleFunc("POST /recovery/phrase/regenerate", recoveryHandler.HandleRegeneratePhrase)

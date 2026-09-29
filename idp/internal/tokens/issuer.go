@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -95,8 +96,12 @@ func (iss *Issuer) IssuerURL() string {
 
 // IDTokenClaims are the claims included in an ID token.
 type IDTokenClaims struct {
-	Subject          string
-	Email            string
+	Subject string
+	Email   string
+	// EmailVerified is emitted as `email_verified` beside the address. Set it
+	// from evidence: a receipt this IdP signed after mailing a code, or a
+	// provider's own claim. An address the holder typed is not verified.
+	EmailVerified    bool
 	Name             string
 	Picture          string
 	AttestationLevel string
@@ -138,7 +143,12 @@ func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 	}
 	if claims.Email != "" {
 		c["email"] = claims.Email
-		c["email_verified"] = true
+		// Said honestly, not assumed. This was an unconditional true, so every
+		// relying party was told the address had been checked even when the
+		// holder had simply typed it into their wallet. It is true when the
+		// address carries a verification the IdP itself performed, or one a
+		// provider asserted, and false otherwise.
+		c["email_verified"] = claims.EmailVerified
 	}
 	if claims.Name != "" {
 		c["name"] = claims.Name
@@ -323,6 +333,77 @@ func (iss *Issuer) IssueVoucher(c VoucherClaims) (string, error) {
 		"v":        1,
 	}
 	return iss.signTyp(claims, "voucher+jwt")
+}
+
+// EmailVerificationClaims is the receipt the IdP signs when a holder proves
+// they can read mail at an address: it says which account proved which
+// address, when, and how. It is the only record that the check happened,
+// because the IdP keeps none: the wallet holds the receipt.
+type EmailVerificationClaims struct {
+	Subject string // internal user id
+	Email   string // the address that was proved, lowercased
+	Method  string // how, e.g. "email-code"
+	TTL     time.Duration
+}
+
+// IssueEmailVerification signs an email-verification receipt with the IdP's
+// OIDC key (typ = "email-verification+jwt"), verifiable against the same JWKS
+// as every other token it issues.
+func (iss *Issuer) IssueEmailVerification(c EmailVerificationClaims) (string, error) {
+	now := time.Now()
+	ttl := c.TTL
+	if ttl == 0 {
+		// Long, because it records something that happened rather than
+		// granting anything. A relying party that wants a recent check reads
+		// `iat`; an expiry is here only so a receipt cannot outlive the key
+		// that signed it by years. A caller that names a TTL gets exactly it,
+		// including one already in the past.
+		ttl = 400 * 24 * time.Hour
+	}
+	method := c.Method
+	if method == "" {
+		method = "email-code"
+	}
+	claims := jwt.MapClaims{
+		"iss":            iss.issuerURL,
+		"sub":            c.Subject,
+		"iat":            now.Unix(),
+		"exp":            now.Add(ttl).Unix(),
+		"email":          c.Email,
+		"email_verified": true,
+		"method":         method,
+		"v":              1,
+	}
+	return iss.signTyp(claims, "email-verification+jwt")
+}
+
+// EmailReceiptProves reports whether `receipt` is a live email-verification
+// receipt this IdP signed, for this subject and this address. Anything else,
+// including a missing receipt, is a no: the claim it feeds is meant to be
+// believed, so it fails closed.
+func (iss *Issuer) EmailReceiptProves(receipt, subject, email string) bool {
+	if receipt == "" || subject == "" || email == "" {
+		return false
+	}
+	parsed, err := jwt.Parse(receipt, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodECDSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method %v", t.Header["alg"])
+		}
+		return &iss.privateKey.PublicKey, nil
+	}, jwt.WithValidMethods([]string{"ES256"}), jwt.WithIssuer(iss.issuerURL))
+	if err != nil || !parsed.Valid {
+		return false
+	}
+	if typ, _ := parsed.Header["typ"].(string); typ != "email-verification+jwt" {
+		return false
+	}
+	claims, ok := parsed.Claims.(jwt.MapClaims)
+	if !ok {
+		return false
+	}
+	sub, _ := claims["sub"].(string)
+	addr, _ := claims["email"].(string)
+	return sub == subject && strings.EqualFold(addr, email)
 }
 
 // IssueWIA signs a Wallet Instance Attestation with the wallet-provider key

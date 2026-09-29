@@ -202,3 +202,86 @@ func TestIssueVoucher(t *testing.T) {
 		t.Fatalf("expected 2 covered claims, got %v", claims["claims"])
 	}
 }
+
+// An address is only ever "verified" on the strength of a receipt this IdP
+// signed. The claim used to be an unconditional true.
+func TestEmailVerifiedFollowsTheReceipt(t *testing.T) {
+	dir := t.TempDir()
+	iss, err := NewIssuer(filepath.Join(dir, "key.pem"), "https://privasys.id")
+	if err != nil {
+		t.Fatalf("issuer: %v", err)
+	}
+	other, err := NewIssuer(filepath.Join(dir, "other.pem"), "https://privasys.id")
+	if err != nil {
+		t.Fatalf("other issuer: %v", err)
+	}
+
+	receipt, err := iss.IssueEmailVerification(EmailVerificationClaims{
+		Subject: "user-1",
+		Email:   "alice@example.com",
+	})
+	if err != nil {
+		t.Fatalf("receipt: %v", err)
+	}
+
+	if !iss.EmailReceiptProves(receipt, "user-1", "alice@example.com") {
+		t.Fatal("its own receipt was refused")
+	}
+	// Case is not identity for an address, so it is compared as such.
+	if !iss.EmailReceiptProves(receipt, "user-1", "Alice@Example.com") {
+		t.Fatal("the same address in another case was refused")
+	}
+	for _, c := range []struct {
+		name, receipt, sub, email string
+	}{
+		{"another account", receipt, "user-2", "alice@example.com"},
+		{"another address", receipt, "user-1", "bob@example.com"},
+		{"no receipt", "", "user-1", "alice@example.com"},
+		{"not a token", "nonsense", "user-1", "alice@example.com"},
+	} {
+		if iss.EmailReceiptProves(c.receipt, c.sub, c.email) {
+			t.Fatalf("%s: accepted", c.name)
+		}
+	}
+	// A receipt signed by a different key is somebody else's word, not ours.
+	elsewhere, err := other.IssueEmailVerification(EmailVerificationClaims{Subject: "user-1", Email: "alice@example.com"})
+	if err != nil {
+		t.Fatalf("other receipt: %v", err)
+	}
+	if iss.EmailReceiptProves(elsewhere, "user-1", "alice@example.com") {
+		t.Fatal("a receipt signed by another key was accepted")
+	}
+	// An expired receipt is no longer proof.
+	stale, err := iss.IssueEmailVerification(EmailVerificationClaims{
+		Subject: "user-1",
+		Email:   "alice@example.com",
+		TTL:     -time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("stale receipt: %v", err)
+	}
+	if iss.EmailReceiptProves(stale, "user-1", "alice@example.com") {
+		t.Fatal("an expired receipt was accepted")
+	}
+
+	// And the claim itself follows the flag rather than the address.
+	for _, verified := range []bool{true, false} {
+		tok, err := iss.IssueIDToken(IDTokenClaims{
+			Subject:       "user-1",
+			Email:         "alice@example.com",
+			EmailVerified: verified,
+			Audience:      "app",
+			AuthTime:      time.Now(),
+		})
+		if err != nil {
+			t.Fatalf("id token: %v", err)
+		}
+		claims, err := iss.VerifyAccessToken(tok)
+		if err != nil {
+			t.Fatalf("verify: %v", err)
+		}
+		if claims["email_verified"] != verified {
+			t.Fatalf("email_verified = %v, want %v", claims["email_verified"], verified)
+		}
+	}
+}

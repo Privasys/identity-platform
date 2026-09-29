@@ -43,7 +43,16 @@ export {
 } from './attributes';
 export type { AttributeMarketplace, CanonicalAttribute } from './attributes';
 export { AttributePicker, assuranceLabel, attributeBadge, attributeLabel } from './attributes-ui';
-export type { AttributeAssuranceBadge, AttributePickerConfig } from './attributes-ui';
+export type { AttributeAssuranceBadge, AttributePickerConfig, AttributeSectionCopy } from './attributes-ui';
+export {
+    CREDITS_PER_GBP,
+    attributeSections,
+    disclosureCost,
+    fetchAttributePrices,
+    formatCredits,
+    priceOf,
+} from './attribute-pricing';
+export type { AttributePrices, AttributeSection, AttributeSectionId } from './attribute-pricing';
 export { PrivasysSession } from './enclave-session';
 export type {
     EncAuthRejectReason,

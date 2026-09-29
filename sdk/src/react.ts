@@ -223,7 +223,11 @@ export function PrivasysAttributePicker(
 ): ReactNode {
     const mount = useRef<HTMLDivElement | null>(null);
     const picker = useRef<AttributePicker | null>(null);
-    const { className, onChange, selected, attributes, only, showKeys } = props;
+    const { className, onChange, selected, attributes, only, showKeys, layout, prices, copy, totalTemplate } =
+        props;
+    // Wording is set once per mount; comparing it by value keeps a caller that
+    // builds the object inline from tearing the picker down on every render.
+    const copyKey = JSON.stringify(copy ?? null);
 
     // onChange is re-created by most callers on every render; holding it in a ref
     // keeps the picker from being torn down and rebuilt underneath the user's
@@ -239,6 +243,10 @@ export function PrivasysAttributePicker(
             attributes,
             only,
             showKeys,
+            layout,
+            prices,
+            copy,
+            totalTemplate,
             onChange: (keys) => onChangeRef.current?.(keys),
         });
         return () => {
@@ -247,8 +255,16 @@ export function PrivasysAttributePicker(
         };
         // `selected` is the INITIAL selection; use the ref's setSelection to
         // drive it from outside, or the picker would reset mid-interaction.
+        // Prices are left out for the same reason: they arrive after the first
+        // render and are applied below without rebuilding the picker.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [attributes, only, showKeys]);
+    }, [attributes, only, showKeys, layout, copyKey, totalTemplate]);
+
+    // Prices usually land a moment after the picker, from the catalogue. Apply
+    // them in place, so a choice made while they loaded is not thrown away.
+    useEffect(() => {
+        picker.current?.setPrices(prices ?? null);
+    }, [prices]);
 
     return createElement('div', { ref: mount, className });
 }

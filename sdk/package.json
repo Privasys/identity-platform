@@ -40,7 +40,8 @@
         "build:iife": "esbuild src/iife.ts --bundle --format=iife --global-name=Privasys --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth.iife.js",
         "build:frame-host": "esbuild src/frame-host.ts --bundle --format=iife --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth-frame.iife.js",
         "build:frame-client": "esbuild src/frame-client.ts --bundle --format=iife --global-name=Privasys --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth-client.iife.js",
-        "dev": "tsc --watch"
+        "dev": "tsc --watch",
+        "test": "esbuild test/*.test.ts --bundle --platform=node --format=esm --outdir=.test --out-extension:.js=.mjs --log-level=warning && node --test \".test/*.test.mjs\""
     },
     "peerDependencies": {
         "react": ">=18"

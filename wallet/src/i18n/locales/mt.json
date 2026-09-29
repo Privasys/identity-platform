@@ -318,6 +318,8 @@
     "suffixOptional": " (mhux obbligatorju)",
     "allSet": "Kollox lest! Agħfas Kompli biex tlesti l-login.",
     "verifyWithId": "Ivverifika bid-dokument tal-identità tiegħek",
+    "verifyEmailAction": "Ivverifika {{email}}",
+    "verifyEmailNotice": "Indirizz jinqasam biss wara li jiġi ċċekkjat. Nibagħtulu kodiċi; l-indirizz jibqa’ fuq it-telefon tiegħek.",
     "govRequiredNotice": "Hemm bżonn attribut ivverifikat mill-gvern. Id-dokument tiegħek jiġi ċċekkjat f'enklavi sigura; il-valur jibqa' fuq l-apparat tiegħek.",
     "importFromAccount": "Importa minn kont",
     "continueWith": "Kompli bi {{provider}}",

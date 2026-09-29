@@ -282,6 +282,8 @@
     "suffixOptional": " (facultatif)",
     "allSet": "Tout est prêt. Touchez Continuer pour terminer la connexion.",
     "verifyWithId": "Vérifier avec votre pièce d'identité",
+    "verifyEmailAction": "Vérifier {{email}}",
+    "verifyEmailNotice": "Une adresse n'est partagée qu'une fois vérifiée. Nous y envoyons un code ; l'adresse reste sur votre téléphone.",
     "govRequiredNotice": "Un attribut vérifié par l'État est requis. Votre pièce d'identité est contrôlée dans une enclave sécurisée ; la valeur reste sur votre appareil.",
     "importFromAccount": "Importer depuis un compte",
     "continueWith": "Continuer avec {{provider}}",

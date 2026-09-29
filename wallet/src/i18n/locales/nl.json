@@ -282,6 +282,8 @@
     "suffixOptional": " (optioneel)",
     "allSet": "Alles klaar. Tik op Doorgaan om het aanmelden af te ronden.",
     "verifyWithId": "Verifiëren met je identiteitsbewijs",
+    "verifyEmailAction": "{{email}} verifiëren",
+    "verifyEmailNotice": "Een adres wordt pas gedeeld als het is gecontroleerd. We sturen er een code naartoe; het adres blijft op je telefoon.",
     "govRequiredNotice": "Er is een door de overheid geverifieerd attribuut vereist. Je identiteitsbewijs wordt in een beveiligde enclave gecontroleerd; de waarde blijft op je apparaat.",
     "importFromAccount": "Importeren uit een account",
     "continueWith": "Doorgaan met {{provider}}",

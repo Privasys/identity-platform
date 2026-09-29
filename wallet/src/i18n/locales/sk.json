@@ -318,6 +318,8 @@
     "suffixOptional": " (voliteľné)",
     "allSet": "Hotovo! Prihlásenie dokončíte ťuknutím na Pokračovať.",
     "verifyWithId": "Overiť dokladom totožnosti",
+    "verifyEmailAction": "Overiť {{email}}",
+    "verifyEmailNotice": "Adresa sa zdieľa až po overení. Pošleme na ňu kód a samotná adresa zostane vo vašom telefóne.",
     "govRequiredNotice": "Vyžaduje sa atribút overený štátom. Váš doklad sa kontroluje v zabezpečenej enkláve; hodnota zostáva vo vašom zariadení.",
     "importFromAccount": "Importovať z účtu",
     "continueWith": "Pokračovať cez {{provider}}",

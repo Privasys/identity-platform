@@ -318,6 +318,8 @@
     "suffixOptional": " (optional)",
     "allSet": "All set! Tap continue to finish signing in.",
     "verifyWithId": "Verify with your ID",
+    "verifyEmailAction": "Verify {{email}}",
+    "verifyEmailNotice": "An address is only shared once it has been checked. We send a code to it; the address stays on your device.",
     "govRequiredNotice": "A government-verified attribute is required. Your ID is checked in a secure enclave; the value stays on your device.",
     "importFromAccount": "Import from an account",
     "continueWith": "Continue with {{provider}}",

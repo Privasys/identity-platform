@@ -318,6 +318,8 @@
     "suffixOptional": " (dewisol)",
     "allSet": "Popeth yn barod! Tapiwch Parhau i orffen mewngofnodi.",
     "verifyWithId": "Gwirio â'ch dogfen adnabod",
+    "verifyEmailAction": "Gwirio {{email}}",
+    "verifyEmailNotice": "Dim ond ar ôl ei wirio y caiff cyfeiriad ei rannu. Rydym yn anfon cod ato; mae'r cyfeiriad yn aros ar eich ffôn.",
     "govRequiredNotice": "Mae angen priodoledd wedi'i wirio gan y llywodraeth. Gwirir eich dogfen mewn cwafell diogel; mae'r gwerth yn aros ar eich dyfais.",
     "importFromAccount": "Mewnforio o gyfrif",
     "continueWith": "Parhau gyda {{provider}}",

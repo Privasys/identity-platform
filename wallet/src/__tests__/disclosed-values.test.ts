@@ -47,13 +47,28 @@ function profileWith(email: string, extra: { key: string; value: string }[] = []
             canonicalDid: 'did:web:privasys.id:users:1',
             pairwiseSeed: 'seed',
             linkedProviders: [],
-            attributes: extra.map((a) => ({
-                key: a.key,
-                label: a.key,
-                value: a.value,
-                source: 'manual' as const,
-                verified: false,
-            })),
+            // The address is carried as a VERIFIED attribute, because an
+            // unverified one is not disclosed at all (see selfAssertedValue).
+            // What is under test here is which value goes out, not whether it
+            // may; that rule has its own tests.
+            attributes: [
+                ...(email
+                    ? [{
+                          key: 'email',
+                          label: 'Email',
+                          value: email,
+                          source: 'manual' as const,
+                          verified: true,
+                      }]
+                    : []),
+                ...extra.map((a) => ({
+                    key: a.key,
+                    label: a.key,
+                    value: a.value,
+                    source: 'manual' as const,
+                    verified: false,
+                })),
+            ],
             createdAt: 0,
             updatedAt: 0,
         },

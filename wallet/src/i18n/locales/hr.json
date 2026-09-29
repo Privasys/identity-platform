@@ -318,6 +318,8 @@
     "suffixOptional": " (neobvezno)",
     "allSet": "Sve spremno! Dodirnite Nastavi za dovršetak prijave.",
     "verifyWithId": "Provjeri osobnim dokumentom",
+    "verifyEmailAction": "Potvrdi {{email}}",
+    "verifyEmailNotice": "Adresa se dijeli tek kad je provjerena. Šaljemo joj kod, a sama adresa ostaje na vašem telefonu.",
     "govRequiredNotice": "Potreban je državno provjeren atribut. Vaš dokument provjerava se u sigurnoj enklavi; vrijednost ostaje na vašem uređaju.",
     "importFromAccount": "Uvezi s računa",
     "continueWith": "Nastavi putem {{provider}}",

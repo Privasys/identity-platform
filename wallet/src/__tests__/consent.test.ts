@@ -186,7 +186,17 @@ describe('consent service', () => {
                 canonicalDid: 'did:web:privasys.id:users:alice',
                 pairwiseSeed: 'ab'.repeat(32),
                 linkedProviders: [],
-                attributes: [],
+                attributes: [
+                    // Verified, because an address nobody has checked is not
+                    // disclosed at all; that rule has its own tests below.
+                    {
+                        key: 'email',
+                        label: 'Email',
+                        value: 'alice@example.com',
+                        source: 'manual' as const,
+                        verified: true,
+                    },
+                ],
             });
 
             const values = getAttributeValues(['displayName', 'email', 'locale', 'missing']);
@@ -269,7 +279,17 @@ describe('data-transit buildPayload', () => {
             canonicalDid: 'did:web:privasys.id:users:alice',
             pairwiseSeed: 'ab'.repeat(32),
             linkedProviders: [],
-            attributes: [],
+            attributes: [
+                // Verified, because an address nobody has checked is not
+                // disclosed at all; that rule has its own tests below.
+                {
+                    key: 'email',
+                    label: 'Email',
+                    value: 'alice@example.com',
+                    source: 'manual' as const,
+                    verified: true,
+                },
+            ],
         });
 
         const json = await buildPayload(['displayName', 'email'], 'app1.privasys.org');

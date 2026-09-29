@@ -318,6 +318,8 @@
     "suffixOptional": " (neobligāti)",
     "allSet": "Viss gatavs! Pieskarieties Turpināt, lai pabeigtu pieteikšanos.",
     "verifyWithId": "Pārbaudīt ar personu apliecinošu dokumentu",
+    "verifyEmailAction": "Apstiprināt {{email}}",
+    "verifyEmailNotice": "Adrese tiek kopīgota tikai pēc pārbaudes. Mēs nosūtām uz to kodu, un pati adrese paliek jūsu tālrunī.",
     "govRequiredNotice": "Nepieciešams valsts pārbaudīts atribūts. Jūsu dokuments tiek pārbaudīts drošā anklāvā; vērtība paliek jūsu ierīcē.",
     "importFromAccount": "Importēt no konta",
     "continueWith": "Turpināt ar {{provider}}",

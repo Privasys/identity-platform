@@ -318,6 +318,8 @@
     "suffixOptional": " (opțional)",
     "allSet": "Gata! Atinge Continuă pentru a finaliza autentificarea.",
     "verifyWithId": "Verifică cu actul tău",
+    "verifyEmailAction": "Verifică {{email}}",
+    "verifyEmailNotice": "O adresă este partajată doar după ce a fost verificată. Îi trimitem un cod, iar adresa rămâne pe telefonul tău.",
     "govRequiredNotice": "Este necesar un atribut verificat de stat. Actul tău este verificat într-o enclavă securizată; valoarea rămâne pe dispozitivul tău.",
     "importFromAccount": "Importă dintr-un cont",
     "continueWith": "Continuă cu {{provider}}",

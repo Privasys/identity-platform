@@ -282,6 +282,8 @@
     "suffixOptional": " (optional)",
     "allSet": "Alles bereit. Tippen Sie auf Weiter, um die Anmeldung abzuschließen.",
     "verifyWithId": "Mit Ihrem Ausweis prüfen",
+    "verifyEmailAction": "{{email}} bestätigen",
+    "verifyEmailNotice": "Eine Adresse wird erst geteilt, wenn sie geprüft wurde. Wir senden einen Code dorthin; die Adresse bleibt auf Ihrem Telefon.",
     "govRequiredNotice": "Ein staatlich geprüftes Attribut ist erforderlich. Ihr Ausweis wird in einer sicheren Enklave geprüft; der Wert bleibt auf Ihrem Gerät.",
     "importFromAccount": "Aus einem Konto importieren",
     "continueWith": "Weiter mit {{provider}}",

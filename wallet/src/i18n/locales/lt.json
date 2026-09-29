@@ -318,6 +318,8 @@
     "suffixOptional": " (neprivaloma)",
     "allSet": "Viskas paruošta! Bakstelėkite Tęsti, kad užbaigtumėte prisijungimą.",
     "verifyWithId": "Patikrinti asmens dokumentu",
+    "verifyEmailAction": "Patvirtinti {{email}}",
+    "verifyEmailNotice": "Adresas dalijamasi tik jį patikrinus. Išsiunčiame į jį kodą, o pats adresas lieka jūsų telefone.",
     "govRequiredNotice": "Reikalingas valstybės patvirtintas atributas. Jūsų dokumentas tikrinamas saugiajame anklave; reikšmė lieka jūsų įrenginyje.",
     "importFromAccount": "Importuoti iš paskyros",
     "continueWith": "Tęsti su {{provider}}",

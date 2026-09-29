@@ -398,11 +398,41 @@ export function govValueKey(profile: UserProfile, key: string): string | undefin
  * birth, and this only answers what to send.
  */
 export function selfAssertedValue(profile: UserProfile, key: string): string | undefined {
+    // An address nobody has checked is not one the wallet hands over. Mail is
+    // how accounts are recovered and how people are reached, so an unchecked
+    // one is worth less than nothing to a relying party: it looks like a fact
+    // about the holder while being whatever they typed, including somebody
+    // else's address. This is the single resolver behind disclosure, the
+    // consent screen's preview and the "what is missing" check, so refusing
+    // here turns the whole flow into asking the holder to prove it first.
+    if (key === 'email') return verifiedEmail(profile);
     const own = getProfileValue(profile, key);
     if (own) return own;
     const govKey = ATTRIBUTE_MAP[key]?.govKey;
     if (!govKey || getProfileAssurance(profile, govKey) !== 'gov') return undefined;
     return getProfileValue(profile, govKey);
+}
+
+/**
+ * An address this wallet holds a verification for: privasys.id mailed a code
+ * to it, or the provider it was imported from says it checked it. The one the
+ * profile mirrors wins when it qualifies, so a holder with several verified
+ * addresses keeps sending the one they chose.
+ */
+export function verifiedEmail(profile: UserProfile): string | undefined {
+    const verified = profile.attributes.filter((a) => a.key === 'email' && a.verified && a.value);
+    if (verified.length === 0) return undefined;
+    const mirrored = (profile.email ?? '').trim().toLowerCase();
+    const preferred = verified.find((a) => a.value.trim().toLowerCase() === mirrored);
+    return (preferred ?? verified[0]).value;
+}
+
+/** Whether this address is one the wallet would disclose. */
+export function isEmailVerified(profile: UserProfile, email: string): boolean {
+    const wanted = email.trim().toLowerCase();
+    return profile.attributes.some(
+        (a) => a.key === 'email' && a.verified && a.value.trim().toLowerCase() === wanted,
+    );
 }
 
 /**

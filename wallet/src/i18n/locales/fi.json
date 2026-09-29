@@ -282,6 +282,8 @@
     "suffixOptional": " (valinnainen)",
     "allSet": "Kaikki valmista. Napauta Jatka viimeistelläksesi kirjautumisen.",
     "verifyWithId": "Vahvista henkilöllisyystodistuksellasi",
+    "verifyEmailAction": "Vahvista {{email}}",
+    "verifyEmailNotice": "Osoite jaetaan vasta, kun se on tarkistettu. Lähetämme siihen koodin, ja osoite pysyy puhelimessasi.",
     "govRequiredNotice": "Viranomaisen vahvistama määrite vaaditaan. Henkilöllisyystodistuksesi tarkistetaan turvallisessa enklaavissa; arvo pysyy laitteellasi.",
     "importFromAccount": "Tuo tililtä",
     "continueWith": "Jatka palvelulla {{provider}}",

@@ -282,6 +282,8 @@
     "suffixOptional": " (valfritt)",
     "allSet": "Allt klart. Tryck på Fortsätt för att slutföra inloggningen.",
     "verifyWithId": "Verifiera med din id-handling",
+    "verifyEmailAction": "Verifiera {{email}}",
+    "verifyEmailNotice": "En adress delas först när den har kontrollerats. Vi skickar en kod till den, och adressen stannar i din telefon.",
     "govRequiredNotice": "Ett myndighetsverifierat attribut krävs. Din id-handling kontrolleras i en säker enklav; värdet stannar på din enhet.",
     "importFromAccount": "Importera från ett konto",
     "continueWith": "Fortsätt med {{provider}}",

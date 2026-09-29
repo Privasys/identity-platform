@@ -383,6 +383,7 @@
       "keptNote": "Ingen annan ser dem. Den här telefonen glömmer dem när du kopplar bort den sista appen som använder dem.",
       "useOther": "Ange andra uppgifter",
       "whichAccount": "Vilket konto ska den här appen använda?",
+      "connectAccount": "Anslut konto",
       "oauthButton": "Fortsätt med {{provider}}",
       "oauthWorking": "Väntar på {{provider}}",
       "oauthDone": "Inloggad med {{provider}}. Tryck för att logga in igen.",

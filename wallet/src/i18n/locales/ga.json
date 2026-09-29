@@ -416,6 +416,7 @@
       "keptNote": "Ní fheiceann aon duine eile iad. Déanann an fón seo dearmad orthu nuair a dhícheanglaíonn tú an aip dheireanach a úsáideann iad.",
       "useOther": "Iontráil sonraí eile",
       "whichAccount": "Cén cuntas ba cheart don aip seo a úsáid?",
+      "connectAccount": "Ceangail an cuntas",
       "oauthButton": "Lean ar aghaidh le {{provider}}",
       "oauthWorking": "Ag fanacht le {{provider}}",
       "oauthDone": "Sínithe isteach le {{provider}}. Tapáil chun síniú isteach arís.",

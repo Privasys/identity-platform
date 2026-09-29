@@ -383,6 +383,7 @@
       "keptNote": "Mais ninguém os vê. Este telemóvel esquece-os quando desligar a última aplicação que os usa.",
       "useOther": "Introduzir outros dados",
       "whichAccount": "Que conta deve esta aplicação usar?",
+      "connectAccount": "Ligar a conta",
       "oauthButton": "Continuar com {{provider}}",
       "oauthWorking": "A aguardar {{provider}}",
       "oauthDone": "Sessão iniciada com {{provider}}. Toque para iniciar de novo.",

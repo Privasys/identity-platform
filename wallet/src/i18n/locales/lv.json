@@ -416,6 +416,7 @@
       "keptNote": "Neviens cits tos neredz. Šis tālrunis tos aizmirst, kad atvienojat pēdējo lietotni, kas tos izmanto.",
       "useOther": "Ievadīt citus datus",
       "whichAccount": "Kuru kontu šai lietotnei izmantot?",
+      "connectAccount": "Pievienot kontu",
       "oauthButton": "Turpināt ar {{provider}}",
       "oauthWorking": "Gaida {{provider}}",
       "oauthDone": "Pierakstījies ar {{provider}}. Pieskarieties, lai pierakstītos vēlreiz.",

@@ -383,6 +383,7 @@
       "keptNote": "Senki más nem látja őket. Ez a telefon elfelejti őket, amikor leválasztja az utolsó alkalmazást, amely használja őket.",
       "useOther": "Más adatok megadása",
       "whichAccount": "Melyik fiókot használja ez az alkalmazás?",
+      "connectAccount": "Fiók csatlakoztatása",
       "oauthButton": "Folytatás ezzel: {{provider}}",
       "oauthWorking": "Várakozás erre: {{provider}}",
       "oauthDone": "Bejelentkezve ezzel: {{provider}}. Koppintson az újbóli bejelentkezéshez.",

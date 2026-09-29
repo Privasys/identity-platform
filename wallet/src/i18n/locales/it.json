@@ -383,6 +383,7 @@
       "keptNote": "Nessun altro li vede. Questo telefono li dimentica quando scolleghi l’ultima app che li usa.",
       "useOther": "Inserisci altri dati",
       "whichAccount": "Quale account deve usare questa app?",
+      "connectAccount": "Collega l’account",
       "oauthButton": "Continua con {{provider}}",
       "oauthWorking": "In attesa di {{provider}}",
       "oauthDone": "Accesso eseguito con {{provider}}. Tocca per accedere di nuovo.",

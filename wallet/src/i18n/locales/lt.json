@@ -416,6 +416,7 @@
       "keptNote": "Niekas kitas jų nemato. Šis telefonas juos pamiršta, kai atjungiate paskutinę juos naudojančią programėlę.",
       "useOther": "Įvesti kitus duomenis",
       "whichAccount": "Kurią paskyrą ši programėlė turėtų naudoti?",
+      "connectAccount": "Prijungti paskyrą",
       "oauthButton": "Tęsti su {{provider}}",
       "oauthWorking": "Laukiama {{provider}}",
       "oauthDone": "Prisijungta per {{provider}}. Palieskite, kad prisijungtumėte iš naujo.",

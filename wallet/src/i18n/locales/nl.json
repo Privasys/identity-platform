@@ -383,6 +383,7 @@
       "keptNote": "Niemand anders ziet ze. Deze telefoon vergeet ze zodra u de laatste app loskoppelt die ze gebruikt.",
       "useOther": "Andere gegevens invoeren",
       "whichAccount": "Welk account moet deze app gebruiken?",
+      "connectAccount": "Account koppelen",
       "oauthButton": "Doorgaan met {{provider}}",
       "oauthWorking": "Wachten op {{provider}}",
       "oauthDone": "Aangemeld met {{provider}}. Tik om opnieuw aan te melden.",

@@ -18,19 +18,22 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { listShareRequests } from '@/services/drive';
 import { rebuildFromGrantsIndex, syncGrantsIndex } from '@/services/grants-index';
 import { useAuthStore } from '@/stores/auth';
 import { useCapabilitiesStore } from '@/stores/capabilities';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useConsentStore } from '@/stores/consent';
+import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useProfileStore } from '@/stores/profile';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
@@ -96,6 +99,33 @@ export default function AccessScreen() {
         return () => clearInterval(id);
     }, [refreshApprovals, refreshAsks]);
 
+    // Drive share requests, asked of the drive itself each time the tab comes
+    // into view. Not on the 20-second timer above: reaching the drive means an
+    // attestation and an RA-TLS round trip, where the IdP lists are one light
+    // call. Once a minute at most is plenty between pushes, which file new
+    // requests into the same store the moment they land.
+    const drivePending = useDriveNotificationsStore((s) => s.pendingRequests().length);
+    const lastDriveSync = useRef(0);
+    const syncDriveRequests = useCallback(async () => {
+        const at = Date.now();
+        if (at - lastDriveSync.current < 60_000) return;
+        lastDriveSync.current = at;
+        const store = useDriveNotificationsStore.getState();
+        await store.hydrate();
+        try {
+            const { tenantId, requests } = await listShareRequests();
+            useDriveNotificationsStore.getState().syncServer(tenantId, requests);
+        } catch {
+            // No drive on this wallet, or it could not be reached: whatever the
+            // pushes filed still shows, and the requests screen says why.
+        }
+    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            void syncDriveRequests();
+        }, [syncDriveRequests])
+    );
+
     const nowSeconds = Math.floor(now / 1000);
     const sessionRows = useMemo(
         () => buildSessionRows(traces, apps, sessions, now),
@@ -149,6 +179,30 @@ export default function AccessScreen() {
                                 {t('home.pendingApprovals', { count: pendingApprovals.length })}
                             </Text>
                             <Text style={styles.bannerMeta}>{t('home.pendingApprovalsHint')}</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.infoText} />
+                    </Pressable>
+                )}
+
+                {/* People asking to open something the holder shared through a
+                    restricted Drive link. Listed from the drive's own record
+                    as well as from pushes, so a request whose notification
+                    was swiped away, failed to open or never came is still
+                    here to answer, rather than gone with the notification. */}
+                {drivePending > 0 && (
+                    <Pressable
+                        style={styles.banner}
+                        onPress={() => router.push('/drive-requests')}
+                        accessibilityLabel={`${t('driveRequests.title')} (${drivePending})`}
+                    >
+                        <RNView style={styles.bannerIcon}>
+                            <Ionicons name="document-lock-outline" size={18} color={p.infoText} />
+                        </RNView>
+                        <RNView style={styles.bannerInfo}>
+                            <Text style={styles.bannerTitle}>
+                                {`${t('driveRequests.title')} (${drivePending})`}
+                            </Text>
+                            <Text style={styles.bannerMeta}>{t('driveRequests.awaiting')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.infoText} />
                     </Pressable>

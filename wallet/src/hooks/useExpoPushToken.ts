@@ -153,7 +153,16 @@ async function fileDriveNotification(data: Record<string, unknown>): Promise<boo
  *  else runs through the auth/voucher connect flow. */
 async function dispatchPush(data: Record<string, unknown>, router: Router): Promise<void> {
     if (data?.type === 'share-request' || data?.type === 'share-decision') {
-        await fileDriveNotification(data);
+        // Filing is a convenience and opening the screen is the point. A
+        // failure here (a sealed payload this device cannot open, storage
+        // refusing a write) used to abort the whole tap, so the holder pressed
+        // a notification and nothing happened. The screen reconciles against
+        // the drive's own list on open, so it shows the request either way.
+        try {
+            await fileDriveNotification(data);
+        } catch (e) {
+            console.warn('[notifications] could not file drive notification', e);
+        }
         // Already filed above, so an open list is showing it: pushing would
         // only stack a second copy of the same view. See the vault-approval
         // branch below for what that cost.

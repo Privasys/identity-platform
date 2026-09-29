@@ -95,23 +95,27 @@ jobs:
       # enabled by default on GCE images; if it is ever disabled, every CI
       # SSH attempt fails with "Permission denied (publickey)" no matter
       # which username is used. See run 25766840278 for the original break.
-      # Into the CI user's own home, not the shared /tmp: a bundle left in /tmp
-      # by any other user (a manual copy, an older run) is one this user cannot
-      # overwrite, and sdk-v0.13.0 failed on exactly that ("Permission denied").
+      # Streamed as a tarball over `gcloud compute ssh`, into the CI user's own
+      # home. Not scp: through the IAP tunnel it connects and then stalls
+      # mid-transfer (sdk-v0.13.0 hung for over half an hour, and the hosted
+      # client bundle had silently fallen behind the SDK since before 0.12),
+      # while ssh to this host is what the IdP deploy uses every release. Not
+      # /tmp either: a bundle another user left there cannot be overwritten.
+      # A timeout, so a stall fails the release instead of holding a runner.
       - name: Upload bundles to idp-fr-par-1
+        timeout-minutes: 5
         run: |
-          gcloud compute scp \
-            sdk/dist/privasys-auth-frame.iife.js \
-            sdk/dist/privasys-auth-frame.iife.js.map \
-            sdk/dist/privasys-auth-client.iife.js \
-            sdk/dist/privasys-auth-client.iife.js.map \
-            idp-fr-par-1:~/ \
+          tar -czf - -C sdk/dist \
+            privasys-auth-frame.iife.js privasys-auth-frame.iife.js.map \
+            privasys-auth-client.iife.js privasys-auth-client.iife.js.map \
+          | gcloud compute ssh idp-fr-par-1 \
             --project privasys-production \
             --zone europe-west9-a \
             --tunnel-through-iap \
-            --scp-flag="-O"
+            --command "rm -rf ~/sdk-bundles && mkdir -p ~/sdk-bundles && tar -xzf - -C ~/sdk-bundles && ls -l ~/sdk-bundles"
 
       - name: Install bundles into /var/www/auth
+        timeout-minutes: 5
         run: |
           gcloud compute ssh idp-fr-par-1 \
             --project privasys-production \
@@ -124,13 +128,13 @@ jobs:
                 if [ -f /var/www/auth/\$B ]; then
                   sudo cp /var/www/auth/\$B /var/www/auth/\$B.bak.\$TS
                 fi
-                sudo cp ~/\$B     /var/www/auth/\$B
-                sudo cp ~/\$B.map /var/www/auth/\$B.map
+                sudo cp ~/sdk-bundles/\$B     /var/www/auth/\$B
+                sudo cp ~/sdk-bundles/\$B.map /var/www/auth/\$B.map
                 sudo chown root:root /var/www/auth/\$B /var/www/auth/\$B.map
                 sudo chmod 644       /var/www/auth/\$B /var/www/auth/\$B.map
                 # Keep only the 5 most recent backups per bundle
                 sudo bash -c \"ls -1t /var/www/auth/\$B.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f\"
-                rm -f ~/\$B ~/\$B.map
+                rm -f ~/sdk-bundles/\$B ~/sdk-bundles/\$B.map
               done
             "
 

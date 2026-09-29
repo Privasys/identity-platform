@@ -74,7 +74,7 @@ func TestMarketplaceKeysNameTheCertifiedField(t *testing.T) {
 }
 
 // The set the marketplace prices, pinned. These keys are seeded by
-// management-service migrations 055/056/076 in a repository with no build-time
+// management-service migrations 055/056/076/094 in a repository with no build-time
 // link to this one, so the only way a divergence gets noticed is a deliberate
 // edit here. Adding a canonical attribute to the marketplace means adding its
 // registry row in the same change, and in that order: a reservation naming a key
@@ -93,6 +93,11 @@ func TestMarketplaceIssuableSetIsPinned(t *testing.T) {
 		"place_of_birth":  "privasys:place_of_birth",
 		"personal_number": "privasys:personal_number",
 		"picture_id":      "privasys:picture_id",
+		// Migration 094: the last certified document fields that were free.
+		"document_number": "privasys:document_number",
+		"document_type":   "privasys:document_type",
+		"issuing_state":   "privasys:issuing_state",
+		"sex":             "privasys:sex",
 	}
 	got := map[string]string{}
 	for _, a := range All {
@@ -331,25 +336,37 @@ func TestCertifiedFieldsRouteToTheEnclaveSpelling(t *testing.T) {
 	}
 }
 
-// MarketplaceKey must refuse the identity attributes the marketplace does not
-// price. Reserving one fails the whole authorization as an unknown attribute, so
-// "not issuable" has to be distinguishable from "issuable under its own name".
-// These four are certified by the enclave and returned alongside a priced
-// insight, but no migration has seeded a row for them: they must stay unpriced
-// here rather than be namespaced on the hope that a row exists.
-func TestMarketplaceKeyRefusesUnpricedIdentityFields(t *testing.T) {
-	for _, key := range []string{
-		"document_number", "document_type", "issuing_state", "sex",
-	} {
+// Every attribute a government document certifies is sold. The last four that
+// were free (document_number, document_type, issuing_state, sex) were priced by
+// management-service migration 094, the way 076 priced doc_expiry and its
+// siblings, because a certified disclosure is one ceremony whichever field it
+// opens. A certified field added later without a registry row fails here rather
+// than reaching a picker as a free government attribute.
+//
+// Each marketplace key must name a row the registry actually has: reserving an
+// unknown key fails the whole authorization, so MarketplaceKey still refuses a
+// key the referential does not know.
+func TestEveryGovernmentAttributeIsSold(t *testing.T) {
+	for _, a := range All {
+		if !a.IsGovVerified() {
+			continue
+		}
+		if _, ok := MarketplaceKey(a.Key); !ok {
+			t.Errorf("%q is certified from a government document but not sold", a.Key)
+		}
+	}
+	for _, key := range []string{"document_number", "document_type", "issuing_state", "sex"} {
 		a, ok := ByKey[key]
 		if !ok {
 			t.Fatalf("attribute %q missing from the referential", key)
 		}
-		if a.Scope != "identity" {
-			t.Errorf("%q scope = %q, want identity", key, a.Scope)
+		// Pricing a key means making it request-only in the same change, or
+		// every `identity` request would buy it unasked.
+		if !a.RequestOnly {
+			t.Errorf("%q is priced but still rides the identity scope", key)
 		}
-		if mk, ok := MarketplaceKey(key); ok {
-			t.Errorf("%q resolved to marketplace key %q; it has no registry row", key, mk)
+		if mk, ok := MarketplaceKey(key); !ok || mk != "privasys:"+key {
+			t.Errorf("MarketplaceKey(%s) = %q, %v; want the migration 094 row privasys:%s", key, mk, ok, key)
 		}
 	}
 	if mk, ok := MarketplaceKey("age_over_18"); !ok || mk != "privasys:age_over_18" {

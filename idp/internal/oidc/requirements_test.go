@@ -159,25 +159,29 @@ func TestIdentityScopePullsNoRequestOnlyAttribute(t *testing.T) {
 		// they rode the scope for free before, and a priced key on a
 		// scope-derived set is a charge nobody asked for.
 		"doc_expiry", "place_of_birth", "personal_number",
+		// The same for the last free document fields, priced by 094. This
+		// client does not name them, so they must not come with the scope.
+		"document_type", "issuing_state", "sex",
 	} {
 		if got[k] {
 			t.Errorf("%s was pulled into a whitelist-less identity request", k)
 		}
 	}
-	// The free half of the identity baseline is untouched. birthdate and
-	// nationality are still here — self-asserted now, which is the deliberate
-	// break — and the document fields the marketplace does not price still ride
-	// the scope.
+	// The whitelisted baseline is untouched. birthdate and nationality are still
+	// here, self-asserted now, which is the deliberate break. document_number is
+	// here because this client NAMES it in its whitelist, which is exactly how a
+	// request-only key is meant to be asked for.
 	for _, k := range []string{"birthdate", "nationality", "age_over_18", "age_over_21", "document_number"} {
 		if !got[k] {
 			t.Errorf("%s dropped out of the identity baseline", k)
 		}
 	}
-	// The baseline now reserves only the two age insights: the passport readings
-	// of a birth date and a nationality moved to keys a client must name.
+	// The baseline reserves the two age insights and, since 094 priced it, the
+	// document number this client named: a charge it asked for, unlike the
+	// three document fields above that it did not.
 	reqs := attributeRequirements("openid identity", nil, baseline)
 	keys := reservableMarketplaceKeys(reqs)
-	want := []string{"privasys:age_over_18", "privasys:age_over_21"}
+	want := []string{"privasys:age_over_18", "privasys:age_over_21", "privasys:document_number"}
 	if len(keys) != len(want) {
 		t.Fatalf("identity baseline reserved %v, want %v", keys, want)
 	}
@@ -321,18 +325,42 @@ func TestPresenceCeremonyIsStillReserved(t *testing.T) {
 	}
 }
 
-// A gov attribute with no registry row must never be namespaced. Reserving an
-// unknown key fails the whole authorization, so the fields the enclave certifies
-// but the marketplace has not priced have to fall out here.
-func TestUnpricedGovFieldsAreNotReserved(t *testing.T) {
+// An attribute with no registry row must never be namespaced. Reserving an
+// unknown key fails the whole authorization, so anything the referential does
+// not sell has to fall out here. Every certified document field is sold now, so
+// the case is held by keys the referential does not know.
+func TestUnsoldAttributesAreNotReserved(t *testing.T) {
+	reqs := map[string]AttributeRequirement{
+		"email":         {Assurance: "any"},
+		"no_such_field": {Assurance: "gov"},
+	}
+	if got := reservableMarketplaceKeys(reqs); len(got) != 0 {
+		t.Errorf("reserved %v for attributes that are not sold", got)
+	}
+}
+
+// The last four certified document fields, priced by migration 094: each must
+// reserve, or the enclave meters a disclosure against a voucher that never
+// authorised it.
+func TestDocumentFieldsPricedBy094AreReserved(t *testing.T) {
 	reqs := map[string]AttributeRequirement{
 		"document_number": {Assurance: "gov"},
 		"document_type":   {Assurance: "gov"},
 		"issuing_state":   {Assurance: "gov"},
 		"sex":             {Assurance: "gov"},
 	}
-	if got := reservableMarketplaceKeys(reqs); len(got) != 0 {
-		t.Errorf("reserved %v for attributes with no registry row", got)
+	want := []string{
+		"privasys:document_number", "privasys:document_type",
+		"privasys:issuing_state", "privasys:sex",
+	}
+	got := reservableMarketplaceKeys(reqs)
+	if len(got) != len(want) {
+		t.Fatalf("reserved %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("reserved %v, want %v", got, want)
+		}
 	}
 }
 

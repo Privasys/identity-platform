@@ -416,6 +416,7 @@
       "keptNote": "Nid oes neb arall yn eu gweld. Mae’r ffôn hwn yn eu hanghofio pan fyddwch yn datgysylltu’r ap olaf sy’n eu defnyddio.",
       "useOther": "Rhoi manylion gwahanol",
       "whichAccount": "Pa gyfrif ddylai’r ap hwn ei ddefnyddio?",
+      "connectAccount": "Cysylltu’r cyfrif",
       "oauthButton": "Parhau gyda {{provider}}",
       "oauthWorking": "Yn aros am {{provider}}",
       "oauthDone": "Wedi mewngofnodi gyda {{provider}}. Tapiwch i fewngofnodi eto.",

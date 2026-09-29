@@ -416,6 +416,7 @@
       "keptNote": "Keegi teine neid ei näe. See telefon unustab need, kui katkestate viimase rakenduse, mis neid kasutab.",
       "useOther": "Sisesta teised andmed",
       "whichAccount": "Millist kontot see rakendus peaks kasutama?",
+      "connectAccount": "Ühenda konto",
       "oauthButton": "Jätka teenusega {{provider}}",
       "oauthWorking": "Ootan teenust {{provider}}",
       "oauthDone": "Sisse logitud teenusega {{provider}}. Puudutage, et uuesti sisse logida.",

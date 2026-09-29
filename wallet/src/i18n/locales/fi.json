@@ -383,6 +383,7 @@
       "keptNote": "Kukaan muu ei näe niitä. Tämä puhelin unohtaa ne, kun katkaiset viimeisen niitä käyttävän sovelluksen yhteyden.",
       "useOther": "Syötä eri tiedot",
       "whichAccount": "Mitä tiliä tämän sovelluksen pitäisi käyttää?",
+      "connectAccount": "Yhdistä tili",
       "oauthButton": "Jatka palvelulla {{provider}}",
       "oauthWorking": "Odotetaan palvelua {{provider}}",
       "oauthDone": "Kirjauduttu palvelulla {{provider}}. Napauta kirjautuaksesi uudelleen.",

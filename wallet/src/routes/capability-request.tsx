@@ -108,6 +108,17 @@ function prefillEmailFor(appHost: string): string {
     return profile?.attributes.find((a) => a.key === 'email')?.value || profile?.email || '';
 }
 
+/**
+ * The sign-in field, when a sign-in at the provider is all a step still needs:
+ * every other required field is answered and exactly one sign-in is not.
+ */
+function onlySignInLeft(fields: SetupField[], answers: SetupAnswers): SetupField | null {
+    const gaps = missingRequired(fields, answers);
+    if (gaps.length !== 1) return null;
+    const field = fields.find((f) => f.name === gaps[0]);
+    return field?.kind === 'oauth' && !!field.oauth ? field : null;
+}
+
 export default function CapabilityRequestScreen() {
     const { t } = useTranslation();
     const p = usePalette();
@@ -166,6 +177,15 @@ export default function CapabilityRequestScreen() {
      * screen lets them pick which one this app gets.
      */
     const [keptChoices, setKeptChoices] = useState<KeptSetup[]>([]);
+    /**
+     * Connecting is one gesture. When the service's next step is only a
+     * sign-in at the provider (the address it was given is a Google account,
+     * say), the sign-in opens at once, as the continuation of the tap on
+     * "Connect account"; and a completed sign-in sends the step, with no
+     * second tap on a button that has nothing left to approve.
+     */
+    const [autoSignIn, setAutoSignIn] = useState<SetupField | null>(null);
+    const [autoSubmit, setAutoSubmit] = useState(false);
 
     // Where the prerequisite chain has got to. Refs, not state, so that the
     // effect driving it can have no dependencies: it must re-run when this
@@ -533,12 +553,12 @@ export default function CapabilityRequestScreen() {
                 setSecretsSoFar(resupplying ? [] : secretsGiven);
                 setSecretNamesSoFar(resupplying ? [] : secretNames);
                 setSetup(outcome.requirement);
-                setAnswers(
-                    initialAnswers(outcome.requirement.fields, {
-                        previous: resupplying ? nonSecretAnswers(kept) : answers,
-                        email: prefillEmailFor(appHost),
-                    }),
-                );
+                const next = initialAnswers(outcome.requirement.fields, {
+                    previous: resupplying ? nonSecretAnswers(kept) : answers,
+                    email: prefillEmailFor(appHost),
+                });
+                setAnswers(next);
+                setAutoSignIn(onlySignInLeft(outcome.requirement.fields, next));
                 setPhase('ready');
                 return;
             }
@@ -694,10 +714,46 @@ export default function CapabilityRequestScreen() {
             if (!field.oauth || !resource?.hostname) {
                 throw new SetupOAuthError('the sign-in cannot start');
             }
-            return runSetupOAuth(field.oauth, resource.hostname);
+            const code = await runSetupOAuth(field.oauth, resource.hostname);
+            setAutoSubmit(true);
+            return code;
         },
         [resource],
     );
+
+    // The step that is only a sign-in: open it now (see autoSignIn). A
+    // cancelled or failed sign-in leaves the step on screen with its own
+    // "Continue with …" button and Deny.
+    useEffect(() => {
+        const field = autoSignIn;
+        if (!field || phase !== 'ready') return;
+        setAutoSignIn(null);
+        void onOAuth(field).then(
+            (code) => setAnswer(field.name, code),
+            (e) => {
+                setAutoSubmit(false);
+                if (!(e as { cancelled?: boolean })?.cancelled) {
+                    setServiceMessage(t('capability.setup.oauthFailed', { provider: field.oauth?.provider ?? '' }));
+                }
+            },
+        );
+    }, [autoSignIn, phase, onOAuth, setAnswer, t]);
+
+    // A completed sign-in sends the step once its answer is in.
+    useEffect(() => {
+        if (!autoSubmit || !setup || phase !== 'ready') return;
+        if (missingRequired(setup.fields, answers).length > 0) return;
+        setAutoSubmit(false);
+        void onApprove();
+        // onApprove is rebuilt every render; this runs on the answer arriving.
+    }, [autoSubmit, setup, answers, phase]);
+
+    // A grant that needs details (an account at a provider) is connecting an
+    // account; one that needs nothing, or re-sends what this phone kept, is
+    // approved as it stands.
+    const connecting = !!setup && setup.fields.length > 0;
+    const canSubmit = !setup || missingRequired(setup.fields, answers).length === 0;
+    const signInPending = !!setup && onlySignInLeft(setup.fields, answers) !== null;
 
     const serviceName = resource?.display_name || resource?.name || '';
 
@@ -958,17 +1014,27 @@ export default function CapabilityRequestScreen() {
                             </RNView>
                         )}
 
-                        <Pressable
-                            style={[styles.primary, phase === 'working' && styles.busy]}
-                            onPress={onApprove}
-                            disabled={phase === 'working'}
-                        >
-                            {phase === 'working' ? (
-                                <ActivityIndicator color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.primaryText}>{t('capability.approve')}</Text>
-                            )}
-                        </Pressable>
+                        {/* What the button does is what it says. A grant that
+                            needs an account connected says "Connect account",
+                            and is not offered until the account is named;
+                            while a sign-in at the provider is all that is
+                            left, that sign-in is the action and this button
+                            steps aside. */}
+                        {(phase === 'working' || !signInPending) && (
+                            <Pressable
+                                style={[styles.primary, (phase === 'working' || !canSubmit) && styles.busy]}
+                                onPress={onApprove}
+                                disabled={phase === 'working' || !canSubmit}
+                            >
+                                {phase === 'working' ? (
+                                    <ActivityIndicator color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.primaryText}>
+                                        {t(connecting ? 'capability.setup.connectAccount' : 'capability.approve')}
+                                    </Text>
+                                )}
+                            </Pressable>
+                        )}
                         {/* Deny is a first-class action, not a dismissal. */}
                         <Pressable
                             style={styles.secondary}

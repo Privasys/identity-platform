@@ -416,6 +416,7 @@
       "keptNote": "Nikto iný ich nevidí. Tento telefón ich zabudne, keď odpojíte poslednú aplikáciu, ktorá ich používa.",
       "useOther": "Zadať iné údaje",
       "whichAccount": "Ktorý účet má táto aplikácia používať?",
+      "connectAccount": "Pripojiť účet",
       "oauthButton": "Pokračovať cez {{provider}}",
       "oauthWorking": "Čaká sa na {{provider}}",
       "oauthDone": "Prihlásené cez {{provider}}. Ťuknutím sa prihlásite znova.",

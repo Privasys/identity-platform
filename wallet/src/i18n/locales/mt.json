@@ -416,6 +416,7 @@
       "keptNote": "Ħadd iktar ma jarahom. Dan it-telefown jinsihom meta taqta’ l-aħħar app li tużahom.",
       "useOther": "Daħħal dettalji differenti",
       "whichAccount": "Liema kont għandha tuża din l-app?",
+      "connectAccount": "Qabbad il-kont",
       "oauthButton": "Kompli ma' {{provider}}",
       "oauthWorking": "Qed nistenna lil {{provider}}",
       "oauthDone": "Dħalt ma' {{provider}}. Għafas biex terġa' tidħol.",

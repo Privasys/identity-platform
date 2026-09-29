@@ -383,6 +383,7 @@
       "keptNote": "Nikdo jiný je nevidí. Tento telefon je zapomene, jakmile odpojíte poslední aplikaci, která je používá.",
       "useOther": "Zadat jiné údaje",
       "whichAccount": "Který účet má tato aplikace používat?",
+      "connectAccount": "Připojit účet",
       "oauthButton": "Pokračovat přes {{provider}}",
       "oauthWorking": "Čekání na {{provider}}",
       "oauthDone": "Přihlášeno přes {{provider}}. Klepnutím se přihlásíte znovu.",

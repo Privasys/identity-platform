@@ -416,6 +416,7 @@
       "keptNote": "Nothing else sees them. This phone forgets them when you disconnect the last app that uses them.",
       "useOther": "Enter different details",
       "whichAccount": "Which account should this app use?",
+      "connectAccount": "Connect account",
       "oauthButton": "Continue with {{provider}}",
       "oauthWorking": "Waiting for {{provider}}",
       "oauthDone": "Signed in with {{provider}}. Tap to sign in again.",

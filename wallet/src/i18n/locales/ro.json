@@ -416,6 +416,7 @@
       "keptNote": "Nimeni altcineva nu le vede. Acest telefon le uită când deconectați ultima aplicație care le folosește.",
       "useOther": "Introduceți alte date",
       "whichAccount": "Ce cont ar trebui să folosească această aplicație?",
+      "connectAccount": "Conectează contul",
       "oauthButton": "Continuați cu {{provider}}",
       "oauthWorking": "Se așteaptă {{provider}}",
       "oauthDone": "Autentificat cu {{provider}}. Atingeți pentru a vă autentifica din nou.",

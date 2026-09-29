@@ -416,6 +416,7 @@
       "keptNote": "Nitko ih drugi ne vidi. Ovaj ih telefon zaboravlja kada odspojite posljednju aplikaciju koja ih koristi.",
       "useOther": "Unesite druge podatke",
       "whichAccount": "Koji račun ova aplikacija treba koristiti?",
+      "connectAccount": "Poveži račun",
       "oauthButton": "Nastavi s {{provider}}",
       "oauthWorking": "Čekanje na {{provider}}",
       "oauthDone": "Prijavljeni putem {{provider}}. Dodirnite za ponovnu prijavu.",

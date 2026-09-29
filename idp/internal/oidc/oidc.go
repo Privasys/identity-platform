@@ -63,6 +63,13 @@ var acrValuesSupported = []string{"wallet", "gov-fresh", "gov-presence"}
 // identity-scope request); the wallet runs a live selfie ceremony for it.
 const presenceAttribute = "holder_present"
 
+// emailReceiptAttribute is how the wallet hands over the receipt this IdP
+// signed when it mailed a code to the holder's address. It rides in the
+// attributes map because that is the channel the wallet already has, and it is
+// not a canonical attribute, so filterAttributesRequested drops it: it decides
+// `email_verified` and is never disclosed to anyone.
+const emailReceiptAttribute = "email_receipt"
+
 // presenceMarketplaceKey is how the registry spells the ceremony (seeded by
 // management-service migration 056). It is hard-coded here, and only here,
 // because presenceAttribute is deliberately absent from the referential that
@@ -1247,9 +1254,20 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 		}
 	}
 
+	// Whether the address was ever checked, rather than merely typed. The
+	// wallet carries the receipt this IdP signed when it mailed a code, under
+	// a reserved key that is not a canonical attribute, so it is dropped by
+	// filterAttributesRequested above and never reaches a relying party as a
+	// value of its own.
+	emailVerified := false
+	if addr := filteredAttrs["email"]; addr != "" {
+		emailVerified = issuer.EmailReceiptProves(attrs[emailReceiptAttribute], ac.UserID, addr)
+	}
+
 	idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{
 		Subject:          ac.UserID,
 		Email:            filteredAttrs["email"],
+		EmailVerified:    emailVerified,
 		Name:             filteredAttrs["name"],
 		Picture:          "",
 		AttestationLevel: "verified",

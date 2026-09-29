@@ -282,6 +282,8 @@
     "suffixOptional": " (opcjonalne)",
     "allSet": "Wszystko gotowe. Dotknij Kontynuuj, aby dokończyć logowanie.",
     "verifyWithId": "Zweryfikuj swoim dokumentem",
+    "verifyEmailAction": "Zweryfikuj {{email}}",
+    "verifyEmailNotice": "Adres jest udostępniany dopiero po sprawdzeniu. Wysyłamy na niego kod, a sam adres zostaje w twoim telefonie.",
     "govRequiredNotice": "Wymagany jest atrybut zweryfikowany przez państwo. Twój dokument jest sprawdzany w bezpiecznej enklawie; wartość pozostaje na Twoim urządzeniu.",
     "importFromAccount": "Importuj z konta",
     "continueWith": "Kontynuuj z {{provider}}",

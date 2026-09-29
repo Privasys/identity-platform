@@ -282,6 +282,8 @@
     "suffixOptional": " (valgfri)",
     "allSet": "Alt er klar. Tryk på Fortsæt for at fuldføre login.",
     "verifyWithId": "Verificer med dit id",
+    "verifyEmailAction": "Bekræft {{email}}",
+    "verifyEmailNotice": "En adresse deles først, når den er kontrolleret. Vi sender en kode til den, og adressen bliver på din telefon.",
     "govRequiredNotice": "Der kræves en myndighedsverificeret attribut. Dit id kontrolleres i en sikker enklave; værdien bliver på din enhed.",
     "importFromAccount": "Importer fra en konto",
     "continueWith": "Fortsæt med {{provider}}",

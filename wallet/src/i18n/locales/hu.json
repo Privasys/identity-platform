@@ -282,6 +282,8 @@
     "suffixOptional": " (nem kötelező)",
     "allSet": "Minden készen áll. Koppintson a Folytatás gombra a bejelentkezés befejezéséhez.",
     "verifyWithId": "Ellenőrzés az okmányával",
+    "verifyEmailAction": "A(z) {{email}} ellenőrzése",
+    "verifyEmailNotice": "Egy címet csak ellenőrzés után osztunk meg. Kódot küldünk rá, a cím pedig a telefonján marad.",
     "govRequiredNotice": "Hatóság által ellenőrzött attribútum szükséges. Az okmányát biztonságos enklávban ellenőrizzük; az érték az eszközén marad.",
     "importFromAccount": "Importálás fiókból",
     "continueWith": "Folytatás ezzel: {{provider}}",

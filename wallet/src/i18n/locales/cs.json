@@ -282,6 +282,8 @@
     "suffixOptional": " (volitelné)",
     "allSet": "Vše je připraveno. Klepnutím na Pokračovat dokončíte přihlášení.",
     "verifyWithId": "Ověřit svým dokladem",
+    "verifyEmailAction": "Ověřit {{email}}",
+    "verifyEmailNotice": "Adresa se sdílí až po ověření. Pošleme na ni kód a samotná adresa zůstane ve vašem telefonu.",
     "govRequiredNotice": "Je vyžadován atribut ověřený státem. Váš doklad se kontroluje v bezpečné enklávě; hodnota zůstává ve vašem zařízení.",
     "importFromAccount": "Importovat z účtu",
     "continueWith": "Pokračovat přes {{provider}}",

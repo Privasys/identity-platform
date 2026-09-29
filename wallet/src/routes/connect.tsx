@@ -75,7 +75,7 @@ import { CREDITS_PER_GBP, formatCap, grantSpendConsent } from '@/services/spend-
 import { ensureWia } from '@/services/wia';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
-import { selfAssertedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, profileName, govValueKey, isDerived, setProfileValue } from '@/services/attributes';
+import { selfAssertedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, profileName, govValueKey, isDerived, isEmailVerified, setProfileValue } from '@/services/attributes';
 import { discloseAttribute, provePresence, voucherForAttribute } from '@/services/kyc';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
@@ -3225,6 +3225,12 @@ function AttributeAcquisitionView({
     const hasGovMissing = stillMissing.some(
         (attr) => assuranceFor(attr, attributeRequirements) === 'gov',
     );
+    // The holder's own address, waiting on a check. An email is "missing" here
+    // until it is proved, so without this the screen would ask someone who has
+    // an address to type it again and stay exactly as stuck.
+    const unverifiedEmail = stillMissing.includes('email')
+        ? profile?.attributes.find((a) => a.key === 'email' && !a.verified && a.value)?.value
+        : undefined;
 
     // Launch the KYC capture flow (NFC chip read + selfie → verifier enclave →
     // gov-assurance auto-fill). On return, the profile is updated and the gating
@@ -3270,6 +3276,14 @@ function AttributeAcquisitionView({
             const value = manualValues[attr]?.trim();
             if (!value) continue;
             setProfileValue(store, attr, value, 'manual');
+        }
+        // An address was just typed, so nobody has checked it and it will not
+        // be disclosed. Going straight to the check is the only way this
+        // screen leads anywhere: saving it again would change nothing.
+        const typed = manualValues['email']?.trim();
+        const saved = useProfileStore.getState().profile;
+        if (typed && saved && !isEmailVerified(saved, typed)) {
+            router.push({ pathname: '/verify-email', params: { email: typed } });
         }
     };
 
@@ -3393,6 +3407,39 @@ function AttributeAcquisitionView({
                     ) : mode === 'choose' ? (
                         /* Provider linking options */
                         <>
+                            {/* An address is already here, it has just never
+                                been checked, so the way on is to prove it
+                                rather than type it again. */}
+                            {unverifiedEmail && (
+                                <>
+                                    <Pressable
+                                        style={acqStyles.providerButton}
+                                        onPress={() =>
+                                            router.push({
+                                                pathname: '/verify-email',
+                                                params: { email: unverifiedEmail },
+                                            })
+                                        }
+                                        disabled={linkingProvider !== null}
+                                    >
+                                        <Ionicons name="mail-outline" size={20} color="#FFFFFF" />
+                                        <Text style={acqStyles.providerButtonText}>
+                                            {t('connect.verifyEmailAction', { email: unverifiedEmail })}
+                                        </Text>
+                                    </Pressable>
+                                    <RNView style={acqStyles.privacyNotice}>
+                                        <Ionicons name="lock-closed-outline" size={16} color={p.warnText} />
+                                        <Text style={acqStyles.privacyNoticeText}>
+                                            {t('connect.verifyEmailNotice')}
+                                        </Text>
+                                    </RNView>
+                                    <RNView style={acqStyles.divider}>
+                                        <RNView style={acqStyles.dividerLine} />
+                                        <Text style={acqStyles.dividerText}>or</Text>
+                                        <RNView style={acqStyles.dividerLine} />
+                                    </RNView>
+                                </>
+                            )}
                             {hasGovMissing && (
                                 <>
                                     <Pressable

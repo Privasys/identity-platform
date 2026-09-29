@@ -282,6 +282,8 @@
     "suffixOptional": " (opcional)",
     "allSet": "Está tudo pronto. Toque em Continuar para concluir o início de sessão.",
     "verifyWithId": "Verificar com o seu documento",
+    "verifyEmailAction": "Verificar {{email}}",
+    "verifyEmailNotice": "Um endereço só é partilhado depois de verificado. Enviamos-lhe um código; o endereço fica no seu telemóvel.",
     "govRequiredNotice": "É necessário um atributo verificado pelo Estado. O seu documento é verificado num enclave seguro; o valor permanece no seu dispositivo.",
     "importFromAccount": "Importar de uma conta",
     "continueWith": "Continuar com {{provider}}",

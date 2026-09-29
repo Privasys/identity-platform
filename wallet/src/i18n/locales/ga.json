@@ -318,6 +318,8 @@
     "suffixOptional": " (roghnach)",
     "allSet": "Gach rud réidh! Tapáil Lean ar aghaidh chun an síniú isteach a chríochnú.",
     "verifyWithId": "Fíoraigh le do cháipéis aitheantais",
+    "verifyEmailAction": "Fíoraigh {{email}}",
+    "verifyEmailNotice": "Ní roinntear seoladh go dtí go mbíonn sé seiceáilte. Seolaimid cód chuige agus fanann an seoladh ar do ghuthán.",
     "govRequiredNotice": "Tá tréith fhíoraithe ag an stát riachtanach. Seiceáiltear do cháipéis in iamhchlós slán; fanann an luach ar do ghléas.",
     "importFromAccount": "Iompórtáil ó chuntas",
     "continueWith": "Lean ar aghaidh le {{provider}}",

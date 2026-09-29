@@ -318,6 +318,8 @@
     "suffixOptional": " (valikuline)",
     "allSet": "Valmis! Sisselogimise lõpetamiseks puudutage Jätka.",
     "verifyWithId": "Kontrolli oma isikut tõendava dokumendiga",
+    "verifyEmailAction": "Kinnita {{email}}",
+    "verifyEmailNotice": "Aadressi jagatakse alles pärast kontrollimist. Saadame sinna koodi ja aadress ise jääb teie telefoni.",
     "govRequiredNotice": "Nõutav on riigi poolt kontrollitud atribuut. Teie dokumenti kontrollitakse turvalises anklaavis; väärtus jääb teie seadmesse.",
     "importFromAccount": "Impordi kontolt",
     "continueWith": "Jätka teenusega {{provider}}",

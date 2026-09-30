@@ -195,6 +195,23 @@
   .app-usage .line span { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
   .meter { height: 0.45rem; border-radius: 999px; background: var(--border); margin-top: 0.5rem; overflow: hidden; }
   .meter i { display: block; height: 100%; border-radius: 999px; background: var(--brand-gradient); }
+
+  /* Credits that can be spent on one app only (a code for a hosted model). */
+  .pots { margin-top: 1.75rem; display: flex; flex-direction: column; gap: 1rem; max-width: 34rem; }
+  .pots > .label { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); }
+  .pot .line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font-size: 0.95rem; }
+  .pot .line b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pot .line span { color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pot .sub { font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem; }
+  .redeem { margin-top: 1.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .redeem input {
+    padding: 0.5rem 0.9rem; border: 1px solid var(--border); border-radius: 999px; background: var(--bg);
+    font-size: 0.9rem; min-width: 14rem; flex: 0 1 18rem; text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .redeem input::placeholder { text-transform: none; letter-spacing: 0; }
+  .redeem input:focus { outline: none; border-color: var(--accent); }
+  .redeem .msg { flex-basis: 100%; font-size: 0.875rem; color: var(--text-secondary); min-height: 1em; }
+  .redeem .msg.bad { color: var(--bad); }
   .app-ctl { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .cap-field { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; background: var(--bg); }
   .cap-field .unit { padding: 0 0.3rem 0 0.8rem; color: var(--text-secondary); font-size: 0.9rem; }
@@ -355,7 +372,13 @@
           <p class="note">Top-ups are one-off payments. A membership adds credits every month and removes the need to top up.</p>
         </div>
       </div>
+      <div class="pots hidden" id="pots"></div>
       <div id="frozen" class="callout hidden">Your credits are used up. Apps that spend for you are paused until you top up.</div>
+      <form class="redeem" id="redeemForm" autocomplete="off">
+        <input id="redeemCode" type="text" placeholder="Have a code? Enter it here" aria-label="Credit code" spellcheck="false">
+        <button class="btn btn-outline btn-sm" type="submit" id="redeemBtn">Redeem</button>
+        <span class="msg" id="redeemMsg" role="status"></span>
+      </form>
       <div class="err" id="billingErr"></div>
     </section>
 
@@ -527,7 +550,9 @@
     $("main").classList.remove("hidden");
     $("monthLabel").textContent = monthLabel();
     // The ledger names apps through the consents, so it renders after them.
-    await Promise.all([loadAccount(), loadConsentsAndSpend(), loadKeys(), loadLedger()]);
+    // The ledger names pot-paid lines from the pots the balance lists, so it
+    // renders after the account.
+    await Promise.all([loadAccount().then(loadLedger), loadConsentsAndSpend(), loadKeys()]);
   }
 
   // API keys are long-lived tokens the identity service mints on a session of
@@ -613,9 +638,70 @@
       var d = bal.data || bal;
       var parts = gbp(d.balance).split(".");
       $("balance").innerHTML = esc(parts[0]) + "<small>." + esc(parts[1] || "00") + "</small>";
+      var pots = d.pots || [];
+      renderPots(pots);
+      var potLeft = pots.some(function (p) { return p.balance > 0; });
+      $("frozen").textContent = potLeft
+        ? "Your general credits are used up, so apps that spend for you are paused until you top up. Credits you hold for one app still work there."
+        : "Your credits are used up. Apps that spend for you are paused until you top up.";
       $("frozen").classList.toggle("hidden", !d.frozen);
     } catch (e) { $("balance").textContent = "—"; $("billingErr").textContent = e.message; }
   }
+
+  // Credits that can only be spent on one app, typically inference on one
+  // hosted model, from a code. They never count toward the general balance.
+  var potsById = {};
+  function potPurpose(p) {
+    return p.app_name || p.app_host || "one app";
+  }
+  function renderPots(pots) {
+    potsById = {};
+    pots.forEach(function (p) { potsById[p.id] = p; });
+    var box = $("pots");
+    if (!pots.length) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+    var html = '<span class="label">For one app only</span>';
+    pots.forEach(function (p) {
+      var until = new Date(p.expires_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+      var pct = p.granted > 0 ? Math.max(0, Math.min(100, Math.round(100 * p.balance / p.granted))) : 0;
+      html += '<div class="pot"><div class="line"><b>' + esc(gbp(p.balance)) + ' for ' + esc(potPurpose(p)) + '</b>' +
+        '<span>of ' + esc(gbp(p.granted)) + '</span></div>' +
+        '<div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="sub">Usable until ' + esc(until) + '. Whatever is left then lapses.</div></div>';
+    });
+    box.innerHTML = html;
+    box.classList.remove("hidden");
+  }
+
+  $("redeemForm").addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    var msg = $("redeemMsg");
+    var code = $("redeemCode").value.trim();
+    msg.className = "msg";
+    if (!code) { msg.className = "msg bad"; msg.textContent = "Enter a code first."; return; }
+    $("redeemBtn").disabled = true;
+    msg.textContent = "Checking the code…";
+    try {
+      var r = await mgmt("/billing/redeem", { method: "POST", body: { code: code } });
+      if (r && r.already_redeemed) {
+        msg.textContent = "You have already redeemed this code.";
+      } else if (r && r.pot) {
+        var until = new Date(r.pot.expires_at).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+        var text = gbp(r.pot.credits) + " added for " + potPurpose(r.pot) + ", usable until " + until + ".";
+        if (r.platform_credits > 0) text += " Plus " + gbp(r.platform_credits) + " for the rest of the platform.";
+        msg.textContent = text;
+      } else {
+        msg.textContent = gbp((r && r.credits) || 0) + " added to your credits.";
+      }
+      $("redeemCode").value = "";
+      await loadAccount();
+      await loadLedger();
+    } catch (e) {
+      msg.className = "msg bad";
+      msg.textContent = e.message || "That code could not be redeemed.";
+    } finally {
+      $("redeemBtn").disabled = false;
+    }
+  });
 
   function bind(id, path) {
     $(id).addEventListener("click", async function () {
@@ -735,7 +821,18 @@
   function ledgerLabel(reason) {
     if (LEDGER_LABELS[reason]) return LEDGER_LABELS[reason];
     if (/^monthly included allowance/.test(reason)) return "Monthly allowance";
+    var promo = /^promo code (.+)$/.exec(reason);
+    if (promo) return "Code " + promo[1];
     return reason;
+  }
+  // A line a pot paid names the pot's app, so its credits are not mistaken
+  // for the general balance moving. An expired pot is no longer listed, so
+  // its old lines fall back to a generic name.
+  function entryLabel(e) {
+    var label = ledgerLabel(e.reason || e.kind || "");
+    if (!e.pot_id) return label;
+    var p = potsById[e.pot_id];
+    return label + ", " + (p ? "credits for " + potPurpose(p) : "credits for one app");
   }
 
   // Metered resources are charged per hour, per thing: six volumes bill six
@@ -775,7 +872,7 @@
       if (!day) { day = byDay[k] = { date: d, total: 0, groups: [], byLabel: {} }; days.push(day); }
       var credits = Number(e.credits) || 0;
       day.total += credits;
-      var label = ledgerLabel(e.reason || e.kind || "");
+      var label = entryLabel(e);
       var g = day.byLabel[label];
       if (!g) { g = day.byLabel[label] = { label: label, credits: 0, rows: [] }; day.groups.push(g); }
       g.credits += credits;

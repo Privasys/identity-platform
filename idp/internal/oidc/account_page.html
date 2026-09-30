@@ -208,6 +208,23 @@
   .add-app { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px dashed var(--border); display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
   .add-app p { font-size: 0.9rem; color: var(--text-secondary); flex: 1 1 18rem; }
 
+  .key-new { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-top: 1.5rem; }
+  .field {
+    flex: 1 1 16rem; min-width: 0; padding: 0.6rem 1rem; border: 1px solid var(--border);
+    border-radius: 999px; background: var(--bg);
+  }
+  .field:focus { outline: none; border-color: var(--accent); }
+  .key-created { margin-top: 1.25rem; padding: 1rem 1.25rem; border-radius: 1rem; background: var(--accent-weak); }
+  .key-created p { font-size: 0.95rem; color: var(--text-secondary); }
+  .key-created p strong { color: var(--text); font-weight: 600; }
+  .key-box { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin: 0.75rem 0; }
+  .key-box code {
+    flex: 1 1 18rem; min-width: 0; max-height: 6rem; overflow: auto; overflow-wrap: anywhere;
+    padding: 0.6rem 0.8rem; border-radius: 0.6rem; border: 1px solid var(--border); background: var(--bg);
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace; font-size: 0.8rem;
+  }
+  .keys { margin-top: 1.5rem; }
+
   .month { display: grid; grid-template-columns: 1fr; gap: 0.6rem; margin-top: 1.25rem; max-width: 30rem; }
   .month .r { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.95rem; }
   .month .r span { color: var(--text-secondary); overflow-wrap: anywhere; }
@@ -296,7 +313,7 @@
 <main>
   <section id="connect" class="connect">
     <h1>Your account.</h1>
-    <p>Your credits, and the apps you let use them. To open it, <strong>confirm on your phone</strong> with your face or fingerprint. Nothing else is asked, not even your name.</p>
+    <p>Your credits, the apps you let use them, and your API keys. To open it, <strong>confirm on your phone</strong> with your face or fingerprint. Nothing else is asked, not even your name.</p>
     <div class="cta-row">
       <button class="btn" id="connectBtn" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>
@@ -350,6 +367,25 @@
         <p>An app asks for this permission on your phone when you sign in to it. A limit of £0 means no limit.</p>
       </div>
       <div class="err" id="consentErr"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><h2>API keys</h2></div>
+      <p class="section-lead">Use Privasys apps from your own code or AI tools: give the tool the app's address and a key. Requests made with a key are yours and are paid from your credits. <strong>Keep a key as private as a password</strong>, and remove it when you no longer need it.</p>
+      <div class="key-new">
+        <input class="field" id="keyLabel" type="text" maxlength="128" placeholder="Name it, e.g. laptop or course notebook" aria-label="Key name">
+        <button class="btn btn-sm" id="keyCreateBtn" type="button">Create key</button>
+      </div>
+      <div class="key-created hidden" id="keyCreated">
+        <p><strong>Copy your key now.</strong> It is shown only this once. Send it as <code>Authorization: Bearer &lt;key&gt;</code>, or paste it where your tool asks for an API key.</p>
+        <div class="key-box">
+          <code id="keyValue"></code>
+          <button class="btn btn-outline btn-sm" id="keyCopyBtn" type="button">Copy</button>
+        </div>
+        <button class="btn btn-quiet btn-sm" id="keyDoneBtn" type="button">Done</button>
+      </div>
+      <div class="apps keys" id="keys"><p class="empty"><span class="spin"></span>Loading…</p></div>
+      <div class="err" id="keyErr"></div>
     </section>
 
     <section class="section">
@@ -491,8 +527,73 @@
     $("main").classList.remove("hidden");
     $("monthLabel").textContent = monthLabel();
     // The ledger names apps through the consents, so it renders after them.
-    await Promise.all([loadAccount(), loadConsentsAndSpend(), loadLedger()]);
+    await Promise.all([loadAccount(), loadConsentsAndSpend(), loadKeys(), loadLedger()]);
   }
+
+  // API keys are long-lived tokens the identity service mints on a session of
+  // their own, so removing one revokes that session and every app refuses it.
+  function day(unix) {
+    return new Date(unix * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  }
+
+  async function loadKeys() {
+    try {
+      var r = await idp("/api-keys");
+      renderKeys((r && r.api_keys) || []);
+    } catch (e) { $("keys").innerHTML = ""; $("keyErr").textContent = e.message; }
+  }
+
+  function renderKeys(list) {
+    var box = $("keys");
+    box.innerHTML = "";
+    if (!list.length) { box.innerHTML = '<p class="empty">No keys yet.</p>'; return; }
+    list.forEach(function (k) {
+      var row = document.createElement("div");
+      row.className = "app";
+      row.innerHTML =
+        '<div><div class="app-name">' + esc(k.label || "API key") + '</div><div class="hint">Created ' + esc(day(k.created_at)) + '</div></div>' +
+        '<div class="hint">Valid until ' + esc(day(k.expires_at)) + '</div>' +
+        '<div class="app-ctl"><button class="btn btn-quiet btn-sm" type="button">Remove</button></div>';
+      row.querySelector("button").addEventListener("click", async function () {
+        if (!confirm("Remove " + (k.label || "this key") + "? Tools using it stop working within a few minutes.")) return;
+        $("keyErr").textContent = "";
+        try { await idp("/sessions/" + encodeURIComponent(k.sid) + "/revoke", { method: "POST" }); await loadKeys(); }
+        catch (e) { $("keyErr").textContent = e.message; }
+      });
+      box.appendChild(row);
+    });
+  }
+
+  $("keyCreateBtn").addEventListener("click", async function () {
+    var btn = this;
+    $("keyErr").textContent = "";
+    btn.disabled = true;
+    try {
+      var k = await idp("/api-keys", { method: "POST", body: { label: $("keyLabel").value.trim() } });
+      $("keyValue").textContent = k.token;
+      $("keyCopyBtn").textContent = "Copy";
+      $("keyCreated").classList.remove("hidden");
+      $("keyLabel").value = "";
+      await loadKeys();
+    } catch (e) { $("keyErr").textContent = e.message; }
+    btn.disabled = false;
+  });
+  $("keyLabel").addEventListener("keydown", function (e) { if (e.key === "Enter") $("keyCreateBtn").click(); });
+
+  $("keyCopyBtn").addEventListener("click", async function () {
+    var btn = this;
+    try { await navigator.clipboard.writeText($("keyValue").textContent); btn.textContent = "Copied"; }
+    catch (e) {
+      var range = document.createRange();
+      range.selectNodeContents($("keyValue"));
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      btn.textContent = "Press Ctrl+C";
+    }
+  });
+  $("keyDoneBtn").addEventListener("click", function () {
+    $("keyValue").textContent = "";
+    $("keyCreated").classList.add("hidden");
+  });
 
   function monthLabel() {
     var now = new Date();

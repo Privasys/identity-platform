@@ -126,7 +126,32 @@ export default function TabScanScreen() {
             // 1. Try raw JSON payload (backward-compatible)
             if (routePayload(result.data)) return;
 
-            // 2. Try universal link URL.
+            // 2. Vault approval: the QR the CLI and the IdP approval page show,
+            //    privasys-wallet[-dev|-preview]://vault-approvals?vault_op=<cap>.
+            //    Matched as text: "vault-approvals" is the URL host here, not
+            //    a path, and React Native's URL is unreliable on custom schemes.
+            const vaultApproval =
+                /^privasys-wallet(?:-dev|-preview)?:\/\/vault-approvals\?(?:[^#]*&)?vault_op=([^&#]+)/.exec(
+                    result.data,
+                );
+            if (vaultApproval) {
+                let vaultOp: string | null = null;
+                try {
+                    vaultOp = decodeURIComponent(vaultApproval[1]);
+                } catch {
+                    // Malformed escape: not one of ours.
+                }
+                if (vaultOp) {
+                    navigating.current = true;
+                    router.push({
+                        pathname: '/vault-approvals',
+                        params: { vault_op: vaultOp, source: 'qr' },
+                    });
+                    return;
+                }
+            }
+
+            // 3. Try universal link URL.
             //    Short form: https://privasys.id/scp?v=1&s=<sid>&h=<pin>&r=<host>
             //                — descriptor is fetched from the relay.
             //    Long form:  https://privasys.id/scp?p=<base64url(JSON)>

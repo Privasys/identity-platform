@@ -24,14 +24,27 @@
   .status.err { color: #ff6b6b; }
   .status.ok  { color: #4fd18b; }
   .muted { color: #6b7180; font-size: 12px; }
+  [hidden] { display: none !important; }
+  .wallet { text-align: center; margin: 18px 0 4px; }
+  .wallet a { display: inline-block; line-height: 0; }
+  .wallet img { width: 184px; height: 184px; image-rendering: pixelated; border-radius: 10px; }
+  .wallet p { margin: 10px 0 0; }
+  .or { display: flex; align-items: center; gap: 10px; color: #6b7180; font-size: 12px; margin: 18px 0 4px; }
+  .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid #262a36; }
 </style>
 </head>
 <body>
   <div class="card">
     <h1>Approve vault operation</h1>
     <p>Your terminal requested a hardware-backed approval. Review the operation, then
-       confirm with your passkey. This authorises this one operation and nothing else.</p>
+       approve it. This authorises this one operation and nothing else.</p>
     <div class="op" id="op"></div>
+    <div class="wallet" id="wallet" hidden>
+      <a id="wallet-link"><img id="wallet-qr" alt="QR code that opens this approval in the Privasys Wallet" /></a>
+      <p>Scan with your phone's camera to approve in the Privasys Wallet.
+         Your terminal continues on its own once you do.</p>
+    </div>
+    <div class="or" id="or" hidden>or, with a passkey on this computer</div>
     <button id="go">Approve with passkey</button>
     <div class="status" id="status"></div>
     <p class="muted" id="hint">You can close this tab after approving; return to your terminal.</p>
@@ -59,8 +72,13 @@ const statusEl = document.getElementById("status");
 const btn = document.getElementById("go");
 function fail(msg) { statusEl.textContent = msg; statusEl.className = "status err"; }
 
-// The CLI passes {options, summary} as a base64url JSON fragment (never sent to
-// the server; the vault_op binding lives in options.publicKey.challenge).
+// The CLI passes {options, summary, deeplink?, qr?} as a base64url JSON fragment
+// (never sent to the server; the vault_op binding lives in
+// options.publicKey.challenge).
+//
+// Anyone can craft this URL, so every fragment value is untrusted: text goes in
+// through textContent, never innerHTML, and the QR and its link are used only
+// when they have exactly the shape the CLI produces.
 let payload;
 try {
   const frag = location.hash.replace(/^#/, "");
@@ -81,10 +99,31 @@ if (payload) {
     "policy-update": "Update a key's policy",
     "app-recovery": "App recovery"
   };
-  document.getElementById("op").innerHTML =
-    "<b>Operation</b>: " + (opLabels[s.operation] || s.operation || "?") + "<br/>" +
-    "<b>Key</b>: " + (s.handle || "?") +
-    (s.measurement ? "<br/><b>New measurement</b>: " + s.measurement : "");
+  const op = document.getElementById("op");
+  function row(label, value) {
+    if (op.firstChild) op.appendChild(document.createElement("br"));
+    const b = document.createElement("b");
+    b.textContent = label;
+    op.appendChild(b);
+    op.appendChild(document.createTextNode(": " + value));
+  }
+  row("Operation", opLabels[s.operation] || s.operation || "?");
+  row("Key", s.handle || "?");
+  if (s.measurement) row("New measurement", s.measurement);
+
+  // The wallet path: a Privasys Wallet credential lives in the app, so this
+  // browser cannot reach it, and the QR hands the approval to the phone when
+  // the push is late or never comes. Tapping the code opens the wallet when
+  // this page is itself on the phone.
+  const deeplinkRe = /^privasys-wallet(-dev|-preview)?:\/\/vault-approvals\?vault_op=[A-Za-z0-9_%-]+$/;
+  const qrRe = /^data:image\/png;base64,[A-Za-z0-9+/]+=*$/;
+  if (typeof payload.deeplink === "string" && deeplinkRe.test(payload.deeplink) &&
+      typeof payload.qr === "string" && qrRe.test(payload.qr)) {
+    document.getElementById("wallet-qr").src = payload.qr;
+    document.getElementById("wallet-link").href = payload.deeplink;
+    document.getElementById("wallet").hidden = false;
+    document.getElementById("or").hidden = false;
+  }
 }
 
 async function approve() {
@@ -131,6 +170,8 @@ async function approve() {
     statusEl.className = "status ok";
     statusEl.textContent = "Approved. Return to your terminal — you can close this tab.";
     btn.style.display = "none";
+    document.getElementById("wallet").hidden = true;
+    document.getElementById("or").hidden = true;
     document.getElementById("hint").textContent = "The terminal will continue automatically.";
   } catch (e) {
     btn.disabled = false;

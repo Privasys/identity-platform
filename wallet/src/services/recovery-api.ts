@@ -26,9 +26,21 @@ async function idpFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     });
     if (!res.ok) {
         const body = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(body.error || `Request failed: ${res.status}`);
+        throw new IdpRequestError(body.error || `Request failed: ${res.status}`, res.status);
     }
     return res.json();
+}
+
+/** A refused IdP call, with its status, so a caller can tell an expired
+ *  session (401) from everything else. */
+export class IdpRequestError extends Error {
+    readonly status: number;
+
+    constructor(message: string, status: number) {
+        super(message);
+        this.name = 'IdpRequestError';
+        this.status = status;
+    }
 }
 
 function walletHeaders(walletSessionToken: string): HeadersInit {

@@ -89,6 +89,13 @@ jest.mock('@/stores/capability-asks', () => {
     return { useCapabilityAsksStore: { getState: () => state } };
 });
 
+// Recovery requests waiting on a guardian: in memory only, refilled from the
+// IdP, and its API module is not under test here.
+jest.mock('@/stores/guardian-requests', () => {
+    const state = { requests: [] as unknown[], heard: false, clearAll: jest.fn() };
+    return { useGuardianRequestsStore: { getState: () => state } };
+});
+
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 

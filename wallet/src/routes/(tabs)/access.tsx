@@ -32,6 +32,7 @@ import { rebuildFromGrantsIndex, syncGrantsIndex } from '@/services/grants-index
 import { useAuthStore } from '@/stores/auth';
 import { useCapabilitiesStore } from '@/stores/capabilities';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
+import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
 import { useConsentStore } from '@/stores/consent';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useProfileStore } from '@/stores/profile';
@@ -59,6 +60,8 @@ export default function AccessScreen() {
     const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
     const asks = useCapabilityAsksStore((s) => s.asks);
     const refreshAsks = useCapabilityAsksStore((s) => s.refresh);
+    const guardianWaiting = useGuardianRequestsStore(waitingCount);
+    const refreshGuardian = useGuardianRequestsStore((s) => s.refresh);
     const hasProfile = useProfileStore((s) => !!s.profile);
     const linked = useProfileStore((s) => s.profile?.linkedProviders);
     const insets = useSafeAreaInsets();
@@ -89,15 +92,19 @@ export default function AccessScreen() {
     // Keep the pending count live: approvals arrive by push and also expire on
     // their own, so neither event is something this screen would otherwise see.
     // Open access requests the same way: they also arrive by push and expire.
+    // And recovery requests waiting on this holder as a guardian, read with the
+    // canonical session only while it is still live, so this never prompts.
     useEffect(() => {
         void refreshApprovals();
         void refreshAsks();
+        void refreshGuardian();
         const id = setInterval(() => {
             void refreshApprovals();
             void refreshAsks();
+            void refreshGuardian();
         }, 20_000);
         return () => clearInterval(id);
-    }, [refreshApprovals, refreshAsks]);
+    }, [refreshApprovals, refreshAsks, refreshGuardian]);
 
     // Drive share requests, asked of the drive itself each time the tab comes
     // into view. Not on the 20-second timer above: reaching the drive means an
@@ -160,6 +167,25 @@ export default function AccessScreen() {
                             <Text style={styles.bannerMeta}>{t('home.savePhraseBody')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </Pressable>
+                )}
+
+                {/* Someone this holder protects is recovering their account.
+                    Another person is waiting on this one, so it comes first. */}
+                {guardianWaiting > 0 && (
+                    <Pressable
+                        style={styles.banner}
+                        onPress={() => router.push('/account-recovery')}
+                        accessibilityLabel={t('accountRecovery.dutyRecovery')}
+                    >
+                        <RNView style={styles.bannerIcon}>
+                            <Ionicons name="people" size={18} color={p.infoText} />
+                        </RNView>
+                        <RNView style={styles.bannerInfo}>
+                            <Text style={styles.bannerTitle}>{t('accountRecovery.dutyRecovery')}</Text>
+                            <Text style={styles.bannerMeta}>{t('accountRecovery.sectionDutiesHint')}</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.infoText} />
                     </Pressable>
                 )}
 

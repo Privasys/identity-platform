@@ -78,10 +78,12 @@ export const useCapabilityAsksStore = create<CapabilityAsksState>((set, get) => 
                 set({ asks: parseAsks(await res.json(), Math.floor(Date.now() / 1000)) });
             } catch (e) {
                 console.warn('[CAPABILITY] could not list open access requests', e);
-            } finally {
-                inflight = null;
             }
-        })();
+        })().finally(() => {
+            // Outside the body: an early return before the first await would
+            // otherwise clear this before it was assigned (see guardian-requests).
+            inflight = null;
+        });
         return inflight;
     },
 

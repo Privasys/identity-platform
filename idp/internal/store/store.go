@@ -67,15 +67,6 @@ func migrate(db *sql.DB) error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
-		-- Which attested apps may notify which identity: one row per app the
-		-- holder signed in to through the wallet. See AddNotifyAudience.
-		CREATE TABLE IF NOT EXISTS notify_audience (
-			user_id    TEXT NOT NULL,
-			app_id     TEXT NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (user_id, app_id)
-		);
-
 		-- FIDO2 credentials (one user can have multiple).
 		CREATE TABLE IF NOT EXISTS credentials (
 			credential_id TEXT PRIMARY KEY,  -- base64url-encoded
@@ -422,32 +413,6 @@ func (db *DB) UpsertPushTarget(userID, pushToken, encPub string) error {
 			updated_at = CURRENT_TIMESTAMP
 	`, userID, pushToken, encPub)
 	return err
-}
-
-// AddNotifyAudience records that this identity signed in to this attested
-// app through the wallet, which is what entitles the app to notify it. The
-// wallet supplies the app id from the attestation it checked at sign-in, so
-// the record is the holder's own act rather than anything the app claimed.
-//
-// It links an identity to an app, which this IdP already records in every
-// session row (client id) and sealed session (host). It adds no link between
-// identities.
-func (db *DB) AddNotifyAudience(userID, appID string) error {
-	_, err := db.Exec(`
-		INSERT INTO notify_audience (user_id, app_id) VALUES (?, ?)
-		ON CONFLICT(user_id, app_id) DO NOTHING
-	`, userID, appID)
-	return err
-}
-
-// InNotifyAudience reports whether this identity signed in to this app
-// through a wallet that records it (see AddNotifyAudience).
-func (db *DB) InNotifyAudience(userID, appID string) bool {
-	var one int
-	err := db.QueryRow(
-		`SELECT 1 FROM notify_audience WHERE user_id = ? AND app_id = ?`, userID, appID,
-	).Scan(&one)
-	return err == nil
 }
 
 // GetPushTarget returns the push token and sealing key for a user

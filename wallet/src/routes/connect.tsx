@@ -2246,16 +2246,7 @@ function ConnectFlow() {
             // IdP learns no linkage it doesn't already have (it sees each
             // pairwise sub independently). Best-effort.
             if (pushToken && result.sessionToken) {
-                // With the attested app this identity just signed in to, so
-                // that app, and only that app, may notify it (see
-                // registerPushTokenWithIdp). No attestation, no app: a host we
-                // could not attest is not one we vouch for.
-                registerPushTokenWithIdp(
-                    result.sessionToken,
-                    pushToken,
-                    '',
-                    appIdFromOids(attestationRef.current?.custom_oids),
-                ).catch((e) =>
+                registerPushTokenWithIdp(result.sessionToken, pushToken).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
             }
@@ -2369,16 +2360,7 @@ function ConnectFlow() {
             // Keep the IdP's push target fresh for this pairwise identity
             // (vault approvals for keys it owns). Best-effort.
             if (pushToken && result.sessionToken) {
-                // With the attested app this identity just signed in to, so
-                // that app, and only that app, may notify it (see
-                // registerPushTokenWithIdp). No attestation, no app: a host we
-                // could not attest is not one we vouch for.
-                registerPushTokenWithIdp(
-                    result.sessionToken,
-                    pushToken,
-                    '',
-                    appIdFromOids(attestationRef.current?.custom_oids),
-                ).catch((e) =>
+                registerPushTokenWithIdp(result.sessionToken, pushToken).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
             }

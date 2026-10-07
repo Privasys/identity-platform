@@ -73,10 +73,6 @@ func (h *Handler) HandleRegeneratePhrase(w http.ResponseWriter, r *http.Request)
 // client-side-generated registration may carry.
 var phraseHashShape = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-// appIDShape is an attested app id as the wallet reads it from OID 4.1 and
-// the control plane forwards it: a lowercase dashed UUID.
-var appIDShape = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-
 // HandleRegisterPhraseHash registers a CLIENT-generated recovery phrase by
 // its hash, replacing any existing phrase. The wallet mints the 24-word
 // BIP39 phrase locally and sends only hex(sha256(normalised phrase)), so
@@ -707,19 +703,9 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 	var req struct {
 		PushToken string `json:"push_token"`
 		EncPub    string `json:"enc_pub"`
-		// AppID is the attested app the wallet just signed this identity in
-		// to (OID 4.1, dashed UUID). Optional: the wallet's own registration
-		// at start-up names no app. When present, that app may notify this
-		// identity; see store.AddNotifyAudience.
-		AppID string `json:"app_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PushToken == "" {
 		http.Error(w, `{"error":"push_token is required"}`, http.StatusBadRequest)
-		return
-	}
-	appID := strings.ToLower(strings.TrimSpace(req.AppID))
-	if appID != "" && !appIDShape.MatchString(appID) {
-		http.Error(w, `{"error":"app_id must be a UUID"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -727,14 +713,6 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 		log.Printf("[push-token] upsert failed for %s: %v", userID, err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
-	}
-	if appID != "" {
-		if err := h.db.AddNotifyAudience(userID, appID); err != nil {
-			// The push token is stored; only the app's entitlement is not.
-			// Answering 500 would make the wallet retry a registration that
-			// already did its main job.
-			log.Printf("[push-token] audience record failed for app %s: %v", appID, err)
-		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

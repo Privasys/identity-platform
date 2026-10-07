@@ -73,6 +73,10 @@ func (h *Handler) HandleRegeneratePhrase(w http.ResponseWriter, r *http.Request)
 // client-side-generated registration may carry.
 var phraseHashShape = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
+// appIDShape is an attested app id as the wallet reads it from OID 4.1 and
+// the control plane forwards it: a lowercase dashed UUID.
+var appIDShape = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
 // HandleRegisterPhraseHash registers a CLIENT-generated recovery phrase by
 // its hash, replacing any existing phrase. The wallet mints the 24-word
 // BIP39 phrase locally and sends only hex(sha256(normalised phrase)), so
@@ -703,9 +707,19 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 	var req struct {
 		PushToken string `json:"push_token"`
 		EncPub    string `json:"enc_pub"`
+		// AppID is the attested app the wallet just signed this identity in
+		// to (OID 4.1, dashed UUID). Optional: the wallet's own registration
+		// at start-up names no app. When present, that app may notify this
+		// identity; see store.AddNotifyAudience.
+		AppID string `json:"app_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PushToken == "" {
 		http.Error(w, `{"error":"push_token is required"}`, http.StatusBadRequest)
+		return
+	}
+	appID := strings.ToLower(strings.TrimSpace(req.AppID))
+	if appID != "" && !appIDShape.MatchString(appID) {
+		http.Error(w, `{"error":"app_id must be a UUID"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -713,6 +727,14 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 		log.Printf("[push-token] upsert failed for %s: %v", userID, err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
+	}
+	if appID != "" {
+		if err := h.db.AddNotifyAudience(userID, appID); err != nil {
+			// The push token is stored; only the app's entitlement is not.
+			// Answering 500 would make the wallet retry a registration that
+			// already did its main job.
+			log.Printf("[push-token] audience record failed for app %s: %v", appID, err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -781,19 +803,24 @@ func (h *Handler) notifyGuardians(userID string) {
 			log.Printf("[recovery] guardian %s has no push token — skipping notification", g.GuardianID)
 			continue
 		}
-		go h.sendGuardianPush(g.GuardianID, pushToken, userID)
+		go h.sendGuardianPush(g.GuardianID, pushToken)
 	}
 }
 
 // sendGuardianPush sends a push notification to a guardian via Expo push service.
-func (h *Handler) sendGuardianPush(guardianID, pushToken, recoveringUserID string) {
+func (h *Handler) sendGuardianPush(guardianID, pushToken string) {
 	if err := push.Notify(context.Background(), h.db, guardianID, push.Message{
 		Token: pushToken,
 		Title: "Recovery request",
 		Body:  "Someone you protect needs your help to recover their account.",
+		// The type and nothing else. This went out with the recovering
+		// person's account id, in the clear, through Expo and Apple or
+		// Google: a record, readable by every hop, that this guardian
+		// protects that account. The wallet needs none of it, since it lists
+		// what is waiting from /guardians/recovery-requests with the
+		// guardian's own session.
 		Data: map[string]string{
-			"type":    "recovery-request",
-			"user_id": recoveringUserID,
+			"type": "recovery-request",
 		},
 	}); err != nil {
 		log.Printf("[recovery] push to guardian %s failed: %v", guardianID, err)

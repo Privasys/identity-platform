@@ -15,12 +15,14 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/hkdf"
 )
 
 // Issuer signs JWTs and serves JWKS.
@@ -375,6 +377,22 @@ func (iss *Issuer) IssueEmailVerification(c EmailVerificationClaims) (string, er
 		"v":              1,
 	}
 	return iss.signTyp(claims, "email-verification+jwt")
+}
+
+// DeriveSecret returns a 32-byte secret for one named purpose, derived from
+// the signing key with HKDF-SHA256. A purpose that needs its own key (a MAC
+// over records it keeps, say) gets one without another file to provision and
+// back up. It changes when the signing key is rotated, so anything keyed by it
+// must tolerate starting over.
+func (iss *Issuer) DeriveSecret(purpose string) []byte {
+	ikm := iss.privateKey.D.FillBytes(make([]byte, 32))
+	out := make([]byte, 32)
+	r := hkdf.New(sha256.New, ikm, nil, []byte("privasys-idp/"+purpose))
+	if _, err := io.ReadFull(r, out); err != nil {
+		// HKDF-SHA256 yields up to 8160 bytes; 32 cannot fail.
+		panic(err)
+	}
+	return out
 }
 
 // EmailReceiptProves reports whether `receipt` is a live email-verification

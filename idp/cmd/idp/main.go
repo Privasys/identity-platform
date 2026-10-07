@@ -41,6 +41,7 @@ import (
 	"github.com/Privasys/idp/internal/config"
 	"github.com/Privasys/idp/internal/emailverify"
 	"github.com/Privasys/idp/internal/fido2"
+	"github.com/Privasys/idp/internal/notifymute"
 	"github.com/Privasys/idp/internal/oidc"
 	"github.com/Privasys/idp/internal/push"
 	"github.com/Privasys/idp/internal/recovery"
@@ -392,7 +393,11 @@ func main() {
 	// list (routes beside the grants index below), so a swiped-away push
 	// does not strand the ask.
 	capabilityAsks := capasks.New()
-	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken, capabilityAsks))
+	// Apps a holder silenced, kept as keyed hashes of the pairs they chose
+	// and nothing else; the wallet's switch is registered below with the
+	// grants index. See internal/notifymute.
+	notifyMutes := notifymute.New(db, issuer.DeriveSecret("notify-mute"))
+	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken, capabilityAsks, notifyMutes))
 	mux.HandleFunc("POST /admin/roles", admin.HandleGrantRole(db, cfg.AdminToken))
 	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
 	mux.HandleFunc("GET /admin/roles", admin.HandleListRoles(db, cfg.AdminToken))
@@ -446,6 +451,10 @@ func main() {
 	mux.HandleFunc("GET /recovery/grants-index", recoveryHandler.HandleGetGrantsIndex)
 	// The capability requests relayed to this holder and still open, and the
 	// wallet's "decided" once the holder has answered one.
+	// A holder silencing one app, or hearing from it again. Under /wallet/
+	// because the front proxy already forwards that prefix.
+	mux.HandleFunc("PUT /wallet/notify-mutes/{app_id}", notifyMutes.HandleMute(recoveryHandler.AuthenticateBearer))
+	mux.HandleFunc("DELETE /wallet/notify-mutes/{app_id}", notifyMutes.HandleUnmute(recoveryHandler.AuthenticateBearer))
 	mux.HandleFunc("GET /capability-requests/pending",
 		capasks.HandleList(capabilityAsks, recoveryHandler.AuthenticateBearer))
 	mux.HandleFunc("DELETE /capability-requests/pending/{nonce}",

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Privasys/idp/internal/capasks"
+	"github.com/Privasys/idp/internal/notifymute"
 	"github.com/Privasys/idp/internal/push"
 	"io"
 	"log"
@@ -106,7 +107,10 @@ func notifyTitleBody(typ, appName string) (string, string) {
 // asks, when non-nil, remembers each capability request for the holder's
 // wallet to list, so an ask survives a push that never arrived or was swiped
 // away (internal/capasks).
-func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store) http.HandlerFunc {
+//
+// mutes, when non-nil, drops a notification from an app the holder silenced;
+// see internal/notifymute.
+func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *notifymute.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !checkAdmin(w, r, adminToken) {
 			return
@@ -120,6 +124,14 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store) http.Han
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Sub == "" || req.Type == "" {
 			writeError(w, http.StatusBadRequest, "sub and type are required")
+			return
+		}
+		// The holder silenced this app. A 200, so the control plane reports
+		// success to the app: it has nothing to retry, and a refusal would
+		// tell it something about the holder. The body says what happened; the
+		// control plane reads only the status and never forwards the body.
+		if mutes.Silenced(req.Sub, req.AppID, req.Type) {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "muted"})
 			return
 		}
 		// Recorded before the push target is looked up: a holder whose push

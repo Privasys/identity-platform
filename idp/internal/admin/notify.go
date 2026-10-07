@@ -31,6 +31,15 @@ import (
 // generic push with no payload — the wallet registers the key on its
 // next start and later notifications carry data again.
 
+// enforceNotifyAudience refuses a notification to an identity that has not
+// signed in to the sending app (see store.AddNotifyAudience). It starts off.
+// Every identity that signed in before the wallet began recording the app has
+// no row, so enforcing straight away would silence Drive share requests and
+// access requests for every holder until each signs in again with an updated
+// wallet. Until it is switched on, the relay logs each notification it would
+// refuse, which is how to tell when switching it on is safe.
+var enforceNotifyAudience = false
+
 // notifySealInfo domain-separates the HKDF derivation.
 const notifySealInfo = "privasys-notify-v1"
 
@@ -121,6 +130,20 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store) http.Han
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Sub == "" || req.Type == "" {
 			writeError(w, http.StatusBadRequest, "sub and type are required")
 			return
+		}
+
+		// An app may notify only an identity that signed in to it. Pairwise
+		// ids mostly guarantee that already, since an app only learns the ids
+		// of its own users, but a leaked id is accepted from any attested app
+		// without this. The wallet records the app at sign-in, from the
+		// attestation it checked; see store.AddNotifyAudience.
+		if !db.InNotifyAudience(req.Sub, req.AppID) {
+			if enforceNotifyAudience {
+				writeError(w, http.StatusForbidden, "this identity has not signed in to this app")
+				return
+			}
+			log.Printf("admin/notify: app %q has no sign-in recorded for this identity (type %s); refused once enforced",
+				req.AppID, req.Type)
 		}
 		// Recorded before the push target is looked up: a holder whose push
 		// token is missing is exactly the one who can only find the ask by

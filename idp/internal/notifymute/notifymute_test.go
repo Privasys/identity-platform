@@ -60,7 +60,7 @@ func TestAMuteSilencesOneAppForOneHolder(t *testing.T) {
 		t.Fatal("her mute silenced the app for someone else")
 	}
 	// The id arrives in any case; it is the same app.
-	if !s.Silenced("alice", strings.ToUpper(appA), "share-request") {
+	if !s.Silenced("alice", strings.ToUpper(appA), "share-decision") {
 		t.Fatal("the same app id in upper case was not recognised")
 	}
 

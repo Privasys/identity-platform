@@ -79,8 +79,13 @@ func TestAMuteSilencesOneAppForOneHolder(t *testing.T) {
 func TestAnAccessRequestAlwaysArrives(t *testing.T) {
 	s, _ := newTest()
 	call(s.HandleMute(auth), "PUT", appA, "alice")
-	if s.Silenced("alice", appA, "capability-request") {
-		t.Fatal("a mute silenced an access request the holder has to answer")
+	for _, typ := range []string{"capability-request", "share-request"} {
+		if s.Silenced("alice", appA, typ) {
+			t.Fatalf("a mute silenced %s, a request the holder has to answer", typ)
+		}
+	}
+	if !s.Silenced("alice", appA, "share-decision") {
+		t.Fatal("a mute let an ordinary notification through")
 	}
 }
 

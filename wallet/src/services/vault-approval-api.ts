@@ -176,8 +176,7 @@ export async function approveVaultApproval(req: VaultApprovalRequest, credential
 export async function registerPushTokenWithIdp(
     walletSessionToken: string,
     expoPushToken: string,
-    encPub = '',
-    appId?: string,
+    encPub = ''
 ): Promise<void> {
     const res = await fetch(`${IDP_BASE}/push-token`, {
         method: 'POST',
@@ -188,16 +187,7 @@ export async function registerPushTokenWithIdp(
         // enc_pub is the device's X25519 notification-sealing key; the
         // IdP seals app-notification payloads to it (empty keeps any
         // previously registered key).
-        //
-        // app_id is the attested app this identity just signed in to, from
-        // the attestation the wallet checked. It is what entitles that app,
-        // and only that app, to notify this identity: an app holding an id
-        // that leaked from elsewhere cannot use it.
-        body: JSON.stringify({
-            push_token: expoPushToken,
-            enc_pub: encPub,
-            ...(appId ? { app_id: appId } : {}),
-        }),
+        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub }),
     });
     if (!res.ok) {
         throw new Error(`register push token failed (${res.status})`);

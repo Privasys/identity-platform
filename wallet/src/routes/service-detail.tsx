@@ -12,7 +12,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Pressable, Alert, Linking, ScrollView, View as RNView } from 'react-native';
+import { ActivityIndicator, StyleSheet, Pressable, Alert, Linking, ScrollView, Switch, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
@@ -30,9 +30,11 @@ import {
     type WorkloadRelease
 } from '@/services/release-provenance';
 import { listMySessions, revokeSession } from '@/services/sessions-api';
+import { setAppMuted } from '@/services/notify-mutes';
 import { revokeSpendConsent } from '@/services/spend-api';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
+import { useNotifyMutesStore } from '@/stores/notify-mutes';
 import { useProfileStore, type UserProfile } from '@/stores/profile';
 import {
     IDENTITY_LABEL_KEYS,
@@ -158,6 +160,16 @@ export default function ServiceDetailScreen() {
     // + workload_release with server-computed digest/measurement match), so the
     // user can see which published build this app is running and open the code.
     const runningAppId = latestAtt?.appId;
+
+    // Whether this app's notifications reach the holder. Keyed by the same
+    // attested app id privasys.id receives with each notification.
+    const [savingMute, setSavingMute] = useState(false);
+    const muted = useNotifyMutesStore((s) =>
+        runningAppId ? s.muted.includes(runningAppId.toLowerCase()) : false,
+    );
+    useEffect(() => {
+        void useNotifyMutesStore.getState().hydrate();
+    }, []);
     const [releases, setReleases] = useState<{
         os?: OsRelease;
         workload?: WorkloadRelease;
@@ -239,6 +251,37 @@ export default function ServiceDetailScreen() {
     // this holder refuses within a minute. Caps are changed at
     // privasys.id/account. Offered whenever an attested app id is known:
     // withdrawing a consent that never existed is a harmless no-op.
+    // Hear from this app, or not. privasys.id drops a silenced app's
+    // notifications at its relay (an access request still arrives), keyed by
+    // a hash of this identity and the attested app id. Authenticates with the
+    // credential this app knows, as withdrawing spend consent does, so the
+    // switch is the holder's own act and asks for Face ID when tapped.
+    const handleToggleMessages = async (allow: boolean) => {
+        if (!runningAppId || !credential || savingMute) return;
+        setSavingMute(true);
+        try {
+            const auth = await fido2.authenticate(
+                credential.rpId,
+                credential.keyAlias,
+                credential.credentialId,
+                '',
+                credential.serverRpId
+            );
+            if (!auth.sessionToken) {
+                throw new Error(t('errors.noSessionFromAuth'));
+            }
+            await setAppMuted(auth.sessionToken, runningAppId.toLowerCase(), !allow);
+            useNotifyMutesStore.getState().setMuted(runningAppId, !allow);
+        } catch (e) {
+            Alert.alert(
+                t('serviceDetail.messagesFailedTitle'),
+                e instanceof Error ? e.message : t('serviceDetail.signOutFailedBody')
+            );
+        } finally {
+            setSavingMute(false);
+        }
+    };
+
     const handleStopSpending = () => {
         if (!runningAppId || !credential) return;
         Alert.alert(
@@ -579,6 +622,26 @@ export default function ServiceDetailScreen() {
                                 {signingOut ? t('serviceDetail.signingOut') : t('serviceDetail.serverSignOut')}
                             </Text>
                         </Pressable>
+                    )}
+
+                    {/* Messages from this app: on unless the holder silenced it */}
+                    {runningAppId && credential && (
+                        <RNView style={styles.messagesRow}>
+                            <Ionicons name="notifications-outline" size={18} color={p.infoText} />
+                            <RNView style={{ flex: 1 }}>
+                                <Text style={styles.messagesTitle}>{t('serviceDetail.messagesTitle')}</Text>
+                                <Text style={styles.messagesHint}>{t('serviceDetail.messagesHint')}</Text>
+                            </RNView>
+                            {savingMute ? (
+                                <ActivityIndicator size="small" color={p.infoText} />
+                            ) : (
+                                <Switch
+                                    value={!muted}
+                                    onValueChange={(allow) => void handleToggleMessages(allow)}
+                                    accessibilityLabel={t('serviceDetail.messagesTitle')}
+                                />
+                            )}
+                        </RNView>
                     )}
 
                     {/* Stop this app spending the holder's credits */}
@@ -972,6 +1035,18 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         marginBottom: 12
     },
     signOutButtonText: { fontSize: 16, fontWeight: '600', color: p.infoText },
+    messagesRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: p.card,
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        marginBottom: 12
+    },
+    messagesTitle: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
+    messagesHint: { fontSize: 12.5, lineHeight: 18, color: p.textSecondary, marginTop: 2 },
     removeButton: {
         flexDirection: 'row',
         alignItems: 'center',

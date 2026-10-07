@@ -67,6 +67,13 @@ func migrate(db *sql.DB) error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
+		-- Apps a holder has silenced, one row per (identity, app) they chose,
+		-- stored only as a keyed hash of the pair. See internal/notifymute.
+		CREATE TABLE IF NOT EXISTS notify_mutes (
+			pair_hash  TEXT PRIMARY KEY,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
 		-- FIDO2 credentials (one user can have multiple).
 		CREATE TABLE IF NOT EXISTS credentials (
 			credential_id TEXT PRIMARY KEY,  -- base64url-encoded
@@ -413,6 +420,26 @@ func (db *DB) UpsertPushTarget(userID, pushToken, encPub string) error {
 			updated_at = CURRENT_TIMESTAMP
 	`, userID, pushToken, encPub)
 	return err
+}
+
+// MuteNotify records a silenced (identity, app) pair by its keyed hash.
+// Idempotent.
+func (db *DB) MuteNotify(pairHash string) error {
+	_, err := db.Exec(
+		`INSERT INTO notify_mutes (pair_hash) VALUES (?) ON CONFLICT(pair_hash) DO NOTHING`, pairHash)
+	return err
+}
+
+// UnmuteNotify forgets a silenced pair. Idempotent.
+func (db *DB) UnmuteNotify(pairHash string) error {
+	_, err := db.Exec(`DELETE FROM notify_mutes WHERE pair_hash = ?`, pairHash)
+	return err
+}
+
+// IsNotifyMuted reports whether this keyed hash names a silenced pair.
+func (db *DB) IsNotifyMuted(pairHash string) bool {
+	var one int
+	return db.QueryRow(`SELECT 1 FROM notify_mutes WHERE pair_hash = ?`, pairHash).Scan(&one) == nil
 }
 
 // GetPushTarget returns the push token and sealing key for a user

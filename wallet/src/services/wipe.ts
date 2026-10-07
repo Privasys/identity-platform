@@ -65,6 +65,7 @@ import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useGuardianRequestsStore } from '@/stores/guardian-requests';
+import { useNotifyMutesStore } from '@/stores/notify-mutes';
 import * as SecureStore from '@/utils/storage';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -107,6 +108,9 @@ export async function wipeWallet(): Promise<void> {
     useVaultApprovalsStore.getState().clearAll();
     useCapabilityAsksStore.getState().clearAll();
     useGuardianRequestsStore.getState().clearAll();
+    // Which apps were silenced is a preference about the last identity's
+    // apps; the next one starts hearing from everything.
+    useNotifyMutesStore.getState().clearAll();
     useSettingsStore.getState().clearAll();
 
     await Promise.all([

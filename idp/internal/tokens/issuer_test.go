@@ -285,3 +285,35 @@ func TestEmailVerifiedFollowsTheReceipt(t *testing.T) {
 		}
 	}
 }
+
+// A derived secret is stable for one signing key and one purpose, differs per
+// purpose, and changes with the key.
+func TestDeriveSecret(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "key.pem")
+	a, err := NewIssuer(path, "https://privasys.id")
+	if err != nil {
+		t.Fatalf("issuer: %v", err)
+	}
+	again, err := NewIssuer(path, "https://privasys.id")
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	other, err := NewIssuer(filepath.Join(dir, "other.pem"), "https://privasys.id")
+	if err != nil {
+		t.Fatalf("other: %v", err)
+	}
+	mute := a.DeriveSecret("notify-mute")
+	if len(mute) != 32 {
+		t.Fatalf("length %d, want 32", len(mute))
+	}
+	if string(mute) != string(again.DeriveSecret("notify-mute")) {
+		t.Fatal("the same key and purpose gave a different secret after a reload")
+	}
+	if string(mute) == string(a.DeriveSecret("something-else")) {
+		t.Fatal("two purposes share a secret")
+	}
+	if string(mute) == string(other.DeriveSecret("notify-mute")) {
+		t.Fatal("two signing keys share a secret")
+	}
+}

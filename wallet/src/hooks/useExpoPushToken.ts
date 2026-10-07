@@ -9,6 +9,7 @@ import { getPrivasysAccount } from '../services/privasys-id';
 import { fetchAttributeApproval } from '../services/attribute-approval-api';
 import { registerPushTokenWithIdp } from '../services/vault-approval-api';
 import { useDriveNotificationsStore } from '../stores/drive-notifications';
+import { useGuardianRequestsStore } from '../stores/guardian-requests';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 import { isRouteActive } from '../utils/active-route';
 
@@ -33,7 +34,8 @@ async function getNotifications() {
                     data?.type === 'voucher-request' ||
                     data?.type === 'vault-approval' ||
                     data?.type === 'attribute-approval' ||
-                    data?.type === 'capability-request';
+                    data?.type === 'capability-request' ||
+                    data?.type === 'recovery-request';
                 return {
                     shouldShowAlert: !isAuthRequest,
                     shouldPlaySound: !isAuthRequest,
@@ -183,6 +185,17 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         router.push({ pathname: '/capability-request', params: { app_host: host, nonce } });
         return;
     }
+    if (data?.type === 'recovery-request') {
+        // Someone this holder protects is recovering their account. The push
+        // says only that: whose, and which request, are listed by the IdP for
+        // the guardian's own session on the Recovery screen, which puts these
+        // first and asks the guardian to unlock when their session has lapsed.
+        useGuardianRequestsStore.getState().remember();
+        if (!isRouteActive('/account-recovery')) {
+            router.push('/account-recovery');
+        }
+        return;
+    }
     if (data?.type === 'vault-approval') {
         const vaultOp = String(data.vault_op ?? '');
         // Remember the capability so the Home banner + the screen list it even
@@ -282,6 +295,11 @@ async function sweepPresentedApprovals(): Promise<void> {
             const data = n.request.content.data as Record<string, unknown> | undefined;
             if (data?.type === 'vault-approval' && data.vault_op) {
                 store.remember(String(data.vault_op));
+            }
+            // A guardian's recovery request: Access shows it as waiting even
+            // when the wallet was opened from its icon rather than the push.
+            if (data?.type === 'recovery-request') {
+                useGuardianRequestsStore.getState().remember();
             }
             // Drive share notifications carry their sealed payload in the
             // notification itself: filing from the tray means the request

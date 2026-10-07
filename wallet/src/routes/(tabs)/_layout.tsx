@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePalette } from '@/components/Themed';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
+import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 
 /** Bar height above whatever the system draws below it. */
@@ -18,7 +19,8 @@ export default function TabLayout() {
     const insets = useSafeAreaInsets();
     const pending = useVaultApprovalsStore((s) => s.pending.length);
     const asks = useCapabilityAsksStore((s) => s.asks.length);
-    const waiting = pending + asks;
+    const guardian = useGuardianRequestsStore(waitingCount);
+    const waiting = pending + asks + guardian;
     // Look for open access requests whenever the wallet comes to the front,
     // not only when Access is open: the badge is how the holder learns of one
     // whose push they swiped away, from whichever tab they are on.

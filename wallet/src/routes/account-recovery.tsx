@@ -39,6 +39,7 @@ import {
     listGuardianInvites,
     respondToGuardianInvite,
     listRecoveryRequests,
+    IdpRequestError,
     approveRecovery,
     listDevices,
     revokeDevice,
@@ -50,6 +51,8 @@ import {
 import { ensurePrivasysSession, getPrivasysAccount } from '@/services/privasys-id';
 import { establishPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
+import { useGuardianRequestsStore } from '@/stores/guardian-requests';
+import { useActiveRoute } from '@/utils/active-route';
 import { RecoveryPhraseCard } from '@/components/RecoveryPhraseCard';
 import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
@@ -64,6 +67,9 @@ export default function AccountRecoveryScreen() {
     const styles = useMemo(() => makeStyles(p), [p]);
     const profile = useProfileStore((s) => s.profile);
     const privasysId = useAuthStore((s) => s.privasysId);
+    // A recovery-request push lands here; marked so a second one updates this
+    // screen instead of stacking another copy of it.
+    useActiveRoute('/account-recovery');
     const credentialsList = useAuthStore((s) => s.credentials);
     const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
     const setRecoveryPhraseSaved = useAuthStore((s) => s.setRecoveryPhraseSaved);
@@ -71,8 +77,15 @@ export default function AccountRecoveryScreen() {
     // Wallet session token for management calls. The legacy `accessToken`
     // string is now `wallet:<sessionToken>` so that the same `Bearer ...`
     // header works for both new and legacy endpoints.
-    const accessToken = privasysId?.sessionToken ? `wallet:${privasysId.sessionToken}` : '';
-    const walletSessionToken = privasysId?.sessionToken ?? '';
+    //
+    // A session past its expiry counts as none. Holding the stale token, the
+    // screen looked unlocked while every list below failed quietly, so a
+    // guardian arriving from a recovery notification saw no request and no
+    // way to unlock. Without one, the Unlock card shows and signs in afresh.
+    const sessionLive =
+        !!privasysId?.sessionToken && Date.now() < (privasysId?.sessionExpiresAt ?? 0);
+    const accessToken = sessionLive ? `wallet:${privasysId!.sessionToken}` : '';
+    const walletSessionToken = sessionLive ? privasysId!.sessionToken : '';
     const userId = privasysId?.userId ?? '';
     // Credential ids this device holds for privasys.id (the canonical slot plus
     // any privasys.id entries in credentials[]), so the device list can mark
@@ -122,19 +135,41 @@ export default function AccountRecoveryScreen() {
                 setLoading(false);
                 return;
             }
+            // The IdP keeps sessions in memory, so one can end before the
+            // expiry the wallet holds (a restart is enough). A 401 here means
+            // exactly that: drop the session so the Unlock card shows, rather
+            // than a screen of empty sections.
+            let expired = false;
+            const quietly = <T,>(p: Promise<T>) =>
+                p.catch((e) => {
+                    if (e instanceof IdpRequestError && e.status === 401) expired = true;
+                    return null;
+                });
             const [guardiansRes, devicesRes, invitesRes, requestsRes] = await Promise.all([
-                listGuardians(accessToken).catch(() => null),
-                listDevices(accessToken).catch(() => null),
-                listGuardianInvites(accessToken).catch(() => null),
-                listRecoveryRequests(accessToken).catch(() => null),
+                quietly(listGuardians(accessToken)),
+                quietly(listDevices(accessToken)),
+                quietly(listGuardianInvites(accessToken)),
+                quietly(listRecoveryRequests(accessToken)),
             ]);
+            if (expired) {
+                const current = useAuthStore.getState().privasysId;
+                if (current) {
+                    useAuthStore.getState().setPrivasysId({ ...current, sessionToken: '', sessionExpiresAt: 0 });
+                }
+                return;
+            }
             if (guardiansRes) {
                 setGuardians(guardiansRes.guardians || []);
                 setGuardianThreshold(guardiansRes.threshold);
             }
             if (devicesRes) setDevices(devicesRes.devices || []);
             if (invitesRes) setPendingInvites(invitesRes.invites || []);
-            if (requestsRes) setRecoveryRequests(requestsRes.requests || []);
+            if (requestsRes) {
+                setRecoveryRequests(requestsRes.requests || []);
+                // What this screen just read is the truth for the Access banner
+                // too, so answering here clears it there.
+                useGuardianRequestsStore.setState({ requests: requestsRes.requests || [], heard: false });
+            }
         } catch (e) {
             console.warn('[account-recovery] load error:', e);
         } finally {
@@ -414,6 +449,71 @@ export default function AccountRecoveryScreen() {
                     </RNView>
                 )}
 
+                {/* Duties first: they are the only things on this screen another
+                    person is waiting on, and a guardian arriving from the
+                    notification should not have to scroll past their own phrase,
+                    guardians and devices to find them. */}
+                {(pendingInvites.length > 0 || recoveryRequests.length > 0) && (
+                    <>
+                        <Text style={styles.sectionTitle}>{t('accountRecovery.sectionDuties')}</Text>
+                        <Text style={styles.sectionDescription}>{t('accountRecovery.sectionDutiesHint')}</Text>
+
+                        {pendingInvites.map((inv) => (
+                            <RNView key={inv.user_id} style={styles.card}>
+                                <Text style={styles.dutyTitle}>{t('accountRecovery.dutyInvitation')}</Text>
+                                <Text style={styles.dutyDescription}>
+                                    {t('accountRecovery.dutyInvitationBody', {
+                                        who: inv.display_name || inv.user_id
+                                    })}
+                                </Text>
+                                <RNView style={styles.formActions}>
+                                    <Pressable
+                                        style={[styles.outlineButton, { flex: 0, borderColor: p.danger }]}
+                                        onPress={() => handleRespondInvite(inv, false)}
+                                    >
+                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>
+                                            {t('accountRecovery.decline')}
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
+                                        onPress={() => handleRespondInvite(inv, true)}
+                                    >
+                                        <Text style={styles.primaryButtonText}>{t('accountRecovery.accept')}</Text>
+                                    </Pressable>
+                                </RNView>
+                            </RNView>
+                        ))}
+
+                        {recoveryRequests.map((req) => (
+                            <RNView key={req.request_id} style={styles.card}>
+                                <Text style={styles.dutyTitle}>{t('accountRecovery.dutyRecovery')}</Text>
+                                <Text style={styles.dutyDescription}>
+                                    {t('accountRecovery.dutyRecoveryBody', {
+                                        who: req.display_name || req.user_id
+                                    })}
+                                </Text>
+                                <RNView style={styles.formActions}>
+                                    <Pressable
+                                        style={[styles.outlineButton, { flex: 0, borderColor: p.danger }]}
+                                        onPress={() => handleApproveRecovery(req, false)}
+                                    >
+                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>
+                                            {t('connect.deny')}
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
+                                        onPress={() => handleApproveRecovery(req, true)}
+                                    >
+                                        <Text style={styles.primaryButtonText}>{t('attestation.approve')}</Text>
+                                    </Pressable>
+                                </RNView>
+                            </RNView>
+                        ))}
+                    </>
+                )}
+
                 {/* ── Recovery Phrase ── */}
                 <Text style={styles.sectionTitle}>{t('accountRecovery.sectionPhrase')}</Text>
                 <Text style={styles.sectionDescription}>{t('accountRecovery.sectionPhraseHint')}</Text>
@@ -666,68 +766,6 @@ export default function AccountRecoveryScreen() {
                             );
                         })}
                     </RNView>
-                )}
-
-                {/* ── Guardian Duties ── */}
-                {(pendingInvites.length > 0 || recoveryRequests.length > 0) && (
-                    <>
-                        <Text style={styles.sectionTitle}>{t('accountRecovery.sectionDuties')}</Text>
-                        <Text style={styles.sectionDescription}>{t('accountRecovery.sectionDutiesHint')}</Text>
-
-                        {pendingInvites.map((inv) => (
-                            <RNView key={inv.user_id} style={styles.card}>
-                                <Text style={styles.dutyTitle}>{t('accountRecovery.dutyInvitation')}</Text>
-                                <Text style={styles.dutyDescription}>
-                                    {t('accountRecovery.dutyInvitationBody', {
-                                        who: inv.display_name || inv.user_id
-                                    })}
-                                </Text>
-                                <RNView style={styles.formActions}>
-                                    <Pressable
-                                        style={[styles.outlineButton, { flex: 0, borderColor: p.danger }]}
-                                        onPress={() => handleRespondInvite(inv, false)}
-                                    >
-                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>
-                                            {t('accountRecovery.decline')}
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
-                                        onPress={() => handleRespondInvite(inv, true)}
-                                    >
-                                        <Text style={styles.primaryButtonText}>{t('accountRecovery.accept')}</Text>
-                                    </Pressable>
-                                </RNView>
-                            </RNView>
-                        ))}
-
-                        {recoveryRequests.map((req) => (
-                            <RNView key={req.request_id} style={styles.card}>
-                                <Text style={styles.dutyTitle}>{t('accountRecovery.dutyRecovery')}</Text>
-                                <Text style={styles.dutyDescription}>
-                                    {t('accountRecovery.dutyRecoveryBody', {
-                                        who: req.display_name || req.user_id
-                                    })}
-                                </Text>
-                                <RNView style={styles.formActions}>
-                                    <Pressable
-                                        style={[styles.outlineButton, { flex: 0, borderColor: p.danger }]}
-                                        onPress={() => handleApproveRecovery(req, false)}
-                                    >
-                                        <Text style={[styles.outlineButtonText, { color: p.danger }]}>
-                                            {t('connect.deny')}
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        style={[styles.primaryButton, { flex: 0, paddingHorizontal: 24 }]}
-                                        onPress={() => handleApproveRecovery(req, true)}
-                                    >
-                                        <Text style={styles.primaryButtonText}>{t('attestation.approve')}</Text>
-                                    </Pressable>
-                                </RNView>
-                            </RNView>
-                        ))}
-                    </>
                 )}
 
                 <RNView style={{ height: 40 }} />

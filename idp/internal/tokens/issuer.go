@@ -499,6 +499,59 @@ func (iss *Issuer) IssueSpendToken(c SpendTokenClaims) (string, error) {
 	return iss.signTyp(claims, "spend+jwt")
 }
 
+// DisclosureClaims are the claims of a DISCLOSURE: the holder (`sub`)
+// approved, in their wallet, giving these attribute values to one app, for
+// the stated purpose. The app asked for them itself (a share link it opens
+// for the holder, say) rather than through a browser sign-in.
+type DisclosureClaims struct {
+	Subject    string
+	AppID      string
+	Attributes map[string]string
+	Purpose    string
+	IssuedAt   time.Time
+	Expiry     time.Time
+	JTI        string
+}
+
+// IssueDisclosure signs a disclosure (typ = "disclosure+jwt"). It is not an
+// access token and must never work as one: its audience is
+// "disclosure:<app id>", which no resource server accepts, it carries no
+// roles and no session, and it lives for minutes. The values sit under
+// `attrs`, keyed by the claim names a token would carry them under.
+func (iss *Issuer) IssueDisclosure(c DisclosureClaims) (string, error) {
+	if c.Subject == "" || c.AppID == "" {
+		return "", fmt.Errorf("disclosure: subject and app are required")
+	}
+	iat := c.IssuedAt
+	if iat.IsZero() {
+		iat = time.Now()
+	}
+	exp := c.Expiry
+	if exp.IsZero() {
+		exp = iat.Add(5 * time.Minute)
+	}
+	attrs := c.Attributes
+	if attrs == nil {
+		attrs = map[string]string{}
+	}
+	claims := jwt.MapClaims{
+		"iss":   iss.issuerURL,
+		"sub":   c.Subject,
+		"aud":   "disclosure:" + c.AppID,
+		"iat":   iat.Unix(),
+		"exp":   exp.Unix(),
+		"attrs": attrs,
+		"v":     1,
+	}
+	if c.Purpose != "" {
+		claims["purpose"] = c.Purpose
+	}
+	if c.JTI != "" {
+		claims["jti"] = c.JTI
+	}
+	return iss.signTyp(claims, "disclosure+jwt")
+}
+
 // ECPublicJWK renders a P-256 public key as a minimal EC public JWK
 // (kty/crv/x/y with fixed 32-byte coordinates) — the exact `cnf.jwk` shape the
 // verifier compares against the holder key it is handed.

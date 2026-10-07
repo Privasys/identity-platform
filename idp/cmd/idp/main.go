@@ -229,6 +229,15 @@ func main() {
 	mux.HandleFunc("GET /spend/consents/{app_id}", spendHandler.HandleGetConsent)
 	mux.HandleFunc("DELETE /spend/consents/{app_id}", spendHandler.HandleRevokeConsent)
 	mux.HandleFunc("POST /spend/token", spendHandler.HandleToken)
+	// App-initiated disclosures: an app the holder already uses (spend
+	// consent) asks for attribute values with no browser involved (an
+	// assistant opening a share link for its user). The holder approves in
+	// their wallet through the same attribute-approval push as a step-up.
+	disclosures := oidc.NewDisclosureStore()
+	mux.HandleFunc("POST /spend/disclosures", oidc.HandleDisclosureRequest(clientReg, sessionStore, voucherMinter,
+		fido2Handler.AttributeApprovalPusher(), disclosures, spendHandler))
+	mux.HandleFunc("POST /spend/disclosures/{id}", oidc.HandleDisclosureResult(clientReg, sessionStore, codeStore,
+		issuer, disclosures, spendHandler))
 	// privasys.id/account: the user's account and billing surface (not every
 	// user is a developer). Money stays in the management service; the page
 	// calls it with the user's bearer.

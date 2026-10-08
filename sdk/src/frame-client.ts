@@ -54,7 +54,7 @@
 // Type-only import (erased at build): the sealed WebSocket the parent gets
 // back is the same shape as the one the iframe runs, just bridged over
 // postMessage.
-import type { SealedWebSocket } from './enclave-session';
+import type { SealedSessionState, SealedWebSocket } from './enclave-session';
 
 export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'identity' | 'offline_access';
 
@@ -307,9 +307,19 @@ export interface SealedSession {
      * The socket runs inside the privasys.id iframe (where the session key
      * lives) and is bridged to this page over postMessage; every message,
      * both ways, is sealed so the terminate-leg gateway never sees plaintext.
-     * See {@link SealedWebSocket}. One sealed WebSocket per session.
+     * See {@link SealedWebSocket}.
      */
     openWebSocket(path: string): SealedWebSocket;
+    /**
+     * Liveness of this session (see {@link SealedSessionState}). The SDK
+     * recovers an enclave-forgotten session silently; the app only has to
+     * act on `reapproval-required` and `signed-out`, by calling
+     * `AuthFrame.connect()` again. This object stays valid across that
+     * recovery: keep using it, do not rebuild your transport.
+     */
+    readonly state: SealedSessionState;
+    /** Subscribe to state changes. Returns an unsubscribe function. */
+    onState(cb: (state: SealedSessionState) => void): () => void;
 }
 
 /**
@@ -524,12 +534,42 @@ export class AuthFrame {
     // The socket itself runs in the iframe (frame-host); these are the
     // parent-side bridges the iframe drives over postMessage.
     private sealedWebSockets = new Map<number, BridgedSealedWebSocket>();
+    // The one SealedSession object handed to the app. It outlives the
+    // iframe that carries it: a recovery (connect() after
+    // reapproval-required / signed-out) swaps the carrier underneath and
+    // the app's transport keeps working.
+    private sealedProxy: SealedSession | null = null;
+    private sealedState: SealedSessionState = { status: 'ok' };
+    private readonly sealedStateCbs = new Set<(s: SealedSessionState) => void>();
+    // True while the session iframe runs a refresh-token grant; teardown is
+    // deferred until it ends so a rotated token is never lost mid-flight.
+    private renewalInFlight = false;
+    private destroyed = false;
 
     constructor(config: AuthFrameConfig) {
         const { authOrigin, container, ...rest } = config;
         this.authOrigin = authOrigin ?? 'https://privasys.id';
         this.container = container ?? null;
         this.config = rest;
+        // One frame per page. Renewal of the shared privasys.id session is
+        // coordinated across documents by a lock and a single-use refresh
+        // token; several frames created and destroyed around each other
+        // (each with its own renewal iframe) is how a rotated token gets
+        // lost and every app in the browser is signed out.
+        const key = `${this.authOrigin}|${this.rpId}`;
+        const live = (liveFrames.get(key) ?? 0) + 1;
+        liveFrames.set(key, live);
+        if (live > 1) {
+            console.warn(`[privasys] ${live} AuthFrame instances are alive for ${this.rpId}; keep ONE per page and call connect() on it again to recover a session.`);
+        }
+    }
+
+    private setSealedState(state: SealedSessionState): void {
+        if (this.sealedState.status === state.status && this.sealedState.reason === state.reason) return;
+        this.sealedState = state;
+        for (const cb of this.sealedStateCbs) {
+            try { cb(state); } catch { /* isolate listener errors */ }
+        }
     }
 
     /** The RP ID used for authentication. */
@@ -581,6 +621,14 @@ export class AuthFrame {
         const appHost = this.config.sessionRelay?.appHost;
         this.connectHint = null;
 
+        // Recovery: the app holds a session whose carrier is dead (the
+        // enclave refused the voucher, or the Privasys ID session ended).
+        // Drop the carrier and run the normal flow; the session object the
+        // app holds is re-pointed at the new carrier when it comes up.
+        if (this.sealedProxy && this.sealedState.status !== 'ok') {
+            this.destroySealedIframe();
+        }
+
         // 1. Silent restore — only when the restored session covers what this
         // configuration asks for. A session minted for a NARROWER request must
         // not be silently returned: the newly asked-for attribute would simply
@@ -598,7 +646,14 @@ export class AuthFrame {
                 return { accessToken: existing.token, session: null };
             }
             try {
-                const sealed = await this.resumeSession();
+                const sealed = await this.resumeSession().catch(async (err: Error) => {
+                    // The enclave budgets voucher-backed bootstraps per
+                    // session (a fixed minute); wait it out once rather than
+                    // failing a connect() the user is looking at.
+                    if (!(err.message ?? '').startsWith('rate-limited')) throw err;
+                    await new Promise((r) => setTimeout(r, 15_000));
+                    return this.resumeSession();
+                });
                 return { accessToken: existing.token, session: sealed };
             } catch (err) {
                 const msg = (err as Error).message ?? '';
@@ -943,6 +998,13 @@ export class AuthFrame {
      */
     private handleSealedRpcMessage(data: { type?: unknown; [k: string]: unknown }): boolean {
         switch (data.type) {
+            case 'privasys:session:state': {
+                const status = String(data.status || 'ok') as SealedSessionState['status'];
+                const reason = typeof data.reason === 'string' ? data.reason : undefined;
+                this.setSealedState(reason ? { status, reason } : { status });
+                return true;
+            }
+
             case 'privasys:session:response': {
                 const id = data.id as number;
                 const pending = this.sealedReqs.get(id);
@@ -1150,10 +1212,29 @@ export class AuthFrame {
     }
 
     private installSealedProxy(meta: { sessionId: string; appHost: string; expiresAt: number }): SealedSession {
+        if (this.sealedProxy) {
+            // Recovery: re-point the object the app already holds.
+            Object.assign(this.sealedProxy, {
+                sessionId: meta.sessionId,
+                appHost: meta.appHost,
+                expiresAt: meta.expiresAt,
+            });
+            this.sealedSession = this.sealedProxy;
+            this.setSealedState({ status: 'ok' });
+            return this.sealedProxy;
+        }
+        const frame = this;
         const sealed: SealedSession = {
             sessionId: meta.sessionId,
             appHost: meta.appHost,
             expiresAt: meta.expiresAt,
+            get state() {
+                return frame.sealedState;
+            },
+            onState: (cb) => {
+                frame.sealedStateCbs.add(cb);
+                return () => frame.sealedStateCbs.delete(cb);
+            },
             request: (method, path, body, init) => {
                 if (!this.sealedIframe?.contentWindow) {
                     return Promise.reject(new Error('AuthFrame: sealed iframe is gone'));
@@ -1232,7 +1313,9 @@ export class AuthFrame {
                 return bridge;
             },
         };
+        this.sealedProxy = sealed;
         this.sealedSession = sealed;
+        this.setSealedState({ status: 'ok' });
         return sealed;
     }
 
@@ -1322,8 +1405,13 @@ export class AuthFrame {
                     }
                     this._onSessionRenewed?.(data.rpId, data.accessToken);
                 } else if (data.type === 'privasys:session-expired') {
+                    // Nothing can be resumed silently any more: the voucher
+                    // fetch needs the bearer this chain no longer mints.
+                    if (this.sealedProxy) this.setSealedState({ status: 'signed-out', reason: 'session-expired' });
                     this._onSessionExpired?.(data.rpId);
                     this.destroySessionIframe();
+                } else if (data.type === 'privasys:renewal') {
+                    this.renewalInFlight = data.phase === 'start';
                 }
             };
 
@@ -1597,6 +1685,14 @@ export class AuthFrame {
     destroy(): void {
         this.destroySessionIframe();
         this.destroySealedIframe();
+        this.sealedProxy = null;
+        if (!this.destroyed) {
+            this.destroyed = true;
+            const key = `${this.authOrigin}|${this.rpId}`;
+            const live = (liveFrames.get(key) ?? 1) - 1;
+            if (live > 0) liveFrames.set(key, live);
+            else liveFrames.delete(key);
+        }
     }
 
     private destroySealedIframe(): void {
@@ -1618,14 +1714,31 @@ export class AuthFrame {
     }
 
     private destroySessionIframe(): void {
-        if (this.sessionHandler) {
-            window.removeEventListener('message', this.sessionHandler);
-            this.sessionHandler = null;
-        }
-        if (this.sessionIframe) {
-            this.sessionIframe.remove();
-            this.sessionIframe = null;
-        }
+        const iframe = this.sessionIframe;
+        const handler = this.sessionHandler;
+        this.sessionIframe = null;
+        this.sessionHandler = null;
         this.cachedSession = null;
+        const remove = () => {
+            if (handler) window.removeEventListener('message', handler);
+            iframe?.remove();
+        };
+        if (!iframe || !this.renewalInFlight) {
+            remove();
+            return;
+        }
+        // A refresh-token grant is in flight in this iframe: the IdP has
+        // already deleted the old token, and removing the document before
+        // the new one is stored kills the chain for every app in this
+        // browser. Let it finish (the handler keeps listening), bounded.
+        const deadline = Date.now() + 10_000;
+        const tick = () => {
+            if (!this.renewalInFlight || Date.now() > deadline) remove();
+            else setTimeout(tick, 100);
+        };
+        setTimeout(tick, 100);
     }
 }
+
+/** Live AuthFrame instances per (auth origin, rpId); see the constructor. */
+const liveFrames = new Map<string, number>();

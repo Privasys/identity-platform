@@ -933,6 +933,7 @@ function ConnectFlow() {
     const pendingRelay = useRef<{
         payload: QRPayload;
         sessionToken: string;
+        userId?: string;
         /** Only set for registration (not authentication) */
         credential?: {
             credentialId: string;
@@ -941,6 +942,13 @@ function ConnectFlow() {
             userName?: string;
             serverRpId?: string;
         };
+        /** The hardware key that signed the ceremony (voucher issuance). */
+        keyAlias: string;
+        /** The sealed binding the ceremony produced, relayed once the
+         *  attributes are in: without it the browser gets a token but no
+         *  sealed channel, and a session-relay app cannot use it. */
+        sessionRelay?: fido2.SessionRelayBinding;
+        sessionRelayArg?: { quoteHash: string };
     } | null>(null);
 
     // Parse QR payload
@@ -1986,30 +1994,32 @@ function ConnectFlow() {
         }
     };
 
-    /** Fire-and-forget EncAuth voucher issuance after a successful
-     *  session-relay sign-in (Phase C wiring). The voucher lets the
-     *  browser silently re-bootstrap its sealed session (idle TTL,
-     *  reload) without waking this wallet. Failures only mean the
-     *  browser falls back to a full wallet ceremony on the next rebind,
-     *  so they are logged and swallowed — never block the sign-in. */
+    /** EncAuth voucher issuance after a successful session-relay sign-in
+     *  (Phase C wiring). The voucher is what the browser establishes the
+     *  app's sealed session from (the only bootstrap the enclave asserts the
+     *  holder's identity on) and what lets it re-bootstrap silently later
+     *  (idle TTL, reload) without waking this wallet. Resolves once the
+     *  upload is done or has failed: failures are logged, never thrown, so
+     *  they can delay but not break the sign-in (the browser then waits out
+     *  its voucher window and falls back to an anonymous session). */
     const maybeIssueEncAuth = (
         payload: QRPayload,
         keyAlias: string,
         result: { sessionToken: string; userId?: string; sessionRelay?: fido2.SessionRelayBinding },
         relayArg: { quoteHash: string } | undefined,
-    ) => {
-        if (!result.sessionRelay || !relayArg) return;
+    ): Promise<void> => {
+        if (!result.sessionRelay || !relayArg) return Promise.resolve();
         if (!payload.clientId) {
             console.log('[CONNECT] payload has no clientId — skipping EncAuth voucher (silent rebind disabled)');
-            return;
+            return Promise.resolve();
         }
         if (!result.userId || !result.sessionToken) {
             console.log('[CONNECT] missing userId/sessionToken — skipping EncAuth voucher');
-            return;
+            return Promise.resolve();
         }
         const att = attestationRef.current ?? attestation;
-        if (!att) return;
-        void issueEncAuthForSignIn({
+        if (!att) return Promise.resolve();
+        const upload = issueEncAuthForSignIn({
             walletSessionToken: result.sessionToken,
             keyId: keyAlias,
             clientId: payload.clientId,
@@ -2023,7 +2033,24 @@ function ConnectFlow() {
             (err) => console.warn('[CONNECT] EncAuth voucher upload failed (silent rebind disabled):', err),
         );
         maybeGrantSpend(payload, result.sessionToken, att);
+        return upload;
     };
+
+    /** Upper bound on how long the relay waits for the voucher upload: a
+     *  slow network must not hold the sign-in hostage, and the browser's
+     *  own voucher window covers an upload that lands a little later. */
+    const VOUCHER_BEFORE_RELAY_MS = 8_000;
+
+    const issueVoucherBeforeRelay = (
+        payload: QRPayload,
+        keyAlias: string,
+        result: { sessionToken: string; userId?: string; sessionRelay?: fido2.SessionRelayBinding },
+        relayArg: { quoteHash: string } | undefined,
+    ): Promise<void> =>
+        Promise.race([
+            maybeIssueEncAuth(payload, keyAlias, result, relayArg),
+            new Promise<void>((resolve) => setTimeout(resolve, VOUCHER_BEFORE_RELAY_MS)),
+        ]);
 
     /** Record the spend consent the approval screen carried, once the sign-in
      *  succeeded. Keyed by the app's ATTESTED id (OID 3.6 from the verified
@@ -2176,6 +2203,7 @@ function ConnectFlow() {
                 pendingRelay.current = {
                     payload,
                     sessionToken: result.sessionToken,
+                    userId: result.userId,
                     credential: {
                         credentialId: result.credentialId,
                         keyAlias,
@@ -2183,6 +2211,9 @@ function ConnectFlow() {
                         userName: result.userName,
                         serverRpId: result.serverRpId,
                     },
+                    keyAlias,
+                    sessionRelay: result.sessionRelay,
+                    sessionRelayArg,
                 };
                 setMissingAttrs(missing);
                 setStep('acquire-attributes');
@@ -2195,6 +2226,14 @@ function ConnectFlow() {
 
             // Resolve only the attributes the app actually requested.
             const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current);
+
+            // The silent-rebind voucher goes up BEFORE the browser learns the
+            // ceremony is done: the SDK establishes the app's sealed session
+            // from it (the only bootstrap that carries the holder's identity),
+            // so relaying first would leave the browser waiting on an upload
+            // that has not started. Also keeps the extra hardware signature
+            // inside the keystore's biometric grace where supported.
+            await issueVoucherBeforeRelay(payload, keyAlias, result, sessionRelayArg);
 
             await relaySessionToken(
                 payload.brokerUrl,
@@ -2282,12 +2321,9 @@ function ConnectFlow() {
                 relay: relayInfo,
             });
 
-            // Upload the silent-rebind voucher while the keystore's
-            // biometric grace (where supported) still covers the extra
-            // hardware signature.
-            maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg);
             // Multi-app attestation: seal any extra enclave hosts in the same
-            // ceremony (back-to-back, under the one biometric grace window).
+            // ceremony (back-to-back, under the one biometric grace window;
+            // the primary host's voucher went up before the relay).
             void issueExtraAppVouchers(payload, keyAlias, result, traceId);
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
@@ -2333,7 +2369,14 @@ function ConnectFlow() {
             const missing = getMissingAttributes(payload, currentProfile);
             if (missing.length > 0) {
                 console.log(`[CONNECT] missing attributes: ${missing.join(', ')} — prompting acquisition`);
-                pendingRelay.current = { payload, sessionToken: result.sessionToken };
+                pendingRelay.current = {
+                    payload,
+                    sessionToken: result.sessionToken,
+                    userId: result.userId,
+                    keyAlias,
+                    sessionRelay: result.sessionRelay,
+                    sessionRelayArg,
+                };
                 setMissingAttrs(missing);
                 setStep('acquire-attributes');
                 return;
@@ -2343,6 +2386,14 @@ function ConnectFlow() {
 
             // Resolve only the attributes the app actually requested.
             const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current);
+
+            // The silent-rebind voucher goes up BEFORE the browser learns the
+            // ceremony is done: the SDK establishes the app's sealed session
+            // from it (the only bootstrap that carries the holder's identity),
+            // so relaying first would leave the browser waiting on an upload
+            // that has not started. Also keeps the extra hardware signature
+            // inside the keystore's biometric grace where supported.
+            await issueVoucherBeforeRelay(payload, keyAlias, result, sessionRelayArg);
 
             await relaySessionToken(
                 payload.brokerUrl,
@@ -2424,12 +2475,9 @@ function ConnectFlow() {
                 relay: relayInfo,
             });
 
-            // Upload the silent-rebind voucher while the keystore's
-            // biometric grace (where supported) still covers the extra
-            // hardware signature.
-            maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg);
             // Multi-app attestation: seal any extra enclave hosts in the same
-            // ceremony (back-to-back, under the one biometric grace window).
+            // ceremony (back-to-back, under the one biometric grace window;
+            // the primary host's voucher went up before the relay).
             void issueExtraAppVouchers(payload, keyAlias, result, traceId);
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
@@ -2538,12 +2586,23 @@ function ConnectFlow() {
         try {
             const attributes = await resolveRequestedAttributes(pending.payload, updatedProfile, approvedAttrsRef.current, selfieRef.current);
 
+            // Same order as the direct path: voucher first, then the relay,
+            // and the sealed binding rides the relay so a first-time holder
+            // who had to add attributes still gets a sealed channel.
+            await issueVoucherBeforeRelay(
+                pending.payload,
+                pending.keyAlias,
+                { sessionToken: pending.sessionToken, userId: pending.userId, sessionRelay: pending.sessionRelay },
+                pending.sessionRelayArg,
+            );
+
             await relaySessionToken(
                 pending.payload.brokerUrl,
                 pending.payload.sessionId,
                 pending.sessionToken,
                 pushToken,
                 attributes,
+                pending.sessionRelay,
             );
 
             // Device-flow attribute delivery (see patchSessionAttributes).
@@ -2562,7 +2621,7 @@ function ConnectFlow() {
                 );
             }
 
-            // Audit trail (no sealed relay rides this late-relay path).
+            // Audit trail.
             recordCeremonyTrace(pending.payload, {
                 channel: params.source === 'push' ? 'push' : 'qr',
                 attestation: attestationRef.current ?? attestation,

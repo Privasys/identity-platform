@@ -283,6 +283,12 @@ function emailReceiptFor(
  *    ceremony could not run (transport/enclave error). */
 type PresenceOutcome = null | 'affirmed' | 'failed-retryable' | 'failed-final';
 
+/** A companion enclave sealed in the same ceremony (multi-app attestation). */
+interface SealedExtraApp {
+    host: string;
+    att: AttestationResult;
+}
+
 /** Decode an SD-JWT VC disclosure (`<jws>~`) payload — value + failure block —
  *  WITHOUT verifying the signature. The relying party re-verifies the VC; the
  *  wallet only needs the shape to show the user a truthful result. */
@@ -933,7 +939,6 @@ function ConnectFlow() {
     const pendingRelay = useRef<{
         payload: QRPayload;
         sessionToken: string;
-        userId?: string;
         /** Only set for registration (not authentication) */
         credential?: {
             credentialId: string;
@@ -942,13 +947,25 @@ function ConnectFlow() {
             userName?: string;
             serverRpId?: string;
         };
-        /** The hardware key that signed the ceremony (voucher issuance). */
-        keyAlias: string;
         /** The sealed binding the ceremony produced, relayed once the
          *  attributes are in: without it the browser gets a token but no
          *  sealed channel, and a session-relay app cannot use it. */
         sessionRelay?: fido2.SessionRelayBinding;
-        sessionRelayArg?: { quoteHash: string };
+        /**
+         * The primary enclave's voucher, and the companion enclaves', signed
+         * when the holder approved and still in flight or done. Signed then
+         * rather than at the relay because the key that signs them is
+         * biometric-gated: minutes later, after the holder has added details
+         * or scanned a document, the grace from that Face ID has gone and a
+         * second, unexplained prompt would appear. They do not depend on
+         * the details added since. Nothing can use them before the relay:
+         * the browser fetches a voucher with the access token the relay
+         * gives it, so an abandoned sign-in leaves one nobody can reach.
+         */
+        voucher: Promise<void>;
+        extraApps: Promise<SealedExtraApp[]>;
+        /** The spend consent, recorded only once the relay has succeeded. */
+        grantSpend: () => void;
     } | null>(null);
 
     // Parse QR payload
@@ -2032,8 +2049,40 @@ function ConnectFlow() {
             ({ sid }) => console.log(`[CONNECT] EncAuth voucher uploaded (sid=${sid.substring(0, 8)}…)`),
             (err) => console.warn('[CONNECT] EncAuth voucher upload failed (silent rebind disabled):', err),
         );
-        maybeGrantSpend(payload, result.sessionToken, att);
+        // No spend consent here. This runs BEFORE the relay, and a consent
+        // recorded for a sign-in whose relay then fails is one the holder
+        // cannot withdraw from the wallet: an unrelayed credential is never
+        // saved, so there is no Service Details entry for it. See
+        // spendGrantFor, called once the relay has succeeded.
         return upload;
+    };
+
+    /**
+     * The spend consent the approval screen carried, as a function to call
+     * once the sign-in has reached the browser.
+     *
+     * Built when the ceremony runs, so it carries THIS render's spendOn and
+     * spendCap. The relay after attribute acquisition runs from a callback
+     * memoised on the push token alone, and reading those from its own
+     * closure could record a stale choice.
+     *
+     * Same conditions the grant has always had (a sealed session-relay
+     * sign-in with a client id and a subject): only where it is recorded
+     * moved.
+     */
+    const spendGrantFor = (
+        payload: QRPayload,
+        result: { sessionToken: string; userId?: string; sessionRelay?: fido2.SessionRelayBinding },
+        relayArg: { quoteHash: string } | undefined,
+    ): (() => void) => {
+        const grant = maybeGrantSpend;
+        return () => {
+            if (!result.sessionRelay || !relayArg || !payload.clientId || !result.userId || !result.sessionToken) {
+                return;
+            }
+            const att = attestationRef.current ?? attestation;
+            if (att) grant(payload, result.sessionToken, att);
+        };
     };
 
     /** Upper bound on how long the relay waits for the voucher upload: a
@@ -2046,9 +2095,12 @@ function ConnectFlow() {
         keyAlias: string,
         result: { sessionToken: string; userId?: string; sessionRelay?: fido2.SessionRelayBinding },
         relayArg: { quoteHash: string } | undefined,
-    ): Promise<void> =>
+    ): Promise<void> => withinVoucherWait(maybeIssueEncAuth(payload, keyAlias, result, relayArg));
+
+    /** Wait for a voucher upload, but never longer than VOUCHER_BEFORE_RELAY_MS. */
+    const withinVoucherWait = (upload: Promise<void>): Promise<void> =>
         Promise.race([
-            maybeIssueEncAuth(payload, keyAlias, result, relayArg),
+            upload,
             new Promise<void>((resolve) => setTimeout(resolve, VOUCHER_BEFORE_RELAY_MS)),
         ]);
 
@@ -2109,8 +2161,8 @@ function ConnectFlow() {
         payload: QRPayload,
         keyAlias: string,
         result: { sessionToken: string; userId?: string },
-        ceremonyTraceId?: string,
-    ) => {
+    ): Promise<SealedExtraApp[]> => {
+        const sealed: SealedExtraApp[] = [];
         const hosts = (payload.extraAppHosts ?? []).filter((h) => h && h !== payload.appHost);
         if (
             hosts.length === 0 ||
@@ -2120,7 +2172,7 @@ function ConnectFlow() {
             !result.userId ||
             !result.sessionToken
         ) {
-            return;
+            return sealed;
         }
         for (const host of hosts) {
             try {
@@ -2136,31 +2188,46 @@ function ConnectFlow() {
                     attestation: att,
                     host,
                 });
-                addTrustedApp({
-                    rpId: host,
-                    origin: host,
-                    appName: payload.appName,
-                    mrenclave: att.mrenclave,
-                    mrtd: att.mrtd,
-                    rtmr1: att.rtmr1,
-                    rtmr2: att.rtmr2,
-                    codeHash: att.workload_code_hash,
-                    configRoot: att.workload_config_merkle_root,
-                    teeType: att.tee_type || 'sgx',
-                    lastVerified: Math.floor(Date.now() / 1000),
-                    credentialId: '', // voucher-only trust row (no passkey on this host)
-                });
-                // One ceremony = one trace: companion enclaves sealed under the
-                // same unlock attach to the primary trace rather than fabricating
-                // a second "session" the user never separately approved.
-                if (ceremonyTraceId) {
-                    useServiceSessionsStore
-                        .getState()
-                        .attachAttestation(ceremonyTraceId, attestationTraceFrom(host, att));
-                }
+                // Saved as trusted only after the relay (recordExtraApps): on
+                // the path through attribute acquisition this runs before the
+                // holder has finished, and an abandoned sign-in must leave
+                // nothing behind on the phone.
+                sealed.push({ host, att });
                 console.log(`[CONNECT] extra-app voucher issued for ${host}`);
             } catch (err: any) {
                 console.warn(`[CONNECT] extra-app voucher for ${host} failed:`, err?.message ?? err);
+            }
+        }
+        return sealed;
+    };
+
+    /**
+     * Record the companion enclaves sealed in this ceremony, once the sign-in
+     * has reached the browser: a voucher-only trusted-app row for each, and
+     * their attestations on the primary trace. One ceremony = one trace: they
+     * attach to it rather than fabricating a second "session" the user never
+     * separately approved. Separate from issuing, because on the path through
+     * attribute acquisition the vouchers are signed before the holder has
+     * finished, and nothing may be saved for a sign-in that is then abandoned.
+     */
+    const recordExtraApps = (payload: QRPayload, ceremonyTraceId: string | undefined, sealed: SealedExtraApp[]) => {
+        for (const { host, att } of sealed) {
+            useTrustedAppsStore.getState().addOrUpdate({
+                rpId: host,
+                origin: host,
+                appName: payload.appName,
+                mrenclave: att.mrenclave,
+                mrtd: att.mrtd,
+                rtmr1: att.rtmr1,
+                rtmr2: att.rtmr2,
+                codeHash: att.workload_code_hash,
+                configRoot: att.workload_config_merkle_root,
+                teeType: att.tee_type || 'sgx',
+                lastVerified: Math.floor(Date.now() / 1000),
+                credentialId: '', // voucher-only trust row (no passkey on this host)
+            });
+            if (ceremonyTraceId) {
+                useServiceSessionsStore.getState().attachAttestation(ceremonyTraceId, attestationTraceFrom(host, att));
             }
         }
     };
@@ -2203,7 +2270,6 @@ function ConnectFlow() {
                 pendingRelay.current = {
                     payload,
                     sessionToken: result.sessionToken,
-                    userId: result.userId,
                     credential: {
                         credentialId: result.credentialId,
                         keyAlias,
@@ -2211,9 +2277,11 @@ function ConnectFlow() {
                         userName: result.userName,
                         serverRpId: result.serverRpId,
                     },
-                    keyAlias,
                     sessionRelay: result.sessionRelay,
-                    sessionRelayArg,
+                    // Signed now, inside this Face ID's grace (see the type).
+                    voucher: maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg),
+                    extraApps: issueExtraAppVouchers(payload, keyAlias, result),
+                    grantSpend: spendGrantFor(payload, result, sessionRelayArg),
                 };
                 setMissingAttrs(missing);
                 setStep('acquire-attributes');
@@ -2324,7 +2392,10 @@ function ConnectFlow() {
             // Multi-app attestation: seal any extra enclave hosts in the same
             // ceremony (back-to-back, under the one biometric grace window;
             // the primary host's voucher went up before the relay).
-            void issueExtraAppVouchers(payload, keyAlias, result, traceId);
+            void issueExtraAppVouchers(payload, keyAlias, result).then((sealed) => recordExtraApps(payload, traceId, sealed));
+
+            // The spend consent, now that the sign-in has reached the browser.
+            spendGrantFor(payload, result, sessionRelayArg)();
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
@@ -2372,10 +2443,11 @@ function ConnectFlow() {
                 pendingRelay.current = {
                     payload,
                     sessionToken: result.sessionToken,
-                    userId: result.userId,
-                    keyAlias,
                     sessionRelay: result.sessionRelay,
-                    sessionRelayArg,
+                    // Signed now, inside this Face ID's grace (see the type).
+                    voucher: maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg),
+                    extraApps: issueExtraAppVouchers(payload, keyAlias, result),
+                    grantSpend: spendGrantFor(payload, result, sessionRelayArg),
                 };
                 setMissingAttrs(missing);
                 setStep('acquire-attributes');
@@ -2478,7 +2550,10 @@ function ConnectFlow() {
             // Multi-app attestation: seal any extra enclave hosts in the same
             // ceremony (back-to-back, under the one biometric grace window;
             // the primary host's voucher went up before the relay).
-            void issueExtraAppVouchers(payload, keyAlias, result, traceId);
+            void issueExtraAppVouchers(payload, keyAlias, result).then((sealed) => recordExtraApps(payload, traceId, sealed));
+
+            // The spend consent, now that the sign-in has reached the browser.
+            spendGrantFor(payload, result, sessionRelayArg)();
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
@@ -2588,13 +2663,10 @@ function ConnectFlow() {
 
             // Same order as the direct path: voucher first, then the relay,
             // and the sealed binding rides the relay so a first-time holder
-            // who had to add attributes still gets a sealed channel.
-            await issueVoucherBeforeRelay(
-                pending.payload,
-                pending.keyAlias,
-                { sessionToken: pending.sessionToken, userId: pending.userId, sessionRelay: pending.sessionRelay },
-                pending.sessionRelayArg,
-            );
+            // who had to add attributes still gets a sealed channel. The
+            // voucher was signed when the holder approved, so this is
+            // normally already settled and asks for no second Face ID.
+            await withinVoucherWait(pending.voucher);
 
             await relaySessionToken(
                 pending.payload.brokerUrl,
@@ -2621,13 +2693,54 @@ function ConnectFlow() {
                 );
             }
 
-            // Audit trail.
-            recordCeremonyTrace(pending.payload, {
+            // From here, everything the direct path does after its relay.
+
+            // The spend consent, now that the sign-in has reached the browser.
+            pending.grantSpend();
+
+            // This identity's push target, so vault approvals and app
+            // notifications for it reach this phone (see the direct path).
+            if (pushToken && pending.sessionToken) {
+                registerPushTokenWithIdp(pending.sessionToken, pushToken).catch((e) =>
+                    console.warn('[CONNECT] push-token registration (pairwise) failed', e),
+                );
+            }
+
+            // The live sealed session on Access, keyed as the direct
+            // authentication path keys it (the app host in session-relay
+            // mode), so it shares a card with the app's trusted-app row.
+            let relayInfo: { sessionId: string; expiresAt: number } | undefined;
+            if (pending.sessionRelay) {
+                const safeExpiresAt = sanitizeRelayExpiresAt(pending.sessionRelay.expiresAt);
+                relayInfo = { sessionId: pending.sessionRelay.sessionId, expiresAt: safeExpiresAt };
+                addRelaySession({
+                    sessionId: pending.sessionRelay.sessionId,
+                    rpId:
+                        pending.payload.mode === 'session-relay' && pending.payload.appHost
+                            ? pending.payload.appHost
+                            : pending.payload.rpId,
+                    origin: pending.payload.origin,
+                    appName: pending.payload.appName,
+                    expiresAt: safeExpiresAt,
+                    startedAt: Date.now(),
+                });
+            }
+
+            // Audit trail, with the companion enclaves sealed in the same
+            // ceremony attached once their vouchers are in.
+            const traceId = recordCeremonyTrace(pending.payload, {
                 channel: params.source === 'push' ? 'push' : 'qr',
                 attestation: attestationRef.current ?? attestation,
                 sharedValues: attributes,
                 approved: approvedAttrsRef.current,
+                relay: relayInfo,
             });
+            void pending.extraApps.then((sealed) => recordExtraApps(pending.payload, traceId, sealed));
+
+            // Start biometric grace period, read at call time: this callback is
+            // memoised on the push token, so a closure copy could be stale.
+            const graceSec = useSettingsStore.getState().gracePeriodSec;
+            if (graceSec > 0) setUnlocked(graceSec * 1000);
 
             pendingRelay.current = null;
             if (!routeTerminal(pending.payload, attributes)) {

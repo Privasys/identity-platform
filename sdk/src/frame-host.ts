@@ -52,6 +52,25 @@ interface ActiveSession {
 
 let pendingHandshake: PendingHandshake | null = null;
 let activeSession: ActiveSession | null = null;
+
+/**
+ * Make `session` this iframe's active sealed transport and forward its
+ * liveness to the parent page (`privasys:session:state`), so the app can
+ * show "reconnecting" or run the one-tap re-approval without tearing its
+ * own state down. Every path that installs a session goes through here.
+ */
+function adoptSession(
+    appHost: string,
+    session: PrivasysSession,
+    expiresAt: number,
+    parentOrigin: string,
+): void {
+    activeSession = { appHost, sessionId: session.sessionId, expiresAt, session };
+    session.onStateChange = (state) => {
+        if (activeSession?.session !== session) return;
+        window.parent.postMessage({ type: 'privasys:session:state', ...state }, parentOrigin);
+    };
+}
 // Sealed WebSockets the parent opened, keyed by the parent's correlation id.
 // The WebSocket lives here (where K is); the parent bridges send/recv over
 // postMessage. Cleaned up on close.
@@ -108,8 +127,17 @@ async function hasSpendConsent(rpId: string, appHost: string): Promise<boolean> 
  */
 function makeGetEncAuth(rpId: string, host: string): () => Promise<EncAuthEnvelope | null> {
     return async () => {
-        const session = sessions.get(rpId);
+        let session = sessions.get(rpId);
         if (!session?.token) return null;
+        // A tab that wakes from a long sleep rebinds BEFORE its renewal
+        // heartbeat has run: the stored access token is already expired, the
+        // IdP would refuse the voucher fetch, and the rebind would fail for
+        // no good reason. Renew first (under the cross-document lock; a
+        // no-op when another document already did).
+        if (session.refreshToken && session.clientId && needsRenewal(session.token)) {
+            session = await renewIfNeeded(rpId, renewalParents.get(rpId) ?? '', false) ?? session;
+            if (!session?.token) return null;
+        }
         const sid = jwtClaim(session.token, 'sid');
         if (!sid) return null;
         // Select the voucher for THIS enclave by host. The browser can't compute
@@ -148,6 +176,44 @@ function makeGetEncAuth(rpId: string, host: string): () => Promise<EncAuthEnvelo
 /** Total budget for picking up the wallet's EncAuth voucher after a
  *  same-device ceremony. Generous: it must span the app switch back. */
 const SAME_DEVICE_VOUCHER_WINDOW_MS = 90_000;
+
+/** Budget for the voucher after an ordinary (cross-device) ceremony. The
+ *  wallet uploads it before relaying the result, so it is normally there on
+ *  the first try; the window covers an older wallet that uploads after. */
+const CEREMONY_VOUCHER_WINDOW_MS = 20_000;
+
+/**
+ * Establish the sealed session from the wallet's EncAuth voucher, retrying
+ * until `windowMs` runs out. A voucher-backed bootstrap is the only kind the
+ * enclave asserts the caller's identity on (X-Privasys-Sub), so this is what
+ * `connect()` must hand the app: the wallet's own bootstrap carries no
+ * identity and an app that attributes callers answers it 401.
+ *
+ * `no-voucher` (not uploaded yet) and `unavailable` (transport blip) are
+ * transient here; `rate-limited` waits out the enclave's window once;
+ * `rejected` (the enclave refused the voucher outright) ends the wait.
+ */
+async function resumeVoucherSession(
+    appHost: string,
+    rpId: string,
+    windowMs: number,
+): Promise<PrivasysSession | null> {
+    const getEncAuth = makeGetEncAuth(rpId, appHost);
+    const deadline = Date.now() + windowMs;
+    let backoff = 1_000;
+    while (Date.now() < deadline) {
+        // Only spend attempts while the page is in the foreground; that is
+        // when the upload lands (iOS suspends a backgrounded tab's timers).
+        await waitForForeground(deadline);
+        const res = await PrivasysSession.resume({ host: appHost, getEncAuth });
+        if (!('error' in res)) return res.session;
+        if (res.error === 'rejected') return null;
+        const wait = res.error === 'rate-limited' ? 15_000 : backoff;
+        await new Promise((r) => setTimeout(r, wait));
+        backoff = Math.min(backoff * 1.5, 5_000);
+    }
+    return null;
+}
 
 /** Resolve once the document is foregrounded, or after a short poll cap so
  *  we still retry if `visibilitychange` never fires. Never resolves later
@@ -508,6 +574,17 @@ async function renewSessionLocked(
     const idpBase = globalThis.location.origin;
     const usedRefreshToken = session.refreshToken!;
 
+    // Tell the parent a grant is in flight: the IdP deletes the old refresh
+    // token before issuing the new one, so an iframe removed between the
+    // request and the stored response kills the chain for every app in
+    // this browser. The frame client defers teardown while this is set.
+    const signalRenewal = (phase: 'start' | 'end') => {
+        if (!parentOrigin) return;
+        try {
+            window.parent.postMessage({ type: 'privasys:renewal', rpId: session.rpId, phase }, parentOrigin);
+        } catch { /* parent gone */ }
+    };
+    signalRenewal('start');
     let resp: Response;
     try {
         resp = await fetch(`${idpBase}/token`, {
@@ -520,20 +597,32 @@ async function renewSessionLocked(
             }),
         });
     } catch (err) {
+        signalRenewal('end');
         console.warn('[frame-host] renewal fetch failed, will retry:', err);
         scheduleRenewalRetry(session.rpId, parentOrigin);
         return session;
     }
+    // The rotated token is persisted synchronously below; nothing after
+    // this point can lose it, so the parent may tear us down again.
+    const tokensBody = resp.ok ? await resp.json().catch(() => null) : null;
+    if (resp.ok && tokensBody) {
+        sessions.store({
+            ...session,
+            token: tokensBody.access_token,
+            refreshToken: tokensBody.refresh_token,
+            authenticatedAt: Date.now(),
+        });
+    }
+    signalRenewal('end');
 
-    if (resp.ok) {
-        const tokens = await resp.json();
+    if (resp.ok && tokensBody) {
+        const tokens = tokensBody;
         const updated: AuthSession = {
             ...session,
             token: tokens.access_token,
             refreshToken: tokens.refresh_token,
             authenticatedAt: Date.now(),
         };
-        sessions.store(updated);
         renewalRetryCount.delete(session.rpId);
         scheduleRenewal(updated, parentOrigin);
 
@@ -913,12 +1002,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                                     ? `${result.error}:${result.reason}`
                                     : String(result.error));
                             }
-                            activeSession = {
-                                appHost,
-                                sessionId: result.session.sessionId,
-                                expiresAt: 0,
-                                session: result.session,
-                            };
+                            adoptSession(appHost, result.session, 0, parentOrigin);
                         },
                     },
                 });
@@ -1343,59 +1427,42 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
                 // Install the sealed session so the parent's `frame.session()`
                 // RPC works once the auth result lands.
-                if (uiResult?.sessionRelay) {
-                    await installSessionRelay(uiResult.sessionRelay, parentOrigin);
-                } else if (uiResult?.completedViaPoll && config.sessionRelay?.appHost) {
-                    // Same-device recovery of the sealed binding: the
-                    // wallet's {session_id, enc_pub} relay never arrived
-                    // (dead socket), but the wallet uploaded an EncAuth
-                    // voucher during its ceremony — resume from it.
-                    //
-                    // Keep trying across the switch BACK to the browser
-                    // (see SAME_DEVICE_VOUCHER_WINDOW_MS): the previous
-                    // 5x2s burst ran while the tab was still backgrounded,
-                    // where iOS suspends timers and the voucher has not
-                    // been uploaded yet, so it routinely expired and left
-                    // the sealed session anonymous — the app then 401s
-                    // with "authentication required".
-                    const appHost = config.sessionRelay.appHost;
-                    const getEncAuth = makeGetEncAuth(rpId, appHost);
-                    const voucherDeadline = Date.now() + SAME_DEVICE_VOUCHER_WINDOW_MS;
-                    let voucherBackoff = 1_000;
-                    while (Date.now() < voucherDeadline) {
-                        // Only spend attempts while the page is actually in
-                        // the foreground; that is when the upload lands.
-                        await waitForForeground(voucherDeadline);
-                        const res = await PrivasysSession.resume({ host: appHost, getEncAuth });
-                        if (!('error' in res)) {
-                            activeSession = {
-                                appHost,
-                                sessionId: res.session.sessionId,
-                                expiresAt: 0,
-                                session: res.session,
-                            };
-                            uiResult.sessionRelay = {
-                                sessionId: res.session.sessionId,
-                                encPub: '',
-                                expiresAt: 0,
-                            };
-                            window.parent.postMessage({
-                                type: 'privasys:session:ready',
-                                sessionId: res.session.sessionId,
-                                appHost,
-                                expiresAt: 0,
-                            }, parentOrigin);
-                            break;
-                        }
-                        // 'rejected' is an outright refusal (measurement or
-                        // workload changed) — retrying cannot help. Both
-                        // 'no-voucher' (not uploaded yet) and 'unavailable'
-                        // (transport blip while the app switch is in flight)
-                        // are transient here, so keep going until the budget
-                        // runs out.
-                        if (res.error === 'rejected') break;
-                        await new Promise((r) => setTimeout(r, voucherBackoff));
-                        voucherBackoff = Math.min(voucherBackoff * 1.5, 5_000);
+                //
+                // The session the app gets is established from the wallet's
+                // EncAuth voucher, never from the wallet's own bootstrap: only
+                // a voucher-backed bootstrap carries the caller's identity
+                // (X-Privasys-Sub), and an app that attributes callers answers
+                // an anonymous session 401 right after a successful sign-in.
+                // The wallet uploads the voucher before relaying the result;
+                // the bounded wait covers an older wallet that uploads after,
+                // and the same-device flow, where the tab is backgrounded
+                // during the app switch and the upload lands on the way back.
+                const wantsSealed = !!config.sessionRelay?.appHost
+                    && (!!uiResult?.sessionRelay || !!uiResult?.completedViaPoll);
+                if (wantsSealed && uiResult) {
+                    const appHost = config.sessionRelay!.appHost;
+                    const session = await resumeVoucherSession(
+                        appHost,
+                        rpId,
+                        uiResult.completedViaPoll ? SAME_DEVICE_VOUCHER_WINDOW_MS : CEREMONY_VOUCHER_WINDOW_MS,
+                    );
+                    if (session) {
+                        pendingHandshake = null;
+                        adoptSession(appHost, session, 0, parentOrigin);
+                        uiResult.sessionRelay = { sessionId: session.sessionId, encPub: '', expiresAt: 0 };
+                        window.parent.postMessage({
+                            type: 'privasys:session:ready',
+                            sessionId: session.sessionId,
+                            appHost,
+                            expiresAt: 0,
+                        }, parentOrigin);
+                    } else if (uiResult.sessionRelay) {
+                        // No voucher landed in time. Fall back to the wallet's
+                        // bootstrap so the app still gets a sealed channel
+                        // (anonymous to the app until a later silent rebind
+                        // picks the voucher up) rather than nothing.
+                        console.warn('[frame-host] no EncAuth voucher after the ceremony; installing the anonymous session');
+                        await installSessionRelay(uiResult.sessionRelay, parentOrigin);
                     }
                 }
 
@@ -1708,12 +1775,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             reply({ error: result.error, reason: result.reason });
             return;
         }
-        activeSession = {
-            appHost,
-            sessionId: result.session.sessionId,
-            expiresAt: 0,
-            session: result.session,
-        };
+        adoptSession(appHost, result.session, 0, e.origin);
         reply({ sessionId: result.session.sessionId, appHost, expiresAt: 0 });
         return;
     }
@@ -1857,12 +1919,7 @@ async function installSessionRelay(
             // wallet involvement.
             getEncAuth: makeGetEncAuth(rpId, appHost),
         });
-        activeSession = {
-            appHost,
-            sessionId: binding.sessionId,
-            expiresAt: expiresAtMs,
-            session,
-        };
+        adoptSession(appHost, session, expiresAtMs, parentOrigin);
         window.parent.postMessage(
             {
                 type: 'privasys:session:ready',

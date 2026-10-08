@@ -148,6 +148,37 @@ export interface EncAuthEnvelope {
     idp_sig: string;  // base64url(64 B R||S)
 }
 
+/**
+ * Liveness of a sealed session, as the SDK sees it:
+ *
+ *  - `ok`: requests flow.
+ *  - `recovering`: the enclave forgot the session (idle TTL, restart) and
+ *    the SDK is re-bootstrapping it from the stored voucher with no user
+ *    involvement. `reason` names a transient obstacle (`unavailable`,
+ *    `rate-limited`) when there is one. Requests in flight may fail; the
+ *    next one retries.
+ *  - `reapproval-required`: the enclave refused the voucher, so recovery
+ *    needs the holder (one tap in the wallet). `reason` says why:
+ *    `workload-changed` (the app was updated), `enc-changed` (the hosting
+ *    platform changed), `voucher-expired`, `voucher-invalid`, or
+ *    `no-voucher`. Call `AuthFrame.connect()` again: it runs the one-tap
+ *    approval on the same frame and the session object keeps working.
+ *  - `signed-out`: the Privasys ID session itself ended (the refresh-token
+ *    chain is dead), so nothing can be resumed silently; `connect()` runs a
+ *    sign-in.
+ */
+export type SealedSessionStatus = 'ok' | 'recovering' | 'reapproval-required' | 'signed-out';
+
+export interface SealedSessionState {
+    status: SealedSessionStatus;
+    reason?: string;
+}
+
+/** Waits applied when the enclave rate-limits voucher-backed rebinds: its
+ *  budget is a fixed one-minute window, so one bounded wait usually lands
+ *  in the next window instead of failing a request the user is waiting on. */
+const REBIND_RATE_LIMIT_WAITS_MS = [15_000, 45_000];
+
 interface DerivedKeys {
     aead: CryptoKey;
     c2sPrefix: Uint8Array;
@@ -167,6 +198,13 @@ export class PrivasysSession {
     private c2sCtr = 0n;
     private s2cCtr = 0n;
     private getEncAuth?: () => Promise<EncAuthEnvelope | null | undefined>;
+    /** The single in-flight silent rebind, shared by every request that
+     *  hits the unsealed 401 at the same time (see tryRebind). */
+    private rebindInFlight: Promise<boolean> | null = null;
+    private lastState: SealedSessionState = { status: 'ok' };
+    /** Liveness listener (see {@link SealedSessionState}); the frame host
+     *  forwards it to the adopter page. */
+    onStateChange?: (state: SealedSessionState) => void;
 
     private constructor(host: string, sessionId: string, keys: DerivedKeys, fetchImpl: typeof fetch) {
         this.host = host;
@@ -220,7 +258,7 @@ export class PrivasysSession {
         fetchImpl?: typeof fetch;
     }): Promise<
         | { session: PrivasysSession }
-        | { error: 'no-voucher' | 'rejected' | 'unavailable'; reason?: EncAuthRejectReason }
+        | { error: 'no-voucher' | 'rejected' | 'unavailable' | 'rate-limited'; reason?: EncAuthRejectReason }
     > {
         const fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
         let env: EncAuthEnvelope | null | undefined;
@@ -424,18 +462,61 @@ export class PrivasysSession {
      * propagates unchanged to the caller, who can then trigger a
      * fresh wallet ceremony.
      */
-    private async tryRebind(): Promise<boolean> {
+    private tryRebind(): Promise<boolean> {
+        // Coalesce: every request that hits the unsealed 401 at the same
+        // moment (a page load fires several in parallel) shares ONE
+        // voucher-backed bootstrap. Each bootstrap counts against the
+        // enclave's per-session rebind budget (six a minute), so one rebind
+        // per burst is the difference between a silent recovery and a
+        // rate-limited failure the app can only surface as a sign-out.
+        if (!this.rebindInFlight) {
+            this.rebindInFlight = this.rebindOnce().finally(() => {
+                this.rebindInFlight = null;
+            });
+        }
+        return this.rebindInFlight;
+    }
+
+    private setState(state: SealedSessionState): void {
+        if (this.lastState.status === state.status && this.lastState.reason === state.reason) return;
+        this.lastState = state;
+        try {
+            this.onStateChange?.(state);
+        } catch {
+            /* a listener's error is not the session's */
+        }
+    }
+
+    private async rebindOnce(): Promise<boolean> {
         if (!this.getEncAuth) return false;
+        this.setState({ status: 'recovering' });
         let env: EncAuthEnvelope | null | undefined;
         try {
             env = await this.getEncAuth();
         } catch {
+            this.setState({ status: 'recovering', reason: 'unavailable' });
             return false;
         }
-        if (!env) return false;
+        if (!env) {
+            this.setState({ status: 'reapproval-required', reason: 'no-voucher' });
+            return false;
+        }
 
-        const handshake = await bootstrapWithEncAuth(this.host, env, this.fetchImpl);
-        if (!handshake.ok) return false;
+        let handshake = await bootstrapWithEncAuth(this.host, env, this.fetchImpl);
+        for (const wait of REBIND_RATE_LIMIT_WAITS_MS) {
+            if (handshake.ok || handshake.error !== 'rate-limited') break;
+            this.setState({ status: 'recovering', reason: 'rate-limited' });
+            await new Promise((r) => setTimeout(r, wait));
+            handshake = await bootstrapWithEncAuth(this.host, env, this.fetchImpl);
+        }
+        if (!handshake.ok) {
+            if (handshake.error === 'rejected') {
+                this.setState({ status: 'reapproval-required', reason: handshake.reason ?? 'rejected' });
+            } else {
+                this.setState({ status: 'recovering', reason: handshake.error });
+            }
+            return false;
+        }
 
         try {
             const reborn = await PrivasysSession.fromHandshake({
@@ -451,8 +532,10 @@ export class PrivasysSession {
             this.keys = reborn.keys;
             this.c2sCtr = 0n;
             this.s2cCtr = 0n;
+            this.setState({ status: 'ok' });
             return true;
         } catch {
+            this.setState({ status: 'recovering', reason: 'unavailable' });
             return false;
         }
     }
@@ -1009,7 +1092,7 @@ async function bootstrapWithEncAuth(
     fetchImpl: typeof fetch,
 ): Promise<
     | { ok: true; sessionId: string; encPub: string; sdkPrivateKey: CryptoKey }
-    | { ok: false; error: 'rejected' | 'unavailable'; reason?: EncAuthRejectReason }
+    | { ok: false; error: 'rejected' | 'unavailable' | 'rate-limited'; reason?: EncAuthRejectReason }
 > {
     try {
         const sdkKeyPair = (await crypto.subtle.generateKey(
@@ -1026,6 +1109,9 @@ async function bootstrapWithEncAuth(
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sdk_pub: sdkPubB64, encauth: env }),
         });
+        // The enclave budgets voucher-backed bootstraps per session (a fixed
+        // one-minute window); a 429 is "try again shortly", not a refusal.
+        if (resp.status === 429) return { ok: false, error: 'rate-limited' };
         if (!resp.ok) return { ok: false, error: 'rejected' };
 
         const data = (await resp.json()) as {

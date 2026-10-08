@@ -57,6 +57,8 @@ export { PrivasysSession } from './enclave-session';
 export type {
     EncAuthRejectReason,
     OpenWebSocketOptions,
+    SealedSessionState,
+    SealedSessionStatus,
     SealedWebSocket,
     SessionInitOptions,
     WalletAttestationResult,

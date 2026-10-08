@@ -582,23 +582,27 @@ export class PrivasysSession {
         if (!WS) {
             throw new Error('openWebSocket: no WebSocket implementation available (pass opts.WebSocketImpl)');
         }
-        const streamBytes = crypto.getRandomValues(new Uint8Array(8));
-        const streamHex = Array.from(streamBytes, (b) => b.toString(16).padStart(2, '0')).join('');
         const url = `wss://${this.host}${path}`;
-        const ws = new WS(url, [
-            SEALED_WS_SUBPROTOCOL,
-            this.sessionId,
-            streamHex,
-            ...(opts?.protocols ?? []),
-        ]);
-        ws.binaryType = 'arraybuffer';
-        return new SealedWebSocketImpl(ws, {
+        return new SealedWebSocketImpl({
             aead: this.keys.aead,
             hkdfIkm: this.keys.hkdfIkm,
             sessionSalt: this.keys.sessionSalt,
             sessionId: this.sessionId,
             path,
-            streamHex,
+            streamHex: newStreamHex(),
+            // Reads the CURRENT session id: after a rebind the socket is
+            // re-opened on the new session.
+            makeSocket: (streamHex) => {
+                const ws = new WS(url, [SEALED_WS_SUBPROTOCOL, this.sessionId, streamHex, ...(opts?.protocols ?? [])]);
+                ws.binaryType = 'arraybuffer';
+                return ws;
+            },
+            // A socket the enclave refused because it forgot the session is
+            // the socket-shaped unsealed 401: run the same coalesced,
+            // state-reporting rebind, then re-open on the new session.
+            rebind: async () => (await this.tryRebind())
+                ? { sessionId: this.sessionId, aead: this.keys.aead, hkdfIkm: this.keys.hkdfIkm, sessionSalt: this.keys.sessionSalt }
+                : null,
         });
     }
 
@@ -795,7 +799,9 @@ export interface SealedWebSocket {
     close(code?: number, reason?: string): void;
 }
 
-/** Everything a SealedWebSocketImpl needs from its parent session. */
+/** Everything a SealedWebSocketImpl needs from its parent session. The key
+ *  material and session id are replaced when the socket re-opens after a
+ *  rebind. */
 interface SealedWSConfig {
     aead: CryptoKey;
     hkdfIkm: CryptoKey;
@@ -803,6 +809,23 @@ interface SealedWSConfig {
     sessionId: string;
     path: string;
     streamHex: string;
+    /** Opens the underlying WebSocket for a stream id (reads the current session id). */
+    makeSocket: (streamHex: string) => WebSocket;
+    /** Re-establishes the session when the enclave refused the socket for
+     *  having forgotten it; null when it could not (the app is told through
+     *  the session state). */
+    rebind?: () => Promise<{ sessionId: string; aead: CryptoKey; hkdfIkm: CryptoKey; sessionSalt: Uint8Array } | null>;
+}
+
+function newStreamHex(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** The enclave's close for a socket on a session it no longer knows (mux.go
+ *  answers the OPEN with a policy-violation close naming the session). */
+function isSessionRefused(ev: CloseEvent): boolean {
+    return ev.code === 1008 && /unknown or expired session/i.test(ev.reason ?? '');
 }
 
 /** The stream's derived keystream, fixed once the upgrade completes. */
@@ -853,10 +876,11 @@ class SealedWebSocketImpl implements SealedWebSocket {
     private readonly closeCbs = new Set<(i: { code: number; reason: string; wasClean: boolean }) => void>();
     private readonly errCbs = new Set<(e: Error) => void>();
 
-    constructor(
-        private readonly ws: WebSocket,
-        private readonly cfg: SealedWSConfig,
-    ) {
+    private ws: WebSocket;
+    /** One transparent re-open per socket, after a rebind. */
+    private reopened = false;
+
+    constructor(private readonly cfg: SealedWSConfig) {
         this.ready = new Promise<void>((resolve, reject) => {
             this.resolveReady = resolve;
             this.rejectReady = reject;
@@ -869,7 +893,10 @@ class SealedWebSocketImpl implements SealedWebSocket {
         // the close/error callbacks carry the signal too.
         this.ready.catch(() => undefined);
         this.keys.catch(() => undefined);
+        this.ws = this.attach(cfg.makeSocket(cfg.streamHex));
+    }
 
+    private attach(ws: WebSocket): WebSocket {
         ws.onopen = () => {
             this.opened = true;
             void this.openStream();
@@ -877,18 +904,52 @@ class SealedWebSocketImpl implements SealedWebSocket {
         ws.onmessage = (ev: MessageEvent) => this.onWireMessage(ev);
         ws.onerror = () => this.emitError(new Error('sealed websocket transport error'));
         ws.onclose = (ev: CloseEvent) => {
-            if (this.keysPending) {
-                this.keysPending = false;
-                this.rejectKeys(new Error(`sealed websocket closed (code ${ev.code})`));
+            // The enclave forgot the session: rebind (coalesced with any
+            // request doing the same) and re-open on the new session, once.
+            // Queued sends stay queued: `keys` is left pending until the new
+            // stream is open, so nothing is lost or reordered.
+            if (this.readyPending && !this.closedLocally && !this.reopened && this.cfg.rebind && isSessionRefused(ev)) {
+                this.reopened = true;
+                void this.reopen(ev);
+                return;
             }
-            if (this.readyPending) {
-                this.readyPending = false;
-                this.rejectReady(new Error(`sealed websocket closed before ready (code ${ev.code}${ev.reason ? `: ${ev.reason}` : ''})`));
-            }
-            for (const cb of this.closeCbs) {
-                try { cb({ code: ev.code, reason: ev.reason, wasClean: ev.wasClean }); } catch { /* isolate */ }
-            }
+            this.finishClose(ev);
         };
+        return ws;
+    }
+
+    private async reopen(refusal: CloseEvent): Promise<void> {
+        let fresh: Awaited<ReturnType<NonNullable<SealedWSConfig['rebind']>>> = null;
+        try {
+            fresh = await this.cfg.rebind!();
+        } catch {
+            fresh = null;
+        }
+        if (!fresh || this.closedLocally) {
+            this.finishClose(refusal);
+            return;
+        }
+        this.cfg.sessionId = fresh.sessionId;
+        this.cfg.aead = fresh.aead;
+        this.cfg.hkdfIkm = fresh.hkdfIkm;
+        this.cfg.sessionSalt = fresh.sessionSalt;
+        this.cfg.streamHex = newStreamHex();
+        this.opened = false;
+        this.ws = this.attach(this.cfg.makeSocket(this.cfg.streamHex));
+    }
+
+    private finishClose(ev: { code: number; reason: string; wasClean: boolean }): void {
+        if (this.keysPending) {
+            this.keysPending = false;
+            this.rejectKeys(new Error(`sealed websocket closed (code ${ev.code})`));
+        }
+        if (this.readyPending) {
+            this.readyPending = false;
+            this.rejectReady(new Error(`sealed websocket closed before ready (code ${ev.code}${ev.reason ? `: ${ev.reason}` : ''})`));
+        }
+        for (const cb of this.closeCbs) {
+            try { cb({ code: ev.code, reason: ev.reason, wasClean: ev.wasClean }); } catch { /* isolate */ }
+        }
     }
 
     /** Derive the per-stream keystream and put the sealed stream open on the

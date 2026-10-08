@@ -499,7 +499,7 @@ export interface RestoredSession {
 export class AuthFrame {
     private readonly authOrigin: string;
     private readonly config: Omit<AuthFrameConfig, 'authOrigin' | 'container'>;
-    private readonly container: HTMLElement | null;
+    private container: HTMLElement | null;
     private sessionIframe: HTMLIFrameElement | null = null;
     private sessionHandler: ((e: MessageEvent) => void) | null = null;
     // Cached session payload from the last successful getSession() call.
@@ -551,17 +551,23 @@ export class AuthFrame {
         this.authOrigin = authOrigin ?? 'https://privasys.id';
         this.container = container ?? null;
         this.config = rest;
-        // One frame per page. Renewal of the shared privasys.id session is
-        // coordinated across documents by a lock and a single-use refresh
-        // token; several frames created and destroyed around each other
-        // (each with its own renewal iframe) is how a rotated token gets
-        // lost and every app in the browser is signed out.
-        const key = `${this.authOrigin}|${this.rpId}`;
+        // One frame per page and app host. Renewal of the shared privasys.id
+        // session is coordinated across documents by a lock and a single-use
+        // refresh token; several frames created and destroyed around each
+        // other (each with its own renewal iframe) is how a rotated token
+        // gets lost and every app in the browser is signed out. A page that
+        // seals to several enclaves legitimately holds one frame per host
+        // (`sessionRelay` is fixed at construction), so the key includes it.
+        const key = this.frameKey();
         const live = (liveFrames.get(key) ?? 0) + 1;
         liveFrames.set(key, live);
         if (live > 1) {
-            console.warn(`[privasys] ${live} AuthFrame instances are alive for ${this.rpId}; keep ONE per page and call connect() on it again to recover a session.`);
+            console.warn(`[privasys] ${live} AuthFrame instances are alive for ${key}; keep ONE per page and app host, and call connect() on it again to recover a session.`);
         }
+    }
+
+    private frameKey(): string {
+        return `${this.authOrigin}|${this.rpId}|${this.config.sessionRelay?.appHost ?? ''}`;
     }
 
     private setSealedState(state: SealedSessionState): void {
@@ -617,9 +623,16 @@ export class AuthFrame {
      * (`cancelled` | `timeout` | `failed`). To retry after a failure, call
      * `connect()` again.
      */
-    async connect(): Promise<ConnectResult> {
+    async connect(opts?: {
+        /** Where to render the gate this time. A page that unmounts its
+         *  sign-in container after success (every React gate does) passes
+         *  the freshly mounted one when it calls `connect()` again to
+         *  recover; without it the gate would render into a detached node. */
+        container?: HTMLElement;
+    }): Promise<ConnectResult> {
         const appHost = this.config.sessionRelay?.appHost;
         this.connectHint = null;
+        if (opts?.container) this.container = opts.container;
 
         // Recovery: the app holds a session whose carrier is dead (the
         // enclave refused the voucher, or the Privasys ID session ended).
@@ -1688,7 +1701,7 @@ export class AuthFrame {
         this.sealedProxy = null;
         if (!this.destroyed) {
             this.destroyed = true;
-            const key = `${this.authOrigin}|${this.rpId}`;
+            const key = this.frameKey();
             const live = (liveFrames.get(key) ?? 1) - 1;
             if (live > 0) liveFrames.set(key, live);
             else liveFrames.delete(key);

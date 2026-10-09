@@ -138,7 +138,20 @@ func (m *Mailer) Send(to, subject, body string) error {
 	return m.send(to, subject, body)
 }
 
+// SendHTML delivers one HTML message. The caller builds the markup from
+// values it controls; nothing taken from a request is interpolated unescaped.
+func (m *Mailer) SendHTML(to, subject, html string) error {
+	if !m.Enabled() {
+		return fmt.Errorf("mailer not configured")
+	}
+	return m.sendAs(to, subject, html, "html")
+}
+
 func (m *Mailer) send(to, subject, body string) error {
+	return m.sendAs(to, subject, body, "text")
+}
+
+func (m *Mailer) sendAs(to, subject, body, contentType string) error {
 	token, err := m.getToken()
 	if err != nil {
 		return fmt.Errorf("get Graph API token: %w", err)
@@ -147,7 +160,7 @@ func (m *Mailer) send(to, subject, body string) error {
 	payload := map[string]any{
 		"message": map[string]any{
 			"subject": subject,
-			"body":    map[string]string{"contentType": "text", "content": body},
+			"body":    map[string]string{"contentType": contentType, "content": body},
 			"toRecipients": []map[string]any{
 				{"emailAddress": map[string]string{"address": to}},
 			},

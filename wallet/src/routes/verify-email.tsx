@@ -187,7 +187,7 @@ export default function VerifyEmailScreen() {
                             </RNView>
                             <Text style={styles.doneTitle}>{t('verifyEmail.doneTitle')}</Text>
                             <Text style={styles.lede}>{t('verifyEmail.doneBody', { email: address })}</Text>
-                            <Pressable style={styles.primary} onPress={() => router.back()}>
+                            <Pressable style={[styles.primary, styles.doneButton]} onPress={() => router.back()}>
                                 <Text style={styles.primaryText}>{t('common.done')}</Text>
                             </Pressable>
                         </RNView>
@@ -312,5 +312,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         justifyContent: 'center',
         marginBottom: 20,
     },
+    // doneWrap centres its children, which would shrink the button to its label.
+    doneButton: { alignSelf: 'stretch' },
     doneTitle: { fontSize: 22, fontWeight: '700', color: p.textPrimary, marginBottom: 8 },
 });

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ type fakeMailer struct {
 }
 
 func (m *fakeMailer) Enabled() bool { return m.enabled }
-func (m *fakeMailer) Send(to, subject, body string) error {
+func (m *fakeMailer) SendHTML(to, subject, body string) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -81,10 +82,10 @@ func codeFrom(t *testing.T, m *fakeMailer) string {
 	if len(m.sent) == 0 {
 		t.Fatal("no mail was sent")
 	}
-	for _, f := range strings.Fields(m.sent[len(m.sent)-1].body) {
-		if len(f) == 6 && strings.Trim(f, "0123456789") == "" {
-			return f
-		}
+	// The code is the one run of exactly six digits in the markup.
+	found := regexp.MustCompile(`(^|[^0-9])([0-9]{6})([^0-9]|$)`).FindAllStringSubmatch(m.sent[len(m.sent)-1].body, -1)
+	if len(found) == 1 {
+		return found[0][2]
 	}
 	t.Fatalf("no 6-digit code in %q", m.sent[len(m.sent)-1].body)
 	return ""

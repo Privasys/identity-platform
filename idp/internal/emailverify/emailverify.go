@@ -59,7 +59,7 @@ const (
 // Mailer satisfies it.
 type Mailer interface {
 	Enabled() bool
-	Send(to, subject, body string) error
+	SendHTML(to, subject, html string) error
 }
 
 // Authenticate resolves the caller to a user id, or writes the error and
@@ -199,16 +199,24 @@ func (s *Service) HandleBegin(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 
 	subject := "Privasys verification code"
+	// Only the code (six digits) and the lifetime are interpolated, so there is
+	// nothing to escape. Inline styles and a table, because mail clients strip
+	// stylesheets and many ignore flexbox. The code box's right padding is
+	// shorter by the letter-spacing the last digit carries, so it centres.
 	body := fmt.Sprintf(
-		"Your Privasys verification code is:\n\n"+
-			"    %s\n\n"+
-			"Type it into your wallet to confirm this address is yours. "+
-			"The code stops working in %d minutes.\n\n"+
-			"If you did not ask for this, nothing has happened to your account "+
-			"and you can ignore this message. Whoever asked cannot see it.\n",
+		`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f6f8fa;">`+
+			`<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#f6f8fa;"><tr><td align="center" style="padding:32px 16px;">`+
+			`<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">`+
+			`<tr><td style="padding:32px 28px 8px;font-size:16px;line-height:24px;">Your Privasys verification code is:</td></tr>`+
+			`<tr><td align="center" style="padding:16px 28px;">`+
+			`<div style="display:inline-block;background:#e9fbf3;border:1px solid #b9f0d8;border-radius:12px;padding:18px 20px 18px 28px;font-size:34px;line-height:40px;font-weight:700;letter-spacing:8px;color:#0e3b2b;font-family:'SF Mono',Menlo,Consolas,'Courier New',monospace;">%s</div>`+
+			`</td></tr>`+
+			`<tr><td style="padding:8px 28px 16px;font-size:15px;line-height:23px;">Type it into your wallet to confirm this address is yours. The code stops working in %d minutes.</td></tr>`+
+			`<tr><td style="padding:0 28px 32px;font-size:13px;line-height:20px;color:#6b7280;">If you did not ask for this, nothing has happened to your account and you can ignore this message. Whoever asked cannot see it.</td></tr>`+
+			`</table></td></tr></table></body></html>`,
 		code, int(codeTTL.Minutes()),
 	)
-	if err := s.mailer.Send(email, subject, body); err != nil {
+	if err := s.mailer.SendHTML(email, subject, body); err != nil {
 		// The address is not logged: it is the holder's, and this server is
 		// meant to forget it.
 		log.Printf("emailverify: send failed: %v", err)

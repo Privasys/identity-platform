@@ -50,14 +50,25 @@ const maxPendingPerApp = 3
 
 // DisclosureAuth authenticates an app from a proof and reports whether a
 // holder has a standing relationship with it (spend.Handler implements both).
+// resolveSubject maps a subject an app holds to the account it names (see
+// internal/tokens/subject.go). Wired at start-up; identity until then.
+var resolveSubject = func(sub string) string { return sub }
+
+// SetSubjectResolver wires the per-sector subject resolution.
+func SetSubjectResolver(f func(string) string) { resolveSubject = f }
+
 type DisclosureAuth interface {
 	VerifyAppProof(ctx context.Context, appID, proof string) (name string, err error)
 	HasConsent(sub, appID string) bool
 }
 
 type disclosureEntry struct {
-	appID     string
+	appID string
+	// sub is the account; appSub is the subject the app named it by, which
+	// is what the disclosure goes back with (they differ outside the shared
+	// sector, internal/tokens/subject.go).
 	sub       string
+	appSub    string
 	sessionID string
 	named     []string
 	purpose   string
@@ -134,6 +145,8 @@ func HandleDisclosureRequest(reg *clients.Registry, sessionStore *SessionStore, 
 			return
 		}
 		req.Sub = strings.TrimSpace(req.Sub)
+		appSub := req.Sub
+		req.Sub = resolveSubject(req.Sub)
 		appName, err := auth.VerifyAppProof(r.Context(), req.AppID, req.Proof)
 		if err != nil {
 			errorResponse(w, http.StatusUnauthorized, "invalid_client", err.Error())
@@ -204,7 +217,7 @@ func HandleDisclosureRequest(reg *clients.Registry, sessionStore *SessionStore, 
 
 		id := generateID()
 		entry := &disclosureEntry{
-			appID: req.AppID, sub: req.Sub, sessionID: session.SessionID,
+			appID: req.AppID, sub: req.Sub, appSub: appSub, sessionID: session.SessionID,
 			named: named, purpose: strings.TrimSpace(req.Purpose), expiresAt: session.ExpiresAt,
 		}
 		if !store.put(id, entry) {
@@ -290,7 +303,7 @@ func HandleDisclosureResult(reg *clients.Registry, sessionStore *SessionStore, c
 		}
 		now := time.Now()
 		tok, err := issuer.IssueDisclosure(tokens.DisclosureClaims{
-			Subject: entry.sub, AppID: entry.appID, Attributes: out, Purpose: entry.purpose,
+			Subject: entry.appSub, AppID: entry.appID, Attributes: out, Purpose: entry.purpose,
 			IssuedAt: now, Expiry: now.Add(5 * time.Minute), JTI: generateID(),
 		})
 		if err != nil {

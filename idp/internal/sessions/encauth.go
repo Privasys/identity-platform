@@ -113,9 +113,6 @@ func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, host strin
 	if p.V != 1 {
 		return nil, fmt.Errorf("unsupported encauth version %d", p.V)
 	}
-	if p.Sub != userID {
-		return nil, errors.New("encauth sub does not match authenticated user")
-	}
 	if len(p.HwPub) != 65 || p.HwPub[0] != 0x04 {
 		return nil, errors.New("hw_pub must be P-256 SEC1 uncompressed")
 	}
@@ -140,6 +137,17 @@ func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, host strin
 	}
 	if sess.UserID != userID {
 		return nil, errors.New("sid does not belong to authenticated user")
+	}
+	// The voucher's subject is what the enclave asserts as X-Privasys-Sub,
+	// so it must be the subject THIS session's client sees: the account id
+	// in the shared sector, the client's own per-person subject otherwise.
+	// Anything else would hand an app an identifier other apps share.
+	want := userID
+	if s.sectorOf != nil {
+		want = issuer.SubjectFor(userID, s.sectorOf(sess.ClientID))
+	}
+	if p.Sub != want {
+		return nil, errors.New("encauth sub is not the subject this session's client sees")
 	}
 	if sess.RevokedAt != nil {
 		return nil, ErrRevoked

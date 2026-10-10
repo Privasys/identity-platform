@@ -32,6 +32,11 @@ type Client struct {
 	BillableRP       bool   `json:"billable_rp,omitempty"`
 	BillingAccountID string `json:"billing_account_id,omitempty"`
 	RPID             string `json:"rp_id,omitempty"`
+	// Sector decides the "sub" this client sees (internal/tokens/subject.go).
+	// Empty is the shared sector: the account id, as Privasys's own apps
+	// receive it. Any other value gives the client its own subject per person,
+	// so it cannot match its users against another site's.
+	Sector string `json:"sector"`
 }
 
 // ValidRedirectURI checks if the given URI is in the client's registered redirect URIs.
@@ -56,12 +61,12 @@ func NewRegistry(db *store.DB) *Registry {
 
 // Get retrieves a client by ID.
 func (reg *Registry) Get(clientID string) (*Client, error) {
-	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID string
+	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID, sector string
 	var billableRP int
 	err := reg.db.QueryRow(
-		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id FROM clients WHERE client_id = ?",
+		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id, sector FROM clients WHERE client_id = ?",
 		clientID,
-	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID)
+	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID, &sector)
 	if err != nil {
 		return nil, fmt.Errorf("client not found: %w", err)
 	}
@@ -81,7 +86,29 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 		BillableRP:         billableRP != 0,
 		BillingAccountID:   billingAccountID,
 		RPID:               rpID,
+		Sector:             sector,
 	}, nil
+}
+
+// SectorOf returns a client's sector, or "" (shared) for an unknown client.
+func (reg *Registry) SectorOf(clientID string) string {
+	var sector string
+	_ = reg.db.QueryRow("SELECT sector FROM clients WHERE client_id = ?", clientID).Scan(&sector)
+	return sector
+}
+
+// SetSector moves a client to a sector. Moving changes the "sub" the client
+// sees for every one of its users, so it is an operator action, done with
+// the client's owner, never a side effect.
+func (reg *Registry) SetSector(clientID, sector string) error {
+	res, err := reg.db.Exec("UPDATE clients SET sector = ? WHERE client_id = ?", sector, clientID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("client not found")
+	}
+	return nil
 }
 
 // ResolveByRPID resolves a billable relying party's rp_id to its linked
@@ -203,9 +230,11 @@ func (reg *Registry) Register(name string, redirectURIs []string, secret string,
 	urisJSON, _ := json.Marshal(redirectURIs)
 	attrsJSON, _ := json.Marshal(requiredAttributes)
 
+	// A client registered here is a third party: it gets its own sector, so
+	// its users' subjects are its own and nobody else's.
 	_, err := reg.db.Exec(
-		"INSERT INTO clients (client_id, client_name, client_secret, redirect_uris, required_attributes) VALUES (?, ?, ?, ?, ?)",
-		clientID, name, secretHash, string(urisJSON), string(attrsJSON),
+		"INSERT INTO clients (client_id, client_name, client_secret, redirect_uris, required_attributes, sector) VALUES (?, ?, ?, ?, ?, ?)",
+		clientID, name, secretHash, string(urisJSON), string(attrsJSON), clientID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("register client: %w", err)
@@ -218,6 +247,7 @@ func (reg *Registry) Register(name string, redirectURIs []string, secret string,
 		RedirectURIs:       redirectURIs,
 		Confidential:       secret != "",
 		RequiredAttributes: requiredAttributes,
+		Sector:             clientID,
 	}, nil
 }
 
@@ -423,5 +453,56 @@ func HandleSetSpendJWKS(reg *Registry, adminToken string) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"client_id": clientID, "spend_jwks_uri": req.JWKSURI})
+	}
+}
+
+// HandleSetSector serves POST /clients/{id}/sector (admin token).
+//
+//	{"sector": "own"}     the client's own sector (its client_id): per-person
+//	                      subjects no other client shares
+//	{"sector": "shared"}  the shared sector: the account id, as Privasys's own
+//	                      apps receive it
+//	{"sector": "<name>"}  a named sector, for several clients of ONE operator
+//	                      that must see the same subject
+//
+// Moving a client changes the "sub" it sees for every user it has, so the
+// client's owner must be ready to re-key their records first.
+func HandleSetSector(reg *Registry, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminToken != "" {
+			auth := r.Header.Get("Authorization")
+			if len(auth) < 8 || auth[7:] != adminToken {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+		}
+		clientID := r.PathValue("id")
+		var req struct {
+			Sector string `json:"sector"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || clientID == "" {
+			http.Error(w, `{"error":"client id and sector are required"}`, http.StatusBadRequest)
+			return
+		}
+		sector := req.Sector
+		switch sector {
+		case "own":
+			sector = clientID
+		case "shared":
+			sector = ""
+		case "":
+			http.Error(w, `{"error":"sector must be own, shared or a name"}`, http.StatusBadRequest)
+			return
+		}
+		if len(sector) > 128 {
+			http.Error(w, `{"error":"sector name too long"}`, http.StatusBadRequest)
+			return
+		}
+		if err := reg.SetSector(clientID, sector); err != nil {
+			http.Error(w, `{"error":"client not found"}`, http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"client_id": clientID, "sector": sector})
 	}
 }

@@ -126,6 +126,13 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			writeError(w, http.StatusBadRequest, "sub and type are required")
 			return
 		}
+		// An app outside the shared sector knows the holder by its own subject
+		// (internal/tokens/subject.go); everything below is keyed by account.
+		if db != nil {
+			if userID, ok := db.ResolveSubject(req.Sub); ok {
+				req.Sub = userID
+			}
+		}
 		// The holder silenced this app. A 200, so the control plane reports
 		// success to the app: it has nothing to retry, and a refusal would
 		// tell it something about the holder. The body says what happened; the

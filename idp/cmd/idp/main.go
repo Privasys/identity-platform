@@ -72,6 +72,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create token issuer: %v", err)
 	}
+	// Per-sector subjects: a client outside the shared sector sees its own
+	// subject for each person (internal/tokens/subject.go).
+	issuer.SetSubjectStore(db)
+	oidc.SetSubjectResolver(issuer.ResolveSubject)
 
 	// Wallet-provider signing key — a DISTINCT key that signs Wallet Instance
 	// Attestations, verified via /wallet-provider/jwks (provisioned into the
@@ -125,6 +129,10 @@ func main() {
 		log.Fatalf("failed to open sessions store: %v", err)
 	}
 	sessionsStore.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
+	sessionsStore.SetSectorResolver(clientReg.SectorOf)
+	fido2Handler.SetSubjectResolver(func(userID, clientID string) string {
+		return issuer.SubjectFor(userID, clientReg.SectorOf(clientID))
+	})
 
 	// Wallet Instance Attestation: attest the wallet's hardware holder key
 	// (Android Keystore key attestation / iOS App Attest) and issue a
@@ -245,6 +253,7 @@ func main() {
 	mux.HandleFunc("GET /account/", oidc.HandleAccountPage(cfg.AccountAPIBase))
 	// A non-enclave relying party registers where it publishes spend keys.
 	mux.HandleFunc("POST /clients/{id}/spend", clients.HandleSetSpendJWKS(clientReg, cfg.AdminToken))
+	mux.HandleFunc("POST /clients/{id}/sector", clients.HandleSetSector(clientReg, cfg.AdminToken))
 
 	// Wallet Instance Attestation: the wallet-provider JWKS (verifiers fetch it /
 	// have it provisioned), a fresh challenge, and enrolment → a holder-bound WIA.

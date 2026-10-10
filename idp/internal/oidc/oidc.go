@@ -243,7 +243,7 @@ func HandleDiscovery(issuerURL string) http.HandlerFunc {
 		"registration_endpoint":                 issuerURL + "/clients",
 		"response_types_supported":              []string{"code"},
 		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer", "urn:ietf:params:oauth:grant-type:device_code"},
-		"subject_types_supported":               []string{"pairwise"},
+		"subject_types_supported":               []string{"public", "pairwise"},
 		"id_token_signing_alg_values_supported": []string{"ES256"},
 		"scopes_supported":                      []string{"openid", "profile", "email", "phone", "identity", "offline_access"},
 		"token_endpoint_auth_methods_supported": []string{"none", "client_secret_post", "client_secret_basic"},
@@ -1198,6 +1198,14 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	// registration-time), discloses no personal data, and IS the receipt the
 	// relying party paid the presence ceremony for.
 	client, _ := reg.Get(ac.ClientID)
+	// The subject this client sees: the account id in the shared sector, its
+	// own per-person subject otherwise (internal/tokens/subject.go). Roles,
+	// receipts and sessions below still key on the account.
+	sector := ""
+	if client != nil {
+		sector = client.Sector
+	}
+	subject := issuer.SubjectFor(ac.UserID, sector)
 	restricted := make(map[string]string, 1)
 	if client != nil {
 		for _, key := range client.RequiredAttributes {
@@ -1218,6 +1226,10 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	allRoles, _ := db.GetRoles(ac.UserID)
 	audience := audienceFromScope(ac.Scope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
+	if sector != "" {
+		// A site in its own sector learns nothing of the account's roles here.
+		roles = nil
+	}
 
 	// Issue ID token.
 	// Reuse (or mint) the unified session row for (user, client, device)
@@ -1265,7 +1277,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	}
 
 	idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{
-		Subject:          ac.UserID,
+		Subject:          subject,
 		Email:            filteredAttrs["email"],
 		EmailVerified:    emailVerified,
 		Name:             filteredAttrs["name"],
@@ -1300,7 +1312,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	// Access token aud is the resource-server trust domain, selected from
 	// the scope (audience:<X>, defaulting to privasys-platform).
 	// ID token aud = client_id (per OIDC spec: ID tokens are for the client).
-	accessToken, err := issuer.IssueAccessTokenWithSID(ac.UserID, audience, sid, roles, filteredAttrs)
+	accessToken, err := issuer.IssueAccessTokenWithSID(subject, audience, sid, roles, filteredAttrs)
 	if err != nil {
 		log.Printf("token: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -1430,9 +1442,13 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	allRoles, _ := db.GetRoles(userID)
 	audience := audienceFromScope(effectiveScope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
+	if reg.SectorOf(clientID) != "" {
+		roles = nil
+	}
 
 	// Issue new access token (with current roles and available profile).
-	accessToken, err := issuer.IssueAccessTokenWithSID(userID, audience, sid, roles, filteredRefreshAttrs)
+	subject := issuer.SubjectFor(userID, reg.SectorOf(clientID))
+	accessToken, err := issuer.IssueAccessTokenWithSID(subject, audience, sid, roles, filteredRefreshAttrs)
 	if err != nil {
 		log.Printf("refresh: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -1441,7 +1457,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 
 	// Issue new ID token.
 	idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{
-		Subject:          userID,
+		Subject:          subject,
 		Email:            filteredRefreshAttrs["email"],
 		Name:             filteredRefreshAttrs["name"],
 		Picture:          "",
@@ -1625,8 +1641,14 @@ func HandleUserInfo(issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 			return
 		}
 
+		// The client gets back the subject it was issued, not the account it
+		// resolves to (the two differ outside the shared sector).
+		issuedSub, _ := claims[tokens.ClaimSubjectAsIssued].(string)
+		if issuedSub == "" {
+			issuedSub = sub
+		}
 		resp := map[string]interface{}{
-			"sub": sub,
+			"sub": issuedSub,
 		}
 
 		// Echo back profile claims from the access token.
@@ -1640,10 +1662,14 @@ func HandleUserInfo(issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 			}
 		}
 
-		// Include roles.
-		roles, _ := db.GetRoles(sub)
-		if len(roles) > 0 {
-			resp["roles"] = roles
+		// Platform roles only for Privasys's own apps (the shared sector):
+		// another site has no business learning that an account administers
+		// something here.
+		if issuedSub == sub {
+			roles, _ := db.GetRoles(sub)
+			if len(roles) > 0 {
+				resp["roles"] = roles
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")

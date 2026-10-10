@@ -91,6 +91,20 @@ type Handler struct {
 	vaultResults   *vaultResultStore
 	vaultPending   *vaultPendingStore
 	attrPending    *attrPendingStore
+	// subjectFor names the subject a client sees for an account, so the
+	// wallet can put it in the voucher the enclave asserts.
+	subjectFor func(userID, clientID string) string
+}
+
+// SetSubjectResolver wires the per-sector subject lookup.
+func (h *Handler) SetSubjectResolver(f func(userID, clientID string) string) { h.subjectFor = f }
+
+// sessionSubject is the subject the browser session's client sees, or "".
+func (h *Handler) sessionSubject(userID, clientID string) string {
+	if h.subjectFor == nil || clientID == "" {
+		return ""
+	}
+	return h.subjectFor(userID, clientID)
 }
 
 // walletSessionStore is a tiny in-memory map of sessionToken → user_id with TTL.
@@ -551,6 +565,7 @@ func (h *Handler) CompleteRegistration(
 		}
 
 		// Mark OIDC session complete (first-time users register, not authenticate).
+		var subject string
 		if entry.sessionID != "" {
 			session, ok := sessionStore.Get(entry.sessionID)
 			if ok {
@@ -582,6 +597,7 @@ func (h *Handler) CompleteRegistration(
 					WalletVerified: session.WalletAsserted,
 				})
 				sessionStore.Complete(entry.sessionID, userID, authCode)
+				subject = h.sessionSubject(userID, session.ClientID)
 			}
 		}
 
@@ -589,6 +605,10 @@ func (h *Handler) CompleteRegistration(
 			"status":       "ok",
 			"sessionToken": sessionToken,
 			"userId":       userID,
+		}
+		// The subject the session's client sees, for the voucher's sub.
+		if subject != "" {
+			resp["subject"] = subject
 		}
 		if recoveryPhrase != "" {
 			resp["recoveryPhrase"] = recoveryPhrase
@@ -817,6 +837,7 @@ func (h *Handler) CompleteAuthentication(
 		sessionToken := h.walletSessions.issue(userID)
 
 		// Generate OIDC auth code and mark session complete.
+		var subject string
 		if entry.sessionID != "" {
 			session, ok := sessionStore.Get(entry.sessionID)
 			if ok {
@@ -844,14 +865,20 @@ func (h *Handler) CompleteAuthentication(
 					WalletVerified: session.WalletAsserted,
 				})
 				sessionStore.Complete(entry.sessionID, userID, authCode)
+				subject = h.sessionSubject(userID, session.ClientID)
 			}
 		}
 
-		writeJSON(w, map[string]interface{}{
+		resp := map[string]interface{}{
 			"status":       "ok",
 			"sessionToken": sessionToken,
 			"userId":       userID,
-		})
+		}
+		// The subject the session's client sees, for the voucher's sub.
+		if subject != "" {
+			resp["subject"] = subject
+		}
+		writeJSON(w, resp)
 	}
 }
 

@@ -386,15 +386,23 @@ export class PrivasysSession {
 
     private async requestOnce(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedResponse> {
         const upperMethod = method.toUpperCase();
-        const ad = encodeAD(upperMethod, path, this.sessionId);
+        // One request, one session. A concurrent request can rebind this
+        // session in place (tryRebind swaps the id and keys) while this one
+        // is on the wire; its reply is still sealed under the session it was
+        // sent on, so decrypting with whatever keys are current by then fails
+        // with the browser's opaque OperationError ("the operation failed for
+        // an operation-specific reason"). Seen on Drive right after a deploy.
+        const sessionId = this.sessionId;
+        const keys = this.keys;
+        const ad = encodeAD(upperMethod, path, sessionId);
 
         const plaintext = serializePlaintext(body);
         const ctr = this.c2sCtr++;
-        const nonce = makeNonce(this.keys.c2sPrefix, ctr);
+        const nonce = makeNonce(keys.c2sPrefix, ctr);
         const ct = new Uint8Array(
             await crypto.subtle.encrypt(
                 { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: ad as BufferSource },
-                this.keys.aead,
+                keys.aead,
                 plaintext as BufferSource,
             ),
         );
@@ -402,7 +410,7 @@ export class PrivasysSession {
 
         const headers = new Headers(init?.headers);
         headers.set('Content-Type', SEALED_CONTENT_TYPE);
-        headers.set('Authorization', `${SESSION_AUTH_SCHEME} ${this.sessionId}`);
+        headers.set('Authorization', `${SESSION_AUTH_SCHEME} ${sessionId}`);
 
         // fetch forbids a body on GET/HEAD, so for those methods the (tiny —
         // empty-plaintext) envelope travels in the X-Privasys-Sealed header
@@ -427,7 +435,7 @@ export class PrivasysSession {
             // Drain the stream into a single Uint8Array so request() retains
             // its single-shot semantics. For SSE callers, use stream() below.
             const chunks: Uint8Array[] = [];
-            for await (const chunk of decodeFrameStream(respBody, this.keys.aead, this.keys.s2cPrefix, ad)) {
+            for await (const chunk of decodeFrameStream(respBody, keys.aead, keys.s2cPrefix, ad)) {
                 chunks.push(chunk);
             }
             const inner = parseInnerStatus(resp.headers, resp.status);
@@ -438,16 +446,18 @@ export class PrivasysSession {
         }
 
         const sealed = decodeSealed(respBody);
-        const respNonce = makeNonce(this.keys.s2cPrefix, sealed.ctr);
+        const respNonce = makeNonce(keys.s2cPrefix, sealed.ctr);
         const pt = new Uint8Array(
             await crypto.subtle.decrypt(
                 { name: 'AES-GCM', iv: respNonce as BufferSource, additionalData: ad as BufferSource },
-                this.keys.aead,
+                keys.aead,
                 sealed.ct as BufferSource,
             ),
         );
-        // Track expected ctr for replay rejection on subsequent responses.
-        if (sealed.ctr >= this.s2cCtr) {
+        // Track expected ctr for replay rejection on subsequent responses,
+        // only while the session is the one this reply belongs to: a reply
+        // from before a rebind must not move the new session's counter.
+        if (this.sessionId === sessionId && sealed.ctr >= this.s2cCtr) {
             this.s2cCtr = sealed.ctr + 1n;
         }
         return { status: resp.status, sealed: true, body: pt, headers: resp.headers };
@@ -643,15 +653,19 @@ export class PrivasysSession {
 
     private async streamOnce(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedStreamResponse> {
         const upperMethod = method.toUpperCase();
-        const ad = encodeAD(upperMethod, path, this.sessionId);
+        // One stream, one session (see requestOnce): a rebind mid-flight must
+        // not change the keys this stream's frames are opened with.
+        const sessionId = this.sessionId;
+        const keys = this.keys;
+        const ad = encodeAD(upperMethod, path, sessionId);
 
         const plaintext = serializePlaintext(body);
         const ctr = this.c2sCtr++;
-        const nonce = makeNonce(this.keys.c2sPrefix, ctr);
+        const nonce = makeNonce(keys.c2sPrefix, ctr);
         const ct = new Uint8Array(
             await crypto.subtle.encrypt(
                 { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: ad as BufferSource },
-                this.keys.aead,
+                keys.aead,
                 plaintext as BufferSource,
             ),
         );
@@ -659,7 +673,7 @@ export class PrivasysSession {
 
         const headers = new Headers(init?.headers);
         headers.set('Content-Type', SEALED_CONTENT_TYPE);
-        headers.set('Authorization', `${SESSION_AUTH_SCHEME} ${this.sessionId}`);
+        headers.set('Authorization', `${SESSION_AUTH_SCHEME} ${sessionId}`);
 
         // fetch forbids a body on GET/HEAD, so for those methods the (tiny —
         // empty-plaintext) envelope travels in the X-Privasys-Sealed header
@@ -686,11 +700,11 @@ export class PrivasysSession {
             let status = resp.status;
             if (respCT.startsWith(SEALED_CONTENT_TYPE)) {
                 const env = decodeSealed(buf);
-                const respNonce = makeNonce(this.keys.s2cPrefix, env.ctr);
+                const respNonce = makeNonce(keys.s2cPrefix, env.ctr);
                 const pt = new Uint8Array(
                     await crypto.subtle.decrypt(
                         { name: 'AES-GCM', iv: respNonce as BufferSource, additionalData: ad as BufferSource },
-                        this.keys.aead,
+                        keys.aead,
                         env.ct as BufferSource,
                     ),
                 );
@@ -707,8 +721,8 @@ export class PrivasysSession {
             return { status, sealed, headers: resp.headers, body: single };
         }
 
-        const aead = this.keys.aead;
-        const s2cPrefix = this.keys.s2cPrefix;
+        const aead = keys.aead;
+        const s2cPrefix = keys.s2cPrefix;
         const reader = resp.body!.getReader();
         const status = parseInnerStatus(resp.headers, resp.status);
         // Per-frame flush: each `pull()` advances the decoder by exactly

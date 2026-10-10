@@ -101,3 +101,62 @@ test('a refused voucher reports reapproval-required with the reason', async () =
         { status: 'reapproval-required', reason: 'workload-changed' },
     ]);
 });
+
+/** The sealed reply an enclave sends: CBOR map {v, ctr, ct}. */
+function sealedEnvelope(ctr: number, ct: Uint8Array): Uint8Array {
+    const text = (s: string) => [0x60 + s.length, ...new TextEncoder().encode(s)];
+    const bytes = ct.byteLength < 24 ? [0x40 + ct.byteLength] : [0x58, ct.byteLength];
+    return new Uint8Array([0xa3, ...text('v'), 0x01, ...text('ctr'), ctr, ...text('ct'), ...bytes, ...ct]);
+}
+
+test('a reply sealed before a concurrent rebind still opens', async () => {
+    const enclave = await encKey();
+    const sdk = (await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits'])) as CryptoKeyPair;
+    const sessionId = b64u(crypto.getRandomValues(new Uint8Array(16)));
+
+    let rebound!: () => void;
+    const reboundDone = new Promise<void>((r) => (rebound = r));
+    let original: { aead: CryptoKey; s2cPrefix: Uint8Array } | undefined;
+
+    const fetchImpl: typeof fetch = async (input) => {
+        const url = String(input);
+        if (url.endsWith('/__privasys/session-bootstrap')) {
+            setTimeout(rebound, 0);
+            return new Response(
+                JSON.stringify({ session_id: b64u(crypto.getRandomValues(new Uint8Array(16))), enc_pub: b64u(enclave.pubRaw), sub: 'holder-1' }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } },
+            );
+        }
+        if (url.endsWith('/api/slow')) {
+            // Answered by the session it was sent on, but only after another
+            // request has rebound the session in place.
+            await reboundDone;
+            const nonce = new Uint8Array(12);
+            nonce.set(original!.s2cPrefix.subarray(0, 4), 0);
+            new DataView(nonce.buffer).setBigUint64(4, 0n, false);
+            const ad = new TextEncoder().encode(`GET:/api/slow:${sessionId}`);
+            const ct = new Uint8Array(await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv: nonce, additionalData: ad }, original!.aead, new TextEncoder().encode('{"ok":true}')));
+            return new Response(sealedEnvelope(0, ct), { status: 200, headers: { 'Content-Type': 'application/privasys-sealed+cbor' } });
+        }
+        // Any other request finds the session forgotten (the enclave restarted).
+        return new Response('unknown or expired session', { status: 401, headers: { 'Content-Type': 'text/plain' } });
+    };
+
+    const session = await PrivasysSession.fromHandshake({
+        host: 'app.example.test',
+        sessionId,
+        sdkPrivateKey: sdk.privateKey,
+        encPub: b64u(enclave.pubRaw),
+        fetchImpl,
+        getEncAuth: async () => voucherFor(enclave.pubRaw),
+    });
+    original = (session as unknown as { keys: { aead: CryptoKey; s2cPrefix: Uint8Array } }).keys;
+
+    const slow = session.request('GET', '/api/slow');
+    await session.request('GET', '/api/fast'); // rebinds the session in place
+    assert.notEqual(session.sessionId, sessionId, 'the session rebound while /api/slow was in flight');
+    const r = await slow;
+    assert.equal(r.status, 200);
+    assert.equal(new TextDecoder().decode(r.body), '{"ok":true}');
+});

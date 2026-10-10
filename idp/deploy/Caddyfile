@@ -17,6 +17,7 @@
 # same change to the live host (caddy validate + systemctl reload caddy).
 
 privasys.id {
+    import conf.d/*.caddy
     handle_path /.well-known/apple-app-site-association {
         root * /var/www/.well-known
         header Content-Type application/json
@@ -41,6 +42,7 @@ privasys.id {
         header X-Frame-Options ""
         header Content-Security-Policy "frame-ancestors *"
         header Access-Control-Allow-Origin "*"
+        header Cache-Control "no-cache"
         root * /var/www
         file_server
     }
@@ -48,14 +50,17 @@ privasys.id {
         header X-Frame-Options ""
         header Content-Security-Policy "frame-ancestors *"
         header Access-Control-Allow-Origin "*"
+        header Cache-Control "no-cache"
         root * /var/www
         try_files /auth/index.html
         file_server
     }
 
-    # OIDC / FIDO2 / session endpoints + wallet-link + referential -> IdP backend
-    @idp path /.well-known/openid-configuration /jwks /authorize /token /userinfo /fido2/* /session/* /sessions /sessions/* /api-keys /api-keys/* /clients /clients/* /admin/* /healthz /e2e/* /recovery/* /guardians/* /devices /devices/* /push-token /device_authorization /device /device/* /wallet/* /referential/* /vault/* /spend /spend/* /account /account/ /capability-requests/*
+    # OIDC / FIDO2 / session endpoints -> IdP backend
+    @idp path /.well-known/openid-configuration /jwks /authorize /token /userinfo /fido2/* /session/* /sessions /sessions/* /api-keys /api-keys/* /clients /clients/* /admin/* /healthz /e2e/* /recovery/* /guardians/* /devices /devices/* /push-token /device_authorization /device /device/* /wallet/* /referential/* /vault/* /wia/* /wallet-provider/* /spend /spend/* /account /account/ /capability-requests/*
     handle @idp {
+        @sessionsApi path /sessions /sessions/*
+        header @sessionsApi Cache-Control "no-store"
         reverse_proxy localhost:8091
     }
 
@@ -71,6 +76,14 @@ privasys.id {
         reverse_proxy https://plausible.privasys.org {
             header_up Host plausible.privasys.org
         }
+    }
+
+    # Paths that look like files (have an extension) must exist: serve or 404,
+    # never fall back to the landing page (avoids soft-404s for crawlers)
+    @withExt path_regexp \.[A-Za-z0-9]+$
+    handle @withExt {
+        root * /var/www
+        file_server
     }
 
     # Static landing page

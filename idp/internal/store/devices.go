@@ -176,11 +176,16 @@ func (db *DB) TagCredential(userID, credentialID, deviceTag string) error {
 // target and its refresh tokens' reach. Passkeys with no tag (written before
 // tags existed) go too, except keepCredentialID, the revoking phone's own: an
 // untagged passkey that is not the caller's belongs to a phone the holder no
-// longer has in hand. Returns the removed credential ids, so the caller can end
-// their wallet sessions.
+// longer has in hand. KeepAllUntagged ("*") leaves every untagged passkey
+// alone: a phone removing itself does not speak for the others. Returns the
+// removed credential ids, so the caller can end their wallet sessions.
 func (db *DB) RevokeDevice(userID, deviceTag, keepCredentialID string) ([]string, error) {
 	if deviceTag == "" {
 		return nil, errors.New("device tag is required")
+	}
+	untaggedToo := 1
+	if keepCredentialID == KeepAllUntagged {
+		untaggedToo = 0
 	}
 	tx, err := db.Begin()
 	if err != nil {
@@ -189,8 +194,8 @@ func (db *DB) RevokeDevice(userID, deviceTag, keepCredentialID string) ([]string
 	defer tx.Rollback()
 	rows, err := tx.Query(`
 		SELECT credential_id, device_tag FROM credentials
-		 WHERE user_id = ? AND (device_tag = ? OR (device_tag = '' AND credential_id <> ?))`,
-		userID, deviceTag, keepCredentialID)
+		 WHERE user_id = ? AND (device_tag = ? OR (? = 1 AND device_tag = '' AND credential_id <> ?))`,
+		userID, deviceTag, untaggedToo, keepCredentialID)
 	if err != nil {
 		return nil, err
 	}
@@ -299,6 +304,9 @@ func (db *DB) GetVersioned(table, userID string) (string, int64, error) {
 	}
 	return blob, v, err
 }
+
+// KeepAllUntagged, as RevokeDevice's keepCredentialID, leaves untagged passkeys alone.
+const KeepAllUntagged = "*"
 
 // ValidDeviceTag reports whether s has the shape of a device tag: base64url,
 // 16 to 64 characters (the wallet sends 22, 16 bytes).

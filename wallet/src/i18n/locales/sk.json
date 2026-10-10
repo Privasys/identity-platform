@@ -370,7 +370,8 @@
       "mail.mailbox": "{{permissions}} poštu v {{resource}} prostredníctvom {{service}}",
       "meeting.transcripts": "{{permissions}} prepisy vašich stretnutí v {{resource}}",
       "meeting.recording": "Zapnúť nahrávanie a prepis pri stretnutiach, ktoré organizujete v {{resource}}",
-      "files.cloud": "{{permissions}} súbory v {{resource}}, cez {{service}}"
+      "files.cloud": "{{permissions}} súbory v {{resource}}, cez {{service}}",
+      "files.ai": "Čítať a prehľadávať súbory, ktoré ste vo svojom Privasys Drive sprístupnili AI"
     },
     "permissionJoin": " a ",
     "permission": {
@@ -394,7 +395,8 @@
         "recording": "Táto aplikácia môže zapnúť vlastné nahrávanie a prepis vášho poskytovateľa pri stretnutiach, ktoré organizujete. Poskytovateľ to oznámi všetkým na stretnutí obvyklým spôsobom. Bez toho budú mať prepis len stretnutia, ktoré už nahrávate."
       },
       "files": {
-        "cloud": "Táto aplikácia môže čítať a prehľadávať súbory v tomto účte a ukladať, čo vytvorí, do jediného priečinka, ktorý tam založí. Nemôže nič mazať, presúvať ani zdieľať. Vaše súbory zostávajú u vášho poskytovateľa; nikam inam sa nekopírujú."
+        "cloud": "Táto aplikácia môže čítať a prehľadávať súbory v tomto účte a ukladať, čo vytvorí, do jediného priečinka, ktorý tam založí. Nemôže nič mazať, presúvať ani zdieľať. Vaše súbory zostávajú u vášho poskytovateľa; nikam inam sa nekopírujú.",
+        "ai": "Táto aplikácia môže čítať a prehľadávať to, čo ste vo svojom Privasys Drive sprístupnili AI: priečinky povolené pre AI a vašu Pamäť. Nič iné vo vašom Drive nevidí a nemôže nič meniť, mazať ani zdieľať."
       }
     },
     "approve": "Schváliť",

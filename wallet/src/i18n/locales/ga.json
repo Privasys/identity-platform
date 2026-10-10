@@ -370,7 +370,8 @@
       "mail.mailbox": "{{permissions}} an post i {{resource}}, trí {{service}}",
       "meeting.transcripts": "{{permissions}} tras-scríbhinní do chruinnithe i {{resource}}",
       "meeting.recording": "Taifeadadh agus tras-scríobh a chur ar siúl do chruinnithe a eagraíonn tú i {{resource}}",
-      "files.cloud": "{{permissions}} na comhaid in {{resource}}, trí {{service}}"
+      "files.cloud": "{{permissions}} na comhaid in {{resource}}, trí {{service}}",
+      "files.ai": "Na comhaid a chuir tú ar fáil do AI i do Privasys Drive a léamh agus a chuardach"
     },
     "permissionJoin": " agus ",
     "permission": {
@@ -394,7 +395,8 @@
         "recording": "Is féidir leis an aip seo taifeadadh agus tras-scríobh do sholáthraí féin a chur ar siúl do chruinnithe a eagraíonn tú. Insíonn an soláthraí do gach duine sa chruinniú é, ar an ngnáthbhealach. Gan é seo, ní bheidh tras-scríbhinn ach ag cruinnithe a thaifeadann tú cheana."
       },
       "files": {
-        "cloud": "Is féidir leis an aip seo na comhaid sa chuntas seo a léamh agus a chuardach, agus a dtáirgeann sí a shábháil in aon fhillteán amháin a chruthaíonn sí ann. Ní féidir léi aon rud a scriosadh, a bhogadh ná a roinnt. Fanann do chomhaid le do sholáthraí; ní chóipeáiltear áit ar bith eile iad."
+        "cloud": "Is féidir leis an aip seo na comhaid sa chuntas seo a léamh agus a chuardach, agus a dtáirgeann sí a shábháil in aon fhillteán amháin a chruthaíonn sí ann. Ní féidir léi aon rud a scriosadh, a bhogadh ná a roinnt. Fanann do chomhaid le do sholáthraí; ní chóipeáiltear áit ar bith eile iad.",
+        "ai": "Is féidir leis an aip seo an méid a chuir tú ar fáil do AI i do Privasys Drive a léamh agus a chuardach: na fillteáin a chuir tú ar siúl do AI, agus do Chuimhne. Ní fheiceann sí aon rud eile i do Drive, agus ní féidir léi aon rud a athrú, a scriosadh ná a chomhroinnt."
       }
     },
     "approve": "Ceadaigh",

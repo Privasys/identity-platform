@@ -337,7 +337,8 @@
       "mail.mailbox": "{{permissions}} die E-Mails in {{resource}}, über {{service}}",
       "meeting.transcripts": "{{permissions}} die Transkripte Ihrer Besprechungen in {{resource}}",
       "meeting.recording": "Aufzeichnung und Transkription für Besprechungen einschalten, die Sie in {{resource}} leiten",
-      "files.cloud": "{{permissions}}: die Dateien in {{resource}}, über {{service}}"
+      "files.cloud": "{{permissions}}: die Dateien in {{resource}}, über {{service}}",
+      "files.ai": "Die Dateien lesen und durchsuchen, die Sie in Ihrem Privasys Drive für KI freigegeben haben"
     },
     "permissionJoin": " und ",
     "permission": {
@@ -361,7 +362,8 @@
         "recording": "Diese App kann die Aufzeichnung und Transkription Ihres Anbieters für Besprechungen einschalten, die Sie leiten. Der Anbieter teilt dies allen Teilnehmenden auf die übliche Weise mit. Ohne dies erhalten nur Besprechungen ein Transkript, die Sie bereits aufzeichnen."
       },
       "files": {
-        "cloud": "Diese App kann die Dateien in diesem Konto lesen und durchsuchen und ihre Ergebnisse in einem einzigen Ordner speichern, den sie dort anlegt. Sie kann nichts löschen, verschieben oder teilen. Ihre Dateien bleiben bei Ihrem Anbieter; sie werden nirgendwo sonst kopiert."
+        "cloud": "Diese App kann die Dateien in diesem Konto lesen und durchsuchen und ihre Ergebnisse in einem einzigen Ordner speichern, den sie dort anlegt. Sie kann nichts löschen, verschieben oder teilen. Ihre Dateien bleiben bei Ihrem Anbieter; sie werden nirgendwo sonst kopiert.",
+        "ai": "Diese App kann lesen und durchsuchen, was Sie in Ihrem Privasys Drive für KI freigegeben haben: die für KI aktivierten Ordner und Ihr Gedächtnis. Sie sieht nichts anderes in Ihrem Drive und kann nichts ändern, löschen oder teilen."
       }
     },
     "approve": "Genehmigen",

@@ -370,7 +370,8 @@
       "mail.mailbox": "{{permissions}} paštą {{resource}} per {{service}}",
       "meeting.transcripts": "{{permissions}} jūsų susitikimų transkripcijas {{resource}}",
       "meeting.recording": "Įjungti įrašymą ir transkripciją susitikimuose, kuriuos rengiate {{resource}}",
-      "files.cloud": "{{permissions}} failus {{resource}}, per {{service}}"
+      "files.cloud": "{{permissions}} failus {{resource}}, per {{service}}",
+      "files.ai": "Skaityti ir ieškoti failuose, kuriuos savo Privasys Drive padarėte prieinamus DI"
     },
     "permissionJoin": " ir ",
     "permission": {
@@ -394,7 +395,8 @@
         "recording": "Ši programa gali įjungti jūsų teikėjo įrašymą ir transkripciją susitikimuose, kuriuos rengiate. Teikėjas apie tai praneša visiems dalyviams įprastu būdu. Be to transkripciją turės tik tie susitikimai, kuriuos jau įrašote."
       },
       "files": {
-        "cloud": "Ši programėlė gali skaityti ir ieškoti šios paskyros failų bei išsaugoti tai, ką sukuria, viename aplanke, kurį ten sukuria. Ji negali nieko ištrinti, perkelti ar bendrinti. Jūsų failai lieka pas jūsų paslaugų teikėją; jie niekur kitur nekopijuojami."
+        "cloud": "Ši programėlė gali skaityti ir ieškoti šios paskyros failų bei išsaugoti tai, ką sukuria, viename aplanke, kurį ten sukuria. Ji negali nieko ištrinti, perkelti ar bendrinti. Jūsų failai lieka pas jūsų paslaugų teikėją; jie niekur kitur nekopijuojami.",
+        "ai": "Ši programėlė gali skaityti ir ieškoti tame, ką savo Privasys Drive padarėte prieinamą DI: aplankuose, kuriems įjungėte DI, ir jūsų Atmintyje. Nieko kito jūsų Drive ji nemato ir negali nieko keisti, ištrinti ar bendrinti."
       }
     },
     "approve": "Patvirtinti",

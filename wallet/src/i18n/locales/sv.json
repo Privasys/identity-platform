@@ -337,7 +337,8 @@
       "mail.mailbox": "{{permissions}} posten i {{resource}}, via {{service}}",
       "meeting.transcripts": "{{permissions}} utskrifterna från dina möten i {{resource}}",
       "meeting.recording": "Slå på inspelning och transkribering för möten du är värd för i {{resource}}",
-      "files.cloud": "{{permissions}} filerna i {{resource}}, via {{service}}"
+      "files.cloud": "{{permissions}} filerna i {{resource}}, via {{service}}",
+      "files.ai": "Läsa och söka i filerna du har gjort tillgängliga för AI i din Privasys Drive"
     },
     "permissionJoin": " och ",
     "permission": {
@@ -361,7 +362,8 @@
         "recording": "Den här appen kan slå på din egen leverantörs inspelning och transkribering för möten du är värd för. Leverantören talar om det för alla i mötet, på vanligt sätt. Utan detta får bara möten du redan spelar in en utskrift."
       },
       "files": {
-        "cloud": "Den här appen kan läsa och söka i filerna på det här kontot och spara det den skapar i en enda mapp som den själv skapar där. Den kan inte radera, flytta eller dela något. Dina filer stannar hos din leverantör; de kopieras inte någon annanstans."
+        "cloud": "Den här appen kan läsa och söka i filerna på det här kontot och spara det den skapar i en enda mapp som den själv skapar där. Den kan inte radera, flytta eller dela något. Dina filer stannar hos din leverantör; de kopieras inte någon annanstans.",
+        "ai": "Den här appen kan läsa och söka i det du har gjort tillgängligt för AI i din Privasys Drive: mapparna du har aktiverat för AI och ditt Minne. Den ser inget annat i din Drive och kan inte ändra, radera eller dela något."
       }
     },
     "approve": "Godkänn",

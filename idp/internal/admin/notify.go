@@ -92,7 +92,9 @@ func notifyTitleBody(typ, appName string) (string, string) {
 	case "share-decision":
 		return appName, "There is an update on your access request."
 	case "capability-request":
-		return appName, "Asks to use a folder in your Drive."
+		// The push cannot say what kind (only the wallet, inside the attested
+		// channel, learns that), so the banner stays generic.
+		return appName, "Asks for access to something of yours."
 	default:
 		return appName, "You have a new notification."
 	}

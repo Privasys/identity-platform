@@ -387,7 +387,8 @@
         "recording": "This app can switch on your provider's own recording and transcription for meetings you host. Everyone in the meeting is told by the provider, in the usual way. Without this, only meetings you already record will have a transcript."
       },
       "files": {
-        "cloud": "This app can read and search the files in this account, and save what it produces into one folder it creates there. It cannot delete, move or share anything. Your files stay with your provider; they are not copied anywhere else."
+        "cloud": "This app can read and search the files in this account, and save what it produces into one folder it creates there. It cannot delete, move or share anything. Your files stay with your provider; they are not copied anywhere else.",
+        "ai": "This app can read and search what you made available to AI in your Privasys Drive: the folders you enabled for AI, and your Memory. It cannot see anything else in your Drive, and it cannot change, delete or share anything."
       }
     },
     "approve": "Approve",
@@ -406,7 +407,8 @@
       "mail.mailbox": "{{permissions}} the mail in {{resource}}, through {{service}}",
       "meeting.transcripts": "{{permissions}} the transcripts of your meetings in {{resource}}",
       "meeting.recording": "Switch on recording and transcription for meetings you host in {{resource}}",
-      "files.cloud": "{{permissions}} the files in {{resource}}, through {{service}}"
+      "files.cloud": "{{permissions}} the files in {{resource}}, through {{service}}",
+      "files.ai": "Read and search the files you made available to AI in your Privasys Drive"
     },
     "setup": {
       "preparing": "Preparing the next step",

@@ -5,9 +5,12 @@ package recovery
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"regexp"
+
+	"github.com/Privasys/idp/internal/store"
 )
 
 // Sovereign backup blob endpoints (the sovereign-data framework, Phase 2).
@@ -21,6 +24,9 @@ import (
 // recovery), and GETs after account recovery — by which point the device
 // has re-registered and holds a wallet session, so plain bearer auth
 // suffices and the blob is never served pre-authentication.
+//
+// Several phones of one holder may write it, so each write names the version
+// it replaces and an older one is refused (409 with the stored version).
 
 // maxBackupBlobBytes bounds the stored blob. The real payload is well
 // under 1 KiB (versioned envelope over two 32-byte secrets); 8 KiB gives
@@ -32,7 +38,8 @@ const maxBackupBlobBytes = 8 * 1024
 var backupBlobShape = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // HandlePutBackup stores (replaces) the caller's sovereign backup blob.
-// PUT /recovery/backup  (requires wallet sessionToken or JWT bearer)
+// PUT /recovery/backup  {"blob": "...", "version": <stored version, optional>}
+// (requires wallet sessionToken or JWT bearer)
 func (h *Handler) HandlePutBackup(w http.ResponseWriter, r *http.Request) {
 	userID := h.authenticateBearer(w, r)
 	if userID == "" {
@@ -40,6 +47,9 @@ func (h *Handler) HandlePutBackup(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Blob string `json:"blob"`
+		// Version is the stored version this write replaces (0: none yet).
+		// Wallets before devices omit it and write unconditionally.
+		Version *int64 `json:"version"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, maxBackupBlobBytes+1024)).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
@@ -49,23 +59,18 @@ func (h *Handler) HandlePutBackup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"blob must be non-empty base64url, at most 8KiB"}`, http.StatusBadRequest)
 		return
 	}
-	if err := h.db.PutSovereignBackup(userID, req.Blob); err != nil {
-		http.Error(w, `{"error":"failed to store backup"}`, http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "stored"})
+	putVersioned(w, h.db, "sovereign_backups", userID, req.Blob, req.Version)
 }
 
-// HandleGetBackup returns the caller's sovereign backup blob, 404 when
-// none is stored (a pre-framework account).
+// HandleGetBackup returns the caller's sovereign backup blob and its version,
+// 404 when none is stored (a pre-framework account).
 // GET /recovery/backup  (requires wallet sessionToken or JWT bearer)
 func (h *Handler) HandleGetBackup(w http.ResponseWriter, r *http.Request) {
 	userID := h.authenticateBearer(w, r)
 	if userID == "" {
 		return
 	}
-	blob, err := h.db.GetSovereignBackup(userID)
+	blob, version, err := h.db.GetVersioned("sovereign_backups", userID)
 	if err != nil {
 		http.Error(w, `{"error":"failed to load backup"}`, http.StatusInternalServerError)
 		return
@@ -75,5 +80,24 @@ func (h *Handler) HandleGetBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"blob": blob})
+	_ = json.NewEncoder(w).Encode(map[string]any{"blob": blob, "version": version})
+}
+
+// putVersioned stores a blob several phones write, refusing (409, with the
+// stored version) a write based on an older one. A nil version writes
+// unconditionally.
+func putVersioned(w http.ResponseWriter, db *store.DB, table, userID, blob string, version *int64) {
+	expect := int64(-1)
+	if version != nil {
+		expect = *version
+	}
+	next, err := db.PutVersioned(table, userID, blob, expect)
+	switch {
+	case errors.Is(err, store.ErrVersionConflict):
+		writeJSONStatus(w, http.StatusConflict, map[string]any{"error": "stored version is newer", "version": next})
+	case err != nil:
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "failed to store"})
+	default:
+		writeJSONStatus(w, http.StatusOK, map[string]any{"status": "stored", "version": next})
+	}
 }

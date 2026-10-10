@@ -156,15 +156,17 @@ func (h *Handler) recordPendingAndPush(sub, vaultOp string, optionsJS json.RawMe
 		summary:   summary,
 		expiresAt: time.Unix(exp, 0),
 	})
-	pushToken := h.db.GetPushToken(sub)
-	if pushToken == "" {
+	pushTokens := h.db.GetPushTokens(sub)
+	if len(pushTokens) == 0 {
 		// No registered wallet token. The approval is still pending and the
 		// wallet can find it via /pending, but nothing will nudge it — an
 		// operator watching only the log used to see silence here.
 		log.Printf("fido2: vault-approval %s… has NO push token for %s; the wallet must open Vault approvals itself", vaultOp[:12], sub)
 		return false
 	}
-	go h.sendVaultApprovalPush(sub, pushToken, vaultOp, summary)
+	for _, pushToken := range pushTokens {
+		go h.sendVaultApprovalPush(sub, pushToken, vaultOp, summary)
+	}
 	return true
 }
 

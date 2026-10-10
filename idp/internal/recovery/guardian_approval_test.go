@@ -101,3 +101,25 @@ func TestTheThresholdNeverExceedsTheGuardians(t *testing.T) {
 		t.Fatalf("count %d threshold %d, want 2 and 2 (5 capped to the guardians there are)", count, threshold)
 	}
 }
+
+func TestTheInvitePageOpensTheWalletAndRefusesJunk(t *testing.T) {
+	h := NewHandler(nil, nil, nil)
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /guardians/invite", h.HandleGuardianInvitePage)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest("GET", "/guardians/invite?token=0123456789abcdef0123456789abcdef", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(),
+		`href="privasys-wallet://account-recovery?invite=0123456789abcdef0123456789abcdef"`) {
+		t.Fatalf("page: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("the page may be cached with a capability in it")
+	}
+
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest("GET", `/guardians/invite?token="><script>`, nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("junk token: %d, want 400", rec.Code)
+	}
+}

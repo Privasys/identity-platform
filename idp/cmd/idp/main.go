@@ -480,6 +480,7 @@ func main() {
 	mux.HandleFunc("GET /recovery/identity-index", recoveryHandler.HandleGetIdentityIndex)
 	mux.HandleFunc("GET /guardians", recoveryHandler.HandleListGuardians)
 	mux.HandleFunc("POST /guardians/invite", recoveryHandler.HandleInviteGuardianByEmail)
+	mux.HandleFunc("GET /guardians/invite", recoveryHandler.HandleGuardianInvitePage)
 	mux.HandleFunc("POST /guardians/add", recoveryHandler.HandleAddGuardianByQR)
 	mux.HandleFunc("POST /guardians/accept-invite", recoveryHandler.HandleAcceptGuardianInviteByToken)
 	mux.HandleFunc("DELETE /guardians", recoveryHandler.HandleRemoveGuardian)

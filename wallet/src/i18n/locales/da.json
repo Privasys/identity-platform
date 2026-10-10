@@ -337,7 +337,8 @@
       "mail.mailbox": "{{permissions}} posten i {{resource}} via {{service}}",
       "meeting.transcripts": "{{permissions}} udskrifterne af dine møder i {{resource}}",
       "meeting.recording": "Slå optagelse og transskription til for møder, du er vært for i {{resource}}",
-      "files.cloud": "{{permissions}} filerne i {{resource}}, via {{service}}"
+      "files.cloud": "{{permissions}} filerne i {{resource}}, via {{service}}",
+      "files.ai": "Læs og søg i de filer, du har gjort tilgængelige for AI i dit Privasys Drive"
     },
     "permissionJoin": " og ",
     "permission": {
@@ -361,7 +362,8 @@
         "recording": "Denne app kan slå din udbyders egen optagelse og transskription til for møder, du er vært for. Udbyderen fortæller alle i mødet det på sædvanlig vis. Uden dette får kun møder, du allerede optager, en udskrift."
       },
       "files": {
-        "cloud": "Denne app kan læse og søge i filerne på denne konto og gemme det, den laver, i én mappe, den selv opretter der. Den kan ikke slette, flytte eller dele noget. Dine filer bliver hos din udbyder; de kopieres ikke andre steder hen."
+        "cloud": "Denne app kan læse og søge i filerne på denne konto og gemme det, den laver, i én mappe, den selv opretter der. Den kan ikke slette, flytte eller dele noget. Dine filer bliver hos din udbyder; de kopieres ikke andre steder hen.",
+        "ai": "Denne app kan læse og søge i det, du har gjort tilgængeligt for AI i dit Privasys Drive: de mapper, du har slået til for AI, og din Hukommelse. Den kan ikke se andet i dit Drive, og den kan ikke ændre, slette eller dele noget."
       }
     },
     "approve": "Godkend",

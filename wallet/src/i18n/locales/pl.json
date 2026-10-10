@@ -337,7 +337,8 @@
       "mail.mailbox": "{{permissions}} pocztę w {{resource}}, przez {{service}}",
       "meeting.transcripts": "{{permissions}} transkrypcje Twoich spotkań w {{resource}}",
       "meeting.recording": "Włączyć nagrywanie i transkrypcję dla spotkań, które prowadzisz w {{resource}}",
-      "files.cloud": "{{permissions}} pliki w {{resource}}, przez {{service}}"
+      "files.cloud": "{{permissions}} pliki w {{resource}}, przez {{service}}",
+      "files.ai": "Odczyt i przeszukiwanie plików, które udostępniłeś AI w swoim Privasys Drive"
     },
     "permissionJoin": " i ",
     "permission": {
@@ -361,7 +362,8 @@
         "recording": "Ta aplikacja może włączyć nagrywanie i transkrypcję Twojego dostawcy dla spotkań, które prowadzisz. Dostawca informuje o tym wszystkich uczestników w zwykły sposób. Bez tego transkrypcję będą miały tylko te spotkania, które już nagrywasz."
       },
       "files": {
-        "cloud": "Ta aplikacja może czytać i przeszukiwać pliki na tym koncie oraz zapisywać to, co tworzy, w jednym folderze, który tam założy. Nie może niczego usuwać, przenosić ani udostępniać. Twoje pliki pozostają u Twojego dostawcy; nie są nigdzie indziej kopiowane."
+        "cloud": "Ta aplikacja może czytać i przeszukiwać pliki na tym koncie oraz zapisywać to, co tworzy, w jednym folderze, który tam założy. Nie może niczego usuwać, przenosić ani udostępniać. Twoje pliki pozostają u Twojego dostawcy; nie są nigdzie indziej kopiowane.",
+        "ai": "Ta aplikacja może odczytywać i przeszukiwać to, co udostępniłeś AI w swoim Privasys Drive: foldery włączone dla AI i Twoją Pamięć. Nie widzi niczego innego na Twoim Drive i nie może niczego zmieniać, usuwać ani udostępniać."
       }
     },
     "approve": "Zatwierdź",

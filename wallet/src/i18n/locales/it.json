@@ -337,7 +337,8 @@
       "mail.mailbox": "{{permissions}} la posta in {{resource}}, tramite {{service}}",
       "meeting.transcripts": "{{permissions}} le trascrizioni delle tue riunioni in {{resource}}",
       "meeting.recording": "Attivare registrazione e trascrizione per le riunioni che organizzi in {{resource}}",
-      "files.cloud": "{{permissions}} i file in {{resource}}, tramite {{service}}"
+      "files.cloud": "{{permissions}} i file in {{resource}}, tramite {{service}}",
+      "files.ai": "Leggere e cercare nei file che hai reso disponibili all'IA nel tuo Privasys Drive"
     },
     "permissionJoin": " e ",
     "permission": {
@@ -361,7 +362,8 @@
         "recording": "Questa app può attivare la registrazione e la trascrizione del tuo provider per le riunioni che organizzi. Il provider lo comunica a tutti i partecipanti, nel modo consueto. Senza questo, avranno una trascrizione solo le riunioni che già registri."
       },
       "files": {
-        "cloud": "Questa app può leggere e cercare i file di questo account e salvare ciò che produce in una sola cartella che vi crea. Non può eliminare, spostare o condividere nulla. I tuoi file restano presso il tuo provider; non vengono copiati altrove."
+        "cloud": "Questa app può leggere e cercare i file di questo account e salvare ciò che produce in una sola cartella che vi crea. Non può eliminare, spostare o condividere nulla. I tuoi file restano presso il tuo provider; non vengono copiati altrove.",
+        "ai": "Questa app può leggere e cercare in ciò che hai reso disponibile all'IA nel tuo Privasys Drive: le cartelle abilitate per l'IA e la tua Memoria. Non vede nient'altro del tuo Drive e non può modificare, eliminare né condividere nulla."
       }
     },
     "approve": "Approva",

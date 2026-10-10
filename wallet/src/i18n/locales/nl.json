@@ -337,7 +337,8 @@
       "mail.mailbox": "{{permissions}} de post in {{resource}}, via {{service}}",
       "meeting.transcripts": "{{permissions}} de transcripties van je vergaderingen in {{resource}}",
       "meeting.recording": "Opname en transcriptie inschakelen voor vergaderingen die je organiseert in {{resource}}",
-      "files.cloud": "{{permissions}} de bestanden in {{resource}}, via {{service}}"
+      "files.cloud": "{{permissions}} de bestanden in {{resource}}, via {{service}}",
+      "files.ai": "De bestanden lezen en doorzoeken die je in je Privasys Drive beschikbaar hebt gemaakt voor AI"
     },
     "permissionJoin": " en ",
     "permission": {
@@ -361,7 +362,8 @@
         "recording": "Deze app kan de opname en transcriptie van je eigen provider inschakelen voor vergaderingen die jij organiseert. De provider vertelt dat aan iedereen in de vergadering, op de gebruikelijke manier. Zonder dit krijgen alleen vergaderingen die je al opneemt een transcriptie."
       },
       "files": {
-        "cloud": "Deze app kan de bestanden in dit account lezen en doorzoeken en wat ze maakt opslaan in één map die ze daar aanmaakt. Ze kan niets verwijderen, verplaatsen of delen. Uw bestanden blijven bij uw aanbieder; ze worden nergens anders gekopieerd."
+        "cloud": "Deze app kan de bestanden in dit account lezen en doorzoeken en wat ze maakt opslaan in één map die ze daar aanmaakt. Ze kan niets verwijderen, verplaatsen of delen. Uw bestanden blijven bij uw aanbieder; ze worden nergens anders gekopieerd.",
+        "ai": "Deze app kan lezen en doorzoeken wat je in je Privasys Drive beschikbaar hebt gemaakt voor AI: de mappen die je voor AI hebt ingeschakeld en je Geheugen. Ze ziet verder niets in je Drive en kan niets wijzigen, verwijderen of delen."
       }
     },
     "approve": "Goedkeuren",

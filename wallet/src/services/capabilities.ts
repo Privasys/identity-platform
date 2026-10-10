@@ -59,6 +59,11 @@ export const CAPABILITY_KINDS = [
     // the service may write into. Distinct from storage.folder, which is the
     // holder's own Privasys Drive.
     'files.cloud',
+    // What the holder made available to AI in their own Privasys Drive (the
+    // folders they enabled for AI, and Memory): read and searched, never
+    // changed. How an assistant reaches the holder's knowledge without sharing
+    // an identifier with Drive: Drive takes the holder from this grant.
+    'files.ai',
     // The holder's files in the asking app's OWN storage, locked with a key the
     // wallet holds. Unlike every kind above, the resource service is the app
     // itself, reached at the `service_url` its ask names, and the wallet sends
@@ -308,6 +313,7 @@ const LIFETIME_SECONDS: Record<CapabilityKind, number | null> = {
     // exists, so it should come back round for a fresh decision sooner.
     'meeting.recording': 30 * DAY,
     'files.cloud': 90 * DAY,
+    'files.ai': 90 * DAY,
     // No expiry: it stands until revoked. An expiry here would not end the
     // app's access to anything the holder cares about; it would lock the
     // holder's own files away from the app they put them with, on a date they

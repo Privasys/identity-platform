@@ -337,7 +337,8 @@
       "mail.mailbox": "{{permissions}} a leveleket itt: {{resource}}, a(z) {{service}} szolgáltatáson keresztül",
       "meeting.transcripts": "{{permissions}} a megbeszélései átiratait itt: {{resource}}",
       "meeting.recording": "Rögzítés és átiratkészítés bekapcsolása az Ön által szervezett megbeszélésekhez itt: {{resource}}",
-      "files.cloud": "{{permissions}}: a(z) {{resource}} fájljai, a(z) {{service}} révén"
+      "files.cloud": "{{permissions}}: a(z) {{resource}} fájljai, a(z) {{service}} révén",
+      "files.ai": "Olvasás és keresés azokban a fájlokban, amelyeket a Privasys Drive-ban elérhetővé tett az MI számára"
     },
     "permissionJoin": " és ",
     "permission": {
@@ -361,7 +362,8 @@
         "recording": "Ez az alkalmazás bekapcsolhatja a szolgáltatója saját rögzítését és átiratkészítését az Ön által szervezett megbeszéléseken. A szolgáltató a szokásos módon értesíti erről a megbeszélés minden résztvevőjét. Enélkül csak azoknak a megbeszéléseknek lesz átirata, amelyeket már rögzít."
       },
       "files": {
-        "cloud": "Ez az alkalmazás olvashatja és kereshet a fiók fájljai között, és amit létrehoz, egyetlen, általa ott létrehozott mappába mentheti. Nem törölhet, nem helyezhet át és nem oszthat meg semmit. A fájljai a szolgáltatójánál maradnak; máshová nem másolódnak."
+        "cloud": "Ez az alkalmazás olvashatja és kereshet a fiók fájljai között, és amit létrehoz, egyetlen, általa ott létrehozott mappába mentheti. Nem törölhet, nem helyezhet át és nem oszthat meg semmit. A fájljai a szolgáltatójánál maradnak; máshová nem másolódnak.",
+        "ai": "Ez az alkalmazás olvashat és kereshet abban, amit a Privasys Drive-ban elérhetővé tett az MI számára: az MI-hez engedélyezett mappákban és a Memóriájában. Mást nem lát a Drive-jában, és semmit sem módosíthat, törölhet vagy oszthat meg."
       }
     },
     "approve": "Jóváhagyás",

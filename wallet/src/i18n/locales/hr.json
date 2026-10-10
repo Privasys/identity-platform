@@ -370,7 +370,8 @@
       "mail.mailbox": "{{permissions}} poštu u {{resource}}, putem {{service}}",
       "meeting.transcripts": "{{permissions}} transkripte vaših sastanaka u {{resource}}",
       "meeting.recording": "Uključiti snimanje i transkripciju za sastanke koje vodite u {{resource}}",
-      "files.cloud": "{{permissions}} datoteke u {{resource}}, putem {{service}}"
+      "files.cloud": "{{permissions}} datoteke u {{resource}}, putem {{service}}",
+      "files.ai": "Čitati i pretraživati datoteke koje ste na svom Privasys Driveu učinili dostupnima umjetnoj inteligenciji"
     },
     "permissionJoin": " i ",
     "permission": {
@@ -394,7 +395,8 @@
         "recording": "Ova aplikacija može uključiti snimanje i transkripciju vašeg pružatelja za sastanke koje vodite. Pružatelj o tome obavještava sve na sastanku, na uobičajen način. Bez toga transkript će imati samo sastanci koje već snimate."
       },
       "files": {
-        "cloud": "Ova aplikacija može čitati i pretraživati datoteke na ovom računu i spremati ono što proizvede u jednu mapu koju ondje stvori. Ne može ništa brisati, premještati ni dijeliti. Vaše datoteke ostaju kod vašeg pružatelja; nigdje se drugdje ne kopiraju."
+        "cloud": "Ova aplikacija može čitati i pretraživati datoteke na ovom računu i spremati ono što proizvede u jednu mapu koju ondje stvori. Ne može ništa brisati, premještati ni dijeliti. Vaše datoteke ostaju kod vašeg pružatelja; nigdje se drugdje ne kopiraju.",
+        "ai": "Ova aplikacija može čitati i pretraživati ono što ste na svom Privasys Driveu učinili dostupnim umjetnoj inteligenciji: mape omogućene za UI i vašu Memoriju. Ne vidi ništa drugo na vašem Driveu i ne može ništa mijenjati, brisati ni dijeliti."
       }
     },
     "approve": "Odobri",

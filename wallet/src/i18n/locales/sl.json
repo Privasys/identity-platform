@@ -370,7 +370,8 @@
       "mail.mailbox": "{{permissions}} pošto v {{resource}} prek {{service}}",
       "meeting.transcripts": "{{permissions}} prepise vaših sestankov v {{resource}}",
       "meeting.recording": "Vklopiti snemanje in prepis za sestanke, ki jih vodite v {{resource}}",
-      "files.cloud": "{{permissions}} datoteke v {{resource}}, prek {{service}}"
+      "files.cloud": "{{permissions}} datoteke v {{resource}}, prek {{service}}",
+      "files.ai": "Branje in iskanje po datotekah, ki ste jih v svojem Privasys Drive dali na voljo umetni inteligenci"
     },
     "permissionJoin": " in ",
     "permission": {
@@ -394,7 +395,8 @@
         "recording": "Ta aplikacija lahko vklopi snemanje in prepis vašega ponudnika za sestanke, ki jih vodite. Ponudnik o tem obvesti vse na sestanku, na običajen način. Brez tega bodo prepis imeli samo sestanki, ki jih že snemate."
       },
       "files": {
-        "cloud": "Ta aplikacija lahko bere in išče datoteke v tem računu ter shranjuje, kar ustvari, v eno mapo, ki jo tam ustvari. Ničesar ne more izbrisati, premakniti ali deliti. Vaše datoteke ostanejo pri vašem ponudniku; nikamor drugam se ne kopirajo."
+        "cloud": "Ta aplikacija lahko bere in išče datoteke v tem računu ter shranjuje, kar ustvari, v eno mapo, ki jo tam ustvari. Ničesar ne more izbrisati, premakniti ali deliti. Vaše datoteke ostanejo pri vašem ponudniku; nikamor drugam se ne kopirajo.",
+        "ai": "Ta aplikacija lahko bere in išče po tem, kar ste v svojem Privasys Drive dali na voljo umetni inteligenci: po mapah, omogočenih za UI, in po vašem Spominu. Ničesar drugega v vašem Drivu ne vidi in ne more ničesar spreminjati, brisati ali deliti."
       }
     },
     "approve": "Odobri",

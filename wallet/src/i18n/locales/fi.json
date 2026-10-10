@@ -337,7 +337,8 @@
       "mail.mailbox": "{{permissions}} postia tilillä {{resource}} palvelun {{service}} kautta",
       "meeting.transcripts": "{{permissions}} kokoustesi tekstityksiä tilillä {{resource}}",
       "meeting.recording": "Ottaa käyttöön tallennus ja tekstitys kokouksissa, jotka järjestät tilillä {{resource}}",
-      "files.cloud": "{{permissions}} tiedostot kohteessa {{resource}} palvelun {{service}} kautta"
+      "files.cloud": "{{permissions}} tiedostot kohteessa {{resource}} palvelun {{service}} kautta",
+      "files.ai": "Lukea ja hakea tiedostoja, jotka olet antanut tekoälyn käyttöön Privasys Drivessasi"
     },
     "permissionJoin": " ja ",
     "permission": {
@@ -361,7 +362,8 @@
         "recording": "Tämä sovellus voi ottaa käyttöön palveluntarjoajasi oman tallennuksen ja tekstityksen kokouksissa, jotka järjestät. Palveluntarjoaja kertoo siitä kaikille kokouksessa tavalliseen tapaan. Ilman tätä vain jo tallentamillasi kokouksilla on tekstitys."
       },
       "files": {
-        "cloud": "Tämä sovellus voi lukea tämän tilin tiedostoja ja hakea niistä sekä tallentaa tuottamansa yhteen kansioon, jonka se luo sinne. Se ei voi poistaa, siirtää tai jakaa mitään. Tiedostosi pysyvät palveluntarjoajallasi; niitä ei kopioida muualle."
+        "cloud": "Tämä sovellus voi lukea tämän tilin tiedostoja ja hakea niistä sekä tallentaa tuottamansa yhteen kansioon, jonka se luo sinne. Se ei voi poistaa, siirtää tai jakaa mitään. Tiedostosi pysyvät palveluntarjoajallasi; niitä ei kopioida muualle.",
+        "ai": "Tämä sovellus voi lukea ja hakea sitä, minkä olet antanut tekoälyn käyttöön Privasys Drivessasi: tekoälylle sallittuja kansioita ja Muistiasi. Se ei näe Drivestasi mitään muuta, eikä se voi muuttaa, poistaa tai jakaa mitään."
       }
     },
     "approve": "Hyväksy",

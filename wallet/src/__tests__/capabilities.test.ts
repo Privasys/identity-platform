@@ -50,6 +50,21 @@ describe('parsePendingCapability', () => {
         expect(p.capability.request).toEqual({ folder: 'Harness' });
     });
 
+    // An assistant reaching the holder's AI scope asks for files.ai, read
+    // only, and the wallet has its own words for it in every language.
+    it('accepts files.ai, and every locale explains it', () => {
+        const r = valid();
+        r.capability.kind = 'files.ai';
+        r.capability.permissions = ['read'];
+        expect(parsePendingCapability(r).capability.kind).toBe('files.ai');
+        const dir = require('path').join(__dirname, '..', 'i18n', 'locales');
+        for (const f of require('fs').readdirSync(dir)) {
+            const j = JSON.parse(require('fs').readFileSync(require('path').join(dir, f), 'utf8'));
+            expect(j.capability.explain.files.ai).toBeTruthy();
+            expect(j.capability.resourceLineByKind['files.ai']).toBeTruthy();
+        }
+    });
+
     // An unknown kind has no wallet-owned explanation, so there is no honest
     // screen to draw for it. Refuse rather than render the raw string.
     it('refuses a kind it cannot explain', () => {

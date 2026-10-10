@@ -370,7 +370,8 @@
       "mail.mailbox": "{{permissions}} posti kontol {{resource}} teenuse {{service}} kaudu",
       "meeting.transcripts": "{{permissions}} teie koosolekute üleskirjutusi kontol {{resource}}",
       "meeting.recording": "Lülitada sisse salvestus ja üleskirjutus koosolekutel, mida korraldate kontol {{resource}}",
-      "files.cloud": "{{permissions}} failid asukohas {{resource}} teenuse {{service}} kaudu"
+      "files.cloud": "{{permissions}} failid asukohas {{resource}} teenuse {{service}} kaudu",
+      "files.ai": "Lugeda ja otsida faile, mille olete oma Privasys Drive’is tehisintellektile kättesaadavaks teinud"
     },
     "permissionJoin": " ja ",
     "permission": {
@@ -394,7 +395,8 @@
         "recording": "See rakendus saab sisse lülitada teie teenusepakkuja enda salvestuse ja üleskirjutuse koosolekutel, mida te korraldate. Teenusepakkuja teatab sellest kõigile osalejatele tavapärasel viisil. Ilma selleta on üleskirjutus ainult neil koosolekutel, mida te juba salvestate."
       },
       "files": {
-        "cloud": "See rakendus saab selle konto faile lugeda ja otsida ning salvestada oma loodu ühte kausta, mille ta seal loob. See ei saa midagi kustutada, teisaldada ega jagada. Teie failid jäävad teie teenusepakkuja juurde; neid ei kopeerita mujale."
+        "cloud": "See rakendus saab selle konto faile lugeda ja otsida ning salvestada oma loodu ühte kausta, mille ta seal loob. See ei saa midagi kustutada, teisaldada ega jagada. Teie failid jäävad teie teenusepakkuja juurde; neid ei kopeerita mujale.",
+        "ai": "See rakendus saab lugeda ja otsida seda, mille olete oma Privasys Drive’is tehisintellektile kättesaadavaks teinud: tehisintellekti jaoks lubatud kaustu ja teie Mälu. Muud teie Drive’is see ei näe ega saa midagi muuta, kustutada ega jagada."
       }
     },
     "approve": "Kinnita",

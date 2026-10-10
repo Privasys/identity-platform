@@ -12,7 +12,11 @@
  */
 
 jest.mock('../../modules/native-ratls/src/index', () => ({ makeRaTlsFetch: jest.fn() }));
-jest.mock('@/services/platform-token', () => ({ getPlatformToken: jest.fn(async () => 'tok') }));
+jest.mock('@/services/platform-token', () => ({
+    getPlatformToken: jest.fn(async () => 'tok'),
+    tokenForHost: jest.fn(async () => 'tok'),
+    cachedTokenForHost: jest.fn(async () => 'tok'),
+}));
 jest.mock('@/services/wallet-call', () => ({
     walletCallHeaders: jest.fn(async () => ({ 'X-Privasys-Wallet-Proof': 'proof' })),
 }));

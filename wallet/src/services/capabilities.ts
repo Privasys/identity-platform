@@ -26,7 +26,7 @@ import {
     SetupSchemaError,
     type SetupRequirement,
 } from '@/services/capability-setup';
-import { getPlatformToken } from '@/services/platform-token';
+import { tokenForHost } from '@/services/platform-token';
 import type { DeclaredConnection } from '@/stores/capabilities';
 import { walletCallHeaders } from '@/services/wallet-call';
 
@@ -426,7 +426,7 @@ export async function createCapability(args: {
     expiresUnix: number;
     setup?: Record<string, unknown>;
 }): Promise<MintOutcome> {
-    const token = await getPlatformToken();
+    const token = await tokenForHost(args.resourceHost);
     const url = capabilitiesUrl(args.resourceHost, args.pending.service_url);
     const raFetch = makeRaTlsFetch({ enclaveHost: args.resourceHost, platformFetch: fetch });
     const res = await raFetch(url, {
@@ -545,7 +545,7 @@ export async function listCapabilities(
     resourceHost: string,
     serviceUrl?: string,
 ): Promise<HeldCapability[] | null> {
-    const token = await getPlatformToken();
+    const token = await tokenForHost(resourceHost);
     const raFetch = makeRaTlsFetch({ enclaveHost: resourceHost, platformFetch: fetch });
     // Bearer only, deliberately: this runs whenever a detail screen opens, and
     // a Face ID prompt to LOOK at your own grants would be hostile.
@@ -583,7 +583,7 @@ export async function revokeCapability(
     capabilityId: string,
     serviceUrl?: string,
 ): Promise<void> {
-    const token = await getPlatformToken();
+    const token = await tokenForHost(resourceHost);
     const raFetch = makeRaTlsFetch({ enclaveHost: resourceHost, platformFetch: fetch });
     const url = `${capabilitiesUrl(resourceHost, serviceUrl)}/${encodeURIComponent(capabilityId)}`;
     const res = await raFetch(url, {

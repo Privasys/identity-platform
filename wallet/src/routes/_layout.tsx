@@ -20,6 +20,22 @@ import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useDependencyApprovalsStore } from '@/stores/dependency-approvals';
 import { useProfileStore } from '@/stores/profile';
+import { pullRelay, requestSync, watchProfileForDevices } from '@/services/device-sync';
+import { syncRegistry } from '@/services/devices';
+import { migrateToThisDeviceOnly } from '@/utils/storage';
+
+/** What the wallet kept before its secrets stayed on this phone (utils/storage.ts). */
+const DEVICE_ONLY_KEYS = [
+    'privasys.sovereign-root',
+    'privasys.sovereign.recovered-seed',
+    'v1-profile',
+    'v1-auth-store',
+    'v1-notify-seal-key',
+    'v1-setup-keep-index',
+    'privasys.kyc.records',
+    'privasys.identities.protected',
+    'privasys.identities.legacy',
+];
 import { restoreFromAutoBackupIfEmpty, watchProfileForBackup } from '@/services/profile-backup';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
@@ -96,9 +112,10 @@ export default function RootLayout() {
     const [storesReady, setStoresReady] = useState(false);
     const [showSplashAnim, setShowSplashAnim] = useState(true);
 
-    // Hydrate persisted stores on app launch
+    // Hydrate persisted stores on app launch, once the secrets written before
+    // they stayed on this phone have been moved (utils/storage.ts).
     useEffect(() => {
-        Promise.all([
+        migrateToThisDeviceOnly(DEVICE_ONLY_KEYS).then(() => Promise.all([
             useAuthStore.getState().hydrate(),
             useProfileStore.getState().hydrate(),
             useConsentStore.getState().hydrate(),
@@ -113,7 +130,13 @@ export default function RootLayout() {
             // restored from its own backup picks the copy up once recovered.
             watchProfileForBackup();
             void restoreFromAutoBackupIfEmpty();
-        });
+            // The holder's other phones: their changes, and this one's to them.
+            watchProfileForDevices();
+            void syncRegistry()
+                .then(() => pullRelay())
+                .then(() => requestSync())
+                .catch((e: any) => console.warn('[device-sync] start-up sync failed:', e?.message ?? e));
+        }));
 
         // Run security checks in the background
         checkDeviceSecurity().then((status) => {

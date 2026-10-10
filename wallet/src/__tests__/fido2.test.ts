@@ -25,6 +25,10 @@ const mockCaptured: Array<{ host: string; port: number; path: string; route: str
 jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 jest.mock('@/stores/settings', () => ({ useSettingsStore: { getState: () => ({}) } }));
 jest.mock('../services/attestation', () => ({ isAttestableHost: () => false }));
+// The device tag is covered by devices.test.ts; here it is a constant.
+jest.mock('../services/devices', () => ({ myDeviceTag: async () => 'thisPhoneTagthisPhoneT' }));
+jest.mock('../services/identities', () => ({ serverIdOf: (c: { userHandle: string }) => c.userHandle }));
+jest.mock('@/stores/auth', () => ({ useAuthStore: { getState: () => ({ privasysId: null, credentials: [] }) } }));
 jest.mock('../../modules/native-ratls/src/index', () => ({
     request: jest.fn(async (_method: string, host: string, port: number, path: string, body: string) => {
         const route = path.split('?')[0];

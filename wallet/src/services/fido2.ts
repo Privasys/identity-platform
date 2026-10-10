@@ -16,7 +16,42 @@ import { Platform } from 'react-native';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
 import { isAttestableHost } from './attestation';
+import { myDeviceTag } from './devices';
+import { serverIdOf } from './identities';
+import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore } from '@/stores/settings';
+
+const IDP_TAG_HOST = (process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
+/**
+ * This phone's device tag for a user id at privasys.id, so the IdP knows which
+ * phone holds each passkey (see services/devices.ts). Null elsewhere, and never
+ * fatal: a ceremony without a tag works as before.
+ */
+async function deviceTagAt(origin: string, userId: string | null | undefined): Promise<string | null> {
+    if (origin !== IDP_TAG_HOST || !userId) return null;
+    try {
+        return await myDeviceTag(userId);
+    } catch {
+        return null;
+    }
+}
+
+/** The IdP user id behind a stored passkey, or null. */
+async function userIdOfCredential(credentialId: string): Promise<string | null> {
+    try {
+        const st = useAuthStore.getState();
+        if (st.privasysId?.credentialId === credentialId) {
+            const id = st.privasysId.userId;
+            // The slot has held the raw 32-hex form too; the IdP keys the base64url text.
+            return /^[0-9a-f]{32}$/.test(id) ? base64urlEncode(new TextEncoder().encode(id)) : id;
+        }
+        const c = st.credentials.find((x) => x.credentialId === credentialId);
+        return c?.userHandle ? serverIdOf(c) : null;
+    } catch {
+        return null;
+    }
+}
 
 // Timestamp of the last actual strong signing biometric — which is what unlocks
 // the time-bound AndroidKeyStore key. We track this specifically (not the auth
@@ -284,12 +319,14 @@ export async function register(
     if (bindingChallengeB64) {
         beginPath += `&binding_challenge=${encodeURIComponent(bindingChallengeB64)}`;
     }
+    const deviceTag = await deviceTagAt(origin, userHandle);
     const beginResp = await fido2Fetch<CredentialCreationOptions>(
         origin,
         beginPath,
         {
             userName: displayName || keyAlias,
             userHandle,
+            ...(deviceTag ? { deviceTag } : {}),
         }
     );
     const options = beginResp.publicKey;
@@ -496,6 +533,8 @@ export async function authenticate(
 
     // 5. Complete authentication — send standard WebAuthn assertion response
     let completePath = `/fido2/authenticate/complete?challenge=${encodeURIComponent(options.challenge)}`;
+    const authTag = await deviceTagAt(origin, await userIdOfCredential(credentialId));
+    if (authTag) completePath += `&device_tag=${encodeURIComponent(authTag)}`;
     if (relay && sessionRelay) {
         completePath +=
             `&session_id=${encodeURIComponent(relay.sessionId)}` +

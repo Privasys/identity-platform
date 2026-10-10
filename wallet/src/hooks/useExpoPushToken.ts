@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { DEFAULT_RELAY_HOST, fetchDescriptor } from '../services/descriptor';
+import { pullRelay } from '../services/device-sync';
+import { mainAccountUserId } from '../services/devices';
 import { ensureNotifySealKey, openSealedNotification } from '../services/notify-seal';
 import { getPrivasysAccount } from '../services/privasys-id';
 import { fetchAttributeApproval } from '../services/attribute-approval-api';
@@ -154,6 +156,11 @@ async function fileDriveNotification(data: Record<string, unknown>): Promise<boo
  *  into the drive-notifications store and open the requests screen; everything
  *  else runs through the auth/voucher connect flow. */
 async function dispatchPush(data: Record<string, unknown>, router: Router): Promise<void> {
+    if (data?.type === 'device-relay') {
+        // Another phone of the holder sent an update: fetch it. Silent.
+        await pullRelay().catch((e) => console.warn('[notifications] device relay failed', e));
+        return;
+    }
     if (data?.type === 'share-request' || data?.type === 'share-decision') {
         // Filing is a convenience and opening the screen is the point. A
         // failure here (a sealed payload this device cannot open, storage
@@ -333,7 +340,7 @@ async function maybeRegisterPushToken(token: string): Promise<void> {
         } catch (e) {
             console.warn('[notifications] sealing key unavailable; registering token alone', e);
         }
-        await registerPushTokenWithIdp(account.sessionToken, token, encPub);
+        await registerPushTokenWithIdp(account.sessionToken, token, encPub, mainAccountUserId(account.userId));
     } catch (e) {
         console.warn('[notifications] register push token with IdP failed', e);
     }
@@ -479,7 +486,10 @@ async function setupListeners(router: Router): Promise<void> {
     // just came up) and again whenever it returns to the foreground.
     void sweepPresentedApprovals();
     AppState.addEventListener('change', (state) => {
-        if (state === 'active') void sweepPresentedApprovals();
+        if (state === 'active') {
+            void sweepPresentedApprovals();
+            void pullRelay().catch(() => undefined);
+        }
     });
 }
 

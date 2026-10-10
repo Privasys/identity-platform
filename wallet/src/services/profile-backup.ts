@@ -24,7 +24,10 @@
  *   deletes the file.
  * - On demand, anywhere the share sheet reaches (Files, a cloud drive, email).
  * - To the holder's Privasys Drive, when they link it from the Backup screen:
- *   the same file in a "Privasys Wallet" folder. Off by default, because Drive
+ *   the same file in a "Privasys Wallet" folder. One file for all the holder's
+ *   phones: they keep each other in step (services/device-sync), and a phone
+ *   writing it first brings in what a newer copy there holds, so an older phone
+ *   cannot replace a newer profile. Off by default, because Drive
  *   needs a Privasys account with billing and the wallet never requires it.
  *   Linking connects to Drive once, on the holder's tap; afterwards the file
  *   follows the profile whenever a Drive session is open, never prompting.
@@ -332,9 +335,35 @@ export async function saveToDrive(text?: string, interactive = true): Promise<bo
             if (interactive) throw new BackupError('no-drive', 'Privasys Drive is not available');
             return false;
         }
-        const body = text ?? (await buildBackup());
         const folder = (await backupFolder(s, true)) as string;
         const before = await s.drive.listFolder(s.tenant.id, folder);
+        // Another phone of the holder may have written a newer copy: take it in
+        // first, so this write carries both.
+        let body = text;
+        const current = before.find((n) => n.kind === 'file' && n.name === DRIVE_FILE);
+        if (current) {
+            try {
+                const root = await peekDataRoot();
+                const there = root ? openContents(root, new TextDecoder().decode(await s.drive.downloadBytes(s.tenant.id, current.id))) : null;
+                const mine = useProfileStore.getState().profile;
+                if (there?.profile && mine && there.profile.updatedAt > mine.updatedAt) {
+                    useProfileStore.getState().applySyncedProfile(there.profile);
+                    body = undefined;
+                }
+                if (there) {
+                    const held = new Set((await loadKycRecords()).map((r) => r.jti));
+                    for (const rec of there.kycRecords) {
+                        if (!held.has(rec.jti)) {
+                            await saveKycRecord(rec);
+                            body = undefined;
+                        }
+                    }
+                }
+            } catch (e: any) {
+                console.warn('[profile-backup] the Drive copy could not be read first:', e?.message ?? e);
+            }
+        }
+        body = body ?? (await buildBackup());
         const saved = await s.drive.uploadFile(s.tenant.id, DRIVE_FILE, body, {
             parentId: folder,
             mime: 'application/json',

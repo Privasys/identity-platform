@@ -35,7 +35,13 @@ import { Text, usePalette, type Palette } from '@/components/Themed';
 import { bip39ChecksumValid } from '@/services/bip39';
 import { useTranslation } from 'react-i18next';
 import { BIP39_WORDLIST, BIP39_WORDSET } from '@/services/bip39-wordlist';
-import { restoreSovereignSecrets, stashRecoveredPairwiseSeed } from '@/services/sovereign';
+import { canonicalHandle as identityCanonicalHandle, restoreIdentityIndex } from '@/services/identities';
+import {
+    establishPhraseWithBackup,
+    mintPhraseOnly,
+    restoreSovereignSecrets,
+    stashRecoveredPairwiseSeed,
+} from '@/services/sovereign';
 import { register as fido2Register } from '@/services/fido2';
 import { canonicalUserHandle } from '@/services/privasys-id';
 import {
@@ -362,6 +368,10 @@ export default function RecoverAccountScreen() {
                 '', // no browser ceremony to relay
                 profileName(profile),
                 recoveryState.userId,
+                undefined,
+                // The replacement phrase is made on this phone, below; the IdP
+                // never sees it.
+                { clientPhrase: true },
             );
 
             // Two accounts share the privasys.id rpId on this device: the
@@ -465,9 +475,10 @@ export default function RecoverAccountScreen() {
             // dropped the phrase; neither should fail the registration.
             const phrase = enteredPhraseRef.current;
             const sessionToken = result.sessionToken ?? '';
+            let restored: { pairwiseSeedHex: string | null } | null = null;
             if (phrase && sessionToken) {
                 try {
-                    const restored = await restoreSovereignSecrets(phrase, sessionToken);
+                    restored = await restoreSovereignSecrets(phrase, sessionToken);
                     if (restored?.pairwiseSeedHex) {
                         const prof = useProfileStore.getState().profile;
                         if (!prof) {
@@ -489,15 +500,71 @@ export default function RecoverAccountScreen() {
             }
             enteredPhraseRef.current = null;
 
+            const seedHex = restored?.pairwiseSeedHex ?? useProfileStore.getState().profile?.pairwiseSeed ?? null;
+
+            // On a phone with no profile yet the canonical check above had no
+            // seed to derive from, so the main account's credential went into
+            // credentials[]. The restored seed settles it: move it to the slot,
+            // where the main account lives.
+            if (!isCanonical && seedHex && recoveryState.userId === identityCanonicalHandle(seedHex)) {
+                const authNow = useAuthStore.getState();
+                const placed = authNow.credentials.find((c) => c.credentialId === result.credentialId);
+                if (placed) {
+                    authNow.setPrivasysId({
+                        userId: recoveryState.userId,
+                        credentialId: placed.credentialId,
+                        keyAlias: placed.keyAlias,
+                        sessionToken,
+                        sessionExpiresAt: sessionToken ? Date.now() + 25 * 60 * 1000 : 0,
+                    });
+                    authNow.removeCredential(placed.credentialId);
+                }
+            }
+
+            // The identities made before handles were derived: their list comes
+            // back with the data root, and each is recovered at its next sign-in.
+            if (restored && sessionToken) {
+                try {
+                    const n = await restoreIdentityIndex(sessionToken);
+                    if (n > 0) console.log(`[recover-account] ${n} earlier identities will come back at their next sign-in`);
+                } catch (e: any) {
+                    console.warn('[recover-account] identity index restore failed:', e?.message);
+                }
+            }
+
+            // The phrase just used is retired. Its replacement is made here and
+            // the backup is wrapped under it at once, so the next recovery works
+            // with the phrase the holder is about to write down. Without a
+            // backup this phone could open, only the phrase is replaced: writing
+            // a backup now would store this phone's fresh root over the real one.
+            let nextPhrase: string | null = null;
+            let backupError: string | undefined;
+            if (sessionToken) {
+                try {
+                    if (restored) {
+                        const r = await establishPhraseWithBackup(sessionToken, result.recoveryPhrase ?? null, seedHex);
+                        nextPhrase = r.phrase;
+                        backupError = r.backupError;
+                    } else {
+                        nextPhrase = await mintPhraseOnly(sessionToken);
+                    }
+                } catch (e: any) {
+                    console.warn('[recover-account] replacement phrase failed:', e?.message);
+                    nextPhrase = result.recoveryPhrase ?? null;
+                }
+            }
+            if (backupError) console.warn('[recover-account] backup under the new phrase failed:', backupError);
+
             await Storage.deleteItemAsync(RECOVERY_STATE_KEY);
-            if (result.recoveryPhrase) {
+            if (nextPhrase) {
                 // Not saved until the holder says so: the nudge on Home is
                 // driven by this flag, and it is the only thing that will chase
                 // them if they walk away from the next screen.
                 useAuthStore.getState().setRecoveryPhraseSaved(false);
-                setIssuedPhrase(result.recoveryPhrase);
+                setIssuedPhrase(nextPhrase);
                 setStep('new-phrase');
             } else {
+                useAuthStore.getState().setRecoveryPhraseSaved(false);
                 setStep('restored');
             }
         } catch (e: any) {

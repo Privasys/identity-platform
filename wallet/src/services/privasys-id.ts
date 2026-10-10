@@ -29,6 +29,7 @@
 import * as Crypto from 'expo-crypto';
 
 import { register as fido2Register, authenticate as fido2Authenticate } from './fido2';
+import { syncIdentityIndex } from './identities';
 import { useAuthStore, type PrivasysIdAccount } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 
@@ -79,7 +80,9 @@ function b64url(s: string): string {
  *          canonical userId and (first registration only) the BIP39
  *          recovery phrase.
  */
-export async function ensurePrivasysSession(displayName?: string): Promise<{ sessionToken: string; userId: string; recoveryPhrase?: string }> {
+export async function ensurePrivasysSession(
+    displayName?: string,
+): Promise<{ sessionToken: string; userId: string; recoveryPhrase?: string; registered?: boolean }> {
     const store = useAuthStore.getState();
     const existing = store.privasysId;
 
@@ -173,6 +176,9 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
         }
         if (!result.sessionToken) throw new Error('No sessionToken from authenticate');
         store.setPrivasysSession(result.sessionToken, SESSION_TTL_MS);
+        // The main account's session is what the identity index is stored
+        // under; now that one is open, upload it if it changed. No prompt.
+        void syncIdentityIndex();
         return { sessionToken: result.sessionToken, userId };
     }
 
@@ -193,6 +199,9 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
         '', // no browser session relay
         displayName || profile.displayName,
         userHandle,
+        undefined,
+        // The wallet makes the phrase itself; the IdP never sees it.
+        { clientPhrase: true },
     );
     if (!result.sessionToken) {
         throw new Error('FIDO2 register did not return sessionToken');
@@ -210,10 +219,14 @@ export async function ensurePrivasysSession(displayName?: string): Promise<{ ses
     };
     store.setPrivasysId(account);
 
+    void syncIdentityIndex();
     return {
         sessionToken: result.sessionToken,
         userId,
+        // An IdP that predates client_phrase still mints one; the caller
+        // supersedes it with its own (establishPhraseWithBackup).
         recoveryPhrase: result.recoveryPhrase,
+        registered: true,
     };
 }
 

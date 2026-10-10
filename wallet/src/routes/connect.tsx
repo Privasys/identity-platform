@@ -67,6 +67,14 @@ import {
     resolveStepUpCredential,
     type StepUpAssertionOptions,
 } from '@/services/attribute-approval-api';
+import {
+    handleForNewCredential,
+    IDP_HOST,
+    isRecoveryRequired,
+    protectIdentity,
+    recoverIdentity,
+    syncIdentityIndex,
+} from '@/services/identities';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
@@ -2254,14 +2262,37 @@ function ConnectFlow() {
             // session, so the chat UI cannot reach the enclave and the
             // Home tab never shows a SESSIONS row.
             const sessionRelayArg = buildSessionRelayArg(payload);
-            const result = await fido2.register(
-                payload.origin,
-                keyAlias,
-                payload.sessionId,
-                profileName(currentProfile),
-                undefined,
-                sessionRelayArg,
-            );
+            // At privasys.id the identity's handle comes from the seed (or the
+            // restored list of older identities), so a recovered phone signs
+            // back in as the same identity instead of minting a new one.
+            const idpBrokered = payload.origin === IDP_HOST;
+            const handle = idpBrokered ? await handleForNewCredential(payload.rpId) : null;
+            const registerOnce = () =>
+                fido2.register(
+                    payload.origin,
+                    keyAlias,
+                    payload.sessionId,
+                    profileName(currentProfile),
+                    handle ?? undefined,
+                    sessionRelayArg,
+                    { clientPhrase: idpBrokered },
+                );
+            let result: Awaited<ReturnType<typeof registerOnce>>;
+            try {
+                result = await registerOnce();
+            } catch (e) {
+                if (!handle || !isRecoveryRequired(e)) throw e;
+                // The identity exists and this phone has no passkey for it: the
+                // phone was replaced. Prove the identity is ours with its own
+                // recovery key, then register on it.
+                console.log('[CONNECT] identity exists — recovering it by its key');
+                await recoverIdentity(handle);
+                result = await registerOnce();
+            }
+            if (idpBrokered && result.sessionToken) {
+                const id = result.userId || handle;
+                if (id) void protectIdentity(result.sessionToken, id).then(syncIdentityIndex);
+            }
 
             // Check for missing attributes before relaying
             const missing = getMissingAttributes(payload, currentProfile);
@@ -2434,6 +2465,11 @@ function ConnectFlow() {
                 serverRpId,
                 sessionRelayArg,
             );
+            // An identity made before recovery keys existed gets one at its next
+            // sign-in, with the session this ceremony just opened.
+            if (payload.origin === IDP_HOST && result.sessionToken && result.userId) {
+                void protectIdentity(result.sessionToken, result.userId).then(syncIdentityIndex);
+            }
 
             // Check for missing attributes before relaying
             const currentProfile = useProfileStore.getState().profile;

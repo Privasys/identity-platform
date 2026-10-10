@@ -206,3 +206,23 @@ func TestTheIdentityIndexRoundTrips(t *testing.T) {
 		t.Fatalf("bad blob: %d", rec.Code)
 	}
 }
+
+// TestTheWalletVectorVerifies pins the contract with the wallet: the vector is
+// produced by wallet/src/__tests__/identities.test.ts (its snapshot). A wallet
+// that signs different bytes than this package verifies would fail here first.
+func TestTheWalletVectorVerifies(t *testing.T) {
+	const (
+		userID = "XUz5Z1gsKjhFFhCeSjYvrgwfcxU-qFjnGLS_BByzxMA"
+		pubB64 = "z3DyB32X65KsSnPkidEPLc-laAdCLnS0-XJiH815ORs"
+		sigB64 = "awyQ8ZyD2TXrnKhWrTvr6Z6NBESAiMZ59_xm4lKXur0s6M88PAmHXfI12o0JD0pUCkOIqOp7amwB9kxgh7abAA"
+	)
+	pub, _ := base64.RawURLEncoding.DecodeString(pubB64)
+	sig, _ := base64.RawURLEncoding.DecodeString(sigB64)
+	challenge := make([]byte, 32)
+	for i := range challenge {
+		challenge[i] = byte(i)
+	}
+	if !ed25519.Verify(ed25519.PublicKey(pub), IdentityRecoveryMessage(userID, challenge), sig) {
+		t.Fatal("the wallet's signature does not verify over the IdP's message")
+	}
+}

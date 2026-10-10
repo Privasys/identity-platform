@@ -250,6 +250,18 @@ export async function mintPhraseWithBackup(
 }
 
 /**
+ * Mint a phrase client-side and register only its hash, WITHOUT touching the
+ * backup. For a recovery that found no backup it could open: writing one then
+ * would wrap this phone's fresh data root and replace the stored backup of the
+ * real one, which is the only copy.
+ */
+export async function mintPhraseOnly(walletSessionToken: string): Promise<string> {
+    const words = await generateMnemonic();
+    await registerPhraseHash(walletSessionToken, phraseHashHex(words));
+    return words.join(' ');
+}
+
+/**
  * The one phrase ceremony every screen shares: mint client-side and
  * register only the hash; against an IdP that predates client-side
  * generation, fall back to a server-minted phrase (the one the

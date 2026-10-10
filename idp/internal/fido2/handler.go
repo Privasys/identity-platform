@@ -209,6 +209,11 @@ type challengeEntry struct {
 	sessionID    string // OIDC authorization session ID
 	discoverable bool   // true when authenticate/begin had no credentialId
 	expiresAt    time.Time
+	// clientPhrase is set when register/begin carried client_phrase=1: the
+	// wallet makes the recovery phrase itself and registers only its hash, so
+	// /complete must not mint one. Wallets before 1.4.28 omit it and get the
+	// server-made phrase as before.
+	clientPhrase bool
 	// vaultApproval is set when this challenge is a vault promote step-up
 	// (the vault promote-step-up design). On /complete the handler issues an operation-bound
 	// access token from these values instead of a session token.
@@ -413,9 +418,10 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	challengeKey := sessionData.Challenge
 	h.challenges.put(challengeKey, &challengeEntry{
 		sessionData: sessionData,
-		user:        user,
-		sessionID:   sessionID,
-		expiresAt:   time.Now().Add(5 * time.Minute),
+		user:         user,
+		sessionID:    sessionID,
+		expiresAt:    time.Now().Add(5 * time.Minute),
+		clientPhrase: r.URL.Query().Get("client_phrase") == "1",
 	})
 
 	// Return standard WebAuthn CredentialCreation options.
@@ -521,11 +527,18 @@ func (h *Handler) CompleteRegistration(
 		// Returned ONCE. A caller that reaches this and drops the response
 		// leaves the holder with a phrase they have never seen, so the wallet
 		// shows it before it does anything else with the result.
+		//
+		// A wallet that makes its own phrase (clientPhrase) gets none: it
+		// registers the hash of the one it made, so the plaintext never
+		// reaches this server, and a per-service identity (recovered by its
+		// own key, not a phrase) is not given a phrase nobody will see.
 		var recoveryPhrase string
 		if priorCredentials == 0 && credCountErr == nil {
 			if err := h.db.MarkRecoveryCodesUsed(userID); err != nil {
 				log.Printf("fido2/register/complete: retire recovery codes: %v", err)
 			}
+		}
+		if priorCredentials == 0 && credCountErr == nil && !entry.clientPhrase {
 			if phrase, err := recovery.GenerateRecoveryPhrase(); err == nil {
 				if err := h.db.StoreRecoveryCodes(userID, []string{recovery.HashPhrase(phrase)}); err == nil {
 					recoveryPhrase = phrase

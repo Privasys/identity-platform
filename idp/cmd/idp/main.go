@@ -471,6 +471,11 @@ func main() {
 	mux.HandleFunc("POST /recovery/begin", recoveryHandler.HandleBeginRecovery)
 	mux.HandleFunc("GET /recovery/status", recoveryHandler.HandleRecoveryStatus)
 	mux.HandleFunc("POST /recovery/complete", recoveryHandler.HandleCompleteRecovery)
+	// Per-identity recovery: each identity proves ownership with its own key,
+	// derived on the wallet, so a recovery never names a set of identities.
+	mux.HandleFunc("PUT /recovery/identity-key", recoveryHandler.HandleSetIdentityKey)
+	mux.HandleFunc("POST /recovery/identity/begin", recoveryHandler.HandleBeginIdentityRecovery)
+	mux.HandleFunc("POST /recovery/identity/complete", recoveryHandler.HandleCompleteIdentityRecovery)
 	mux.HandleFunc("GET /guardians", recoveryHandler.HandleListGuardians)
 	mux.HandleFunc("POST /guardians/invite", recoveryHandler.HandleInviteGuardianByEmail)
 	mux.HandleFunc("POST /guardians/add", recoveryHandler.HandleAddGuardianByQR)

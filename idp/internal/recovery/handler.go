@@ -6,6 +6,7 @@ package recovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/Privasys/idp/internal/push"
 	"io"
 	"log"
@@ -589,6 +590,10 @@ func (h *Handler) HandleApproveRecovery(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := h.db.ApproveRecovery(req.RequestID, guardianID, req.Approved); err != nil {
+		if errors.Is(err, store.ErrNotAGuardian) {
+			http.Error(w, `{"error":"you are not a guardian of this account, or the request has closed"}`, http.StatusForbidden)
+			return
+		}
 		log.Printf("[recovery] approve error: %v", err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return

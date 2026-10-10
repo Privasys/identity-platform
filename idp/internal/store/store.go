@@ -1029,6 +1029,11 @@ func (db *DB) GetAcceptedGuardianCount(userID string) (int, int, error) {
 		 FROM guardians WHERE user_id = ? AND status = 'accepted'`,
 		userID,
 	).Scan(&count, &threshold)
+	// A threshold above the number of accepted guardians could never be met,
+	// and a recovery waiting on it would wait for ever.
+	if threshold > count {
+		threshold = count
+	}
 	return count, threshold, err
 }
 
@@ -1158,6 +1163,10 @@ func (db *DB) UpdateRecoveryCodeVerified(requestID string) error {
 }
 
 // ApproveRecovery records a guardian's approval and increments the count.
+// ErrNotAGuardian is returned when the caller is not an accepted guardian of
+// the account a recovery request is for, or the request is not open.
+var ErrNotAGuardian = errors.New("not a guardian of this account, or the request is not open")
+
 func (db *DB) ApproveRecovery(requestID, guardianID string, approved bool) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -1165,13 +1174,34 @@ func (db *DB) ApproveRecovery(requestID, guardianID string, approved bool) error
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec(
+	// Only an accepted guardian of the account being recovered may answer, and
+	// only while the request is open. Without this, any signed-in identity that
+	// learned a request id could approve someone else's recovery.
+	var allowed int
+	if err := tx.QueryRow(
+		`SELECT COUNT(*) FROM recovery_requests rr
+		 JOIN guardians g ON g.user_id = rr.user_id AND g.guardian_id = ? AND g.status = 'accepted'
+		 WHERE rr.request_id = ? AND rr.status = 'pending' AND rr.expires_at > ?`,
+		guardianID, requestID, time.Now(),
+	).Scan(&allowed); err != nil {
+		return err
+	}
+	if allowed == 0 {
+		return ErrNotAGuardian
+	}
+
+	res, err := tx.Exec(
 		`INSERT INTO recovery_approvals (request_id, guardian_id, approved)
 		 VALUES (?, ?, ?) ON CONFLICT(request_id, guardian_id) DO NOTHING`,
 		requestID, guardianID, approved,
 	)
 	if err != nil {
 		return err
+	}
+	// A guardian answers once. A second approval from the same guardian used to
+	// count again, so one guardian could meet any threshold alone.
+	if n, _ := res.RowsAffected(); n == 0 {
+		return tx.Commit()
 	}
 
 	if approved {

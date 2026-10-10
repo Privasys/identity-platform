@@ -184,3 +184,25 @@ func TestIdentityRecoveryIsRateLimited(t *testing.T) {
 		t.Fatalf("attempt past the limit: %d, want 429", code)
 	}
 }
+
+func TestTheIdentityIndexRoundTrips(t *testing.T) {
+	h, _, mux := identityTestHandler(t)
+	mux.HandleFunc("PUT /recovery/identity-index", h.HandlePutIdentityIndex)
+	mux.HandleFunc("GET /recovery/identity-index", h.HandleGetIdentityIndex)
+	if rec := call(mux, "GET", "/recovery/identity-index", "", "wallet:alice-drive"); rec.Code != http.StatusNotFound {
+		t.Fatalf("empty: %d", rec.Code)
+	}
+	if rec := call(mux, "PUT", "/recovery/identity-index", `{"blob":"AQID_-x"}`, "wallet:alice-drive"); rec.Code != http.StatusOK {
+		t.Fatalf("put: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := call(mux, "GET", "/recovery/identity-index", "", "wallet:alice-drive"); !strings.Contains(rec.Body.String(), `"AQID_-x"`) {
+		t.Fatalf("get: %s", rec.Body.String())
+	}
+	// Another account sees nothing of it.
+	if rec := call(mux, "GET", "/recovery/identity-index", "", "wallet:bob"); rec.Code != http.StatusNotFound {
+		t.Fatalf("other account: %d", rec.Code)
+	}
+	if rec := call(mux, "PUT", "/recovery/identity-index", `{"blob":"not base64!"}`, "wallet:alice-drive"); rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad blob: %d", rec.Code)
+	}
+}

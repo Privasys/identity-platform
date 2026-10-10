@@ -225,6 +225,16 @@ func migrate(db *sql.DB) error {
 		-- challenge with the matching private key recovers THAT identity and
 		-- no other. Nothing here relates one identity to another: each key is
 		-- independent to anyone without the seed. See internal/recovery/identity.go.
+		-- Identity index: the identities a wallet held before identities were
+		-- derived from its seed, whose handles cannot be re-derived. Encrypted
+		-- client-side under a key from the data root, like the grants index,
+		-- and stored on the main account. Opaque ciphertext to the IdP.
+		CREATE TABLE IF NOT EXISTS identity_indexes (
+			user_id    TEXT PRIMARY KEY REFERENCES users(user_id),
+			blob       TEXT NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
 		CREATE TABLE IF NOT EXISTS identity_recovery_keys (
 			user_id    TEXT PRIMARY KEY REFERENCES users(user_id),
 			public_key BLOB NOT NULL,
@@ -771,6 +781,28 @@ func (db *DB) GetGrantsIndex(userID string) (string, error) {
 	err := db.QueryRow(
 		"SELECT blob FROM grants_indexes WHERE user_id = ?", userID,
 	).Scan(&blob)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return blob, err
+}
+
+// PutIdentityIndex stores (or replaces) a user's encrypted identity index.
+func (db *DB) PutIdentityIndex(userID, blob string) error {
+	_, err := db.Exec(`
+		INSERT INTO identity_indexes (user_id, blob, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(user_id) DO UPDATE SET
+			blob = excluded.blob, updated_at = CURRENT_TIMESTAMP`,
+		userID, blob,
+	)
+	return err
+}
+
+// GetIdentityIndex returns a user's encrypted identity index, or "".
+func (db *DB) GetIdentityIndex(userID string) (string, error) {
+	var blob string
+	err := db.QueryRow("SELECT blob FROM identity_indexes WHERE user_id = ?", userID).Scan(&blob)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}

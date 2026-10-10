@@ -273,3 +273,61 @@ func clientIP(r *http.Request) string {
 	}
 	return r.RemoteAddr
 }
+
+// Identity index endpoints.
+//
+// Identities created before this existed have random handles, which no seed
+// can re-derive. The wallet keeps the list of those it held, encrypted under a
+// key derived from the sovereign data root, on the main account: a recovered
+// phone restores the root from the phrase-wrapped backup, reads the list, and
+// recovers each of those identities by its key. The list only ever shrinks or
+// stays the same: every identity made since is derived.
+//
+// Opaque ciphertext to the IdP. It is stored on the main account, which the
+// IdP knows, but it cannot read which identities are in it.
+
+const maxIdentityIndexBytes = 16 * 1024
+
+// HandlePutIdentityIndex stores (replaces) the caller's identity index.
+// PUT /recovery/identity-index  (requires wallet sessionToken or JWT bearer)
+func (h *Handler) HandlePutIdentityIndex(w http.ResponseWriter, r *http.Request) {
+	userID := h.authenticateBearer(w, r)
+	if userID == "" {
+		return
+	}
+	var req struct {
+		Blob string `json:"blob"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxIdentityIndexBytes+1024)).Decode(&req); err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
+		return
+	}
+	if req.Blob == "" || len(req.Blob) > maxIdentityIndexBytes || !backupBlobShape.MatchString(req.Blob) {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "blob must be non-empty base64url, at most 16KiB"})
+		return
+	}
+	if err := h.db.PutIdentityIndex(userID, req.Blob); err != nil {
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "failed to store identity index"})
+		return
+	}
+	writeJSONStatus(w, http.StatusOK, map[string]string{"status": "stored"})
+}
+
+// HandleGetIdentityIndex returns the caller's identity index, 404 when none.
+// GET /recovery/identity-index  (requires wallet sessionToken or JWT bearer)
+func (h *Handler) HandleGetIdentityIndex(w http.ResponseWriter, r *http.Request) {
+	userID := h.authenticateBearer(w, r)
+	if userID == "" {
+		return
+	}
+	blob, err := h.db.GetIdentityIndex(userID)
+	if err != nil {
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "failed to load identity index"})
+		return
+	}
+	if blob == "" {
+		writeJSONStatus(w, http.StatusNotFound, map[string]string{"error": "no identity index stored"})
+		return
+	}
+	writeJSONStatus(w, http.StatusOK, map[string]string{"blob": blob})
+}

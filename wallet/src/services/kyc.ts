@@ -767,11 +767,16 @@ async function holderSignature(
 async function buildSignedBase(
     record: KycRecord,
     rpId: string,
-    nonce?: string
+    nonce?: string,
+    subject?: string
 ): Promise<SignedBase> {
     const profile = useProfileStore.getState().profile;
     if (!profile?.pairwiseSeed) throw new Error('Profile is not initialised');
-    const sub = await deriveAppSub(profile.pairwiseSeed, rpId);
+    // The subject the relying party knows the holder by (the ID token's sub,
+    // which the IdP returns at sign-in), so the disclosure and the sign-in
+    // name the same person to that site and to no other. Without one (an
+    // enclave that is its own relying party), the wallet's own derivation.
+    const sub = subject || (await deriveAppSub(profile.pairwiseSeed, rpId));
     const n = nonce ?? b64uBytes(Crypto.getRandomBytes(16));
     const ts = Math.floor(Date.now() / 1000);
     const holderPub = await getHolderPublicKey();
@@ -798,10 +803,11 @@ export async function proveAgeOver(
     rpId: string,
     threshold: number,
     nonce?: string,
-    voucher?: string
+    voucher?: string,
+    subject?: string
 ): Promise<string> {
     const record = await requireRecord();
-    const base = await buildSignedBase(record, rpId, nonce);
+    const base = await buildSignedBase(record, rpId, nonce, subject);
     const resp = await postToVerifier<{ token: string }>('/prove/age-over', {
         ...base,
         birthdate: record.fields.birthdate,
@@ -816,10 +822,11 @@ export async function proveAgeBand(
     rpId: string,
     bands?: number[],
     nonce?: string,
-    voucher?: string
+    voucher?: string,
+    subject?: string
 ): Promise<string> {
     const record = await requireRecord();
-    const base = await buildSignedBase(record, rpId, nonce);
+    const base = await buildSignedBase(record, rpId, nonce, subject);
     const resp = await postToVerifier<{ token: string }>('/prove/age-band', {
         ...base,
         birthdate: record.fields.birthdate,
@@ -834,7 +841,8 @@ export async function proveField(
     rpId: string,
     field: string,
     nonce?: string,
-    voucher?: string
+    voucher?: string,
+    subject?: string
 ): Promise<string> {
     const record = await requireRecord();
     const value = record.fields[field];
@@ -842,7 +850,7 @@ export async function proveField(
     if (value == null || salt == null) {
         throw new Error(`No verified value for "${field}" in the identity receipt.`);
     }
-    const base = await buildSignedBase(record, rpId, nonce);
+    const base = await buildSignedBase(record, rpId, nonce, subject);
     const resp = await postToVerifier<{ token: string }>('/prove/field', {
         ...base,
         field,
@@ -872,7 +880,8 @@ export async function provePresence(
     rpId: string,
     selfieBase64: string,
     nonce?: string,
-    voucher?: string
+    voucher?: string,
+    subject?: string
 ): Promise<string> {
     const record = await requireRecord();
     if (!record.dg2 || !record.salts[PORTRAIT_SALT_KEY]) {
@@ -880,7 +889,7 @@ export async function provePresence(
             'This identity receipt predates presence support. Re-verify your ID to enable it.'
         );
     }
-    const base = await buildSignedBase(record, rpId, nonce);
+    const base = await buildSignedBase(record, rpId, nonce, subject);
     const resp = await postToVerifier<{ token: string }>('/prove/presence', {
         ...base,
         // The commitment is over b64url(DG2 bytes); re-derive the exact string
@@ -897,10 +906,11 @@ export async function provePresence(
 export async function proveDocumentValid(
     rpId: string,
     nonce?: string,
-    voucher?: string
+    voucher?: string,
+    subject?: string
 ): Promise<string> {
     const record = await requireRecord();
-    const base = await buildSignedBase(record, rpId, nonce);
+    const base = await buildSignedBase(record, rpId, nonce, subject);
     const resp = await postToVerifier<{ token: string }>('/prove/document-valid', base, voucher);
     return resp.token;
 }
@@ -952,19 +962,20 @@ export async function discloseAttribute(
     rpId: string,
     key: string,
     nonce?: string,
-    vouchers?: DisclosureVoucher[]
+    vouchers?: DisclosureVoucher[],
+    subject?: string
 ): Promise<string> {
     const voucher = voucherForAttribute(key, vouchers);
     const ageOver = /^age_over_(\d+)$/.exec(key);
-    if (ageOver) return proveAgeOver(rpId, Number(ageOver[1]), nonce, voucher);
-    if (key === 'age_band') return proveAgeBand(rpId, undefined, nonce, voucher);
-    if (key === 'document_valid') return proveDocumentValid(rpId, nonce, voucher);
+    if (ageOver) return proveAgeOver(rpId, Number(ageOver[1]), nonce, voucher, subject);
+    if (key === 'age_band') return proveAgeBand(rpId, undefined, nonce, voucher, subject);
+    if (key === 'document_valid') return proveDocumentValid(rpId, nonce, voucher, subject);
     if (key === 'holder_present') {
         // Presence needs a live selfie ceremony — the connect flow captures it
         // and calls provePresence directly; it can never resolve as a field.
         throw new Error('holder_present requires a live selfie: use provePresence');
     }
-    return proveField(rpId, certifiedFieldFor(key), nonce, voucher);
+    return proveField(rpId, certifiedFieldFor(key), nonce, voucher, subject);
 }
 
 // ── Sealed persistence ──────────────────────────────────────────────────────

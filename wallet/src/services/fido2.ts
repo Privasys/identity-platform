@@ -94,6 +94,13 @@ interface CompleteResponse {
     status: string;
     sessionToken?: string;
     userId?: string;
+    /**
+     * The subject the browser session's client knows the holder by: the
+     * account id for Privasys's own apps, a per-site subject otherwise. Goes
+     * into the voucher (the enclave asserts it) and into disclosures, so the
+     * site sees one identifier for the holder and no other site sees it.
+     */
+    subject?: string;
     /** BIP39 24-word recovery phrase. Returned ONCE on first registration. */
     recoveryPhrase?: string;
 }
@@ -221,7 +228,7 @@ export async function register(
          */
         clientPhrase?: boolean;
     }
-): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string; userId?: string; recoveryPhrase?: string; sessionRelay?: SessionRelayBinding }> {
+): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string; userId?: string; subject?: string; recoveryPhrase?: string; sessionRelay?: SessionRelayBinding }> {
     // Mirror of authenticate(): if the QR opted into session-relay we
     // must bootstrap a sealed session against the enclave app first so
     // the IdP can bind the issued JWT to the same (sdk_pub, enc_pub,
@@ -379,6 +386,7 @@ export async function register(
         userName: options.user.name,
         serverRpId: options.rp.id,
         userId: completeResp.userId,
+        subject: completeResp.subject,
         recoveryPhrase: completeResp.recoveryPhrase,
         sessionRelay: relay,
     };
@@ -401,7 +409,7 @@ export async function authenticate(
     browserSessionId: string,
     rpId?: string,
     sessionRelay?: { sdkPub: string; appHost: string; quoteHash: string; nonce: string }
-): Promise<{ sessionToken: string; userId?: string; sessionRelay?: SessionRelayBinding }> {
+): Promise<{ sessionToken: string; userId?: string; subject?: string; sessionRelay?: SessionRelayBinding }> {
     // 0. Optional: bootstrap a browser→enclave session over the same
     //    RA-TLS connection. Wallet posts the SDK's ephemeral P-256
     //    public key (SEC1 uncompressed, base64url) and gets back the
@@ -511,7 +519,12 @@ export async function authenticate(
         }
     );
 
-    return { sessionToken: completeResp.sessionToken || '', userId: completeResp.userId, sessionRelay: relay };
+    return {
+        sessionToken: completeResp.sessionToken || '',
+        userId: completeResp.userId,
+        subject: completeResp.subject,
+        sessionRelay: relay,
+    };
 }
 
 /**

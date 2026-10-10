@@ -80,6 +80,7 @@ beforeEach(() => {
         status: 'ok',
         sessionToken: 'reg-session-token',
         userId: 'user-id-from-idp',
+        subject: 'site-subject',
     };
     mockResponses['/fido2/authenticate/begin'] = {
         publicKey: { challenge: AUTH_CHALLENGE, rpId: 'example.privasys.org' },
@@ -200,6 +201,8 @@ describe('fido2.register', () => {
             userName: 'test-key',
             serverRpId: 'example.privasys.org',
             userId: 'user-id-from-idp',
+            // The subject the session's client knows the holder by.
+            subject: 'site-subject',
         });
     });
 });

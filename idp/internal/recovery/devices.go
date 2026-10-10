@@ -281,6 +281,13 @@ func (h *Handler) revoke(userID, deviceTag, keep string) ([]string, error) {
 	if len(ids) > 0 && h.endSessions != nil {
 		h.endSessions(ids)
 	}
+	// The sealed browser sessions of the account go with the phone. No row
+	// names which phone approved a browser (a session's device is the
+	// browser's), so every one ends; the phones that stay approve again,
+	// one tap per site, through the SDK's signed-out recovery.
+	if len(ids) > 0 && h.revokeSealedSessions != nil {
+		h.revokeSealedSessions(userID)
+	}
 	log.Printf("[devices] revoked %d passkey(s) of one phone on %s…", len(ids), userID[:min(8, len(userID))])
 	return ids, nil
 }

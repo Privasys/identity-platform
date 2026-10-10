@@ -46,8 +46,8 @@ import (
 	"github.com/Privasys/idp/internal/push"
 	"github.com/Privasys/idp/internal/recovery"
 	"github.com/Privasys/idp/internal/sessions"
-	"github.com/Privasys/idp/internal/spend"
 	"github.com/Privasys/idp/internal/social"
+	"github.com/Privasys/idp/internal/spend"
 	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/support"
 	"github.com/Privasys/idp/internal/tokens"
@@ -454,6 +454,14 @@ func main() {
 	recoveryHandler.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	recoveryHandler.SetWalletSessionEnder(fido2Handler.WalletSessionEnder())
 	recoveryHandler.SetSessionCredential(fido2Handler.SessionCredential)
+	recoveryHandler.SetSealedSessionRevoker(func(userID string) {
+		n, err := sessionsStore.RevokeAllForUser(userID)
+		if err != nil {
+			log.Printf("[recovery] end sealed sessions of %s…: %v", userID[:min(8, len(userID))], err)
+			return
+		}
+		log.Printf("[recovery] ended %d sealed session(s) of %s…", n, userID[:min(8, len(userID))])
+	})
 	// Recovery phrase (BIP39) endpoints — preferred names.
 	mux.HandleFunc("POST /recovery/phrase/regenerate", recoveryHandler.HandleRegeneratePhrase)
 	mux.HandleFunc("POST /recovery/phrase/register", recoveryHandler.HandleRegisterPhraseHash)

@@ -137,3 +137,79 @@ func TestAnAPIKeyForAClientCarriesItsSubject(t *testing.T) {
 		t.Fatalf("legacy key: %v", legacy)
 	}
 }
+
+// The wallet uploads its sign-in voucher through POST /sessions/encauth,
+// which allocates the sid first. That path must check the voucher against the
+// authenticated account like the direct PUT does, not against the voucher's
+// own sub: for a client with its own subjects the two differ.
+func TestThePostedVoucherCarriesTheClientsSubject(t *testing.T) {
+	dir := t.TempDir()
+	db, err := store.Open(filepath.Join(dir, "idp.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	iss, err := tokens.NewIssuer(filepath.Join(dir, "k.pem"), "https://privasys.id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	iss.SetSubjectStore(db)
+	if _, err := db.Exec("INSERT INTO users (user_id) VALUES ('acct-1')"); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.SetSectorResolver(func(c string) string {
+		if c == "site" {
+			return "site"
+		}
+		return ""
+	})
+	s.SetWalletSessionResolver(func(token string) (string, bool) { return "acct-1", token == "tok" })
+
+	hw, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	hwPub := elliptic.Marshal(elliptic.P256(), hw.PublicKey.X, hw.PublicKey.Y)
+	post := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "/sessions/encauth", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer wallet:tok")
+		rec := httptest.NewRecorder()
+		s.HandlePostEncAuth(iss)(rec, req)
+		return rec
+	}
+	upload := func(client, sub string) *httptest.ResponseRecorder {
+		rec := post(`{"client_id":"` + client + `"}`)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("allocate: %d %s", rec.Code, rec.Body.String())
+		}
+		var alloc struct{ SID string }
+		_ = json.Unmarshal(rec.Body.Bytes(), &alloc)
+		now := uint64(time.Now().Unix())
+		payload, err := EncAuthCanonicalCBOR(&EncAuth{
+			V: 1, Sub: sub, SID: alloc.SID,
+			WorkloadDigest: bytes32(1), EncMeas: bytes32(2), EncPub: sec1Pub(), QuoteHash: bytes32(3),
+			NotBefore: now - 10, NotAfter: now + 3600, HwPub: hwPub,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		d := sha256.Sum256(payload)
+		r, sv, _ := ecdsa.Sign(rand.Reader, hw, d[:])
+		sig := make([]byte, 64)
+		r.FillBytes(sig[:32])
+		sv.FillBytes(sig[32:])
+		return post(`{"client_id":"` + client + `","host":"app.example","payload":"` +
+			base64.RawURLEncoding.EncodeToString(payload) + `","hw_sig":"` + base64.RawURLEncoding.EncodeToString(sig) + `"}`)
+	}
+
+	if rec := upload("site", iss.SubjectFor("acct-1", "site")); rec.Code != http.StatusOK {
+		t.Fatalf("a posted voucher with the client's subject: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := upload("site", "acct-1"); rec.Code == http.StatusOK {
+		t.Fatal("a posted voucher naming the account to an own-sector client was accepted")
+	}
+	if rec := upload("privasys-platform", "acct-1"); rec.Code != http.StatusOK {
+		t.Fatalf("a posted shared-sector voucher: %d %s", rec.Code, rec.Body.String())
+	}
+}

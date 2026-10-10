@@ -171,6 +171,8 @@ func TestRevokePhoneKeepsTheCallersPasskey(t *testing.T) {
 	h.SetSessionCredential(func(string) string { return "cred-a" })
 	var ended []string
 	h.SetWalletSessionEnder(func(ids []string) { ended = append(ended, ids...) })
+	var sealedEndedFor []string
+	h.SetSealedSessionRevoker(func(user string) { sealedEndedFor = append(sealedEndedFor, user) })
 	addCredential(t, db, "bob", "cred-a", "")
 	addCredential(t, db, "bob", "cred-b", tagB)
 
@@ -183,6 +185,37 @@ func TestRevokePhoneKeepsTheCallersPasskey(t *testing.T) {
 	}
 	if len(ended) != 1 || ended[0] != "cred-b" {
 		t.Fatalf("sessions ended for %v", ended)
+	}
+	// The browsers that phone approved go with it (every sealed session of
+	// the account: no row says which phone approved which browser).
+	if len(sealedEndedFor) != 1 || sealedEndedFor[0] != "bob" {
+		t.Fatalf("sealed sessions ended for %v", sealedEndedFor)
+	}
+	// A revoke that removes nothing ends nothing.
+	sealedEndedFor = nil
+	call(mux, "POST", "/devices/revoke", `{"device_tag":"`+tagB+`"}`, "wallet:bob")
+	if len(sealedEndedFor) != 0 {
+		t.Fatalf("sealed sessions ended with no passkey removed: %v", sealedEndedFor)
+	}
+}
+
+// A completed recovery replaces the phone; the sealed sessions it approved
+// end with its refresh tokens, so a stolen phone's browsers do not keep
+// rebinding on their vouchers.
+func TestCompleteRecoveryEndsTheSealedSessions(t *testing.T) {
+	h, db, mux := devicesTestHandler(t)
+	mux.HandleFunc("POST /recovery/complete", h.HandleCompleteRecovery)
+	var sealedEndedFor []string
+	h.SetSealedSessionRevoker(func(user string) { sealedEndedFor = append(sealedEndedFor, user) })
+	if _, err := db.Exec("INSERT INTO recovery_requests (request_id, user_id, code_verified, expires_at) VALUES ('rr-1', 'bob', 1, datetime('now', '+1 hour'))"); err != nil {
+		t.Fatal(err)
+	}
+	rec := call(mux, "POST", "/recovery/complete", `{"request_id":"rr-1"}`, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("complete: %d %s", rec.Code, rec.Body)
+	}
+	if len(sealedEndedFor) != 1 || sealedEndedFor[0] != "bob" {
+		t.Fatalf("sealed sessions ended for %v", sealedEndedFor)
 	}
 }
 

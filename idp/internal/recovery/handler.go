@@ -36,7 +36,15 @@ type Handler struct {
 	// sessionCredential names the passkey behind a wallet session.
 	endSessions       func([]string)
 	sessionCredential func(string) string
+	// revokeSealedSessions ends every sealed browser session of an account
+	// (internal/sessions): the sessions a removed or replaced phone approved
+	// must not outlive it on their vouchers.
+	revokeSealedSessions func(userID string)
 }
+
+// SetSealedSessionRevoker wires the sessions store's revoke-all, run when a
+// phone is removed from an account and when a recovery completes.
+func (h *Handler) SetSealedSessionRevoker(f func(userID string)) { h.revokeSealedSessions = f }
 
 // NewHandler creates a recovery handler.
 func NewHandler(db *store.DB, mailer *Mailer, issuer *tokens.Issuer) *Handler {
@@ -327,6 +335,12 @@ func (h *Handler) HandleCompleteRecovery(w http.ResponseWriter, r *http.Request)
 		log.Printf("[recovery] complete error: %v", err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
+	}
+	// The refresh tokens are gone, but a sealed browser session rebinds on
+	// its voucher without one. End them too: the phone that approved them is
+	// the one being replaced.
+	if h.revokeSealedSessions != nil {
+		h.revokeSealedSessions(rr.UserID)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

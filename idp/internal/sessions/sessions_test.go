@@ -223,3 +223,30 @@ func TestNewSIDUnique(t *testing.T) {
 		seen[sid] = true
 	}
 }
+
+// Removing a phone, or recovering the account, ends every sealed session of
+// the account: they would otherwise rebind on their vouchers for 90 days.
+func TestRevokeAllForUserEndsEverySessionAndRunsTheHook(t *testing.T) {
+	s := newTestStore(t)
+	var hooked []string
+	s.SetRevokeHook(func(sid string) { hooked = append(hooked, sid) })
+	a, _ := s.FindOrCreateForApp("alice", "app-1", "", time.Hour)
+	b, _ := s.FindOrCreateForApp("alice", "app-2", "", time.Hour)
+	c, _ := s.FindOrCreateForApp("bob", "app-1", "", time.Hour)
+	n, err := s.RevokeAllForUser("alice")
+	if err != nil || n != 2 {
+		t.Fatalf("revoke all: n=%d err=%v", n, err)
+	}
+	if s.IsActive(a.SID) || s.IsActive(b.SID) {
+		t.Fatal("alice's sessions still active")
+	}
+	if !s.IsActive(c.SID) {
+		t.Fatal("bob's session ended")
+	}
+	if len(hooked) != 2 {
+		t.Fatalf("hook ran for %v", hooked)
+	}
+	if n, _ := s.RevokeAllForUser("alice"); n != 0 {
+		t.Fatalf("second pass ended %d", n)
+	}
+}

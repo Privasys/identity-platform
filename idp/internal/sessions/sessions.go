@@ -455,6 +455,33 @@ func (s *Store) Revoke(sid string) error {
 	return nil
 }
 
+// RevokeAllForUser ends every live session of an account, running the
+// revoke hook for each as HandleRevoke does. A phone that is removed from
+// the account, or replaced by a recovery, approved browser sessions that
+// would otherwise keep rebinding on their vouchers for the rest of their
+// 90 days; the SDK sees them end as signed-out and asks for one approval.
+// Returns how many were ended.
+func (s *Store) RevokeAllForUser(userID string) (int, error) {
+	live, err := s.ListByUser(userID)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, sess := range live {
+		if err := s.Revoke(sess.SID); err != nil {
+			if errors.Is(err, ErrNotFound) {
+				continue
+			}
+			return n, err
+		}
+		n++
+		if s.onRevoke != nil {
+			s.onRevoke(sess.SID)
+		}
+	}
+	return n, nil
+}
+
 // CleanupExpired hard-deletes rows whose expires_at + 30d has passed.
 // Revoked rows are kept for the same window so audit queries still work.
 func (s *Store) CleanupExpired() {

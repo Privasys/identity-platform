@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"net/http"
 	"time"
@@ -328,6 +329,7 @@ func (s *Store) HandlePutEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 		}
 		env, err := s.PutEncAuth(userID, payload, hwSig, req.Host, issuer)
 		if err != nil {
+			log.Printf("sessions/encauth: voucher refused for sid %s on %s: %v", sid, req.Host, err)
 			if errors.Is(err, ErrRevoked) {
 				httpErr(w, http.StatusGone, err.Error())
 				return
@@ -388,8 +390,11 @@ func (s *Store) HandleGetEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 }
 
 // PutEncAuthForSession is like PutEncAuth but pins to a server-chosen
-// sid: the wallet does not need to know its sid ahead of time.
-func (s *Store) PutEncAuthForSession(sid string, payloadBytes, hwSig []byte, host string, issuer *tokens.Issuer) (*Envelope, error) {
+// sid: the wallet does not need to know its sid ahead of time. userID is
+// the authenticated account, never the voucher's own sub: for a client
+// with its own subjects the two differ, and PutEncAuth checks the voucher
+// names the subject that client sees.
+func (s *Store) PutEncAuthForSession(userID, sid string, payloadBytes, hwSig []byte, host string, issuer *tokens.Issuer) (*Envelope, error) {
 	p, err := DecodeEncAuthPayload(payloadBytes)
 	if err != nil {
 		return nil, err
@@ -397,7 +402,7 @@ func (s *Store) PutEncAuthForSession(sid string, payloadBytes, hwSig []byte, hos
 	if p.SID != sid {
 		return nil, errors.New("payload sid does not match session row")
 	}
-	return s.PutEncAuth(p.Sub, payloadBytes, hwSig, host, issuer)
+	return s.PutEncAuth(userID, payloadBytes, hwSig, host, issuer)
 }
 
 // defaultEncAuthTTL is the lifetime of an EncAuth-anchored session
@@ -459,8 +464,12 @@ func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 				httpErr(w, http.StatusBadRequest, "invalid hw_sig b64")
 				return
 			}
-			env, perr := s.PutEncAuthForSession(sess.SID, payload, hwSig, req.Host, issuer)
+			env, perr := s.PutEncAuthForSession(userID, sess.SID, payload, hwSig, req.Host, issuer)
 			if perr != nil {
+				// A refused voucher leaves the browser on an anonymous
+				// session, which the holder sees as a sign-in that did not
+				// take; the reason must be in this log, not only on the phone.
+				log.Printf("sessions/encauth: voucher refused for client %s on %s: %v", req.ClientID, req.Host, perr)
 				if errors.Is(perr, ErrRevoked) {
 					httpErr(w, http.StatusGone, perr.Error())
 					return

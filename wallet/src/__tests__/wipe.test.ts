@@ -53,6 +53,12 @@ jest.mock('@/services/grants-index', () => ({
         delete storage['privasys.grants-index.synced'];
     }),
 }));
+// The automatic profile copy is a file the phone's own backup carries; the
+// next identity on this device must not inherit it.
+const mockClearProfileBackup = jest.fn(async () => undefined);
+jest.mock('@/services/profile-backup', () => ({
+    clearProfileBackupLocalState: () => mockClearProfileBackup(),
+}));
 
 // Hardware keys live outside SecureStore, so they get their own ledger.
 const mockHardwareKeys = new Set<string>();
@@ -277,4 +283,11 @@ describe('wipe coverage', () => {
 
         expect(unaccounted).toEqual([]);
     });
+});
+
+it('deletes the automatic profile backup', async () => {
+    const { wipeWallet } = require('@/services/wipe');
+    mockClearProfileBackup.mockClear();
+    await wipeWallet();
+    expect(mockClearProfileBackup).toHaveBeenCalledTimes(1);
 });

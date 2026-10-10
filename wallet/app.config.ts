@@ -246,7 +246,9 @@ export default (context: ConfigContext): ExpoConfig => {
             [
                 'expo-secure-store',
                 {
-                    configureAndroidBackup: true,
+                    // Backup rules come from ./plugins/android-backup-rules,
+                    // which keeps these and adds the profile backup file.
+                    configureAndroidBackup: false,
                     faceIDPermission:
                         '$(PRODUCT_NAME) uses your biometrics to validate your connection requests.'
                 }
@@ -340,7 +342,8 @@ export default (context: ConfigContext): ExpoConfig => {
             './modules/notification-service/app.plugin',
             './modules/app-attest/app.plugin',
             './plugins/swift-concurrency-fix',
-            './plugins/disable-lint-vital'
+            './plugins/disable-lint-vital',
+            './plugins/android-backup-rules'
         ].filter((p) => p !== 'noop') as ExpoConfig['plugins'],
         experiments: { typedRoutes: true, reactCompiler: true, buildCacheProvider: 'eas' }
     };

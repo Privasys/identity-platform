@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useDependencyApprovalsStore } from '@/stores/dependency-approvals';
 import { useProfileStore } from '@/stores/profile';
+import { restoreFromAutoBackupIfEmpty, watchProfileForBackup } from '@/services/profile-backup';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
@@ -106,7 +107,13 @@ export default function RootLayout() {
             useSessionsStore.getState().hydrate(),
             useServiceSessionsStore.getState().hydrate(),
             useDependencyApprovalsStore.getState().hydrate()
-        ]).then(() => setStoresReady(true));
+        ]).then(() => {
+            setStoresReady(true);
+            // The profile's encrypted copy follows its changes, and a phone
+            // restored from its own backup picks the copy up once recovered.
+            watchProfileForBackup();
+            void restoreFromAutoBackupIfEmpty();
+        });
 
         // Run security checks in the background
         checkDeviceSecurity().then((status) => {

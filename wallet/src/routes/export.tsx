@@ -2,29 +2,113 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Export Data sub-page. The user picks which attributes to export (all selected
- * by default) and shares a signed-provenance JSON, or exports everything.
+ * Backup and export.
+ *
+ * The encrypted backup (services/profile-backup.ts): an automatic copy that
+ * travels with the phone's own backup, a copy the holder saves anywhere, and a
+ * restore from a file. Then the readable copy, the holder's details as a file
+ * anyone can read, which is theirs to take (data portability); it is behind
+ * the biometric and says plainly that it is unprotected.
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
+import * as LocalAuthentication from 'expo-local-authentication';
 import * as Sharing from 'expo-sharing';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react-native';
-
-import { SubPageHeader } from '@/components/SubPageHeader';
 import { useTranslation } from 'react-i18next';
+
+import { sectionTitleStyle } from '@/components/section-title';
+import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { attributeLabel, exportAttributesForAudit } from '@/services/attributes';
+import {
+    BackupError,
+    buildBackup,
+    isAutoBackupOn,
+    lastAutoBackupAt,
+    restoreFromText,
+    setAutoBackup,
+} from '@/services/profile-backup';
 import { useProfileStore } from '@/stores/profile';
 
-export default function ExportDataScreen() {
-    const { t } = useTranslation();
+export default function BackupAndExportScreen() {
+    const { t, i18n } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const { profile } = useProfileStore();
     const attrs = profile?.attributes ?? [];
     const [selected, setSelected] = useState<Set<string>>(() => new Set(attrs.map((a) => a.key)));
+    const [autoOn, setAutoOn] = useState(true);
+    const [lastAt, setLastAt] = useState<number | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    const refreshAuto = useCallback(async () => {
+        setAutoOn(await isAutoBackupOn());
+        setLastAt(await lastAutoBackupAt());
+    }, []);
+    useEffect(() => {
+        void refreshAuto();
+    }, [refreshAuto]);
+
+    const toggleAuto = async (on: boolean) => {
+        setAutoOn(on);
+        await setAutoBackup(on);
+        await refreshAuto();
+    };
+
+    const share = async (name: string, text: string, mimeType: string, uti: string) => {
+        const file = new File(Paths.cache, name);
+        if (file.exists) file.delete();
+        file.create();
+        file.write(text);
+        await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: t('export.dialogTitle'), UTI: uti });
+    };
+
+    const saveEncrypted = async () => {
+        setBusy(true);
+        try {
+            const stamp = new Date().toISOString().slice(0, 10);
+            await share(`privasys-wallet-backup-${stamp}.json`, await buildBackup(), 'application/json', 'public.json');
+        } catch (e: any) {
+            Alert.alert(t('export.failed'), e?.message ?? String(e));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const restore = async () => {
+        try {
+            const picked = await DocumentPicker.getDocumentAsync({
+                type: ['application/json', 'text/plain', '*/*'],
+                copyToCacheDirectory: true,
+                multiple: false,
+            });
+            if (picked.canceled || !picked.assets?.[0]) return;
+            setBusy(true);
+            const text = await new File(picked.assets[0].uri).text();
+            const r = await restoreFromText(text);
+            Alert.alert(
+                t('backup.restoredTitle'),
+                t('backup.restoredBody', { attributes: r.attributes, records: r.records }),
+            );
+        } catch (e: any) {
+            const reason = e instanceof BackupError ? e.reason : null;
+            const body =
+                reason === 'not-a-backup'
+                    ? t('backup.errNotBackup')
+                    : reason === 'wrong-wallet'
+                      ? t('backup.errWrongWallet')
+                      : reason === 'no-root' || reason === 'no-profile'
+                        ? t('backup.errRecoverFirst')
+                        : (e?.message ?? String(e));
+            Alert.alert(t('backup.restoreFailedTitle'), body);
+        } finally {
+            setBusy(false);
+        }
+    };
 
     const toggle = (key: string) =>
         setSelected((prev) => {
@@ -34,37 +118,70 @@ export default function ExportDataScreen() {
             return next;
         });
 
-    const doExport = async (keys: Set<string>) => {
+    // The readable copy is unprotected by design: say so, and ask for the
+    // biometric, so it is never one stray tap away.
+    const exportReadable = (keys: Set<string>) => {
         if (!profile) return;
-        try {
-            const data = exportAttributesForAudit(profile);
-            data.attributes = data.attributes.filter((a) => keys.has(a.key));
-            const json = JSON.stringify(data, null, 2);
-            const file = new File(Paths.cache, `privasys-profile-${Date.now()}.json`);
-            file.write(json);
-            await Sharing.shareAsync(file.uri, {
-                mimeType: 'application/json',
-                dialogTitle: t('export.dialogTitle'),
-                UTI: 'public.json',
-            });
-        } catch (e: any) {
-            Alert.alert(t('export.failed'), e.message);
-        }
+        Alert.alert(t('backup.readableWarnTitle'), t('backup.readableWarnBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+                text: t('common.continue'),
+                onPress: async () => {
+                    try {
+                        const auth = await LocalAuthentication.authenticateAsync({
+                            promptMessage: t('backup.readableConfirm'),
+                        });
+                        if (!auth.success) return;
+                        const data = exportAttributesForAudit(profile);
+                        data.attributes = data.attributes.filter((a) => keys.has(a.key));
+                        await share(
+                            `privasys-profile-${Date.now()}.json`,
+                            JSON.stringify(data, null, 2),
+                            'application/json',
+                            'public.json',
+                        );
+                    } catch (e: any) {
+                        Alert.alert(t('export.failed'), e?.message ?? String(e));
+                    }
+                },
+            },
+        ]);
     };
 
     const count = attrs.filter((a) => selected.has(a.key)).length;
+    const lastLabel = lastAt
+        ? t('backup.autoLast', {
+              when: new Date(lastAt * 1000).toLocaleString(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
+          })
+        : t('backup.autoNever');
 
     return (
         <RNView style={styles.screen}>
-            <SubPageHeader title={t('profile.exportData')} />
+            <SubPageHeader title={t('backup.title')} />
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.intro}>
-                    Export your attributes as a JSON file with their provenance and verification
-                    history. Choose what to include, or export everything.
-                </Text>
+                <Text style={styles.sectionTitle}>{t('backup.autoTitle')}</Text>
+                <RNView style={styles.row}>
+                    <RNView style={{ flex: 1 }}>
+                        <Text style={styles.rowLabel}>{t('backup.autoTitle')}</Text>
+                        <Text style={styles.rowValue}>{autoOn ? lastLabel : ''}</Text>
+                    </RNView>
+                    <Switch value={autoOn} onValueChange={(v) => void toggleAuto(v)} />
+                </RNView>
+                <Text style={styles.intro}>{t('backup.autoHint')}</Text>
 
+                <Pressable style={[styles.primary, busy && styles.disabled]} onPress={saveEncrypted} disabled={busy}>
+                    <Ionicons name="lock-closed-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.primaryText}>{t('backup.saveEncrypted')}</Text>
+                </Pressable>
+                <Text style={styles.hint}>{t('backup.saveEncryptedHint')}</Text>
+                <Pressable style={styles.secondary} onPress={restore} disabled={busy}>
+                    <Text style={styles.secondaryText}>{t('backup.restore')}</Text>
+                </Pressable>
+
+                <Text style={styles.sectionTitle}>{t('backup.readableTitle')}</Text>
+                <Text style={styles.intro}>{t('backup.readableHint')}</Text>
                 {attrs.length === 0 ? (
-                    <Text style={styles.empty}>No attributes to export yet.</Text>
+                    <Text style={styles.empty}>{t('backup.noAttributes')}</Text>
                 ) : (
                     <>
                         {attrs.map((attr) => (
@@ -78,19 +195,19 @@ export default function ExportDataScreen() {
                                 <Switch value={selected.has(attr.key)} onValueChange={() => toggle(attr.key)} />
                             </Pressable>
                         ))}
-
                         <Pressable
                             style={[styles.primary, count === 0 && styles.disabled]}
-                            onPress={() => doExport(selected)}
+                            onPress={() => exportReadable(selected)}
                             disabled={count === 0}
                         >
                             <Ionicons name="share-outline" size={18} color="#FFFFFF" />
-                            <Text style={styles.primaryText}>
-                                {t('export.exportCount', { count })}
-                            </Text>
+                            <Text style={styles.primaryText}>{t('export.exportCount', { count })}</Text>
                         </Pressable>
-                        <Pressable style={styles.secondary} onPress={() => doExport(new Set(attrs.map((a) => a.key)))}>
-                            <Text style={styles.secondaryText}>Export all</Text>
+                        <Pressable
+                            style={styles.secondary}
+                            onPress={() => exportReadable(new Set(attrs.map((a) => a.key)))}
+                        >
+                            <Text style={styles.secondaryText}>{t('backup.exportAll')}</Text>
                         </Pressable>
                     </>
                 )}
@@ -99,23 +216,38 @@ export default function ExportDataScreen() {
     );
 }
 
-const makeStyles = (p: Palette) => StyleSheet.create({
-    screen: { flex: 1, backgroundColor: p.screenBg },
-    content: { padding: 20 },
-    intro: { fontSize: 14, color: p.textSecondary, lineHeight: 20, marginBottom: 16 },
-    empty: { fontSize: 14, color: p.textMuted, textAlign: 'center', marginTop: 16 },
-    row: {
-        flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: p.card,
-        borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 8,
-    },
-    rowLabel: { fontSize: 15, fontWeight: '500', color: p.textPrimary },
-    rowValue: { fontSize: 12, color: p.textMuted, marginTop: 1 },
-    primary: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-        backgroundColor: p.blue, borderRadius: 12, paddingVertical: 14, marginTop: 12,
-    },
-    primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
-    disabled: { opacity: 0.5 },
-    secondary: { paddingVertical: 12, alignItems: 'center' },
-    secondaryText: { color: p.blue, fontSize: 14, fontWeight: '500' },
-});
+const makeStyles = (p: Palette) =>
+    StyleSheet.create({
+        screen: { flex: 1, backgroundColor: p.screenBg },
+        content: { padding: 20, paddingBottom: 48 },
+        sectionTitle: { ...sectionTitleStyle(p), marginTop: 16, marginBottom: 8 },
+        intro: { fontSize: 14, color: p.textSecondary, lineHeight: 20, marginBottom: 12 },
+        hint: { fontSize: 13, color: p.textMuted, lineHeight: 19, marginTop: 8 },
+        empty: { fontSize: 14, color: p.textMuted, textAlign: 'center', marginTop: 8 },
+        row: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            backgroundColor: p.card,
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            marginBottom: 8,
+        },
+        rowLabel: { fontSize: 15, fontWeight: '500', color: p.textPrimary },
+        rowValue: { fontSize: 12, color: p.textMuted, marginTop: 1 },
+        primary: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            backgroundColor: p.blue,
+            borderRadius: 12,
+            paddingVertical: 14,
+            marginTop: 12,
+        },
+        primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+        disabled: { opacity: 0.5 },
+        secondary: { paddingVertical: 12, alignItems: 'center' },
+        secondaryText: { color: p.blue, fontSize: 14, fontWeight: '500' },
+    });

@@ -5,6 +5,7 @@ package recovery
 
 import (
 	"crypto/ed25519"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -274,5 +275,39 @@ func TestDeviceLimit(t *testing.T) {
 	}
 	if full, _ := db.DeviceLimitReached("bob", "t3t3t3t3t3t3t3t3"); full {
 		t.Fatal("a phone already there was refused")
+	}
+}
+
+func TestRevokeAllOtherPhones(t *testing.T) {
+	_, db, mux := devicesTestHandler(t)
+	key := keyFor(3)
+	setKey(t, mux, "alice-ai", key)
+	addCredential(t, db, "alice-ai", "lost-tagged", tagB)
+	addCredential(t, db, "alice-ai", "lost-untagged", "")
+	db.UpsertDevicePushTarget("alice-ai", tagB, "tokB", "")
+	_, c := begin(t, mux, "alice-ai")
+	sig := ed25519.Sign(key, IdentityRevokeMessage("alice-ai", c, "*", ""))
+	rec := call(mux, "POST", "/recovery/identity/revoke-device",
+		`{"user_id":"alice-ai","device_tag":"*","keep_credential_id":"","new_public_key":"","challenge":"`+b64(c)+`","signature":"`+b64(sig)+`"}`, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("revoke all: %d %s", rec.Code, rec.Body)
+	}
+	if got := credentials(t, db, "alice-ai"); len(got) != 0 {
+		t.Fatalf("left %v", got)
+	}
+	if got := db.GetPushTokens("alice-ai"); len(got) != 0 {
+		t.Fatalf("push targets left %v", got)
+	}
+}
+
+// The wallet signs exactly these bytes (wallet/src/__tests__/devices.test.ts
+// builds the same ones).
+func TestDeviceMessagesMatchTheWallet(t *testing.T) {
+	c := []byte{1, 2, 3, 4}
+	if got := hex.EncodeToString(IdentityEnrolMessage("user-1", c)); got != "70726976617379732d6964656e746974792d656e726f6c2f763100757365722d310001020304" {
+		t.Fatalf("enrol message: %s", got)
+	}
+	if got := hex.EncodeToString(IdentityRevokeMessage("user-1", c, "tag", "newpub")); got != "70726976617379732d6964656e746974792d7265766f6b652f763100757365722d31000102030400746167006e6577707562" {
+		t.Fatalf("revoke message: %s", got)
 	}
 }

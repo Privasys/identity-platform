@@ -328,7 +328,8 @@ func (h *Handler) HandleRevokeIdentityDevice(w http.ResponseWriter, r *http.Requ
 		Challenge        string `json:"challenge"`
 		Signature        string `json:"signature"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&req); err != nil || !store.ValidDeviceTag(req.DeviceTag) {
+	// device_tag "*" removes every phone but keep_credential_id's (after a phrase recovery).
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&req); err != nil || (!store.ValidDeviceTag(req.DeviceTag) && req.DeviceTag != store.AllOtherDevices) {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "user_id, device_tag, challenge and signature are required"})
 		return
 	}

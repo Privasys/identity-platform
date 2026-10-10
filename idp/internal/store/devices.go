@@ -183,6 +183,9 @@ func (db *DB) RevokeDevice(userID, deviceTag, keepCredentialID string) ([]string
 	if deviceTag == "" {
 		return nil, errors.New("device tag is required")
 	}
+	if deviceTag == AllOtherDevices {
+		return db.revokeAllBut(userID, keepCredentialID)
+	}
 	untaggedToo := 1
 	if keepCredentialID == KeepAllUntagged {
 		untaggedToo = 0
@@ -225,6 +228,43 @@ func (db *DB) RevokeDevice(userID, deviceTag, keepCredentialID string) ([]string
 		if _, err := tx.Exec("DELETE FROM push_tokens WHERE user_id = ? AND device_tag = ''", userID); err != nil {
 			return nil, err
 		}
+	}
+	return ids, tx.Commit()
+}
+
+// AllOtherDevices, as RevokeDevice's deviceTag, removes every phone but the
+// caller's: after a phrase recovery the holder has one phone, and a lost one may
+// hold passkeys no list names.
+const AllOtherDevices = "*"
+
+func (db *DB) revokeAllBut(userID, keepCredentialID string) ([]string, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	rows, err := tx.Query("SELECT credential_id FROM credentials WHERE user_id = ? AND credential_id <> ?", userID, keepCredentialID)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	for _, id := range ids {
+		if _, err := tx.Exec("DELETE FROM credentials WHERE credential_id = ?", id); err != nil {
+			return nil, err
+		}
+	}
+	// The caller registers its own push target again with its next session.
+	if _, err := tx.Exec("DELETE FROM push_tokens WHERE user_id = ?", userID); err != nil {
+		return nil, err
 	}
 	return ids, tx.Commit()
 }

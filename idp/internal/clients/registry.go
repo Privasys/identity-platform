@@ -39,6 +39,11 @@ type Client struct {
 	// until their cross-app dependencies have moved to capabilities
 	// (per-app subjects migration). It is never a name shared by clients.
 	Sector string `json:"sector"`
+	// Platform marks a first-party control-plane client (the portal, the
+	// CLI). Its tokens may be for the platform audience and carry the
+	// account and its roles even when it has its own subjects, because the
+	// platform is Privasys itself, not a relying party. Operator-set only.
+	Platform bool `json:"platform,omitempty"`
 }
 
 // ValidRedirectURI checks if the given URI is in the client's registered redirect URIs.
@@ -64,11 +69,11 @@ func NewRegistry(db *store.DB) *Registry {
 // Get retrieves a client by ID.
 func (reg *Registry) Get(clientID string) (*Client, error) {
 	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID, sector string
-	var billableRP int
+	var billableRP, platform int
 	err := reg.db.QueryRow(
-		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id, sector FROM clients WHERE client_id = ?",
+		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id, sector, platform FROM clients WHERE client_id = ?",
 		clientID,
-	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID, &sector)
+	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID, &sector, &platform)
 	if err != nil {
 		return nil, fmt.Errorf("client not found: %w", err)
 	}
@@ -89,7 +94,31 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 		BillingAccountID:   billingAccountID,
 		RPID:               rpID,
 		Sector:             sector,
+		Platform:           platform != 0,
 	}, nil
+}
+
+// IsPlatform reports whether a client is a first-party control-plane client.
+func (reg *Registry) IsPlatform(clientID string) bool {
+	var platform int
+	_ = reg.db.QueryRow("SELECT platform FROM clients WHERE client_id = ?", clientID).Scan(&platform)
+	return platform != 0
+}
+
+// SetPlatform marks or unmarks a first-party control-plane client.
+func (reg *Registry) SetPlatform(clientID string, platform bool) error {
+	v := 0
+	if platform {
+		v = 1
+	}
+	res, err := reg.db.Exec("UPDATE clients SET platform = ? WHERE client_id = ?", v, clientID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("client not found")
+	}
+	return nil
 }
 
 // SectorOf returns a client's sector, or "" (shared) for an unknown client.
@@ -488,9 +517,23 @@ func HandleSetSubjectMode(reg *Registry, adminToken string) http.HandlerFunc {
 		clientID := r.PathValue("id")
 		var req struct {
 			Mode string `json:"mode"`
+			// Platform, when present, marks or unmarks a first-party
+			// control-plane client (see Client.Platform).
+			Platform *bool `json:"platform,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || clientID == "" {
 			http.Error(w, `{"error":"client id and mode are required"}`, http.StatusBadRequest)
+			return
+		}
+		if req.Platform != nil {
+			if err := reg.SetPlatform(clientID, *req.Platform); err != nil {
+				http.Error(w, `{"error":"client not found"}`, http.StatusNotFound)
+				return
+			}
+		}
+		if req.Mode == "" && req.Platform != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"client_id": clientID, "platform": *req.Platform})
 			return
 		}
 		var sector string

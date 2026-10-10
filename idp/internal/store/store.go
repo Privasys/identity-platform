@@ -340,6 +340,10 @@ func migrate(db *sql.DB) error {
 		// clients get the shared sector, so nothing they hold changes until
 		// one is moved deliberately; new third-party clients get their own.
 		{"sector", "ALTER TABLE clients ADD COLUMN sector TEXT NOT NULL DEFAULT ''"},
+		// A first-party control-plane client (the portal, the CLI): may hold
+		// the platform audience, with the account and roles, whatever subject
+		// it sees. Set by an operator only.
+		{"platform", "ALTER TABLE clients ADD COLUMN platform INTEGER NOT NULL DEFAULT 0"},
 	} {
 		if !clientCols[add.col] {
 			if _, err = db.Exec(add.ddl); err != nil {

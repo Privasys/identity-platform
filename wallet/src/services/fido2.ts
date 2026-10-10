@@ -212,7 +212,15 @@ export async function register(
     browserSessionId: string,
     displayName?: string,
     userHandleOverride?: string,
-    sessionRelay?: { sdkPub: string; appHost: string; quoteHash: string; nonce: string }
+    sessionRelay?: { sdkPub: string; appHost: string; quoteHash: string; nonce: string },
+    opts?: {
+        /**
+         * The wallet makes the recovery phrase itself (or the identity is
+         * recovered by its own key and needs none): ask the IdP not to mint
+         * one. Its plaintext then never reaches the server.
+         */
+        clientPhrase?: boolean;
+    }
 ): Promise<{ sessionToken: string; credentialId: string; userHandle: string; userName: string; serverRpId: string; userId?: string; recoveryPhrase?: string; sessionRelay?: SessionRelayBinding }> {
     // Mirror of authenticate(): if the QR opted into session-relay we
     // must bootstrap a sealed session against the enclave app first so
@@ -263,6 +271,9 @@ export async function register(
     }
 
     let beginPath = `/fido2/register/begin?session_id=${encodeURIComponent(browserSessionId)}`;
+    if (opts?.clientPhrase) {
+        beginPath += '&client_phrase=1';
+    }
     if (bindingChallengeB64) {
         beginPath += `&binding_challenge=${encodeURIComponent(bindingChallengeB64)}`;
     }

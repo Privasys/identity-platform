@@ -191,18 +191,16 @@ export default function AccountRecoveryScreen() {
         setSigningIn(true);
         try {
             const result = await ensurePrivasysSession(profileName(profile));
-            // First registration: the server auto-mints a phrase and returns
-            // it once, but we immediately supersede it with a CLIENT-minted
-            // one whose plaintext never reaches the server — only its hash
-            // is registered. The server-returned phrase is kept solely as
-            // the fallback for an IdP that predates client-side generation.
-            // Either way the sovereign backup is stored under whichever
-            // phrase the user is shown.
-            if (result.recoveryPhrase) {
+            // First registration: the wallet mints the phrase itself and
+            // registers only its hash, so the plaintext never reaches the
+            // server. An IdP that predates that still returns one of its own,
+            // kept only as the fallback. Either way the sovereign backup is
+            // stored under whichever phrase the user is shown.
+            if (result.registered || result.recoveryPhrase) {
                 setRecoveryPhraseSaved(false);
                 const r = await establishPhraseWithBackup(
                     result.sessionToken,
-                    result.recoveryPhrase,
+                    result.recoveryPhrase ?? null,
                     profile?.pairwiseSeed ?? null,
                 );
                 setNewPhrase(r.phrase);

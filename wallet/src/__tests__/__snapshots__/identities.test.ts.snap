@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`the contract with the IdP produces the fixed vector the IdP verifies 1`] = `
+{
+  "id": "XUz5Z1gsKjhFFhCeSjYvrgwfcxU-qFjnGLS_BByzxMA",
+  "publicKey": "z3DyB32X65KsSnPkidEPLc-laAdCLnS0-XJiH815ORs",
+  "signature": "awyQ8ZyD2TXrnKhWrTvr6Z6NBESAiMZ59_xm4lKXur0s6M88PAmHXfI12o0JD0pUCkOIqOp7amwB9kxgh7abAA",
+}
+`;

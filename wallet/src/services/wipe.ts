@@ -46,6 +46,7 @@
 import { deleteDeviceKey } from '@/services/did';
 import { clearKycRecords } from '@/services/kyc';
 import { clearGrantsIndexLocalState } from '@/services/grants-index';
+import { clearIdentitiesLocalState } from '@/services/identities';
 import { clearKeptSetups } from '@/services/setup-keep';
 import { clearNotifySealKey } from '@/services/notify-seal';
 import { clearPlatformToken } from '@/services/platform-token';
@@ -85,10 +86,15 @@ export async function wipeWallet(): Promise<void> {
     // Read before anything is cleared: each credential names the hardware key
     // it registered, and once the store is empty those aliases are unrecoverable
     // and their keys would sit in the keychain for ever.
-    const credentialKeyAliases = useAuthStore
-        .getState()
-        .credentials.map((c) => c.keyAlias)
-        .filter(Boolean);
+    const authBefore = useAuthStore.getState();
+    // The main account's passkey lives in its own slot, outside credentials[],
+    // and its hardware key was left behind until this was added.
+    const credentialKeyAliases = [
+        ...new Set(
+            [...authBefore.credentials.map((c) => c.keyAlias), authBefore.privasysId?.keyAlias ?? '']
+                .filter(Boolean),
+        ),
+    ];
 
     // In-memory stores first: they are synchronous, so the UI drops to its
     // empty state immediately rather than after the storage round-trips.
@@ -116,6 +122,7 @@ export async function wipeWallet(): Promise<void> {
     await Promise.all([
         settle('sovereign state', clearSovereignLocalState()),
         settle('grants index', clearGrantsIndexLocalState()),
+        settle('identities', clearIdentitiesLocalState()),
         settle('KYC records', clearKycRecords()),
         settle('wallet instance attestation', clearWia()),
         settle('platform token', clearPlatformToken()),

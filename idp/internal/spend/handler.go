@@ -257,7 +257,10 @@ func (h *Handler) HandleToken(w http.ResponseWriter, r *http.Request) {
 		oauthErr(w, http.StatusUnauthorized, "invalid_client", err.Error())
 		return
 	}
-	consent, err := h.store.Get(sub, appID)
+	// Consents are kept by account; an app outside the shared sector names
+	// the holder by its own subject (internal/tokens/subject.go). The token
+	// goes back with the subject the app used.
+	consent, err := h.store.Get(h.issuer.ResolveSubject(sub), appID)
 	if errors.Is(err, ErrNotFound) {
 		oauthErr(w, http.StatusForbidden, "consent_required",
 			"the user has not allowed this app to spend their credits, or revoked it")

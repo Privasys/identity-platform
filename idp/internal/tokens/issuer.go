@@ -30,6 +30,8 @@ type Issuer struct {
 	privateKey *ecdsa.PrivateKey
 	keyID      string
 	issuerURL  string
+	// subjects maps per-sector subjects back to accounts; see subject.go.
+	subjects SubjectStore
 }
 
 // NewIssuer loads an EC P-256 private key from a PEM file and creates an issuer.
@@ -584,6 +586,14 @@ func (iss *Issuer) VerifyAccessToken(tokenStr string) (map[string]interface{}, e
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
 		return nil, fmt.Errorf("invalid token")
+	}
+	// Every caller of this inside the IdP looks the account up by "sub". A
+	// token issued to a client in its own sector carries that sector's
+	// subject, so resolve it to the account here, once, and keep what was
+	// issued for the one caller that echoes it back (userinfo).
+	if sub, _ := claims["sub"].(string); sub != "" {
+		claims[ClaimSubjectAsIssued] = sub
+		claims["sub"] = iss.ResolveSubject(sub)
 	}
 	return claims, nil
 }

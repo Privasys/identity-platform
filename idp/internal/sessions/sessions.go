@@ -58,7 +58,13 @@ type Store struct {
 	db            *store.DB
 	walletSession WalletSessionResolver
 	onRevoke      func(sid string)
+	// sectorOf names a client's subject sector, so a voucher can be checked
+	// against the subject that client sees (internal/tokens/subject.go).
+	sectorOf func(clientID string) string
 }
+
+// SetSectorResolver wires the client registry's sector lookup.
+func (s *Store) SetSectorResolver(f func(clientID string) string) { s.sectorOf = f }
 
 // SetWalletSessionResolver wires the FIDO2 wallet-session lookup into
 // the auth path of /sessions/me and /sessions/{sid}/revoke. Optional

@@ -235,6 +235,16 @@ func migrate(db *sql.DB) error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
+		-- Per-sector subjects: the subject a client in its own sector sees for
+		-- an account, mapped back to the account so a subject an app hands back
+		-- can be resolved. See internal/tokens/subject.go.
+		CREATE TABLE IF NOT EXISTS subjects (
+			sub        TEXT PRIMARY KEY,
+			user_id    TEXT NOT NULL,
+			sector     TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
 		CREATE TABLE IF NOT EXISTS identity_recovery_keys (
 			user_id    TEXT PRIMARY KEY REFERENCES users(user_id),
 			public_key BLOB NOT NULL,
@@ -326,6 +336,10 @@ func migrate(db *sql.DB) error {
 		// A non-enclave relying party that spends its users' credits publishes
 		// its spend keys here (platform apps publish at their enclave origin).
 		{"spend_jwks_uri", "ALTER TABLE clients ADD COLUMN spend_jwks_uri TEXT NOT NULL DEFAULT ''"},
+		// The client's subject sector (internal/tokens/subject.go). Existing
+		// clients get the shared sector, so nothing they hold changes until
+		// one is moved deliberately; new third-party clients get their own.
+		{"sector", "ALTER TABLE clients ADD COLUMN sector TEXT NOT NULL DEFAULT ''"},
 	} {
 		if !clientCols[add.col] {
 			if _, err = db.Exec(add.ddl); err != nil {
@@ -701,6 +715,24 @@ func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID s
 // --- Sovereign backup operations ---
 
 // PutSovereignBackup stores (or replaces) a user's sovereign backup blob.
+// RememberSubject records a sector subject's account. Idempotent.
+func (db *DB) RememberSubject(sub, userID, sector string) error {
+	_, err := db.Exec(
+		"INSERT INTO subjects (sub, user_id, sector) VALUES (?, ?, ?) ON CONFLICT(sub) DO NOTHING",
+		sub, userID, sector,
+	)
+	return err
+}
+
+// ResolveSubject returns the account a sector subject names.
+func (db *DB) ResolveSubject(sub string) (string, bool) {
+	var userID string
+	if err := db.QueryRow("SELECT user_id FROM subjects WHERE sub = ?", sub).Scan(&userID); err != nil {
+		return "", false
+	}
+	return userID, true
+}
+
 // ErrRecoveryKeyMismatch is returned when an identity already has a different
 // recovery key. Keys are set once: replacing one would let whoever holds a
 // session swap in a key of their own and recover the identity later.

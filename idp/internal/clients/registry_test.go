@@ -94,3 +94,35 @@ func TestSetBilling(t *testing.T) {
 		t.Fatal("expected error for unknown client")
 	}
 }
+
+// A client registered by the admin API is a third party and gets its own
+// sector; a pre-known client (RegisterWithID) stays in the shared one, and
+// moving a client is explicit.
+func TestSectors(t *testing.T) {
+	reg := newTestRegistry(t)
+	third, err := reg.Register("Some Site", []string{"https://site/cb"}, "", []string{"email"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := reg.Get(third.ClientID); got.Sector != third.ClientID {
+		t.Fatalf("new third-party client sector %q, want its own (%q)", got.Sector, third.ClientID)
+	}
+	if _, err := reg.RegisterWithID("privasys-platform", "Privasys", []string{"https://p/cb"}, "", []string{"email"}); err != nil {
+		t.Fatal(err)
+	}
+	if reg.SectorOf("privasys-platform") != "" {
+		t.Fatal("a pre-known first-party client left the shared sector")
+	}
+	if err := reg.SetSector("privasys-platform", "privasys"); err != nil {
+		t.Fatal(err)
+	}
+	if reg.SectorOf("privasys-platform") != "privasys" {
+		t.Fatal("SetSector did not move the client")
+	}
+	if err := reg.SetSector("no-such-client", "x"); err == nil {
+		t.Fatal("SetSector on an unknown client succeeded")
+	}
+	if reg.SectorOf("no-such-client") != "" {
+		t.Fatal("an unknown client is not in the shared sector")
+	}
+}

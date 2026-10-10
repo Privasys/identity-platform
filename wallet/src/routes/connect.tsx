@@ -75,6 +75,7 @@ import {
     recoverIdentity,
     syncIdentityIndex,
 } from '@/services/identities';
+import { identitySealPub } from '@/services/notify-seal';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
@@ -947,6 +948,8 @@ function ConnectFlow() {
     const pendingRelay = useRef<{
         payload: QRPayload;
         sessionToken: string;
+        /** The IdP's id for this identity, for its push target's sealing key. */
+        userId?: string;
         /** Only set for registration (not authentication) */
         credential?: {
             credentialId: string;
@@ -2301,6 +2304,7 @@ function ConnectFlow() {
                 pendingRelay.current = {
                     payload,
                     sessionToken: result.sessionToken,
+                    userId: result.userId,
                     credential: {
                         credentialId: result.credentialId,
                         keyAlias,
@@ -2384,7 +2388,7 @@ function ConnectFlow() {
             // IdP learns no linkage it doesn't already have (it sees each
             // pairwise sub independently). Best-effort.
             if (pushToken && result.sessionToken) {
-                registerPushTokenWithIdp(result.sessionToken, pushToken).catch((e) =>
+                registerPushTokenWithIdp(result.sessionToken, pushToken, identitySealPub(result.userId)).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
             }
@@ -2479,6 +2483,7 @@ function ConnectFlow() {
                 pendingRelay.current = {
                     payload,
                     sessionToken: result.sessionToken,
+                    userId: result.userId,
                     sessionRelay: result.sessionRelay,
                     // Signed now, inside this Face ID's grace (see the type).
                     voucher: maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg),
@@ -2519,7 +2524,7 @@ function ConnectFlow() {
             // Keep the IdP's push target fresh for this pairwise identity
             // (vault approvals for keys it owns). Best-effort.
             if (pushToken && result.sessionToken) {
-                registerPushTokenWithIdp(result.sessionToken, pushToken).catch((e) =>
+                registerPushTokenWithIdp(result.sessionToken, pushToken, identitySealPub(result.userId)).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
             }
@@ -2737,7 +2742,7 @@ function ConnectFlow() {
             // This identity's push target, so vault approvals and app
             // notifications for it reach this phone (see the direct path).
             if (pushToken && pending.sessionToken) {
-                registerPushTokenWithIdp(pending.sessionToken, pushToken).catch((e) =>
+                registerPushTokenWithIdp(pending.sessionToken, pushToken, identitySealPub(pending.userId)).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
             }

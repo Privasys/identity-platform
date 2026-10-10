@@ -68,21 +68,35 @@ func EncAuthCanonicalCBOR(p *EncAuth) ([]byte, error) {
 // app that client does not stand for.
 var ErrAppNotOfClient = errors.New("this app is not registered for the session's client")
 
+// errResolversNotWired is a deployment fault, never a voucher outcome: with
+// no client registry behind the store there is no subject to name, and no
+// voucher is accepted (this store never falls back to the account id).
+var errResolversNotWired = errors.New("sessions: client registry resolvers not wired")
+
+// subjectForClient is the subject a client sees for an account: the account
+// id in the shared sector, the client's own subject otherwise.
+func (s *Store) subjectForClient(userID, clientID string, issuer *tokens.Issuer) (string, error) {
+	if s.sectorOf == nil {
+		return "", errResolversNotWired
+	}
+	return issuer.SubjectFor(userID, s.sectorOf(clientID)), nil
+}
+
 // appStandsFor reports whether the attested app is one the client stands for.
-func (s *Store) appStandsFor(clientID, appID string) bool {
+func (s *Store) appStandsFor(clientID, appID string) (bool, error) {
 	if s.appsOf == nil {
-		return false
+		return false, errResolversNotWired
 	}
 	id := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(appID), "-", ""))
 	if id == "" {
-		return false
+		return false, nil
 	}
 	for _, a := range s.appsOf(clientID) {
 		if a == id {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // DecodeEncAuthPayload parses canonical CBOR back into EncAuth.
@@ -170,16 +184,24 @@ func (s *Store) PutEncAuth(userID, appID string, payloadBytes, hwSig []byte, hos
 	// The voucher's subject is what the enclave asserts as X-Privasys-Sub,
 	// so it must be the subject THIS session's client sees: the account id
 	// in the shared sector, the client's own per-person subject otherwise.
-	// Anything else would hand an app an identifier other apps share.
-	want := userID
-	if s.sectorOf != nil {
-		want = issuer.SubjectFor(userID, s.sectorOf(sess.ClientID))
+	// Anything else would hand an app an identifier other apps share. The
+	// wallet signed what the allocate step told it; this is the same
+	// answer, computed again.
+	want, err := s.subjectForClient(userID, sess.ClientID, issuer)
+	if err != nil {
+		return nil, err
 	}
 	if p.Sub != want {
 		return nil, errors.New("encauth sub is not the subject this session's client sees")
 	}
-	if want != userID && !s.appStandsFor(sess.ClientID, appID) {
-		return nil, ErrAppNotOfClient
+	if want != userID {
+		ok, err := s.appStandsFor(sess.ClientID, appID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, ErrAppNotOfClient
+		}
 	}
 	if sess.RevokedAt != nil {
 		return nil, ErrRevoked
@@ -487,7 +509,14 @@ func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			httpErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		out := map[string]any{"sid": sess.SID}
+		// The subject this client sees is what the wallet signs into the
+		// voucher: it learns it here, from the IdP, never by guessing.
+		subject, err := s.subjectForClient(userID, req.ClientID, issuer)
+		if err != nil {
+			httpErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		out := map[string]any{"sid": sess.SID, "subject": subject}
 		if req.Payload != "" && req.HwSig != "" {
 			payload, perr := base64.RawURLEncoding.DecodeString(req.Payload)
 			if perr != nil {

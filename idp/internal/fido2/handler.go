@@ -928,15 +928,6 @@ func (h *Handler) CompleteAuthentication(
 				subject = h.sessionSubject(userID, session.ClientID)
 			}
 		}
-		// A wallet extending a live sealed session to another app (voucher-
-		// only) has no sign-in session here, only the app's client id: it
-		// names it, and gets back the subject that client sees, for its
-		// voucher. It is the holder's own identifier, returned only to the
-		// holder's own authenticated wallet.
-		if cid := r.URL.Query().Get("client_id"); subject == "" && cid != "" && len(cid) <= 128 {
-			subject = h.sessionSubject(userID, cid)
-		}
-
 		resp := map[string]interface{}{
 			"status":       "ok",
 			"sessionToken": sessionToken,

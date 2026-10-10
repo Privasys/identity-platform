@@ -1970,7 +1970,8 @@ function ConnectFlow() {
         setStep('authenticating');
         try {
             // 1. Authenticate against the existing credential to mint a fresh
-            //    wallet session token (and get the pairwise sub). No relay.
+            //    wallet session token. No relay. The voucher's subject comes
+            //    from the IdP when the voucher's sid is allocated.
             // Use the bare IdP host (rpId) as the FIDO2 fetch host. `origin`
             // may arrive scheme-prefixed ("https://privasys.id"), which the
             // native RA-TLS layer would resolve to host "https" and fail DNS.
@@ -1980,11 +1981,8 @@ function ConnectFlow() {
                 credential.credentialId,
                 payload.sid, // correlation only; no browser relay on this path
                 credential.serverRpId,
-                undefined,
-                // The voucher names the subject THIS app sees (per-app subjects).
-                { clientId: payload.clientId },
             );
-            if (!auth.sessionToken || !auth.userId) {
+            if (!auth.sessionToken) {
                 throw new Error('authentication did not return a session');
             }
             // 2. Bootstrap the enclave to read its enc_pub (throwaway sdkPub).
@@ -1994,7 +1992,6 @@ function ConnectFlow() {
                 walletSessionToken: auth.sessionToken,
                 keyId: credential.keyAlias,
                 clientId: payload.clientId,
-                sub: auth.subject || auth.userId,
                 encPubB64: bs.encPub,
                 quoteHashHex: deriveQuoteHash(att),
                 attestation: att,
@@ -2063,7 +2060,6 @@ function ConnectFlow() {
             walletSessionToken: result.sessionToken,
             keyId: keyAlias,
             clientId: payload.clientId,
-            sub: result.subject ?? result.userId,
             encPubB64: result.sessionRelay.encPub,
             quoteHashHex: relayArg.quoteHash,
             attestation: att,
@@ -2205,7 +2201,6 @@ function ConnectFlow() {
                     walletSessionToken: result.sessionToken,
                     keyId: keyAlias,
                     clientId: payload.clientId,
-                    sub: result.subject ?? result.userId,
                     encPubB64: bs.encPub,
                     quoteHashHex: deriveQuoteHash(att),
                     attestation: att,

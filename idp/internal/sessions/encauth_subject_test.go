@@ -237,4 +237,37 @@ func TestThePostedVoucherCarriesTheClientsSubject(t *testing.T) {
 	if rec := upload("privasys-platform", "acct-1"); rec.Code != http.StatusOK {
 		t.Fatalf("a posted shared-sector voucher: %d %s", rec.Code, rec.Body.String())
 	}
+	// The allocate step names the subject the wallet is to sign.
+	for client, want := range map[string]string{"site": iss.SubjectFor("acct-1", "site"), "privasys-platform": "acct-1"} {
+		rec := post(`{"client_id":"` + client + `"}`)
+		var alloc struct{ SID, Subject string }
+		_ = json.Unmarshal(rec.Body.Bytes(), &alloc)
+		if rec.Code != http.StatusOK || alloc.Subject != want {
+			t.Fatalf("allocate for %s: %d subject %q, want %q", client, rec.Code, alloc.Subject, want)
+		}
+	}
+}
+
+// A store with no client registry behind it names no subject and accepts no
+// voucher: there is no account-id default to fall back to.
+func TestNoRegistryNoVoucher(t *testing.T) {
+	dir := t.TempDir()
+	db, err := store.Open(filepath.Join(dir, "idp.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	iss, _ := tokens.NewIssuer(filepath.Join(dir, "k.pem"), "https://privasys.id")
+	if _, err := db.Exec("INSERT INTO users (user_id) VALUES ('acct-1')"); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := New(db)
+	s.SetWalletSessionResolver(func(token string) (string, bool) { return "acct-1", token == "tok" })
+	req := httptest.NewRequest("POST", "/sessions/encauth", strings.NewReader(`{"client_id":"privasys-platform"}`))
+	req.Header.Set("Authorization", "Bearer wallet:tok")
+	rec := httptest.NewRecorder()
+	s.HandlePostEncAuth(iss)(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("allocate without a registry: %d %s", rec.Code, rec.Body.String())
+	}
 }

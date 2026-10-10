@@ -311,10 +311,10 @@ export async function issueEncAuthForSignIn(args: {
     walletSessionToken: string;
     /** Hardware key alias used for the FIDO2 ceremony (signs the voucher). */
     keyId: string;
-    /** OIDC client_id of the relying party (from the QR / push payload). */
+    /** OIDC client_id of the relying party (from the QR / push payload).
+     *  The subject the voucher names is the IdP's answer for this client,
+     *  learned when the sid is allocated: the wallet never guesses it. */
     clientId: string;
-    /** Pairwise user id for this app (completeResp.userId). */
-    sub: string;
     /** Enclave identity pubkey from the bootstrap response, base64url SEC1. */
     encPubB64: string;
     /** The wallet attestation digest over the verified attestation
@@ -331,6 +331,13 @@ export async function issueEncAuthForSignIn(args: {
     /** Optional stable device identifier (defaults to ''). */
     deviceId?: string;
 }): Promise<{ sid: string }> {
+    // The attested app (OID 4.1) this wallet verified: the IdP hands a
+    // client's own subject only to an app registered for that client. Every
+    // enclave the platform deploys carries it; one without it gets no voucher.
+    const appId = appIdFromOids(args.attestation.custom_oids);
+    if (!appId) {
+        throw new Error(`${args.host ?? 'the enclave'} carries no app id: no voucher issued`);
+    }
     const hwKey = await NativeKeys.getPublicKey(args.keyId);
     const nowSec = Math.floor(Date.now() / 1000);
     const { sid } = await signAndUploadEncAuth({
@@ -338,12 +345,9 @@ export async function issueEncAuthForSignIn(args: {
         keyId: args.keyId,
         clientId: args.clientId,
         host: args.host,
-        // The attested app (OID 4.1) this wallet verified: the IdP hands a
-        // client's own subject only to an app registered for that client.
-        appId: appIdFromOids(args.attestation.custom_oids) ?? '',
+        appId,
         deviceId: args.deviceId,
         payload: {
-            sub: args.sub,
             workloadDigest: workloadDigestHash(args.attestation),
             encMeas: encMeasHash(args.attestation),
             encPub: b64uDecode(args.encPubB64),
@@ -364,10 +368,12 @@ export async function signAndUploadEncAuth(args: {
     /** Enclave hostname this voucher is for — the browser SDK's resume selector. */
     host?: string;
     /** The attested app id (OID 4.1) of the enclave the wallet verified. */
-    appId?: string;
-    payload: Omit<EncAuthPayload, 'sid'>;
+    appId: string;
+    /** Everything but the sid and the subject, which the IdP names in step 1. */
+    payload: Omit<EncAuthPayload, 'sid' | 'sub'>;
 }): Promise<{ sid: string; envelope: EncAuthEnvelope }> {
-    // Step 1: allocate (or reuse) a sid for (user, client_id, device).
+    // Step 1: allocate (or reuse) a sid for (user, client_id, device), and
+    // learn the subject this client sees, which the voucher must name.
     const allocUrl = `${IDP_BASE_URL}/sessions/encauth`;
     const allocResp = await fetch(allocUrl, {
         method: 'POST',
@@ -381,12 +387,13 @@ export async function signAndUploadEncAuth(args: {
         const detail = await allocResp.text().catch(() => '');
         throw new Error(`allocate encauth sid: ${allocResp.status} ${detail}`);
     }
-    const allocBody = (await allocResp.json()) as { sid: string };
-    const sid = allocBody.sid;
+    const allocBody = (await allocResp.json()) as { sid?: string; subject?: string };
+    const { sid, subject: sub } = allocBody;
     if (!sid) throw new Error('allocate encauth sid: server returned no sid');
+    if (!sub) throw new Error('allocate encauth sid: server returned no subject');
 
-    // Step 2: sign with the allocated sid embedded.
-    const fullPayload: EncAuthPayload = { ...args.payload, sid };
+    // Step 2: sign with the allocated sid and the IdP-named subject embedded.
+    const fullPayload: EncAuthPayload = { ...args.payload, sid, sub };
     const { payload: cborBytes, hwSig } = await signEncAuth(args.keyId, fullPayload);
 
     // Step 3: upload payload + hw_sig in the same POST shape.
@@ -406,7 +413,7 @@ export async function signAndUploadEncAuth(args: {
             // re-verifies the workload digest at consumption, so this hint
             // can't be used to smuggle a wrong voucher.
             host: args.host ?? '',
-            app_id: args.appId ?? '',
+            app_id: args.appId,
         }),
     });
     if (!putResp.ok) {

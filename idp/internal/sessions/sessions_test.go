@@ -31,6 +31,10 @@ func newTestStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatalf("new sessions: %v", err)
 	}
+	// Every client in the shared sector, standing for no app: the store
+	// refuses vouchers outright without a registry behind it.
+	s.SetSectorResolver(func(string) string { return "" })
+	s.SetAppsResolver(func(string) []string { return nil })
 	return s
 }
 

@@ -362,6 +362,7 @@ export class PrivasysSession {
      * already a Uint8Array / string.
      */
     async request(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedResponse> {
+        const sentOn = this.sessionId;
         const r = await this.requestOnce(method, path, body, init);
         // Silent-rebind: when the enclave rejected our session (expired
         // or evicted) and the caller wired a getEncAuth fetcher, ask
@@ -376,12 +377,25 @@ export class PrivasysSession {
             // Avoid infinite loops: skip rebind on the rebind path itself.
             path !== INIT_PATH
         ) {
-            const rebound = await this.tryRebind();
-            if (rebound) {
+            if (await this.recoveredSince(sentOn)) {
                 return this.requestOnce(method, path, body, init);
             }
         }
         return r;
+    }
+
+    /**
+     * After an unsealed 401 on a request sent on `sentOn`: true when the
+     * request can be retried on a live session. A concurrent request may
+     * already have rebound the session while this one was on the wire; its
+     * late 401 then says nothing about the CURRENT session, so retrying on
+     * it is enough, and starting another bootstrap would only spend the
+     * enclave's rebind budget and swap the live keys again. Only a 401 for
+     * the session we are still on triggers a (coalesced) rebind.
+     */
+    private async recoveredSince(sentOn: string): Promise<boolean> {
+        if (this.sessionId !== sentOn) return true;
+        return this.tryRebind();
     }
 
     private async requestOnce(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedResponse> {
@@ -624,6 +638,7 @@ export class PrivasysSession {
      * decrypted body bytes.
      */
     async stream(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedStreamResponse> {
+        const sentOn = this.sessionId;
         const r = await this.streamOnce(method, path, body, init);
         // Silent-rebind for the streaming path, mirroring request(): when
         // the enclave no longer recognises our session it answers with an
@@ -641,8 +656,7 @@ export class PrivasysSession {
             this.getEncAuth &&
             path !== INIT_PATH
         ) {
-            const rebound = await this.tryRebind();
-            if (rebound) {
+            if (await this.recoveredSince(sentOn)) {
                 // Discard the unsealed error stream before replaying.
                 try { await r.body.cancel(); } catch { /* tearing down */ }
                 return this.streamOnce(method, path, body, init);

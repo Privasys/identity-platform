@@ -160,3 +160,58 @@ test('a reply sealed before a concurrent rebind still opens', async () => {
     assert.equal(r.status, 200);
     assert.equal(new TextDecoder().decode(r.body), '{"ok":true}');
 });
+
+test('a late 401 from a session already rebound retries without a second bootstrap', async () => {
+    const enclave = await encKey();
+    const sdk = (await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits'])) as CryptoKeyPair;
+    const sessionId = b64u(crypto.getRandomValues(new Uint8Array(16)));
+
+    let bootstraps = 0;
+    let rebound!: () => void;
+    const reboundDone = new Promise<void>((r) => (rebound = r));
+    const live = new Set<string>();
+
+    const fetchImpl: typeof fetch = async (input, init) => {
+        const url = String(input);
+        if (url.endsWith('/__privasys/session-bootstrap')) {
+            bootstraps++;
+            const id = b64u(crypto.getRandomValues(new Uint8Array(16)));
+            live.add(id);
+            setTimeout(rebound, 0);
+            return new Response(
+                JSON.stringify({ session_id: id, enc_pub: b64u(enclave.pubRaw), sub: 'holder-1' }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } },
+            );
+        }
+        const auth = new Headers(init?.headers).get('Authorization') ?? '';
+        const onSession = auth.split(' ')[1] ?? '';
+        if (url.endsWith('/api/slow') && onSession === sessionId) {
+            // The enclave restarted: this request on the first session is
+            // refused, but only after another request has rebound it.
+            await reboundDone;
+            return new Response('unknown or expired session', { status: 401, headers: { 'Content-Type': 'text/plain' } });
+        }
+        if (live.has(onSession)) {
+            // A live session's reply; the test only checks the status.
+            return new Response(null, { status: 204 });
+        }
+        return new Response('unknown or expired session', { status: 401, headers: { 'Content-Type': 'text/plain' } });
+    };
+
+    const session = await PrivasysSession.fromHandshake({
+        host: 'app.example.test',
+        sessionId,
+        sdkPrivateKey: sdk.privateKey,
+        encPub: b64u(enclave.pubRaw),
+        fetchImpl,
+        getEncAuth: async () => voucherFor(enclave.pubRaw),
+    });
+
+    const slow = session.request('GET', '/api/slow');
+    const fast = await session.request('GET', '/api/fast'); // rebinds the session in place
+    assert.equal(fast.status, 204);
+    assert.equal(bootstraps, 1);
+    const r = await slow;
+    assert.equal(r.status, 204, 'the straggler was retried on the live session');
+    assert.equal(bootstraps, 1, 'its late 401 did not start a second bootstrap');
+});

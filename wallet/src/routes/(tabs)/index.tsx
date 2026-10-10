@@ -449,8 +449,8 @@ export default function ProfileScreen() {
                             <Ionicons name="share-outline" size={20} color={p.blue} />
                         </RNView>
                         <RNView style={{ flex: 1 }}>
-                            <Text style={styles.sharingLabel}>{t('profile.exportData')}</Text>
-                            <Text style={styles.sharingDetail}>{t('profile.exportDataHint')}</Text>
+                            <Text style={styles.sharingLabel}>{t('backup.title')}</Text>
+                            <Text style={styles.sharingDetail}>{t('backup.entryHint')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>

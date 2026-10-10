@@ -476,6 +476,8 @@ func main() {
 	mux.HandleFunc("PUT /recovery/identity-key", recoveryHandler.HandleSetIdentityKey)
 	mux.HandleFunc("POST /recovery/identity/begin", recoveryHandler.HandleBeginIdentityRecovery)
 	mux.HandleFunc("POST /recovery/identity/complete", recoveryHandler.HandleCompleteIdentityRecovery)
+	mux.HandleFunc("PUT /recovery/identity-index", recoveryHandler.HandlePutIdentityIndex)
+	mux.HandleFunc("GET /recovery/identity-index", recoveryHandler.HandleGetIdentityIndex)
 	mux.HandleFunc("GET /guardians", recoveryHandler.HandleListGuardians)
 	mux.HandleFunc("POST /guardians/invite", recoveryHandler.HandleInviteGuardianByEmail)
 	mux.HandleFunc("POST /guardians/add", recoveryHandler.HandleAddGuardianByQR)

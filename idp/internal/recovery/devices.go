@@ -312,9 +312,6 @@ func (h *Handler) HandleRevokePhone(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
-	h.devices.mu.Lock()
-	h.devices.dropRelay(relayKey(userID, req.DeviceTag))
-	h.devices.mu.Unlock()
 	writeJSONStatus(w, http.StatusOK, map[string]any{"status": "revoked", "passkeys": len(ids)})
 }
 
@@ -448,47 +445,65 @@ func (h *Handler) HandleReadPairing(w http.ResponseWriter, r *http.Request) {
 //
 // Phones of one holder pass sealed updates (a profile change, a request for a
 // full sync) through here. Nothing is stored: an update waits in memory for at
-// most relayTTL, and a silent push wakes the phone it is for. Reading takes it.
-// The sending wallet keeps its own outbox and sends again until the other phone
-// confirms, through this same relay, that it has the update.
+// most relayTTL, and reading takes it. The sending wallet keeps its own outbox
+// and sends again until the other phone confirms, through this same relay,
+// that it has the update.
+//
+// No session is needed on either side, because a phone woken in the background
+// cannot open one (that takes Face ID). Each phone reads at an address only its
+// holder's phones can compute (from that phone's secret), and what it reads is
+// sealed under a key only they hold. A sender may ask for the phone to be woken
+// with a silent push, naming the account and the phone's device tag on it,
+// which again only the holder's phones know.
 
 type relayItem struct {
 	blob      string
 	expiresAt time.Time
 }
 
-func relayKey(userID, tag string) string { return userID + "/" + tag }
+const (
+	relayPostsPerIP = 2000
+	relayReadsPerIP = 5000
+)
 
-// dropRelay forgets what waits for one phone (it was revoked). Locked by caller.
-func (s *deviceState) dropRelay(key string) {
-	for _, it := range s.relay[key] {
+// dropRelay forgets what waits at one address. Locked by caller.
+func (s *deviceState) dropRelay(addr string) {
+	for _, it := range s.relay[addr] {
 		s.relayBytes -= len(it.blob)
 	}
-	delete(s.relay, key)
+	delete(s.relay, addr)
 }
 
-// HandlePostRelay passes sealed updates to other phones of the caller.
-// POST /devices/relay  {"items": [{"to": "<device tag>", "blob": "..."}]}
+// HandlePostRelay passes sealed updates to other phones.
+// POST /devices/relay
+// {"items": [{"to": "<address>", "blob": "...", "wake": {"account": "...", "tag": "..."}}]}
 func (h *Handler) HandlePostRelay(w http.ResponseWriter, r *http.Request) {
-	userID := h.authenticateBearer(w, r)
-	if userID == "" {
-		return
-	}
 	var req struct {
 		Items []struct {
 			To   string `json:"to"`
 			Blob string `json:"blob"`
+			Wake *struct {
+				Account string `json:"account"`
+				Tag     string `json:"tag"`
+			} `json:"wake"`
 		} `json:"items"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxDevices*maxRelayBlob+4096)).Decode(&req); err != nil || len(req.Items) == 0 || len(req.Items) > maxDevices {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxDevices*maxRelayBlob+8192)).Decode(&req); err != nil || len(req.Items) == 0 || len(req.Items) > maxDevices {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "1 to 5 items are required"})
 		return
 	}
 	for _, it := range req.Items {
 		if !store.ValidDeviceTag(it.To) || it.Blob == "" || len(it.Blob) > maxRelayBlob || !backupBlobShape.MatchString(it.Blob) {
-			writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "each item needs a device tag and a base64url blob of at most 1MiB"})
+			writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "each item needs an address and a base64url blob of at most 1MiB"})
 			return
 		}
+		if it.Wake != nil && (!store.ValidDeviceTag(it.Wake.Tag) || it.Wake.Account == "" || len(it.Wake.Account) > 128) {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "wake needs an account and a device tag"})
+			return
+		}
+	}
+	if !h.allow(w, r, "relay-post-ip", clientIP(r), relayPostsPerIP) {
+		return
 	}
 	now := time.Now()
 	h.devices.mu.Lock()
@@ -499,28 +514,29 @@ func (h *Handler) HandlePostRelay(w http.ResponseWriter, r *http.Request) {
 			writeJSONStatus(w, http.StatusServiceUnavailable, map[string]string{"error": "relay busy, try again later"})
 			return
 		}
-		key := relayKey(userID, it.To)
-		q := h.devices.relay[key]
+		q := h.devices.relay[it.To]
 		if len(q) >= maxRelayPerPhone {
 			// The sender resends whatever the other phone never confirms.
 			h.devices.relayBytes -= len(q[0].blob)
 			q = q[1:]
 		}
-		h.devices.relay[key] = append(q, relayItem{blob: it.Blob, expiresAt: now.Add(relayTTL)})
+		h.devices.relay[it.To] = append(q, relayItem{blob: it.Blob, expiresAt: now.Add(relayTTL)})
 		h.devices.relayBytes += len(it.Blob)
 	}
 	h.devices.mu.Unlock()
 	for _, it := range req.Items {
-		go h.wake(userID, it.To)
+		if it.Wake != nil {
+			go h.wake(it.Wake.Account, it.Wake.Tag)
+		}
 	}
 	writeJSONStatus(w, http.StatusOK, map[string]string{"status": "relayed"})
 }
 
-// wake sends a silent push to one phone of the account, telling it to read the
+// wake sends a silent push to one phone of an account, telling it to read the
 // relay. Best effort: the phone reads it anyway when next opened.
-func (h *Handler) wake(userID, tag string) {
-	for _, t := range h.db.GetDevicePushTargets(userID, tag) {
-		if err := push.Notify(context.Background(), h.db, userID, push.Message{
+func (h *Handler) wake(account, tag string) {
+	for _, t := range h.db.GetDevicePushTargets(account, tag) {
+		if err := push.Notify(context.Background(), h.db, account, push.Message{
 			Token: t.Token, Background: true, Data: map[string]string{"type": "device-relay"},
 		}); err != nil {
 			log.Printf("[devices] wake: %v", err)
@@ -528,23 +544,21 @@ func (h *Handler) wake(userID, tag string) {
 	}
 }
 
-// HandleGetRelay hands one phone of the caller what waits for it, and forgets it.
-// GET /devices/relay?tag=<device tag>  → {"items": ["<blob>", ...]}
+// HandleGetRelay hands over what waits at an address, and forgets it.
+// GET /devices/relay?to=<address>  → {"items": ["<blob>", ...]}
 func (h *Handler) HandleGetRelay(w http.ResponseWriter, r *http.Request) {
-	userID := h.authenticateBearer(w, r)
-	if userID == "" {
+	addr := r.URL.Query().Get("to")
+	if !store.ValidDeviceTag(addr) {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "to is required"})
 		return
 	}
-	tag := r.URL.Query().Get("tag")
-	if !store.ValidDeviceTag(tag) {
-		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "tag is required"})
+	if !h.allow(w, r, "relay-read-ip", clientIP(r), relayReadsPerIP) {
 		return
 	}
-	key := relayKey(userID, tag)
 	now := time.Now()
 	h.devices.mu.Lock()
-	q := h.devices.relay[key]
-	h.devices.dropRelay(key)
+	q := h.devices.relay[addr]
+	h.devices.dropRelay(addr)
 	h.devices.mu.Unlock()
 	out := make([]string, 0, len(q))
 	for _, it := range q {

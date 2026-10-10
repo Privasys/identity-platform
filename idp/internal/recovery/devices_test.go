@@ -214,21 +214,33 @@ func TestPairingSlotIsReadOnce(t *testing.T) {
 	}
 }
 
-func TestRelayHandsOverOnceAndKeepsNothingElse(t *testing.T) {
+func TestRelayHandsOverOnce(t *testing.T) {
 	_, _, mux := devicesTestHandler(t)
-	if rec := call(mux, "POST", "/devices/relay", `{"items":[{"to":"`+tagB+`","blob":"dXBkYXRl"}]}`, "wallet:bob"); rec.Code != http.StatusOK {
+	if rec := call(mux, "POST", "/devices/relay", `{"items":[{"to":"`+tagB+`","blob":"dXBkYXRl","wake":{"account":"bob","tag":"`+tagB+`"}}]}`, ""); rec.Code != http.StatusOK {
 		t.Fatalf("post: %d %s", rec.Code, rec.Body)
 	}
-	// Another account cannot read bob's phone's relay.
-	if rec := call(mux, "GET", "/devices/relay?tag="+tagB, "", "wallet:alice-ai"); strings.Contains(rec.Body.String(), "dXBkYXRl") {
-		t.Fatal("relay readable by another account")
+	if rec := call(mux, "GET", "/devices/relay?to="+tagA, "", ""); strings.Contains(rec.Body.String(), "dXBkYXRl") {
+		t.Fatal("handed to another address")
 	}
-	rec := call(mux, "GET", "/devices/relay?tag="+tagB, "", "wallet:bob")
+	rec := call(mux, "GET", "/devices/relay?to="+tagB, "", "")
 	if !strings.Contains(rec.Body.String(), "dXBkYXRl") {
 		t.Fatalf("get: %s", rec.Body)
 	}
-	if rec := call(mux, "GET", "/devices/relay?tag="+tagB, "", "wallet:bob"); strings.Contains(rec.Body.String(), "dXBkYXRl") {
+	if rec := call(mux, "GET", "/devices/relay?to="+tagB, "", ""); strings.Contains(rec.Body.String(), "dXBkYXRl") {
 		t.Fatal("relay handed the same update twice")
+	}
+}
+
+func TestSelfRemovalLeavesUntaggedPasskeys(t *testing.T) {
+	_, db, _ := devicesTestHandler(t)
+	addCredential(t, db, "bob", "mine", tagA)
+	addCredential(t, db, "bob", "old-phone", "")
+	ids, err := db.RevokeDevice("bob", tagA, store.KeepAllUntagged)
+	if err != nil || len(ids) != 1 || ids[0] != "mine" {
+		t.Fatalf("removed %v (%v)", ids, err)
+	}
+	if got := credentials(t, db, "bob"); len(got) != 1 || got[0] != "old-phone" {
+		t.Fatalf("left %v", got)
 	}
 }
 

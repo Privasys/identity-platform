@@ -105,6 +105,10 @@ func TestASharedSectorClientSeesTheAccount(t *testing.T) {
 	if info["sub"] != "acct-1" || info["roles"] == nil {
 		t.Fatalf("shared-sector userinfo: %v", info)
 	}
+	at := claimsOf(t, s.tokens["access_token"].(string))
+	if at["aud"] != "privasys-platform" || at[ClaimPrivasysAccount] != "acct-1" {
+		t.Fatalf("legacy platform token: aud %v, account %v", at["aud"], at[ClaimPrivasysAccount])
+	}
 }
 
 func TestAnOwnSectorClientSeesItsOwnSubject(t *testing.T) {
@@ -119,6 +123,13 @@ func TestAnOwnSectorClientSeesItsOwnSubject(t *testing.T) {
 	}
 	if _, has := at["roles"]; has {
 		t.Fatalf("an own-sector client was given the account's roles: %v", at["roles"])
+	}
+	// Its token is for itself, not the platform, and names no account.
+	if at["aud"] != "privasys-cli" {
+		t.Fatalf("own-subject client token aud %v, want the client itself", at["aud"])
+	}
+	if _, has := at[ClaimPrivasysAccount]; has {
+		t.Fatal("an own-subject client's token carries the account id")
 	}
 
 	// The IdP itself still finds the account behind the subject.

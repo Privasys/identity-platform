@@ -1227,8 +1227,18 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	audience := audienceFromScope(ac.Scope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
 	if sector != "" {
-		// A site in its own sector learns nothing of the account's roles here.
+		// A client with its own subjects is a relying party, not the
+		// platform: its token is for itself alone, and carries none of the
+		// account's roles. The platform audience stays with the legacy
+		// first-party clients (see per-app-subjects in the client registry).
+		audience = ac.ClientID
 		roles = nil
+	} else if audience == "privasys-platform" {
+		// The platform keys accounts by this, never by an app's subject.
+		if filteredAttrs == nil {
+			filteredAttrs = map[string]string{}
+		}
+		filteredAttrs[ClaimPrivasysAccount] = ac.UserID
 	}
 
 	// Issue ID token.
@@ -1443,7 +1453,13 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	audience := audienceFromScope(effectiveScope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
 	if reg.SectorOf(clientID) != "" {
+		audience = clientID
 		roles = nil
+	} else if audience == "privasys-platform" {
+		if filteredRefreshAttrs == nil {
+			filteredRefreshAttrs = map[string]string{}
+		}
+		filteredRefreshAttrs[ClaimPrivasysAccount] = userID
 	}
 
 	// Issue new access token (with current roles and available profile).
@@ -1694,6 +1710,11 @@ func verifyPKCE(challenge, verifier string) bool {
 // by filterRolesByAudience — this is the mechanism enforcing the strict role
 // taxonomy (e.g. `privasys-platform:admin` only surfaces to consumers of the
 // `privasys-platform` audience).
+// ClaimPrivasysAccount carries the account id on tokens for the platform
+// audience only. The platform keys ownership, billing and keys by it, so it
+// never depends on which client's subject the token carries.
+const ClaimPrivasysAccount = "privasys_account"
+
 func audienceFromScope(scope, fallback string) string {
 	for _, s := range strings.Fields(scope) {
 		if strings.HasPrefix(s, "audience:") {

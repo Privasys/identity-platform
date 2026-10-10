@@ -173,6 +173,8 @@ async function resolveRequestedAttributes(
     profile: import('@/stores/profile').UserProfile | null,
     approved?: Set<string> | null,
     selfieBase64?: string | null,
+    /** The subject this site knows the holder by, from the sign-in. */
+    subject?: string,
 ): Promise<Record<string, string> | undefined> {
     const requested = payload.requestedAttributes;
     if (!requested?.length || !profile) return undefined;
@@ -181,8 +183,12 @@ async function resolveRequestedAttributes(
 
     for (const attr of requested) {
         if (attr === 'sub') {
-            if (profile.pairwiseSeed) {
-                try { attrs.sub = await deriveAppSub(profile.pairwiseSeed, payload.rpId); } catch {}
+            if (subject) {
+                attrs.sub = subject;
+            } else if (profile.pairwiseSeed) {
+                // No sign-in subject (an attribute step-up): derive per site,
+                // never per shared relying party, so two sites cannot match it.
+                try { attrs.sub = await deriveAppSub(profile.pairwiseSeed, payload.clientId || payload.rpId); } catch {}
             }
             continue;
         }
@@ -211,6 +217,7 @@ async function resolveRequestedAttributes(
                     selfieBase64,
                     payload.nonce ?? payload.sessionId,
                     voucherForAttribute(PRESENCE_KEY, payload.disclosureVouchers),
+                    subject,
                 );
             } catch (e: any) {
                 // The ceremony could not run (transport/enclave error) — never
@@ -234,7 +241,7 @@ async function resolveRequestedAttributes(
                 // Gov claims are presented as enclave-signed, audience-bound
                 // disclosure tokens (commit-and-prove), never the raw value.
                 try {
-                    attrs[attr] = await discloseAttribute(payload.rpId, attr, payload.nonce ?? payload.sessionId, payload.disclosureVouchers);
+                    attrs[attr] = await discloseAttribute(payload.rpId, attr, payload.nonce ?? payload.sessionId, payload.disclosureVouchers, subject);
                 } catch (e: any) {
                     // Never fall back to the raw gov value; omit on failure.
                     console.warn(`[CONNECT] disclosure for ${attr} failed: ${e?.message}`);
@@ -950,6 +957,8 @@ function ConnectFlow() {
         sessionToken: string;
         /** The IdP's id for this identity, for its push target's sealing key. */
         userId?: string;
+        /** The subject this site knows the holder by, for the late attributes. */
+        subject?: string;
         /** Only set for registration (not authentication) */
         credential?: {
             credentialId: string;
@@ -2033,7 +2042,7 @@ function ConnectFlow() {
     const maybeIssueEncAuth = (
         payload: QRPayload,
         keyAlias: string,
-        result: { sessionToken: string; userId?: string; sessionRelay?: fido2.SessionRelayBinding },
+        result: { sessionToken: string; userId?: string; subject?: string; sessionRelay?: fido2.SessionRelayBinding },
         relayArg: { quoteHash: string } | undefined,
     ): Promise<void> => {
         if (!result.sessionRelay || !relayArg) return Promise.resolve();
@@ -2051,7 +2060,7 @@ function ConnectFlow() {
             walletSessionToken: result.sessionToken,
             keyId: keyAlias,
             clientId: payload.clientId,
-            sub: result.userId,
+            sub: result.subject ?? result.userId,
             encPubB64: result.sessionRelay.encPub,
             quoteHashHex: relayArg.quoteHash,
             attestation: att,
@@ -2171,7 +2180,7 @@ function ConnectFlow() {
     const issueExtraAppVouchers = async (
         payload: QRPayload,
         keyAlias: string,
-        result: { sessionToken: string; userId?: string },
+        result: { sessionToken: string; userId?: string; subject?: string },
     ): Promise<SealedExtraApp[]> => {
         const sealed: SealedExtraApp[] = [];
         const hosts = (payload.extraAppHosts ?? []).filter((h) => h && h !== payload.appHost);
@@ -2193,7 +2202,7 @@ function ConnectFlow() {
                     walletSessionToken: result.sessionToken,
                     keyId: keyAlias,
                     clientId: payload.clientId,
-                    sub: result.userId,
+                    sub: result.subject ?? result.userId,
                     encPubB64: bs.encPub,
                     quoteHashHex: deriveQuoteHash(att),
                     attestation: att,
@@ -2305,6 +2314,7 @@ function ConnectFlow() {
                     payload,
                     sessionToken: result.sessionToken,
                     userId: result.userId,
+                    subject: result.subject,
                     credential: {
                         credentialId: result.credentialId,
                         keyAlias,
@@ -2328,7 +2338,7 @@ function ConnectFlow() {
             setStep('relaying');
 
             // Resolve only the attributes the app actually requested.
-            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current);
+            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current, result.subject);
 
             // The silent-rebind voucher goes up BEFORE the browser learns the
             // ceremony is done: the SDK establishes the app's sealed session
@@ -2484,6 +2494,7 @@ function ConnectFlow() {
                     payload,
                     sessionToken: result.sessionToken,
                     userId: result.userId,
+                    subject: result.subject,
                     sessionRelay: result.sessionRelay,
                     // Signed now, inside this Face ID's grace (see the type).
                     voucher: maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg),
@@ -2498,7 +2509,7 @@ function ConnectFlow() {
             setStep('relaying');
 
             // Resolve only the attributes the app actually requested.
-            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current);
+            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current, result.subject);
 
             // The silent-rebind voucher goes up BEFORE the browser learns the
             // ceremony is done: the SDK establishes the app's sealed session
@@ -2700,7 +2711,7 @@ function ConnectFlow() {
 
         setStep('relaying');
         try {
-            const attributes = await resolveRequestedAttributes(pending.payload, updatedProfile, approvedAttrsRef.current, selfieRef.current);
+            const attributes = await resolveRequestedAttributes(pending.payload, updatedProfile, approvedAttrsRef.current, selfieRef.current, pending.subject);
 
             // Same order as the direct path: voucher first, then the relay,
             // and the sealed binding rides the relay so a first-time holder

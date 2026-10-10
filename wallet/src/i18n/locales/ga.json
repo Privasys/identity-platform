@@ -619,7 +619,14 @@
     "readableWarnBody": "Is féidir le duine ar bith a fhaigheann an comhad gach rud ann a léamh. Coinnigh in áit shábháilte é.",
     "readableConfirm": "Deimhnigh chun cóip inléite a easpórtáil",
     "exportAll": "Easpórtáil gach rud",
-    "noAttributes": "Níl aon sonraí le heaspórtáil fós."
+    "noAttributes": "Níl aon sonraí le heaspórtáil fós.",
+    "driveTitle": "Sábháil i mo Privasys Drive freisin",
+    "driveHint": "An comhad criptithe céanna, i bhfillteán Privasys Wallet i do Drive. Teastaíonn cuntas Privasys a bhfuil billeáil socraithe air ó Drive.",
+    "driveLast": "Sábháladh i Drive go deireanach {{when}}",
+    "driveUnavailableTitle": "Níl Privasys Drive ar fáil",
+    "driveUnavailableBody": "Oscail Drive ó do Phróifíl ar dtús, ansin bain triail eile as.",
+    "restoreFromDrive": "Athchóirigh ó mo Drive",
+    "errNoDriveBackup": "Níl aon chúltaca i do Drive fós."
   },
   "firstConnect": {
     "genericApp": "an aip seo",

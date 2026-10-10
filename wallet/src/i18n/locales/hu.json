@@ -581,7 +581,14 @@
     "readableWarnBody": "Aki megkapja a fájlt, mindent elolvashat benne. Tartsa biztonságos helyen.",
     "readableConfirm": "Erősítse meg az olvasható másolat exportálását",
     "exportAll": "Összes exportálása",
-    "noAttributes": "Még nincs exportálható adat."
+    "noAttributes": "Még nincs exportálható adat.",
+    "driveTitle": "Mentés a Privasys Drive-omba is",
+    "driveHint": "Ugyanaz a titkosított fájl a Drive-ja Privasys Wallet mappájában. A Drive-hoz beállított számlázású Privasys-fiók kell.",
+    "driveLast": "Utolsó mentés a Drive-ba: {{when}}",
+    "driveUnavailableTitle": "A Privasys Drive nem érhető el",
+    "driveUnavailableBody": "Előbb nyissa meg a Drive-ot a profiljából, majd próbálja újra.",
+    "restoreFromDrive": "Visszaállítás a Drive-omból",
+    "errNoDriveBackup": "A Drive-jában még nincs biztonsági mentés."
   },
 
   "firstConnect": {

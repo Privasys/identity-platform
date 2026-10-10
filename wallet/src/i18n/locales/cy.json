@@ -622,7 +622,14 @@
     "readableWarnBody": "Gall unrhyw un sy'n cael y ffeil ddarllen popeth ynddi. Cadwch hi'n ddiogel.",
     "readableConfirm": "Cadarnhewch i allforio copi darllenadwy",
     "exportAll": "Allforio popeth",
-    "noAttributes": "Dim manylion i'w hallforio eto."
+    "noAttributes": "Dim manylion i'w hallforio eto.",
+    "driveTitle": "Cadw i'm Privasys Drive hefyd",
+    "driveHint": "Yr un ffeil wedi'i hamgryptio, mewn ffolder Privasys Wallet yn eich Drive. Mae Drive angen cyfrif Privasys gyda bilio wedi'i osod.",
+    "driveLast": "Cadwyd i Drive ddiwethaf {{when}}",
+    "driveUnavailableTitle": "Nid yw Privasys Drive ar gael",
+    "driveUnavailableBody": "Agorwch Drive o'ch Proffil yn gyntaf, yna rhowch gynnig arall arni.",
+    "restoreFromDrive": "Adfer o'm Drive",
+    "errNoDriveBackup": "Nid oes copi wrth gefn yn eich Drive eto."
   },
   "firstConnect": {
     "genericApp": "yr ap hwn",

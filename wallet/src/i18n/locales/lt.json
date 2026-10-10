@@ -613,7 +613,14 @@
     "readableWarnBody": "Kiekvienas, gavęs failą, gali perskaityti viską, kas jame yra. Laikykite jį saugioje vietoje.",
     "readableConfirm": "Patvirtinkite, kad eksportuotumėte skaitomą kopiją",
     "exportAll": "Eksportuoti viską",
-    "noAttributes": "Kol kas nėra duomenų eksportuoti."
+    "noAttributes": "Kol kas nėra duomenų eksportuoti.",
+    "driveTitle": "Taip pat saugoti mano Privasys Drive",
+    "driveHint": "Tas pats užšifruotas failas aplanke Privasys Wallet jūsų Drive. Drive reikia Privasys paskyros su nustatytu atsiskaitymu.",
+    "driveLast": "Paskutinį kartą išsaugota Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive nepasiekiamas",
+    "driveUnavailableBody": "Pirmiausia atidarykite Drive iš savo profilio, tada bandykite dar kartą.",
+    "restoreFromDrive": "Atkurti iš mano Drive",
+    "errNoDriveBackup": "Jūsų Drive dar nėra atsarginės kopijos."
   },
   "firstConnect": {
     "genericApp": "ši programėlė",

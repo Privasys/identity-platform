@@ -610,7 +610,14 @@
     "readableWarnBody": "Igaüks, kes faili saab, saab kõike selles lugeda. Hoidke seda turvalises kohas.",
     "readableConfirm": "Kinnitage loetava koopia eksportimiseks",
     "exportAll": "Ekspordi kõik",
-    "noAttributes": "Eksportimiseks pole veel andmeid."
+    "noAttributes": "Eksportimiseks pole veel andmeid.",
+    "driveTitle": "Salvesta ka minu Privasys Drive’i",
+    "driveHint": "Sama krüpteeritud fail teie Drive’i kaustas Privasys Wallet. Drive vajab Privasyse kontot, millel on arveldus seadistatud.",
+    "driveLast": "Viimati salvestatud Drive’i {{when}}",
+    "driveUnavailableTitle": "Privasys Drive pole saadaval",
+    "driveUnavailableBody": "Avage esmalt Drive oma profiilist ja proovige siis uuesti.",
+    "restoreFromDrive": "Taasta minu Drive’ist",
+    "errNoDriveBackup": "Teie Drive’is pole veel varukoopiat."
   },
   "firstConnect": {
     "genericApp": "see rakendus",

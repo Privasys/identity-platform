@@ -28,9 +28,13 @@ import {
     BackupError,
     buildBackup,
     isAutoBackupOn,
+    isDriveBackupOn,
     lastAutoBackupAt,
+    lastDriveBackupAt,
+    restoreFromDrive,
     restoreFromText,
     setAutoBackup,
+    setDriveBackup,
 } from '@/services/profile-backup';
 import { useProfileStore } from '@/stores/profile';
 
@@ -43,11 +47,15 @@ export default function BackupAndExportScreen() {
     const [selected, setSelected] = useState<Set<string>>(() => new Set(attrs.map((a) => a.key)));
     const [autoOn, setAutoOn] = useState(true);
     const [lastAt, setLastAt] = useState<number | null>(null);
+    const [driveOn, setDriveOn] = useState(false);
+    const [lastDriveAt, setLastDriveAt] = useState<number | null>(null);
     const [busy, setBusy] = useState(false);
 
     const refreshAuto = useCallback(async () => {
         setAutoOn(await isAutoBackupOn());
         setLastAt(await lastAutoBackupAt());
+        setDriveOn(await isDriveBackupOn());
+        setLastDriveAt(await lastDriveBackupAt());
     }, []);
     useEffect(() => {
         void refreshAuto();
@@ -57,6 +65,21 @@ export default function BackupAndExportScreen() {
         setAutoOn(on);
         await setAutoBackup(on);
         await refreshAuto();
+    };
+
+    const toggleDrive = async (on: boolean) => {
+        setBusy(true);
+        try {
+            await setDriveBackup(on);
+        } catch (e: any) {
+            Alert.alert(
+                t('backup.driveUnavailableTitle'),
+                e instanceof BackupError && e.reason === 'no-drive' ? t('backup.driveUnavailableBody') : (e?.message ?? String(e)),
+            );
+        } finally {
+            setBusy(false);
+            await refreshAuto();
+        }
     };
 
     const share = async (name: string, text: string, mimeType: string, uti: string) => {
@@ -89,25 +112,43 @@ export default function BackupAndExportScreen() {
             if (picked.canceled || !picked.assets?.[0]) return;
             setBusy(true);
             const text = await new File(picked.assets[0].uri).text();
-            const r = await restoreFromText(text);
-            Alert.alert(
-                t('backup.restoredTitle'),
-                t('backup.restoredBody', { attributes: r.attributes, records: r.records }),
-            );
+            restored(await restoreFromText(text));
         } catch (e: any) {
-            const reason = e instanceof BackupError ? e.reason : null;
-            const body =
-                reason === 'not-a-backup'
-                    ? t('backup.errNotBackup')
-                    : reason === 'wrong-wallet'
-                      ? t('backup.errWrongWallet')
-                      : reason === 'no-root' || reason === 'no-profile'
-                        ? t('backup.errRecoverFirst')
-                        : (e?.message ?? String(e));
-            Alert.alert(t('backup.restoreFailedTitle'), body);
+            restoreFailed(e);
         } finally {
             setBusy(false);
         }
+    };
+
+    const restoreDrive = async () => {
+        setBusy(true);
+        try {
+            restored(await restoreFromDrive());
+        } catch (e: any) {
+            restoreFailed(e);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const restored = (r: { attributes: number; records: number }) =>
+        Alert.alert(t('backup.restoredTitle'), t('backup.restoredBody', { attributes: r.attributes, records: r.records }));
+
+    const restoreFailed = (e: any) => {
+        const reason = e instanceof BackupError ? e.reason : null;
+        const body =
+            reason === 'not-a-backup'
+                ? t('backup.errNotBackup')
+                : reason === 'wrong-wallet'
+                  ? t('backup.errWrongWallet')
+                  : reason === 'no-root' || reason === 'no-profile'
+                    ? t('backup.errRecoverFirst')
+                    : reason === 'no-drive'
+                      ? t('backup.driveUnavailableBody')
+                      : reason === 'none-in-drive'
+                        ? t('backup.errNoDriveBackup')
+                        : (e?.message ?? String(e));
+        Alert.alert(t('backup.restoreFailedTitle'), body);
     };
 
     const toggle = (key: string) =>
@@ -177,6 +218,29 @@ export default function BackupAndExportScreen() {
                 <Pressable style={styles.secondary} onPress={restore} disabled={busy}>
                     <Text style={styles.secondaryText}>{t('backup.restore')}</Text>
                 </Pressable>
+
+                <RNView style={[styles.row, { marginTop: 8 }]}>
+                    <RNView style={{ flex: 1 }}>
+                        <Text style={styles.rowLabel}>{t('backup.driveTitle')}</Text>
+                        {driveOn && lastDriveAt ? (
+                            <Text style={styles.rowValue}>
+                                {t('backup.driveLast', {
+                                    when: new Date(lastDriveAt * 1000).toLocaleString(i18n.language, {
+                                        dateStyle: 'medium',
+                                        timeStyle: 'short',
+                                    }),
+                                })}
+                            </Text>
+                        ) : null}
+                    </RNView>
+                    <Switch value={driveOn} onValueChange={(v) => void toggleDrive(v)} disabled={busy} />
+                </RNView>
+                <Text style={styles.hint}>{t('backup.driveHint')}</Text>
+                {driveOn ? (
+                    <Pressable style={styles.secondary} onPress={restoreDrive} disabled={busy}>
+                        <Text style={styles.secondaryText}>{t('backup.restoreFromDrive')}</Text>
+                    </Pressable>
+                ) : null}
 
                 <Text style={styles.sectionTitle}>{t('backup.readableTitle')}</Text>
                 <Text style={styles.intro}>{t('backup.readableHint')}</Text>

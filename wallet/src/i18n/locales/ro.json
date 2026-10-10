@@ -613,7 +613,14 @@
     "readableWarnBody": "Oricine obține fișierul poate citi tot ce conține. Păstrează-l într-un loc sigur.",
     "readableConfirm": "Confirmă pentru a exporta o copie lizibilă",
     "exportAll": "Exportă tot",
-    "noAttributes": "Încă nu există date de exportat."
+    "noAttributes": "Încă nu există date de exportat.",
+    "driveTitle": "Salvează și în Privasys Drive-ul meu",
+    "driveHint": "Același fișier criptat, într-un dosar Privasys Wallet din Drive-ul tău. Drive necesită un cont Privasys cu facturarea configurată.",
+    "driveLast": "Ultima salvare în Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive nu este disponibil",
+    "driveUnavailableBody": "Deschide mai întâi Drive din profilul tău, apoi încearcă din nou.",
+    "restoreFromDrive": "Restaurează din Drive-ul meu",
+    "errNoDriveBackup": "Încă nu există nicio copie de rezervă în Drive-ul tău."
   },
   "firstConnect": {
     "genericApp": "această aplicație",

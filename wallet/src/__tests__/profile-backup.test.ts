@@ -38,13 +38,42 @@ jest.mock('@/services/sovereign', () => ({
     peekDataRoot: jest.fn(async () => mockRoot),
 }));
 
+// An in-memory Drive: folders and files by id.
+const mockNodes: Array<{ id: string; parent?: string; kind: 'folder' | 'file'; name: string; body?: string }> = [];
+const mockDrive = {
+    listRoot: jest.fn(async () => mockNodes.filter((n) => !n.parent)),
+    listFolder: jest.fn(async (_t: string, id: string) => mockNodes.filter((n) => n.parent === id)),
+    createFolder: jest.fn(async (_t: string, name: string) => {
+        const n = { id: `f${mockNodes.length}`, kind: 'folder' as const, name };
+        mockNodes.push(n);
+        return n;
+    }),
+    uploadFile: jest.fn(async (_t: string, name: string, body: string, o: { parentId: string }) => {
+        const n = { id: `n${mockNodes.length}`, parent: o.parentId, kind: 'file' as const, name, body };
+        mockNodes.push(n);
+        return n;
+    }),
+    deleteNode: jest.fn(async (_t: string, id: string) => {
+        mockNodes.splice(mockNodes.findIndex((n) => n.id === id), 1);
+    }),
+    downloadBytes: jest.fn(async (_t: string, id: string) =>
+        new TextEncoder().encode(mockNodes.find((n) => n.id === id)!.body!),
+    ),
+};
+jest.mock('@/services/drive', () => ({
+    ensureDrive: jest.fn(async () => ({ drive: mockDrive, tenant: { id: 't' }, origin: 'drive' })),
+    currentDrive: jest.fn(() => null),
+}));
+
 import { peekDataRoot } from '@/services/sovereign';
 import {
     BackupError,
     collectContents,
     openContents,
     restoreContents,
+    restoreFromDrive,
     restoreFromText,
+    saveToDrive,
     sealContents,
 } from '@/services/profile-backup';
 import { useProfileStore, type UserProfile } from '@/stores/profile';
@@ -132,4 +161,28 @@ it('asks for a recovery first, rather than restoring into a wallet with no root 
     await expect(restoreFromText(backup)).rejects.toMatchObject({ reason: 'no-root' });
     useProfileStore.setState({ profile: null });
     await expect(restoreContents(openContents(ROOT, backup))).rejects.toMatchObject({ reason: 'no-profile' });
+});
+
+it('keeps one encrypted copy in the Drive folder, replacing the old one only after the new one is in', async () => {
+    mockNodes.length = 0;
+    await saveToDrive();
+    await saveToDrive();
+    const files = mockNodes.filter((n) => n.kind === 'file');
+    expect(mockNodes.filter((n) => n.kind === 'folder').map((n) => n.name)).toEqual(['Privasys Wallet']);
+    expect(files).toHaveLength(1);
+    expect(files[0].name).toBe('wallet-backup.json');
+    expect(files[0].body).not.toContain('Alice');
+    // The second upload landed before the first copy was deleted.
+    const order = mockDrive.uploadFile.mock.invocationCallOrder[1];
+    expect(order).toBeLessThan(mockDrive.deleteNode.mock.invocationCallOrder[0]);
+});
+
+it('restores from the Drive copy', async () => {
+    mockNodes.length = 0;
+    useProfileStore.setState({ profile: profile([{ key: 'family_name', value: 'Smith' }]) });
+    await saveToDrive();
+    useProfileStore.setState({ profile: profile([]) });
+    await expect(restoreFromDrive()).resolves.toEqual({ attributes: 1, records: 0 });
+    mockNodes.length = 0;
+    await expect(restoreFromDrive()).rejects.toMatchObject({ reason: 'none-in-drive' });
 });

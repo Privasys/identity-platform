@@ -33,9 +33,11 @@ type Client struct {
 	BillingAccountID string `json:"billing_account_id,omitempty"`
 	RPID             string `json:"rp_id,omitempty"`
 	// Sector decides the "sub" this client sees (internal/tokens/subject.go).
-	// Empty is the shared sector: the account id, as Privasys's own apps
-	// receive it. Any other value gives the client its own subject per person,
-	// so it cannot match its users against another site's.
+	// It is the client's own id for every client: its own subject per
+	// person, which no other client shares. Empty is the LEGACY shared mode,
+	// the account id itself, kept only for Privasys's first-party clients
+	// until their cross-app dependencies have moved to capabilities
+	// (per-app subjects migration). It is never a name shared by clients.
 	Sector string `json:"sector"`
 }
 
@@ -334,7 +336,16 @@ func HandleRegister(reg *Registry, adminToken string) http.HandlerFunc {
 		var client *Client
 		var err error
 		if req.ClientID != "" {
+			_, getErr := reg.Get(req.ClientID)
+			isNew := getErr != nil
 			client, err = reg.RegisterWithID(req.ClientID, req.ClientName, req.RedirectURIs, req.ClientSecret, req.RequiredAttributes)
+			// A client created here gets its own subjects, whatever its id.
+			// An existing client keeps what it has: moving it is explicit.
+			if err == nil && isNew {
+				if serr := reg.SetSector(req.ClientID, req.ClientID); serr == nil {
+					client.Sector = req.ClientID
+				}
+			}
 		} else {
 			client, err = reg.Register(req.ClientName, req.RedirectURIs, req.ClientSecret, req.RequiredAttributes)
 		}
@@ -456,18 +467,16 @@ func HandleSetSpendJWKS(reg *Registry, adminToken string) http.HandlerFunc {
 	}
 }
 
-// HandleSetSector serves POST /clients/{id}/sector (admin token).
+// HandleSetSubjectMode serves POST /clients/{id}/subject (admin token).
 //
-//	{"sector": "own"}     the client's own sector (its client_id): per-person
-//	                      subjects no other client shares
-//	{"sector": "shared"}  the shared sector: the account id, as Privasys's own
-//	                      apps receive it
-//	{"sector": "<name>"}  a named sector, for several clients of ONE operator
-//	                      that must see the same subject
+//	{"mode": "own"}            the client's own subject per person (the rule)
+//	{"mode": "legacy-shared"}  the account id itself, for a first-party client
+//	                           whose cross-app dependencies have not moved yet
 //
-// Moving a client changes the "sub" it sees for every user it has, so the
-// client's owner must be ready to re-key their records first.
-func HandleSetSector(reg *Registry, adminToken string) http.HandlerFunc {
+// Switching changes the "sub" the client sees for every user it has, so the
+// client's data is re-keyed first (POST /internal/subjects/for gives the
+// mapping), never as a side effect.
+func HandleSetSubjectMode(reg *Registry, adminToken string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if adminToken != "" {
 			auth := r.Header.Get("Authorization")
@@ -478,24 +487,20 @@ func HandleSetSector(reg *Registry, adminToken string) http.HandlerFunc {
 		}
 		clientID := r.PathValue("id")
 		var req struct {
-			Sector string `json:"sector"`
+			Mode string `json:"mode"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || clientID == "" {
-			http.Error(w, `{"error":"client id and sector are required"}`, http.StatusBadRequest)
+			http.Error(w, `{"error":"client id and mode are required"}`, http.StatusBadRequest)
 			return
 		}
-		sector := req.Sector
-		switch sector {
+		var sector string
+		switch req.Mode {
 		case "own":
 			sector = clientID
-		case "shared":
+		case "legacy-shared":
 			sector = ""
-		case "":
-			http.Error(w, `{"error":"sector must be own, shared or a name"}`, http.StatusBadRequest)
-			return
-		}
-		if len(sector) > 128 {
-			http.Error(w, `{"error":"sector name too long"}`, http.StatusBadRequest)
+		default:
+			http.Error(w, `{"error":"mode must be own or legacy-shared"}`, http.StatusBadRequest)
 			return
 		}
 		if err := reg.SetSector(clientID, sector); err != nil {
@@ -503,6 +508,6 @@ func HandleSetSector(reg *Registry, adminToken string) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"client_id": clientID, "sector": sector})
+		json.NewEncoder(w).Encode(map[string]string{"client_id": clientID, "mode": req.Mode})
 	}
 }

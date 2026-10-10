@@ -4,7 +4,10 @@
 package clients
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Privasys/idp/internal/store"
@@ -95,34 +98,51 @@ func TestSetBilling(t *testing.T) {
 	}
 }
 
-// A client registered by the admin API is a third party and gets its own
-// sector; a pre-known client (RegisterWithID) stays in the shared one, and
-// moving a client is explicit.
-func TestSectors(t *testing.T) {
+// Every client created through the admin API gets its own subjects, with or
+// without a chosen id; a pre-known first-party client seeded in code
+// (RegisterWithID) stays in the legacy shared mode until moved.
+func TestSubjectModes(t *testing.T) {
 	reg := newTestRegistry(t)
 	third, err := reg.Register("Some Site", []string{"https://site/cb"}, "", []string{"email"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := reg.Get(third.ClientID); got.Sector != third.ClientID {
-		t.Fatalf("new third-party client sector %q, want its own (%q)", got.Sector, third.ClientID)
+	if reg.SectorOf(third.ClientID) != third.ClientID {
+		t.Fatal("a new client does not have its own subjects")
 	}
-	if _, err := reg.RegisterWithID("privasys-platform", "Privasys", []string{"https://p/cb"}, "", []string{"email"}); err != nil {
+	if _, err := reg.RegisterWithID("privasys-cli", "CLI", []string{"https://p/cb"}, "", []string{"email"}); err != nil {
 		t.Fatal(err)
 	}
-	if reg.SectorOf("privasys-platform") != "" {
-		t.Fatal("a pre-known first-party client left the shared sector")
+	if reg.SectorOf("privasys-cli") != "" {
+		t.Fatal("a seeded first-party client left the legacy shared mode")
 	}
-	if err := reg.SetSector("privasys-platform", "privasys"); err != nil {
-		t.Fatal(err)
+
+	h := HandleRegister(reg, "admin")
+	req := httptest.NewRequest("POST", "/clients", strings.NewReader(
+		`{"client_id":"named-site","client_name":"Named","redirect_uris":["https://n/cb"],"required_attributes":["email"]}`))
+	req.Header.Set("Authorization", "Bearer admin")
+	rec := httptest.NewRecorder()
+	h(rec, req)
+	if rec.Code != http.StatusCreated || reg.SectorOf("named-site") != "named-site" {
+		t.Fatalf("admin-registered client with an id: %d, sector %q", rec.Code, reg.SectorOf("named-site"))
 	}
-	if reg.SectorOf("privasys-platform") != "privasys" {
-		t.Fatal("SetSector did not move the client")
+
+	mode := HandleSetSubjectMode(reg, "admin")
+	set := func(id, body string) int {
+		req := httptest.NewRequest("POST", "/clients/"+id+"/subject", strings.NewReader(body))
+		req.SetPathValue("id", id)
+		req.Header.Set("Authorization", "Bearer admin")
+		rec := httptest.NewRecorder()
+		mode(rec, req)
+		return rec.Code
 	}
-	if err := reg.SetSector("no-such-client", "x"); err == nil {
-		t.Fatal("SetSector on an unknown client succeeded")
+	if set("privasys-cli", `{"mode":"own"}`) != http.StatusOK || reg.SectorOf("privasys-cli") != "privasys-cli" {
+		t.Fatal("moving a client to its own subjects failed")
 	}
-	if reg.SectorOf("no-such-client") != "" {
-		t.Fatal("an unknown client is not in the shared sector")
+	if set("privasys-cli", `{"mode":"team-a"}`) != http.StatusBadRequest {
+		t.Fatal("a named group was accepted; clients never share subjects")
+	}
+	if set("nobody", `{"mode":"own"}`) != http.StatusNotFound {
+		t.Fatal("an unknown client was moved")
 	}
 }

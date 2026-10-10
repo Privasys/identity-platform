@@ -253,7 +253,7 @@ func main() {
 	mux.HandleFunc("GET /account/", oidc.HandleAccountPage(cfg.AccountAPIBase))
 	// A non-enclave relying party registers where it publishes spend keys.
 	mux.HandleFunc("POST /clients/{id}/spend", clients.HandleSetSpendJWKS(clientReg, cfg.AdminToken))
-	mux.HandleFunc("POST /clients/{id}/sector", clients.HandleSetSector(clientReg, cfg.AdminToken))
+	mux.HandleFunc("POST /clients/{id}/subject", clients.HandleSetSubjectMode(clientReg, cfg.AdminToken))
 
 	// Wallet Instance Attestation: the wallet-provider JWKS (verifiers fetch it /
 	// have it provisioned), a fresh challenge, and enrolment → a holder-bound WIA.
@@ -416,6 +416,8 @@ func main() {
 	// grants index. See internal/notifymute.
 	notifyMutes := notifymute.New(db, issuer.DeriveSecret("notify-mute"))
 	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken, capabilityAsks, notifyMutes))
+	mux.HandleFunc("POST /admin/subjects/resolve", admin.HandleResolveSubjects(db, cfg.AdminToken))
+	mux.HandleFunc("POST /admin/subjects/for", admin.HandleSubjectsFor(issuer, cfg.AdminToken))
 	mux.HandleFunc("POST /admin/roles", admin.HandleGrantRole(db, cfg.AdminToken))
 	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
 	mux.HandleFunc("GET /admin/roles", admin.HandleListRoles(db, cfg.AdminToken))

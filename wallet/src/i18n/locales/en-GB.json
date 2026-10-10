@@ -610,7 +610,14 @@
     "readableWarnBody": "Anyone who gets the file can read everything in it. Keep it somewhere safe.",
     "readableConfirm": "Confirm to export a readable copy",
     "exportAll": "Export all",
-    "noAttributes": "No details to export yet."
+    "noAttributes": "No details to export yet.",
+    "driveTitle": "Also save to my Privasys Drive",
+    "driveHint": "The same encrypted file, in a Privasys Wallet folder in your Drive. Drive needs a Privasys account with billing set up.",
+    "driveLast": "Last saved to Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive is not available",
+    "driveUnavailableBody": "Open Drive from your Profile first, then try again.",
+    "restoreFromDrive": "Restore from my Drive",
+    "errNoDriveBackup": "There is no backup in your Drive yet."
   },
   "firstConnect": {
     "genericApp": "this app",

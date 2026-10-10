@@ -581,7 +581,14 @@
     "readableWarnBody": "Όποιος αποκτήσει το αρχείο μπορεί να διαβάσει όλο το περιεχόμενό του. Φυλάξτε το σε ασφαλές μέρος.",
     "readableConfirm": "Επιβεβαιώστε για εξαγωγή αναγνώσιμου αντιγράφου",
     "exportAll": "Εξαγωγή όλων",
-    "noAttributes": "Δεν υπάρχουν ακόμη στοιχεία για εξαγωγή."
+    "noAttributes": "Δεν υπάρχουν ακόμη στοιχεία για εξαγωγή.",
+    "driveTitle": "Αποθήκευση και στο Privasys Drive μου",
+    "driveHint": "Το ίδιο κρυπτογραφημένο αρχείο, σε φάκελο Privasys Wallet στο Drive σας. Το Drive απαιτεί λογαριασμό Privasys με ρυθμισμένη χρέωση.",
+    "driveLast": "Τελευταία αποθήκευση στο Drive {{when}}",
+    "driveUnavailableTitle": "Το Privasys Drive δεν είναι διαθέσιμο",
+    "driveUnavailableBody": "Ανοίξτε πρώτα το Drive από το Προφίλ σας και δοκιμάστε ξανά.",
+    "restoreFromDrive": "Επαναφορά από το Drive μου",
+    "errNoDriveBackup": "Δεν υπάρχει ακόμη αντίγραφο ασφαλείας στο Drive σας."
   },
 
   "firstConnect": {

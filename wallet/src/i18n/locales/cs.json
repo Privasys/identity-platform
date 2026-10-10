@@ -584,7 +584,14 @@
     "readableWarnBody": "Kdokoli, kdo soubor získá, si v něm může přečíst vše. Uložte ho na bezpečné místo.",
     "readableConfirm": "Potvrďte export čitelné kopie",
     "exportAll": "Exportovat vše",
-    "noAttributes": "Zatím nejsou žádné údaje k exportu."
+    "noAttributes": "Zatím nejsou žádné údaje k exportu.",
+    "driveTitle": "Ukládat také do mého Privasys Drive",
+    "driveHint": "Stejný šifrovaný soubor ve složce Privasys Wallet ve vašem Drive. Drive vyžaduje účet Privasys s nastavenou platbou.",
+    "driveLast": "Naposledy uloženo do Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive není k dispozici",
+    "driveUnavailableBody": "Nejprve otevřete Drive ze svého profilu a pak to zkuste znovu.",
+    "restoreFromDrive": "Obnovit z mého Drive",
+    "errNoDriveBackup": "Ve vašem Drive zatím není žádná záloha."
   },
 
   "firstConnect": {

@@ -23,6 +23,11 @@
  *   the wallet first runs. On by default; the holder can turn it off, which
  *   deletes the file.
  * - On demand, anywhere the share sheet reaches (Files, a cloud drive, email).
+ * - To the holder's Privasys Drive, when they link it from the Backup screen:
+ *   the same file in a "Privasys Wallet" folder. Off by default, because Drive
+ *   needs a Privasys account with billing and the wallet never requires it.
+ *   Linking connects to Drive once, on the holder's tap; afterwards the file
+ *   follows the profile whenever a Drive session is open, never prompting.
  *
  * What it holds: the profile (details, linked providers, photo) without the
  * seed, which the key backup carries, and the identity-check records. Not the
@@ -36,6 +41,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import * as Crypto from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
 
+import { currentDrive, ensureDrive, type DriveSession } from '@/services/drive';
 import { loadKycRecords, saveKycRecord, type KycRecord } from '@/services/kyc';
 import { ensureDataRoot, peekDataRoot } from '@/services/sovereign';
 import { useProfileStore, type UserProfile } from '@/stores/profile';
@@ -48,6 +54,11 @@ const KEY_INFO = 'privasys-profile-backup/v1';
 /** The automatic copy, in the folder the phone's own backup carries. */
 export const AUTO_BACKUP_NAME = 'privasys-wallet-backup.json';
 const AUTO_OFF_KEY = 'privasys.profile-backup.auto-off';
+const DRIVE_ON_KEY = 'privasys.profile-backup.drive-on';
+const LAST_DRIVE_KEY = 'privasys.profile-backup.last-drive';
+/** The folder and file the copy lives under in the holder's Drive. */
+export const DRIVE_FOLDER = 'Privasys Wallet';
+export const DRIVE_FILE = 'wallet-backup.json';
 const LAST_AUTO_KEY = 'privasys.profile-backup.last-auto';
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
@@ -68,7 +79,7 @@ interface BackupFile {
 
 export class BackupError extends Error {
     constructor(
-        public readonly reason: 'not-a-backup' | 'wrong-wallet' | 'no-root' | 'no-profile',
+        public readonly reason: 'not-a-backup' | 'wrong-wallet' | 'no-root' | 'no-profile' | 'no-drive' | 'none-in-drive',
         message: string,
     ) {
         super(message);
@@ -249,6 +260,7 @@ export function writeAutoBackup(): Promise<void> {
             if (!f.exists) f.create();
             f.write(text);
             await SecureStore.setItemAsync(LAST_AUTO_KEY, String(Math.floor(Date.now() / 1000)));
+            if (await isDriveBackupOn()) void saveToDrive(text, false);
         } catch (e: any) {
             console.warn('[profile-backup] automatic copy failed:', e?.message ?? e);
         }
@@ -288,6 +300,82 @@ export function watchProfileForBackup(): void {
     });
 }
 
+// ---------------------------------------------------------------- Privasys Drive
+
+export async function isDriveBackupOn(): Promise<boolean> {
+    return (await SecureStore.getItemAsync(DRIVE_ON_KEY)) === '1';
+}
+
+export async function lastDriveBackupAt(): Promise<number | null> {
+    const v = await SecureStore.getItemAsync(LAST_DRIVE_KEY);
+    return v ? Number(v) : null;
+}
+
+async function backupFolder(s: DriveSession, create: boolean): Promise<string | null> {
+    const root = await s.drive.listRoot(s.tenant.id);
+    const found = root.find((n) => n.kind === 'folder' && n.name === DRIVE_FOLDER);
+    if (found) return found.id;
+    if (!create) return null;
+    return (await s.drive.createFolder(s.tenant.id, DRIVE_FOLDER)).id;
+}
+
+/**
+ * Write the copy to the holder's Drive. Interactive (the holder's tap) may
+ * connect to Drive; otherwise only an open session is used, so this never
+ * prompts. Returns whether it was saved. Older copies are removed only after
+ * the new one is in place.
+ */
+export async function saveToDrive(text?: string, interactive = true): Promise<boolean> {
+    try {
+        const s = interactive ? await ensureDrive() : currentDrive();
+        if (!s) {
+            if (interactive) throw new BackupError('no-drive', 'Privasys Drive is not available');
+            return false;
+        }
+        const body = text ?? (await buildBackup());
+        const folder = (await backupFolder(s, true)) as string;
+        const before = await s.drive.listFolder(s.tenant.id, folder);
+        const saved = await s.drive.uploadFile(s.tenant.id, DRIVE_FILE, body, {
+            parentId: folder,
+            mime: 'application/json',
+        });
+        for (const old of before) {
+            if (old.kind === 'file' && old.name === DRIVE_FILE && old.id !== saved.id) {
+                await s.drive.deleteNode(s.tenant.id, old.id).catch(() => undefined);
+            }
+        }
+        await SecureStore.setItemAsync(LAST_DRIVE_KEY, String(Math.floor(Date.now() / 1000)));
+        return true;
+    } catch (e: any) {
+        if (interactive) throw e;
+        console.warn('[profile-backup] Drive copy failed:', e?.message ?? e);
+        return false;
+    }
+}
+
+/** Link (save now, on the holder's tap) or unlink the Drive copy. */
+export async function setDriveBackup(on: boolean): Promise<void> {
+    if (on) {
+        await saveToDrive(undefined, true);
+        await SecureStore.setItemAsync(DRIVE_ON_KEY, '1');
+    } else {
+        await SecureStore.deleteItemAsync(DRIVE_ON_KEY);
+    }
+}
+
+/** Fetch the copy from the holder's Drive and restore it. */
+export async function restoreFromDrive(): Promise<{ attributes: number; records: number }> {
+    const s = await ensureDrive();
+    if (!s) throw new BackupError('no-drive', 'Privasys Drive is not available');
+    const folder = await backupFolder(s, false);
+    const file = folder
+        ? (await s.drive.listFolder(s.tenant.id, folder)).find((n) => n.kind === 'file' && n.name === DRIVE_FILE)
+        : undefined;
+    if (!file) throw new BackupError('none-in-drive', 'there is no backup in this Drive');
+    const bytes = await s.drive.downloadBytes(s.tenant.id, file.id);
+    return restoreFromText(new TextDecoder().decode(bytes));
+}
+
 const AUTO_RESTORED_KEY = 'privasys.profile-backup.auto-restored';
 
 /**
@@ -325,4 +413,6 @@ export async function clearProfileBackupLocalState(): Promise<void> {
     await SecureStore.deleteItemAsync(AUTO_OFF_KEY);
     await SecureStore.deleteItemAsync(LAST_AUTO_KEY);
     await SecureStore.deleteItemAsync(AUTO_RESTORED_KEY);
+    await SecureStore.deleteItemAsync(DRIVE_ON_KEY);
+    await SecureStore.deleteItemAsync(LAST_DRIVE_KEY);
 }

@@ -581,7 +581,14 @@
     "readableWarnBody": "Iedereen die het bestand krijgt, kan alles erin lezen. Bewaar het op een veilige plek.",
     "readableConfirm": "Bevestig om een leesbare kopie te exporteren",
     "exportAll": "Alles exporteren",
-    "noAttributes": "Nog geen gegevens om te exporteren."
+    "noAttributes": "Nog geen gegevens om te exporteren.",
+    "driveTitle": "Ook opslaan in mijn Privasys Drive",
+    "driveHint": "Hetzelfde versleutelde bestand, in een map Privasys Wallet in je Drive. Drive vereist een Privasys-account met ingestelde facturering.",
+    "driveLast": "Laatst opgeslagen in Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive is niet beschikbaar",
+    "driveUnavailableBody": "Open eerst Drive vanuit je profiel en probeer het dan opnieuw.",
+    "restoreFromDrive": "Terugzetten uit mijn Drive",
+    "errNoDriveBackup": "Er staat nog geen back-up in je Drive."
   },
 
   "firstConnect": {

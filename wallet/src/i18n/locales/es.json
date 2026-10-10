@@ -584,7 +584,14 @@
     "readableWarnBody": "Quien obtenga el archivo podrá leer todo su contenido. Guárdalo en un lugar seguro.",
     "readableConfirm": "Confirma para exportar una copia legible",
     "exportAll": "Exportar todo",
-    "noAttributes": "Aún no hay datos para exportar."
+    "noAttributes": "Aún no hay datos para exportar.",
+    "driveTitle": "Guardar también en mi Privasys Drive",
+    "driveHint": "El mismo archivo cifrado, en una carpeta Privasys Wallet de tu Drive. Drive necesita una cuenta de Privasys con la facturación configurada.",
+    "driveLast": "Último guardado en Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive no está disponible",
+    "driveUnavailableBody": "Abre primero Drive desde tu perfil y vuelve a intentarlo.",
+    "restoreFromDrive": "Restaurar desde mi Drive",
+    "errNoDriveBackup": "Aún no hay ninguna copia en tu Drive."
   },
 
   "firstConnect": {

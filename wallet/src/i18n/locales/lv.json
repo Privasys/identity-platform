@@ -613,7 +613,14 @@
     "readableWarnBody": "Ikviens, kurš iegūst failu, var izlasīt visu tā saturu. Glabājiet to drošā vietā.",
     "readableConfirm": "Apstipriniet, lai eksportētu lasāmu kopiju",
     "exportAll": "Eksportēt visu",
-    "noAttributes": "Pagaidām nav datu eksportēšanai."
+    "noAttributes": "Pagaidām nav datu eksportēšanai.",
+    "driveTitle": "Saglabāt arī manā Privasys Drive",
+    "driveHint": "Tas pats šifrētais fails mapē Privasys Wallet jūsu Drive. Drive nepieciešams Privasys konts ar iestatītu norēķinu.",
+    "driveLast": "Pēdējoreiz saglabāts Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive nav pieejams",
+    "driveUnavailableBody": "Vispirms atveriet Drive no sava profila un mēģiniet vēlreiz.",
+    "restoreFromDrive": "Atjaunot no mana Drive",
+    "errNoDriveBackup": "Jūsu Drive vēl nav dublējuma."
   },
   "firstConnect": {
     "genericApp": "šī lietotne",

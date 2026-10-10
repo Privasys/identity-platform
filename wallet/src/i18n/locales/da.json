@@ -581,7 +581,14 @@
     "readableWarnBody": "Alle, der får fat i filen, kan læse alt i den. Opbevar den et sikkert sted.",
     "readableConfirm": "Bekræft for at eksportere en læsbar kopi",
     "exportAll": "Eksportér alt",
-    "noAttributes": "Ingen oplysninger at eksportere endnu."
+    "noAttributes": "Ingen oplysninger at eksportere endnu.",
+    "driveTitle": "Gem også i mit Privasys Drive",
+    "driveHint": "Den samme krypterede fil i en Privasys Wallet-mappe i dit Drive. Drive kræver en Privasys-konto med betaling sat op.",
+    "driveLast": "Senest gemt i Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive er ikke tilgængeligt",
+    "driveUnavailableBody": "Åbn først Drive fra din profil, og prøv så igen.",
+    "restoreFromDrive": "Gendan fra mit Drive",
+    "errNoDriveBackup": "Der er endnu ingen sikkerhedskopi i dit Drive."
   },
 
   "firstConnect": {

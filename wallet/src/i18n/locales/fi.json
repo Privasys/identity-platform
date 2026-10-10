@@ -581,7 +581,14 @@
     "readableWarnBody": "Kuka tahansa tiedoston saava voi lukea kaiken sen sisällön. Säilytä se turvallisessa paikassa.",
     "readableConfirm": "Vahvista luettavan kopion vienti",
     "exportAll": "Vie kaikki",
-    "noAttributes": "Ei vielä vietäviä tietoja."
+    "noAttributes": "Ei vielä vietäviä tietoja.",
+    "driveTitle": "Tallenna myös Privasys Driveeni",
+    "driveHint": "Sama salattu tiedosto Privasys Wallet -kansiossa Drivessasi. Drive edellyttää Privasys-tiliä, jonka laskutus on määritetty.",
+    "driveLast": "Viimeksi tallennettu Driveen {{when}}",
+    "driveUnavailableTitle": "Privasys Drive ei ole käytettävissä",
+    "driveUnavailableBody": "Avaa ensin Drive profiilistasi ja yritä sitten uudelleen.",
+    "restoreFromDrive": "Palauta Drivestani",
+    "errNoDriveBackup": "Drivessasi ei ole vielä varmuuskopiota."
   },
 
   "firstConnect": {

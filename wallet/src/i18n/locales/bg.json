@@ -610,7 +610,14 @@
     "readableWarnBody": "Всеки, който получи файла, може да прочете всичко в него. Пазете го на сигурно място.",
     "readableConfirm": "Потвърдете, за да експортирате четимо копие",
     "exportAll": "Експортиране на всичко",
-    "noAttributes": "Все още няма данни за експортиране."
+    "noAttributes": "Все още няма данни за експортиране.",
+    "driveTitle": "Запазване и в моя Privasys Drive",
+    "driveHint": "Същият шифрован файл в папка Privasys Wallet във вашия Drive. Drive изисква акаунт в Privasys с настроено плащане.",
+    "driveLast": "Последно запазване в Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive не е наличен",
+    "driveUnavailableBody": "Първо отворете Drive от профила си, след това опитайте отново.",
+    "restoreFromDrive": "Възстановяване от моя Drive",
+    "errNoDriveBackup": "Все още няма резервно копие във вашия Drive."
   },
   "firstConnect": {
     "genericApp": "това приложение",

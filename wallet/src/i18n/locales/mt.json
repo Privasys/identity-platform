@@ -619,7 +619,14 @@
     "readableWarnBody": "Kull min jikseb il-fajl jista’ jaqra kollox fih. Żommu f’post sigur.",
     "readableConfirm": "Ikkonferma biex tesporta kopja li tinqara",
     "exportAll": "Esporta kollox",
-    "noAttributes": "Għad m’hemm l-ebda dettalji x’tesporta."
+    "noAttributes": "Għad m’hemm l-ebda dettalji x’tesporta.",
+    "driveTitle": "Issejvja wkoll fil-Privasys Drive tiegħi",
+    "driveHint": "L-istess fajl kriptat, f’folder Privasys Wallet fid-Drive tiegħek. Id-Drive jeħtieġ kont Privasys bil-ħlas issettjat.",
+    "driveLast": "L-aħħar issejvjat fid-Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive mhuwiex disponibbli",
+    "driveUnavailableBody": "Iftaħ id-Drive mill-Profil tiegħek l-ewwel, imbagħad erġa’ pprova.",
+    "restoreFromDrive": "Irrestawra mid-Drive tiegħi",
+    "errNoDriveBackup": "Għad m’hemm l-ebda backup fid-Drive tiegħek."
   },
   "firstConnect": {
     "genericApp": "din l-app",

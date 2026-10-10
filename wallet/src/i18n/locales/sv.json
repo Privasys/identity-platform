@@ -581,7 +581,14 @@
     "readableWarnBody": "Den som får filen kan läsa allt i den. Förvara den på ett säkert ställe.",
     "readableConfirm": "Bekräfta för att exportera en läsbar kopia",
     "exportAll": "Exportera allt",
-    "noAttributes": "Inga uppgifter att exportera än."
+    "noAttributes": "Inga uppgifter att exportera än.",
+    "driveTitle": "Spara även i min Privasys Drive",
+    "driveHint": "Samma krypterade fil, i en mapp Privasys Wallet i din Drive. Drive kräver ett Privasys-konto med fakturering inställd.",
+    "driveLast": "Senast sparad i Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive är inte tillgänglig",
+    "driveUnavailableBody": "Öppna först Drive från din profil och försök sedan igen.",
+    "restoreFromDrive": "Återställ från min Drive",
+    "errNoDriveBackup": "Det finns ingen säkerhetskopia i din Drive än."
   },
 
   "firstConnect": {

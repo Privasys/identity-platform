@@ -616,7 +616,14 @@
     "readableWarnBody": "Kdor dobi datoteko, lahko prebere vse v njej. Hranite jo na varnem mestu.",
     "readableConfirm": "Potrdite izvoz berljive kopije",
     "exportAll": "Izvozi vse",
-    "noAttributes": "Ni še podatkov za izvoz."
+    "noAttributes": "Ni še podatkov za izvoz.",
+    "driveTitle": "Shrani tudi v moj Privasys Drive",
+    "driveHint": "Ista šifrirana datoteka v mapi Privasys Wallet na vašem Drivu. Drive zahteva račun Privasys z nastavljenim obračunavanjem.",
+    "driveLast": "Nazadnje shranjeno na Drive {{when}}",
+    "driveUnavailableTitle": "Privasys Drive ni na voljo",
+    "driveUnavailableBody": "Najprej odprite Drive v svojem profilu, nato poskusite znova.",
+    "restoreFromDrive": "Obnovi iz mojega Driva",
+    "errNoDriveBackup": "Na vašem Drivu še ni varnostne kopije."
   },
   "firstConnect": {
     "genericApp": "ta aplikacija",

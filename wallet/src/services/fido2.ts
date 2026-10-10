@@ -445,7 +445,15 @@ export async function authenticate(
     credentialId: string,
     browserSessionId: string,
     rpId?: string,
-    sessionRelay?: { sdkPub: string; appHost: string; quoteHash: string; nonce: string }
+    sessionRelay?: { sdkPub: string; appHost: string; quoteHash: string; nonce: string },
+    opts?: {
+        /**
+         * The client whose subject the IdP should return when there is no
+         * sign-in session behind this ceremony (extending a sealed session to
+         * another app): that app's voucher must name the subject it sees.
+         */
+        clientId?: string;
+    }
 ): Promise<{ sessionToken: string; userId?: string; subject?: string; sessionRelay?: SessionRelayBinding }> {
     // 0. Optional: bootstrap a browser→enclave session over the same
     //    RA-TLS connection. Wallet posts the SDK's ephemeral P-256
@@ -535,6 +543,7 @@ export async function authenticate(
     let completePath = `/fido2/authenticate/complete?challenge=${encodeURIComponent(options.challenge)}`;
     const authTag = await deviceTagAt(origin, await userIdOfCredential(credentialId));
     if (authTag) completePath += `&device_tag=${encodeURIComponent(authTag)}`;
+    if (opts?.clientId) completePath += `&client_id=${encodeURIComponent(opts.clientId)}`;
     if (relay && sessionRelay) {
         completePath +=
             `&session_id=${encodeURIComponent(relay.sessionId)}` +

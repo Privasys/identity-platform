@@ -1980,6 +1980,9 @@ function ConnectFlow() {
                 credential.credentialId,
                 payload.sid, // correlation only; no browser relay on this path
                 credential.serverRpId,
+                undefined,
+                // The voucher names the subject THIS app sees (per-app subjects).
+                { clientId: payload.clientId },
             );
             if (!auth.sessionToken || !auth.userId) {
                 throw new Error('authentication did not return a session');
@@ -1991,7 +1994,7 @@ function ConnectFlow() {
                 walletSessionToken: auth.sessionToken,
                 keyId: credential.keyAlias,
                 clientId: payload.clientId,
-                sub: auth.userId,
+                sub: auth.subject || auth.userId,
                 encPubB64: bs.encPub,
                 quoteHashHex: deriveQuoteHash(att),
                 attestation: att,

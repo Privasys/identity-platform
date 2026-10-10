@@ -28,6 +28,7 @@ import * as NativeKeys from '../../modules/native-keys/src/index';
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
 
 import { encMeasHash, workloadDigestHash } from './oid-digest';
+import { appIdFromOids } from './release-provenance';
 
 const IDP_BASE_URL = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
@@ -337,6 +338,9 @@ export async function issueEncAuthForSignIn(args: {
         keyId: args.keyId,
         clientId: args.clientId,
         host: args.host,
+        // The attested app (OID 4.1) this wallet verified: the IdP hands a
+        // client's own subject only to an app registered for that client.
+        appId: appIdFromOids(args.attestation.custom_oids) ?? '',
         deviceId: args.deviceId,
         payload: {
             sub: args.sub,
@@ -359,6 +363,8 @@ export async function signAndUploadEncAuth(args: {
     deviceId?: string;
     /** Enclave hostname this voucher is for — the browser SDK's resume selector. */
     host?: string;
+    /** The attested app id (OID 4.1) of the enclave the wallet verified. */
+    appId?: string;
     payload: Omit<EncAuthPayload, 'sid'>;
 }): Promise<{ sid: string; envelope: EncAuthEnvelope }> {
     // Step 1: allocate (or reuse) a sid for (user, client_id, device).
@@ -400,6 +406,7 @@ export async function signAndUploadEncAuth(args: {
             // re-verifies the workload digest at consumption, so this hint
             // can't be used to smuggle a wrong voucher.
             host: args.host ?? '',
+            app_id: args.appId ?? '',
         }),
     });
     if (!putResp.ok) {

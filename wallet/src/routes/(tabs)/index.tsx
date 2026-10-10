@@ -35,6 +35,7 @@ import {
 import { profileDisplayName } from '@/services/attributes';
 import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
+import { runPendingSecure } from '@/services/device-flows';
 import { hasRecoveredPairwiseSeed, takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { wipeWallet } from '@/services/wipe';
 import { BIOMETRIC_TIMEOUT_MS, withTimeout } from '@/utils/timeout';
@@ -192,6 +193,8 @@ export default function ProfileScreen() {
             });
             setOnboarded();
             setSetupDone(3);
+            // After a phrase recovery on this phone, shut the old phones out.
+            void runPendingSecure();
             // The setup flow continues onto its second page: the dedicated
             // recovery-phrase step (a real screen, not a popup). It carries its
             // own "later" escape for users who insist. Reaching it is not
@@ -298,6 +301,14 @@ export default function ProfileScreen() {
                                 </Text>
                             </>
                         )}
+                    </Pressable>
+
+                    <Pressable
+                        style={styles.recoverButton}
+                        onPress={() => router.push('/device-add' as never)}
+                    >
+                        <Ionicons name="phone-portrait-outline" size={16} color={p.blue} />
+                        <Text style={styles.recoverButtonText}>{t('devices.addEntry')}</Text>
                     </Pressable>
 
                     <Pressable

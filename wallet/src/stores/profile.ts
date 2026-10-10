@@ -179,6 +179,12 @@ export interface ProfileState {
     removeAttribute: (key: string) => void;
     /** Get attributes by keys (for consent/disclosure). */
     getAttributes: (keys: string[]) => ProfileAttribute[];
+    /**
+     * Take the profile another phone of the holder sent (services/device-sync):
+     * its details replace these; the seed and this phone's DID stay. A photo
+     * that is a file on the other phone stays behind too.
+     */
+    applySyncedProfile: (incoming: Omit<UserProfile, 'pairwiseSeed' | 'did'>) => void;
     /** Clear the entire profile (danger zone). */
     clearProfile: () => void;
     /** Hydrate from secure storage. */
@@ -344,6 +350,23 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         const current = get().profile;
         if (!current) return [];
         return current.attributes.filter((a) => keys.includes(a.key));
+    },
+
+    applySyncedProfile: (incoming) => {
+        const current = get().profile;
+        if (!current) return;
+        const avatarUri = /^(file|content|ph|assets-library):/.test(incoming.avatarUri ?? '') ? current.avatarUri : incoming.avatarUri;
+        const updated: UserProfile = {
+            ...current,
+            displayName: incoming.displayName,
+            email: incoming.email,
+            avatarUri,
+            linkedProviders: incoming.linkedProviders ?? [],
+            attributes: incoming.attributes ?? [],
+            updatedAt: incoming.updatedAt,
+        };
+        set({ profile: updated });
+        persist(updated);
     },
 
     clearProfile: () => {

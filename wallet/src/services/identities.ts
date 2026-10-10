@@ -39,6 +39,16 @@
  *
  * Recovery is lazy: an identity comes back at the first sign-in to its service,
  * not all at once, which would group them by time and address.
+ *
+ * With several phones (services/devices.ts) the recovery key also depends on an
+ * epoch, moved on whenever a phone is revoked, so the revoked phone's copy of
+ * the seed no longer opens anything:
+ *
+ *   sk = HKDF-SHA256(seed ‖ epoch secret, info = "privasys-identity-recovery/v2" ‖ 0 ‖ n ‖ 0 ‖ handle, 32)
+ *
+ * Epoch 0 is the seed alone, the v1 key above. The same key also lets another
+ * phone of the holder ENROL on an identity: register its own passkey beside the
+ * others', where a recovery removes them.
  */
 
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
@@ -47,6 +57,18 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import * as Crypto from 'expo-crypto';
 
+import {
+    currentEpoch,
+    emptyRegistry,
+    enrolMessage,
+    loadEpochs,
+    localRegistry,
+    mergeRegistries,
+    noteIdentity,
+    saveLocalRegistry,
+    syncRegistry,
+    type RecoveryEpoch,
+} from '@/services/devices';
 import { ensureDataRoot } from '@/services/sovereign';
 import { useAuthStore, type Credential } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
@@ -59,6 +81,7 @@ export const IDP_HOST = IDP_BASE.replace(/^https?:\/\//, '').replace(/\/.*$/, ''
 
 const HANDLE_INFO = 'privasys-identity/v1';
 const RECOVERY_INFO = 'privasys-identity-recovery/v1';
+const RECOVERY_INFO_V2 = 'privasys-identity-recovery/v2';
 const RECOVERY_DOMAIN = 'privasys-identity-recovery/v1';
 const INDEX_INFO = 'privasys-identity-index/v1';
 const INDEX_AAD = 'privasys-identity-index';
@@ -97,10 +120,39 @@ export function deriveIdentityHandle(seedHex: string, rpId: string): string {
     return bytesToBase64url(hkdf(sha256, hexToBytes(seedHex), undefined, infoFor(HANDLE_INFO, rpId), 32));
 }
 
-/** The recovery key pair of the identity with this handle. */
-export function deriveRecoveryKey(seedHex: string, userHandle: string): { secretKey: Uint8Array; publicKey: Uint8Array } {
-    const secretKey = hkdf(sha256, hexToBytes(seedHex), undefined, infoFor(RECOVERY_INFO, userHandle), 32);
+/** The recovery key pair of the identity with this handle, on an epoch (none: epoch 0). */
+export function deriveRecoveryKey(
+    seedHex: string,
+    userHandle: string,
+    epoch?: RecoveryEpoch | null,
+): { secretKey: Uint8Array; publicKey: Uint8Array } {
+    let secretKey: Uint8Array;
+    if (!epoch || !epoch.n) {
+        secretKey = hkdf(sha256, hexToBytes(seedHex), undefined, infoFor(RECOVERY_INFO, userHandle), 32);
+    } else {
+        const seed = hexToBytes(seedHex);
+        const extra = base64urlToBytes(epoch.secret);
+        const ikm = new Uint8Array(seed.length + extra.length);
+        ikm.set(seed, 0);
+        ikm.set(extra, seed.length);
+        secretKey = hkdf(sha256, ikm, undefined, infoFor(RECOVERY_INFO_V2, `${epoch.n}\x00${userHandle}`), 32);
+    }
     return { secretKey, publicKey: ed25519.getPublicKey(secretKey) };
+}
+
+/**
+ * The epochs to try for an identity, the likeliest first: the one the registry
+ * records, then every known epoch from the newest, then epoch 0.
+ */
+export async function epochCandidates(userHandle: string): Promise<(RecoveryEpoch | null)[]> {
+    const all = await loadEpochs();
+    const recorded = (await localRegistry()).identities.find((i) => i.userHandle === userHandle)?.epoch ?? 0;
+    const out: (RecoveryEpoch | null)[] = [];
+    const first = all.find((e) => e.n === recorded);
+    if (first) out.push(first);
+    for (const e of [...all].reverse()) if (e !== first) out.push(e);
+    out.push(null);
+    return out;
 }
 
 /** The bytes a recovery key signs: domain ‖ 0 ‖ user id ‖ 0 ‖ challenge. Must match the IdP. */
@@ -169,13 +221,8 @@ export function isRecoveryRequired(e: unknown): boolean {
     return /requires account recovery/i.test(String((e as any)?.message ?? e));
 }
 
-/**
- * Prove ownership of one identity and complete its recovery, so this phone may
- * register a passkey on it. Throws with the IdP's reason on failure.
- */
-export async function recoverIdentity(userHandle: string): Promise<void> {
-    const seed = currentSeed();
-    if (!seed) throw new Error('identities: no seed on this phone');
+/** A fresh challenge for one identity. */
+export async function identityChallenge(userHandle: string): Promise<string> {
     const begin = await idpJson<{ challenge?: string; error?: string }>('/recovery/identity/begin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -184,21 +231,49 @@ export async function recoverIdentity(userHandle: string): Promise<void> {
     if (begin.status !== 200 || !begin.body?.challenge) {
         throw new Error(begin.body?.error ?? `identity recovery could not start (HTTP ${begin.status})`);
     }
-    const challenge = base64urlToBytes(begin.body.challenge);
-    const { secretKey } = deriveRecoveryKey(seed, userHandle);
-    const signature = ed25519.sign(recoveryMessage(userHandle, challenge), secretKey);
-    const done = await idpJson<{ error?: string }>('/recovery/identity/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            user_id: userHandle,
-            challenge: begin.body.challenge,
-            signature: bytesToBase64url(signature),
-        }),
-    });
-    if (done.status !== 200) {
-        throw new Error(done.body?.error ?? `identity recovery failed (HTTP ${done.status})`);
+    return begin.body.challenge;
+}
+
+/**
+ * Prove ownership of one identity so this phone may register a passkey on it.
+ * 'recover' removes every other passkey on it (a replaced phone); 'enrol' keeps
+ * them (another phone of the holder). Tries each epoch the key may be on.
+ * Returns the epoch that worked. Throws with the IdP's reason on failure.
+ */
+export async function recoverIdentity(userHandle: string, mode: 'recover' | 'enrol' = 'recover', rpId = ''): Promise<number> {
+    const seed = currentSeed();
+    if (!seed) throw new Error('identities: no seed on this phone');
+    let lastError = 'identity recovery failed';
+    for (const epoch of await epochCandidates(userHandle)) {
+        const challengeB64 = await identityChallenge(userHandle);
+        const challenge = base64urlToBytes(challengeB64);
+        const { secretKey } = deriveRecoveryKey(seed, userHandle, epoch);
+        const msg = mode === 'enrol' ? enrolMessage(userHandle, challenge) : recoveryMessage(userHandle, challenge);
+        const done = await idpJson<{ error?: string }>(mode === 'enrol' ? '/recovery/identity/enrol' : '/recovery/identity/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: userHandle,
+                challenge: challengeB64,
+                signature: bytesToBase64url(ed25519.sign(msg, secretKey)),
+            }),
+        });
+        if (done.status === 200) {
+            const n = epoch?.n ?? 0;
+            await noteIdentity(rpId, userHandle, n);
+            await markProtected(userHandle);
+            return n;
+        }
+        lastError = done.body?.error ?? `identity recovery failed (HTTP ${done.status})`;
+        // 403: not this epoch's key; anything else will not change with another.
+        if (done.status !== 403) break;
     }
+    throw new Error(lastError);
+}
+
+async function markProtected(userHandle: string): Promise<void> {
+    const done = await readJson<string[]>(PROTECTED_KEY, []);
+    if (!done.includes(userHandle)) await SecureStore.setItemAsync(PROTECTED_KEY, JSON.stringify([...done, userHandle]));
 }
 
 /**
@@ -206,13 +281,15 @@ export async function recoverIdentity(userHandle: string): Promise<void> {
  * silent: a failure is retried at the next sign-in. `sessionToken` is the
  * identity's own wallet session, from the ceremony that just completed.
  */
-export async function protectIdentity(sessionToken: string, userHandle: string): Promise<void> {
+export async function protectIdentity(sessionToken: string, userHandle: string, rpId = ''): Promise<void> {
     const seed = currentSeed();
     if (!seed || !sessionToken || !userHandle) return;
     try {
         const done = await readJson<string[]>(PROTECTED_KEY, []);
         if (done.includes(userHandle)) return;
-        const { publicKey } = deriveRecoveryKey(seed, userHandle);
+        // A new identity's key is on the newest epoch this phone knows.
+        const epoch = await currentEpoch();
+        const { publicKey } = deriveRecoveryKey(seed, userHandle, epoch);
         const res = await fetch(`${IDP_BASE}/recovery/identity-key`, {
             method: 'PUT',
             headers: { Authorization: `Bearer wallet:${sessionToken}`, 'Content-Type': 'application/json' },
@@ -223,6 +300,7 @@ export async function protectIdentity(sessionToken: string, userHandle: string):
         if (res.ok || res.status === 409) {
             if (res.status === 409) console.warn('[identities] the IdP holds a different recovery key for this identity');
             await SecureStore.setItemAsync(PROTECTED_KEY, JSON.stringify([...done, userHandle]));
+            if (res.ok) await noteIdentity(rpId, userHandle, epoch?.n ?? 0);
         }
     } catch (e: any) {
         console.warn('[identities] could not register the recovery key:', e?.message ?? e);
@@ -328,54 +406,37 @@ function fingerprint(entries: LegacyIdentity[]): string {
 }
 
 /**
- * Upload the identity index when it has changed, using the main account's
- * session only if one is already open: this never asks for Face ID. Called
- * after sign-ins and from the recovery screen, which opens that session anyway.
+ * Bring the holder's registry (phones and identities, services/devices.ts) up to
+ * date with what this phone holds, using the main account's session only if one
+ * is already open: this never asks for Face ID. Called after sign-ins and from
+ * the recovery screen, which opens that session anyway.
  */
 export async function syncIdentityIndex(): Promise<void> {
     try {
         const seed = currentSeed();
-        const account = useAuthStore.getState().privasysId;
-        if (!seed || !account?.sessionToken || Date.now() >= account.sessionExpiresAt) return;
-        // What this phone holds now, in sign-in order, then what a recovery
-        // restored and the phone has not signed in to yet.
+        if (!seed) return;
         const auth = useAuthStore.getState();
-        const merged = new Map<string, LegacyIdentity>();
-        for (const e of [
-            ...legacyFromCredentials(auth.credentials, seed, auth.activeCredentialId),
-            ...(await legacyIdentities()),
-        ]) {
-            if (!merged.has(e.userHandle)) merged.set(e.userHandle, e);
-        }
-        const entries = [...merged.values()];
-        if (entries.length === 0) return;
-        const fp = fingerprint(entries);
-        if ((await SecureStore.getItemAsync(INDEX_SYNCED_KEY)) === fp) return;
-        const res = await fetch(`${IDP_BASE}/recovery/identity-index`, {
-            method: 'PUT',
-            headers: { Authorization: `Bearer wallet:${account.sessionToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ blob: sealIndex(await indexKey(), entries) }),
-        });
-        if (res.ok) await SecureStore.setItemAsync(INDEX_SYNCED_KEY, fp);
+        const main = canonicalHandle(seed);
+        const held = auth.credentials
+            .filter((c) => isIdpCredential(c) && c.userHandle)
+            .map((c) => ({ rpId: c.rpId, userHandle: serverIdOf(c), epoch: 0 }))
+            .filter((i) => i.userHandle !== main);
+        const legacy = (await legacyIdentities()).map((l) => ({ ...l, epoch: 0 }));
+        await saveLocalRegistry(mergeRegistries(await localRegistry(), { ...emptyRegistry(), identities: [...held, ...legacy] }));
+        await syncRegistry();
     } catch (e: any) {
-        console.warn('[identities] identity index sync failed:', e?.message ?? e);
+        console.warn('[identities] registry sync failed:', e?.message ?? e);
     }
 }
 
 /**
- * After a phrase recovery: fetch the identity index with the main account's
- * fresh session and keep its entries, so each legacy identity is recovered at
- * its next sign-in. Needs the data root restored first. Returns how many.
+ * After a phrase recovery or on a phone just added: fetch the registry with the
+ * main account's session and keep its identities, so each is found again at its
+ * next sign-in. Needs the data root first. Returns how many identities.
  */
 export async function restoreIdentityIndex(canonicalSessionToken: string): Promise<number> {
-    const res = await fetch(`${IDP_BASE}/recovery/identity-index`, {
-        headers: { Authorization: `Bearer wallet:${canonicalSessionToken}` },
-    });
-    if (res.status === 404) return 0;
-    if (!res.ok) throw new Error(`identity index could not be read (HTTP ${res.status})`);
-    const { blob } = (await res.json()) as { blob: string };
-    const entries = openIndex(await indexKey(), blob);
-    if (!entries) throw new Error('identity index did not open with the restored data root');
+    const reg = await syncRegistry(canonicalSessionToken);
+    const entries: LegacyIdentity[] = reg.identities.map((i) => ({ rpId: i.rpId, userHandle: i.userHandle }));
     await SecureStore.setItemAsync(LEGACY_KEY, JSON.stringify(entries));
     await SecureStore.setItemAsync(INDEX_SYNCED_KEY, fingerprint(entries));
     return entries.length;

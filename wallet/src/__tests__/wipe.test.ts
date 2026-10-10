@@ -59,6 +59,12 @@ const mockClearProfileBackup = jest.fn(async () => undefined);
 jest.mock('@/services/profile-backup', () => ({
     clearProfileBackupLocalState: () => mockClearProfileBackup(),
 }));
+// The pending after-recovery securing is this wallet's, and pulls in the whole
+// sign-in stack; its one key is cleared like any other.
+const mockClearDeviceFlows = jest.fn(async () => undefined);
+jest.mock('@/services/device-flows', () => ({
+    clearDeviceFlowsLocalState: () => mockClearDeviceFlows(),
+}));
 
 // Hardware keys live outside SecureStore, so they get their own ledger.
 const mockHardwareKeys = new Set<string>();

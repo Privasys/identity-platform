@@ -35,6 +35,7 @@ import { Text, usePalette, type Palette } from '@/components/Themed';
 import { bip39ChecksumValid } from '@/services/bip39';
 import { useTranslation } from 'react-i18next';
 import { BIP39_WORDLIST, BIP39_WORDSET } from '@/services/bip39-wordlist';
+import { markSecurePending, runPendingSecure } from '@/services/device-flows';
 import { canonicalHandle as identityCanonicalHandle, restoreIdentityIndex } from '@/services/identities';
 import {
     establishPhraseWithBackup,
@@ -526,10 +527,15 @@ export default function RecoverAccountScreen() {
             if (restored && sessionToken) {
                 try {
                     const n = await restoreIdentityIndex(sessionToken);
-                    if (n > 0) console.log(`[recover-account] ${n} earlier identities will come back at their next sign-in`);
+                    if (n > 0) console.log(`[recover-account] ${n} identities to bring back`);
                 } catch (e: any) {
                     console.warn('[recover-account] identity index restore failed:', e?.message);
                 }
+                // This phone is now the holder's only one: shut every other
+                // phone out of every identity now, not one sign-in at a time.
+                // Without a profile yet, it runs once the wallet is set up.
+                await markSecurePending();
+                void runPendingSecure();
             }
 
             // The phrase just used is retired. Its replacement is made here and

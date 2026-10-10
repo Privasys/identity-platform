@@ -46,6 +46,9 @@
 import { deleteDeviceKey } from '@/services/did';
 import { clearKycRecords } from '@/services/kyc';
 import { clearGrantsIndexLocalState } from '@/services/grants-index';
+import { clearDeviceFlowsLocalState } from '@/services/device-flows';
+import { clearDeviceSyncLocalState } from '@/services/device-sync';
+import { clearDevicesLocalState } from '@/services/devices';
 import { clearIdentitiesLocalState } from '@/services/identities';
 import { clearProfileBackupLocalState } from '@/services/profile-backup';
 import { clearKeptSetups } from '@/services/setup-keep';
@@ -124,6 +127,9 @@ export async function wipeWallet(): Promise<void> {
         settle('sovereign state', clearSovereignLocalState()),
         settle('grants index', clearGrantsIndexLocalState()),
         settle('identities', clearIdentitiesLocalState()),
+        settle('devices', clearDevicesLocalState()),
+        settle('device sync', clearDeviceSyncLocalState()),
+        settle('device flows', clearDeviceFlowsLocalState()),
         // The automatic copy of the profile goes too: the phone's own backup
         // must not carry the last identity's details to the next one.
         settle('profile backup', clearProfileBackupLocalState()),

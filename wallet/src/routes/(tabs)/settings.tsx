@@ -9,8 +9,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,7 @@ import { LanguagePicker } from '@/components/LanguagePicker';
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
+import { listDevices } from '@/services/devices';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { getLogs } from '@/utils/logs';
 
@@ -33,6 +34,15 @@ export default function SettingsScreen() {
     const verificationMode = useSettingsStore((s) => s.verificationMode);
     const setVerificationMode = useSettingsStore((s) => s.setVerificationMode);
     const pushToken = useExpoPushToken();
+    // The Devices section appears only for a holder with more than one phone.
+    const [phones, setPhones] = useState(0);
+    useFocusEffect(
+        useCallback(() => {
+            void listDevices()
+                .then((rows) => setPhones(rows.length))
+                .catch(() => setPhones(0));
+        }, []),
+    );
 
     return (
         <RNView style={styles.screen}>
@@ -118,6 +128,18 @@ export default function SettingsScreen() {
                                 {pushToken}
                             </Text>
                             <Ionicons name="copy-outline" size={18} color={p.textSecondary} />
+                        </Pressable>
+                    </>
+                ) : null}
+
+                {phones > 1 ? (
+                    <>
+                        <Text style={styles.sectionTitle}>{t('devices.settingsTitle')}</Text>
+                        <Text style={styles.sectionDescription}>{t('devices.settingsDescription')}</Text>
+                        <Pressable style={styles.logsButton} onPress={() => router.push('/devices' as never)}>
+                            <Ionicons name="phone-portrait-outline" size={18} color={p.textPrimary} />
+                            <Text style={styles.logsButtonText}>{t('devices.settingsRow', { count: phones })}</Text>
+                            <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                         </Pressable>
                     </>
                 ) : null}

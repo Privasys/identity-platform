@@ -19,6 +19,7 @@
  *  - POST /complete is authenticated by the assertion itself.
  */
 
+import { myDeviceTag } from './devices';
 import { signVaultAssertion } from './fido2';
 import { useAuthStore, type Credential } from '../stores/auth';
 
@@ -176,8 +177,18 @@ export async function approveVaultApproval(req: VaultApprovalRequest, credential
 export async function registerPushTokenWithIdp(
     walletSessionToken: string,
     expoPushToken: string,
-    encPub = ''
+    encPub = '',
+    /** The IdP user id the session is for: names this phone's target on it. */
+    userId?: string,
 ): Promise<void> {
+    let deviceTag = '';
+    if (userId) {
+        try {
+            deviceTag = await myDeviceTag(userId);
+        } catch {
+            /* registers untagged, as before */
+        }
+    }
     const res = await fetch(`${IDP_BASE}/push-token`, {
         method: 'POST',
         headers: {
@@ -187,7 +198,8 @@ export async function registerPushTokenWithIdp(
         // enc_pub is the device's X25519 notification-sealing key; the
         // IdP seals app-notification payloads to it (empty keeps any
         // previously registered key).
-        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub }),
+        // device_tag keeps one target per phone of the holder; every phone is notified.
+        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub, ...(deviceTag ? { device_tag: deviceTag } : {}) }),
     });
     if (!res.ok) {
         throw new Error(`register push token failed (${res.status})`);

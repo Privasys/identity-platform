@@ -7,6 +7,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
+import { parsePairingLink } from '@/services/devices';
 import { useTranslation } from 'react-i18next';
 
 export default function TabScanScreen() {
@@ -149,6 +150,15 @@ export default function TabScanScreen() {
                     });
                     return;
                 }
+            }
+
+            // 2a. The code a new phone of the holder shows: send this wallet to it,
+            //     after the holder confirms on the next screen.
+            const pair = parsePairingLink(result.data);
+            if (pair) {
+                navigating.current = true;
+                router.replace({ pathname: '/device-send', params: { s: pair.slot, k: pair.key } });
+                return;
             }
 
             // 2b. A guardian code, shown on a guardian's phone, or a guardian

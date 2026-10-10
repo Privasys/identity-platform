@@ -2294,16 +2294,18 @@ function ConnectFlow() {
                 result = await registerOnce();
             } catch (e) {
                 if (!handle || !isRecoveryRequired(e)) throw e;
-                // The identity exists and this phone has no passkey for it: the
-                // phone was replaced. Prove the identity is ours with its own
-                // recovery key, then register on it.
-                console.log('[CONNECT] identity exists — recovering it by its key');
-                await recoverIdentity(handle);
+                // The identity exists and this phone has no passkey for it:
+                // another phone of the holder has one, or had one. Prove the
+                // identity is ours with its own recovery key and add this
+                // phone beside it. A lost phone was already shut out when the
+                // holder recovered or revoked it (services/device-flows.ts).
+                console.log('[CONNECT] identity exists — adding this phone by its key');
+                await recoverIdentity(handle, 'enrol', payload.rpId);
                 result = await registerOnce();
             }
             if (idpBrokered && result.sessionToken) {
                 const id = result.userId || handle;
-                if (id) void protectIdentity(result.sessionToken, id).then(syncIdentityIndex);
+                if (id) void protectIdentity(result.sessionToken, id, payload.rpId).then(syncIdentityIndex);
             }
 
             // Check for missing attributes before relaying
@@ -2398,7 +2400,7 @@ function ConnectFlow() {
             // IdP learns no linkage it doesn't already have (it sees each
             // pairwise sub independently). Best-effort.
             if (pushToken && result.sessionToken) {
-                registerPushTokenWithIdp(result.sessionToken, pushToken, identitySealPub(result.userId)).catch((e) =>
+                registerPushTokenWithIdp(result.sessionToken, pushToken, identitySealPub(result.userId), result.userId).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
             }
@@ -2482,7 +2484,7 @@ function ConnectFlow() {
             // An identity made before recovery keys existed gets one at its next
             // sign-in, with the session this ceremony just opened.
             if (payload.origin === IDP_HOST && result.sessionToken && result.userId) {
-                void protectIdentity(result.sessionToken, result.userId).then(syncIdentityIndex);
+                void protectIdentity(result.sessionToken, result.userId, payload.rpId).then(syncIdentityIndex);
             }
 
             // Check for missing attributes before relaying
@@ -2535,7 +2537,7 @@ function ConnectFlow() {
             // Keep the IdP's push target fresh for this pairwise identity
             // (vault approvals for keys it owns). Best-effort.
             if (pushToken && result.sessionToken) {
-                registerPushTokenWithIdp(result.sessionToken, pushToken, identitySealPub(result.userId)).catch((e) =>
+                registerPushTokenWithIdp(result.sessionToken, pushToken, identitySealPub(result.userId), result.userId).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
             }
@@ -2753,7 +2755,7 @@ function ConnectFlow() {
             // This identity's push target, so vault approvals and app
             // notifications for it reach this phone (see the direct path).
             if (pushToken && pending.sessionToken) {
-                registerPushTokenWithIdp(pending.sessionToken, pushToken, identitySealPub(pending.userId)).catch((e) =>
+                registerPushTokenWithIdp(pending.sessionToken, pushToken, identitySealPub(pending.userId), pending.userId).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
             }

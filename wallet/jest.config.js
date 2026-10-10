@@ -11,6 +11,7 @@ module.exports = {
         '^@/(.*)$': '<rootDir>/src/$1',
         // A native module shipped as ES modules, which Jest cannot load.
         '^expo-local-authentication$': '<rootDir>/jest/expo-local-authentication.js',
+        '^expo-device$': '<rootDir>/jest/expo-device.js',
         '^@noble/hashes/(.*)\\.js$': '<rootDir>/node_modules/@noble/hashes/$1.js',
     },
     modulePaths: ['<rootDir>'],

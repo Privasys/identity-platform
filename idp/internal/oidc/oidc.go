@@ -1226,11 +1226,12 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	allRoles, _ := db.GetRoles(ac.UserID)
 	audience := audienceFromScope(ac.Scope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
-	if sector != "" {
+	platformClient := client != nil && client.Platform
+	if sector != "" && !platformClient {
 		// A client with its own subjects is a relying party, not the
 		// platform: its token is for itself alone, and carries none of the
-		// account's roles. The platform audience stays with the legacy
-		// first-party clients (see per-app-subjects in the client registry).
+		// account's roles. The platform audience stays with first-party
+		// control-plane clients (Client.Platform) and legacy clients.
 		audience = ac.ClientID
 		roles = nil
 	} else if audience == "privasys-platform" {
@@ -1452,7 +1453,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	allRoles, _ := db.GetRoles(userID)
 	audience := audienceFromScope(effectiveScope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
-	if reg.SectorOf(clientID) != "" {
+	if reg.SectorOf(clientID) != "" && !reg.IsPlatform(clientID) {
 		audience = clientID
 		roles = nil
 	} else if audience == "privasys-platform" {
@@ -1681,7 +1682,7 @@ func HandleUserInfo(issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 		// Platform roles only for Privasys's own apps (the shared sector):
 		// another site has no business learning that an account administers
 		// something here.
-		if issuedSub == sub {
+		if _, platform := claims[ClaimPrivasysAccount]; issuedSub == sub || platform {
 			roles, _ := db.GetRoles(sub)
 			if len(roles) > 0 {
 				resp["roles"] = roles

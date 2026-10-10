@@ -45,10 +45,20 @@ type signedIn struct {
 // in `sector` ("" for the shared one), and returns the token response.
 func signIn(t *testing.T, userID, sector string) signedIn {
 	t.Helper()
+	return signInWith(t, userID, sector, false)
+}
+
+func signInWith(t *testing.T, userID, sector string, platform bool) signedIn {
+	t.Helper()
 	reg, db, iss := newDeviceTestEnv(t)
 	iss.SetSubjectStore(db)
 	if sector != "" {
 		if err := reg.SetSector("privasys-cli", sector); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if platform {
+		if err := reg.SetPlatform("privasys-cli", true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -171,5 +181,22 @@ func TestTwoSectorsCannotMatchAPerson(t *testing.T) {
 	subB := claimsOf(t, b.tokens["id_token"].(string))["sub"]
 	if subA == subB {
 		t.Fatalf("two sectors got the same subject %v for one person", subA)
+	}
+}
+
+// A first-party control-plane client (the portal, the CLI) may have its own
+// subjects and still hold the platform audience, with the account and roles:
+// the platform is Privasys itself.
+func TestAPlatformClientWithItsOwnSubjects(t *testing.T) {
+	s := signInWith(t, "acct-1", "privasys-cli", true)
+	at := claimsOf(t, s.tokens["access_token"].(string))
+	if at["sub"] == "acct-1" {
+		t.Fatal("an own-subject platform client got the account id as sub")
+	}
+	if at["aud"] != "privasys-platform" || at[ClaimPrivasysAccount] != "acct-1" || at["roles"] == nil {
+		t.Fatalf("platform client token: aud %v account %v roles %v", at["aud"], at[ClaimPrivasysAccount], at["roles"])
+	}
+	if info := userinfo(t, s); info["roles"] == nil {
+		t.Fatal("userinfo dropped a platform client's roles")
 	}
 }

@@ -5,12 +5,13 @@
 package store
 
 import (
+	"bytes"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Privasys/idp/internal/push"
@@ -217,6 +218,17 @@ func migrate(db *sql.DB) error {
 			user_id    TEXT PRIMARY KEY REFERENCES users(user_id),
 			blob       TEXT NOT NULL,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
+		-- Identity recovery keys: one Ed25519 public key per identity, which
+		-- the wallet derives from its seed and the relying party. Signing a
+		-- challenge with the matching private key recovers THAT identity and
+		-- no other. Nothing here relates one identity to another: each key is
+		-- independent to anyone without the seed. See internal/recovery/identity.go.
+		CREATE TABLE IF NOT EXISTS identity_recovery_keys (
+			user_id    TEXT PRIMARY KEY REFERENCES users(user_id),
+			public_key BLOB NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 	`)
 	if err != nil {
@@ -679,6 +691,41 @@ func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID s
 // --- Sovereign backup operations ---
 
 // PutSovereignBackup stores (or replaces) a user's sovereign backup blob.
+// ErrRecoveryKeyMismatch is returned when an identity already has a different
+// recovery key. Keys are set once: replacing one would let whoever holds a
+// session swap in a key of their own and recover the identity later.
+var ErrRecoveryKeyMismatch = errors.New("a different recovery key is already registered")
+
+// SetIdentityRecoveryKey records an identity's recovery public key. Setting the
+// same key again is a no-op; a different key is refused.
+func (db *DB) SetIdentityRecoveryKey(userID string, publicKey []byte) error {
+	existing, err := db.GetIdentityRecoveryKey(userID)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		if bytes.Equal(existing, publicKey) {
+			return nil
+		}
+		return ErrRecoveryKeyMismatch
+	}
+	_, err = db.Exec(
+		"INSERT INTO identity_recovery_keys (user_id, public_key) VALUES (?, ?) ON CONFLICT(user_id) DO NOTHING",
+		userID, publicKey,
+	)
+	return err
+}
+
+// GetIdentityRecoveryKey returns an identity's recovery public key, or nil.
+func (db *DB) GetIdentityRecoveryKey(userID string) ([]byte, error) {
+	var key []byte
+	err := db.QueryRow("SELECT public_key FROM identity_recovery_keys WHERE user_id = ?", userID).Scan(&key)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return key, err
+}
+
 func (db *DB) PutSovereignBackup(userID, blob string) error {
 	_, err := db.Exec(`
 		INSERT INTO sovereign_backups (user_id, blob, updated_at)
@@ -1232,10 +1279,8 @@ func (db *DB) CleanupExpiredRateLimits() {
 // control of the account, so none of it is a disclosure the phrase did not
 // already make.
 type RecoveryAccountSummary struct {
-	UserID      string `json:"user_id"`
-	DisplayName string `json:"display_name,omitempty"`
-	Email       string `json:"email,omitempty"`
-	CreatedAt   string `json:"created_at,omitempty"`
+	UserID    string `json:"user_id"`
+	CreatedAt string `json:"created_at,omitempty"`
 	// Registered devices that completing the recovery will revoke.
 	CredentialCount int `json:"credential_count"`
 	// Roles held, as a count only: enough to tell an account that owns things
@@ -1250,23 +1295,16 @@ type RecoveryAccountSummary struct {
 func (db *DB) GetRecoveryAccountSummary(userID string) (RecoveryAccountSummary, error) {
 	s := RecoveryAccountSummary{UserID: userID}
 
-	var name, email, created sql.NullString
-	err := db.QueryRow(
-		"SELECT display_name, email, created_at FROM users WHERE user_id = ?",
-		userID,
-	).Scan(&name, &email, &created)
-	if err != nil {
+	// Only columns the current schema defines. Name and email were read here
+	// from columns an older schema had; on a database created since, the query
+	// failed and the summary came back empty. The IdP keeps no name or email,
+	// so the summary is the id, its age and the counts below.
+	var created sql.NullString
+	if err := db.QueryRow(
+		"SELECT created_at FROM users WHERE user_id = ?", userID,
+	).Scan(&created); err != nil {
 		return s, err
 	}
-	// Suppress the registration artefact. The wallet registers with a user
-	// name of "fido2-<rpId>", which every account created that way carries, so
-	// showing it on the confirmation screen would put the SAME string under
-	// every account and help nobody tell them apart. Verified against the live
-	// data (2026-09-04): the admin account display_name is "fido2-privasys.id".
-	if !strings.HasPrefix(name.String, "fido2-") {
-		s.DisplayName = name.String
-	}
-	s.Email = email.String
 	s.CreatedAt = created.String
 
 	_ = db.QueryRow("SELECT COUNT(*) FROM credentials WHERE user_id = ?", userID).Scan(&s.CredentialCount)

@@ -28,11 +28,13 @@ type Handler struct {
 	mailer        *Mailer
 	issuer        *tokens.Issuer
 	walletSession WalletSessionResolver
+
+	identityChallenges *identityChallengeStore
 }
 
 // NewHandler creates a recovery handler.
 func NewHandler(db *store.DB, mailer *Mailer, issuer *tokens.Issuer) *Handler {
-	return &Handler{db: db, mailer: mailer, issuer: issuer}
+	return &Handler{db: db, mailer: mailer, issuer: issuer, identityChallenges: newIdentityChallengeStore()}
 }
 
 // SetWalletSessionResolver wires the fido2 wallet-session lookup into recovery auth.
@@ -164,7 +166,7 @@ func (h *Handler) HandleDeleteRecoveryCodes(w http.ResponseWriter, r *http.Reque
 // --- Recovery flow endpoints ---
 
 // HandleBeginRecovery starts the recovery process using a BIP39 recovery phrase.
-// No device attestation or rate limiting — protection comes from 256-bit phrase entropy.
+// The phrase carries 256 bits of entropy; attempts are also limited per address.
 // POST /recovery/begin  { "recovery_phrase": "word1 word2 ..." }
 // (Legacy field "recovery_code" still accepted for backward compatibility.)
 func (h *Handler) HandleBeginRecovery(w http.ResponseWriter, r *http.Request) {
@@ -182,6 +184,9 @@ func (h *Handler) HandleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 	}
 	if phrase == "" {
 		http.Error(w, `{"error":"recovery_phrase is required"}`, http.StatusBadRequest)
+		return
+	}
+	if !h.allow(w, r, "phrase-ip", clientIP(r), phraseAttemptsPerIP) {
 		return
 	}
 

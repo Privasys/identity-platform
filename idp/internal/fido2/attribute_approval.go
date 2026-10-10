@@ -170,8 +170,8 @@ func attrPendingJSON(cap string, e *attrPendingEntry) map[string]interface{} {
 // push token, no credentials, or the push machinery fails.
 func (h *Handler) AttributeApprovalPusher() func(sub string, session *oidc.AuthSession, added []string, payload map[string]interface{}) bool {
 	return func(sub string, session *oidc.AuthSession, added []string, payload map[string]interface{}) bool {
-		pushToken := h.db.GetPushToken(sub)
-		if pushToken == "" {
+		pushTokens := h.db.GetPushTokens(sub)
+		if len(pushTokens) == 0 {
 			return false
 		}
 		creds, err := h.loadCredentials(sub)
@@ -212,7 +212,9 @@ func (h *Handler) AttributeApprovalPusher() func(sub string, session *oidc.AuthS
 			// longer clock of its own.
 			expiresAt: session.ExpiresAt,
 		})
-		go h.sendAttributeApprovalPush(string(user.ID), pushToken, capability, len(added))
+		for _, pushToken := range pushTokens {
+			go h.sendAttributeApprovalPush(string(user.ID), pushToken, capability, len(added))
+		}
 		log.Printf("fido2: attribute-approval pushed to holder of client %s (session %s…, +%d keys)",
 			session.ClientID, session.SessionID[:8], len(added))
 		return true

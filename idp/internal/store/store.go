@@ -427,18 +427,14 @@ func migrate(db *sql.DB) error {
 		}
 	}
 
-	return nil
+	return migrateDevices(db)
 }
 
 // --- User operations ---
 
 // UpsertPushToken stores or updates the Expo push token for a user.
 func (db *DB) UpsertPushToken(userID, pushToken string) error {
-	_, err := db.Exec(`
-		INSERT INTO push_tokens (user_id, push_token, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(user_id) DO UPDATE SET push_token = excluded.push_token, updated_at = CURRENT_TIMESTAMP
-	`, userID, pushToken)
-	return err
+	return db.UpsertDevicePushTarget(userID, "", pushToken, "")
 }
 
 // GetPushToken returns the stored push token for a user, or "" if none.
@@ -452,14 +448,7 @@ func (db *DB) GetPushToken(userID string) string {
 // notification-sealing public key (base64url raw 32 bytes; empty keeps
 // any previously registered key).
 func (db *DB) UpsertPushTarget(userID, pushToken, encPub string) error {
-	_, err := db.Exec(`
-		INSERT INTO push_tokens (user_id, push_token, enc_pub, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(user_id) DO UPDATE SET
-			push_token = excluded.push_token,
-			enc_pub = CASE WHEN excluded.enc_pub = '' THEN push_tokens.enc_pub ELSE excluded.enc_pub END,
-			updated_at = CURRENT_TIMESTAMP
-	`, userID, pushToken, encPub)
-	return err
+	return db.UpsertDevicePushTarget(userID, "", pushToken, encPub)
 }
 
 // MuteNotify records a silenced (identity, app) pair by its keyed hash.
@@ -1292,6 +1281,13 @@ func (db *DB) CompleteRecovery(requestID, userID string) error {
 	// Invalidate all refresh tokens.
 	_, err = tx.Exec("DELETE FROM refresh_tokens WHERE user_id = ?", userID)
 	if err != nil {
+		return err
+	}
+
+	// And the push targets: the phone that registered them is the one being
+	// replaced, and it holds the keys that open what it would receive. The new
+	// phone registers its own as soon as it is signed in.
+	if _, err = tx.Exec("DELETE FROM push_tokens WHERE user_id = ?", userID); err != nil {
 		return err
 	}
 

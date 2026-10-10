@@ -156,38 +156,47 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			asks.Put(req.Sub, capReq.Nonce, capReq.AppHost, req.AppID, req.AppName)
 		}
 
-		token, encPub := db.GetPushTarget(req.Sub)
-		if token == "" {
+		targets := db.GetPushTargets(req.Sub)
+		if len(targets) == 0 {
 			writeError(w, http.StatusNotFound, "no push target for user")
 			return
 		}
 
-		data := map[string]string{"type": req.Type, "app_id": req.AppID}
-		// A capability request carries ONLY a nonce and the host to fetch it
-		// from, in the clear: the wallet learns everything that matters (the
-		// key being authorised included) inside the attested channel to that
-		// host. The nonce is single use and expires in minutes.
-		if isCapReq {
-			data["nonce"] = capReq.Nonce
-			data["app_host"] = capReq.AppHost
-		}
-		status := "sent-unsealed"
-		if encPub != "" && len(req.Payload) > 0 {
-			sealed, err := sealToWallet(encPub, req.Type, req.Payload)
-			if err != nil {
-				log.Printf("admin/notify: seal failed for %s: %v", req.Type, err)
-				writeError(w, http.StatusInternalServerError, "seal failed")
-				return
-			}
-			data["sealed"] = sealed
-			status = "sent"
-		}
-
+		// Every phone of the holder gets it. Each is sealed to that phone's
+		// registered key (the same per-identity key on every phone of one
+		// holder, so in practice one sealing).
 		title, body := notifyTitleBody(req.Type, req.AppName)
-		if err := push.Notify(r.Context(), db, req.Sub, push.Message{
-			Token: token, Title: title, Body: body, Data: data,
-		}); err != nil {
-			log.Printf("admin/notify: push send failed: %v", err)
+		status := "sent-unsealed"
+		delivered := 0
+		for _, t := range targets {
+			data := map[string]string{"type": req.Type, "app_id": req.AppID}
+			// A capability request carries ONLY a nonce and the host to fetch it
+			// from, in the clear: the wallet learns everything that matters (the
+			// key being authorised included) inside the attested channel to that
+			// host. The nonce is single use and expires in minutes.
+			if isCapReq {
+				data["nonce"] = capReq.Nonce
+				data["app_host"] = capReq.AppHost
+			}
+			if t.EncPub != "" && len(req.Payload) > 0 {
+				sealed, err := sealToWallet(t.EncPub, req.Type, req.Payload)
+				if err != nil {
+					log.Printf("admin/notify: seal failed for %s: %v", req.Type, err)
+					writeError(w, http.StatusInternalServerError, "seal failed")
+					return
+				}
+				data["sealed"] = sealed
+				status = "sent"
+			}
+			if err := push.Notify(r.Context(), db, req.Sub, push.Message{
+				Token: t.Token, Title: title, Body: body, Data: data,
+			}); err != nil {
+				log.Printf("admin/notify: push send failed: %v", err)
+				continue
+			}
+			delivered++
+		}
+		if delivered == 0 {
 			writeError(w, http.StatusBadGateway, "push delivery failed")
 			return
 		}

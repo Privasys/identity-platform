@@ -53,6 +53,10 @@ type Message struct {
 	Title string
 	Body  string
 	Data  map[string]string
+	// Background sends a silent, data-only push that wakes the wallet to
+	// fetch something (an update from another phone of the holder): no
+	// title, no sound, normal priority, as Apple asks for background pushes.
+	Background bool
 }
 
 // Sender posts to Expo and inspects the answer.
@@ -110,7 +114,15 @@ func (s *Sender) client() *http.Client {
 // receipt lookup needs. A returned id with a nil error means Expo ACCEPTED the
 // message, not that it reached the device: that is what receipts are for.
 func (s *Sender) Send(ctx context.Context, m Message) (string, error) {
-	payload, err := json.Marshal([]map[string]any{{
+	if m.Background {
+		return s.post(ctx, map[string]any{
+			"to":                m.Token,
+			"data":              m.Data,
+			"priority":          "normal",
+			"_contentAvailable": true,
+		})
+	}
+	return s.post(ctx, map[string]any{
 		"to":    m.Token,
 		"sound": "default",
 		// APNs priority 10, not the 5 Expo defaults to.
@@ -130,7 +142,12 @@ func (s *Sender) Send(ctx context.Context, m Message) (string, error) {
 		"title":    m.Title,
 		"body":     m.Body,
 		"data":     m.Data,
-	}})
+	})
+}
+
+// post sends one Expo message and returns its ticket id.
+func (s *Sender) post(ctx context.Context, msg map[string]any) (string, error) {
+	payload, err := json.Marshal([]map[string]any{msg})
 	if err != nil {
 		return "", err
 	}
@@ -168,7 +185,7 @@ func (s *Sender) Send(ctx context.Context, m Message) (string, error) {
 	if t.Status != "ok" {
 		e := &Error{Code: t.Details.Error, Message: t.Message}
 		if e.Code == errDeviceNotRegistered {
-			s.retire(m.Token)
+			s.retire(msg["to"].(string))
 		}
 		return "", e
 	}

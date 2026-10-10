@@ -116,8 +116,11 @@ type walletSessionStore struct {
 }
 
 type walletSessionEntry struct {
-	userID    string
-	expiresAt time.Time
+	userID string
+	// credentialID is the passkey that opened the session, so revoking a
+	// phone ends the sessions its passkeys opened.
+	credentialID string
+	expiresAt    time.Time
 }
 
 const walletSessionTTL = 30 * time.Minute
@@ -133,10 +136,10 @@ func newWalletSessionStore() *walletSessionStore {
 	return s
 }
 
-func (s *walletSessionStore) issue(userID string) string {
+func (s *walletSessionStore) issue(userID, credentialID string) string {
 	token := generateToken()
 	s.mu.Lock()
-	s.sessions[token] = walletSessionEntry{userID: userID, expiresAt: time.Now().Add(walletSessionTTL)}
+	s.sessions[token] = walletSessionEntry{userID: userID, credentialID: credentialID, expiresAt: time.Now().Add(walletSessionTTL)}
 	s.mu.Unlock()
 	return token
 }
@@ -164,6 +167,38 @@ func (s *walletSessionStore) cleanup() {
 			delete(s.sessions, k)
 		}
 	}
+}
+
+// endForCredentials ends every session a revoked passkey opened.
+func (s *walletSessionStore) endForCredentials(credentialIDs []string) {
+	gone := make(map[string]bool, len(credentialIDs))
+	for _, id := range credentialIDs {
+		gone[id] = true
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for k, v := range s.sessions {
+		if gone[v.credentialID] {
+			delete(s.sessions, k)
+		}
+	}
+}
+
+// WalletSessionEnder returns a closure the recovery package calls after
+// removing passkeys, so a revoked phone's open sessions end with them.
+func (h *Handler) WalletSessionEnder() func([]string) {
+	return h.walletSessions.endForCredentials
+}
+
+// SessionCredential returns the passkey behind a wallet session, "" when the
+// token is not a live wallet session.
+func (h *Handler) SessionCredential(token string) string {
+	h.walletSessions.mu.Lock()
+	defer h.walletSessions.mu.Unlock()
+	if e, ok := h.walletSessions.sessions[token]; ok && time.Now().Before(e.expiresAt) {
+		return e.credentialID
+	}
+	return ""
 }
 
 // WalletSessionResolver returns a closure usable by the recovery package.
@@ -228,6 +263,8 @@ type challengeEntry struct {
 	// /complete must not mint one. Wallets before 1.4.28 omit it and get the
 	// server-made phrase as before.
 	clientPhrase bool
+	// deviceTag is the phone the new passkey lives on (register/begin).
+	deviceTag string
 	// vaultApproval is set when this challenge is a vault promote step-up
 	// (the vault promote-step-up design). On /complete the handler issues an operation-bound
 	// access token from these values instead of a session token.
@@ -348,9 +385,16 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		UserName   string `json:"userName"`
 		UserHandle string `json:"userHandle"`
+		// DeviceTag names the phone this passkey will live on, as the wallet
+		// derives it for this identity (see store/devices.go). Optional.
+		DeviceTag string `json:"deviceTag"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		errorJSON(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.DeviceTag != "" && !store.ValidDeviceTag(req.DeviceTag) {
+		errorJSON(w, http.StatusBadRequest, "invalid deviceTag")
 		return
 	}
 
@@ -361,7 +405,8 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 
 	// Takeover gate: a caller-supplied userHandle pointing at an EXISTING
 	// account is only accepted right after a completed recovery for that
-	// account. Without this, anyone who learns a user_id (it appears in every
+	// account, or an enrolment of another phone of the same holder (status
+	// 'enrol': granted by an existing phone, and it keeps their passkeys). Without this, anyone who learns a user_id (it appears in every
 	// id_token an RP receives) could register their own credential on the
 	// account — including credential-less accounts that still hold roles.
 	// Brand-new user ids (no row yet) register freely, as before.
@@ -378,7 +423,7 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 			var recovered int
 			if err := h.db.QueryRow(
 				`SELECT COUNT(*) FROM recovery_requests
-				 WHERE user_id = ? AND status = 'completed' AND expires_at > ?`,
+				 WHERE user_id = ? AND status IN ('completed', 'enrol') AND expires_at > ?`,
 				userID, time.Now(),
 			).Scan(&recovered); err != nil {
 				log.Printf("fido2/register/begin: recovery check failed: %v", err)
@@ -388,6 +433,12 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 			if recovered == 0 {
 				log.Printf("fido2/register/begin: refused registration for existing user %s… (no completed recovery)", userID[:min(8, len(userID))])
 				errorJSON(w, http.StatusForbidden, "registration for an existing account requires account recovery")
+				return
+			}
+			if full, err := h.db.DeviceLimitReached(userID, req.DeviceTag); err != nil {
+				log.Printf("fido2/register/begin: device count failed: %v", err)
+			} else if full {
+				errorJSON(w, http.StatusConflict, "this account already has the maximum number of devices")
 				return
 			}
 		}
@@ -436,6 +487,7 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		sessionID:    sessionID,
 		expiresAt:    time.Now().Add(5 * time.Minute),
 		clientPhrase: r.URL.Query().Get("client_phrase") == "1",
+		deviceTag:    req.DeviceTag,
 	})
 
 	// Return standard WebAuthn CredentialCreation options.
@@ -510,8 +562,8 @@ func (h *Handler) CompleteRegistration(
 		aaguid := hex.EncodeToString(credential.Authenticator.AAGUID)
 
 		_, err = h.db.Exec(`
-			INSERT INTO credentials (credential_id, user_id, public_key, aaguid, sign_count, attestation_type)
-			VALUES (?, ?, ?, ?, ?, ?)
+			INSERT INTO credentials (credential_id, user_id, public_key, aaguid, sign_count, attestation_type, device_tag)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(credential_id) DO UPDATE SET
 				public_key = excluded.public_key,
 				aaguid = excluded.aaguid,
@@ -519,7 +571,7 @@ func (h *Handler) CompleteRegistration(
 				attestation_type = excluded.attestation_type
 			WHERE credentials.user_id = excluded.user_id
 		`, credID, string(entry.user.ID), pubKeyBytes, aaguid,
-			credential.Authenticator.SignCount, credential.AttestationType)
+			credential.Authenticator.SignCount, credential.AttestationType, entry.deviceTag)
 		if err != nil {
 			log.Printf("fido2/register/complete: store credential: %v", err)
 			errorJSON(w, http.StatusInternalServerError, "credential storage failed")
@@ -531,7 +583,7 @@ func (h *Handler) CompleteRegistration(
 			credID[:16]+"...", userID, aaguid)
 
 		// Issue a wallet session token for management ops (recovery phrase, etc).
-		sessionToken := h.walletSessions.issue(userID)
+		sessionToken := h.walletSessions.issue(userID, credID)
 
 		// The first credential on an account mints a recovery phrase, and this
 		// is also where a recovery is finalised: the phrase that was used to get
@@ -834,7 +886,15 @@ func (h *Handler) CompleteAuthentication(
 
 		log.Printf("fido2: authenticated user %s (credential %s...)", userID, credID[:16])
 
-		sessionToken := h.walletSessions.issue(userID)
+		// A wallet that knows its device tag names the phone behind a passkey
+		// written before tags existed; set once, never moved.
+		if tag := r.URL.Query().Get("device_tag"); store.ValidDeviceTag(tag) {
+			if err := h.db.TagCredential(userID, credID, tag); err != nil {
+				log.Printf("fido2/authenticate/complete: tag credential: %v", err)
+			}
+		}
+
+		sessionToken := h.walletSessions.issue(userID, credID)
 
 		// Generate OIDC auth code and mark session complete.
 		var subject string

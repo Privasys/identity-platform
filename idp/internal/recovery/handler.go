@@ -31,11 +31,16 @@ type Handler struct {
 	walletSession WalletSessionResolver
 
 	identityChallenges *identityChallengeStore
+	devices            *deviceState
+	// endSessions ends the wallet sessions of removed passkeys;
+	// sessionCredential names the passkey behind a wallet session.
+	endSessions       func([]string)
+	sessionCredential func(string) string
 }
 
 // NewHandler creates a recovery handler.
 func NewHandler(db *store.DB, mailer *Mailer, issuer *tokens.Issuer) *Handler {
-	return &Handler{db: db, mailer: mailer, issuer: issuer, identityChallenges: newIdentityChallengeStore()}
+	return &Handler{db: db, mailer: mailer, issuer: issuer, identityChallenges: newIdentityChallengeStore(), devices: newDeviceState()}
 }
 
 // SetWalletSessionResolver wires the fido2 wallet-session lookup into recovery auth.
@@ -713,13 +718,20 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 	var req struct {
 		PushToken string `json:"push_token"`
 		EncPub    string `json:"enc_pub"`
+		// DeviceTag names this phone for this identity; with it, each phone
+		// of a holder keeps its own target and all of them are notified.
+		DeviceTag string `json:"device_tag"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PushToken == "" {
 		http.Error(w, `{"error":"push_token is required"}`, http.StatusBadRequest)
 		return
 	}
+	if req.DeviceTag != "" && !store.ValidDeviceTag(req.DeviceTag) {
+		http.Error(w, `{"error":"invalid device_tag"}`, http.StatusBadRequest)
+		return
+	}
 
-	if err := h.db.UpsertPushTarget(userID, req.PushToken, req.EncPub); err != nil {
+	if err := h.db.UpsertDevicePushTarget(userID, req.DeviceTag, req.PushToken, req.EncPub); err != nil {
 		log.Printf("[push-token] upsert failed for %s: %v", userID, err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
@@ -786,12 +798,14 @@ func (h *Handler) notifyGuardians(userID string) {
 		if g.Status != "accepted" {
 			continue
 		}
-		pushToken := h.db.GetPushToken(g.GuardianID)
-		if pushToken == "" {
+		pushTokens := h.db.GetPushTokens(g.GuardianID)
+		if len(pushTokens) == 0 {
 			log.Printf("[recovery] guardian %s has no push token — skipping notification", g.GuardianID)
 			continue
 		}
-		go h.sendGuardianPush(g.GuardianID, pushToken)
+		for _, pushToken := range pushTokens {
+			go h.sendGuardianPush(g.GuardianID, pushToken)
+		}
 	}
 }
 

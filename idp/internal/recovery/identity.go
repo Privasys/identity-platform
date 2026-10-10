@@ -297,6 +297,9 @@ func (h *Handler) HandlePutIdentityIndex(w http.ResponseWriter, r *http.Request)
 	}
 	var req struct {
 		Blob string `json:"blob"`
+		// Version is the stored version this write replaces (0: none yet).
+		// Wallets before devices omit it and write unconditionally.
+		Version *int64 `json:"version"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, maxIdentityIndexBytes+1024)).Decode(&req); err != nil {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
@@ -306,11 +309,7 @@ func (h *Handler) HandlePutIdentityIndex(w http.ResponseWriter, r *http.Request)
 		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "blob must be non-empty base64url, at most 16KiB"})
 		return
 	}
-	if err := h.db.PutIdentityIndex(userID, req.Blob); err != nil {
-		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "failed to store identity index"})
-		return
-	}
-	writeJSONStatus(w, http.StatusOK, map[string]string{"status": "stored"})
+	putVersioned(w, h.db, "identity_indexes", userID, req.Blob, req.Version)
 }
 
 // HandleGetIdentityIndex returns the caller's identity index, 404 when none.
@@ -320,7 +319,7 @@ func (h *Handler) HandleGetIdentityIndex(w http.ResponseWriter, r *http.Request)
 	if userID == "" {
 		return
 	}
-	blob, err := h.db.GetIdentityIndex(userID)
+	blob, version, err := h.db.GetVersioned("identity_indexes", userID)
 	if err != nil {
 		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "failed to load identity index"})
 		return
@@ -329,5 +328,5 @@ func (h *Handler) HandleGetIdentityIndex(w http.ResponseWriter, r *http.Request)
 		writeJSONStatus(w, http.StatusNotFound, map[string]string{"error": "no identity index stored"})
 		return
 	}
-	writeJSONStatus(w, http.StatusOK, map[string]string{"blob": blob})
+	writeJSONStatus(w, http.StatusOK, map[string]any{"blob": blob, "version": version})
 }

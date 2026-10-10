@@ -452,6 +452,8 @@ func main() {
 	mux.HandleFunc("POST /wallet/email/verify/begin", emailVerify.HandleBegin)
 	mux.HandleFunc("POST /wallet/email/verify/complete", emailVerify.HandleComplete)
 	recoveryHandler.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
+	recoveryHandler.SetWalletSessionEnder(fido2Handler.WalletSessionEnder())
+	recoveryHandler.SetSessionCredential(fido2Handler.SessionCredential)
 	// Recovery phrase (BIP39) endpoints — preferred names.
 	mux.HandleFunc("POST /recovery/phrase/regenerate", recoveryHandler.HandleRegeneratePhrase)
 	mux.HandleFunc("POST /recovery/phrase/register", recoveryHandler.HandleRegisterPhraseHash)
@@ -503,6 +505,19 @@ func main() {
 	mux.HandleFunc("POST /push-token", recoveryHandler.HandleRegisterPushToken)
 	mux.HandleFunc("GET /devices", recoveryHandler.HandleListDevices)
 	mux.HandleFunc("DELETE /devices", recoveryHandler.HandleRevokeDevice)
+	// Several phones of one holder: adding one (pairing slot, enrolment ticket,
+	// per-identity enrolment), removing one, and passing updates between them.
+	// See internal/recovery/devices.go.
+	mux.HandleFunc("POST /devices/enrol-ticket", recoveryHandler.HandleEnrolTicket)
+	mux.HandleFunc("POST /devices/enrol", recoveryHandler.HandleRedeemEnrolTicket)
+	mux.HandleFunc("POST /devices/revoke", recoveryHandler.HandleRevokePhone)
+	mux.HandleFunc("POST /devices/pair", recoveryHandler.HandleOpenPairing)
+	mux.HandleFunc("PUT /devices/pair/{slot}", recoveryHandler.HandleFillPairing)
+	mux.HandleFunc("GET /devices/pair/{slot}", recoveryHandler.HandleReadPairing)
+	mux.HandleFunc("POST /devices/relay", recoveryHandler.HandlePostRelay)
+	mux.HandleFunc("GET /devices/relay", recoveryHandler.HandleGetRelay)
+	mux.HandleFunc("POST /recovery/identity/enrol", recoveryHandler.HandleEnrolIdentity)
+	mux.HandleFunc("POST /recovery/identity/revoke-device", recoveryHandler.HandleRevokeIdentityDevice)
 
 	// Health.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {

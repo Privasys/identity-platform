@@ -12,8 +12,8 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -27,6 +27,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { QrCode } from '@/components/QrCode';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import {
     getRecoveryPhraseStatus,
@@ -35,6 +36,8 @@ import {
     listGuardians,
     inviteGuardianByEmail,
     addGuardianByQR,
+    acceptGuardianInviteByToken,
+    getGuardianQR,
     removeGuardian,
     listGuardianInvites,
     respondToGuardianInvite,
@@ -55,6 +58,7 @@ import { useGuardianRequestsStore } from '@/stores/guardian-requests';
 import { useActiveRoute } from '@/utils/active-route';
 import { RecoveryPhraseCard } from '@/components/RecoveryPhraseCard';
 import { profileName } from '@/services/attributes';
+import { shortAccountId } from '@/utils/account-id';
 import { useProfileStore } from '@/stores/profile';
 
 type InviteMethod = 'email' | 'qr';
@@ -121,6 +125,13 @@ export default function AccountRecoveryScreen() {
     // Guardian duties
     const [pendingInvites, setPendingInvites] = useState<GuardianInvite[]>([]);
     const [recoveryRequests, setRecoveryRequests] = useState<RecoveryRequestInfo[]>([]);
+
+    // Shown on this phone for someone who wants this holder as their guardian.
+    const [guardianCode, setGuardianCode] = useState<string | null>(null);
+    // A guardian code scanned here, or an invitation link opened from email:
+    // both land as parameters, and wait for the screen to be unlocked.
+    const params = useLocalSearchParams<{ guardian?: string; invite?: string }>();
+    const handledParam = useRef<string | null>(null);
 
     const acceptedGuardianCount = guardians.filter((g) => g.status === 'accepted').length;
 
@@ -316,10 +327,70 @@ export default function AccountRecoveryScreen() {
         }
     };
 
-    const handleAddGuardianByQR = async () => {
-        // TODO: open camera, scan QR code, extract guardian_id from JSON.
-        Alert.alert(t('accountRecovery.scanQrTitle'), t('accountRecovery.scanQrBody'));
+    // The scanner recognises a guardian code and comes back here with it.
+    const handleAddGuardianByQR = () => {
+        setShowInviteForm(false);
+        router.push('/scan');
     };
+
+    const handleShowGuardianCode = async () => {
+        try {
+            const { user_id } = await getGuardianQR(accessToken);
+            setGuardianCode(`privasys-wallet://account-recovery?guardian=${encodeURIComponent(user_id)}`);
+        } catch (e: any) {
+            Alert.alert(t('common.error'), e?.message ?? String(e));
+        }
+    };
+
+    useEffect(() => {
+        const guardianId = typeof params.guardian === 'string' ? params.guardian : '';
+        const inviteToken = typeof params.invite === 'string' ? params.invite : '';
+        const key = guardianId ? `g:${guardianId}` : inviteToken ? `i:${inviteToken}` : '';
+        // Wait for an unlocked screen; the Unlock card is showing until then.
+        if (!key || !accessToken || handledParam.current === key) return;
+        handledParam.current = key;
+        router.setParams({ guardian: undefined, invite: undefined });
+
+        if (guardianId) {
+            const threshold = Math.max(1, parseInt(thresholdInput, 10) || 1);
+            Alert.alert(
+                t('accountRecovery.addGuardianConfirmTitle'),
+                t('accountRecovery.addGuardianConfirmBody', { guardian: shortAccountId(guardianId) }),
+                [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    {
+                        text: t('accountRecovery.addGuardian'),
+                        onPress: async () => {
+                            try {
+                                await addGuardianByQR(accessToken, guardianId, threshold);
+                                Alert.alert(t('accountRecovery.guardianAddedTitle'), t('accountRecovery.guardianAddedBody'));
+                                await loadData();
+                            } catch (e: any) {
+                                Alert.alert(t('accountRecovery.addGuardianFailedTitle'), e?.message ?? String(e));
+                            }
+                        },
+                    },
+                ],
+            );
+        } else {
+            Alert.alert(t('accountRecovery.acceptInviteTitle'), t('accountRecovery.acceptInviteBody'), [
+                { text: t('common.notNow'), style: 'cancel' },
+                {
+                    text: t('accountRecovery.accept'),
+                    onPress: async () => {
+                        try {
+                            await acceptGuardianInviteByToken(accessToken, inviteToken);
+                            Alert.alert(t('accountRecovery.inviteAcceptedTitle'));
+                            await loadData();
+                        } catch (e: any) {
+                            Alert.alert(t('accountRecovery.inviteFailedTitle'), e?.message ?? String(e));
+                        }
+                    },
+                },
+            ]);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [params.guardian, params.invite, accessToken]);
 
     const handleRemoveGuardian = (g: GuardianInfo) => {
         Alert.alert(
@@ -709,6 +780,29 @@ export default function AccountRecoveryScreen() {
                     >
                         <Ionicons name="person-add-outline" size={18} color={p.blue} />
                         <Text style={styles.outlineButtonText}>{t('accountRecovery.addGuardian')}</Text>
+                    </Pressable>
+                )}
+
+                {/* Being someone else's guardian starts with them scanning this. */}
+                {guardianCode ? (
+                    <RNView style={[styles.card, { alignItems: 'center' }]}>
+                        <Text style={styles.dutyTitle}>{t('accountRecovery.guardianCodeTitle')}</Text>
+                        <RNView style={{ marginVertical: 16 }}>
+                            <QrCode value={guardianCode} />
+                        </RNView>
+                        <Text style={[styles.helperText, { textAlign: 'center' }]}>{t('accountRecovery.guardianCodeHint')}</Text>
+                        <Pressable onPress={() => setGuardianCode(null)} style={{ marginTop: 12 }}>
+                            <Text style={styles.cancelText}>{t('common.close')}</Text>
+                        </Pressable>
+                    </RNView>
+                ) : (
+                    <Pressable
+                        style={[styles.outlineButton, { marginTop: 10 }, !accessToken && { opacity: 0.4 }]}
+                        onPress={handleShowGuardianCode}
+                        disabled={!accessToken}
+                    >
+                        <Ionicons name="qr-code-outline" size={18} color={p.blue} />
+                        <Text style={styles.outlineButtonText}>{t('accountRecovery.showGuardianCode')}</Text>
                     </Pressable>
                 )}
 

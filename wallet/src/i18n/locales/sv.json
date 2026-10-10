@@ -50,8 +50,6 @@
     "addGuardian": "Lägg till förtroendeperson",
     "invited": "Inbjuden",
     "invitedBody": "Inbjudningsmejl till förtroendepersonen har skickats. Går ut {{when, date}}.",
-    "scanQrTitle": "Skanna QR-kod",
-    "scanQrBody": "QR-kodsskannern blir tillgänglig i en framtida uppdatering.",
     "removeGuardianTitle": "Ta bort förtroendeperson",
     "removeGuardianBody": "Ta bort {{guardian}} som förtroendeperson?",
     "sectionDevices": "REGISTRERADE ENHETER",
@@ -80,7 +78,19 @@
     "denyRecovery": "Neka återställningen",
     "denyRecoveryBody": "Neka återställningsbegäran från {{who}}?",
     "recoveryApproved": "Återställningen är godkänd.",
-    "recoveryDenied": "Återställningen är nekad."
+    "recoveryDenied": "Återställningen är nekad.",
+    "showGuardianCode": "Visa min kod som förtroendeperson",
+    "guardianCodeTitle": "Din kod som förtroendeperson",
+    "guardianCodeHint": "Den som vill ha dig som förtroendeperson vid återställning skannar den här koden med Privasys Wallet. Sedan ombeds du att acceptera.",
+    "addGuardianConfirmTitle": "Lägga till den här förtroendepersonen?",
+    "addGuardianConfirmBody": "{{guardian}} ombeds att acceptera. När det är gjort kan personen godkänna en återställning av ditt konto.",
+    "guardianAddedTitle": "Förtroendeperson inbjuden",
+    "guardianAddedBody": "Personen ser din förfrågan i sin Privasys Wallet och kan acceptera den där.",
+    "acceptInviteTitle": "Bli förtroendeperson vid återställning?",
+    "acceptInviteBody": "Någon har bett dig hjälpa dem tillbaka in på sitt Privasys-konto om de förlorar sin telefon. Om det någon gång behövs ombeds du att godkänna.",
+    "inviteAcceptedTitle": "Du är nu förtroendeperson vid återställning",
+    "inviteFailedTitle": "Inbjudan kunde inte accepteras",
+    "addGuardianFailedTitle": "Förtroendepersonen kunde inte läggas till"
   },
 
   "attestation": {

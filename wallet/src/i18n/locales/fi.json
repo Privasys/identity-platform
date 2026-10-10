@@ -50,8 +50,6 @@
     "addGuardian": "Lisää luottohenkilö",
     "invited": "Kutsuttu",
     "invitedBody": "Kutsusähköposti luottohenkilölle lähetetty. Vanhenee {{when, date}}.",
-    "scanQrTitle": "Skannaa QR-koodi",
-    "scanQrBody": "QR-koodiskanneri tulee saataville tulevassa päivityksessä.",
     "removeGuardianTitle": "Poista luottohenkilö",
     "removeGuardianBody": "Poistetaanko {{guardian}} luottohenkilöistä?",
     "sectionDevices": "REKISTERÖIDYT LAITTEET",
@@ -80,7 +78,19 @@
     "denyRecovery": "Hylkää palautus",
     "denyRecoveryBody": "Hylätäänkö käyttäjän {{who}} palautuspyyntö?",
     "recoveryApproved": "Palautus hyväksytty.",
-    "recoveryDenied": "Palautus hylätty."
+    "recoveryDenied": "Palautus hylätty.",
+    "showGuardianCode": "Näytä luottohenkilökoodini",
+    "guardianCodeTitle": "Luottohenkilökoodisi",
+    "guardianCodeHint": "Henkilö, joka haluaa sinut palautuksen luottohenkilökseen, skannaa tämän koodin Privasys Walletilla. Sen jälkeen sinua pyydetään hyväksymään.",
+    "addGuardianConfirmTitle": "Lisätäänkö tämä luottohenkilö?",
+    "addGuardianConfirmBody": "Henkilöä {{guardian}} pyydetään hyväksymään. Kun hän on hyväksynyt, hän voi hyväksyä tilisi palautuksen.",
+    "guardianAddedTitle": "Luottohenkilö kutsuttu",
+    "guardianAddedBody": "Hän näkee pyyntösi Privasys Walletissaan ja voi hyväksyä sen siellä.",
+    "acceptInviteTitle": "Ryhdytäänkö palautuksen luottohenkilöksi?",
+    "acceptInviteBody": "Joku on pyytänyt sinua auttamaan häntä pääsemään takaisin Privasys-tililleen, jos hän kadottaa puhelimensa. Jos sitä koskaan tarvitaan, sinua pyydetään hyväksymään.",
+    "inviteAcceptedTitle": "Olet nyt palautuksen luottohenkilö",
+    "inviteFailedTitle": "Kutsua ei voitu hyväksyä",
+    "addGuardianFailedTitle": "Luottohenkilöä ei voitu lisätä"
   },
 
   "attestation": {

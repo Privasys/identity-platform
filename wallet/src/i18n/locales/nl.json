@@ -50,8 +50,6 @@
     "addGuardian": "Vertrouwenspersoon toevoegen",
     "invited": "Uitgenodigd",
     "invitedBody": "Uitnodigingsmail voor de vertrouwenspersoon verstuurd. Verloopt op {{when, date}}.",
-    "scanQrTitle": "QR-code scannen",
-    "scanQrBody": "De QR-codescanner komt beschikbaar in een toekomstige update.",
     "removeGuardianTitle": "Vertrouwenspersoon verwijderen",
     "removeGuardianBody": "{{guardian}} als vertrouwenspersoon verwijderen?",
     "sectionDevices": "GEREGISTREERDE APPARATEN",
@@ -80,7 +78,19 @@
     "denyRecovery": "Herstel weigeren",
     "denyRecoveryBody": "Het herstelverzoek van {{who}} weigeren?",
     "recoveryApproved": "Herstel goedgekeurd.",
-    "recoveryDenied": "Herstel geweigerd."
+    "recoveryDenied": "Herstel geweigerd.",
+    "showGuardianCode": "Mijn code als vertrouwenspersoon tonen",
+    "guardianCodeTitle": "Je code als vertrouwenspersoon",
+    "guardianCodeHint": "Iemand die jou als vertrouwenspersoon voor herstel wil, scant deze code met Privasys Wallet. Daarna wordt je gevraagd om te accepteren.",
+    "addGuardianConfirmTitle": "Deze vertrouwenspersoon toevoegen?",
+    "addGuardianConfirmBody": "{{guardian}} wordt gevraagd om te accepteren. Daarna kan die persoon een herstel van je account goedkeuren.",
+    "guardianAddedTitle": "Vertrouwenspersoon uitgenodigd",
+    "guardianAddedBody": "Die persoon ziet je verzoek in de eigen Privasys Wallet en kan het daar accepteren.",
+    "acceptInviteTitle": "Vertrouwenspersoon voor herstel worden?",
+    "acceptInviteBody": "Iemand vraagt je om te helpen weer toegang te krijgen tot een Privasys-account als die persoon de telefoon kwijtraakt. Als het ooit nodig is, wordt je om goedkeuring gevraagd.",
+    "inviteAcceptedTitle": "Je bent nu vertrouwenspersoon voor herstel",
+    "inviteFailedTitle": "De uitnodiging kon niet worden geaccepteerd",
+    "addGuardianFailedTitle": "De vertrouwenspersoon kon niet worden toegevoegd"
   },
 
   "attestation": {

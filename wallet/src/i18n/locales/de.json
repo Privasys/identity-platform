@@ -50,8 +50,6 @@
     "addGuardian": "Treuhänder hinzufügen",
     "invited": "Eingeladen",
     "invitedBody": "Einladungs-E-Mail an den Treuhänder gesendet. Läuft am {{when, date}} ab.",
-    "scanQrTitle": "QR-Code scannen",
-    "scanQrBody": "Der QR-Code-Scanner steht in einer künftigen Aktualisierung zur Verfügung.",
     "removeGuardianTitle": "Treuhänder entfernen",
     "removeGuardianBody": "{{guardian}} als Treuhänder entfernen?",
     "sectionDevices": "REGISTRIERTE GERÄTE",
@@ -80,7 +78,19 @@
     "denyRecovery": "Wiederherstellung ablehnen",
     "denyRecoveryBody": "Die Wiederherstellungsanfrage von {{who}} ablehnen?",
     "recoveryApproved": "Wiederherstellung freigegeben.",
-    "recoveryDenied": "Wiederherstellung abgelehnt."
+    "recoveryDenied": "Wiederherstellung abgelehnt.",
+    "showGuardianCode": "Meinen Treuhänder-Code anzeigen",
+    "guardianCodeTitle": "Ihr Treuhänder-Code",
+    "guardianCodeHint": "Wer Sie als Treuhänder für die Wiederherstellung möchte, scannt diesen Code mit Privasys Wallet. Danach werden Sie gebeten, zuzustimmen.",
+    "addGuardianConfirmTitle": "Diesen Treuhänder hinzufügen?",
+    "addGuardianConfirmBody": "{{guardian}} wird gebeten, zuzustimmen. Danach kann er eine Wiederherstellung Ihres Kontos genehmigen.",
+    "guardianAddedTitle": "Treuhänder eingeladen",
+    "guardianAddedBody": "Er sieht Ihre Anfrage in seinem Privasys Wallet und kann sie dort annehmen.",
+    "acceptInviteTitle": "Treuhänder für die Wiederherstellung werden?",
+    "acceptInviteBody": "Jemand bittet Sie, ihm wieder Zugang zu seinem Privasys-Konto zu verschaffen, falls er sein Telefon verliert. Falls es je nötig wird, werden Sie um Ihre Genehmigung gebeten.",
+    "inviteAcceptedTitle": "Sie sind jetzt Treuhänder für die Wiederherstellung",
+    "inviteFailedTitle": "Die Einladung konnte nicht angenommen werden",
+    "addGuardianFailedTitle": "Der Treuhänder konnte nicht hinzugefügt werden"
   },
 
   "attestation": {

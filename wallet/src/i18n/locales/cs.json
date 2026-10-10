@@ -50,8 +50,6 @@
     "addGuardian": "Přidat důvěrníka",
     "invited": "Pozvánka odeslána",
     "invitedBody": "Pozvánka pro důvěrníka byla odeslána e-mailem. Vyprší {{when, date}}.",
-    "scanQrTitle": "Naskenovat QR kód",
-    "scanQrBody": "Skener QR kódů bude k dispozici v budoucí aktualizaci.",
     "removeGuardianTitle": "Odebrat důvěrníka",
     "removeGuardianBody": "Odebrat {{guardian}} z důvěrníků?",
     "sectionDevices": "REGISTROVANÁ ZAŘÍZENÍ",
@@ -80,7 +78,19 @@
     "denyRecovery": "Zamítnout obnovu",
     "denyRecoveryBody": "Zamítnout žádost o obnovu od {{who}}?",
     "recoveryApproved": "Obnova byla schválena.",
-    "recoveryDenied": "Obnova byla zamítnuta."
+    "recoveryDenied": "Obnova byla zamítnuta.",
+    "showGuardianCode": "Zobrazit můj kód důvěrníka",
+    "guardianCodeTitle": "Váš kód důvěrníka",
+    "guardianCodeHint": "Kdo vás chce mít za důvěrníka pro obnovení, naskenuje tento kód v Privasys Wallet. Poté budete požádáni o souhlas.",
+    "addGuardianConfirmTitle": "Přidat tohoto důvěrníka?",
+    "addGuardianConfirmBody": "{{guardian}} bude požádán o souhlas. Jakmile souhlasí, může schválit obnovení vašeho účtu.",
+    "guardianAddedTitle": "Důvěrník pozván",
+    "guardianAddedBody": "Žádost uvidí ve své Privasys Wallet a může ji tam přijmout.",
+    "acceptInviteTitle": "Stát se důvěrníkem pro obnovení?",
+    "acceptInviteBody": "Někdo vás žádá o pomoc s návratem do svého účtu Privasys, pokud ztratí telefon. Pokud to někdy bude potřeba, budete požádáni o schválení.",
+    "inviteAcceptedTitle": "Nyní jste důvěrníkem pro obnovení",
+    "inviteFailedTitle": "Pozvánku se nepodařilo přijmout",
+    "addGuardianFailedTitle": "Důvěrníka se nepodařilo přidat"
   },
 
   "attestation": {

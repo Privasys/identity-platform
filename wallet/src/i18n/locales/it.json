@@ -50,8 +50,6 @@
     "addGuardian": "Aggiungi un garante",
     "invited": "Invito inviato",
     "invitedBody": "E-mail di invito al garante inviata. Scade il {{when, date}}.",
-    "scanQrTitle": "Scansiona un codice QR",
-    "scanQrBody": "Lo scanner di codici QR sarà disponibile in un aggiornamento futuro.",
     "removeGuardianTitle": "Rimuovi il garante",
     "removeGuardianBody": "Rimuovere {{guardian}} dai garanti?",
     "sectionDevices": "DISPOSITIVI REGISTRATI",
@@ -80,7 +78,19 @@
     "denyRecovery": "Rifiuta il recupero",
     "denyRecoveryBody": "Rifiutare la richiesta di recupero di {{who}}?",
     "recoveryApproved": "Recupero approvato.",
-    "recoveryDenied": "Recupero rifiutato."
+    "recoveryDenied": "Recupero rifiutato.",
+    "showGuardianCode": "Mostra il mio codice da garante",
+    "guardianCodeTitle": "Il tuo codice da garante",
+    "guardianCodeHint": "Chi vuole che tu sia il suo garante per il recupero scansiona questo codice con Privasys Wallet. Poi ti verrà chiesto di accettare.",
+    "addGuardianConfirmTitle": "Aggiungere questo garante?",
+    "addGuardianConfirmBody": "A {{guardian}} verrà chiesto di accettare. Una volta accettato, potrà approvare un recupero del tuo account.",
+    "guardianAddedTitle": "Garante invitato",
+    "guardianAddedBody": "Vedrà la tua richiesta nel suo Privasys Wallet e potrà accettarla lì.",
+    "acceptInviteTitle": "Diventare garante per il recupero?",
+    "acceptInviteBody": "Qualcuno ti ha chiesto di aiutarlo a rientrare nel suo account Privasys se perde il telefono. Se mai servirà, ti verrà chiesto di approvare.",
+    "inviteAcceptedTitle": "Ora sei un garante per il recupero",
+    "inviteFailedTitle": "Non è stato possibile accettare l'invito",
+    "addGuardianFailedTitle": "Non è stato possibile aggiungere il garante"
   },
 
   "attestation": {

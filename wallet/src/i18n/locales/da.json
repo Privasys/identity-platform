@@ -50,8 +50,6 @@
     "addGuardian": "Tilføj tillidsperson",
     "invited": "Inviteret",
     "invitedBody": "Invitationsmail til tillidspersonen er sendt. Udløber {{when, date}}.",
-    "scanQrTitle": "Scan QR-kode",
-    "scanQrBody": "QR-kodescanneren bliver tilgængelig i en fremtidig opdatering.",
     "removeGuardianTitle": "Fjern tillidsperson",
     "removeGuardianBody": "Fjern {{guardian}} som tillidsperson?",
     "sectionDevices": "REGISTREREDE ENHEDER",
@@ -80,7 +78,19 @@
     "denyRecovery": "Afvis gendannelsen",
     "denyRecoveryBody": "Afvis gendannelsesanmodningen fra {{who}}?",
     "recoveryApproved": "Gendannelsen er godkendt.",
-    "recoveryDenied": "Gendannelsen er afvist."
+    "recoveryDenied": "Gendannelsen er afvist.",
+    "showGuardianCode": "Vis min kode som tillidsperson",
+    "guardianCodeTitle": "Din kode som tillidsperson",
+    "guardianCodeHint": "En, der vil have dig som tillidsperson ved gendannelse, scanner denne kode med Privasys Wallet. Derefter bliver du bedt om at acceptere.",
+    "addGuardianConfirmTitle": "Tilføj denne tillidsperson?",
+    "addGuardianConfirmBody": "{{guardian}} bliver bedt om at acceptere. Når det er sket, kan de godkende en gendannelse af din konto.",
+    "guardianAddedTitle": "Tillidsperson inviteret",
+    "guardianAddedBody": "De ser din anmodning i deres Privasys Wallet og kan acceptere den der.",
+    "acceptInviteTitle": "Bliv tillidsperson ved gendannelse?",
+    "acceptInviteBody": "Nogen har bedt dig om at hjælpe dem tilbage til deres Privasys-konto, hvis de mister deres telefon. Hvis det nogensinde bliver nødvendigt, bliver du bedt om at godkende.",
+    "inviteAcceptedTitle": "Du er nu tillidsperson ved gendannelse",
+    "inviteFailedTitle": "Invitationen kunne ikke accepteres",
+    "addGuardianFailedTitle": "Tillidspersonen kunne ikke tilføjes"
   },
 
   "attestation": {

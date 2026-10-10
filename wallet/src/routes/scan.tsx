@@ -151,6 +151,29 @@ export default function TabScanScreen() {
                 }
             }
 
+            // 2b. A guardian code, shown on a guardian's phone, or a guardian
+            //     invitation link: both open the recovery screen, which asks
+            //     before anything is added or accepted.
+            const guardianLink =
+                /^privasys-wallet(?:-dev|-preview)?:\/\/account-recovery\?(?:[^#]*&)?(guardian|invite)=([^&#]+)/.exec(
+                    result.data,
+                );
+            if (guardianLink) {
+                let value: string | null = null;
+                try {
+                    value = decodeURIComponent(guardianLink[2]);
+                } catch {
+                    // Malformed escape: not one of ours.
+                }
+                if (value) {
+                    navigating.current = true;
+                    // navigate, not push: the recovery screen that opened the
+                    // scanner is still underneath, and gets the code there.
+                    router.navigate({ pathname: '/account-recovery', params: { [guardianLink[1]]: value } });
+                    return;
+                }
+            }
+
             // 3. Try universal link URL.
             //    Short form: https://privasys.id/scp?v=1&s=<sid>&h=<pin>&r=<host>
             //                — descriptor is fetched from the relay.

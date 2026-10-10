@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -119,6 +120,77 @@ func (reg *Registry) SetPlatform(clientID string, platform bool) error {
 		return fmt.Errorf("client not found")
 	}
 	return nil
+}
+
+// AppIDsOf returns the attested app ids (OID 4.1, lowercase hex, no dashes)
+// a client stands for. A client with its own subjects hands its subject only
+// to these apps' enclaves, so another app cannot claim the client's id to
+// learn the identifier a person has there.
+func (reg *Registry) AppIDsOf(clientID string) []string {
+	var raw string
+	_ = reg.db.QueryRow("SELECT app_ids FROM clients WHERE client_id = ?", clientID).Scan(&raw)
+	var out []string
+	for _, id := range strings.Split(raw, ",") {
+		if id = NormaliseAppID(id); id != "" {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// NormaliseAppID writes an app id as 32 lowercase hex characters, or "".
+func NormaliseAppID(id string) string {
+	id = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(id), "-", ""))
+	if len(id) != 32 || strings.Trim(id, "0123456789abcdef") != "" {
+		return ""
+	}
+	return id
+}
+
+// SetAppIDs replaces the attested apps a client stands for.
+func (reg *Registry) SetAppIDs(clientID string, ids []string) error {
+	var clean []string
+	for _, id := range ids {
+		n := NormaliseAppID(id)
+		if n == "" {
+			return fmt.Errorf("app id %q is not 32 hex characters", id)
+		}
+		clean = append(clean, n)
+	}
+	res, err := reg.db.Exec("UPDATE clients SET app_ids = ? WHERE client_id = ?", strings.Join(clean, ","), clientID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("unknown client %q", clientID)
+	}
+	return nil
+}
+
+// HandleSetAppIDs sets the attested apps a client stands for.
+//
+//	POST /clients/{id}/apps  {"app_ids": ["<uuid or 32 hex>", ...]}   (admin token)
+func HandleSetAppIDs(reg *Registry, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminToken == "" || r.Header.Get("Authorization") != "Bearer "+adminToken {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		var req struct {
+			AppIDs []string `json:"app_ids"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 64*1024)).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
+			return
+		}
+		clientID := r.PathValue("id")
+		if err := reg.SetAppIDs(clientID, req.AppIDs); err != nil {
+			http.Error(w, `{"error":"`+strings.ReplaceAll(err.Error(), `"`, "'")+`"}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"client_id": clientID, "app_ids": reg.AppIDsOf(clientID)})
+	}
 }
 
 // SectorOf returns a client's sector, or "" (shared) for an unknown client.

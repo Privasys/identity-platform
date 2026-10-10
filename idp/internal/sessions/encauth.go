@@ -15,6 +15,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Privasys/idp/internal/tokens"
@@ -63,6 +64,27 @@ func EncAuthCanonicalCBOR(p *EncAuth) ([]byte, error) {
 	return em.Marshal(p)
 }
 
+// ErrAppNotOfClient refuses a voucher carrying a client's own subject for an
+// app that client does not stand for.
+var ErrAppNotOfClient = errors.New("this app is not registered for the session's client")
+
+// appStandsFor reports whether the attested app is one the client stands for.
+func (s *Store) appStandsFor(clientID, appID string) bool {
+	if s.appsOf == nil {
+		return false
+	}
+	id := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(appID), "-", ""))
+	if id == "" {
+		return false
+	}
+	for _, a := range s.appsOf(clientID) {
+		if a == id {
+			return true
+		}
+	}
+	return false
+}
+
 // DecodeEncAuthPayload parses canonical CBOR back into EncAuth.
 func DecodeEncAuthPayload(b []byte) (*EncAuth, error) {
 	var p EncAuth
@@ -106,7 +128,13 @@ func VerifyES256Raw(pubSEC1, sig, msg []byte) error {
 // wallet session token). PutEncAuth additionally checks that the
 // payload's `Sub` matches `userID` and that `SID` matches an active
 // session row owned by `userID`.
-func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, host string, issuer *tokens.Issuer) (*Envelope, error) {
+//
+// appID is the attested app (OID 4.1) the wallet verified the voucher's
+// enclave to be: reported by the holder's own authenticated wallet, never
+// by the page. For a client with its own subjects it must be one of the
+// apps that client stands for, or an app could claim another app's client
+// id and be handed the identifier the person has at that other app.
+func (s *Store) PutEncAuth(userID, appID string, payloadBytes, hwSig []byte, host string, issuer *tokens.Issuer) (*Envelope, error) {
 	p, err := DecodeEncAuthPayload(payloadBytes)
 	if err != nil {
 		return nil, err
@@ -149,6 +177,9 @@ func (s *Store) PutEncAuth(userID string, payloadBytes, hwSig []byte, host strin
 	}
 	if p.Sub != want {
 		return nil, errors.New("encauth sub is not the subject this session's client sees")
+	}
+	if want != userID && !s.appStandsFor(sess.ClientID, appID) {
+		return nil, ErrAppNotOfClient
 	}
 	if sess.RevokedAt != nil {
 		return nil, ErrRevoked
@@ -301,6 +332,8 @@ func (s *Store) HandlePutEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			Payload string `json:"payload"`
 			HwSig   string `json:"hw_sig"`
 			Host    string `json:"host"`
+			// AppID is the attested app (OID 4.1) the wallet verified.
+			AppID string `json:"app_id"`
 		}
 		if err := json.Unmarshal(body, &req); err != nil {
 			httpErr(w, http.StatusBadRequest, "invalid json")
@@ -327,7 +360,7 @@ func (s *Store) HandlePutEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			httpErr(w, http.StatusBadRequest, "payload sid mismatch")
 			return
 		}
-		env, err := s.PutEncAuth(userID, payload, hwSig, req.Host, issuer)
+		env, err := s.PutEncAuth(userID, req.AppID, payload, hwSig, req.Host, issuer)
 		if err != nil {
 			log.Printf("sessions/encauth: voucher refused for sid %s on %s: %v", sid, req.Host, err)
 			if errors.Is(err, ErrRevoked) {
@@ -394,7 +427,7 @@ func (s *Store) HandleGetEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 // the authenticated account, never the voucher's own sub: for a client
 // with its own subjects the two differ, and PutEncAuth checks the voucher
 // names the subject that client sees.
-func (s *Store) PutEncAuthForSession(userID, sid string, payloadBytes, hwSig []byte, host string, issuer *tokens.Issuer) (*Envelope, error) {
+func (s *Store) PutEncAuthForSession(userID, appID, sid string, payloadBytes, hwSig []byte, host string, issuer *tokens.Issuer) (*Envelope, error) {
 	p, err := DecodeEncAuthPayload(payloadBytes)
 	if err != nil {
 		return nil, err
@@ -402,7 +435,7 @@ func (s *Store) PutEncAuthForSession(userID, sid string, payloadBytes, hwSig []b
 	if p.SID != sid {
 		return nil, errors.New("payload sid does not match session row")
 	}
-	return s.PutEncAuth(userID, payloadBytes, hwSig, host, issuer)
+	return s.PutEncAuth(userID, appID, payloadBytes, hwSig, host, issuer)
 }
 
 // defaultEncAuthTTL is the lifetime of an EncAuth-anchored session
@@ -438,6 +471,8 @@ func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			Payload  string `json:"payload"`
 			HwSig    string `json:"hw_sig"`
 			Host     string `json:"host"`
+			// AppID is the attested app (OID 4.1) the wallet verified.
+			AppID string `json:"app_id"`
 		}
 		if err := json.Unmarshal(body, &req); err != nil {
 			httpErr(w, http.StatusBadRequest, "invalid json")
@@ -464,7 +499,7 @@ func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 				httpErr(w, http.StatusBadRequest, "invalid hw_sig b64")
 				return
 			}
-			env, perr := s.PutEncAuthForSession(userID, sess.SID, payload, hwSig, req.Host, issuer)
+			env, perr := s.PutEncAuthForSession(userID, req.AppID, sess.SID, payload, hwSig, req.Host, issuer)
 			if perr != nil {
 				// A refused voucher leaves the browser on an anonymous
 				// session, which the holder sees as a sign-in that did not

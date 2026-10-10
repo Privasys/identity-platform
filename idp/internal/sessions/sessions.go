@@ -61,10 +61,16 @@ type Store struct {
 	// sectorOf names a client's subject sector, so a voucher can be checked
 	// against the subject that client sees (internal/tokens/subject.go).
 	sectorOf func(clientID string) string
+	// appsOf names the attested apps a client stands for (OID 4.1 ids), so
+	// a client's own subject reaches only those apps' enclaves.
+	appsOf func(clientID string) []string
 }
 
 // SetSectorResolver wires the client registry's sector lookup.
 func (s *Store) SetSectorResolver(f func(clientID string) string) { s.sectorOf = f }
+
+// SetAppsResolver wires the client registry's attested-apps lookup.
+func (s *Store) SetAppsResolver(f func(clientID string) []string) { s.appsOf = f }
 
 // SetWalletSessionResolver wires the FIDO2 wallet-session lookup into
 // the auth path of /sessions/me and /sessions/{sid}/revoke. Optional

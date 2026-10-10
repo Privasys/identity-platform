@@ -124,7 +124,7 @@ func TestMultiAppEncAuth(t *testing.T) {
 	hosts := map[byte]string{app1[0]: "a.example", app2[0]: "b.example"}
 	for _, appID := range [][]byte{app1, app2} {
 		payload, hwSig := signedVoucher(t, "user-1", row.SID, appID)
-		if _, err := s.PutEncAuth("user-1", payload, hwSig, hosts[appID[0]], iss); err != nil {
+		if _, err := s.PutEncAuth("user-1", "", payload, hwSig, hosts[appID[0]], iss); err != nil {
 			t.Fatalf("PutEncAuth(%x): %v", appID[0], err)
 		}
 	}

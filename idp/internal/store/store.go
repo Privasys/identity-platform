@@ -344,6 +344,10 @@ func migrate(db *sql.DB) error {
 		// the platform audience, with the account and roles, whatever subject
 		// it sees. Set by an operator only.
 		{"platform", "ALTER TABLE clients ADD COLUMN platform INTEGER NOT NULL DEFAULT 0"},
+		// The attested apps (OID 4.1 app ids, comma-separated, lowercase hex)
+		// a client with its own subjects stands for: a sealed-session voucher
+		// carrying that client's subject is accepted only for one of them.
+		{"app_ids", "ALTER TABLE clients ADD COLUMN app_ids TEXT NOT NULL DEFAULT ''"},
 	} {
 		if !clientCols[add.col] {
 			if _, err = db.Exec(add.ddl); err != nil {

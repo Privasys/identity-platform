@@ -130,6 +130,7 @@ func main() {
 	}
 	sessionsStore.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	sessionsStore.SetSectorResolver(clientReg.SectorOf)
+	sessionsStore.SetAppsResolver(clientReg.AppIDsOf)
 	fido2Handler.SetSubjectResolver(func(userID, clientID string) string {
 		return issuer.SubjectFor(userID, clientReg.SectorOf(clientID))
 	})
@@ -254,6 +255,8 @@ func main() {
 	// A non-enclave relying party registers where it publishes spend keys.
 	mux.HandleFunc("POST /clients/{id}/spend", clients.HandleSetSpendJWKS(clientReg, cfg.AdminToken))
 	mux.HandleFunc("POST /clients/{id}/subject", clients.HandleSetSubjectMode(clientReg, cfg.AdminToken))
+	// The attested apps a client with its own subjects stands for.
+	mux.HandleFunc("POST /clients/{id}/apps", clients.HandleSetAppIDs(clientReg, cfg.AdminToken))
 
 	// Wallet Instance Attestation: the wallet-provider JWKS (verifiers fetch it /
 	// have it provisioned), a fresh challenge, and enrolment → a holder-bound WIA.

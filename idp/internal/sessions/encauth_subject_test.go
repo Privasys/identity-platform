@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -45,10 +46,17 @@ func TestTheVoucherCarriesTheClientsSubject(t *testing.T) {
 	}
 	sectors := map[string]string{"site": "site", "privasys-platform": ""}
 	s.SetSectorResolver(func(c string) string { return sectors[c] })
+	const siteApp = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	s.SetAppsResolver(func(c string) []string {
+		if c == "site" {
+			return []string{siteApp}
+		}
+		return nil
+	})
 
 	hw, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	hwPub := elliptic.Marshal(elliptic.P256(), hw.PublicKey.X, hw.PublicKey.Y)
-	put := func(client, sub string) error {
+	put := func(client, sub, app string) error {
 		sess, err := s.FindOrCreateForApp("acct-1", client, "", time.Hour)
 		if err != nil {
 			t.Fatal(err)
@@ -67,21 +75,32 @@ func TestTheVoucherCarriesTheClientsSubject(t *testing.T) {
 		sig := make([]byte, 64)
 		r.FillBytes(sig[:32])
 		sv.FillBytes(sig[32:])
-		_, err = s.PutEncAuth("acct-1", payload, sig, "app.example", iss)
+		_, err = s.PutEncAuth("acct-1", app, payload, sig, "app.example", iss)
 		return err
 	}
 
 	siteSub := iss.SubjectFor("acct-1", "site")
-	if err := put("site", "acct-1"); err == nil || !strings.Contains(err.Error(), "subject") {
+	if err := put("site", "acct-1", siteApp); err == nil || !strings.Contains(err.Error(), "subject") {
 		t.Fatalf("a voucher naming the account to an own-sector client: %v, want refused", err)
 	}
-	if err := put("site", siteSub); err != nil {
-		t.Fatalf("a voucher with the client's subject: %v", err)
+	if err := put("site", siteSub, siteApp); err != nil {
+		t.Fatalf("a voucher with the client's subject for its own app: %v", err)
 	}
-	if err := put("privasys-platform", "acct-1"); err != nil {
+	// Another app claiming the client's id is never handed its subject.
+	if err := put("site", siteSub, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"); !errors.Is(err, ErrAppNotOfClient) {
+		t.Fatalf("a voucher with the client's subject for another app: %v, want ErrAppNotOfClient", err)
+	}
+	if err := put("site", siteSub, ""); !errors.Is(err, ErrAppNotOfClient) {
+		t.Fatalf("a voucher with the client's subject and no app: %v, want ErrAppNotOfClient", err)
+	}
+	// The same app id written as a UUID is the same app.
+	if err := put("site", siteSub, "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"); err != nil {
+		t.Fatalf("a dashed app id: %v", err)
+	}
+	if err := put("privasys-platform", "acct-1", ""); err != nil {
 		t.Fatalf("a shared-sector voucher with the account id: %v", err)
 	}
-	if err := put("privasys-platform", siteSub); err == nil {
+	if err := put("privasys-platform", siteSub, ""); err == nil {
 		t.Fatal("a shared-sector voucher accepted another sector's subject")
 	}
 }
@@ -168,6 +187,12 @@ func TestThePostedVoucherCarriesTheClientsSubject(t *testing.T) {
 		return ""
 	})
 	s.SetWalletSessionResolver(func(token string) (string, bool) { return "acct-1", token == "tok" })
+	s.SetAppsResolver(func(c string) []string {
+		if c == "site" {
+			return []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+		}
+		return nil
+	})
 
 	hw, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	hwPub := elliptic.Marshal(elliptic.P256(), hw.PublicKey.X, hw.PublicKey.Y)
@@ -199,7 +224,7 @@ func TestThePostedVoucherCarriesTheClientsSubject(t *testing.T) {
 		sig := make([]byte, 64)
 		r.FillBytes(sig[:32])
 		sv.FillBytes(sig[32:])
-		return post(`{"client_id":"` + client + `","host":"app.example","payload":"` +
+		return post(`{"client_id":"` + client + `","app_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","host":"app.example","payload":"` +
 			base64.RawURLEncoding.EncodeToString(payload) + `","hw_sig":"` + base64.RawURLEncoding.EncodeToString(sig) + `"}`)
 	}
 

@@ -63,14 +63,16 @@ func (m *Mailer) SendGuardianInvite(guardianEmail, userName, inviteToken string)
 		return errors.New("mail is not configured on this server")
 	}
 
-	deepLink := fmt.Sprintf("https://privasys.id/guardian?token=%s", inviteToken)
+	// /guardians/* is forwarded to the IdP by the front proxy; the page there
+	// opens the wallet on the invitation (see HandleGuardianInvitePage).
+	deepLink := fmt.Sprintf("https://privasys.id/guardians/invite?token=%s", inviteToken)
 
 	// Use a fallback if the wallet didn't provide a name.
 	if userName == "" {
 		userName = "A Privasys user"
 	}
 
-	subject := "Privasys — Recovery Guardian Invitation"
+	subject := "Privasys: recovery guardian invitation"
 	body := fmt.Sprintf(
 		"%s has invited you as a recovery guardian on Privasys.\n\n"+
 			"As a recovery guardian, you help protect their account by approving "+

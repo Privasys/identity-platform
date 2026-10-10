@@ -26,6 +26,59 @@ const IDP_BASE_URL = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id'
 const PLATFORM_AUDIENCE = process.env['EXPO_PUBLIC_PLATFORM_AUDIENCE'] || 'privasys-platform';
 
 const STORE_KEY = 'privasys.platform-token';
+
+/**
+ * Drive's OIDC client. Every app sees the holder by its own identifier (the
+ * IdP's per-app subjects), and Drive's is the one its sign-in gives, so the
+ * wallet calls Drive with a key minted FOR Drive's client: the same
+ * identifier Drive's web sign-in carries. While Drive's client is still in
+ * the IdP's legacy shared mode, or not registered, the IdP mints the account
+ * key as before, so this is safe ahead of Drive's move.
+ */
+const DRIVE_CLIENT_ID = process.env['EXPO_PUBLIC_DRIVE_CLIENT_ID'] || 'privasys-drive';
+/** The Drive host the wallet last resolved (services/drive.ts records it). */
+const DRIVE_HOST_KEY = 'privasys.drive.host';
+
+/** Recorded by services/drive.ts whenever it resolves Drive's host. */
+export async function rememberDriveHost(host: string): Promise<void> {
+    try {
+        await SecureStore.setItemAsync(DRIVE_HOST_KEY, host);
+    } catch {
+        /* the next resolve records it again */
+    }
+}
+
+async function isDriveHost(host: string): Promise<boolean> {
+    try {
+        return !!host && (await SecureStore.getItemAsync(DRIVE_HOST_KEY)) === host;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * The bearer to present to a service at `host`: Drive's own key at Drive,
+ * the platform key everywhere else (the control plane, connectors).
+ */
+export async function tokenForHost(host: string): Promise<string> {
+    return (await isDriveHost(host)) ? getPlatformToken(PLATFORM_AUDIENCE, DRIVE_CLIENT_ID) : getPlatformToken();
+}
+
+/** tokenForHost without minting, so without a prompt. */
+export async function cachedTokenForHost(host: string): Promise<string | null> {
+    return (await isDriveHost(host))
+        ? getCachedPlatformToken(PLATFORM_AUDIENCE, DRIVE_CLIENT_ID)
+        : getCachedPlatformToken();
+}
+
+/** Drive's own key, for calls to the Drive enclave. */
+export async function getDriveToken(): Promise<string> {
+    return getPlatformToken(PLATFORM_AUDIENCE, DRIVE_CLIENT_ID);
+}
+
+function storeKeyFor(clientId?: string): string {
+    return clientId ? `${STORE_KEY}.${clientId}` : STORE_KEY;
+}
 /** Re-mint this long before expiry so a call never rides an about-to-die token. */
 const REFRESH_SKEW_MS = 24 * 60 * 60 * 1000; // 1 day
 
@@ -33,13 +86,15 @@ interface StoredToken {
     token: string;
     expiresAt: number; // unix ms
     audience: string;
+    /** The OIDC client the key names the holder for, or none (the platform). */
+    clientId?: string;
     /** credentialId of the identity the token was minted under — a cached
      *  token is only valid while the wallet's active platform identity is
      *  still that credential (see activePlatformCredentialId). */
     mintedBy?: string;
 }
 
-let inflight: Promise<string> | null = null;
+const inflight = new Map<string, Promise<string>>();
 
 /**
  * The credential of the wallet's ACTIVE platform identity — the same
@@ -64,14 +119,17 @@ function activePlatformCredentialId(): string {
  * mints a fresh one via the IdP (which may require a wallet sign-in, i.e. a
  * biometric — so call this from a user-initiated flow, not cold start).
  */
-export async function getPlatformToken(audience = PLATFORM_AUDIENCE): Promise<string> {
-    const cached = await readCached(audience);
+export async function getPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: string): Promise<string> {
+    const cached = await readCached(audience, clientId);
     if (cached) return cached;
-    if (inflight) return inflight;
-    inflight = mint(audience).finally(() => {
-        inflight = null;
+    const key = storeKeyFor(clientId);
+    const running = inflight.get(key);
+    if (running) return running;
+    const p = mint(audience, clientId).finally(() => {
+        inflight.delete(key);
     });
-    return inflight;
+    inflight.set(key, p);
+    return p;
 }
 
 /**
@@ -79,22 +137,24 @@ export async function getPlatformToken(audience = PLATFORM_AUDIENCE): Promise<st
  * mints, so never prompts: for background checks that must not put a Face ID
  * sheet in front of someone who did not ask for anything.
  */
-export async function getCachedPlatformToken(audience = PLATFORM_AUDIENCE): Promise<string | null> {
-    return readCached(audience);
+export async function getCachedPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: string): Promise<string | null> {
+    return readCached(audience, clientId);
 }
 
 /** Drop the cached platform token (e.g. on sign-out). */
 export async function clearPlatformToken(): Promise<void> {
-    try {
-        await SecureStore.deleteItemAsync(STORE_KEY);
-    } catch {
-        /* ignore */
+    for (const key of [STORE_KEY, storeKeyFor(DRIVE_CLIENT_ID), DRIVE_HOST_KEY]) {
+        try {
+            await SecureStore.deleteItemAsync(key);
+        } catch {
+            /* ignore */
+        }
     }
 }
 
-async function readCached(audience: string): Promise<string | null> {
+async function readCached(audience: string, clientId?: string): Promise<string | null> {
     try {
-        const raw = await SecureStore.getItemAsync(STORE_KEY);
+        const raw = await SecureStore.getItemAsync(storeKeyFor(clientId));
         if (!raw) return null;
         const s = JSON.parse(raw) as StoredToken;
         if (
@@ -111,7 +171,7 @@ async function readCached(audience: string): Promise<string | null> {
     }
 }
 
-async function mint(audience: string): Promise<string> {
+async function mint(audience: string, clientId?: string): Promise<string> {
     const sessionToken = await platformSessionToken();
     const res = await fetch(`${IDP_BASE_URL}/api-keys`, {
         method: 'POST',
@@ -119,7 +179,9 @@ async function mint(audience: string): Promise<string> {
             'Content-Type': 'application/json',
             Authorization: `Bearer wallet:${sessionToken}`
         },
-        body: JSON.stringify({ label: 'Privasys Wallet', audience })
+        body: JSON.stringify(
+            clientId ? { label: 'Privasys Wallet', audience, client_id: clientId } : { label: 'Privasys Wallet', audience },
+        )
     });
     if (!res.ok) {
         throw new Error(`mint platform token failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
@@ -130,9 +192,10 @@ async function mint(audience: string): Promise<string> {
         token: body.token,
         expiresAt: (body.expires_at ?? Math.floor(Date.now() / 1000) + 3600) * 1000,
         audience,
+        clientId,
         mintedBy: activePlatformCredentialId()
     };
-    await SecureStore.setItemAsync(STORE_KEY, JSON.stringify(stored)).catch(() => {});
+    await SecureStore.setItemAsync(storeKeyFor(clientId), JSON.stringify(stored)).catch(() => {});
     return body.token;
 }
 

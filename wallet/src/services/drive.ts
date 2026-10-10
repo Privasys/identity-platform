@@ -21,7 +21,7 @@ import { PrivasysDrive, type DriveNode, type Tenant } from '@privasys/drive-sdk'
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, attestEnclave, type AttestationResult } from '@/services/attestation';
 import { apiBasesForHost, appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
-import { getPlatformToken } from '@/services/platform-token';
+import { getDriveToken, getPlatformToken, rememberDriveHost, tokenForHost } from '@/services/platform-token';
 import { useSettingsStore, type VerificationMode } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
@@ -85,6 +85,7 @@ async function resolveDrive(force = false): Promise<ResolvedDrive> {
                     imageOid: j.image_oid || OID_WORKLOAD_IMAGE_DIGEST,
                     imageDigest: j.image_digest.toLowerCase()
                 };
+                void rememberDriveHost(resolved.origin);
                 return resolved;
             }
         }
@@ -96,6 +97,7 @@ async function resolveDrive(force = false): Promise<ResolvedDrive> {
         imageOid: OID_WORKLOAD_IMAGE_DIGEST,
         imageDigest: FALLBACK_DRIVE_IMAGE_DIGEST.toLowerCase()
     };
+    void rememberDriveHost(resolved.origin);
     return resolved;
 }
 
@@ -219,7 +221,9 @@ async function setup(): Promise<DriveSession | null> {
             ? lastAttest.appId
             : (await attestDrive()).appId;
 
-    const token = await getPlatformToken();
+    // Drive's own key: Drive knows the holder by the identifier its sign-in
+    // gives (per-app subjects), and the control plane by the account.
+    const token = await getDriveToken();
     const drive = PrivasysDrive.connect({
         baseUrl: `https://${d.origin}`,
         token,
@@ -227,7 +231,7 @@ async function setup(): Promise<DriveSession | null> {
         // over the platform fetch. The SDK sends the bearer on both legs.
         fetch: makeRaTlsFetch({ enclaveHost: d.origin, platformFetch: fetch })
     });
-    const { tenant } = await drive.setupPersonalDrive({ mgmtBaseUrl: PLATFORM_API_BASE, appId });
+    const { tenant } = await setupDriveAt(drive, PLATFORM_API_BASE, appId);
 
     session = { drive, tenant, origin: d.origin };
     return session;
@@ -255,7 +259,7 @@ export interface RemoteShareRequest {
 export async function listShareRequests(): Promise<{ tenantId: string; requests: RemoteShareRequest[] }> {
     const s = await ensureDrive();
     if (!s) throw new Error('Drive is unavailable');
-    const token = await getPlatformToken();
+    const token = await getDriveToken();
     const raFetch = makeRaTlsFetch({ enclaveHost: s.origin, platformFetch: fetch });
     const res = await raFetch(
         `https://${s.origin}/v1/tenants/${encodeURIComponent(s.tenant.id)}/link-requests`,
@@ -280,7 +284,7 @@ export async function decideShareRequest(
 ): Promise<void> {
     const s = await ensureDrive();
     if (!s) throw new Error('Drive is unavailable');
-    const token = await getPlatformToken();
+    const token = await getDriveToken();
     const raFetch = makeRaTlsFetch({ enclaveHost: s.origin, platformFetch: fetch });
     const res = await raFetch(
         `https://${s.origin}/v1/tenants/${encodeURIComponent(tenantId)}/link-requests/${encodeURIComponent(requestId)}/${decision}`,
@@ -315,7 +319,7 @@ export async function rearmTenantKeyAt(args: {
     appId: string;
     appHost?: string;
 }): Promise<{ status: string; handle: string }> {
-    const token = await getPlatformToken();
+    const token = await tokenForHost(args.host);
     const drive = PrivasysDrive.connect({
         baseUrl: `https://${args.host}`,
         token,
@@ -324,13 +328,49 @@ export async function rearmTenantKeyAt(args: {
     let lastErr: unknown = new Error('no control plane knows this app');
     for (const mgmtBaseUrl of apiBasesForHost(args.appHost ?? args.host)) {
         try {
-            const { key } = await drive.setupPersonalDrive({ mgmtBaseUrl, appId: args.appId });
+            const { key } = await setupDriveAt(drive, mgmtBaseUrl, args.appId);
             return key;
         } catch (e) {
             lastErr = e;
         }
     }
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/**
+ * The login setup, split so each leg carries the right key: the personal
+ * tenant and its key on the Drive enclave with Drive's own key (`drive` was
+ * connected with it), the data-key grant from the control plane with the
+ * platform key, which names the account the vault key belongs to. The SDK's
+ * one-call setupPersonalDrive would send Drive's key to the control plane.
+ */
+async function setupDriveAt(
+    drive: PrivasysDrive,
+    mgmtBaseUrl: string,
+    appId: string,
+): Promise<{ tenant: Tenant; key: { status: string; handle: string } }> {
+    const tenant = await drive.ensurePersonalTenant();
+    const platformToken = await getPlatformToken();
+    const res = await fetch(
+        `${mgmtBaseUrl.replace(/\/$/, '')}/api/v1/apps/${encodeURIComponent(appId)}/data-keys/grant`,
+        { method: 'POST', headers: { Authorization: `Bearer ${platformToken}` } },
+    );
+    if (!res.ok) {
+        throw new Error(`data-key grant failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    }
+    const bundle = (await res.json()) as {
+        grant?: string;
+        handle_hint?: string;
+        attestation_token?: string;
+        constellation?: { endpoints: string[]; mrenclave: string; attestation_server: string; threshold: number };
+    };
+    const key = await drive.provisionTenantKey({
+        grant: bundle.grant,
+        handle: bundle.handle_hint,
+        attestation_token: bundle.attestation_token,
+        constellation: bundle.constellation,
+    });
+    return { tenant, key };
 }
 
 /** Drop the cached drive session (e.g. on sign-out). */

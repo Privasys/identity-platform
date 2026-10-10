@@ -50,8 +50,6 @@
     "addGuardian": "Προσθήκη εγγυητή",
     "invited": "Στάλθηκε πρόσκληση",
     "invitedBody": "Το email πρόσκλησης εγγυητή στάλθηκε. Λήγει στις {{when, date}}.",
-    "scanQrTitle": "Σάρωση κωδικού QR",
-    "scanQrBody": "Ο σαρωτής κωδικών QR θα είναι διαθέσιμος σε μελλοντική ενημέρωση.",
     "removeGuardianTitle": "Αφαίρεση εγγυητή",
     "removeGuardianBody": "Να αφαιρεθεί ο/η {{guardian}} από τους εγγυητές;",
     "sectionDevices": "ΚΑΤΑΧΩΡΙΣΜΕΝΕΣ ΣΥΣΚΕΥΕΣ",
@@ -80,7 +78,19 @@
     "denyRecovery": "Άρνηση ανάκτησης",
     "denyRecoveryBody": "Να απορριφθεί το αίτημα ανάκτησης από {{who}};",
     "recoveryApproved": "Η ανάκτηση εγκρίθηκε.",
-    "recoveryDenied": "Η ανάκτηση απορρίφθηκε."
+    "recoveryDenied": "Η ανάκτηση απορρίφθηκε.",
+    "showGuardianCode": "Εμφάνιση του κωδικού εγγυητή μου",
+    "guardianCodeTitle": "Ο κωδικός εγγυητή σας",
+    "guardianCodeHint": "Όποιος θέλει να γίνετε εγγυητής ανάκτησής του σαρώνει αυτόν τον κωδικό με το Privasys Wallet. Στη συνέχεια θα σας ζητηθεί να αποδεχθείτε.",
+    "addGuardianConfirmTitle": "Προσθήκη αυτού του εγγυητή;",
+    "addGuardianConfirmBody": "Θα ζητηθεί από τον/την {{guardian}} να αποδεχθεί. Μόλις αποδεχθεί, μπορεί να εγκρίνει την ανάκτηση του λογαριασμού σας.",
+    "guardianAddedTitle": "Ο εγγυητής προσκλήθηκε",
+    "guardianAddedBody": "Θα δει το αίτημά σας στο Privasys Wallet του και μπορεί να το αποδεχθεί εκεί.",
+    "acceptInviteTitle": "Θέλετε να γίνετε εγγυητής ανάκτησης;",
+    "acceptInviteBody": "Κάποιος σας ζήτησε να τον βοηθήσετε να ανακτήσει τον λογαριασμό του στο Privasys αν χάσει το τηλέφωνό του. Αν χρειαστεί ποτέ, θα σας ζητηθεί έγκριση.",
+    "inviteAcceptedTitle": "Είστε πλέον εγγυητής ανάκτησης",
+    "inviteFailedTitle": "Δεν ήταν δυνατή η αποδοχή της πρόσκλησης",
+    "addGuardianFailedTitle": "Δεν ήταν δυνατή η προσθήκη του εγγυητή"
   },
 
   "attestation": {

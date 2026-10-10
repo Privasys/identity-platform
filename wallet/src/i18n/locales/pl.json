@@ -50,8 +50,6 @@
     "addGuardian": "Dodaj opiekuna",
     "invited": "Zaproszono",
     "invitedBody": "E-mail z zaproszeniem dla opiekuna wysłany. Wygasa {{when, date}}.",
-    "scanQrTitle": "Zeskanuj kod QR",
-    "scanQrBody": "Skaner kodów QR będzie dostępny w przyszłej aktualizacji.",
     "removeGuardianTitle": "Usuń opiekuna",
     "removeGuardianBody": "Usunąć {{guardian}} z grona opiekunów?",
     "sectionDevices": "ZAREJESTROWANE URZĄDZENIA",
@@ -80,7 +78,19 @@
     "denyRecovery": "Odmów odzyskania",
     "denyRecoveryBody": "Odmówić prośbie o odzyskanie od {{who}}?",
     "recoveryApproved": "Odzyskiwanie zatwierdzone.",
-    "recoveryDenied": "Odzyskiwanie odrzucone."
+    "recoveryDenied": "Odzyskiwanie odrzucone.",
+    "showGuardianCode": "Pokaż mój kod opiekuna",
+    "guardianCodeTitle": "Twój kod opiekuna",
+    "guardianCodeHint": "Osoba, która chce, abyś został jej opiekunem odzyskiwania, skanuje ten kod w Privasys Wallet. Następnie zostaniesz poproszony o akceptację.",
+    "addGuardianConfirmTitle": "Dodać tego opiekuna?",
+    "addGuardianConfirmBody": "{{guardian}} zostanie poproszony o akceptację. Gdy to zrobi, będzie mógł zatwierdzić odzyskanie Twojego konta.",
+    "guardianAddedTitle": "Zaproszono opiekuna",
+    "guardianAddedBody": "Zobaczy Twoją prośbę w swoim Privasys Wallet i będzie mógł ją tam zaakceptować.",
+    "acceptInviteTitle": "Zostać opiekunem odzyskiwania?",
+    "acceptInviteBody": "Ktoś poprosił Cię o pomoc w odzyskaniu dostępu do konta Privasys, jeśli zgubi telefon. Jeśli kiedykolwiek będzie to potrzebne, zostaniesz poproszony o zatwierdzenie.",
+    "inviteAcceptedTitle": "Jesteś teraz opiekunem odzyskiwania",
+    "inviteFailedTitle": "Nie udało się zaakceptować zaproszenia",
+    "addGuardianFailedTitle": "Nie udało się dodać opiekuna"
   },
 
   "attestation": {

@@ -63,6 +63,7 @@
     "oxfmt": "^0.35.0",
     "oxlint": "^1.50.0",
     "patch-package": "^8.0.1",
+    "qrcode-generator": "2.0.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-i18next": "^16.6.6",

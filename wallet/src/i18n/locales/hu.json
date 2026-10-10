@@ -50,8 +50,6 @@
     "addGuardian": "Bizalmi személy hozzáadása",
     "invited": "Meghívva",
     "invitedBody": "A bizalmi személy meghívó e-mailje elküldve. Lejár: {{when, date}}.",
-    "scanQrTitle": "QR-kód beolvasása",
-    "scanQrBody": "A QR-kódolvasó egy későbbi frissítésben lesz elérhető.",
     "removeGuardianTitle": "Bizalmi személy eltávolítása",
     "removeGuardianBody": "Eltávolítja {{guardian}} nevű bizalmi személyt?",
     "sectionDevices": "REGISZTRÁLT ESZKÖZÖK",
@@ -80,7 +78,19 @@
     "denyRecovery": "Helyreállítás elutasítása",
     "denyRecoveryBody": "Elutasítja {{who}} helyreállítási kérelmét?",
     "recoveryApproved": "A helyreállítás jóváhagyva.",
-    "recoveryDenied": "A helyreállítás elutasítva."
+    "recoveryDenied": "A helyreállítás elutasítva.",
+    "showGuardianCode": "Bizalmi személy kódom megjelenítése",
+    "guardianCodeTitle": "Az Ön bizalmi személy kódja",
+    "guardianCodeHint": "Aki Önt szeretné helyreállítási bizalmi személyének, beolvassa ezt a kódot a Privasys Wallettel. Ezután Önt megkérjük, hogy fogadja el.",
+    "addGuardianConfirmTitle": "Hozzáadja ezt a bizalmi személyt?",
+    "addGuardianConfirmBody": "{{guardian}} felkérést kap az elfogadásra. Ha elfogadta, jóváhagyhatja fiókja helyreállítását.",
+    "guardianAddedTitle": "Bizalmi személy meghívva",
+    "guardianAddedBody": "A kérést a saját Privasys Walletjében látja, és ott elfogadhatja.",
+    "acceptInviteTitle": "Helyreállítási bizalmi személy lesz?",
+    "acceptInviteBody": "Valaki arra kérte, segítsen neki visszajutni Privasys-fiókjába, ha elveszíti a telefonját. Ha erre valaha szükség lesz, Önt jóváhagyásra kérjük.",
+    "inviteAcceptedTitle": "Ön mostantól helyreállítási bizalmi személy",
+    "inviteFailedTitle": "A meghívást nem sikerült elfogadni",
+    "addGuardianFailedTitle": "A bizalmi személyt nem sikerült hozzáadni"
   },
 
   "attestation": {

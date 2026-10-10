@@ -89,6 +89,11 @@ func (s *Store) HandleCreateAPIKey(issuer *tokens.Issuer, defaultAudience string
 		var body struct {
 			Label    string `json:"label"`
 			Audience string `json:"audience"`
+			// ClientID asks for a key that names the user as that client does
+			// (per-app subjects): its own subject and its own audience. The
+			// wallet calls Drive with one, so Drive sees the identifier its own
+			// sign-in gives. Unknown or legacy clients get the account, as before.
+			ClientID string `json:"client_id"`
 		}
 		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body)
 		label := strings.TrimSpace(body.Label)
@@ -107,7 +112,19 @@ func (s *Store) HandleCreateAPIKey(issuer *tokens.Issuer, defaultAudience string
 			httpErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		token, err := issuer.IssueAccessTokenWithTTL(userID, aud, sid, nil, nil, APIKeyTTL)
+		subject := userID
+		var claims map[string]string
+		if c := strings.TrimSpace(body.ClientID); c != "" && s.sectorOf != nil {
+			if sector := s.sectorOf(c); sector != "" {
+				subject = issuer.SubjectFor(userID, sector)
+				aud = c
+			}
+		}
+		if subject == userID && aud == "privasys-platform" {
+			// The platform keys accounts by this whatever subject is used.
+			claims = map[string]string{"privasys_account": userID}
+		}
+		token, err := issuer.IssueAccessTokenWithTTL(subject, aud, sid, nil, claims, APIKeyTTL)
 		if err != nil {
 			_ = s.Revoke(sid) // never leave a session with no usable key
 			httpErr(w, http.StatusInternalServerError, err.Error())

@@ -32,6 +32,7 @@ import {
 import { listMySessions, revokeSession } from '@/services/sessions-api';
 import { setAppMuted } from '@/services/notify-mutes';
 import { revokeSpendConsent } from '@/services/spend-api';
+import { removeAppAtIdp } from '@/services/apps';
 import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useNotifyMutesStore } from '@/stores/notify-mutes';
@@ -343,6 +344,29 @@ export default function ServiceDetailScreen() {
                         // Drop this app's trail + standing consent.
                         removeService(serviceKey);
                         useConsentStore.getState().removeStandingConsent(serviceKey);
+                        // And the relationship at the IdP: the app's way back to this
+                        // holder (notifications, spend, asks) ends with it, and its
+                        // browsers end as signed-out. Authenticates with the credential
+                        // this app knows, as the other switches here do. Best effort:
+                        // the phone's own removal is not held up by the network.
+                        if (runningAppId && credential) {
+                            void (async () => {
+                                try {
+                                    const auth = await fido2.authenticate(
+                                        credential.rpId,
+                                        credential.keyAlias,
+                                        credential.credentialId,
+                                        '',
+                                        credential.serverRpId
+                                    );
+                                    if (auth.sessionToken) {
+                                        await removeAppAtIdp(auth.sessionToken, runningAppId.toLowerCase());
+                                    }
+                                } catch (e) {
+                                    console.warn('[SERVICE] remove at the identity provider failed:', e);
+                                }
+                            })();
+                        }
                         // End any live sealed session this app bootstrapped, so
                         // "Remove" actually disconnects instead of leaving the
                         // relay session up (and the card standing) until its TTL.

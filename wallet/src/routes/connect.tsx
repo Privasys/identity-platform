@@ -81,6 +81,7 @@ import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, gener
 import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { issueEncAuthForSignIn } from '@/services/encauth';
 import { CREDITS_PER_GBP, formatCap, grantSpendConsent } from '@/services/spend-api';
+import { bindSpendConsent } from '@/services/spend-binding';
 import { ensureWia } from '@/services/wia';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
@@ -2137,13 +2138,26 @@ function ConnectFlow() {
             console.warn('[CONNECT] spend consent skipped: the attested certificate carries no app id');
             return;
         }
-        void grantSpendConsent(walletSessionToken, appId, spendCap, {
-            appHost: payload.appHost,
-            appName: payload.appName,
-        }).then(
-            (c) => console.log(`[CONNECT] spend consent recorded for ${appId.substring(0, 8)}… (cap ${c.cap})`),
-            (err) => console.warn('[CONNECT] spend consent failed (the app cannot spend until allowed):', err),
-        );
+        // The holder binds the consent to a ledger handle of the wallet's own
+        // making, signed with the holder key: the platform debits by that
+        // handle and nothing names the holder (services/spend-binding.ts).
+        // A binding that cannot be made (a key refusing to sign) still records
+        // the consent; the IdP then mints the handle, unsigned.
+        void bindSpendConsent(appId, spendCap)
+            .catch((err) => {
+                console.warn('[CONNECT] spend binding not signed (the IdP mints the handle):', err);
+                return undefined;
+            })
+            .then((binding) =>
+                grantSpendConsent(walletSessionToken, appId, spendCap, {
+                    appHost: payload.appHost,
+                    appName: payload.appName,
+                }, binding),
+            )
+            .then(
+                (c) => console.log(`[CONNECT] spend consent recorded for ${appId.substring(0, 8)}… (cap ${c.cap})`),
+                (err) => console.warn('[CONNECT] spend consent failed (the app cannot spend until allowed):', err),
+            );
     };
 
     /** Full attestation (inspect + attestation-server verify) of an additional

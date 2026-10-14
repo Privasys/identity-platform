@@ -8,6 +8,13 @@ export interface KeyInfo {
     publicKey: string;
     /** Whether the key is backed by secure hardware (SE/StrongBox/TEE). */
     hardwareBacked: boolean;
+    /**
+     * How the key gates its use: `biometric` (bound to the enrolment that
+     * existed at creation), `passcode` (the phone had no usable biometric, so
+     * the device passcode unlocks it) or `none`. iOS reports it; Android keys
+     * accept a strong biometric or the device credential and omit it.
+     */
+    protection?: 'biometric' | 'passcode' | 'none';
 }
 
 export interface SignatureResult {

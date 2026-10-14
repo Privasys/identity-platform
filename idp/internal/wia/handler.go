@@ -23,19 +23,19 @@ import (
 type WalletSessionResolver func(token string) (string, bool)
 
 const (
-	challengeTTL = 5 * time.Minute
+	challengeTTL  = 5 * time.Minute
 	defaultWIATTL = 48 * time.Hour
-	maxBody      = 1 << 16
+	maxBody       = 1 << 16
 )
 
 // Handler serves the WIA challenge + enrolment endpoints and issues WIAs with
 // the wallet-provider signing key.
 type Handler struct {
-	issuer   *tokens.Issuer // wallet-provider issuer (distinct from the OIDC issuer)
-	resolve  WalletSessionResolver
-	policy   AttestPolicy
-	ttl      time.Duration
-	ch       *challengeStore
+	issuer  *tokens.Issuer // wallet-provider issuer (distinct from the OIDC issuer)
+	resolve WalletSessionResolver
+	policy  AttestPolicy
+	ttl     time.Duration
+	ch      *challengeStore
 }
 
 // Config configures the WIA handler.
@@ -144,6 +144,12 @@ type enrolRequest struct {
 	HolderSig     string      `json:"holder_sig"` // base64url ECDSA(DER) over the challenge
 	Attestation   Attestation `json:"attestation"`
 	WalletVersion string      `json:"wallet_version"`
+	// KeyProtection says how the holder key gates its use: "biometric" (the
+	// default when absent, as every wallet before 1.4.35) or "passcode" (the
+	// phone has no usable biometric; the device passcode unlocks the key).
+	// Reported, never verified: it lets a relying party that needs a
+	// biometric refuse, and keeps a phone without one usable everywhere else.
+	KeyProtection string `json:"key_protection"`
 }
 
 type enrolResponse struct {
@@ -175,6 +181,13 @@ func (h *Handler) HandleEnrol(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fresh, single-use challenge (anti-replay).
+	if req.KeyProtection == "" {
+		req.KeyProtection = "biometric"
+	}
+	if req.KeyProtection != "biometric" && req.KeyProtection != "passcode" {
+		writeErr(w, http.StatusBadRequest, "key_protection must be 'biometric' or 'passcode'")
+		return
+	}
 	if req.Challenge == "" || !h.ch.consume(req.Challenge) {
 		writeErr(w, http.StatusBadRequest, "unknown or expired challenge")
 		return
@@ -215,6 +228,7 @@ func (h *Handler) HandleEnrol(w http.ResponseWriter, r *http.Request) {
 		Level:         level,
 		Platform:      req.Platform,
 		WalletVersion: req.WalletVersion,
+		KeyProtection: req.KeyProtection,
 		TTL:           h.ttl,
 	})
 	if err != nil {

@@ -29,6 +29,7 @@ import { sectionTitleStyle } from '@/components/section-title';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import {
     biometricLabelKey,
+    holderVerificationAvailable,
     titleiseBiometric,
     DEFAULT_BIOMETRIC_LABEL_KEY,
 } from '@/services/biometrics';
@@ -131,9 +132,11 @@ export default function ProfileScreen() {
         setSetupBusy(true);
         setSetupDone(0);
         try {
-            // 1 — Confirm biometrics exist, are enrolled, and actually work.
-            const hasHardware = await LocalAuthentication.hasHardwareAsync();
-            const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
+            // 1 — Confirm the phone can verify its holder: a biometric, or failing
+            // that a device passcode, PIN, pattern or password. A phone with no
+            // working Face ID still gets a wallet; its key is passcode-gated and
+            // the attestation says so (services/biometrics.ts).
+            const enrolled = await holderVerificationAvailable();
             if (!enrolled) {
                 Alert.alert(
                     t('profile.setupBiometricFirstTitle', { method: bioLabel }),

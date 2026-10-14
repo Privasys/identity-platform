@@ -12,6 +12,9 @@
 
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Platform } from 'react-native';
+import { keyProtectionFor, type KeyProtection } from './key-protection';
+
+export { keyProtectionFor, type KeyProtection };
 
 /**
  * The default label KEY while the async capability probe is in flight, or if
@@ -63,4 +66,32 @@ export async function biometricLabelKey(): Promise<string> {
  */
 export function titleiseBiometric(label: string): string {
     return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+
+/** The holder key's protection on this phone (see keyProtectionFor). */
+export async function holderKeyProtection(
+    keyInfoProtection?: string
+): Promise<KeyProtection> {
+    let enrolled = false;
+    try {
+        enrolled = (await LocalAuthentication.hasHardwareAsync()) && (await LocalAuthentication.isEnrolledAsync());
+    } catch {
+        enrolled = false;
+    }
+    return keyProtectionFor(enrolled, keyInfoProtection);
+}
+
+/**
+ * Whether the phone can verify its holder at all: a biometric, or failing
+ * that a device passcode, PIN, pattern or password. A phone with neither
+ * cannot hold a key the holder must be present to use.
+ */
+export async function holderVerificationAvailable(): Promise<boolean> {
+    try {
+        const level = await LocalAuthentication.getEnrolledLevelAsync();
+        return level !== LocalAuthentication.SecurityLevel.NONE;
+    } catch {
+        return false;
+    }
 }

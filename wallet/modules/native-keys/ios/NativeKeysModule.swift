@@ -38,9 +38,21 @@ public class NativeKeysModule: Module {
                 return info
             }
 
+            // A key the holder must be present to use. With a biometric enrolled
+            // it is bound to that enrolment (a changed Face ID invalidates it);
+            // on a phone with no working biometric it is gated by the device
+            // passcode instead, so the wallet still works, and the choice is
+            // remembered so the attestation can say which (key_protection).
             var accessFlags: SecAccessControlCreateFlags = [.privateKeyUsage]
+            var protection = "none"
             if requireBiometric {
-                accessFlags.insert(.biometryCurrentSet)
+                if Self.biometricsAvailable() {
+                    accessFlags.insert(.biometryCurrentSet)
+                    protection = "biometric"
+                } else {
+                    accessFlags.insert(.userPresence)
+                    protection = "passcode"
+                }
             }
 
             guard let access = SecAccessControlCreateWithFlags(
@@ -68,6 +80,7 @@ public class NativeKeysModule: Module {
                 let msg = error?.takeRetainedValue().localizedDescription ?? "unknown"
                 return "{\"error\":\"\(msg)\"}"
             }
+            Self.rememberProtection(tag: tag, protection: protection)
 
             guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
                 return "{\"error\":\"failed to get public key\"}"
@@ -125,7 +138,12 @@ public class NativeKeysModule: Module {
         AsyncFunction("authenticateForSigning") { (reason: String, promise: Promise) in
             let ctx = Self.makeSigningContext()
             Self.signingContext = ctx
-            ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, _ in
+            // Biometrics when the phone has them; the device passcode otherwise
+            // (the key itself is passcode-gated on such a phone, see generateKey).
+            let policy: LAPolicy = Self.biometricsAvailable()
+                ? .deviceOwnerAuthenticationWithBiometrics
+                : .deviceOwnerAuthentication
+            ctx.evaluatePolicy(policy, localizedReason: reason) { success, _ in
                 promise.resolve(success)
             }
         }
@@ -212,10 +230,30 @@ public class NativeKeysModule: Module {
         return pubData
     }
 
+    /// Whether a biometric is enrolled and usable right now.
+    private static func biometricsAvailable() -> Bool {
+        var err: NSError?
+        return LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err)
+    }
+
+    private static let protectionPrefix = "org.privasys.wallet.keyprotection."
+
+    /// Remembers how a key gates its use, so key info can report it later.
+    private static func rememberProtection(tag: Data, protection: String) {
+        UserDefaults.standard.set(protection, forKey: protectionPrefix + base64urlEncode(tag))
+    }
+
+    /// How a key gates its use: "biometric" (the default for keys made before
+    /// this was recorded), "passcode" or "none".
+    private static func protection(tag: Data) -> String {
+        UserDefaults.standard.string(forKey: protectionPrefix + base64urlEncode(tag)) ?? "biometric"
+    }
+
     private static func keyInfoJson(keyId: String, publicKey: Data, hardwareBacked: Bool) -> String {
         let b64 = base64urlEncode(publicKey)
+        let prot = protection(tag: tag(for: keyId))
         return """
-        {"keyId":"\(keyId)","publicKey":"\(b64)","hardwareBacked":\(hardwareBacked)}
+        {"keyId":"\(keyId)","publicKey":"\(b64)","hardwareBacked":\(hardwareBacked),"protection":"\(prot)"}
         """
     }
 

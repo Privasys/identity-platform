@@ -26,6 +26,7 @@ import * as SecureStore from '@/utils/storage';
 
 import * as AppAttest from '../../modules/app-attest/src/index';
 import { signWithDeviceKey } from './did';
+import { holderKeyProtection } from './biometrics';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import { ensurePrivasysSession } from './privasys-id';
 
@@ -140,7 +141,8 @@ async function enrol(): Promise<string | null> {
         // Signed first so a key the hardware has retired is reported as such,
         // rather than as a public key read from a key that cannot sign.
         const holderSig = await signWithDeviceKey(challenge, HOLDER_KEY_ID);
-        const holderPub = (await NativeKeys.getPublicKey(HOLDER_KEY_ID)).publicKey; // b64url SEC1
+        const holderKeyInfo = await NativeKeys.getPublicKey(HOLDER_KEY_ID);
+        const holderPub = holderKeyInfo.publicKey; // b64url SEC1
 
         // Never post a half-built proof. The iOS module used to report failure
         // by RETURNING an error object, so these came through as undefined,
@@ -170,7 +172,10 @@ async function enrol(): Promise<string | null> {
                 challenge,
                 holder_sig: holderSig,
                 attestation,
-                wallet_version: walletVersion
+                wallet_version: walletVersion,
+                // How this phone verifies its holder, so a relying party that
+                // needs a biometric can tell a passcode-gated key apart.
+                key_protection: await holderKeyProtection(holderKeyInfo?.protection)
             }
         );
 

@@ -297,6 +297,8 @@ type WIAClaims struct {
 	Level         string                 // attested security level (strongbox|tee|app-attest)
 	Platform      string                 // ios | android
 	WalletVersion string
+	// KeyProtection is how the holder key gates its use: biometric | passcode.
+	KeyProtection string
 	TTL           time.Duration
 }
 
@@ -450,6 +452,9 @@ func (iss *Issuer) IssueWIA(c WIAClaims) (string, error) {
 	}
 	if c.WalletVersion != "" {
 		claims["wallet_version"] = c.WalletVersion
+	}
+	if c.KeyProtection != "" {
+		claims["key_protection"] = c.KeyProtection
 	}
 	return iss.signTyp(claims, "wia+jwt")
 }

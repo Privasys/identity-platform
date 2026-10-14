@@ -516,6 +516,11 @@ func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 			httpErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		// The relationship row: the one way from that subject back to the
+		// account, written forward here (internal/sessions/holders.go).
+		if err := s.RecordHolder(subject, req.ClientID, userID); err != nil {
+			log.Printf("sessions/encauth: record holder for %s: %v", req.ClientID, err)
+		}
 		out := map[string]any{"sid": sess.SID, "subject": subject}
 		if req.Payload != "" && req.HwSig != "" {
 			payload, perr := base64.RawURLEncoding.DecodeString(req.Payload)

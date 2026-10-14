@@ -7,7 +7,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"log"
 )
 
 // Per-app subjects.
@@ -28,30 +27,38 @@ import (
 // sector is the account id itself, kept only for Privasys's first-party
 // clients until their cross-app dependencies have moved to capabilities.
 //
-// The IdP keeps the reverse map (subject to account): apps hand subjects back
-// (a notification, a spend token, a disclosure) and the IdP, or the platform
-// through it, must find the account. The IdP already sees which clients an
-// account signs in to; the change is that relying parties no longer can.
+// The derivation is ONE-WAY and the IdP keeps NO map from a subject back to
+// an account. Where a flow must act on a subject an app hands back, it goes
+// through a row the holder made for that app and can end (the session a
+// token names by `sid`, a spend consent, a relationship row): never through
+// the subject itself. A reversible subject was considered and rejected: a
+// leaked key would have turned every subject ever issued into the account
+// behind it.
 
 // ClaimSubjectAsIssued holds the token's original "sub" after
 // VerifyAccessToken has resolved "sub" to the account.
 const ClaimSubjectAsIssued = "privasys_sub_as_issued"
 
+// ClaimPrivasysAccount names the account on a platform-audience token, where
+// the subject may be a client's own; VerifyAccessToken uses it when the token
+// names no session.
+const ClaimPrivasysAccount = "privasys_account"
+
 const subjectDomain = "privasys-subject/v1"
 
-// SubjectStore persists the reverse map. The store package implements it.
-type SubjectStore interface {
-	RememberSubject(sub, userID, sector string) error
-	ResolveSubject(sub string) (userID string, ok bool)
-}
+// AccountResolver names the account behind a live session, or ok=false when
+// the session is unknown, expired or revoked. The sessions store implements
+// it; VerifyAccessToken resolves a token's subject to its account through it.
+type AccountResolver func(sid string) (userID string, ok bool)
 
-// SetSubjectStore wires the reverse map. Without one, every sector behaves
-// as the shared one (subject = account id), which is the pre-sector state.
-func (iss *Issuer) SetSubjectStore(s SubjectStore) { iss.subjects = s }
+// SetAccountResolver wires the sessions store. Without one, a token's subject
+// is taken as the account unless it carries privasys_account.
+func (iss *Issuer) SetAccountResolver(f AccountResolver) { iss.accountOf = f }
 
 // SubjectFor returns the subject a client in `sector` sees for an account.
+// Pure: nothing is stored.
 func (iss *Issuer) SubjectFor(userID, sector string) string {
-	if sector == "" || iss.subjects == nil || userID == "" {
+	if sector == "" || userID == "" {
 		return userID
 	}
 	mac := hmac.New(sha256.New, iss.DeriveSecret("pairwise-subject"))
@@ -60,21 +67,5 @@ func (iss *Issuer) SubjectFor(userID, sector string) string {
 	mac.Write([]byte(sector))
 	mac.Write([]byte{0})
 	mac.Write([]byte(userID))
-	sub := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	if err := iss.subjects.RememberSubject(sub, userID, sector); err != nil {
-		log.Printf("tokens: remember subject: %v", err)
-	}
-	return sub
-}
-
-// ResolveSubject maps a subject any client might hold back to the account it
-// names. An account id (the shared sector) resolves to itself.
-func (iss *Issuer) ResolveSubject(sub string) string {
-	if iss.subjects == nil || sub == "" {
-		return sub
-	}
-	if userID, ok := iss.subjects.ResolveSubject(sub); ok {
-		return userID
-	}
-	return sub
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

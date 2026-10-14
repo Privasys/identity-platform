@@ -106,6 +106,18 @@ func (h *Handler) VerifyAppProof(ctx context.Context, appID, proof string) (stri
 // standing relationship an app needs before it may ask the holder for
 // anything on its own initiative.
 func (h *Handler) HasConsent(sub, appID string) bool {
-	_, err := h.store.Get(sub, NormaliseAppID(appID))
+	_, err := h.store.GetBySubject(sub, NormaliseAppID(appID))
 	return err == nil
+}
+
+// ConsentAccount names the account behind the subject an app holds, through
+// the live consent the holder gave that app, and nothing else: an app with
+// no consent from the holder learns nothing, and a subject from another app
+// matches no row.
+func (h *Handler) ConsentAccount(sub, appID string) (string, bool) {
+	c, err := h.store.GetBySubject(sub, NormaliseAppID(appID))
+	if err != nil {
+		return "", false
+	}
+	return c.UserID, true
 }

@@ -26,7 +26,9 @@
 package spend
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"regexp"
@@ -71,12 +73,22 @@ func NormaliseAppID(s string) string {
 
 // Consent is one user's standing authorisation for one app to spend.
 type Consent struct {
-	UserID    string     `json:"-"`
-	AppID     string     `json:"app_id"`
-	AppHost   string     `json:"app_host,omitempty"`
-	AppName   string     `json:"app_name,omitempty"`
-	Cap       int64      `json:"cap"` // credits per calendar month; 0 = no cap
-	SID       string     `json:"sid"`
+	UserID  string `json:"-"`
+	AppID   string `json:"app_id"`
+	AppHost string `json:"app_host,omitempty"`
+	AppName string `json:"app_name,omitempty"`
+	Cap     int64  `json:"cap"` // credits per calendar month; 0 = no cap
+	SID     string `json:"sid"`
+	// AppSubject is the subject the app names this holder by; the row is
+	// addressed by it on every app-facing path.
+	AppSubject string `json:"-"`
+	// Ledger is the per-consent handle the platform debits by. WalletSig is
+	// the holder's signature over handle‖app‖cap and HolderPub its key, kept
+	// as evidence and forwarded to the platform; both empty for a consent
+	// from a wallet that predates handles.
+	Ledger    string     `json:"ledger,omitempty"`
+	WalletSig string     `json:"-"`
+	HolderPub string     `json:"-"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
@@ -86,7 +98,12 @@ type Consent struct {
 type Store struct {
 	db       *store.DB
 	sessions *sessions.Store
+	onRevoke func(c *Consent)
 }
+
+// consentColumns is the SELECT list every scan reads.
+const consentColumns = `user_id, app_id, app_host, app_name, cap, sid,
+			created_at, updated_at, revoked_at, app_subject, ledger_handle, wallet_sig, holder_pub`
 
 // NewStore creates the consent table if needed.
 func NewStore(db *store.DB, sess *sessions.Store) (*Store, error) {
@@ -108,19 +125,158 @@ func NewStore(db *store.DB, sess *sessions.Store) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create spend_consents: %w", err)
 	}
+	// A consent is addressed by the subject the app sees, not the account:
+	// an app names its users by its own subject, and the IdP keeps no way
+	// back from one. The account stays on the row for the holder's own list.
+	// The ledger handle is what the platform debits by; the holder's
+	// signature over handle‖app‖cap is the evidence that bound their money.
+	for _, col := range []struct{ name, ddl string }{
+		{"app_subject", `ALTER TABLE spend_consents ADD COLUMN app_subject TEXT NOT NULL DEFAULT ''`},
+		{"ledger_handle", `ALTER TABLE spend_consents ADD COLUMN ledger_handle TEXT NOT NULL DEFAULT ''`},
+		{"wallet_sig", `ALTER TABLE spend_consents ADD COLUMN wallet_sig TEXT NOT NULL DEFAULT ''`},
+		{"holder_pub", `ALTER TABLE spend_consents ADD COLUMN holder_pub TEXT NOT NULL DEFAULT ''`},
+	} {
+		if err := addColumnIfMissing(db, "spend_consents", col.name, col.ddl); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_spend_consents_subject
+		ON spend_consents(app_subject, app_id) WHERE app_subject <> ''`); err != nil {
+		return nil, fmt.Errorf("index spend_consents: %w", err)
+	}
 	return &Store{db: db, sessions: sess}, nil
+}
+
+// addColumnIfMissing adds a column when the table predates it (SQLite has no
+// IF NOT EXISTS for ALTER TABLE ADD COLUMN).
+func addColumnIfMissing(db *store.DB, table, column, ddl string) error {
+	rows, err := db.Query(fmt.Sprintf(`PRAGMA table_info(%s)`, table))
+	if err != nil {
+		return fmt.Errorf("inspect %s: %w", table, err)
+	}
+	has := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt *string
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		if name == column {
+			has = true
+		}
+	}
+	rows.Close()
+	if !has {
+		if _, err := db.Exec(ddl); err != nil {
+			return fmt.Errorf("add %s.%s: %w", table, column, err)
+		}
+	}
+	return nil
+}
+
+// HandleProof is the per-consent ledger handle and the holder's signature
+// binding it, as the wallet sends them with a grant. A wallet that predates
+// handles sends none: the IdP mints the handle and the row carries no
+// signature until the holder's next re-consent.
+type HandleProof struct {
+	Handle    string
+	WalletSig string
+	HolderPub string
+}
+
+// NewHandle mints a random ledger handle (16 bytes, base64url).
+func NewHandle() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("spend: rand.Read: %v", err))
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// ValidHandle reports whether s is a 16-byte base64url handle.
+func ValidHandle(s string) bool {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	return err == nil && len(b) == 16
+}
+
+// SetRevokeNotifier registers a callback run with every consent this store
+// revokes through RevokeBySID (the generic session revoke path), so the
+// platform can be told the handle is dead.
+func (s *Store) SetRevokeNotifier(f func(c *Consent)) { s.onRevoke = f }
+
+// GetBySubject returns the LIVE consent an app holds for the subject it
+// names, or ErrNotFound. This is the lookup every app-facing path uses.
+func (s *Store) GetBySubject(appSubject, appID string) (*Consent, error) {
+	if appSubject == "" {
+		return nil, ErrNotFound
+	}
+	row := s.db.QueryRow(`SELECT `+consentColumns+`
+		FROM spend_consents WHERE app_subject = ? AND app_id = ?`, appSubject, appID)
+	c, err := scan(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if c.RevokedAt != nil || !s.sessions.IsActive(c.SID) {
+		return nil, ErrNotFound
+	}
+	return c, nil
+}
+
+// FillSubjects writes app_subject (and a handle) on rows that predate them,
+// deriving forward from the account. Run once at startup; returns how many
+// rows were filled, and the consents that got a handle, for registration.
+func (s *Store) FillSubjects(subjectFor func(userID, appID string) string) ([]*Consent, error) {
+	rows, err := s.db.Query(`SELECT user_id, app_id FROM spend_consents WHERE app_subject = '' OR ledger_handle = ''`)
+	if err != nil {
+		return nil, err
+	}
+	type pair struct{ user, app string }
+	var pairs []pair
+	for rows.Next() {
+		var p pair
+		if err := rows.Scan(&p.user, &p.app); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		pairs = append(pairs, p)
+	}
+	rows.Close()
+	var filled []*Consent
+	for _, p := range pairs {
+		sub := subjectFor(p.user, p.app)
+		if sub == "" {
+			continue
+		}
+		if _, err := s.db.Exec(`UPDATE spend_consents SET app_subject = ?,
+			ledger_handle = CASE WHEN ledger_handle = '' THEN ? ELSE ledger_handle END
+			WHERE user_id = ? AND app_id = ?`, sub, NewHandle(), p.user, p.app); err != nil {
+			return filled, err
+		}
+		if c, err := s.get(p.user, p.app, false); err == nil && s.sessions.IsActive(c.SID) {
+			filled = append(filled, c)
+		}
+	}
+	return filled, nil
 }
 
 // Grant records (or renews) the user's consent for appID under cap. A fresh
 // consent, or one that was revoked, gets a new backing session; a live one
 // keeps its sid (so tokens already issued stay valid) and only the cap and
 // display fields move.
-func (s *Store) Grant(userID, appID, appHost, appName string, cap int64) (*Consent, error) {
-	if userID == "" || appID == "" {
-		return nil, errors.New("spend: user and app required")
+func (s *Store) Grant(userID, appSubject, appID, appHost, appName string, cap int64, proof HandleProof) (*Consent, error) {
+	if userID == "" || appID == "" || appSubject == "" {
+		return nil, errors.New("spend: user, subject and app required")
 	}
 	if cap < 0 {
 		return nil, errors.New("spend: cap must not be negative")
+	}
+	if proof.Handle != "" && !ValidHandle(proof.Handle) {
+		return nil, errors.New("spend: ledger handle must be 16 bytes base64url")
 	}
 	now := time.Now().UTC()
 	existing, err := s.get(userID, appID, true)
@@ -128,6 +284,9 @@ func (s *Store) Grant(userID, appID, appHost, appName string, cap int64) (*Conse
 		return nil, err
 	}
 	if existing != nil && existing.RevokedAt == nil && s.sessions.IsActive(existing.SID) {
+		// A live consent keeps its handle (tokens already issued carry it);
+		// a holder-signed binding replaces an unsigned one from a wallet
+		// that predates handles, never the other way round.
 		_ = s.sessions.Touch(existing.SID, ConsentTTL)
 		if appHost == "" {
 			appHost = existing.AppHost
@@ -135,10 +294,21 @@ func (s *Store) Grant(userID, appID, appHost, appName string, cap int64) (*Conse
 		if appName == "" {
 			appName = existing.AppName
 		}
+		handle, sig, pub := existing.Ledger, existing.WalletSig, existing.HolderPub
+		if handle == "" {
+			handle = proof.Handle
+			if handle == "" {
+				handle = NewHandle()
+			}
+			sig, pub = proof.WalletSig, proof.HolderPub
+		} else if sig == "" && proof.Handle == handle && proof.WalletSig != "" {
+			sig, pub = proof.WalletSig, proof.HolderPub
+		}
 		if _, err := s.db.Exec(`UPDATE spend_consents
-			SET cap = ?, app_host = ?, app_name = ?, updated_at = ?
+			SET cap = ?, app_host = ?, app_name = ?, updated_at = ?, app_subject = ?,
+			    ledger_handle = ?, wallet_sig = ?, holder_pub = ?
 			WHERE user_id = ? AND app_id = ?`,
-			cap, appHost, appName, now, userID, appID); err != nil {
+			cap, appHost, appName, now, appSubject, handle, sig, pub, userID, appID); err != nil {
 			return nil, fmt.Errorf("update consent: %w", err)
 		}
 		return s.get(userID, appID, false)
@@ -147,16 +317,24 @@ func (s *Store) Grant(userID, appID, appHost, appName string, cap int64) (*Conse
 	if err != nil {
 		return nil, fmt.Errorf("create consent session: %w", err)
 	}
+	handle := proof.Handle
+	if handle == "" {
+		handle = NewHandle()
+	}
 	if existing == nil {
 		_, err = s.db.Exec(`INSERT INTO spend_consents
-			(user_id, app_id, app_host, app_name, cap, sid, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			userID, appID, appHost, appName, cap, sess.SID, now, now)
+			(user_id, app_id, app_host, app_name, cap, sid, created_at, updated_at,
+			 app_subject, ledger_handle, wallet_sig, holder_pub)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			userID, appID, appHost, appName, cap, sess.SID, now, now,
+			appSubject, handle, proof.WalletSig, proof.HolderPub)
 	} else {
 		_, err = s.db.Exec(`UPDATE spend_consents
-			SET cap = ?, app_host = ?, app_name = ?, sid = ?, updated_at = ?, revoked_at = NULL
+			SET cap = ?, app_host = ?, app_name = ?, sid = ?, updated_at = ?, revoked_at = NULL,
+			    app_subject = ?, ledger_handle = ?, wallet_sig = ?, holder_pub = ?
 			WHERE user_id = ? AND app_id = ?`,
-			cap, appHost, appName, sess.SID, now, userID, appID)
+			cap, appHost, appName, sess.SID, now,
+			appSubject, handle, proof.WalletSig, proof.HolderPub, userID, appID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("write consent: %w", err)
@@ -178,8 +356,7 @@ func (s *Store) Get(userID, appID string) (*Consent, error) {
 }
 
 func (s *Store) get(userID, appID string, includeRevoked bool) (*Consent, error) {
-	row := s.db.QueryRow(`SELECT user_id, app_id, app_host, app_name, cap, sid,
-			created_at, updated_at, revoked_at
+	row := s.db.QueryRow(`SELECT `+consentColumns+`
 		FROM spend_consents WHERE user_id = ? AND app_id = ?`, userID, appID)
 	c, err := scan(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -196,8 +373,7 @@ func (s *Store) get(userID, appID string, includeRevoked bool) (*Consent, error)
 
 // List returns the user's live consents, most recently updated first.
 func (s *Store) List(userID string) ([]*Consent, error) {
-	rows, err := s.db.Query(`SELECT user_id, app_id, app_host, app_name, cap, sid,
-			created_at, updated_at, revoked_at
+	rows, err := s.db.Query(`SELECT `+consentColumns+`
 		FROM spend_consents WHERE user_id = ? AND revoked_at IS NULL
 		ORDER BY updated_at DESC`, userID)
 	if err != nil {
@@ -247,8 +423,18 @@ func (s *Store) SetDisplay(userID, appID, appHost, appName string) error {
 
 func (s *Store) RevokeBySID(sid string) error {
 	now := time.Now().UTC()
+	var hit *Consent
+	if s.onRevoke != nil {
+		row := s.db.QueryRow(`SELECT `+consentColumns+` FROM spend_consents WHERE sid = ? AND revoked_at IS NULL`, sid)
+		if c, err := scan(row); err == nil {
+			hit = c
+		}
+	}
 	_, err := s.db.Exec(`UPDATE spend_consents SET revoked_at = ?, updated_at = ?
 		WHERE sid = ? AND revoked_at IS NULL`, now, now, sid)
+	if err == nil && hit != nil {
+		s.onRevoke(hit)
+	}
 	return err
 }
 
@@ -260,7 +446,7 @@ func scan(r scanner) (*Consent, error) {
 	var c Consent
 	var revoked sql.NullTime
 	if err := r.Scan(&c.UserID, &c.AppID, &c.AppHost, &c.AppName, &c.Cap, &c.SID,
-		&c.CreatedAt, &c.UpdatedAt, &revoked); err != nil {
+		&c.CreatedAt, &c.UpdatedAt, &revoked, &c.AppSubject, &c.Ledger, &c.WalletSig, &c.HolderPub); err != nil {
 		return nil, err
 	}
 	if revoked.Valid {

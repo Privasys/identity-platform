@@ -30,8 +30,8 @@ type Issuer struct {
 	privateKey *ecdsa.PrivateKey
 	keyID      string
 	issuerURL  string
-	// subjects maps per-sector subjects back to accounts; see subject.go.
-	subjects SubjectStore
+	// accountOf names the account behind a live session; see subject.go.
+	accountOf AccountResolver
 }
 
 // NewIssuer loads an EC P-256 private key from a PEM file and creates an issuer.
@@ -460,9 +460,13 @@ func (iss *Issuer) IssueWIA(c WIAClaims) (string, error) {
 // of that key can produce the per-request proofs a callee demands. `sid`
 // is the consent session, the revocation handle every callee already polls.
 type SpendTokenClaims struct {
-	Subject  string
-	AppID    string
-	SID      string
+	Subject string
+	AppID   string
+	SID     string
+	// Ledger is the per-consent handle the platform's billing layer debits
+	// by (see IssueLedgerHandleStatement). Callees forward it with usage;
+	// nothing maps the subject to an account.
+	Ledger   string
 	Cap      int64
 	Cnf      map[string]interface{} // the app's public spend key (EC P-256 JWK)
 	IssuedAt time.Time
@@ -498,7 +502,70 @@ func (iss *Issuer) IssueSpendToken(c SpendTokenClaims) (string, error) {
 	if c.JTI != "" {
 		claims["jti"] = c.JTI
 	}
+	if c.Ledger != "" {
+		claims["ledger"] = c.Ledger
+	}
 	return iss.signTyp(claims, "spend+jwt")
+}
+
+// LedgerHandleStatement is what the IdP tells the platform's billing layer
+// when a holder grants (or withdraws) an app's consent to spend: which
+// account this handle debits, for which app, under which cap. It is the
+// ONLY place the account behind a spend token is named, it is signed by
+// the IdP and verified against its JWKS, and it carries the holder's own
+// signature over handle‖app_id‖cap as the evidence that the holder, not the
+// IdP alone, bound their money to this handle.
+type LedgerHandleStatement struct {
+	Kind      string // "register" | "revoke"
+	Handle    string
+	Account   string
+	AppID     string
+	Cap       int64
+	SID       string
+	WalletSig string // base64url raw P-256 signature by the holder key, or ""
+	HolderPub string // base64url SEC1 point of that key, or ""
+	IssuedAt  time.Time
+	JTI       string
+}
+
+// LedgerHandleTyp is the JOSE typ of a ledger-handle statement.
+const LedgerHandleTyp = "ledger-handle+jwt"
+
+// IssueLedgerHandleStatement signs a statement (typ = "ledger-handle+jwt").
+// It is not an access token: its audience is the billing layer and no
+// resource server accepts it.
+func (iss *Issuer) IssueLedgerHandleStatement(s LedgerHandleStatement) (string, error) {
+	if s.Handle == "" || s.Account == "" || s.AppID == "" || (s.Kind != "register" && s.Kind != "revoke") {
+		return "", fmt.Errorf("ledger handle statement: kind, handle, account and app are required")
+	}
+	iat := s.IssuedAt
+	if iat.IsZero() {
+		iat = time.Now()
+	}
+	claims := jwt.MapClaims{
+		"iss":     iss.issuerURL,
+		"aud":     "privasys-billing",
+		"typ":     LedgerHandleTyp,
+		"kind":    s.Kind,
+		"ledger":  s.Handle,
+		"account": s.Account,
+		"app_id":  s.AppID,
+		"cap":     s.Cap,
+		"iat":     iat.Unix(),
+		"exp":     iat.Add(24 * time.Hour).Unix(),
+		"v":       1,
+	}
+	if s.SID != "" {
+		claims["sid"] = s.SID
+	}
+	if s.WalletSig != "" {
+		claims["wallet_sig"] = s.WalletSig
+		claims["holder_pub"] = s.HolderPub
+	}
+	if s.JTI != "" {
+		claims["jti"] = s.JTI
+	}
+	return iss.signTyp(claims, LedgerHandleTyp)
 }
 
 // DisclosureClaims are the claims of a DISCLOSURE: the holder (`sub`)
@@ -578,6 +645,11 @@ func (iss *Issuer) VerifyAccessToken(tokenStr string) (map[string]interface{}, e
 		if _, ok := t.Method.(*jwt.SigningMethodECDSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
+		// A ledger-handle statement is signed with the same key and names an
+		// account; it is for the billing layer only and never a bearer here.
+		if typ, _ := t.Header["typ"].(string); typ == LedgerHandleTyp {
+			return nil, fmt.Errorf("not an access token: %s", typ)
+		}
 		return &iss.privateKey.PublicKey, nil
 	})
 	if err != nil {
@@ -589,13 +661,38 @@ func (iss *Issuer) VerifyAccessToken(tokenStr string) (map[string]interface{}, e
 	}
 	// Every caller of this inside the IdP looks the account up by "sub". A
 	// token issued to a client in its own sector carries that sector's
-	// subject, so resolve it to the account here, once, and keep what was
-	// issued for the one caller that echoes it back (userinfo).
+	// subject, which the IdP cannot invert: the account comes from the
+	// SESSION the token names (`sid`), so a revoked session's token stops
+	// naming anyone, or from privasys_account on a platform-audience token.
+	// A token with neither is a shared-sector token, whose subject is the
+	// account. What was issued is kept for the one caller that echoes it
+	// back (userinfo).
 	if sub, _ := claims["sub"].(string); sub != "" {
 		claims[ClaimSubjectAsIssued] = sub
-		claims["sub"] = iss.ResolveSubject(sub)
+		account, err := iss.accountOfClaims(claims)
+		if err != nil {
+			return nil, err
+		}
+		claims["sub"] = account
 	}
 	return claims, nil
+}
+
+// accountOfClaims names the account a verified token acts for (see
+// VerifyAccessToken).
+func (iss *Issuer) accountOfClaims(claims jwt.MapClaims) (string, error) {
+	if sid, _ := claims["sid"].(string); sid != "" && iss.accountOf != nil {
+		account, ok := iss.accountOf(sid)
+		if !ok {
+			return "", fmt.Errorf("session revoked or expired")
+		}
+		return account, nil
+	}
+	if account, _ := claims[ClaimPrivasysAccount].(string); account != "" {
+		return account, nil
+	}
+	sub, _ := claims["sub"].(string)
+	return sub, nil
 }
 
 // VerifyServiceAccountJWT verifies a JWT assertion signed by a service account's RSA key.

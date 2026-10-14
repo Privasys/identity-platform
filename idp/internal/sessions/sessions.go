@@ -166,6 +166,9 @@ func New(db *store.DB) (*Store, error) {
 	if err := s.migrateEncAuthBlobs(); err != nil {
 		return nil, fmt.Errorf("migrate encauth blobs: %w", err)
 	}
+	if err := s.ensureHolders(); err != nil {
+		return nil, fmt.Errorf("create app_holders: %w", err)
+	}
 	return s, nil
 }
 

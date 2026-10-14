@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/Privasys/idp/internal/store"
+	idpsessions "github.com/Privasys/idp/internal/sessions"
 	"github.com/Privasys/idp/internal/tokens"
 )
 
@@ -51,7 +52,6 @@ func signIn(t *testing.T, userID, sector string) signedIn {
 func signInWith(t *testing.T, userID, sector string, platform bool) signedIn {
 	t.Helper()
 	reg, db, iss := newDeviceTestEnv(t)
-	iss.SetSubjectStore(db)
 	if sector != "" {
 		if err := reg.SetSector("privasys-cli", sector); err != nil {
 			t.Fatal(err)
@@ -69,8 +69,15 @@ func signInWith(t *testing.T, userID, sector string, platform bool) signedIn {
 		t.Fatal(err)
 	}
 	codes, sessions, devices := NewCodeStore(), NewSessionStore(), NewDeviceStore()
+	// Tokens name a session row; the IdP finds the account behind an
+	// own-subject token through it, never through the subject.
+	sessStore, err := idpsessions.New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iss.SetAccountResolver(sessStore.ActiveAccount)
 	devHandler := HandleDeviceAuthorization(reg, sessions, devices, "https://privasys.id", nil)
-	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, nil)
+	tokenHandler := HandleToken(reg, codes, devices, sessions, iss, db, sessStore)
 	_, body := postForm(t, devHandler, "/device_authorization", url.Values{
 		"client_id":      {"privasys-cli"},
 		"scope":          {"openid email profile offline_access"},
@@ -116,8 +123,8 @@ func TestASharedSectorClientSeesTheAccount(t *testing.T) {
 		t.Fatalf("shared-sector userinfo: %v", info)
 	}
 	at := claimsOf(t, s.tokens["access_token"].(string))
-	if at["aud"] != "privasys-platform" || at[ClaimPrivasysAccount] != "acct-1" {
-		t.Fatalf("legacy platform token: aud %v, account %v", at["aud"], at[ClaimPrivasysAccount])
+	if at["aud"] != "privasys-platform" || at[tokens.ClaimPrivasysAccount] != "acct-1" {
+		t.Fatalf("legacy platform token: aud %v, account %v", at["aud"], at[tokens.ClaimPrivasysAccount])
 	}
 }
 
@@ -138,7 +145,7 @@ func TestAnOwnSectorClientSeesItsOwnSubject(t *testing.T) {
 	if at["aud"] != "privasys-cli" {
 		t.Fatalf("own-subject client token aud %v, want the client itself", at["aud"])
 	}
-	if _, has := at[ClaimPrivasysAccount]; has {
+	if _, has := at[tokens.ClaimPrivasysAccount]; has {
 		t.Fatal("an own-subject client's token carries the account id")
 	}
 
@@ -193,8 +200,8 @@ func TestAPlatformClientWithItsOwnSubjects(t *testing.T) {
 	if at["sub"] == "acct-1" {
 		t.Fatal("an own-subject platform client got the account id as sub")
 	}
-	if at["aud"] != "privasys-platform" || at[ClaimPrivasysAccount] != "acct-1" || at["roles"] == nil {
-		t.Fatalf("platform client token: aud %v account %v roles %v", at["aud"], at[ClaimPrivasysAccount], at["roles"])
+	if at["aud"] != "privasys-platform" || at[tokens.ClaimPrivasysAccount] != "acct-1" || at["roles"] == nil {
+		t.Fatalf("platform client token: aud %v account %v roles %v", at["aud"], at[tokens.ClaimPrivasysAccount], at["roles"])
 	}
 	if info := userinfo(t, s); info["roles"] == nil {
 		t.Fatal("userinfo dropped a platform client's roles")

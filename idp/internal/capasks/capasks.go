@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -174,5 +175,21 @@ func HandleDismiss(s *Store, auth Authenticate) http.HandlerFunc {
 		}
 		s.Remove(sub, r.PathValue("nonce"))
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// RemoveByApp drops every ask one app has waiting for sub: the holder removed
+// the app, and nothing of it should still be listed.
+func (s *Store) RemoveByApp(sub, appID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	mine := s.asks[sub]
+	for n, a := range mine {
+		if strings.EqualFold(a.AppID, appID) || strings.EqualFold(strings.ReplaceAll(a.AppID, "-", ""), appID) {
+			delete(mine, n)
+		}
+	}
+	if len(mine) == 0 {
+		delete(s.asks, sub)
 	}
 }

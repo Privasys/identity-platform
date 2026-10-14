@@ -112,7 +112,14 @@ func notifyTitleBody(typ, appName string) (string, string) {
 //
 // mutes, when non-nil, drops a notification from an app the holder silenced;
 // see internal/notifymute.
-func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *notifymute.Service) http.HandlerFunc {
+// HolderResolver names the account behind the subject an app sees, through
+// the relationship row the holder's sign-in to that app wrote (internal/
+// sessions/holders.go), or ok=false: the IdP keeps no map from a subject back
+// to an account. For an app whose client shares the account id as its
+// subject, the subject IS the account and the resolver checks it exists.
+type HolderResolver func(sub, appID string) (userID string, ok bool)
+
+func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *notifymute.Service, holders HolderResolver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !checkAdmin(w, r, adminToken) {
 			return
@@ -128,12 +135,18 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			writeError(w, http.StatusBadRequest, "sub and type are required")
 			return
 		}
-		// An app outside the shared sector knows the holder by its own subject
-		// (internal/tokens/subject.go); everything below is keyed by account.
-		if db != nil {
-			if userID, ok := db.ResolveSubject(req.Sub); ok {
-				req.Sub = userID
+		// An app knows the holder by its own subject; everything below is
+		// keyed by account. The only way from one to the other is the
+		// relationship the holder's sign-in to this app created, and a holder
+		// who removed the app is unreachable: a 404 the control plane reports
+		// as "no push target", which tells the app nothing new.
+		if holders != nil {
+			userID, ok := holders(req.Sub, req.AppID)
+			if !ok {
+				writeError(w, http.StatusNotFound, "no push target for user")
+				return
 			}
+			req.Sub = userID
 		}
 		// The holder silenced this app. A 200, so the control plane reports
 		// success to the app: it has nothing to retry, and a refusal would

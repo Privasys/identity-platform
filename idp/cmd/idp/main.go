@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/Privasys/idp/internal/admin"
+	"github.com/Privasys/idp/internal/apps"
 	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/capasks"
 	"github.com/Privasys/idp/internal/clients"
@@ -73,9 +74,8 @@ func main() {
 		log.Fatalf("failed to create token issuer: %v", err)
 	}
 	// Per-sector subjects: a client outside the shared sector sees its own
-	// subject for each person (internal/tokens/subject.go).
-	issuer.SetSubjectStore(db)
-	oidc.SetSubjectResolver(issuer.ResolveSubject)
+	// subject for each person (internal/tokens/subject.go). One-way: the IdP
+	// keeps no map back; a token's account comes from the session it names.
 
 	// Wallet-provider signing key — a DISTINCT key that signs Wallet Instance
 	// Attestations, verified via /wallet-provider/jwks (provisioned into the
@@ -131,6 +131,16 @@ func main() {
 	sessionsStore.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	sessionsStore.SetSectorResolver(clientReg.SectorOf)
 	sessionsStore.SetAppsResolver(clientReg.AppIDsOf)
+	issuer.SetAccountResolver(sessionsStore.ActiveAccount)
+	// Relationship rows for every live (account, client) pair that predates
+	// them (internal/sessions/holders.go); idempotent.
+	if n, err := sessionsStore.BackfillHolders(func(userID, clientID string) string {
+		return issuer.SubjectFor(userID, clientReg.SectorOf(clientID))
+	}); err != nil {
+		log.Printf("sessions: backfill holders: %v", err)
+	} else if n > 0 {
+		log.Printf("sessions: %d relationship row(s) backfilled", n)
+	}
 	fido2Handler.SetSubjectResolver(func(userID, clientID string) string {
 		return issuer.SubjectFor(userID, clientReg.SectorOf(clientID))
 	})
@@ -218,9 +228,26 @@ func main() {
 		log.Fatalf("failed to open spend store: %v", err)
 	}
 	sessionsStore.SetRevokeHook(func(sid string) { _ = spendStore.RevokeBySID(sid) })
+	// The subject an app sees for an account: through the client that stands
+	// for the app (internal/clients), the account itself when none does.
+	subjectForApp := func(userID, appID string) string {
+		return issuer.SubjectFor(userID, clientReg.SectorOf(clientReg.ClientOfApp(appID)))
+	}
+	// The platform learns which account a consent's handle debits from a
+	// signed statement delivered through this outbox (internal/spend/outbox.go).
+	ledgerOutbox, err := spend.NewOutbox(db, []spend.OutboxTarget{
+		{URL: cfg.MgmtURL, Token: cfg.IdpMgmtToken},
+		{URL: cfg.MgmtDevURL, Token: cfg.MgmtDevToken},
+	}, nil)
+	if err != nil {
+		log.Fatalf("failed to open ledger outbox: %v", err)
+	}
+	go ledgerOutbox.Run(context.Background(), 30*time.Second)
 	spendHandler := spend.New(spend.Config{
-		Store:  spendStore,
-		Issuer: issuer,
+		Store:      spendStore,
+		Issuer:     issuer,
+		SubjectFor: subjectForApp,
+		Outbox:     ledgerOutbox,
 		Auth: func(r *http.Request) (string, error) {
 			userID, _, err := sessionsStore.AuthenticateBearer(r, issuer)
 			return userID, err
@@ -238,6 +265,14 @@ func main() {
 	mux.HandleFunc("GET /spend/consents/{app_id}", spendHandler.HandleGetConsent)
 	mux.HandleFunc("DELETE /spend/consents/{app_id}", spendHandler.HandleRevokeConsent)
 	mux.HandleFunc("POST /spend/token", spendHandler.HandleToken)
+	// Consents that predate subjects and handles get both, once, and the
+	// platform is told their handles.
+	if filled, err := spendStore.FillSubjects(subjectForApp); err != nil {
+		log.Printf("spend: fill consent subjects: %v", err)
+	} else if len(filled) > 0 {
+		spendHandler.RegisterFilled(filled)
+		log.Printf("spend: %d consent(s) given a subject and a handle", len(filled))
+	}
 	// App-initiated disclosures: an app the holder already uses (spend
 	// consent) asks for attribute values with no browser involved (an
 	// assistant opening a share link for its user). The holder approves in
@@ -414,12 +449,21 @@ func main() {
 	// list (routes beside the grants index below), so a swiped-away push
 	// does not strand the ask.
 	capabilityAsks := capasks.New()
+	// The account behind the subject an app sees, through the relationship
+	// row its holder's sign-in wrote; for an app whose client shares the
+	// account id, the subject is the account and need only exist.
+	holderOfApp := func(sub, appID string) (string, bool) {
+		clientID := clientReg.ClientOfApp(appID)
+		if clientID == "" || clientReg.SectorOf(clientID) == "" {
+			return sub, db.UserExists(sub)
+		}
+		return sessionsStore.HolderOf(sub, clientID)
+	}
 	// Apps a holder silenced, kept as keyed hashes of the pairs they chose
 	// and nothing else; the wallet's switch is registered below with the
 	// grants index. See internal/notifymute.
 	notifyMutes := notifymute.New(db, issuer.DeriveSecret("notify-mute"))
-	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken, capabilityAsks, notifyMutes))
-	mux.HandleFunc("POST /admin/subjects/resolve", admin.HandleResolveSubjects(db, cfg.AdminToken))
+	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken, capabilityAsks, notifyMutes, holderOfApp))
 	mux.HandleFunc("POST /admin/subjects/for", admin.HandleSubjectsFor(issuer, cfg.AdminToken))
 	mux.HandleFunc("POST /admin/roles", admin.HandleGrantRole(db, cfg.AdminToken))
 	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
@@ -488,6 +532,13 @@ func main() {
 	// because the front proxy already forwards that prefix.
 	mux.HandleFunc("PUT /wallet/notify-mutes/{app_id}", notifyMutes.HandleMute(recoveryHandler.AuthenticateBearer))
 	mux.HandleFunc("DELETE /wallet/notify-mutes/{app_id}", notifyMutes.HandleUnmute(recoveryHandler.AuthenticateBearer))
+	// The holder removing an app: its relationship row, the sessions of the
+	// client that stands for it, its spend consent and its open asks all go,
+	// and with them the app's only way back to the person (internal/apps).
+	mux.HandleFunc("DELETE /wallet/apps/{app_id}", apps.HandleRemove(&apps.Remover{
+		Sessions: sessionsStore, Spend: spendStore, Asks: capabilityAsks, Clients: clientReg,
+		OnConsentRevoked: spendHandler.NotifyRevoked,
+	}, recoveryHandler.AuthenticateBearer))
 	mux.HandleFunc("GET /capability-requests/pending",
 		capasks.HandleList(capabilityAsks, recoveryHandler.AuthenticateBearer))
 	mux.HandleFunc("DELETE /capability-requests/pending/{nonce}",

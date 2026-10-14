@@ -6,6 +6,8 @@ package spend
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -14,7 +16,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,15 +47,22 @@ type AccountEnsurer func(ctx context.Context, sub string) error
 
 // Handler serves the consent and token endpoints.
 type Handler struct {
-	store    *Store
-	issuer   *tokens.Issuer
-	auth     Authenticator
-	keys     *keyCache
-	resolver AppResolver
-	ensure   AccountEnsurer
-	ttl      time.Duration
-	now      func() time.Time
+	store      *Store
+	issuer     *tokens.Issuer
+	auth       Authenticator
+	keys       *keyCache
+	resolver   AppResolver
+	ensure     AccountEnsurer
+	subjectFor SubjectFor
+	outbox     *Outbox
+	ttl        time.Duration
+	now        func() time.Time
 }
+
+// SubjectFor derives, forward, the subject an app sees for an account: the
+// account id for an app whose client shares it, the client's own subject
+// otherwise. Wired from the client registry; identity when nil.
+type SubjectFor func(userID, appID string) string
 
 // Config wires a Handler.
 type Config struct {
@@ -60,6 +71,10 @@ type Config struct {
 	Auth     Authenticator
 	Resolver AppResolver
 	Ensure   AccountEnsurer
+	// SubjectFor keys consents by the subject the app sees (see SubjectFor).
+	SubjectFor SubjectFor
+	// Outbox tells the platform which account a consent's handle debits.
+	Outbox *Outbox
 	// TokenTTL bounds a spend token's lifetime (default 24h). A token also
 	// never outlives the consent session behind it.
 	TokenTTL time.Duration
@@ -73,16 +88,89 @@ func New(c Config) *Handler {
 	if ttl <= 0 {
 		ttl = 24 * time.Hour
 	}
-	return &Handler{
-		store:    c.Store,
-		issuer:   c.Issuer,
-		auth:     c.Auth,
-		keys:     newKeyCache(c.Resolver, c.HTTP),
-		resolver: c.Resolver,
-		ensure:   c.Ensure,
-		ttl:      ttl,
-		now:      time.Now,
+	subjectFor := c.SubjectFor
+	if subjectFor == nil {
+		subjectFor = func(userID, _ string) string { return userID }
 	}
+	h := &Handler{
+		store:      c.Store,
+		issuer:     c.Issuer,
+		auth:       c.Auth,
+		keys:       newKeyCache(c.Resolver, c.HTTP),
+		resolver:   c.Resolver,
+		ensure:     c.Ensure,
+		subjectFor: subjectFor,
+		outbox:     c.Outbox,
+		ttl:        ttl,
+		now:        time.Now,
+	}
+	// A consent revoked through its session (the wallet's sessions list)
+	// reports its handle dead like one withdrawn here.
+	c.Store.SetRevokeNotifier(func(consent *Consent) { h.tell("revoke", consent) })
+	return h
+}
+
+// tell queues the signed statement that binds (or unbinds) a consent's
+// handle to its account, for every control plane the IdP serves.
+func (h *Handler) tell(kind string, c *Consent) {
+	if h.outbox == nil || c == nil || c.Ledger == "" {
+		return
+	}
+	stmt, err := h.issuer.IssueLedgerHandleStatement(tokens.LedgerHandleStatement{
+		Kind: kind, Handle: c.Ledger, Account: c.UserID, AppID: c.AppID, Cap: c.Cap, SID: c.SID,
+		WalletSig: c.WalletSig, HolderPub: c.HolderPub, IssuedAt: h.now(), JTI: randomID(),
+	})
+	if err != nil {
+		log.Printf("spend: ledger statement for %s: %v", c.AppID, err)
+		return
+	}
+	if err := h.outbox.Enqueue(c.Ledger, kind, stmt); err != nil {
+		log.Printf("spend: enqueue ledger %s for %s: %v", kind, c.AppID, err)
+	}
+}
+
+// NotifyRevoked reports a consent revoked elsewhere (the holder removing the
+// app) so the platform learns its handle is dead.
+func (h *Handler) NotifyRevoked(c *Consent) { h.tell("revoke", c) }
+
+// RegisterFilled queues a registration for every consent that got its
+// handle in a startup fill (FillSubjects): the platform learns them once.
+func (h *Handler) RegisterFilled(consents []*Consent) {
+	for _, c := range consents {
+		h.tell("register", c)
+	}
+}
+
+// walletBinding is the holder's own signature over handle‖0‖app_id‖0‖cap,
+// raw P-256, by the key whose SEC1 point is holder_pub. The IdP checks it is
+// a valid signature by that key before storing it as evidence; that the key
+// is the holder's is what the IdP's own co-signature asserts.
+func verifyWalletBinding(handle, appID string, cap int64, sigB64, pubB64 string) error {
+	if sigB64 == "" && pubB64 == "" {
+		return nil
+	}
+	if sigB64 == "" || pubB64 == "" {
+		return errors.New("wallet_sig and holder_pub go together")
+	}
+	sig, err := base64.RawURLEncoding.DecodeString(sigB64)
+	if err != nil || len(sig) != 64 {
+		return errors.New("wallet_sig must be 64 raw bytes, base64url")
+	}
+	pub, err := base64.RawURLEncoding.DecodeString(pubB64)
+	if err != nil || len(pub) != 65 || pub[0] != 0x04 {
+		return errors.New("holder_pub must be a SEC1 uncompressed P-256 point, base64url")
+	}
+	x, y := new(big.Int).SetBytes(pub[1:33]), new(big.Int).SetBytes(pub[33:])
+	if !elliptic.P256().IsOnCurve(x, y) {
+		return errors.New("holder_pub is not on P-256")
+	}
+	msg := []byte(handle + "\x00" + appID + "\x00" + strconv.FormatInt(cap, 10))
+	d := sha256.Sum256(msg)
+	key := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
+	if !ecdsa.Verify(key, d[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])) {
+		return errors.New("wallet_sig does not verify over handle, app and cap")
+	}
+	return nil
 }
 
 // --- consents (user-facing) --------------------------------------------
@@ -162,6 +250,11 @@ func (h *Handler) HandleGrantConsent(w http.ResponseWriter, r *http.Request) {
 		AppHost string `json:"app_host"`
 		AppName string `json:"app_name"`
 		Cap     int64  `json:"cap"`
+		// The wallet mints the ledger handle and signs handle‖app‖cap with
+		// the holder key; a wallet that predates handles sends none.
+		LedgerHandle string `json:"ledger_handle"`
+		WalletSig    string `json:"wallet_sig"`
+		HolderPub    string `json:"holder_pub"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 16*1024)).Decode(&req); err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid json")
@@ -174,6 +267,18 @@ func (h *Handler) HandleGrantConsent(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Cap < 0 {
 		httpErr(w, http.StatusBadRequest, "cap must not be negative")
+		return
+	}
+	if req.LedgerHandle != "" && !ValidHandle(req.LedgerHandle) {
+		httpErr(w, http.StatusBadRequest, "ledger_handle must be 16 bytes base64url")
+		return
+	}
+	if req.LedgerHandle == "" && (req.WalletSig != "" || req.HolderPub != "") {
+		httpErr(w, http.StatusBadRequest, "a wallet signature needs the handle it signs")
+		return
+	}
+	if err := verifyWalletBinding(req.LedgerHandle, appID, req.Cap, req.WalletSig, req.HolderPub); err != nil {
+		httpErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	// Fill the display fields from the platform when the caller did not:
@@ -191,12 +296,14 @@ func (h *Handler) HandleGrantConsent(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	c, err := h.store.Grant(userID, appID, strings.ToLower(strings.TrimSpace(req.AppHost)),
-		strings.TrimSpace(req.AppName), req.Cap)
+	c, err := h.store.Grant(userID, h.subjectFor(userID, appID), appID,
+		strings.ToLower(strings.TrimSpace(req.AppHost)), strings.TrimSpace(req.AppName), req.Cap,
+		HandleProof{Handle: req.LedgerHandle, WalletSig: req.WalletSig, HolderPub: req.HolderPub})
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.tell("register", c)
 	if h.ensure != nil {
 		if err := h.ensure(r.Context(), userID); err != nil {
 			// The consent stands; the account will also be ensured on the
@@ -215,7 +322,10 @@ func (h *Handler) HandleRevokeConsent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	appID := NormaliseAppID(r.PathValue("app_id"))
-	err = h.store.Revoke(userID, appID)
+	c, err := h.store.Get(userID, appID)
+	if err == nil {
+		err = h.store.Revoke(userID, appID)
+	}
 	if errors.Is(err, ErrNotFound) {
 		httpErr(w, http.StatusNotFound, "no consent for this app")
 		return
@@ -224,6 +334,7 @@ func (h *Handler) HandleRevokeConsent(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.tell("revoke", c)
 	writeJSON(w, http.StatusOK, map[string]any{"revoked": true, "app_id": appID})
 }
 
@@ -257,10 +368,10 @@ func (h *Handler) HandleToken(w http.ResponseWriter, r *http.Request) {
 		oauthErr(w, http.StatusUnauthorized, "invalid_client", err.Error())
 		return
 	}
-	// Consents are kept by account; an app outside the shared sector names
-	// the holder by its own subject (internal/tokens/subject.go). The token
-	// goes back with the subject the app used.
-	consent, err := h.store.Get(h.issuer.ResolveSubject(sub), appID)
+	// A consent is addressed by the subject the app names the holder by;
+	// the IdP has no other way from that subject to anything. The token
+	// goes back with the subject the app used and the consent's handle.
+	consent, err := h.store.GetBySubject(sub, appID)
 	if errors.Is(err, ErrNotFound) {
 		oauthErr(w, http.StatusForbidden, "consent_required",
 			"the user has not allowed this app to spend their credits, or revoked it")
@@ -283,6 +394,7 @@ func (h *Handler) HandleToken(w http.ResponseWriter, r *http.Request) {
 		Subject:  sub,
 		AppID:    appID,
 		SID:      consent.SID,
+		Ledger:   consent.Ledger,
 		Cap:      consent.Cap,
 		Cnf:      key.Cnf(),
 		IssuedAt: now,

@@ -36,7 +36,6 @@ func TestTheVoucherCarriesTheClientsSubject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	iss.SetSubjectStore(db)
 	if _, err := db.Exec("INSERT INTO users (user_id) VALUES ('acct-1')"); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +115,6 @@ func TestAnAPIKeyForAClientCarriesItsSubject(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	iss, _ := tokens.NewIssuer(filepath.Join(dir, "k.pem"), "https://privasys.id")
-	iss.SetSubjectStore(db)
 	if _, err := db.Exec("INSERT INTO users (user_id) VALUES ('acct-1')"); err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +170,6 @@ func TestThePostedVoucherCarriesTheClientsSubject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	iss.SetSubjectStore(db)
 	if _, err := db.Exec("INSERT INTO users (user_id) VALUES ('acct-1')"); err != nil {
 		t.Fatal(err)
 	}

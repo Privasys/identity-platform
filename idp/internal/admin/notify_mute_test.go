@@ -23,7 +23,7 @@ func relay(t *testing.T, db *store.DB, mutes *notifymute.Service, typ string) (i
 	req := httptest.NewRequest("POST", "/admin/notify", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	// No admin token configured: the dev-mode path, not under test.
-	HandleNotify(db, "", nil, mutes)(rec, req)
+	HandleNotify(db, "", nil, mutes, nil)(rec, req)
 	var out struct{ Status string }
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
 	return rec.Code, out.Status

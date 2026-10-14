@@ -1239,7 +1239,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 		if filteredAttrs == nil {
 			filteredAttrs = map[string]string{}
 		}
-		filteredAttrs[ClaimPrivasysAccount] = ac.UserID
+		filteredAttrs[tokens.ClaimPrivasysAccount] = ac.UserID
 	}
 
 	// Issue ID token.
@@ -1261,6 +1261,12 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 			log.Printf("token: session row lookup/creation failed: %v", err)
 		} else {
 			sid = row.SID
+			// The relationship row: the one way from the subject this client
+			// sees back to the account, written forward here, while the
+			// holder keeps the app (internal/sessions/holders.go).
+			if err := sess.RecordHolder(subject, ac.ClientID, ac.UserID); err != nil {
+				log.Printf("token: record holder for %s: %v", ac.ClientID, err)
+			}
 		}
 	}
 
@@ -1460,7 +1466,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 		if filteredRefreshAttrs == nil {
 			filteredRefreshAttrs = map[string]string{}
 		}
-		filteredRefreshAttrs[ClaimPrivasysAccount] = userID
+		filteredRefreshAttrs[tokens.ClaimPrivasysAccount] = userID
 	}
 
 	// Issue new access token (with current roles and available profile).
@@ -1682,7 +1688,7 @@ func HandleUserInfo(issuer *tokens.Issuer, db *store.DB) http.HandlerFunc {
 		// Platform roles only for Privasys's own apps (the shared sector):
 		// another site has no business learning that an account administers
 		// something here.
-		if _, platform := claims[ClaimPrivasysAccount]; issuedSub == sub || platform {
+		if _, platform := claims[tokens.ClaimPrivasysAccount]; issuedSub == sub || platform {
 			roles, _ := db.GetRoles(sub)
 			if len(roles) > 0 {
 				resp["roles"] = roles
@@ -1711,10 +1717,6 @@ func verifyPKCE(challenge, verifier string) bool {
 // by filterRolesByAudience — this is the mechanism enforcing the strict role
 // taxonomy (e.g. `privasys-platform:admin` only surfaces to consumers of the
 // `privasys-platform` audience).
-// ClaimPrivasysAccount carries the account id on tokens for the platform
-// audience only. The platform keys ownership, billing and keys by it, so it
-// never depends on which client's subject the token carries.
-const ClaimPrivasysAccount = "privasys_account"
 
 func audienceFromScope(scope, fallback string) string {
 	for _, s := range strings.Fields(scope) {

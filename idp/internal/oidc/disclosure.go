@@ -50,16 +50,12 @@ const maxPendingPerApp = 3
 
 // DisclosureAuth authenticates an app from a proof and reports whether a
 // holder has a standing relationship with it (spend.Handler implements both).
-// resolveSubject maps a subject an app holds to the account it names (see
-// internal/tokens/subject.go). Wired at start-up; identity until then.
-var resolveSubject = func(sub string) string { return sub }
-
-// SetSubjectResolver wires the per-sector subject resolution.
-func SetSubjectResolver(f func(string) string) { resolveSubject = f }
 
 type DisclosureAuth interface {
 	VerifyAppProof(ctx context.Context, appID, proof string) (name string, err error)
-	HasConsent(sub, appID string) bool
+	// ConsentAccount names the account behind the subject the app holds, through
+	// the live consent the holder gave that app; ok=false otherwise.
+	ConsentAccount(sub, appID string) (account string, ok bool)
 }
 
 type disclosureEntry struct {
@@ -144,15 +140,18 @@ func HandleDisclosureRequest(reg *clients.Registry, sessionStore *SessionStore, 
 			errorResponse(w, http.StatusBadRequest, "invalid_request", "invalid json")
 			return
 		}
-		req.Sub = strings.TrimSpace(req.Sub)
-		appSub := req.Sub
-		req.Sub = resolveSubject(req.Sub)
+		appSub := strings.TrimSpace(req.Sub)
 		appName, err := auth.VerifyAppProof(r.Context(), req.AppID, req.Proof)
 		if err != nil {
 			errorResponse(w, http.StatusUnauthorized, "invalid_client", err.Error())
 			return
 		}
-		if req.Sub == "" || !auth.HasConsent(req.Sub, req.AppID) {
+		// The account behind the app's subject comes from the consent the
+		// holder gave this app, the only row that links the two; the IdP keeps
+		// no way back from a subject on its own.
+		account, consented := auth.ConsentAccount(appSub, req.AppID)
+		req.Sub = account
+		if appSub == "" || !consented {
 			// Only an app the holder already uses may ask them anything.
 			errorResponse(w, http.StatusForbidden, "consent_required",
 				"the holder has no standing relationship with this app")

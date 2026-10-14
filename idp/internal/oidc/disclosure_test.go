@@ -24,8 +24,11 @@ func (fakeDisclosureAuth) VerifyAppProof(_ context.Context, appID, proof string)
 	return "Privasys Drive", nil
 }
 
-func (fakeDisclosureAuth) HasConsent(sub, appID string) bool {
-	return sub == "sub-1" && appID == "app-1"
+func (fakeDisclosureAuth) ConsentAccount(sub, appID string) (string, bool) {
+	if sub == "sub-1" && appID == "app-1" {
+		return "acct-1", true
+	}
+	return "", false
 }
 
 // TestAppInitiatedDisclosure walks the whole exchange: the app asks, the
@@ -45,7 +48,8 @@ func TestAppInitiatedDisclosure(t *testing.T) {
 	var pushedAdded []string
 	var pushedPayload map[string]interface{}
 	push := func(sub string, s *AuthSession, added []string, payload map[string]interface{}) bool {
-		if sub != "sub-1" {
+		// The push goes to the ACCOUNT the consent resolves the app's subject to.
+		if sub != "acct-1" {
 			t.Errorf("pushed %q", sub)
 		}
 		pushedSession, pushedAdded, pushedPayload = s, added, payload
@@ -100,10 +104,10 @@ func TestAppInitiatedDisclosure(t *testing.T) {
 	}
 
 	// The wallet approves, as /fido2/attribute-approval/complete does.
-	authCode := codes.Create(&AuthCode{ClientID: DisclosureClientID, UserID: "sub-1", Scope: "openid",
+	authCode := codes.Create(&AuthCode{ClientID: DisclosureClientID, UserID: "acct-1", Scope: "openid",
 		NamedAttributes: pushedSession.NamedAttributes,
 		Attributes:      map[string]string{"name": "Ada Lovelace", "email": "ada@example.org"}})
-	if !sessions.CompleteIfPending(pushedSession.SessionID, "sub-1", authCode) {
+	if !sessions.CompleteIfPending(pushedSession.SessionID, "acct-1", authCode) {
 		t.Fatal("completion refused")
 	}
 

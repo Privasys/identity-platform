@@ -138,6 +138,33 @@ func (reg *Registry) AppIDsOf(clientID string) []string {
 	return out
 }
 
+// ClientOfApp returns the client that stands for an attested app, or "" when
+// none claims it. An app belongs to one client; the first match wins if the
+// registry were ever inconsistent.
+func (reg *Registry) ClientOfApp(appID string) string {
+	id := NormaliseAppID(appID)
+	if id == "" {
+		return ""
+	}
+	rows, err := reg.db.Query("SELECT client_id, app_ids FROM clients WHERE app_ids LIKE ?", "%"+id+"%")
+	if err != nil {
+		return ""
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var clientID, raw string
+		if err := rows.Scan(&clientID, &raw); err != nil {
+			return ""
+		}
+		for _, cand := range strings.Split(raw, ",") {
+			if NormaliseAppID(cand) == id {
+				return clientID
+			}
+		}
+	}
+	return ""
+}
+
 // NormaliseAppID writes an app id as 32 lowercase hex characters, or "".
 func NormaliseAppID(id string) string {
 	id = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(id), "-", ""))

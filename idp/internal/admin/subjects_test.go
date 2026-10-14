@@ -11,19 +11,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Privasys/idp/internal/store"
 	"github.com/Privasys/idp/internal/tokens"
 )
 
-func TestSubjectEndpoints(t *testing.T) {
+// The one subject endpoint left is the forward derivation an operator needs
+// for a re-key. Nothing resolves a subject back to an account.
+func TestSubjectsForIsForwardOnly(t *testing.T) {
 	dir := t.TempDir()
-	db, err := store.Open(filepath.Join(dir, "idp.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
 	iss, _ := tokens.NewIssuer(filepath.Join(dir, "k.pem"), "https://privasys.id")
-	iss.SetSubjectStore(db)
 
 	post := func(h http.HandlerFunc, body, token string) (int, map[string]map[string]string) {
 		req := httptest.NewRequest("POST", "/", strings.NewReader(body))
@@ -37,7 +32,6 @@ func TestSubjectEndpoints(t *testing.T) {
 		return rec.Code, out
 	}
 	forH := HandleSubjectsFor(iss, "admin")
-	resolveH := HandleResolveSubjects(db, "admin")
 
 	if code, _ := post(forH, `{"client_id":"drive","accounts":["acct-1"]}`, ""); code != http.StatusUnauthorized {
 		t.Fatalf("no admin token: %d", code)
@@ -46,12 +40,7 @@ func TestSubjectEndpoints(t *testing.T) {
 	if code != http.StatusOK || out["subjects"]["acct-1"] != iss.SubjectFor("acct-1", "drive") {
 		t.Fatalf("subjects for: %d %v", code, out)
 	}
-	sub := out["subjects"]["acct-1"]
-	code, res := post(resolveH, `{"subs":["`+sub+`","acct-9"]}`, "admin")
-	if code != http.StatusOK || res["accounts"][sub] != "acct-1" {
-		t.Fatalf("resolve: %d %v", code, res)
-	}
-	if _, has := res["accounts"]["acct-9"]; has {
-		t.Fatal("an unknown subject was resolved to something")
+	if out["subjects"]["acct-1"] == out["subjects"]["acct-2"] || out["subjects"]["acct-1"] == "acct-1" {
+		t.Fatal("subjects are not distinct per account, or equal the account")
 	}
 }

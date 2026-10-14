@@ -235,15 +235,10 @@ func migrate(db *sql.DB) error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
-		-- Per-sector subjects: the subject a client in its own sector sees for
-		-- an account, mapped back to the account so a subject an app hands back
-		-- can be resolved. See internal/tokens/subject.go.
-		CREATE TABLE IF NOT EXISTS subjects (
-			sub        TEXT PRIMARY KEY,
-			user_id    TEXT NOT NULL,
-			sector     TEXT NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		);
+		-- The reverse map of subjects to accounts (table "subjects", 2026-10-10
+		-- to 2026-10-14) is gone: the IdP keeps no way back from a subject
+		-- (internal/tokens/subject.go). Dropped below, once.
+		DROP TABLE IF EXISTS subjects;
 
 		CREATE TABLE IF NOT EXISTS identity_recovery_keys (
 			user_id    TEXT PRIMARY KEY REFERENCES users(user_id),
@@ -712,22 +707,12 @@ func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID s
 // --- Sovereign backup operations ---
 
 // PutSovereignBackup stores (or replaces) a user's sovereign backup blob.
-// RememberSubject records a sector subject's account. Idempotent.
-func (db *DB) RememberSubject(sub, userID, sector string) error {
-	_, err := db.Exec(
-		"INSERT INTO subjects (sub, user_id, sector) VALUES (?, ?, ?) ON CONFLICT(sub) DO NOTHING",
-		sub, userID, sector,
-	)
-	return err
-}
-
-// ResolveSubject returns the account a sector subject names.
-func (db *DB) ResolveSubject(sub string) (string, bool) {
-	var userID string
-	if err := db.QueryRow("SELECT user_id FROM subjects WHERE sub = ?", sub).Scan(&userID); err != nil {
-		return "", false
-	}
-	return userID, true
+// UserExists reports whether an account id is one of this IdP's. The one
+// forward check a shared-sector flow may make on an identifier an app hands
+// back: in that sector the subject IS the account id.
+func (db *DB) UserExists(userID string) bool {
+	var one int
+	return userID != "" && db.QueryRow("SELECT 1 FROM users WHERE user_id = ?", userID).Scan(&one) == nil
 }
 
 // ErrRecoveryKeyMismatch is returned when an identity already has a different

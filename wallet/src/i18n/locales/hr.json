@@ -1115,7 +1115,9 @@
     "signOutFailedTitle": "Odjava nije uspjela",
     "signOutFailedBody": "Sesije nije bilo moguće opozvati.",
     "removeTitle": "Ukloni uslugu",
-    "removeBody": "Prekinuti vezu s {{app}}? Za ponovno povezivanje morat ćete opet skenirati QR kod."
+    "removeBody": "Prekinuti vezu s {{app}}? Za ponovno povezivanje morat ćete opet skenirati QR kod.",
+    "removeFailedTitle": "Uklanjanje {{app}} nije uspjelo",
+    "removeFailedBody": "{{app}} nije uklonjen i još vas može kontaktirati. Provjerite vezu i pokušajte ponovno."
   },
   "sessionKind": {
     "signIn": "Prijava",

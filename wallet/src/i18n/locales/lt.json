@@ -1115,7 +1115,9 @@
     "signOutFailedTitle": "Atsijungti nepavyko",
     "signOutFailedBody": "Nepavyko atšaukti sesijų.",
     "removeTitle": "Pašalinti paslaugą",
-    "removeBody": "Atjungti nuo {{app}}? Norint prisijungti iš naujo, reikės vėl nuskaityti QR kodą."
+    "removeBody": "Atjungti nuo {{app}}? Norint prisijungti iš naujo, reikės vėl nuskaityti QR kodą.",
+    "removeFailedTitle": "Nepavyko pašalinti {{app}}",
+    "removeFailedBody": "{{app}} nepašalinta ir vis dar gali su jumis susisiekti. Patikrinkite ryšį ir bandykite dar kartą."
   },
   "sessionKind": {
     "signIn": "Prisijungimas",

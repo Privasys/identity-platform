@@ -1099,7 +1099,9 @@
     "signOutFailedTitle": "Error al cerrar sesión",
     "signOutFailedBody": "No se han podido revocar las sesiones.",
     "removeTitle": "Quitar el servicio",
-    "removeBody": "¿Desconectarte de {{app}}? Tendrás que escanear el código QR de nuevo para volver a conectarte."
+    "removeBody": "¿Desconectarte de {{app}}? Tendrás que escanear el código QR de nuevo para volver a conectarte.",
+    "removeFailedTitle": "No se pudo eliminar {{app}}",
+    "removeFailedBody": "{{app}} no se ha eliminado y aún puede contactarte. Comprueba tu conexión e inténtalo de nuevo."
   },
 
   "sessionKind": {

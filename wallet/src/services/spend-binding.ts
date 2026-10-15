@@ -2,23 +2,21 @@
  * The holder's binding of a spend consent to a ledger handle.
  *
  * The wallet mints the handle the platform will debit by, random and
- * meaningful to nobody, and signs handle‖0‖app‖0‖cap with the holder key.
- * The IdP stores the signature and forwards it, with its own co-signature,
- * to the platform as the evidence that the holder, not the IdP alone,
- * bound their credits to this handle. Nothing in the handle names the
- * holder, and the IdP keeps no way from a subject back to an account.
+ * meaningful to nobody, and signs handle‖0‖app‖0‖cap with the passkey of
+ * the identity that consents: its own credential at privasys.id, the key
+ * that signed the sign-in. The IdP looks that key up itself from the wallet
+ * session, checks the signature, and forwards it with its own co-signature
+ * to the platform as the evidence that the holder, not the IdP alone, bound
+ * their credits to this handle. Each identity has its own passkey, so the
+ * key links nothing, and the wallet sends no key of its own.
  */
 import * as Crypto from 'expo-crypto';
 import { derToRawEcdsa } from './encauth';
 import { signWithDeviceKey } from './did';
-import { getHolderPublicKey } from './kyc';
-
-const HOLDER_KEY_ID = 'privasys-wallet-default';
 
 export interface SpendBinding {
     ledgerHandle: string;
     walletSig: string;
-    holderPub: string;
 }
 
 function b64u(bytes: Uint8Array): string {
@@ -40,12 +38,16 @@ export function spendBindingMessage(ledgerHandle: string, appId: string, cap: nu
     return new TextEncoder().encode(`${ledgerHandle}\u0000${appId}\u0000${Math.max(0, Math.floor(cap))}`);
 }
 
-/** Mint a handle for `appId` under `cap` and sign the binding with the holder key. */
-export async function bindSpendConsent(appId: string, cap: number): Promise<SpendBinding> {
+/**
+ * Mint a handle for `appId` under `cap` and sign the binding with
+ * `passkeyAlias`, the identity's privasys.id passkey that opened the wallet
+ * session the consent is recorded with.
+ */
+export async function bindSpendConsent(passkeyAlias: string, appId: string, cap: number): Promise<SpendBinding> {
     const ledgerHandle = b64u(Crypto.getRandomBytes(16));
     const msg = spendBindingMessage(ledgerHandle, appId, cap);
-    const der = await signWithDeviceKey(b64u(msg), HOLDER_KEY_ID);
+    const der = await signWithDeviceKey(b64u(msg), passkeyAlias);
     const raw = derToRawEcdsa(b64uToBytes(der));
     if (raw.length !== 64) throw new Error('wallet_sig must be 64 bytes');
-    return { ledgerHandle, walletSig: b64u(raw), holderPub: await getHolderPublicKey() };
+    return { ledgerHandle, walletSig: b64u(raw) };
 }

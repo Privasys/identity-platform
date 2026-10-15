@@ -2092,6 +2092,7 @@ function ConnectFlow() {
      */
     const spendGrantFor = (
         payload: QRPayload,
+        keyAlias: string,
         result: { sessionToken: string; userId?: string; sessionRelay?: fido2.SessionRelayBinding },
         relayArg: { quoteHash: string } | undefined,
     ): (() => void) => {
@@ -2101,7 +2102,7 @@ function ConnectFlow() {
                 return;
             }
             const att = attestationRef.current ?? attestation;
-            if (att) grant(payload, result.sessionToken, att);
+            if (att) grant(payload, keyAlias, result.sessionToken, att);
         };
     };
 
@@ -2131,7 +2132,7 @@ function ConnectFlow() {
      *  holder manages caps and withdrawal from Service Details or
      *  privasys.id/account). Failures are logged, never block the sign-in:
      *  the app then simply cannot spend until the holder allows it. */
-    const maybeGrantSpend = (payload: QRPayload, walletSessionToken: string, att: AttestationResult) => {
+    const maybeGrantSpend = (payload: QRPayload, keyAlias: string, walletSessionToken: string, att: AttestationResult) => {
         if (!payload.spend || !spendOn) return;
         const appId = appIdFromOids(att.custom_oids);
         if (!appId) {
@@ -2139,15 +2140,11 @@ function ConnectFlow() {
             return;
         }
         // The holder binds the consent to a ledger handle of the wallet's own
-        // making, signed with the holder key: the platform debits by that
-        // handle and nothing names the holder (services/spend-binding.ts).
-        // A binding that cannot be made (a key refusing to sign) still records
-        // the consent; the IdP then mints the handle, unsigned.
-        void bindSpendConsent(appId, spendCap)
-            .catch((err) => {
-                console.warn('[CONNECT] spend binding not signed (the IdP mints the handle):', err);
-                return undefined;
-            })
+        // making, signed with this identity's passkey (the one that just signed
+        // the sign-in): the platform debits by that handle and nothing names
+        // the holder (services/spend-binding.ts). No signature, no consent:
+        // the app then cannot spend until the holder allows it again.
+        void bindSpendConsent(keyAlias, appId, spendCap)
             .then((binding) =>
                 grantSpendConsent(walletSessionToken, appId, spendCap, {
                     appHost: payload.appHost,
@@ -2340,7 +2337,7 @@ function ConnectFlow() {
                     // Signed now, inside this Face ID's grace (see the type).
                     voucher: maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg),
                     extraApps: issueExtraAppVouchers(payload, keyAlias, result),
-                    grantSpend: spendGrantFor(payload, result, sessionRelayArg),
+                    grantSpend: spendGrantFor(payload, keyAlias, result, sessionRelayArg),
                 };
                 setMissingAttrs(missing);
                 setStep('acquire-attributes');
@@ -2454,7 +2451,7 @@ function ConnectFlow() {
             void issueExtraAppVouchers(payload, keyAlias, result).then((sealed) => recordExtraApps(payload, traceId, sealed));
 
             // The spend consent, now that the sign-in has reached the browser.
-            spendGrantFor(payload, result, sessionRelayArg)();
+            spendGrantFor(payload, keyAlias, result, sessionRelayArg)();
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
@@ -2513,7 +2510,7 @@ function ConnectFlow() {
                     // Signed now, inside this Face ID's grace (see the type).
                     voucher: maybeIssueEncAuth(payload, keyAlias, result, sessionRelayArg),
                     extraApps: issueExtraAppVouchers(payload, keyAlias, result),
-                    grantSpend: spendGrantFor(payload, result, sessionRelayArg),
+                    grantSpend: spendGrantFor(payload, keyAlias, result, sessionRelayArg),
                 };
                 setMissingAttrs(missing);
                 setStep('acquire-attributes');
@@ -2619,7 +2616,7 @@ function ConnectFlow() {
             void issueExtraAppVouchers(payload, keyAlias, result).then((sealed) => recordExtraApps(payload, traceId, sealed));
 
             // The spend consent, now that the sign-in has reached the browser.
-            spendGrantFor(payload, result, sessionRelayArg)();
+            spendGrantFor(payload, keyAlias, result, sessionRelayArg)();
 
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);

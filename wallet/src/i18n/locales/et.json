@@ -1096,7 +1096,9 @@
     "signOutFailedTitle": "Väljalogimine ebaõnnestus",
     "signOutFailedBody": "Seansse ei õnnestunud tühistada.",
     "removeTitle": "Eemalda teenus",
-    "removeBody": "Kas katkestada ühendus rakendusega {{app}}? Uuesti ühendumiseks peate QR-koodi uuesti skannima."
+    "removeBody": "Kas katkestada ühendus rakendusega {{app}}? Uuesti ühendumiseks peate QR-koodi uuesti skannima.",
+    "removeFailedTitle": "Rakendust {{app}} ei õnnestunud eemaldada",
+    "removeFailedBody": "Rakendust {{app}} ei eemaldatud ja see saab teiega endiselt ühendust võtta. Kontrollige ühendust ja proovige uuesti."
   },
   "sessionKind": {
     "signIn": "Sisselogimine",

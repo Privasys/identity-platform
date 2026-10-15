@@ -1080,7 +1080,9 @@
     "signOutFailedTitle": "Afmelden mislukt",
     "signOutFailedBody": "De sessies konden niet worden ingetrokken.",
     "removeTitle": "Dienst verwijderen",
-    "removeBody": "De verbinding met {{app}} verbreken? Je moet de QR-code opnieuw scannen om weer te verbinden."
+    "removeBody": "De verbinding met {{app}} verbreken? Je moet de QR-code opnieuw scannen om weer te verbinden.",
+    "removeFailedTitle": "{{app}} kon niet worden verwijderd",
+    "removeFailedBody": "{{app}} is niet verwijderd en kan je nog steeds bereiken. Controleer je verbinding en probeer het opnieuw."
   },
 
   "sessionKind": {

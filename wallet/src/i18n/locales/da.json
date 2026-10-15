@@ -1080,7 +1080,9 @@
     "signOutFailedTitle": "Log ud mislykkedes",
     "signOutFailedBody": "Sessionerne kunne ikke tilbagekaldes.",
     "removeTitle": "Fjern tjenesten",
-    "removeBody": "Afbryd forbindelsen til {{app}}? Du skal scanne QR-koden igen for at forbinde på ny."
+    "removeBody": "Afbryd forbindelsen til {{app}}? Du skal scanne QR-koden igen for at forbinde på ny.",
+    "removeFailedTitle": "Kunne ikke fjerne {{app}}",
+    "removeFailedBody": "{{app}} blev ikke fjernet og kan stadig kontakte dig. Tjek din forbindelse, og prøv igen."
   },
 
   "sessionKind": {

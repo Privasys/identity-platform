@@ -1099,7 +1099,9 @@
     "signOutFailedTitle": "Odhlášení se nezdařilo",
     "signOutFailedBody": "Relace se nepodařilo odvolat.",
     "removeTitle": "Odebrat službu",
-    "removeBody": "Odpojit se od {{app}}? Pro opětovné připojení budete muset znovu naskenovat QR kód."
+    "removeBody": "Odpojit se od {{app}}? Pro opětovné připojení budete muset znovu naskenovat QR kód.",
+    "removeFailedTitle": "{{app}} se nepodařilo odebrat",
+    "removeFailedBody": "{{app}} nebylo odebráno a stále vás může kontaktovat. Zkontrolujte připojení a zkuste to znovu."
   },
 
   "sessionKind": {

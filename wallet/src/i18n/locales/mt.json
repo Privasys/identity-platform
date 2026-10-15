@@ -1153,7 +1153,9 @@
     "signOutFailedTitle": "Il-ħruġ falla",
     "signOutFailedBody": "Is-sessjonijiet ma setgħux jiġu rrevokati.",
     "removeTitle": "Neħħi s-servizz",
-    "removeBody": "Tiskonnettja minn {{app}}? Se jkollok terġa' tiskennja l-kodiċi QR biex terġa' tikkonnettja."
+    "removeBody": "Tiskonnettja minn {{app}}? Se jkollok terġa' tiskennja l-kodiċi QR biex terġa' tikkonnettja.",
+    "removeFailedTitle": "Ma setax jitneħħa {{app}}",
+    "removeFailedBody": "{{app}} ma tneħħiex u għadu jista' jikkuntattjak. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
   },
   "sessionKind": {
     "signIn": "Login",

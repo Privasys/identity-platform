@@ -1115,7 +1115,9 @@
     "signOutFailedTitle": "Odhlásenie zlyhalo",
     "signOutFailedBody": "Relácie sa nepodarilo zrušiť.",
     "removeTitle": "Odstrániť službu",
-    "removeBody": "Odpojiť sa od {{app}}? Na opätovné pripojenie budete musieť znova naskenovať QR kód."
+    "removeBody": "Odpojiť sa od {{app}}? Na opätovné pripojenie budete musieť znova naskenovať QR kód.",
+    "removeFailedTitle": "{{app}} sa nepodarilo odobrať",
+    "removeFailedBody": "{{app}} nebolo odobraté a stále vás môže kontaktovať. Skontrolujte pripojenie a skúste to znova."
   },
   "sessionKind": {
     "signIn": "Prihlásenie",

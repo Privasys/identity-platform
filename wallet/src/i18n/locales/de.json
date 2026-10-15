@@ -1080,7 +1080,9 @@
     "signOutFailedTitle": "Abmeldung fehlgeschlagen",
     "signOutFailedBody": "Die Sitzungen konnten nicht widerrufen werden.",
     "removeTitle": "Dienst entfernen",
-    "removeBody": "Die Verbindung zu {{app}} trennen? Sie müssen den QR-Code erneut scannen, um sich wieder zu verbinden."
+    "removeBody": "Die Verbindung zu {{app}} trennen? Sie müssen den QR-Code erneut scannen, um sich wieder zu verbinden.",
+    "removeFailedTitle": "{{app}} konnte nicht entfernt werden",
+    "removeFailedBody": "{{app}} wurde nicht entfernt und kann Sie weiterhin erreichen. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
   },
 
   "sessionKind": {

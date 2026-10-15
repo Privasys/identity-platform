@@ -1080,7 +1080,9 @@
     "signOutFailedTitle": "Uloskirjautuminen epäonnistui",
     "signOutFailedBody": "Istuntoja ei voitu peruuttaa.",
     "removeTitle": "Poista palvelu",
-    "removeBody": "Katkaistaanko yhteys palveluun {{app}}? Sinun on skannattava QR-koodi uudelleen yhdistääksesi."
+    "removeBody": "Katkaistaanko yhteys palveluun {{app}}? Sinun on skannattava QR-koodi uudelleen yhdistääksesi.",
+    "removeFailedTitle": "Palvelun {{app}} poistaminen epäonnistui",
+    "removeFailedBody": "Palvelua {{app}} ei poistettu, ja se voi yhä tavoittaa sinut. Tarkista yhteys ja yritä uudelleen."
   },
 
   "sessionKind": {

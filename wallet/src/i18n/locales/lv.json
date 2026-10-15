@@ -1115,7 +1115,9 @@
     "signOutFailedTitle": "Atteikšanās neizdevās",
     "signOutFailedBody": "Neizdevās atsaukt sesijas.",
     "removeTitle": "Noņemt pakalpojumu",
-    "removeBody": "Vai pārtraukt savienojumu ar {{app}}? Lai atkal izveidotu savienojumu, jums būs jānoskenē QR kods no jauna."
+    "removeBody": "Vai pārtraukt savienojumu ar {{app}}? Lai atkal izveidotu savienojumu, jums būs jānoskenē QR kods no jauna.",
+    "removeFailedTitle": "Neizdevās noņemt {{app}}",
+    "removeFailedBody": "{{app}} netika noņemta un joprojām var ar jums sazināties. Pārbaudiet savienojumu un mēģiniet vēlreiz."
   },
   "sessionKind": {
     "signIn": "Pieteikšanās",

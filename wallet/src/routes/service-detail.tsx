@@ -341,32 +341,40 @@ export default function ServiceDetailScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         setRemoving(true);
+                        // End the relationship at the IdP FIRST: the app's way back to
+                        // this holder (notifications, spend, asks) ends with it, and its
+                        // browsers end as signed-out. Authenticates with the credential
+                        // this app knows, as the other switches here do. If it fails
+                        // (offline, the prompt cancelled), nothing is removed from the
+                        // phone either: otherwise the app would vanish from the wallet
+                        // while it can still spend and reach the holder, with no screen
+                        // left to stop it from.
+                        if (runningAppId && credential) {
+                            try {
+                                const auth = await fido2.authenticate(
+                                    credential.rpId,
+                                    credential.keyAlias,
+                                    credential.credentialId,
+                                    '',
+                                    credential.serverRpId
+                                );
+                                if (!auth.sessionToken) {
+                                    throw new Error(t('errors.noSessionFromAuth'));
+                                }
+                                await removeAppAtIdp(auth.sessionToken, runningAppId.toLowerCase());
+                            } catch (e) {
+                                console.warn('[SERVICE] remove at the identity provider failed:', e);
+                                setRemoving(false);
+                                Alert.alert(
+                                    t('serviceDetail.removeFailedTitle', { app: name }),
+                                    t('serviceDetail.removeFailedBody', { app: name })
+                                );
+                                return;
+                            }
+                        }
                         // Drop this app's trail + standing consent.
                         removeService(serviceKey);
                         useConsentStore.getState().removeStandingConsent(serviceKey);
-                        // And the relationship at the IdP: the app's way back to this
-                        // holder (notifications, spend, asks) ends with it, and its
-                        // browsers end as signed-out. Authenticates with the credential
-                        // this app knows, as the other switches here do. Best effort:
-                        // the phone's own removal is not held up by the network.
-                        if (runningAppId && credential) {
-                            void (async () => {
-                                try {
-                                    const auth = await fido2.authenticate(
-                                        credential.rpId,
-                                        credential.keyAlias,
-                                        credential.credentialId,
-                                        '',
-                                        credential.serverRpId
-                                    );
-                                    if (auth.sessionToken) {
-                                        await removeAppAtIdp(auth.sessionToken, runningAppId.toLowerCase());
-                                    }
-                                } catch (e) {
-                                    console.warn('[SERVICE] remove at the identity provider failed:', e);
-                                }
-                            })();
-                        }
                         // End any live sealed session this app bootstrapped, so
                         // "Remove" actually disconnects instead of leaving the
                         // relay session up (and the card standing) until its TTL.

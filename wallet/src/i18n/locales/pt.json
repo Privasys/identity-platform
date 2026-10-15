@@ -1099,7 +1099,9 @@
     "signOutFailedTitle": "Falha ao terminar sessão",
     "signOutFailedBody": "Não foi possível revogar as sessões.",
     "removeTitle": "Remover o serviço",
-    "removeBody": "Desligar de {{app}}? Terá de ler o código QR de novo para voltar a ligar."
+    "removeBody": "Desligar de {{app}}? Terá de ler o código QR de novo para voltar a ligar.",
+    "removeFailedTitle": "Não foi possível remover {{app}}",
+    "removeFailedBody": "{{app}} não foi removido e ainda pode contactá-lo. Verifique a ligação e tente de novo."
   },
 
   "sessionKind": {

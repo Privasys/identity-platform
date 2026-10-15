@@ -1115,7 +1115,9 @@
     "signOutFailedTitle": "Deconectarea a eșuat",
     "signOutFailedBody": "Nu am putut revoca sesiunile.",
     "removeTitle": "Elimină serviciul",
-    "removeBody": "Te deconectezi de la {{app}}? Va trebui să scanezi din nou codul QR pentru a te reconecta."
+    "removeBody": "Te deconectezi de la {{app}}? Va trebui să scanezi din nou codul QR pentru a te reconecta.",
+    "removeFailedTitle": "{{app}} nu a putut fi eliminat",
+    "removeFailedBody": "{{app}} nu a fost eliminat și te poate contacta în continuare. Verifică conexiunea și încearcă din nou."
   },
   "sessionKind": {
     "signIn": "Autentificare",

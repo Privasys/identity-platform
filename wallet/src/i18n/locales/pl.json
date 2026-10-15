@@ -1118,7 +1118,9 @@
     "signOutFailedTitle": "Wylogowanie nie powiodło się",
     "signOutFailedBody": "Nie udało się unieważnić sesji.",
     "removeTitle": "Usuń usługę",
-    "removeBody": "Rozłączyć się z {{app}}? Aby połączyć się ponownie, trzeba będzie jeszcze raz zeskanować kod QR."
+    "removeBody": "Rozłączyć się z {{app}}? Aby połączyć się ponownie, trzeba będzie jeszcze raz zeskanować kod QR.",
+    "removeFailedTitle": "Nie udało się usunąć {{app}}",
+    "removeFailedBody": "{{app}} nie zostało usunięte i nadal może się z Tobą kontaktować. Sprawdź połączenie i spróbuj ponownie."
   },
 
   "sessionKind": {

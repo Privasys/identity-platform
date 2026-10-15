@@ -79,7 +79,7 @@ export async function holderKeyProtection(
     } catch {
         enrolled = false;
     }
-    return keyProtectionFor(enrolled, keyInfoProtection);
+    return keyProtectionFor(Platform.OS, enrolled, keyInfoProtection);
 }
 
 /**

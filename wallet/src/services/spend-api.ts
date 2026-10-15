@@ -58,8 +58,10 @@ export async function grantSpendConsent(
     appId: string,
     cap: number,
     display?: { appHost?: string; appName?: string },
-    /** The holder's binding of this consent to a ledger handle (services/spend-binding.ts). */
-    binding?: { ledgerHandle: string; walletSig: string; holderPub: string },
+    /** The holder's binding of this consent to a ledger handle, signed with
+     *  the identity's passkey (services/spend-binding.ts). The wallet always
+     *  sends one; consents made on the web at privasys.id/account have none. */
+    binding?: { ledgerHandle: string; walletSig: string },
 ): Promise<SpendConsent> {
     return idpFetch<SpendConsent>('/spend/consents', {
         method: 'POST',
@@ -70,7 +72,7 @@ export async function grantSpendConsent(
             app_host: display?.appHost,
             app_name: display?.appName,
             ...(binding
-                ? { ledger_handle: binding.ledgerHandle, wallet_sig: binding.walletSig, holder_pub: binding.holderPub }
+                ? { ledger_handle: binding.ledgerHandle, wallet_sig: binding.walletSig }
                 : {}),
         }),
     });

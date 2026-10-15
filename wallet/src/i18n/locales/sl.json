@@ -1134,7 +1134,9 @@
     "signOutFailedTitle": "Odjava ni uspela",
     "signOutFailedBody": "Sej ni bilo mogoče preklicati.",
     "removeTitle": "Odstrani storitev",
-    "removeBody": "Ali se želite odklopiti od {{app}}? Za ponovno povezavo boste morali znova skenirati kodo QR."
+    "removeBody": "Ali se želite odklopiti od {{app}}? Za ponovno povezavo boste morali znova skenirati kodo QR.",
+    "removeFailedTitle": "{{app}} ni bilo mogoče odstraniti",
+    "removeFailedBody": "{{app}} ni bil odstranjen in vas lahko še vedno doseže. Preverite povezavo in poskusite znova."
   },
   "sessionKind": {
     "signIn": "Prijava",

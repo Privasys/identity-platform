@@ -1172,7 +1172,9 @@
     "signOutFailedTitle": "Methodd yr allgofnodi",
     "signOutFailedBody": "Methwyd â dirymu'r sesiynau.",
     "removeTitle": "Tynnu'r gwasanaeth",
-    "removeBody": "Datgysylltu oddi wrth {{app}}? Bydd angen i chi sganio'r cod QR eto i ailgysylltu."
+    "removeBody": "Datgysylltu oddi wrth {{app}}? Bydd angen i chi sganio'r cod QR eto i ailgysylltu.",
+    "removeFailedTitle": "Methu tynnu {{app}}",
+    "removeFailedBody": "Ni chafodd {{app}} ei dynnu, a gall gysylltu â chi o hyd. Gwiriwch eich cysylltiad a rhowch gynnig arall arni."
   },
   "sessionKind": {
     "signIn": "Mewngofnodi",

@@ -1080,7 +1080,9 @@
     "signOutFailedTitle": "A kijelentkezés sikertelen",
     "signOutFailedBody": "A munkameneteket nem sikerült visszavonni.",
     "removeTitle": "Szolgáltatás eltávolítása",
-    "removeBody": "Lecsatlakozik a(z) {{app}} szolgáltatásról? Az újbóli csatlakozáshoz ismét be kell olvasnia a QR-kódot."
+    "removeBody": "Lecsatlakozik a(z) {{app}} szolgáltatásról? Az újbóli csatlakozáshoz ismét be kell olvasnia a QR-kódot.",
+    "removeFailedTitle": "A(z) {{app}} eltávolítása nem sikerült",
+    "removeFailedBody": "A(z) {{app}} nem lett eltávolítva, és továbbra is elérheti Önt. Ellenőrizze a kapcsolatot, és próbálja újra."
   },
 
   "sessionKind": {

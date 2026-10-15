@@ -1080,7 +1080,9 @@
     "signOutFailedTitle": "Utloggningen misslyckades",
     "signOutFailedBody": "Sessionerna kunde inte återkallas.",
     "removeTitle": "Ta bort tjänsten",
-    "removeBody": "Koppla från {{app}}? Du behöver skanna QR-koden igen för att ansluta på nytt."
+    "removeBody": "Koppla från {{app}}? Du behöver skanna QR-koden igen för att ansluta på nytt.",
+    "removeFailedTitle": "Det gick inte att ta bort {{app}}",
+    "removeFailedBody": "{{app}} togs inte bort och kan fortfarande nå dig. Kontrollera anslutningen och försök igen."
   },
 
   "sessionKind": {

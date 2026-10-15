@@ -1096,7 +1096,9 @@
     "signOutFailedTitle": "Sign out failed",
     "signOutFailedBody": "Could not revoke the sessions.",
     "removeTitle": "Remove Service",
-    "removeBody": "Disconnect from {{app}}? You will need to scan the QR code again to reconnect."
+    "removeBody": "Disconnect from {{app}}? You will need to scan the QR code again to reconnect.",
+    "removeFailedTitle": "Could not remove {{app}}",
+    "removeFailedBody": "{{app}} was not removed and can still reach you. Check your connection and try again."
   },
   "sessionKind": {
     "signIn": "Sign-in",

@@ -1099,7 +1099,9 @@
     "signOutFailedTitle": "Disconnessione non riuscita",
     "signOutFailedBody": "Non è stato possibile revocare le sessioni.",
     "removeTitle": "Rimuovi il servizio",
-    "removeBody": "Disconnetterti da {{app}}? Dovrai scansionare di nuovo il codice QR per riconnetterti."
+    "removeBody": "Disconnetterti da {{app}}? Dovrai scansionare di nuovo il codice QR per riconnetterti.",
+    "removeFailedTitle": "Impossibile rimuovere {{app}}",
+    "removeFailedBody": "{{app}} non è stata rimossa e può ancora contattarti. Controlla la connessione e riprova."
   },
 
   "sessionKind": {

@@ -1153,7 +1153,9 @@
     "signOutFailedTitle": "Theip ar an síniú amach",
     "signOutFailedBody": "Níorbh fhéidir na seisiúin a chúlghairm.",
     "removeTitle": "Bain an tseirbhís",
-    "removeBody": "An ndícheanglófar ó {{app}}? Beidh ort an cód QR a scanadh arís chun athcheangal."
+    "removeBody": "An ndícheanglófar ó {{app}}? Beidh ort an cód QR a scanadh arís chun athcheangal.",
+    "removeFailedTitle": "Níorbh fhéidir {{app}} a bhaint",
+    "removeFailedBody": "Níor baineadh {{app}} agus is féidir leis teagmháil a dhéanamh leat fós. Seiceáil do cheangal agus bain triail eile as."
   },
   "sessionKind": {
     "signIn": "Síniú isteach",

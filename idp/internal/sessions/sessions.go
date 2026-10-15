@@ -64,7 +64,13 @@ type Store struct {
 	// appsOf names the attested apps a client stands for (OID 4.1 ids), so
 	// a client's own subject reaches only those apps' enclaves.
 	appsOf func(clientID string) []string
+	// passkeysOf names the public keys (SEC1) of an identity's passkeys at
+	// privasys.id: a voucher is signed by one of them or by nobody.
+	passkeysOf func(userID string) ([][]byte, error)
 }
+
+// SetPasskeysResolver wires the lookup of an identity's passkey keys.
+func (s *Store) SetPasskeysResolver(f func(userID string) ([][]byte, error)) { s.passkeysOf = f }
 
 // SetSectorResolver wires the client registry's sector lookup.
 func (s *Store) SetSectorResolver(f func(clientID string) string) { s.sectorOf = f }

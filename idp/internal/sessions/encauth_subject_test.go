@@ -55,6 +55,7 @@ func TestTheVoucherCarriesTheClientsSubject(t *testing.T) {
 
 	hw, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	hwPub := elliptic.Marshal(elliptic.P256(), hw.PublicKey.X, hw.PublicKey.Y)
+	s.SetPasskeysResolver(func(string) ([][]byte, error) { return [][]byte{hwPub}, nil })
 	put := func(client, sub, app string) error {
 		sess, err := s.FindOrCreateForApp("acct-1", client, "", time.Hour)
 		if err != nil {
@@ -101,6 +102,11 @@ func TestTheVoucherCarriesTheClientsSubject(t *testing.T) {
 	}
 	if err := put("privasys-platform", siteSub, ""); err == nil {
 		t.Fatal("a shared-sector voucher accepted another sector's subject")
+	}
+	// A voucher signed by a key that is none of the identity's passkeys.
+	s.SetPasskeysResolver(func(string) ([][]byte, error) { return [][]byte{sec1Pub()}, nil })
+	if err := put("privasys-platform", "acct-1", ""); !errors.Is(err, ErrNotAPasskey) {
+		t.Fatalf("a voucher by a stranger's key: %v, want ErrNotAPasskey", err)
 	}
 }
 
@@ -193,6 +199,7 @@ func TestThePostedVoucherCarriesTheClientsSubject(t *testing.T) {
 
 	hw, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	hwPub := elliptic.Marshal(elliptic.P256(), hw.PublicKey.X, hw.PublicKey.Y)
+	s.SetPasskeysResolver(func(string) ([][]byte, error) { return [][]byte{hwPub}, nil })
 	post := func(body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest("POST", "/sessions/encauth", strings.NewReader(body))
 		req.Header.Set("Authorization", "Bearer wallet:tok")

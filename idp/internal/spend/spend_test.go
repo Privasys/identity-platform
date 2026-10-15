@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -35,6 +36,8 @@ type fixture struct {
 	appID    string
 	jwksHits int
 	resolver *staticResolver
+	// passkey is the key behind the test wallet session, nil for none.
+	passkey []byte
 }
 
 type staticResolver struct {
@@ -91,9 +94,15 @@ func newFixture(t *testing.T) *fixture {
 	t.Cleanup(srv.Close)
 	f.resolver = &staticResolver{url: srv.URL + WellKnownPath, name: "Harness", host: strings.TrimPrefix(srv.URL, "https://")}
 	f.h = New(Config{
-		Store:    st,
-		Issuer:   iss,
-		Auth:     func(r *http.Request) (string, error) { return r.Header.Get("X-Test-User"), nil },
+		Store:  st,
+		Issuer: iss,
+		Auth:   func(r *http.Request) (string, error) { return r.Header.Get("X-Test-User"), nil },
+		SessionKey: func(*http.Request) ([]byte, error) {
+			if f.passkey == nil {
+				return nil, errors.New("not a wallet session")
+			}
+			return f.passkey, nil
+		},
 		Resolver: f.resolver,
 		HTTP:     srv.Client(),
 	})

@@ -4,6 +4,7 @@
 package sessions
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/sha256"
@@ -72,6 +73,27 @@ var ErrAppNotOfClient = errors.New("this app is not registered for the session's
 // no client registry behind the store there is no subject to name, and no
 // voucher is accepted (this store never falls back to the account id).
 var errResolversNotWired = errors.New("sessions: client registry resolvers not wired")
+
+// ErrNotAPasskey refuses a voucher signed by a key that is none of the
+// identity's passkeys.
+var ErrNotAPasskey = errors.New("the voucher is not signed by one of this identity's passkeys")
+
+// isPasskeyOf checks hwPub is one of the identity's passkeys.
+func (s *Store) isPasskeyOf(userID string, hwPub []byte) error {
+	if s.passkeysOf == nil {
+		return errResolversNotWired
+	}
+	keys, err := s.passkeysOf(userID)
+	if err != nil {
+		return fmt.Errorf("passkeys: %w", err)
+	}
+	for _, k := range keys {
+		if bytes.Equal(k, hwPub) {
+			return nil
+		}
+	}
+	return ErrNotAPasskey
+}
 
 // subjectForClient is the subject a client sees for an account: the account
 // id in the shared sector, the client's own subject otherwise.
@@ -205,6 +227,12 @@ func (s *Store) PutEncAuth(userID, appID string, payloadBytes, hwSig []byte, hos
 	}
 	if sess.RevokedAt != nil {
 		return nil, ErrRevoked
+	}
+	// The voucher is signed by the passkey of the identity it speaks for,
+	// one of this identity's own at privasys.id: a key the IdP has never
+	// seen for it proves nothing about the holder.
+	if err := s.isPasskeyOf(userID, p.HwPub); err != nil {
+		return nil, err
 	}
 
 	// Verify the wallet signature over the canonical CBOR payload.

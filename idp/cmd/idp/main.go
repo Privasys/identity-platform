@@ -26,6 +26,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -131,6 +132,7 @@ func main() {
 	sessionsStore.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	sessionsStore.SetSectorResolver(clientReg.SectorOf)
 	sessionsStore.SetAppsResolver(clientReg.AppIDsOf)
+	sessionsStore.SetPasskeysResolver(fido2Handler.UserKeys)
 	issuer.SetAccountResolver(sessionsStore.ActiveAccount)
 	// Relationship rows for every live (account, client) pair that predates
 	// them (internal/sessions/holders.go); idempotent.
@@ -248,6 +250,16 @@ func main() {
 		Issuer:     issuer,
 		SubjectFor: subjectForApp,
 		Outbox:     ledgerOutbox,
+		// A spend binding is signed by the passkey that opened the wallet
+		// session, looked up here, never named by the wallet.
+		SessionKey: func(r *http.Request) ([]byte, error) {
+			const prefix = "Bearer wallet:"
+			auth := r.Header.Get("Authorization")
+			if !strings.HasPrefix(auth, prefix) {
+				return nil, errors.New("not a wallet session")
+			}
+			return fido2Handler.SessionKey(strings.TrimPrefix(auth, prefix))
+		},
 		Auth: func(r *http.Request) (string, error) {
 			userID, _, err := sessionsStore.AuthenticateBearer(r, issuer)
 			return userID, err

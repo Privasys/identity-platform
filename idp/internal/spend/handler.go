@@ -54,6 +54,7 @@ type Handler struct {
 	resolver   AppResolver
 	ensure     AccountEnsurer
 	subjectFor SubjectFor
+	sessionKey SessionKey
 	outbox     *Outbox
 	ttl        time.Duration
 	now        func() time.Time
@@ -64,6 +65,10 @@ type Handler struct {
 // otherwise. Wired from the client registry; identity when nil.
 type SubjectFor func(userID, appID string) string
 
+// SessionKey returns the public key (SEC1) of the passkey behind the
+// request's wallet session, the key a spend binding must be signed by.
+type SessionKey func(r *http.Request) ([]byte, error)
+
 // Config wires a Handler.
 type Config struct {
 	Store    *Store
@@ -73,6 +78,8 @@ type Config struct {
 	Ensure   AccountEnsurer
 	// SubjectFor keys consents by the subject the app sees (see SubjectFor).
 	SubjectFor SubjectFor
+	// SessionKey names the passkey a wallet's spend binding is signed by.
+	SessionKey SessionKey
 	// Outbox tells the platform which account a consent's handle debits.
 	Outbox *Outbox
 	// TokenTTL bounds a spend token's lifetime (default 24h). A token also
@@ -100,6 +107,7 @@ func New(c Config) *Handler {
 		resolver:   c.Resolver,
 		ensure:     c.Ensure,
 		subjectFor: subjectFor,
+		sessionKey: c.SessionKey,
 		outbox:     c.Outbox,
 		ttl:        ttl,
 		now:        time.Now,
@@ -141,24 +149,17 @@ func (h *Handler) RegisterFilled(consents []*Consent) {
 	}
 }
 
-// walletBinding is the holder's own signature over handle‖0‖app_id‖0‖cap,
-// raw P-256, by the key whose SEC1 point is holder_pub. The IdP checks it is
-// a valid signature by that key before storing it as evidence; that the key
-// is the holder's is what the IdP's own co-signature asserts.
-func verifyWalletBinding(handle, appID string, cap int64, sigB64, pubB64 string) error {
-	if sigB64 == "" && pubB64 == "" {
-		return nil
-	}
-	if sigB64 == "" || pubB64 == "" {
-		return errors.New("wallet_sig and holder_pub go together")
-	}
+// verifyWalletBinding checks the holder's own signature over
+// handle‖0‖app_id‖0‖cap, raw P-256, by pub: the passkey of the identity
+// that consents, which the IdP looked up itself from the wallet session.
+// Each identity has its own passkey, so the key links nothing.
+func verifyWalletBinding(handle, appID string, cap int64, sigB64 string, pub []byte) error {
 	sig, err := base64.RawURLEncoding.DecodeString(sigB64)
 	if err != nil || len(sig) != 64 {
 		return errors.New("wallet_sig must be 64 raw bytes, base64url")
 	}
-	pub, err := base64.RawURLEncoding.DecodeString(pubB64)
-	if err != nil || len(pub) != 65 || pub[0] != 0x04 {
-		return errors.New("holder_pub must be a SEC1 uncompressed P-256 point, base64url")
+	if len(pub) != 65 || pub[0] != 0x04 {
+		return errors.New("the passkey is not a SEC1 uncompressed P-256 point")
 	}
 	x, y := new(big.Int).SetBytes(pub[1:33]), new(big.Int).SetBytes(pub[33:])
 	if !elliptic.P256().IsOnCurve(x, y) {
@@ -251,10 +252,13 @@ func (h *Handler) HandleGrantConsent(w http.ResponseWriter, r *http.Request) {
 		AppName string `json:"app_name"`
 		Cap     int64  `json:"cap"`
 		// The wallet mints the ledger handle and signs handle‖app‖cap with
-		// the holder key; a wallet that predates handles sends none.
+		// the identity's passkey; a wallet that predates handles sends none.
 		LedgerHandle string `json:"ledger_handle"`
 		WalletSig    string `json:"wallet_sig"`
-		HolderPub    string `json:"holder_pub"`
+		// HolderPub was the phone-wide holder key of wallets 1.4.34 and
+		// 1.4.35 (TestFlight only). It linked an phone's identities, so it
+		// is refused: the passkey is looked up here instead.
+		HolderPub string `json:"holder_pub"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 16*1024)).Decode(&req); err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid json")
@@ -273,13 +277,30 @@ func (h *Handler) HandleGrantConsent(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusBadRequest, "ledger_handle must be 16 bytes base64url")
 		return
 	}
-	if req.LedgerHandle == "" && (req.WalletSig != "" || req.HolderPub != "") {
+	if req.HolderPub != "" {
+		httpErr(w, http.StatusBadRequest, "holder_pub is not accepted: the binding is signed with the identity's passkey (update the wallet)")
+		return
+	}
+	if req.LedgerHandle == "" && req.WalletSig != "" {
 		httpErr(w, http.StatusBadRequest, "a wallet signature needs the handle it signs")
 		return
 	}
-	if err := verifyWalletBinding(req.LedgerHandle, appID, req.Cap, req.WalletSig, req.HolderPub); err != nil {
-		httpErr(w, http.StatusBadRequest, err.Error())
-		return
+	var holderPub string
+	if req.WalletSig != "" {
+		if h.sessionKey == nil {
+			httpErr(w, http.StatusInternalServerError, "spend: passkey lookup not wired")
+			return
+		}
+		pub, err := h.sessionKey(r)
+		if err != nil {
+			httpErr(w, http.StatusBadRequest, "a signed binding needs a wallet session: "+err.Error())
+			return
+		}
+		if err := verifyWalletBinding(req.LedgerHandle, appID, req.Cap, req.WalletSig, pub); err != nil {
+			httpErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		holderPub = base64.RawURLEncoding.EncodeToString(pub)
 	}
 	// Fill the display fields from the platform when the caller did not:
 	// the consent row is what the user sees under "Apps that may spend".
@@ -298,7 +319,7 @@ func (h *Handler) HandleGrantConsent(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := h.store.Grant(userID, h.subjectFor(userID, appID), appID,
 		strings.ToLower(strings.TrimSpace(req.AppHost)), strings.TrimSpace(req.AppName), req.Cap,
-		HandleProof{Handle: req.LedgerHandle, WalletSig: req.WalletSig, HolderPub: req.HolderPub})
+		HandleProof{Handle: req.LedgerHandle, WalletSig: req.WalletSig, HolderPub: holderPub})
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, err.Error())
 		return

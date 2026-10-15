@@ -63,7 +63,8 @@ func TestConsentHandleAndStatement(t *testing.T) {
 	f.h.outbox = ob
 	f.h.subjectFor = func(userID, _ string) string { return "sub:" + userID }
 
-	// The wallet mints the handle and signs handle‖app‖cap with the holder key.
+	// The wallet mints the handle and signs handle‖app‖cap with the
+	// identity's passkey, which the IdP looks up from the wallet session.
 	holder, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	handle := NewHandle()
 	sign := func(h string, cap int64) string {
@@ -85,19 +86,39 @@ func TestConsentHandleAndStatement(t *testing.T) {
 		return w.Code, out
 	}
 
+	signed := func(h string, cap int64) string {
+		return `{"app_id":"` + f.appID + `","cap":100,"ledger_handle":"` + h + `","wallet_sig":"` + sign(h, cap) + `"}`
+	}
+
+	// Without a wallet session there is no passkey to check the binding by.
+	if code, _ := grant(signed(handle, 100)); code != http.StatusBadRequest {
+		t.Fatalf("a binding without a wallet session accepted: %d", code)
+	}
+	// A key the wallet names is refused outright: the passkey is looked up.
+	f.passkey = elliptic.Marshal(elliptic.P256(), holder.PublicKey.X, holder.PublicKey.Y)
+	if code, _ := grant(`{"app_id":"` + f.appID + `","cap":100,"ledger_handle":"` + handle + `","wallet_sig":"` + sign(handle, 100) + `","holder_pub":"` + pub + `"}`); code != http.StatusBadRequest {
+		t.Fatalf("a wallet-named holder key accepted: %d", code)
+	}
 	// A signature over something else is refused; a bad handle too.
-	if code, _ := grant(`{"app_id":"` + f.appID + `","cap":100,"ledger_handle":"` + handle + `","wallet_sig":"` + sign(handle, 99) + `","holder_pub":"` + pub + `"}`); code != http.StatusBadRequest {
+	if code, _ := grant(signed(handle, 99)); code != http.StatusBadRequest {
 		t.Fatalf("mismatched signature accepted: %d", code)
 	}
 	if code, _ := grant(`{"app_id":"` + f.appID + `","cap":100,"ledger_handle":"short"}`); code != http.StatusBadRequest {
 		t.Fatalf("bad handle accepted: %d", code)
 	}
-	code, out := grant(`{"app_id":"` + f.appID + `","cap":100,"ledger_handle":"` + handle + `","wallet_sig":"` + sign(handle, 100) + `","holder_pub":"` + pub + `"}`)
+	// A signature by another passkey than the session's.
+	other, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	f.passkey = elliptic.Marshal(elliptic.P256(), other.PublicKey.X, other.PublicKey.Y)
+	if code, _ := grant(signed(handle, 100)); code != http.StatusBadRequest {
+		t.Fatalf("a binding by another passkey accepted: %d", code)
+	}
+	f.passkey = elliptic.Marshal(elliptic.P256(), holder.PublicKey.X, holder.PublicKey.Y)
+	code, out := grant(signed(handle, 100))
 	if code != http.StatusOK || out["ledger"] != handle {
 		t.Fatalf("grant: %d %v", code, out)
 	}
 	c, err := f.store.GetBySubject("sub:user-1", f.appID)
-	if err != nil || c.Ledger != handle || c.WalletSig == "" || c.UserID != "user-1" {
+	if err != nil || c.Ledger != handle || c.WalletSig == "" || c.UserID != "user-1" || c.HolderPub != pub {
 		t.Fatalf("stored consent: %+v %v", c, err)
 	}
 	if _, err := f.store.GetBySubject("user-1", f.appID); err == nil {

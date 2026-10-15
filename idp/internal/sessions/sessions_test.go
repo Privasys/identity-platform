@@ -13,6 +13,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,7 +36,24 @@ func newTestStore(t *testing.T) *Store {
 	// refuses vouchers outright without a registry behind it.
 	s.SetSectorResolver(func(string) string { return "" })
 	s.SetAppsResolver(func(string) []string { return nil })
+	s.SetPasskeysResolver(func(string) ([][]byte, error) { return testPasskeys.all(), nil })
 	return s
+}
+
+// testPasskeys holds every key signedVoucher signs with: in these tests
+// each is a passkey of the identity.
+var testPasskeys passkeyList
+
+type passkeyList struct {
+	mu   sync.Mutex
+	keys [][]byte
+}
+
+func (l *passkeyList) add(k []byte) { l.mu.Lock(); l.keys = append(l.keys, k); l.mu.Unlock() }
+func (l *passkeyList) all() [][]byte {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([][]byte(nil), l.keys...)
 }
 
 func TestCreateAndIsActive(t *testing.T) {
@@ -181,6 +199,7 @@ func signedVoucher(t *testing.T, sub, sid string, appID []byte) (payload, hwSig 
 		t.Fatal(err)
 	}
 	hwPub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y)
+	testPasskeys.add(hwPub)
 	now := uint64(time.Now().Unix())
 	p := &EncAuth{
 		V: 1, Sub: sub, SID: sid,

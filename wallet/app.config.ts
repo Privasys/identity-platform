@@ -39,8 +39,8 @@ process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KE
  * Keychain access groups, named here rather than inferred.
  *
  * Keychain items are addressed by `<prefix>.<group>`, where the prefix is the
- * signing team. When the app moved from the previous Apple account to
- * Privasys Ltd (2026-09-04) that prefix changed from XXXXXXXXXX to HLW68Z8TMZ,
+ * signing team. When the app moved from Bertrand personal Apple account to
+ * Privasys Ltd (2026-09-04) that prefix changed to HLW68Z8TMZ,
  * and everything an installed wallet held went out of reach with it: the
  * profile, credentials, the auth store, the sovereign root, KYC records, and
  * the Secure Enclave keys, which are keychain items like any other.

@@ -37,7 +37,7 @@ function withIosMainAppEntitlements(config) {
         // MERGED, not assigned, the same way the associated-domains block
         // below does it. Assigning outright silently discarded anything
         // app.config.ts declared, which after the Apple account transfer meant
-        // dropping the legacy XXXXXXXXXX groups that keep an existing wallet
+        // dropping the legacy keychain groups that keep an existing wallet
         // readable. The config looked correct and the built app was missing
         // two entries, with nothing anywhere to say so.
         //

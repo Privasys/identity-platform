@@ -87,6 +87,7 @@ import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { selfAssertedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, profileName, govValueKey, isDerived, isEmailVerified, setProfileValue } from '@/services/attributes';
 import { discloseAttribute, provePresence, voucherForAttribute } from '@/services/kyc';
+import { disclosureRpId } from '@/services/voucher-rp';
 import { getAttributeValues, type ValueOption } from '@/services/value-sets';
 import { getDeviceAttribute } from '@/services/device-attributes';
 import { snapshotDisclosed } from '@/services/consent';
@@ -214,7 +215,7 @@ async function resolveRequestedAttributes(
             if (!selfieBase64) continue;
             try {
                 attrs[attr] = await provePresence(
-                    payload.rpId,
+                    disclosureRpId(payload.rpId, voucherForAttribute(PRESENCE_KEY, payload.disclosureVouchers)),
                     selfieBase64,
                     payload.nonce ?? payload.sessionId,
                     voucherForAttribute(PRESENCE_KEY, payload.disclosureVouchers),
@@ -242,7 +243,7 @@ async function resolveRequestedAttributes(
                 // Gov claims are presented as enclave-signed, audience-bound
                 // disclosure tokens (commit-and-prove), never the raw value.
                 try {
-                    attrs[attr] = await discloseAttribute(payload.rpId, attr, payload.nonce ?? payload.sessionId, payload.disclosureVouchers, subject);
+                    attrs[attr] = await discloseAttribute(disclosureRpId(payload.rpId, voucherForAttribute(attr, payload.disclosureVouchers)), attr, payload.nonce ?? payload.sessionId, payload.disclosureVouchers, subject);
                 } catch (e: any) {
                     // Never fall back to the raw gov value; omit on failure.
                     console.warn(`[CONNECT] disclosure for ${attr} failed: ${e?.message}`);
@@ -2398,7 +2399,10 @@ function ConnectFlow() {
             setStep('relaying');
 
             // Resolve only the attributes the app actually requested.
-            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current, result.subject);
+            // Read now, not from this render: the sign-in may run after the
+            // holder added what was missing (an ID check), and the closure
+            // still holds the profile from before.
+            const attributes = await resolveRequestedAttributes(payload, useProfileStore.getState().profile, approvedAttrsRef.current, selfieRef.current, result.subject);
             const undelivered = undeliveredEssentials(payload, attributes);
             if (undelivered.length > 0) {
                 console.warn(`[CONNECT] not relaying: essential attributes not shared: ${undelivered.join(', ')}`);
@@ -2576,7 +2580,10 @@ function ConnectFlow() {
             setStep('relaying');
 
             // Resolve only the attributes the app actually requested.
-            const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current, result.subject);
+            // Read now, not from this render: the sign-in may run after the
+            // holder added what was missing (an ID check), and the closure
+            // still holds the profile from before.
+            const attributes = await resolveRequestedAttributes(payload, useProfileStore.getState().profile, approvedAttrsRef.current, selfieRef.current, result.subject);
             const undelivered = undeliveredEssentials(payload, attributes);
             if (undelivered.length > 0) {
                 console.warn(`[CONNECT] not relaying: essential attributes not shared: ${undelivered.join(', ')}`);

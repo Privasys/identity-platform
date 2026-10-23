@@ -1135,6 +1135,20 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     throw err;
                 }
                 const authData = await authResp.json();
+                // The IdP keeps from the wallet any attribute the client's
+                // registration does not allow. Signing in anyway would hand
+                // the page a token without what it asked for, and the holder
+                // an approval that showed less than the page expects, so the
+                // sign-in fails and names the keys.
+                const dropped: unknown = authData.dropped_attributes;
+                if (Array.isArray(dropped) && dropped.length > 0) {
+                    const err = new Error(
+                        `This app may not ask for ${dropped.join(', ')}: its registration does not allow ${dropped.length === 1 ? 'it' : 'them'}`,
+                    );
+                    (err as Error & { code?: string; dropped?: string[] }).code = 'attributes_not_allowed';
+                    (err as Error & { code?: string; dropped?: string[] }).dropped = dropped.map(String);
+                    throw err;
+                }
                 const oidcSessionId: string = authData.session_id;
                 const pollUrl: string = authData.poll_url;
                 const requestedAttributes: string[] | undefined = authData.requested_attributes;

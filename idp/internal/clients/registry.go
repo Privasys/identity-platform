@@ -675,3 +675,52 @@ func HandleClientAttributes(reg *Registry) http.HandlerFunc {
 		json.NewEncoder(w).Encode(map[string]any{"client_id": c.ClientID, "required_attributes": attrs})
 	}
 }
+
+// SetRequiredAttributes replaces a client's attribute whitelist and
+// nothing else, so an operator can widen or narrow what a client may
+// request without re-registering it (which rewrites its name, redirect
+// URIs and secret).
+func (reg *Registry) SetRequiredAttributes(clientID string, attrs []string) (*Client, error) {
+	if err := validateRequiredAttributes(attrs); err != nil {
+		return nil, err
+	}
+	raw, _ := json.Marshal(attrs)
+	res, err := reg.db.Exec("UPDATE clients SET required_attributes = ? WHERE client_id = ?", string(raw), clientID)
+	if err != nil {
+		return nil, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, fmt.Errorf("client not found")
+	}
+	return reg.Get(clientID)
+}
+
+// HandleSetRequiredAttributes is the admin endpoint for SetRequiredAttributes.
+// Request: {"required_attributes": ["name", "given_name_id", ...]}.
+func HandleSetRequiredAttributes(reg *Registry, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminToken != "" {
+			auth := r.Header.Get("Authorization")
+			if len(auth) < 8 || auth[7:] != adminToken {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+		}
+		var req struct {
+			RequiredAttributes []string `json:"required_attributes"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+		c, err := reg.SetRequiredAttributes(r.PathValue("id"), req.RequiredAttributes)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"client_id": c.ClientID, "required_attributes": c.RequiredAttributes})
+	}
+}

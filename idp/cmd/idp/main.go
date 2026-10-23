@@ -448,6 +448,8 @@ func main() {
 	mux.HandleFunc("POST /clients", clients.HandleRegister(clientReg, cfg.AdminToken))
 	// What a client may request (public), for its own attribute picker.
 	mux.HandleFunc("GET /clients/{id}/attributes", clients.HandleClientAttributes(clientReg))
+	// Widen or narrow that list without re-registering the client (admin).
+	mux.HandleFunc("POST /clients/{id}/attributes", clients.HandleSetRequiredAttributes(clientReg, cfg.AdminToken))
 	// Flag a client as a billable relying party + link its billing account
 	// (the attribute-marketplace consumer side).
 	mux.HandleFunc("POST /clients/{id}/billing", clients.HandleSetBilling(clientReg, cfg.AdminToken))

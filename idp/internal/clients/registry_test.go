@@ -146,3 +146,31 @@ func TestSubjectModes(t *testing.T) {
 		t.Fatal("an unknown client was moved")
 	}
 }
+
+// Widening a client's whitelist changes the whitelist and nothing else: its
+// name, redirect URIs and secret survive, and a non-canonical key is refused.
+func TestSetRequiredAttributes(t *testing.T) {
+	reg := newTestRegistry(t)
+	if _, err := reg.RegisterWithID("portal", "Portal", []string{"https://portal/cb"}, "s3cret", []string{"name"}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := reg.SetRequiredAttributes("portal", []string{"name", "given_name_id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.RequiredAttributes) != 2 || c.RequiredAttributes[1] != "given_name_id" {
+		t.Fatalf("required_attributes = %v", c.RequiredAttributes)
+	}
+	if c.ClientName != "Portal" || len(c.RedirectURIs) != 1 {
+		t.Fatalf("registration changed: %+v", c)
+	}
+	if ok, _ := reg.VerifySecret("portal", "s3cret"); !ok {
+		t.Fatal("the secret did not survive")
+	}
+	if _, err := reg.SetRequiredAttributes("portal", []string{"not_a_key"}); err == nil {
+		t.Fatal("a non-canonical key was accepted")
+	}
+	if _, err := reg.SetRequiredAttributes("nobody", []string{"name"}); err == nil {
+		t.Fatal("an unknown client was updated")
+	}
+}

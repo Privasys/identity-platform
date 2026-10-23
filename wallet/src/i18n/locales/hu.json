@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Hibás formátumú jóváhagyási kérelem (hiányzik: appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Hiányzó adatok",
     "missingInfoBody": "Adja meg a következőket: {{attributes}}",
+    "detailsReadyScanAgain": "Az adatai készen állnak. Ez a bejelentkezés lejárt, amíg hozzáadta őket: a befejezéshez olvassa be újra a kódot.",
+    "essentialNotShared": "Semmi sem lett megosztva: {{attributes}} nem adható meg. Az újrapróbálkozáshoz olvassa be újra a kódot.",
     "linkFailed": "Az összekapcsolás sikertelen",
     "reportError": "Hiba bejelentése",
     "reportDestination": "Címzett",

@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Nepareizi noformēts apstiprinājuma pieprasījums (trūkst appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Trūkst informācijas",
     "missingInfoBody": "Lūdzu, norādiet: {{attributes}}",
+    "detailsReadyScanAgain": "Jūsu dati ir gatavi. Šī pierakstīšanās beidzās, kamēr tos pievienojāt: lai pabeigtu, noskenējiet kodu vēlreiz.",
+    "essentialNotShared": "Nekas netika kopīgots: {{attributes}} nevarēja nodrošināt. Lai mēģinātu vēlreiz, noskenējiet kodu vēlreiz.",
     "linkFailed": "Sasaiste neizdevās",
     "reportError": "Ziņot par kļūdu",
     "reportDestination": "Tiks nosūtīts uz",

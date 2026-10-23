@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Solicitud de aprobación con formato incorrecto (falta appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Faltan datos",
     "missingInfoBody": "Indica lo siguiente: {{attributes}}",
+    "detailsReadyScanAgain": "Tus datos están listos. Este inicio de sesión caducó mientras los añadías: vuelve a escanear el código para terminar.",
+    "essentialNotShared": "No se compartió nada: no se pudo proporcionar {{attributes}}. Vuelve a escanear el código para intentarlo de nuevo.",
     "linkFailed": "Error al vincular",
     "reportError": "Informar del error",
     "reportDestination": "Se enviará a",

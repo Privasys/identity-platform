@@ -483,6 +483,30 @@ function getRequiredMissing(missing: string[], reqs?: AttributeRequirements): st
     return missing.filter((k) => isEssential(k, reqs));
 }
 
+/**
+ * The essential attributes a resolved disclosure set does not carry. A sign-in
+ * that lacks one is not relayed: the app would receive a session that looks
+ * complete and is not (a paid proof whose voucher lapsed, a disclosure the
+ * enclave refused). Presence is the one exception: its failure is itself the
+ * answer, reported to the app (see resolveRequestedAttributes).
+ */
+function undeliveredEssentials(
+    payload: QRPayload,
+    attributes: Record<string, string> | undefined,
+): string[] {
+    return (payload.requestedAttributes ?? []).filter(
+        (k) =>
+            k !== 'sub' &&
+            k !== PRESENCE_KEY &&
+            isEssential(k, payload.attributeRequirements) &&
+            !attributes?.[k],
+    );
+}
+
+/** How long after the QR was read the sign-in it carries can still finish:
+ *  privasys.id keeps an authorize session for five minutes. */
+const SIGN_IN_WINDOW_MS = 4 * 60 * 1000;
+
 /** One row on the sign-in consent screen. */
 interface SignInConsentItem {
     key: string;
@@ -953,6 +977,16 @@ function ConnectFlow() {
     const selfieContinuation = useRef<(() => Promise<void>) | null>(null);
     const selfieCameraRef = useRef<CameraView>(null);
     const [selfiePermission, requestSelfiePermission] = useCameraPermissions();
+    /**
+     * The sign-in itself, deferred until the holder has what the app asked
+     * for. Nothing reaches privasys.id before then: the passkey ceremony is
+     * what completes the browser's sign-in there, and the voucher is what
+     * opens its sealed session, so running either first handed the app a
+     * session while the holder was still verifying their ID.
+     */
+    const pendingCeremony = useRef<(() => Promise<void>) | null>(null);
+    /** When the QR was read: its privasys.id session expires five minutes on. */
+    const qrReadAt = useRef(0);
     const pendingRelay = useRef<{
         payload: QRPayload;
         sessionToken: string;
@@ -1019,6 +1053,7 @@ function ConnectFlow() {
         }
 
         console.log('[CONNECT] QR parsed:', JSON.stringify(parsed));
+        qrReadAt.current = Date.now();
         setQr(parsed);
         startFlow(parsed);
     }, []);
@@ -1836,40 +1871,54 @@ function ConnectFlow() {
 
             // Consent first — the disclosure step is gated by what it approves.
             await ensureConsentThen(qr, async () => {
-                // If attestation changed AND the RP *is* the enclave app
-                // (enclave-as-RP: the credential lives in the enclave's sealed
-                // KV), the new KV means our old credential no longer exists
-                // server-side — remove it and re-register.
-                //
-                // Never do this for IdP-brokered ceremonies (rpId = the IdP,
-                // e.g. privasys.id, with a separate appHost): the credential
-                // lives at the IdP and survives app redeploys, and re-register
-                // would mint a NEW pairwise userHandle — a brand-new identity
-                // that silently orphans everything keyed to the old sub
-                // (tenants, vault keys, billing). A changed app enclave only
-                // needs the user's approval, then a normal authenticate.
-                const rpIsEnclave = !qr.appHost || qr.appHost === qr.rpId;
-                const credential = getCredentialForRp(qr.rpId);
-                if (credential && attestationChanged && rpIsEnclave) {
-                    // Two-phase swap: the old credential (and its hardware key)
-                    // is removed only AFTER the replacement registration fully
-                    // succeeds — a failed re-register must never leave the user
-                    // with no credential and a destroyed key.
-                    console.log('[CONNECT] attestation changed — re-registering, old credential retired on success');
-                    await doRegister(qr, { credentialId: credential.credentialId, keyAlias: credential.keyAlias });
-                } else if (credential) {
-                    await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
-                } else {
-                    await doRegister(qr);
+                const ceremony = async () => {
+                    // If attestation changed AND the RP *is* the enclave app
+                    // (enclave-as-RP: the credential lives in the enclave's sealed
+                    // KV), the new KV means our old credential no longer exists
+                    // server-side — remove it and re-register.
+                    //
+                    // Never do this for IdP-brokered ceremonies (rpId = the IdP,
+                    // e.g. privasys.id, with a separate appHost): the credential
+                    // lives at the IdP and survives app redeploys, and re-register
+                    // would mint a NEW pairwise userHandle — a brand-new identity
+                    // that silently orphans everything keyed to the old sub
+                    // (tenants, vault keys, billing). A changed app enclave only
+                    // needs the user's approval, then a normal authenticate.
+                    const rpIsEnclave = !qr.appHost || qr.appHost === qr.rpId;
+                    const credential = getCredentialForRp(qr.rpId);
+                    if (credential && attestationChanged && rpIsEnclave) {
+                        // Two-phase swap: the old credential (and its hardware key)
+                        // is removed only AFTER the replacement registration fully
+                        // succeeds — a failed re-register must never leave the user
+                        // with no credential and a destroyed key.
+                        console.log('[CONNECT] attestation changed — re-registering, old credential retired on success');
+                        await doRegister(qr, { credentialId: credential.credentialId, keyAlias: credential.keyAlias });
+                    } else if (credential) {
+                        await doAuthenticate(qr, credential.keyAlias, credential.credentialId, credential.serverRpId);
+                    } else {
+                        await doRegister(qr);
+                    }
+                    // Approving this enclave also approves the attested cross-enclave
+                    // dependencies it declares (OID 7.1), cached by (app-id, identity)
+                    // with this app as provenance and reused wherever they recur.
+                    try {
+                        recordDeclaredDependencies(attestation.custom_oids, 'approved', qr.rpId);
+                    } catch (depErr) {
+                        console.warn('[CONNECT] recording dependency approvals failed (non-fatal):', depErr);
+                    }
+                };
+                // What the app asked for and the holder does not have yet is
+                // acquired FIRST (details, an ID check), and the sign-in runs
+                // after: see pendingCeremony.
+                const missing = getMissingAttributes(qr, useProfileStore.getState().profile);
+                if (missing.length > 0) {
+                    console.log(`[CONNECT] missing attributes: ${missing.join(', ')}: acquiring before the sign-in`);
+                    pendingCeremony.current = ceremony;
+                    setMissingAttrs(missing);
+                    setStep('acquire-attributes');
+                    return;
                 }
-                // Approving this enclave also approves the attested cross-enclave
-                // dependencies it declares (OID 7.1), cached by (app-id, identity)
-                // with this app as provenance and reused wherever they recur.
-                try {
-                    recordDeclaredDependencies(attestation.custom_oids, 'approved', qr.rpId);
-                } catch (depErr) {
-                    console.warn('[CONNECT] recording dependency approvals failed (non-fatal):', depErr);
-                }
+                await ceremony();
             });
         } catch (e: any) {
             console.error('[CONNECT] approve FAILED:', e?.message, e);
@@ -2350,6 +2399,13 @@ function ConnectFlow() {
 
             // Resolve only the attributes the app actually requested.
             const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current, result.subject);
+            const undelivered = undeliveredEssentials(payload, attributes);
+            if (undelivered.length > 0) {
+                console.warn(`[CONNECT] not relaying: essential attributes not shared: ${undelivered.join(', ')}`);
+                setError(t('connect.essentialNotShared', { attributes: undelivered.map((k) => attributeLabel(k)).join(', ') }));
+                setStep('error');
+                return;
+            }
 
             // The silent-rebind voucher goes up BEFORE the browser learns the
             // ceremony is done: the SDK establishes the app's sealed session
@@ -2521,6 +2577,13 @@ function ConnectFlow() {
 
             // Resolve only the attributes the app actually requested.
             const attributes = await resolveRequestedAttributes(payload, profile, approvedAttrsRef.current, selfieRef.current, result.subject);
+            const undelivered = undeliveredEssentials(payload, attributes);
+            if (undelivered.length > 0) {
+                console.warn(`[CONNECT] not relaying: essential attributes not shared: ${undelivered.join(', ')}`);
+                setError(t('connect.essentialNotShared', { attributes: undelivered.map((k) => attributeLabel(k)).join(', ') }));
+                setStep('error');
+                return;
+            }
 
             // The silent-rebind voucher goes up BEFORE the browser learns the
             // ceremony is done: the SDK establishes the app's sealed session
@@ -2700,6 +2763,39 @@ function ConnectFlow() {
      * Re-reads the profile, resolves attributes, and completes the relay.
      */
     const handleAttributesAcquired = useCallback(async () => {
+        // The usual case: the sign-in has not run yet (see pendingCeremony).
+        const ceremony = pendingCeremony.current;
+        if (ceremony && qr) {
+            const requiredMissing = getRequiredMissing(
+                getMissingAttributes(qr, useProfileStore.getState().profile),
+                qr.attributeRequirements,
+            );
+            if (requiredMissing.length > 0) {
+                Alert.alert(
+                    t('connect.missingInfoTitle'),
+                    t('connect.missingInfoBody', {
+                        attributes: requiredMissing.map((k) => attributeLabel(k)).join(', ')
+                    }),
+                );
+                return;
+            }
+            pendingCeremony.current = null;
+            if (Date.now() - qrReadAt.current > SIGN_IN_WINDOW_MS) {
+                // What the holder added is kept; this sign-in's session at
+                // privasys.id has expired, and a fresh code finishes at once.
+                setError(t('connect.detailsReadyScanAgain'));
+                setStep('error');
+                return;
+            }
+            try {
+                await ceremony();
+            } catch (e: any) {
+                console.error('[CONNECT] sign-in after acquiring attributes FAILED:', e?.message, e);
+                setError(`Approval failed: ${e?.message ?? e}`);
+                setStep('error');
+            }
+            return;
+        }
         const pending = pendingRelay.current;
         if (!pending) return;
 
@@ -2723,6 +2819,13 @@ function ConnectFlow() {
         setStep('relaying');
         try {
             const attributes = await resolveRequestedAttributes(pending.payload, updatedProfile, approvedAttrsRef.current, selfieRef.current, pending.subject);
+            const undelivered = undeliveredEssentials(pending.payload, attributes);
+            if (undelivered.length > 0) {
+                console.warn(`[CONNECT] not relaying: essential attributes not shared: ${undelivered.join(', ')}`);
+                setError(t('connect.essentialNotShared', { attributes: undelivered.map((k) => attributeLabel(k)).join(', ') }));
+                setStep('error');
+                return;
+            }
 
             // Same order as the direct path: voucher first, then the relay,
             // and the sealed binding rides the relay so a first-time holder
@@ -2814,7 +2917,7 @@ function ConnectFlow() {
             setError(`Failed to complete sign-in: ${e.message}`);
             setStep('error');
         }
-    }, [pushToken]);
+    }, [pushToken, qr]);
 
     return (
         <>

@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Poškodená žiadosť o schválenie (chýba appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Chýbajúce informácie",
     "missingInfoBody": "Uveďte, prosím: {{attributes}}",
+    "detailsReadyScanAgain": "Vaše údaje sú pripravené. Toto prihlásenie vypršalo, kým ste ich dopĺňali: dokončite ho opätovným naskenovaním kódu.",
+    "essentialNotShared": "Nič nebolo zdieľané: {{attributes}} nebolo možné poskytnúť. Naskenujte kód znova a skúste to znova.",
     "linkFailed": "Prepojenie zlyhalo",
     "reportError": "Nahlásiť chybu",
     "reportDestination": "Odošle sa na",

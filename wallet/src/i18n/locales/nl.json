@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Onjuist gevormd goedkeuringsverzoek (appHost/clientId/sdkPub/sid ontbreekt).",
     "missingInfoTitle": "Ontbrekende gegevens",
     "missingInfoBody": "Vul het volgende in: {{attributes}}",
+    "detailsReadyScanAgain": "Je gegevens zijn klaar. Deze aanmelding is verlopen terwijl je ze toevoegde: scan de code opnieuw om af te ronden.",
+    "essentialNotShared": "Er is niets gedeeld: {{attributes}} kon niet worden verstrekt. Scan de code opnieuw om het nog eens te proberen.",
     "linkFailed": "Koppelen mislukt",
     "reportError": "Fout melden",
     "reportDestination": "Wordt verstuurd naar",

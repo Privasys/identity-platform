@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Fehlerhafte Freigabeanforderung (appHost/clientId/sdkPub/sid fehlt).",
     "missingInfoTitle": "Fehlende Angaben",
     "missingInfoBody": "Bitte geben Sie an: {{attributes}}",
+    "detailsReadyScanAgain": "Ihre Angaben sind bereit. Diese Anmeldung ist abgelaufen, während Sie sie ergänzt haben: Scannen Sie den Code erneut, um sie abzuschließen.",
+    "essentialNotShared": "Es wurde nichts geteilt: {{attributes}} konnte nicht bereitgestellt werden. Scannen Sie den Code erneut, um es noch einmal zu versuchen.",
     "linkFailed": "Verknüpfung fehlgeschlagen",
     "reportError": "Fehler melden",
     "reportDestination": "Wird gesendet an",

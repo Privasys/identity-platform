@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Nieprawidłowo sformułowane żądanie zatwierdzenia (brak appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Brakujące informacje",
     "missingInfoBody": "Podaj: {{attributes}}",
+    "detailsReadyScanAgain": "Twoje dane są gotowe. To logowanie wygasło, gdy je dodawałeś: zeskanuj kod ponownie, aby je dokończyć.",
+    "essentialNotShared": "Nic nie zostało udostępnione: nie udało się przekazać {{attributes}}. Zeskanuj kod ponownie, aby spróbować jeszcze raz.",
     "linkFailed": "Powiązanie nie powiodło się",
     "reportError": "Zgłoś błąd",
     "reportDestination": "Zostanie wysłane do",

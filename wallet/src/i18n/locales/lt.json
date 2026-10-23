@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Netinkamai suformuotas patvirtinimo prašymas (trūksta appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Trūksta informacijos",
     "missingInfoBody": "Prašome nurodyti: {{attributes}}",
+    "detailsReadyScanAgain": "Jūsų duomenys paruošti. Šis prisijungimas baigėsi, kol juos pridėjote: norėdami užbaigti, nuskaitykite kodą dar kartą.",
+    "essentialNotShared": "Niekas nebuvo bendrinta: nepavyko pateikti {{attributes}}. Norėdami bandyti dar kartą, vėl nuskaitykite kodą.",
     "linkFailed": "Susieti nepavyko",
     "reportError": "Pranešti apie klaidą",
     "reportDestination": "Bus išsiųsta adresu",

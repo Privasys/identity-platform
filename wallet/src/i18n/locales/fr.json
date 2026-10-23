@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Demande d'approbation mal formée (appHost/clientId/sdkPub/sid manquant).",
     "missingInfoTitle": "Informations manquantes",
     "missingInfoBody": "Veuillez fournir : {{attributes}}",
+    "detailsReadyScanAgain": "Vos informations sont prêtes. Cette connexion a expiré pendant que vous les ajoutiez : scannez à nouveau le code pour terminer.",
+    "essentialNotShared": "Rien n'a été partagé : {{attributes}} n'a pas pu être fourni. Scannez à nouveau le code pour réessayer.",
     "linkFailed": "Échec de la liaison",
     "reportError": "Signaler l'erreur",
     "reportDestination": "Sera envoyé à",

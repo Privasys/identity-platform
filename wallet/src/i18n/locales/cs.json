@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Chybně sestavená žádost o schválení (chybí appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Chybějící údaje",
     "missingInfoBody": "Doplňte prosím: {{attributes}}",
+    "detailsReadyScanAgain": "Vaše údaje jsou připravené. Toto přihlášení vypršelo, zatímco jste je doplňovali: dokončete ho opětovným naskenováním kódu.",
+    "essentialNotShared": "Nic nebylo sdíleno: {{attributes}} nebylo možné poskytnout. Naskenujte kód znovu a zkuste to znovu.",
     "linkFailed": "Propojení se nezdařilo",
     "reportError": "Nahlásit chybu",
     "reportDestination": "Bude odesláno na",

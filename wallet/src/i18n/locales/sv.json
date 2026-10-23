@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Felaktigt utformad godkännandebegäran (appHost/clientId/sdkPub/sid saknas).",
     "missingInfoTitle": "Uppgifter saknas",
     "missingInfoBody": "Ange följande: {{attributes}}",
+    "detailsReadyScanAgain": "Dina uppgifter är klara. Den här inloggningen gick ut medan du lade till dem: skanna koden igen för att slutföra.",
+    "essentialNotShared": "Inget delades: {{attributes}} kunde inte lämnas. Skanna koden igen för att försöka på nytt.",
     "linkFailed": "Länkningen misslyckades",
     "reportError": "Rapportera felet",
     "reportDestination": "Skickas till",

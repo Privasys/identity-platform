@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Talba ta' approvazzjoni mhux iffurmata sew (nieqsa appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Informazzjoni nieqsa",
     "missingInfoBody": "Jekk jogħġbok ipprovdi: {{attributes}}",
+    "detailsReadyScanAgain": "Id-dettalji tiegħek huma lesti. Dan id-dħul skada waqt li kont qed iżżidhom: erġa' skennja l-kodiċi biex tlestih.",
+    "essentialNotShared": "Ma nqasam xejn: {{attributes}} ma setax jingħata. Erġa' skennja l-kodiċi biex terġa' tipprova.",
     "linkFailed": "Ir-rabta falliet",
     "reportError": "Irrapporta l-iżball",
     "reportDestination": "Se jintbagħat lil",

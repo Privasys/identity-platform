@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Cerere de aprobare malformată (lipsesc appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Informații lipsă",
     "missingInfoBody": "Te rugăm să furnizezi: {{attributes}}",
+    "detailsReadyScanAgain": "Datele tale sunt gata. Această conectare a expirat în timp ce le adăugai: scanează din nou codul ca să o finalizezi.",
+    "essentialNotShared": "Nu s-a partajat nimic: {{attributes}} nu a putut fi furnizat. Scanează din nou codul ca să încerci iar.",
     "linkFailed": "Legarea a eșuat",
     "reportError": "Raportează eroarea",
     "reportDestination": "Va fi trimis către",

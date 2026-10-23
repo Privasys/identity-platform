@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Malformed approval request (missing appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Missing information",
     "missingInfoBody": "Please provide: {{attributes}}",
+    "detailsReadyScanAgain": "Your details are ready. This sign-in expired while you added them: scan the code again to finish.",
+    "essentialNotShared": "Nothing was shared: {{attributes}} could not be provided. Scan the code again to retry.",
     "linkFailed": "Link failed",
     "reportError": "Report Error",
     "reportDestination": "Will be sent to",

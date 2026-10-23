@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Κακοσχηματισμένο αίτημα έγκρισης (λείπει appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Λείπουν στοιχεία",
     "missingInfoBody": "Συμπληρώστε: {{attributes}}",
+    "detailsReadyScanAgain": "Τα στοιχεία σας είναι έτοιμα. Αυτή η σύνδεση έληξε όσο τα προσθέτατε: σαρώστε ξανά τον κωδικό για να ολοκληρωθεί.",
+    "essentialNotShared": "Δεν κοινοποιήθηκε τίποτα: δεν ήταν δυνατή η παροχή του {{attributes}}. Σαρώστε ξανά τον κωδικό για να δοκιμάσετε πάλι.",
     "linkFailed": "Η σύνδεση λογαριασμού απέτυχε",
     "reportError": "Αναφορά σφάλματος",
     "reportDestination": "Θα σταλεί σε",

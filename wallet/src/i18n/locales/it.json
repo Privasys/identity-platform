@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Richiesta di approvazione malformata (manca appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Informazioni mancanti",
     "missingInfoBody": "Indica: {{attributes}}",
+    "detailsReadyScanAgain": "I tuoi dati sono pronti. Questo accesso è scaduto mentre li aggiungevi: scansiona di nuovo il codice per completarlo.",
+    "essentialNotShared": "Non è stato condiviso nulla: non è stato possibile fornire {{attributes}}. Scansiona di nuovo il codice per riprovare.",
     "linkFailed": "Collegamento non riuscito",
     "reportError": "Segnala l'errore",
     "reportDestination": "Sarà inviato a",

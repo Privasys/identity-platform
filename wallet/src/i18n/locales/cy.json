@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Cais cymeradwyo camffurfiedig (appHost/clientId/sdkPub/sid ar goll).",
     "missingInfoTitle": "Gwybodaeth ar goll",
     "missingInfoBody": "Rhowch: {{attributes}}",
+    "detailsReadyScanAgain": "Mae'ch manylion yn barod. Daeth y mewngofnodi hwn i ben tra oeddech yn eu hychwanegu: sganiwch y cod eto i orffen.",
+    "essentialNotShared": "Ni rannwyd dim: nid oedd modd darparu {{attributes}}. Sganiwch y cod eto i roi cynnig arall arni.",
     "linkFailed": "Methodd y cysylltiad",
     "reportError": "Adrodd am y gwall",
     "reportDestination": "Anfonir at",

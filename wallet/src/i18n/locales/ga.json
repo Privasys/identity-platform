@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Iarratas ceadaithe míchumtha (appHost/clientId/sdkPub/sid ar iarraidh).",
     "missingInfoTitle": "Eolas ar iarraidh",
     "missingInfoBody": "Tabhair le do thoil: {{attributes}}",
+    "detailsReadyScanAgain": "Tá do shonraí réidh. Chuaigh an síniú isteach seo in éag fad is a bhí tú á gcur leis: scan an cód arís chun é a chríochnú.",
+    "essentialNotShared": "Níor roinneadh aon rud: níorbh fhéidir {{attributes}} a sholáthar. Scan an cód arís chun triail eile a bhaint as.",
     "linkFailed": "Theip ar an nasc",
     "reportError": "Tuairiscigh an earráid",
     "reportDestination": "Seolfar chuig",

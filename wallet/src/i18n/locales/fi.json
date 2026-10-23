@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Virheellisesti muotoiltu hyväksyntäpyyntö (appHost/clientId/sdkPub/sid puuttuu).",
     "missingInfoTitle": "Puuttuvia tietoja",
     "missingInfoBody": "Anna seuraavat: {{attributes}}",
+    "detailsReadyScanAgain": "Tietosi ovat valmiina. Tämä kirjautuminen vanheni, kun lisäsit niitä: viimeistele skannaamalla koodi uudelleen.",
+    "essentialNotShared": "Mitään ei jaettu: {{attributes}} ei voitu antaa. Yritä uudelleen skannaamalla koodi uudelleen.",
     "linkFailed": "Liittäminen epäonnistui",
     "reportError": "Ilmoita virheestä",
     "reportDestination": "Lähetetään osoitteeseen",

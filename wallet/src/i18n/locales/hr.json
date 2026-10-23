@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Neispravno oblikovan zahtjev za odobrenje (nedostaje appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Nedostaju podaci",
     "missingInfoBody": "Molimo navedite: {{attributes}}",
+    "detailsReadyScanAgain": "Vaši su podaci spremni. Ova je prijava istekla dok ste ih dodavali: ponovno skenirajte kod da biste je dovršili.",
+    "essentialNotShared": "Ništa nije podijeljeno: {{attributes}} nije bilo moguće pružiti. Ponovno skenirajte kod da biste pokušali opet.",
     "linkFailed": "Povezivanje nije uspjelo",
     "reportError": "Prijavi pogrešku",
     "reportDestination": "Bit će poslano na",

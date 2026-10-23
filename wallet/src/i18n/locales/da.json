@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Forkert udformet godkendelsesanmodning (appHost/clientId/sdkPub/sid mangler).",
     "missingInfoTitle": "Manglende oplysninger",
     "missingInfoBody": "Angiv følgende: {{attributes}}",
+    "detailsReadyScanAgain": "Dine oplysninger er klar. Dette login udløb, mens du tilføjede dem: scan koden igen for at gøre det færdigt.",
+    "essentialNotShared": "Intet blev delt: {{attributes}} kunne ikke leveres. Scan koden igen for at prøve igen.",
     "linkFailed": "Sammenkædningen mislykkedes",
     "reportError": "Rapporter fejlen",
     "reportDestination": "Sendes til",

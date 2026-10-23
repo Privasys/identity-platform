@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Vigaselt vormistatud heakskiidutaotlus (puudub appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Puuduv teave",
     "missingInfoBody": "Palun esitage: {{attributes}}",
+    "detailsReadyScanAgain": "Teie andmed on valmis. See sisselogimine aegus nende lisamise ajal: lõpetamiseks skannige kood uuesti.",
+    "essentialNotShared": "Midagi ei jagatud: {{attributes}} ei õnnestunud esitada. Uuesti proovimiseks skannige kood uuesti.",
     "linkFailed": "Sidumine ebaõnnestus",
     "reportError": "Teata veast",
     "reportDestination": "Saadetakse aadressile",

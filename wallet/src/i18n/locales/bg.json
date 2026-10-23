@@ -302,6 +302,8 @@
     "malformedApprovalRequest": "Неправилно оформена заявка за одобрение (липсват appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Липсваща информация",
     "missingInfoBody": "Моля, посочете: {{attributes}}",
+    "detailsReadyScanAgain": "Данните ви са готови. Това влизане изтече, докато ги добавяхте: сканирайте кода отново, за да завършите.",
+    "essentialNotShared": "Нищо не беше споделено: {{attributes}} не можа да бъде предоставено. Сканирайте кода отново, за да опитате пак.",
     "linkFailed": "Свързването е неуспешно",
     "reportError": "Докладване на грешката",
     "reportDestination": "Ще бъде изпратено до",

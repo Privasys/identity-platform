@@ -266,6 +266,8 @@
     "malformedApprovalRequest": "Pedido de aprovação mal formado (falta appHost/clientId/sdkPub/sid).",
     "missingInfoTitle": "Faltam dados",
     "missingInfoBody": "Indique: {{attributes}}",
+    "detailsReadyScanAgain": "Os seus dados estão prontos. Este início de sessão expirou enquanto os adicionava: leia o código de novo para concluir.",
+    "essentialNotShared": "Nada foi partilhado: não foi possível fornecer {{attributes}}. Leia o código de novo para tentar outra vez.",
     "linkFailed": "Falha ao associar",
     "reportError": "Comunicar o erro",
     "reportDestination": "Será enviado para",

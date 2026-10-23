@@ -28,10 +28,14 @@ export interface AuthUIConfig {
     timeout?: number;
     /** Custom element to mount the overlay into (default: document.body). */
     container?: HTMLElement;
+    /** Called with the rendered UI's height in CSS pixels whenever it
+     *  changes, so a host that embeds this UI in an iframe can size the
+     *  iframe to its content (see frame-size.ts). */
+    onContentHeight?: (px: number) => void;
     /** Presentation mode. `'modal'` (default) renders the full-page chrome:
      *  brand panel, close button, spanning footer. `'inline'` renders a
      *  single compact column without brand panel or close button, sized to
-     *  fit an adopter-provided container (min-height 560px) — the embedding
+     *  fit an adopter-provided container, sized to its content — the embedding
      *  page owns the surrounding content and dismissal. `'page'` renders
      *  the whole gate: the two-column layout with the adopter's `pitch`
      *  content (SDK-styled) in the left panel and no close button. */
@@ -338,13 +342,12 @@ const MODAL_CSS = /* css */ `
 
 /* Inline presentation — embedded in an adopter-provided container. The
    embedding page owns the surrounding chrome (brand content, dismissal),
-   so render a single compact column that fits the documented 560px
-   min-height container without scrolling. Brand panel and close button
+   so render a single compact column; the host sizes the iframe to the
+   column's height (AuthUIConfig.onContentHeight). Brand panel and close button
    are not rendered in this mode (see AuthUI.render). */
 :host(.inline) .page {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr auto;
-    min-height: 100%;
 }
 :host(.inline) .auth-panel {
     padding: 24px 28px;
@@ -991,6 +994,7 @@ export class AuthUI {
     private readonly cfg: Required<Pick<AuthUIConfig, 'apiBase' | 'appName' | 'brokerUrl' | 'timeout'>> & AuthUIConfig;
     private host: HTMLElement | null = null;
     private shadow: ShadowRoot | null = null;
+    private sizeObserver: ResizeObserver | null = null;
     private resolve: ((r: SignInResult) => void) | null = null;
     private reject: ((e: Error) => void) | null = null;
     private relayClient: PrivasysAuth | null = null;
@@ -1100,6 +1104,8 @@ export class AuthUI {
     /** Close the modal without completing authentication. */
     close(): void {
         this.cleanup();
+        this.sizeObserver?.disconnect();
+        this.sizeObserver = null;
         if (this.host) {
             this.host.remove();
             this.host = null;
@@ -1132,6 +1138,15 @@ export class AuthUI {
 
         const container = this.cfg.container ?? document.body;
         container.appendChild(this.host);
+        // Tell the host how tall the content is, on every change: an iframe
+        // cannot measure a cross-origin document itself.
+        if (this.cfg.onContentHeight && typeof ResizeObserver !== 'undefined') {
+            const cb = this.cfg.onContentHeight;
+            this.sizeObserver = new ResizeObserver(() => {
+                if (this.host) cb(this.host.getBoundingClientRect().height);
+            });
+            this.sizeObserver.observe(this.host);
+        }
     }
 
     private render(): void {

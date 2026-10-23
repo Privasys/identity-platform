@@ -55,6 +55,7 @@
 // back is the same shape as the one the iframe runs, just bridged over
 // postMessage.
 import type { SealedSessionState, SealedWebSocket } from './enclave-session';
+import { FRAME_SIZE_MESSAGE, inlineFrameHeight } from './frame-size';
 
 export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'identity' | 'offline_access';
 
@@ -183,7 +184,8 @@ export interface AuthFrameConfig {
     /**
      * Mount the auth iframe inside this element instead of as a full-screen
      * modal overlay.  The iframe fills the container (width/height: 100%).
-     * The container should have explicit dimensions (min-height 560px).
+     * The iframe sizes itself to the frame's content (the frame reports its
+     * height, see frame-size.ts), so the container may be auto-sized.
      *
      * Passing a container implies `presentation: 'inline'` — the hosted
      * auth page drops its own brand panel and close button and renders a
@@ -939,6 +941,22 @@ export class AuthFrame {
                         const url = String(data.url || '');
                         if (/^privasys-wallet(-dev|-preview)?:\/\//.test(url)) {
                             window.location.href = url;
+                        }
+                        break;
+                    }
+
+                    case FRAME_SIZE_MESSAGE: {
+                        // The frame reports its content height; size the inline
+                        // embed to it (the overlay follows its container, the
+                        // embedded iframe is sized directly). Modal frames fill
+                        // the viewport and ignore it.
+                        const h = inlineFrameHeight(data.height);
+                        if (h === null) break;
+                        if (overlayContainer) {
+                            overlayContainer.style.height = `${h}px`;
+                            reflowOverlay();
+                        } else if (this.container) {
+                            iframe.style.height = `${h}px`;
                         }
                         break;
                     }

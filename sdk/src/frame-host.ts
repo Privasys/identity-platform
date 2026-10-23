@@ -16,6 +16,7 @@
  */
 
 import { AuthUI } from './ui';
+import { FRAME_SIZE_MESSAGE } from './frame-size';
 import type { AuthUIConfig, SignInResult } from './ui';
 import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
 import type { AuthSession } from './types';
@@ -898,6 +899,25 @@ async function exchangeCode(
 }
 
 /** The adopter's spend hint, reduced to a non-negative integer cap. */
+// contentHeightReporter posts the rendered UI's height to the parent page,
+// at most once per animation frame, so an inline embed can size its iframe
+// to the content (frame-size.ts).
+function contentHeightReporter(parentOrigin: string): (px: number) => void {
+    let pending: number | null = null;
+    return (px: number): void => {
+        pending = px;
+        if (pending === null) return;
+        const flush = (): void => {
+            if (pending === null) return;
+            const height = pending;
+            pending = null;
+            window.parent.postMessage({ type: FRAME_SIZE_MESSAGE, height }, parentOrigin);
+        };
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(flush);
+        else flush();
+    };
+}
+
 function sanitiseSpend(v: unknown): { cap?: number } {
     if (!v || typeof v !== 'object') return {};
     const cap = (v as { cap?: unknown }).cap;
@@ -925,6 +945,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
             attributes?: readonly string[];
         } = data.config;
         const parentOrigin = e.origin;
+        // The inline frame reports its content height so the embedding page
+        // can size the iframe to it (frame-size.ts); throttled to a frame.
+        const onContentHeight = contentHeightReporter(parentOrigin);
 
         // Wallet handoff via the parent page (mobile): only when the frame
         // client declared it handles `privasys:navigate` — older bundled
@@ -977,6 +1000,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     .replace(/\b\w/g, (c) => c.toUpperCase());
                 const approveUI = new AuthUI({
                     apiBase: globalThis.location.origin,
+                    onContentHeight,
                     appName: config.appName,
                     rpId,
                     presentation,
@@ -1193,6 +1217,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         .replace(/\b\w/g, (c) => c.toUpperCase());
                     const approveUI = new AuthUI({
                         apiBase: idpBase,
+                        onContentHeight,
                         appName: config.appName,
                         rpId: rpIdHint,
                         presentation,
@@ -1321,6 +1346,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 activeUI = new AuthUI({
                     ...config,
                     apiBase: idpBase,
+                    onContentHeight,
                     sessionId: oidcSessionId,
                     fido2Base: `${idpBase}/fido2`,
                     pushToken,
@@ -1523,6 +1549,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
         activeUI = new AuthUI({
             ...config,
             pushToken,
+            onContentHeight,
             deviceTrusted,
             sessionRelay: sessionRelayUI,
             presentation,

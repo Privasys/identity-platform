@@ -835,6 +835,13 @@ func HandleAuthorize(reg *clients.Registry, sessionStore *SessionStore, issuerUR
 			resp["requested_attributes"] = requested
 			resp["attribute_requirements"] = reqs
 		}
+		// A key the relying party named but may not ask for (outside its
+		// required_attributes) never reaches the wallet. Say so, rather than
+		// let the holder approve less than the page believes it asked for.
+		if dropped := droppedAttributes(namedAttributes, requested); len(dropped) > 0 {
+			resp["dropped_attributes"] = dropped
+			log.Printf("authorize: client %s named attributes outside its registration: %v", clientID, dropped)
+		}
 
 		// Attribute step-up by push: a session_hint that resolves to a holder
 		// whose standing grant for this client is narrower than this request
@@ -2031,4 +2038,21 @@ func errorResponse(w http.ResponseWriter, status int, errCode, desc string) {
 		"error":             errCode,
 		"error_description": desc,
 	})
+}
+
+// droppedAttributes lists the keys a request named that will not be put to
+// the holder: unknown to the referential, or outside the client's
+// registration. Order follows the request.
+func droppedAttributes(named, requested []string) []string {
+	kept := make(map[string]bool, len(requested))
+	for _, k := range requested {
+		kept[k] = true
+	}
+	var out []string
+	for _, k := range named {
+		if k != "" && k != presenceAttribute && !kept[k] {
+			out = append(out, k)
+		}
+	}
+	return out
 }

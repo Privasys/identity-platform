@@ -653,3 +653,25 @@ func HandleSetSubjectMode(reg *Registry, adminToken string) http.HandlerFunc {
 		json.NewEncoder(w).Encode(map[string]string{"client_id": clientID, "mode": req.Mode})
 	}
 }
+
+// HandleClientAttributes serves the attributes a client may request, its
+// required_attributes. Public: a registration is a statement of what a
+// relying party consumes, nothing secret, and a relying party's own
+// picker needs it to offer only what /authorize will put to the wallet.
+func HandleClientAttributes(reg *Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c, err := reg.Get(r.PathValue("id"))
+		if err != nil {
+			http.Error(w, `{"error":"client not found"}`, http.StatusNotFound)
+			return
+		}
+		attrs := c.RequiredAttributes
+		if attrs == nil {
+			attrs = []string{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(w).Encode(map[string]any{"client_id": c.ClientID, "required_attributes": attrs})
+	}
+}

@@ -1853,8 +1853,17 @@ func requestedAttributes(scope string, named []string, client *clients.Client) [
 	if strings.Contains(scope, "openid") {
 		requested = append(requested, "sub")
 	}
+	namedOnly := client != nil && client.Platform
 	for _, attr := range attributes.All {
 		if !attr.InScope(scope) && !inRequest[attr.Key] && !namedByRegistration(attr, scope, allowed) {
+			continue
+		}
+		// A first-party platform client is shared by every Privasys surface,
+		// so its registration is a ceiling and nothing more: a priced key
+		// reaches the wallet only when this request names it, never because
+		// the scope carries it or the whitelist lists it. Widening what the
+		// platform may ask for then changes no sign-in until a page asks.
+		if namedOnly && attr.IsPriced() && !inRequest[attr.Key] {
 			continue
 		}
 		requested = append(requested, attr.Key)

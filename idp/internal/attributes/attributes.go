@@ -235,6 +235,11 @@ func (a Attribute) CertifiedFieldName() string {
 // requestedAttributes in the oidc package). The substring test on the scope
 // string is the historical behaviour of /authorize, kept verbatim so the
 // requested set and the filter that trims the wallet's answer never disagree.
+// IsPriced reports whether disclosing this key carries a charge.
+func (a Attribute) IsPriced() bool {
+	return a.Marketplace != nil && a.Marketplace.Billable
+}
+
 func (a Attribute) InScope(scope string) bool {
 	return !a.RequestOnly && a.Scope != "" && strings.Contains(scope, a.Scope)
 }

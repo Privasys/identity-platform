@@ -165,7 +165,7 @@ func verifyWalletBinding(handle, appID string, cap int64, sigB64 string, pub []b
 	if !elliptic.P256().IsOnCurve(x, y) {
 		return errors.New("holder_pub is not on P-256")
 	}
-	msg := []byte(handle + "\x00" + appID + "\x00" + strconv.FormatInt(cap, 10))
+	msg := []byte(handle + "\x00" + BindingAppID(appID) + "\x00" + strconv.FormatInt(cap, 10))
 	d := sha256.Sum256(msg)
 	key := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
 	if !ecdsa.Verify(key, d[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])) {

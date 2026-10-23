@@ -76,6 +76,12 @@ func TestMint(t *testing.T) {
 	if _, has := claims["sub"]; has {
 		t.Fatal("voucher must carry no user identity")
 	}
+	// It lives as long as the hold it spends, so a first ID check that
+	// takes longer than ten minutes still has a voucher to present.
+	exp, _ := claims["exp"].(float64)
+	if left := time.Until(time.Unix(int64(exp), 0)); left < 29*time.Minute || left > 31*time.Minute {
+		t.Fatalf("voucher lifetime %v, want the 30-minute reservation", left)
+	}
 }
 
 // TestMintInsufficient surfaces the ledger's 402 as ErrInsufficient.

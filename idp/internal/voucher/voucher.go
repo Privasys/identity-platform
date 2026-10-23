@@ -49,11 +49,10 @@ var ErrInsufficient = fmt.Errorf("relying party has insufficient credits")
 // Minter reserves credits via the management-service and signs the resulting
 // vouchers with the IdP issuer key.
 type Minter struct {
-	issuer   *tokens.Issuer
-	mgmtURL  string
-	mgmtTok  string
-	http     *http.Client
-	voucherT time.Duration // voucher JWT lifetime (short; ~10 min)
+	issuer  *tokens.Issuer
+	mgmtURL string
+	mgmtTok string
+	http    *http.Client
 }
 
 // NewMinter builds a Minter. mgmtURL/mgmtTok address the internal reserve
@@ -61,11 +60,10 @@ type Minter struct {
 // without the marketplace configured.
 func NewMinter(issuer *tokens.Issuer, mgmtURL, mgmtTok string) *Minter {
 	return &Minter{
-		issuer:   issuer,
-		mgmtURL:  strings.TrimRight(mgmtURL, "/"),
-		mgmtTok:  mgmtTok,
-		http:     &http.Client{Timeout: 10 * time.Second},
-		voucherT: 10 * time.Minute,
+		issuer:  issuer,
+		mgmtURL: strings.TrimRight(mgmtURL, "/"),
+		mgmtTok: mgmtTok,
+		http:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -133,7 +131,10 @@ func (m *Minter) Mint(ctx context.Context, rpAccountID, rpID string, attributes 
 			Provider: g.ProviderNamespace,
 			Claims:   g.Claims,
 			Credits:  g.PriceCredits,
-			TTL:      m.voucherT,
+			// As long as the hold it spends: a voucher that expired before
+			// its reservation stranded a holder whose first ID check took
+			// longer than ten minutes.
+			TTL: time.Duration(ttlSecs) * time.Second,
 		})
 		if err != nil {
 			return nil, err

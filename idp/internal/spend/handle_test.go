@@ -68,7 +68,10 @@ func TestConsentHandleAndStatement(t *testing.T) {
 	holder, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	handle := NewHandle()
 	sign := func(h string, cap int64) string {
-		d := sha256.Sum256([]byte(h + "\x00" + f.appID + "\x00" + strconv.FormatInt(cap, 10)))
+		// The wallet signs the app id as it reads it off the certificate,
+		// a dashed UUID (BindingAppID); the stored undashed form never
+		// verified, which is what every wallet binding failed on.
+		d := sha256.Sum256([]byte(h + "\x00" + BindingAppID(f.appID) + "\x00" + strconv.FormatInt(cap, 10)))
 		r, s, _ := ecdsa.Sign(rand.Reader, holder, d[:])
 		sig := make([]byte, 64)
 		r.FillBytes(sig[:32])

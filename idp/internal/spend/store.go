@@ -52,6 +52,17 @@ const ConsentTTL = 365 * 24 * time.Hour
 // OIDC client id.
 const SessionClientPrefix = "spend:"
 
+// BindingAppID is how an app id is spelt inside the holder's signed binding
+// (handle‖0‖app‖0‖cap): the lowercase dashed UUID, the form the wallet reads
+// off the attested certificate. Consents and statements store the undashed
+// form; anyone re-checking a binding signature converts it with this.
+func BindingAppID(id string) string {
+	if !appIDRe.MatchString(id) {
+		return id
+	}
+	return id[0:8] + "-" + id[8:12] + "-" + id[12:16] + "-" + id[16:20] + "-" + id[20:]
+}
+
 // appIDRe is the undashed lowercase hex form of a platform app id (OID
 // 3.6). A spender that is not a platform app (a non-enclave relying party)
 // is identified by its OIDC client id instead; see Handler.resolveKeys.

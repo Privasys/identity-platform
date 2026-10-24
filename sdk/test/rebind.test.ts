@@ -215,3 +215,38 @@ test('a late 401 from a session already rebound retries without a second bootstr
     assert.equal(r.status, 204, 'the straggler was retried on the live session');
     assert.equal(bootstraps, 1, 'its late 401 did not start a second bootstrap');
 });
+
+test('a refused rebind is not retried by later requests', async () => {
+    const enclave = await encKey();
+    const sdk = (await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits'])) as CryptoKeyPair;
+    let bootstraps = 0;
+    const fetchImpl: typeof fetch = async (input) => {
+        const url = String(input);
+        if (url.endsWith('/__privasys/session-bootstrap')) {
+            bootstraps++;
+            // The enclave refuses the voucher (e.g. it pins the previous version).
+            return new Response('encauth rejected', {
+                status: 403,
+                headers: { 'Content-Type': 'text/plain', 'X-Privasys-EncAuth-Reject': 'workload-digest' },
+            });
+        }
+        return new Response('unknown or expired session', { status: 401, headers: { 'Content-Type': 'text/plain' } });
+    };
+    const session = await PrivasysSession.fromHandshake({
+        host: 'app.example.test',
+        sessionId: b64u(crypto.getRandomValues(new Uint8Array(16))),
+        sdkPrivateKey: sdk.privateKey,
+        encPub: b64u(enclave.pubRaw),
+        fetchImpl,
+        getEncAuth: async () => voucherFor(enclave.pubRaw),
+    });
+    const states: SealedSessionState[] = [];
+    session.onStateChange = (s) => states.push(s);
+
+    for (let i = 0; i < 8; i++) {
+        const r = await session.request('GET', '/v1/me');
+        assert.equal(r.status, 401);
+    }
+    assert.equal(bootstraps, 1, 'one refused bootstrap, then no more');
+    assert.equal(states.at(-1)?.status, 'reapproval-required');
+});

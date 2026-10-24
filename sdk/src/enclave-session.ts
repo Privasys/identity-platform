@@ -201,6 +201,12 @@ export class PrivasysSession {
     /** The single in-flight silent rebind, shared by every request that
      *  hits the unsealed 401 at the same time (see tryRebind). */
     private rebindInFlight: Promise<boolean> | null = null;
+    /** Set once the enclave has refused this session's voucher (or there is
+     *  none): no later request may try again. Only a fresh wallet ceremony,
+     *  which makes a new session, recovers; retrying would spend the
+     *  enclave's rebind budget and end in rate-limited bootstraps, leaving
+     *  the page with nothing to show. */
+    private rebindRefused = false;
     private lastState: SealedSessionState = { status: 'ok' };
     /** Liveness listener (see {@link SealedSessionState}); the frame host
      *  forwards it to the adopter page. */
@@ -487,6 +493,7 @@ export class PrivasysSession {
      * fresh wallet ceremony.
      */
     private tryRebind(): Promise<boolean> {
+        if (this.rebindRefused) return Promise.resolve(false);
         // Coalesce: every request that hits the unsealed 401 at the same
         // moment (a page load fires several in parallel) shares ONE
         // voucher-backed bootstrap. Each bootstrap counts against the
@@ -522,6 +529,7 @@ export class PrivasysSession {
             return false;
         }
         if (!env) {
+            this.rebindRefused = true;
             this.setState({ status: 'reapproval-required', reason: 'no-voucher' });
             return false;
         }
@@ -535,6 +543,7 @@ export class PrivasysSession {
         }
         if (!handshake.ok) {
             if (handshake.error === 'rejected') {
+                this.rebindRefused = true;
                 this.setState({ status: 'reapproval-required', reason: handshake.reason ?? 'rejected' });
             } else {
                 this.setState({ status: 'recovering', reason: handshake.error });

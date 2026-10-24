@@ -393,9 +393,12 @@ func TestNewlyPricedCertifiedFieldsAreReserved(t *testing.T) {
 // the named set threaded onto the auth code it would be dropped one step before
 // the ID token, after the wallet did the work and the relying party paid for it.
 func TestNamedAttributeSurvivesTheTokenFilter(t *testing.T) {
-	attrs := map[string]string{"given_name_id": "BERTRAND", "sex": "M"}
+	// A government-backed value is the verifier's signed disclosure (see
+	// TestGovKeyNeedsADisclosureToken for the plain-value case).
+	const disclosure = "eyJhbGciOiJFUzI1NiJ9.eyJ2YWx1ZSI6IkpBTkUifQ.c2ln~"
+	attrs := map[string]string{"given_name_id": disclosure, "sex": "M"}
 	got := filterAttributesRequested(attrs, "openid email profile", []string{"given_name_id"})
-	if got["given_name_id"] != "BERTRAND" {
+	if got["given_name_id"] != disclosure {
 		t.Error("a named request-only attribute was filtered out of the token")
 	}
 	if _, ok := got["sex"]; ok {

@@ -2021,6 +2021,16 @@ func filterAttributesRequested(attrs map[string]string, scope string, named []st
 			// or the relying party named it.
 			// Special case: email is also allowed under profile scope.
 			if attr.InScope(scope) || inRequest[k] || (k == "email" && strings.Contains(scope, "profile")) {
+				// A government-backed key is only ever the identity
+				// verifier's signed disclosure. A plain value in its place
+				// is something the wallet typed or kept, and passing it on
+				// would let a relying party that reads the claim without
+				// verifying it take it as proven; it is dropped, so the
+				// attribute is simply absent. A key the verifier
+				// deliberately relays raw says so in the referential.
+				if attr.IsGovVerified() && attr.Disclosure != "raw" && !looksLikeDisclosureToken(v) {
+					continue
+				}
 				out[k] = v
 			}
 		} else {

@@ -1859,11 +1859,13 @@ func requestedAttributes(scope string, named []string, client *clients.Client) [
 			continue
 		}
 		// A first-party platform client is shared by every Privasys surface,
-		// so its registration is a ceiling and nothing more: a priced key
-		// reaches the wallet only when this request names it, never because
-		// the scope carries it or the whitelist lists it. Widening what the
-		// platform may ask for then changes no sign-in until a page asks.
-		if namedOnly && attr.IsPriced() && !inRequest[attr.Key] {
+		// so its registration is a ceiling and nothing more. Its scopes carry
+		// only the account basics (email, name); any other key, and every
+		// priced one, reaches the wallet only when this request names it,
+		// never because the scope carries it or the whitelist lists it.
+		// Widening what the platform may ask for then changes no sign-in
+		// until a page asks.
+		if namedOnly && !inRequest[attr.Key] && (attr.IsPriced() || !platformScopeBasics[attr.Key]) {
 			continue
 		}
 		requested = append(requested, attr.Key)
@@ -2065,3 +2067,8 @@ func droppedAttributes(named, requested []string) []string {
 	}
 	return out
 }
+
+// platformScopeBasics are the only keys a first-party platform client's
+// scopes bring in by themselves: what every Privasys surface shows of the
+// signed-in account.
+var platformScopeBasics = map[string]bool{"email": true, "name": true}

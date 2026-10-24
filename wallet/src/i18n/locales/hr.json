@@ -277,6 +277,7 @@
     "consentGovNote": "Provjereni atributi dijele se kao dokazi potpisani enklavom i vezani uz ovu uslugu, nikada sam dokument. Usluga ih plaća; vi ne plaćate ništa.",
     "share": "Podijeli",
     "sublabelPresence": "Brzi selfie usporeden s vašim dokumentom u enklavi",
+    "sublabelGov": "Potvrđeno iz vašeg identifikacijskog dokumenta",
     "sublabelWillBeVerified": "Provjerit će se tijekom prijave",
     "selfieTitle": "Potvrdite da ste to vi",
     "selfieBody": "{{app}} je zatražila potvrdu da ste fizički prisutni. Vaš selfie uspoređuje se s fotografijom na vašem dokumentu unutar sigurne enklave, a zatim se odbacuje.",

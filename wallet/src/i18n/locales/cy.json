@@ -277,6 +277,7 @@
     "consentGovNote": "Rhennir priodoleddau gwiriedig fel profion wedi'u llofnodi gan y cwafell ac wedi'u rhwymo i'r gwasanaeth hwn, byth y ddogfen ei hun. Y gwasanaeth sy'n talu amdanynt; nid ydych chi'n talu dim.",
     "share": "Rhannu",
     "sublabelPresence": "Hunlun cyflym wedi'i gymharu â'ch dogfen yn y cwafell",
+    "sublabelGov": "Wedi'i ardystio o'ch dogfen adnabod",
     "sublabelWillBeVerified": "Caiff ei wirio wrth fewngofnodi",
     "selfieTitle": "Cadarnhewch mai chi sydd yma",
     "selfieBody": "Gofynnodd {{app}} i chi gadarnhau eich bod yn bresennol yn gorfforol. Cymherir eich hunlun â llun eich dogfen y tu mewn i'r cwafell diogel, ac yna caiff ei daflu.",

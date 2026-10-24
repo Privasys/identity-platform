@@ -277,6 +277,7 @@
     "consentGovNote": "Atributele verificate sunt împărtășite ca dovezi semnate de enclavă și legate de acest serviciu, niciodată documentul brut. Serviciul plătește pentru ele; tu nu plătești nimic.",
     "share": "Împărtășește",
     "sublabelPresence": "Un selfie rapid, comparat cu actul tău în enclavă",
+    "sublabelGov": "Certificat pe baza actului dumneavoastră de identitate",
     "sublabelWillBeVerified": "Va fi verificat în timpul autentificării",
     "selfieTitle": "Confirmă că tu ești",
     "selfieBody": "{{app}} a cerut să confirmi că ești prezent fizic. Selfie-ul tău este comparat cu fotografia din actul tău în interiorul enclavei securizate, apoi este șters.",

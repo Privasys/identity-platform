@@ -4,9 +4,10 @@
 /**
  * Drive notifications + the attribute referential.
  *
- * The drive stores subjects only (its PII boundary); the WALLET is where
- * names live. Every share-request notification carries the requester's
- * presented attributes in its sealed payload — this store keeps them as
+ * The drive keeps a requester's presented attributes only while their
+ * request waits (7 days at most); the WALLET is where names live. Every
+ * share-request notification carries them in its sealed payload, and the
+ * request list fills in any a missed push left out. This store keeps them as
  * an on-device referential (sub -> attributes) so the wallet can
  * decorate any raw sub the drive hands back (requests, shares, metrics).
  * The mapping never leaves the device.
@@ -78,6 +79,7 @@ interface DriveNotificationsState {
             requester_sub: string;
             scope: string[];
             status: 'pending' | 'approved' | 'denied';
+            attributes?: Record<string, string>;
         }[]
     ) => void;
     /** Decorate a raw sub from the drive with known attributes. */
@@ -155,8 +157,30 @@ export const useDriveNotificationsStore = create<DriveNotificationsState>((set, 
         const now = Math.floor(Date.now() / 1000);
         set((s) => {
             const byId = new Map(s.requests.map((r) => [r.requestId, r]));
+            let subjects = s.subjects;
             let changed = false;
             for (const row of rows) {
+                // Drive keeps what the requester presented while the request
+                // waits. A missed push leaves nothing on the device, so fill the
+                // referential from it; what a push brought is never overwritten.
+                const presented = row.attributes ?? {};
+                if (!row.status || row.status === 'pending') {
+                    const known = subjects[row.requester_sub];
+                    const missing = Object.entries(presented).filter(([k]) => !(k in (known?.attributes ?? {})));
+                    if (missing.length > 0) {
+                        subjects = {
+                            ...subjects,
+                            [row.requester_sub]: {
+                                sub: row.requester_sub,
+                                attributes: { ...Object.fromEntries(missing), ...known?.attributes },
+                                viaApp: known?.viaApp,
+                                firstSeen: known?.firstSeen ?? now,
+                                lastSeen: now,
+                            },
+                        };
+                        changed = true;
+                    }
+                }
                 const decision =
                     row.status === 'approved' ? ('approved' as const)
                     : row.status === 'denied' ? ('denied' as const)
@@ -180,7 +204,7 @@ export const useDriveNotificationsStore = create<DriveNotificationsState>((set, 
                 }
             }
             if (!changed) return s;
-            return { requests: [...byId.values()] };
+            return { requests: [...byId.values()], subjects };
         });
         persist(get());
     },

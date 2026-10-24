@@ -277,6 +277,7 @@
     "consentGovNote": "L-attributi vverifikati jinqasmu bħala provi ffirmati mill-enklavi u marbuta ma' dan is-servizz, qatt id-dokument innifsu. Is-servizz iħallas għalihom; int ma tħallas xejn.",
     "share": "Aqsam",
     "sublabelPresence": "Selfie mgħaġġel imqabbel mad-dokument tiegħek fl-enklavi",
+    "sublabelGov": "Iċċertifikat mid-dokument tal-identità tiegħek",
     "sublabelWillBeVerified": "Se jiġi vverifikat waqt il-login",
     "selfieTitle": "Ikkonferma li int",
     "selfieBody": "{{app}} talbet li tikkonferma li int preżenti fiżikament. Is-selfie tiegħek jitqabbel mar-ritratt tad-dokument tiegħek fl-enklavi sigura, u mbagħad jintrema.",

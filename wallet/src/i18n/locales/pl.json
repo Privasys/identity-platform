@@ -241,6 +241,7 @@
     "consentGovNote": "Zweryfikowane atrybuty są udostępniane jako podpisane przez enklawę dowody powiązane z tą usługą, nigdy jako surowy dokument. Płaci za nie usługa; Ty nie płacisz nic.",
     "share": "Udostępnij",
     "sublabelPresence": "Szybkie selfie porównane z Twoim dokumentem w enklawie",
+    "sublabelGov": "Potwierdzone na podstawie Twojego dokumentu tożsamości",
     "sublabelWillBeVerified": "Zostanie zweryfikowane podczas logowania",
     "selfieTitle": "Potwierdź, że to Ty",
     "selfieBody": "{{app}} poprosiła o potwierdzenie Twojej fizycznej obecności. Twoje selfie jest porównywane ze zdjęciem z dokumentu wewnątrz bezpiecznej enklawy, a następnie usuwane.",

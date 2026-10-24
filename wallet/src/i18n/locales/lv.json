@@ -277,6 +277,7 @@
     "consentGovNote": "Pārbaudītie atribūti tiek kopīgoti kā anklāva parakstīti pierādījumi, kas piesaistīti šim pakalpojumam, nekad pats dokuments. Pakalpojums par tiem maksā; jūs nemaksājat neko.",
     "share": "Kopīgot",
     "sublabelPresence": "Ātrs pašportrets, ko anklāvā salīdzina ar jūsu dokumentu",
+    "sublabelGov": "Apliecināts no jūsu personu apliecinoša dokumenta",
     "sublabelWillBeVerified": "Tiks pārbaudīts pieteikšanās laikā",
     "selfieTitle": "Apstipriniet, ka tas esat jūs",
     "selfieBody": "{{app}} lūdza apstiprināt, ka esat fiziski klāt. Jūsu pašportretu drošajā anklāvā salīdzina ar jūsu dokumenta fotoattēlu un pēc tam iznīcina.",

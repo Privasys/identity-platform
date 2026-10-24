@@ -247,6 +247,12 @@ export interface RemoteShareRequest {
     scope: string[];
     status: 'pending' | 'approved' | 'denied';
     created_at: string;
+    /**
+     * What the requester presented, kept by Drive only while the request is
+     * undecided (at most 7 days). The push normally brings it first; this is
+     * how a request whose push never arrived still shows who is asking.
+     */
+    attributes?: Record<string, string>;
 }
 
 /**

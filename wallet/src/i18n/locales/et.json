@@ -277,6 +277,7 @@
     "consentGovNote": "Kontrollitud atribuute jagatakse anklaavi allkirjastatud tõenditena, mis on seotud selle teenusega, mitte kunagi toorest dokumenti. Teenus maksab nende eest; teie ei maksa midagi.",
     "share": "Jaga",
     "sublabelPresence": "Kiire selfi, mida anklaavis teie dokumendiga võrreldakse",
+    "sublabelGov": "Kinnitatud teie isikutunnistuse põhjal",
     "sublabelWillBeVerified": "Kontrollitakse sisselogimise ajal",
     "selfieTitle": "Kinnitage, et see olete teie",
     "selfieBody": "{{app}} palus kinnitada, et olete füüsiliselt kohal. Teie selfit võrreldakse turvalises anklaavis teie dokumendi fotoga ja seejärel kustutatakse.",

@@ -241,6 +241,7 @@
     "consentGovNote": "Os atributos verificados são partilhados como provas assinadas pelo enclave e associadas a este serviço, nunca o documento original. O serviço paga por elas; você não paga nada.",
     "share": "Partilhar",
     "sublabelPresence": "Selfie rápida comparada com o seu documento no enclave",
+    "sublabelGov": "Certificado a partir do seu documento de identificação",
     "sublabelWillBeVerified": "Será verificado durante o início de sessão",
     "selfieTitle": "Confirme que é você",
     "selfieBody": "{{app}} pediu para confirmar que está fisicamente presente. A sua selfie é comparada com a foto do seu documento dentro do enclave seguro e depois descartada.",

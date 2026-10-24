@@ -277,6 +277,7 @@
     "consentGovNote": "Patikrinti atributai dalijami kaip anklavo pasirašyti įrodymai, susieti su šia paslauga, o ne pats dokumentas. Paslauga už juos moka; jūs nemokate nieko.",
     "share": "Dalytis",
     "sublabelPresence": "Greita asmenukė, anklave palyginta su jūsų dokumentu",
+    "sublabelGov": "Patvirtinta pagal jūsų asmens dokumentą",
     "sublabelWillBeVerified": "Bus patikrinta prisijungimo metu",
     "selfieTitle": "Patvirtinkite, kad tai jūs",
     "selfieBody": "{{app}} paprašė patvirtinti, kad esate fiziškai šalia. Jūsų asmenukė saugiajame anklave palyginama su jūsų dokumento nuotrauka ir po to sunaikinama.",

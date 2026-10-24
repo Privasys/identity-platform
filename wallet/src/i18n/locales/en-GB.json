@@ -277,6 +277,7 @@
     "consentGovNote": "Verified attributes are shared as enclave-signed proofs bound to this service, never the raw document. The service pays for them; you pay nothing.",
     "share": "Share",
     "sublabelPresence": "Quick selfie matched to your ID in the enclave",
+    "sublabelGov": "Certified from your ID",
     "sublabelWillBeVerified": "Will be verified during sign-in",
     "selfieTitle": "Confirm it's you",
     "selfieBody": "{{app}} asked to confirm you are physically present. Your selfie is matched to your ID photo inside the secure enclave, then discarded.",

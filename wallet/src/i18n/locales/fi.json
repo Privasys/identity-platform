@@ -241,6 +241,7 @@
     "consentGovNote": "Vahvistetut määritteet jaetaan enklaavin allekirjoittamina todisteina, jotka on sidottu tähän palveluun, ei koskaan raakana asiakirjana. Palvelu maksaa niistä; sinä et maksa mitään.",
     "share": "Jaa",
     "sublabelPresence": "Nopea selfie, joka verrataan henkilöllisyystodistukseesi enklaavissa",
+    "sublabelGov": "Varmennettu henkilöllisyystodistuksestasi",
     "sublabelWillBeVerified": "Vahvistetaan kirjautumisen aikana",
     "selfieTitle": "Vahvista, että se olet sinä",
     "selfieBody": "{{app}} pyysi vahvistamaan, että olet fyysisesti läsnä. Selfietäsi verrataan henkilöllisyystodistuksesi kuvaan turvallisen enklaavin sisällä, minkä jälkeen se hävitetään.",

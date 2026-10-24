@@ -277,6 +277,7 @@
     "consentGovNote": "Overené atribúty sa zdieľajú ako enklávou podpísané dôkazy viazané na túto službu, nikdy nie samotný doklad. Služba za ne platí; vy neplatíte nič.",
     "share": "Zdieľať",
     "sublabelPresence": "Rýchla selfie porovnaná s vaším dokladom v enkláve",
+    "sublabelGov": "Overené z vášho dokladu totožnosti",
     "sublabelWillBeVerified": "Overí sa počas prihlasovania",
     "selfieTitle": "Potvrďte, že ste to vy",
     "selfieBody": "{{app}} požiadala o potvrdenie, že ste fyzicky prítomní. Vaša selfie sa porovná s fotografiou na vašom doklade vnútri zabezpečenej enklávy a potom sa zahodí.",

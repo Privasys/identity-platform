@@ -241,6 +241,7 @@
     "consentGovNote": "Verifierade attribut delas som enklavsignerade bevis som är bundna till den här tjänsten, aldrig som råa dokument. Tjänsten betalar för dem; du betalar ingenting.",
     "share": "Dela",
     "sublabelPresence": "Snabb selfie som jämförs med din id-handling i enklaven",
+    "sublabelGov": "Bekräftat från din id-handling",
     "sublabelWillBeVerified": "Verifieras under inloggningen",
     "selfieTitle": "Bekräfta att det är du",
     "selfieBody": "{{app}} har bett om att få bekräftat att du är fysiskt närvarande. Din selfie jämförs med fotot i din id-handling inne i den säkra enklaven och kastas sedan.",

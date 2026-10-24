@@ -241,6 +241,7 @@
     "consentGovNote": "Geprüfte Attribute werden als von der Enklave signierte, an diesen Dienst gebundene Nachweise geteilt, niemals als Rohdokument. Der Dienst bezahlt dafür; für Sie ist es kostenlos.",
     "share": "Teilen",
     "sublabelPresence": "Kurzes Selfie, in der Enklave mit Ihrem Ausweis abgeglichen",
+    "sublabelGov": "Aus Ihrem Ausweis bestätigt",
     "sublabelWillBeVerified": "Wird während der Anmeldung geprüft",
     "selfieTitle": "Bestätigen Sie, dass Sie es sind",
     "selfieBody": "{{app}} hat um die Bestätigung Ihrer physischen Anwesenheit gebeten. Ihr Selfie wird innerhalb der sicheren Enklave mit Ihrem Ausweisfoto abgeglichen und danach verworfen.",

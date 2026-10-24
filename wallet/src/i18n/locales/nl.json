@@ -241,6 +241,7 @@
     "consentGovNote": "Geverifieerde attributen worden gedeeld als door de enclave ondertekende bewijzen die aan deze dienst zijn gebonden, nooit als het ruwe document. De dienst betaalt ervoor; jij betaalt niets.",
     "share": "Delen",
     "sublabelPresence": "Snelle selfie, in de enclave vergeleken met je identiteitsbewijs",
+    "sublabelGov": "Bevestigd op basis van uw identiteitsbewijs",
     "sublabelWillBeVerified": "Wordt tijdens het aanmelden geverifieerd",
     "selfieTitle": "Bevestig dat jij het bent",
     "selfieBody": "{{app}} heeft gevraagd te bevestigen dat je fysiek aanwezig bent. Je selfie wordt binnen de beveiligde enclave vergeleken met de foto op je identiteitsbewijs en daarna weggegooid.",

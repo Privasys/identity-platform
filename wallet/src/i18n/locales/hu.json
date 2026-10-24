@@ -241,6 +241,7 @@
     "consentGovNote": "Az ellenőrzött attribútumokat az enkláv által aláírt, ehhez a szolgáltatáshoz kötött bizonyítékként osztjuk meg, sosem magát a dokumentumot. A szolgáltatás fizet értük; Önnek semmibe sem kerül.",
     "share": "Megosztás",
     "sublabelPresence": "Gyors szelfi, amelyet az enklávban vetnek össze az okmányával",
+    "sublabelGov": "A személyazonosító okmányából igazolva",
     "sublabelWillBeVerified": "A bejelentkezés során ellenőrizzük",
     "selfieTitle": "Erősítse meg, hogy Ön az",
     "selfieBody": "A(z) {{app}} a fizikai jelenléte megerősítését kérte. A szelfijét a biztonságos enklávon belül vetjük össze az okmányán szereplő fényképpel, majd eldobjuk.",

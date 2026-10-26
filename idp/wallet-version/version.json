@@ -1,242 +1,242 @@
 {
   "schema": 1,
-  "issuedAt": "2026-10-24T12:17:58Z",
+  "issuedAt": "2026-10-26T15:30:46Z",
   "platforms": {
     "ios": {
-      "minimum": "1.4.36",
+      "minimum": "1.4.38",
       "level": "required"
     },
     "android": {
-      "minimum": "1.4.36",
+      "minimum": "1.4.38",
       "level": "required"
     }
   },
   "notice": {
-    "id": "2026-10-24-wallet-1.4.36",
+    "id": "2026-10-26-wallet-1.4.38",
     "text": {
       "en-GB": {
         "title": "Update to keep using Privasys Wallet",
-        "body": "This version can no longer complete some sign-ins or record spending you allow. The update keeps your identities and data.",
+        "body": "This version cannot prove a verified detail, such as being over 18, to the apps that ask for it. The update keeps your identities and data.",
         "changes": [
-          "Sign-ins to apps that know you by their own identifier work again",
-          "Spending you allow an app is now recorded, signed on your phone",
-          "Phones without working Face ID or fingerprint can use the wallet"
+          "Proving you are over 18, or another verified detail, works again",
+          "When an app asks for something you have not verified yet, the ID check comes first and the sign-in after",
+          "If a detail an app requires cannot be shared, nothing is shared"
         ]
       },
       "bg": {
         "title": "Актуализирайте, за да продължите да използвате Privasys Wallet",
-        "body": "Тази версия вече не може да завършва някои влизания или да записва разходите, които разрешавате. Актуализацията запазва вашите идентичности и данни.",
+        "body": "Тази версия не може да доказва проверени данни, например че сте над 18 години, пред приложенията, които ги изискват. Актуализацията запазва вашите идентичности и данни.",
         "changes": [
-          "Влизанията в приложения, които ви познават по собствен идентификатор, отново работят",
-          "Разходите, които разрешавате на приложение, вече се записват, подписани на телефона ви",
-          "Телефони без работещ Face ID или пръстов отпечатък могат да използват портфейла"
+          "Доказването, че сте над 18 години, или на други проверени данни отново работи",
+          "Когато приложение поиска нещо, което още не сте проверили, първо идва проверката на документа, а след това влизането",
+          "Ако задължителни данни не могат да бъдат споделени, не се споделя нищо"
         ]
       },
       "cs": {
         "title": "Aktualizujte, abyste mohli dál používat Privasys Wallet",
-        "body": "Tato verze už nedokáže dokončit některá přihlášení ani zaznamenat útraty, které povolíte. Aktualizace zachová vaše identity i data.",
+        "body": "Tato verze neumí aplikacím, které o to žádají, prokázat ověřený údaj, například že je vám přes 18 let. Aktualizace zachová vaše identity i data.",
         "changes": [
-          "Přihlášení do aplikací, které vás znají pod vlastním identifikátorem, opět fungují",
-          "Útraty, které aplikaci povolíte, se nyní zaznamenávají a podepisují ve vašem telefonu",
-          "Telefony bez funkčního Face ID nebo otisku prstu mohou peněženku používat"
+          "Prokázání, že je vám přes 18 let, nebo jiného ověřeného údaje opět funguje",
+          "Když aplikace žádá něco, co ještě nemáte ověřené, nejdřív proběhne kontrola dokladu a až potom přihlášení",
+          "Pokud nelze sdílet údaj, který aplikace vyžaduje, nesdílí se nic"
         ]
       },
       "cy": {
         "title": "Diweddarwch i barhau i ddefnyddio Privasys Wallet",
-        "body": "Ni all y fersiwn hon gwblhau rhai mewngofnodion na chofnodi gwariant rydych yn ei ganiatáu mwyach. Mae'r diweddariad yn cadw eich hunaniaethau a'ch data.",
+        "body": "Ni all y fersiwn hon brofi manylyn wedi'i ddilysu, fel bod dros 18 oed, i'r apiau sy'n gofyn amdano. Mae'r diweddariad yn cadw eich hunaniaethau a'ch data.",
         "changes": [
-          "Mae mewngofnodi i apiau sy'n eich adnabod wrth eu dynodydd eu hunain yn gweithio eto",
-          "Mae gwariant rydych yn ei ganiatáu i ap bellach yn cael ei gofnodi, wedi'i lofnodi ar eich ffôn",
-          "Gall ffonau heb Face ID nac olion bysedd sy'n gweithio ddefnyddio'r waled"
+          "Mae profi eich bod dros 18 oed, neu fanylyn arall wedi'i ddilysu, yn gweithio eto",
+          "Pan fydd ap yn gofyn am rywbeth nad ydych wedi'i ddilysu eto, daw'r gwiriad ID yn gyntaf a'r mewngofnodi wedyn",
+          "Os na ellir rhannu manylyn y mae ap yn ei fynnu, ni rennir dim"
         ]
       },
       "da": {
         "title": "Opdater for at blive ved med at bruge Privasys Wallet",
-        "body": "Denne version kan ikke længere gennemføre visse logins eller registrere forbrug, du tillader. Opdateringen bevarer dine identiteter og data.",
+        "body": "Denne version kan ikke bevise en verificeret oplysning, for eksempel at du er over 18, over for de apps, der beder om den. Opdateringen bevarer dine identiteter og data.",
         "changes": [
-          "Login i apps, der kender dig ved deres egen identifikator, virker igen",
-          "Forbrug, du tillader en app, registreres nu og signeres på din telefon",
-          "Telefoner uden fungerende Face ID eller fingeraftryk kan bruge tegnebogen"
+          "Det virker igen at bevise, at du er over 18, eller en anden verificeret oplysning",
+          "Når en app beder om noget, du endnu ikke har verificeret, kommer id-kontrollen først og login bagefter",
+          "Hvis en oplysning, som en app kræver, ikke kan deles, deles intet"
         ]
       },
       "de": {
         "title": "Aktualisieren Sie, um Privasys Wallet weiter zu nutzen",
-        "body": "Diese Version kann manche Anmeldungen nicht mehr abschließen und von Ihnen erlaubte Ausgaben nicht erfassen. Die Aktualisierung behält Ihre Identitäten und Daten.",
+        "body": "Diese Version kann Apps, die danach fragen, keine geprüfte Angabe nachweisen, etwa dass Sie über 18 sind. Die Aktualisierung behält Ihre Identitäten und Daten.",
         "changes": [
-          "Anmeldungen bei Apps, die Sie unter einer eigenen Kennung kennen, funktionieren wieder",
-          "Ausgaben, die Sie einer App erlauben, werden jetzt erfasst und auf Ihrem Telefon signiert",
-          "Telefone ohne funktionierende Face ID oder Fingerabdruck können die Wallet nutzen"
+          "Der Nachweis, dass Sie über 18 sind, oder einer anderen geprüften Angabe funktioniert wieder",
+          "Fragt eine App nach etwas, das Sie noch nicht geprüft haben, kommt zuerst die Ausweisprüfung und danach die Anmeldung",
+          "Kann eine von einer App verlangte Angabe nicht geteilt werden, wird nichts geteilt"
         ]
       },
       "el": {
         "title": "Ενημερώστε για να συνεχίσετε να χρησιμοποιείτε το Privasys Wallet",
-        "body": "Αυτή η έκδοση δεν μπορεί πλέον να ολοκληρώνει ορισμένες συνδέσεις ή να καταγράφει δαπάνες που επιτρέπετε. Η ενημέρωση διατηρεί τις ταυτότητες και τα δεδομένα σας.",
+        "body": "Αυτή η έκδοση δεν μπορεί να αποδείξει ένα επαληθευμένο στοιχείο, όπως ότι είστε άνω των 18, στις εφαρμογές που το ζητούν. Η ενημέρωση διατηρεί τις ταυτότητες και τα δεδομένα σας.",
         "changes": [
-          "Οι συνδέσεις σε εφαρμογές που σας γνωρίζουν με δικό τους αναγνωριστικό λειτουργούν ξανά",
-          "Οι δαπάνες που επιτρέπετε σε μια εφαρμογή καταγράφονται πλέον, υπογεγραμμένες στο τηλέφωνό σας",
-          "Τηλέφωνα χωρίς λειτουργικό Face ID ή δακτυλικό αποτύπωμα μπορούν να χρησιμοποιούν το πορτοφόλι"
+          "Η απόδειξη ότι είστε άνω των 18, ή άλλου επαληθευμένου στοιχείου, λειτουργεί ξανά",
+          "Όταν μια εφαρμογή ζητά κάτι που δεν έχετε επαληθεύσει ακόμη, πρώτα γίνεται ο έλεγχος ταυτότητας και μετά η σύνδεση",
+          "Αν ένα στοιχείο που απαιτεί μια εφαρμογή δεν μπορεί να κοινοποιηθεί, δεν κοινοποιείται τίποτα"
         ]
       },
       "es": {
         "title": "Actualiza para seguir usando Privasys Wallet",
-        "body": "Esta versión ya no puede completar algunos inicios de sesión ni registrar los gastos que permites. La actualización conserva tus identidades y tus datos.",
+        "body": "Esta versión no puede demostrar un dato verificado, como que eres mayor de 18 años, a las apps que lo piden. La actualización conserva tus identidades y tus datos.",
         "changes": [
-          "Vuelven a funcionar los inicios de sesión en apps que te conocen por su propio identificador",
-          "Los gastos que permites a una app ahora se registran, firmados en tu teléfono",
-          "Los teléfonos sin Face ID ni huella que funcionen pueden usar la cartera"
+          "Vuelve a funcionar demostrar que eres mayor de 18 años u otro dato verificado",
+          "Cuando una app pide algo que aún no has verificado, primero se hace la comprobación del documento y después el inicio de sesión",
+          "Si no se puede compartir un dato que una app exige, no se comparte nada"
         ]
       },
       "et": {
         "title": "Värskendage, et Privasys Walleti kasutamist jätkata",
-        "body": "See versioon ei suuda enam mõnda sisselogimist lõpule viia ega teie lubatud kulutusi salvestada. Värskendus säilitab teie identiteedid ja andmed.",
+        "body": "See versioon ei suuda seda küsivatele rakendustele tõendada kontrollitud andmeid, näiteks et olete üle 18-aastane. Värskendus säilitab teie identiteedid ja andmed.",
         "changes": [
-          "Sisselogimine rakendustesse, mis tunnevad teid oma identifikaatori järgi, töötab taas",
-          "Rakendusele lubatud kulutused salvestatakse nüüd, allkirjastatuna teie telefonis",
-          "Telefonid ilma töötava Face ID või sõrmejäljeta saavad rahakotti kasutada"
+          "Üle 18-aastaseks olemise või muude kontrollitud andmete tõendamine töötab taas",
+          "Kui rakendus küsib midagi, mida te pole veel kontrollinud, tuleb esmalt isikutuvastus ja seejärel sisselogimine",
+          "Kui rakenduse nõutud andmeid ei saa jagada, ei jagata midagi"
         ]
       },
       "fi": {
         "title": "Päivitä jatkaaksesi Privasys Walletin käyttöä",
-        "body": "Tämä versio ei enää pysty viemään loppuun kaikkia kirjautumisia eikä tallentamaan sallimiasi kuluja. Päivitys säilyttää identiteettisi ja tietosi.",
+        "body": "Tämä versio ei pysty todistamaan vahvistettua tietoa, kuten että olet yli 18-vuotias, sitä pyytäville sovelluksille. Päivitys säilyttää identiteettisi ja tietosi.",
         "changes": [
-          "Kirjautuminen sovelluksiin, jotka tuntevat sinut omalla tunnisteellaan, toimii taas",
-          "Sovellukselle sallimasi kulut tallennetaan nyt, puhelimessasi allekirjoitettuina",
-          "Puhelimet ilman toimivaa Face ID:tä tai sormenjälkeä voivat käyttää lompakkoa"
+          "Yli 18 vuoden iän tai muun vahvistetun tiedon todistaminen toimii taas",
+          "Kun sovellus pyytää jotain, mitä et ole vielä vahvistanut, henkilöllisyyden tarkistus tulee ensin ja kirjautuminen sen jälkeen",
+          "Jos sovelluksen vaatimaa tietoa ei voi jakaa, mitään ei jaeta"
         ]
       },
       "fr": {
         "title": "Mettez à jour pour continuer à utiliser Privasys Wallet",
-        "body": "Cette version ne peut plus terminer certaines connexions ni enregistrer les dépenses que vous autorisez. La mise à jour conserve vos identités et vos données.",
+        "body": "Cette version ne peut pas prouver une information vérifiée, comme le fait d'avoir plus de 18 ans, aux applications qui la demandent. La mise à jour conserve vos identités et vos données.",
         "changes": [
-          "Les connexions aux applications qui vous connaissent sous leur propre identifiant fonctionnent de nouveau",
-          "Les dépenses que vous autorisez à une application sont désormais enregistrées, signées sur votre téléphone",
-          "Les téléphones sans Face ID ni empreinte digitale fonctionnels peuvent utiliser le portefeuille"
+          "Prouver que vous avez plus de 18 ans, ou une autre information vérifiée, fonctionne de nouveau",
+          "Quand une application demande une information que vous n'avez pas encore vérifiée, la vérification d'identité vient d'abord et la connexion ensuite",
+          "Si une information exigée par une application ne peut pas être partagée, rien n'est partagé"
         ]
       },
       "ga": {
         "title": "Nuashonraigh chun leanúint ar aghaidh ag úsáid Privasys Wallet",
-        "body": "Ní féidir leis an leagan seo roinnt síntí isteach a chríochnú ná caiteachas a cheadaíonn tú a thaifeadadh a thuilleadh. Coinníonn an nuashonrú d'aitheantais agus do shonraí.",
+        "body": "Ní féidir leis an leagan seo sonra fíoraithe, mar shampla go bhfuil tú os cionn 18, a chruthú do na haipeanna a iarrann é. Coinníonn an nuashonrú d'aitheantais agus do shonraí.",
         "changes": [
-          "Oibríonn síntí isteach chuig aipeanna a aithníonn tú lena n-aitheantóir féin arís",
-          "Taifeadtar anois caiteachas a cheadaíonn tú d'aip, sínithe ar do ghuthán",
-          "Is féidir le fóin gan Face ID ná méarlorg atá ag obair an sparán a úsáid"
+          "Oibríonn sé arís a chruthú go bhfuil tú os cionn 18, nó sonra fíoraithe eile",
+          "Nuair a iarrann aip rud nár fhíoraigh tú fós, tagann an seiceáil aitheantais ar dtús agus an síniú isteach ina dhiaidh",
+          "Mura féidir sonra a éilíonn aip a roinnt, ní roinntear aon rud"
         ]
       },
       "hr": {
         "title": "Ažurirajte kako biste nastavili koristiti Privasys Wallet",
-        "body": "Ova verzija više ne može dovršiti neke prijave ni zabilježiti potrošnju koju dopuštate. Ažuriranje zadržava vaše identitete i podatke.",
+        "body": "Ova verzija ne može aplikacijama koje to traže dokazati provjereni podatak, na primjer da imate više od 18 godina. Ažuriranje zadržava vaše identitete i podatke.",
         "changes": [
-          "Prijave u aplikacije koje vas poznaju po vlastitom identifikatoru ponovno rade",
-          "Potrošnja koju dopustite aplikaciji sada se bilježi, potpisana na vašem telefonu",
-          "Telefoni bez ispravnog Face ID-a ili otiska prsta mogu koristiti novčanik"
+          "Dokazivanje da imate više od 18 godina, ili drugog provjerenog podatka, ponovno radi",
+          "Kad aplikacija traži nešto što još niste provjerili, najprije slijedi provjera isprave, a zatim prijava",
+          "Ako se podatak koji aplikacija zahtijeva ne može podijeliti, ne dijeli se ništa"
         ]
       },
       "hu": {
         "title": "Frissítsen, hogy tovább használhassa a Privasys Walletet",
-        "body": "Ez a verzió már nem tud befejezni egyes bejelentkezéseket, és nem tudja rögzíteni az Ön által engedélyezett költéseket. A frissítés megőrzi az identitásait és adatait.",
+        "body": "Ez a verzió nem tud igazolni ellenőrzött adatot, például hogy elmúlt 18 éves, az azt kérő alkalmazásoknak. A frissítés megőrzi az identitásait és adatait.",
         "changes": [
-          "Ismét működik a bejelentkezés azokba az alkalmazásokba, amelyek saját azonosítóval ismerik Önt",
-          "Az alkalmazásnak engedélyezett költéseket mostantól rögzíti, a telefonján aláírva",
-          "A működő Face ID vagy ujjlenyomat nélküli telefonok is használhatják a tárcát"
+          "Ismét működik annak igazolása, hogy elmúlt 18 éves, vagy más ellenőrzött adaté",
+          "Ha egy alkalmazás olyasmit kér, amit még nem ellenőrzött, előbb az igazolványellenőrzés jön, utána a bejelentkezés",
+          "Ha egy alkalmazás által megkövetelt adat nem osztható meg, semmi sem kerül megosztásra"
         ]
       },
       "it": {
         "title": "Aggiorna per continuare a usare Privasys Wallet",
-        "body": "Questa versione non riesce più a completare alcuni accessi né a registrare le spese che autorizzi. L'aggiornamento conserva le tue identità e i tuoi dati.",
+        "body": "Questa versione non riesce a dimostrare un dato verificato, come avere più di 18 anni, alle app che lo chiedono. L'aggiornamento conserva le tue identità e i tuoi dati.",
         "changes": [
-          "Gli accessi alle app che ti conoscono con un proprio identificativo funzionano di nuovo",
-          "Le spese che autorizzi a un'app ora vengono registrate, firmate sul tuo telefono",
-          "I telefoni senza Face ID o impronta funzionanti possono usare il portafoglio"
+          "Dimostrare di avere più di 18 anni, o un altro dato verificato, funziona di nuovo",
+          "Quando un'app chiede qualcosa che non hai ancora verificato, prima viene il controllo del documento e poi l'accesso",
+          "Se un dato richiesto da un'app non può essere condiviso, non viene condiviso nulla"
         ]
       },
       "lt": {
         "title": "Atnaujinkite, kad galėtumėte toliau naudoti Privasys Wallet",
-        "body": "Ši versija nebegali užbaigti kai kurių prisijungimų ar užregistruoti jūsų leidžiamų išlaidų. Atnaujinimas išsaugo jūsų tapatybes ir duomenis.",
+        "body": "Ši versija negali programėlėms, kurios to prašo, įrodyti patikrinto duomens, pavyzdžiui, kad jums daugiau nei 18 metų. Atnaujinimas išsaugo jūsų tapatybes ir duomenis.",
         "changes": [
-          "Vėl veikia prisijungimai prie programėlių, kurios jus atpažįsta pagal savo identifikatorių",
-          "Programėlei leidžiamos išlaidos dabar registruojamos, pasirašytos jūsų telefone",
-          "Telefonai be veikiančio Face ID ar piršto atspaudo gali naudoti piniginę"
+          "Vėl veikia įrodymas, kad jums daugiau nei 18 metų, ar kito patikrinto duomens įrodymas",
+          "Kai programėlė prašo to, ko dar nepatikrinote, pirmiausia atliekamas dokumento patikrinimas, o tada prisijungimas",
+          "Jei programėlės reikalaujamo duomens negalima pateikti, nepateikiama nieko"
         ]
       },
       "lv": {
         "title": "Atjauniniet, lai turpinātu lietot Privasys Wallet",
-        "body": "Šī versija vairs nevar pabeigt dažas pierakstīšanās vai reģistrēt jūsu atļautos tēriņus. Atjauninājums saglabā jūsu identitātes un datus.",
+        "body": "Šī versija nevar pierādīt pārbaudītus datus, piemēram, ka esat vecāks par 18 gadiem, lietotnēm, kas tos pieprasa. Atjauninājums saglabā jūsu identitātes un datus.",
         "changes": [
-          "Pierakstīšanās lietotnēs, kas jūs pazīst pēc sava identifikatora, atkal darbojas",
-          "Lietotnei atļautie tēriņi tagad tiek reģistrēti, parakstīti jūsu tālrunī",
-          "Tālruņi bez strādājoša Face ID vai pirkstu nospieduma var lietot maku"
+          "Atkal darbojas pierādīšana, ka esat vecāks par 18 gadiem, vai citu pārbaudītu datu pierādīšana",
+          "Ja lietotne pieprasa kaut ko, ko vēl neesat pārbaudījis, vispirms notiek dokumenta pārbaude un pēc tam pierakstīšanās",
+          "Ja lietotnes pieprasītos datus nevar kopīgot, netiek kopīgots nekas"
         ]
       },
       "mt": {
         "title": "Aġġorna biex tibqa' tuża Privasys Wallet",
-        "body": "Din il-verżjoni ma tistax tlesti xi dħul jew tirreġistra l-infiq li tippermetti. L-aġġornament iżomm l-identitajiet u d-dejta tiegħek.",
+        "body": "Din il-verżjoni ma tistax tipprova dettall ivverifikat, bħal li għandek aktar minn 18-il sena, lill-apps li jitolbuh. L-aġġornament iżomm l-identitajiet u d-dejta tiegħek.",
         "changes": [
-          "Id-dħul f'apps li jafuk bl-identifikatur tagħhom jerġa' jaħdem",
-          "L-infiq li tippermetti lil app issa jiġi rreġistrat, iffirmat fuq it-telefon tiegħek",
-          "Telefowns mingħajr Face ID jew marki tas-swaba' li jaħdmu jistgħu jużaw il-kartiera"
+          "Li tipprova li għandek aktar minn 18-il sena, jew dettall ivverifikat ieħor, jerġa' jaħdem",
+          "Meta app titlob xi ħaġa li għadek ma vverifikajtx, l-ewwel jiġi l-kontroll tal-ID u mbagħad id-dħul",
+          "Jekk dettall li titlob app ma jistax jinqasam, ma jinqasam xejn"
         ]
       },
       "nl": {
         "title": "Werk bij om Privasys Wallet te blijven gebruiken",
-        "body": "Deze versie kan sommige aanmeldingen niet meer voltooien en uitgaven die je toestaat niet vastleggen. De update bewaart je identiteiten en gegevens.",
+        "body": "Deze versie kan een geverifieerd gegeven, zoals dat je ouder bent dan 18, niet aantonen aan de apps die erom vragen. De update bewaart je identiteiten en gegevens.",
         "changes": [
-          "Aanmelden bij apps die je kennen onder hun eigen id werkt weer",
-          "Uitgaven die je een app toestaat worden nu vastgelegd, ondertekend op je telefoon",
-          "Telefoons zonder werkende Face ID of vingerafdruk kunnen de wallet gebruiken"
+          "Aantonen dat je ouder bent dan 18, of een ander geverifieerd gegeven, werkt weer",
+          "Als een app vraagt om iets wat je nog niet hebt geverifieerd, komt eerst de id-controle en daarna de aanmelding",
+          "Als een gegeven dat een app vereist niet gedeeld kan worden, wordt er niets gedeeld"
         ]
       },
       "pl": {
         "title": "Zaktualizuj, aby dalej korzystać z Privasys Wallet",
-        "body": "Ta wersja nie może już dokończyć niektórych logowań ani zapisać wydatków, na które pozwalasz. Aktualizacja zachowuje Twoje tożsamości i dane.",
+        "body": "Ta wersja nie potrafi udowodnić aplikacjom, które o to proszą, zweryfikowanej informacji, na przykład że masz ukończone 18 lat. Aktualizacja zachowuje Twoje tożsamości i dane.",
         "changes": [
-          "Logowanie do aplikacji, które znają Cię pod własnym identyfikatorem, znów działa",
-          "Wydatki, na które pozwalasz aplikacji, są teraz zapisywane i podpisywane na Twoim telefonie",
-          "Telefony bez działającego Face ID lub odcisku palca mogą korzystać z portfela"
+          "Udowodnienie, że masz ukończone 18 lat, lub innej zweryfikowanej informacji znów działa",
+          "Gdy aplikacja prosi o coś, czego jeszcze nie zweryfikowałeś, najpierw następuje sprawdzenie dokumentu, a potem logowanie",
+          "Jeśli wymaganej przez aplikację informacji nie można udostępnić, nic nie zostaje udostępnione"
         ]
       },
       "pt": {
         "title": "Atualize para continuar a usar a Privasys Wallet",
-        "body": "Esta versão já não consegue concluir alguns inícios de sessão nem registar os gastos que autoriza. A atualização mantém as suas identidades e dados.",
+        "body": "Esta versão não consegue provar um dado verificado, como ter mais de 18 anos, às apps que o pedem. A atualização mantém as suas identidades e dados.",
         "changes": [
-          "Os inícios de sessão em apps que o conhecem pelo seu próprio identificador voltam a funcionar",
-          "Os gastos que autoriza a uma app passam a ser registados, assinados no seu telemóvel",
-          "Telemóveis sem Face ID ou impressão digital a funcionar podem usar a carteira"
+          "Provar que tem mais de 18 anos, ou outro dado verificado, volta a funcionar",
+          "Quando uma app pede algo que ainda não verificou, primeiro vem a verificação do documento e depois o início de sessão",
+          "Se um dado que uma app exige não puder ser partilhado, nada é partilhado"
         ]
       },
       "ro": {
         "title": "Actualizează ca să folosești în continuare Privasys Wallet",
-        "body": "Această versiune nu mai poate finaliza unele conectări și nici înregistra cheltuielile pe care le permiți. Actualizarea îți păstrează identitățile și datele.",
+        "body": "Această versiune nu poate dovedi o informație verificată, de exemplu că ai peste 18 ani, aplicațiilor care o cer. Actualizarea îți păstrează identitățile și datele.",
         "changes": [
-          "Conectările la aplicații care te cunosc după propriul identificator funcționează din nou",
-          "Cheltuielile pe care le permiți unei aplicații sunt acum înregistrate, semnate pe telefonul tău",
-          "Telefoanele fără Face ID sau amprentă funcționale pot folosi portofelul"
+          "Dovedirea că ai peste 18 ani, sau a altei informații verificate, funcționează din nou",
+          "Când o aplicație cere ceva ce nu ai verificat încă, întâi are loc verificarea actului și apoi conectarea",
+          "Dacă o informație cerută de o aplicație nu poate fi partajată, nu se partajează nimic"
         ]
       },
       "sk": {
         "title": "Aktualizujte, aby ste mohli ďalej používať Privasys Wallet",
-        "body": "Táto verzia už nedokáže dokončiť niektoré prihlásenia ani zaznamenať výdavky, ktoré povolíte. Aktualizácia zachová vaše identity aj údaje.",
+        "body": "Táto verzia nedokáže aplikáciám, ktoré o to žiadajú, preukázať overený údaj, napríklad že máte viac ako 18 rokov. Aktualizácia zachová vaše identity aj údaje.",
         "changes": [
-          "Prihlásenia do aplikácií, ktoré vás poznajú pod vlastným identifikátorom, opäť fungujú",
-          "Výdavky, ktoré aplikácii povolíte, sa teraz zaznamenávajú a podpisujú vo vašom telefóne",
-          "Telefóny bez funkčného Face ID alebo odtlačku prsta môžu peňaženku používať"
+          "Preukázanie, že máte viac ako 18 rokov, alebo iného overeného údaja opäť funguje",
+          "Keď aplikácia žiada niečo, čo ešte nemáte overené, najprv prebehne kontrola dokladu a až potom prihlásenie",
+          "Ak nemožno zdieľať údaj, ktorý aplikácia vyžaduje, nezdieľa sa nič"
         ]
       },
       "sl": {
         "title": "Posodobite, da boste lahko še naprej uporabljali Privasys Wallet",
-        "body": "Ta različica ne more več dokončati nekaterih prijav ali zabeležiti porabe, ki jo dovolite. Posodobitev ohrani vaše identitete in podatke.",
+        "body": "Ta različica aplikacijam, ki to zahtevajo, ne more dokazati preverjenega podatka, na primer da ste starejši od 18 let. Posodobitev ohrani vaše identitete in podatke.",
         "changes": [
-          "Prijave v aplikacije, ki vas poznajo po lastnem identifikatorju, spet delujejo",
-          "Poraba, ki jo dovolite aplikaciji, se zdaj beleži, podpisana v vašem telefonu",
-          "Telefoni brez delujočega Face ID ali prstnega odtisa lahko uporabljajo denarnico"
+          "Dokazovanje, da ste starejši od 18 let, ali drugega preverjenega podatka spet deluje",
+          "Ko aplikacija zahteva nekaj, česar še niste preverili, najprej sledi preverjanje dokumenta in nato prijava",
+          "Če podatka, ki ga aplikacija zahteva, ni mogoče deliti, se ne deli nič"
         ]
       },
       "sv": {
         "title": "Uppdatera för att fortsätta använda Privasys Wallet",
-        "body": "Den här versionen kan inte längre slutföra vissa inloggningar eller registrera utgifter som du tillåter. Uppdateringen behåller dina identiteter och data.",
+        "body": "Den här versionen kan inte bevisa en verifierad uppgift, till exempel att du är över 18, för de appar som ber om den. Uppdateringen behåller dina identiteter och data.",
         "changes": [
-          "Inloggning i appar som känner dig under sin egen identifierare fungerar igen",
-          "Utgifter som du tillåter en app registreras nu, signerade på din telefon",
-          "Telefoner utan fungerande Face ID eller fingeravtryck kan använda plånboken"
+          "Att bevisa att du är över 18, eller en annan verifierad uppgift, fungerar igen",
+          "När en app ber om något du ännu inte har verifierat kommer id-kontrollen först och inloggningen efter",
+          "Om en uppgift som en app kräver inte kan delas, delas ingenting"
         ]
       }
     }

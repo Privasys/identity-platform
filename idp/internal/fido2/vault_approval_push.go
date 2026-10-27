@@ -50,6 +50,7 @@ type vaultApprovalSummary struct {
 	Version string `json:"version,omitempty"`
 	Source  string `json:"source,omitempty"`
 	KeyType string `json:"key_type,omitempty"`
+	Summary string `json:"summary,omitempty"`
 
 	// Identifiers the wallet uses to fetch mgmt release provenance (the
 	// published release + old→new code diff) itself. Not display text.
@@ -292,4 +293,17 @@ func (e *sessionError) Error() string { return e.msg }
 // targets a production wallet.
 func walletDeepLink(vaultOp string) string {
 	return "privasys-wallet://vault-approvals?vault_op=" + url.QueryEscape(vaultOp)
+}
+
+// maxSummaryRunes bounds the plain-language summary an initiator attaches to
+// an approval: a few lines on a phone card, never a document.
+const maxSummaryRunes = 600
+
+// clipSummary trims an initiator's summary to what a wallet card can show.
+func clipSummary(s string) string {
+	s = strings.TrimSpace(s)
+	if r := []rune(s); len(r) > maxSummaryRunes {
+		return string(r[:maxSummaryRunes-1]) + "…"
+	}
+	return s
 }

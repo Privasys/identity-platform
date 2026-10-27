@@ -191,6 +191,10 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				Version string `json:"version"`
 				Source  string `json:"source"`
 				KeyType string `json:"key_type"`
+				// Summary says in plain words what the operation does, e.g.
+				// the callers an app policy admits, so a widened list is
+				// visible before the approver taps. Display only, like the rest.
+				Summary string `json:"summary"`
 				// Identifiers the wallet uses to fetch release provenance
 				// (published release + code-diff) from mgmt itself.
 				AppID     string `json:"app_id"`
@@ -327,6 +331,7 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			Version:       req.Context.Version,
 			Source:        req.Context.Source,
 			KeyType:       req.Context.KeyType,
+			Summary:       clipSummary(req.Context.Summary),
 			AppID:         req.Context.AppID,
 			VersionID:     req.Context.VersionID,
 		}, exp)

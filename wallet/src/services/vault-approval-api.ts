@@ -40,6 +40,10 @@ export interface VaultApprovalSummary {
     version?: string; // e.g. "v1.2.3 · git:a1b2c3d · 23 Jun 2026"
     source?: string;
     key_type?: string; // export: the key kind (e.g. Aes256GcmKey)
+    // What the operation does, in plain words (an app policy: the callers it
+    // admits, from which machines, what it depends on). Advisory, like the
+    // rest: the digest is what the approval binds.
+    summary?: string;
     // Identifiers the wallet uses to fetch mgmt release provenance itself (the
     // published release + old→new code diff for the promote target).
     app_id?: string;

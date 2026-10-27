@@ -260,6 +260,9 @@ export default function VaultApprovalsScreen() {
                         const urgent = req.expires_at - now / 1000 < 60;
                         const s = req.summary;
                         const subject = s.app_name || shortHandle(s.handle);
+                        // An app's own policy: its handle is a namespace, not a
+                        // key, and its digest is the document's, not a measurement.
+                        const isPolicy = s.operation === 'app-policy';
                         return (
                             <RNView key={req.vault_op} style={[styles.card, highlighted && styles.cardHighlighted]}>
                                 <RNView style={styles.cardHeader}>
@@ -272,7 +275,9 @@ export default function VaultApprovalsScreen() {
                                                 ? t('vaultApprovals.approveNewVersion')
                                                 : s.operation === 'export'
                                                   ? t('vaultApprovals.approveKeyExport')
-                                                  : t('vaultApprovals.approveOperation')}
+                                                  : isPolicy
+                                                    ? t('vaultApprovals.approvePolicy')
+                                                    : t('vaultApprovals.approveOperation')}
                                         </Text>
                                     </RNView>
                                     <RNView style={[styles.ttlPill, urgent && styles.ttlPillUrgent]}>
@@ -297,10 +302,21 @@ export default function VaultApprovalsScreen() {
                                             : t('vaultApprovals.explainPromoteEnclave')
                                         : s.operation === 'export'
                                           ? t('vaultApprovals.explainExport')
-                                          : t('vaultApprovals.explainOther')}
+                                          : isPolicy
+                                            ? t('vaultApprovals.explainPolicy')
+                                            : t('vaultApprovals.explainOther')}
                                 </Text>
 
-                                {s.version ? (
+                                {s.summary ? (
+                                    <RNView style={styles.summaryBox}>
+                                        <Text style={styles.summaryLabel}>
+                                            {isPolicy ? t('vaultApprovals.policyContents') : t('vaultApprovals.operationContents')}
+                                        </Text>
+                                        <Text style={styles.summaryText}>{s.summary}</Text>
+                                    </RNView>
+                                ) : null}
+
+                                {s.version && !isPolicy ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>{t('vaultApprovals.version')}</Text>
                                         <Text style={styles.value}>{s.version}</Text>
@@ -341,16 +357,20 @@ export default function VaultApprovalsScreen() {
                                         </>
                                     );
                                 })()}
-                                {s.key_type ? (
+                                {s.key_type && !isPolicy ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>{t('vaultApprovals.keyType')}</Text>
                                         <Text style={styles.value}>{s.key_type}</Text>
                                     </RNView>
                                 ) : null}
-                                <RNView style={styles.row}>
-                                    <Text style={styles.label}>{t('vaultApprovals.appKey')}</Text>
-                                    <Text style={styles.value}>{shortHandle(s.handle)}</Text>
-                                </RNView>
+                                {!isPolicy ? (
+                                    <RNView style={styles.row}>
+                                        <Text style={styles.label}>{t('vaultApprovals.appKey')}</Text>
+                                        <Text style={styles.value} numberOfLines={1} ellipsizeMode="middle">
+                                            {shortHandle(s.handle)}
+                                        </Text>
+                                    </RNView>
+                                ) : null}
                                 {typeof s.policy_version === 'number' ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>{t('vaultApprovals.policyVersion')}</Text>
@@ -359,7 +379,9 @@ export default function VaultApprovalsScreen() {
                                 ) : null}
                                 {s.measurement ? (
                                     <RNView style={styles.row}>
-                                        <Text style={styles.label}>{t('vaultApprovals.newMeasurement')}</Text>
+                                        <Text style={styles.label}>
+                                            {isPolicy ? t('vaultApprovals.policyDocument') : t('vaultApprovals.newMeasurement')}
+                                        </Text>
                                         <Text style={styles.mono}>{shortHex(s.measurement, t)}</Text>
                                     </RNView>
                                 ) : null}
@@ -457,10 +479,13 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     ttlPillUrgent: { backgroundColor: p.warnBg },
     ttlText: { fontSize: 12, fontWeight: '600', color: p.infoText },
     ttlTextUrgent: { color: p.warnText },
-    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 12 },
     label: { fontSize: 13, color: p.textSecondary },
-    value: { fontSize: 14, fontWeight: '600', color: p.textPrimary },
-    mono: { fontSize: 12, color: p.textSecondary, fontFamily: 'monospace' },
+    value: { fontSize: 14, fontWeight: '600', color: p.textPrimary, flexShrink: 1, textAlign: 'right' },
+    mono: { fontSize: 12, color: p.textSecondary, fontFamily: 'monospace', flexShrink: 1, textAlign: 'right' },
+    summaryBox: { backgroundColor: p.infoBg, borderRadius: 10, padding: 12, marginBottom: 12, gap: 4 },
+    summaryLabel: { fontSize: 12, fontWeight: '600', color: p.infoText },
+    summaryText: { fontSize: 14, color: p.textPrimary, lineHeight: 20 },
     approveBtn: {
         flexDirection: 'row',
         gap: 8,

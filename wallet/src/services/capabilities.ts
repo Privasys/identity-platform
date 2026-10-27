@@ -29,6 +29,7 @@ import {
 import { tokenForHost } from '@/services/platform-token';
 import type { DeclaredConnection } from '@/stores/capabilities';
 import { walletCallHeaders } from '@/services/wallet-call';
+import { ensureWia } from '@/services/wia';
 
 /**
  * The closed permission vocabulary. The wallet renders only these and refuses
@@ -373,6 +374,12 @@ async function instanceProof(
     serviceUrl: string | undefined,
 ): Promise<Record<string, string>> {
     if (!serviceUrl) return {};
+    // The attestation lives 48 hours and only a sign-in or a verification
+    // renewed it, so a holder two days from their last sign-in minted with
+    // no proof and the service refused every approval (2026-10-27). A mint
+    // is a deliberate tap where a prompt is expected, so it enrols afresh
+    // when the cached one is stale.
+    await ensureWia().catch(() => null);
     return (await walletCallHeaders(method, new URL(url).pathname)) ?? {};
 }
 

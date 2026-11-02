@@ -302,6 +302,8 @@ func main() {
 	// A non-enclave relying party registers where it publishes spend keys.
 	mux.HandleFunc("POST /clients/{id}/spend", clients.HandleSetSpendJWKS(clientReg, cfg.AdminToken))
 	mux.HandleFunc("POST /clients/{id}/subject", clients.HandleSetSubjectMode(clientReg, cfg.AdminToken))
+	// The external identity providers a client's users may sign in with.
+	mux.HandleFunc("POST /clients/{id}/social-providers", clients.HandleSetSocialProviders(clientReg, cfg.AdminToken))
 	// The attested apps a client with its own subjects stands for.
 	mux.HandleFunc("POST /clients/{id}/apps", clients.HandleSetAppIDs(clientReg, cfg.AdminToken))
 
@@ -420,6 +422,9 @@ func main() {
 	})
 
 	socialHandler := social.NewHandler(socialProviders, codeStore, sessionStore, cfg.IssuerURL)
+	// A client's registration is the ceiling on the providers its users may
+	// sign in with; the page's preference can only narrow it.
+	socialHandler.SetClientPolicy(clientReg.SocialProvidersOf)
 	mux.HandleFunc("GET /auth/social", socialHandler.HandleRedirect)
 	mux.HandleFunc("GET /auth/social/callback", socialHandler.HandleCallback)
 	mux.HandleFunc("GET /auth/social/providers", socialHandler.HandleProviders)

@@ -174,3 +174,45 @@ func TestSetRequiredAttributes(t *testing.T) {
 		t.Fatal("an unknown client was updated")
 	}
 }
+
+// A client's users may be restricted to named external identity providers;
+// the restriction is operator-set, normalised, and lifted by an empty list.
+func TestSocialProviders_SetAndRead(t *testing.T) {
+	reg := newTestRegistry(t)
+	c, err := reg.Register("Workplace app", []string{"https://app.example/cb"}, "", []string{"email"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := reg.SocialProvidersOf(c.ClientID); got != nil {
+		t.Fatalf("a new client restricts nothing, got %v", got)
+	}
+	clean, err := reg.SetSocialProviders(c.ClientID, []string{" Microsoft ", "google", "microsoft"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(clean) != 2 || clean[0] != "microsoft" || clean[1] != "google" {
+		t.Fatalf("normalised list = %v", clean)
+	}
+	if got := reg.SocialProvidersOf(c.ClientID); len(got) != 2 || got[0] != "microsoft" {
+		t.Fatalf("stored list = %v", got)
+	}
+	full, err := reg.Get(c.ClientID)
+	if err != nil || len(full.SocialProviders) != 2 {
+		t.Fatalf("Get carries the list: %+v %v", full, err)
+	}
+	if _, err := reg.SetSocialProviders(c.ClientID, []string{"Not A Provider!"}); err == nil {
+		t.Fatal("an invalid provider name must be refused")
+	}
+	if _, err := reg.SetSocialProviders(c.ClientID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := reg.SocialProvidersOf(c.ClientID); got != nil {
+		t.Fatalf("an empty list lifts the restriction, got %v", got)
+	}
+	if _, err := reg.SetSocialProviders("no-such-client", []string{"github"}); err == nil {
+		t.Fatal("an unknown client must be refused")
+	}
+	if got := reg.SocialProvidersOf("no-such-client"); got != nil {
+		t.Fatalf("an unknown client restricts nothing here (it is refused elsewhere), got %v", got)
+	}
+}

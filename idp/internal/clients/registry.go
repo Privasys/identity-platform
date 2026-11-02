@@ -45,6 +45,15 @@ type Client struct {
 	// account and its roles even when it has its own subjects, because the
 	// platform is Privasys itself, not a relying party. Operator-set only.
 	Platform bool `json:"platform,omitempty"`
+	// SocialProviders is the external identity providers this client's
+	// users may sign in with (github, google, microsoft, linkedin), or
+	// empty for every provider the identity provider is configured with.
+	// Enforced on the social start path and reflected by the providers
+	// listing, so the gate shows only these and a page cannot widen them.
+	// Operator-set: a relying party that accepts one workplace identity
+	// names it here, and the SDK's `providers` option stays a display
+	// preference inside this ceiling.
+	SocialProviders []string `json:"social_providers,omitempty"`
 }
 
 // ValidRedirectURI checks if the given URI is in the client's registered redirect URIs.
@@ -69,12 +78,12 @@ func NewRegistry(db *store.DB) *Registry {
 
 // Get retrieves a client by ID.
 func (reg *Registry) Get(clientID string) (*Client, error) {
-	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID, sector string
+	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID, sector, socialJSON string
 	var billableRP, platform int
 	err := reg.db.QueryRow(
-		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id, sector, platform FROM clients WHERE client_id = ?",
+		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id, sector, platform, social_providers FROM clients WHERE client_id = ?",
 		clientID,
-	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID, &sector, &platform)
+	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID, &sector, &platform, &socialJSON)
 	if err != nil {
 		return nil, fmt.Errorf("client not found: %w", err)
 	}
@@ -84,6 +93,9 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 
 	var requiredAttrs []string
 	json.Unmarshal([]byte(requiredAttrsJSON), &requiredAttrs)
+
+	var social []string
+	json.Unmarshal([]byte(socialJSON), &social)
 
 	return &Client{
 		ClientID:           clientID,
@@ -96,7 +108,105 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 		RPID:               rpID,
 		Sector:             sector,
 		Platform:           platform != 0,
+		SocialProviders:    social,
 	}, nil
+}
+
+// SocialProvidersOf returns the external identity providers a client's
+// users may sign in with, or nil when the client restricts nothing (or is
+// unknown: an unknown client is refused elsewhere, never widened here).
+func (reg *Registry) SocialProvidersOf(clientID string) []string {
+	var raw string
+	if err := reg.db.QueryRow("SELECT social_providers FROM clients WHERE client_id = ?", clientID).Scan(&raw); err != nil {
+		return nil
+	}
+	var out []string
+	_ = json.Unmarshal([]byte(raw), &out)
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// validSocialProvider reports whether a provider name is a plausible
+// identifier: lowercase letters, digits and dashes. Whether the identity
+// provider is configured with it is the social handler's concern; a name
+// it lacks is simply never offered.
+func validSocialProvider(name string) bool {
+	if name == "" || len(name) > 32 {
+		return false
+	}
+	for _, c := range name {
+		if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-') {
+			return false
+		}
+	}
+	return true
+}
+
+// SetSocialProviders restricts a client's users to the named external
+// identity providers; an empty list lifts the restriction. Names are
+// lowercased and de-duplicated, in the order given.
+func (reg *Registry) SetSocialProviders(clientID string, providers []string) ([]string, error) {
+	clean := make([]string, 0, len(providers))
+	seen := map[string]bool{}
+	for _, p := range providers {
+		p = strings.ToLower(strings.TrimSpace(p))
+		if !validSocialProvider(p) {
+			return nil, fmt.Errorf("invalid provider name %q", p)
+		}
+		if !seen[p] {
+			seen[p] = true
+			clean = append(clean, p)
+		}
+	}
+	raw, _ := json.Marshal(clean)
+	res, err := reg.db.Exec("UPDATE clients SET social_providers = ? WHERE client_id = ?", string(raw), clientID)
+	if err != nil {
+		return nil, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, fmt.Errorf("client not found")
+	}
+	return clean, nil
+}
+
+// HandleSetSocialProviders restricts (or unrestricts) the external identity
+// providers a client's users may sign in with. Admin token.
+// POST /clients/{id}/social-providers {"providers": ["microsoft"]}
+// An empty list means every provider the identity provider is configured
+// with. The restriction is enforced on the social start path and reflected
+// by GET /auth/social/providers?client_id=, so the sign-in gate shows only
+// what is allowed and a page cannot widen it.
+func HandleSetSocialProviders(reg *Registry, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminToken != "" {
+			auth := r.Header.Get("Authorization")
+			if len(auth) < 8 || auth[7:] != adminToken {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+		}
+		clientID := r.PathValue("id")
+		var req struct {
+			Providers []string `json:"providers"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || clientID == "" {
+			http.Error(w, `{"error":"client id and providers are required"}`, http.StatusBadRequest)
+			return
+		}
+		clean, err := reg.SetSocialProviders(clientID, req.Providers)
+		if err != nil {
+			if err.Error() == "client not found" {
+				http.Error(w, `{"error":"client not found"}`, http.StatusNotFound)
+				return
+			}
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"client_id": clientID, "providers": clean})
+	}
 }
 
 // IsPlatform reports whether a client is a first-party control-plane client.

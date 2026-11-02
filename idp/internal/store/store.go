@@ -343,6 +343,11 @@ func migrate(db *sql.DB) error {
 		// a client with its own subjects stands for: a sealed-session voucher
 		// carrying that client's subject is accepted only for one of them.
 		{"app_ids", "ALTER TABLE clients ADD COLUMN app_ids TEXT NOT NULL DEFAULT ''"},
+		// The external identity providers a client's users may sign in
+		// with (JSON list of provider names). Empty means every provider
+		// this identity provider is configured with; a list is enforced on
+		// the social start path, so a page cannot widen it.
+		{"social_providers", "ALTER TABLE clients ADD COLUMN social_providers TEXT NOT NULL DEFAULT '[]'"},
 	} {
 		if !clientCols[add.col] {
 			if _, err = db.Exec(add.ddl); err != nil {

@@ -1293,7 +1293,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 let socialProviders: string[] = [];
                 if (!effectiveMethods || effectiveMethods.includes('social')) {
                     try {
-                        const provResp = await fetch(`${idpBase}/auth/social/providers`);
+                        // Named for the client, the identity provider lists only
+                        // the providers that client's users may sign in with.
+                        const provQuery = config.clientId ? `?client_id=${encodeURIComponent(config.clientId)}` : '';
+                        const provResp = await fetch(`${idpBase}/auth/social/providers${provQuery}`);
                         if (provResp.ok) {
                             const provData = await provResp.json();
                             const published: string[] = provData.providers ?? [];

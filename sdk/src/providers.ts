@@ -54,6 +54,13 @@ export function selectProviders(
     requested: readonly SocialProvider[] | undefined,
 ): string[] {
     if (!requested) return [...available];
+    const chosen = requested.filter((p) => available.includes(p));
+    // A preference that matches nothing is a misconfiguration; a gate with
+    // no button at all would strand the user, so offer what is published.
+    return chosen.length ? chosen : [...available];
+}| undefined,
+): string[] {
+    if (!requested) return [...available];
     return requested.filter((p) => available.includes(p));
 }
 

@@ -1296,12 +1296,18 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         const provResp = await fetch(`${idpBase}/auth/social/providers`);
                         if (provResp.ok) {
                             const provData = await provResp.json();
-                            socialProviders = selectProviders(provData.providers ?? [], providers);
-                            if (providers && socialProviders.length === 0) {
+                            const published: string[] = provData.providers ?? [];
+                            socialProviders = selectProviders(published, providers);
+                            if (providers && socialProviders.length === 0 && published.length > 0) {
+                                // A preference that matches nothing would leave a
+                                // gate with no button at all; show the published
+                                // list instead and say so, since this console is
+                                // the frame's, not the adopter's.
                                 console.warn(
                                     '[privasys] none of the requested providers',
-                                    providers, 'is configured at the identity provider',
+                                    providers, 'is configured at the identity provider; offering', published,
                                 );
+                                socialProviders = published;
                             }
                         }
                     } catch { /* social not available, that's fine */ }

@@ -32,8 +32,12 @@ test('a preference restricts and orders the available providers', () => {
 });
 
 test('a requested provider the identity provider lacks is left out, not shown dead', () => {
-    assert.deepEqual(selectProviders(['github', 'google'], ['microsoft']), []);
     assert.deepEqual(selectProviders(['github', 'google'], ['microsoft', 'google']), ['google']);
+});
+
+test('a preference that matches nothing falls back to the published list, never to no button', () => {
+    assert.deepEqual(selectProviders(['github', 'google'], ['microsoft']), ['github', 'google']);
+    assert.deepEqual(selectProviders([], ['microsoft']), []);
 });
 
 test('button labels are brand-correct and carry the call to action only when alone', () => {

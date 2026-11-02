@@ -46,8 +46,8 @@ export function sanitiseProviders(raw: unknown): readonly SocialProvider[] | und
  * The providers the gate offers: those the identity provider has
  * available, restricted to the adopter's preference when one was given
  * and ordered as the adopter listed them. A requested provider the
- * identity provider does not have is left out, so a misconfiguration
- * shows fewer buttons rather than a dead one.
+ * identity provider does not have is left out; a preference that matches
+ * nothing yields the published list, never an empty one.
  */
 export function selectProviders(
     available: readonly string[],
@@ -58,10 +58,6 @@ export function selectProviders(
     // A preference that matches nothing is a misconfiguration; a gate with
     // no button at all would strand the user, so offer what is published.
     return chosen.length ? chosen : [...available];
-}| undefined,
-): string[] {
-    if (!requested) return [...available];
-    return requested.filter((p) => available.includes(p));
 }
 
 /** The display name for a provider, falling back to the raw identifier. */

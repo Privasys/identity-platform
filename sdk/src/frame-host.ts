@@ -1297,17 +1297,16 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         if (provResp.ok) {
                             const provData = await provResp.json();
                             const published: string[] = provData.providers ?? [];
+                            // A preference that matches nothing yields the published
+                            // list (selectProviders): a gate with no button at all
+                            // would strand the user. Say so, since this console is
+                            // the frame's, not the adopter's.
                             socialProviders = selectProviders(published, providers);
-                            if (providers && socialProviders.length === 0 && published.length > 0) {
-                                // A preference that matches nothing would leave a
-                                // gate with no button at all; show the published
-                                // list instead and say so, since this console is
-                                // the frame's, not the adopter's.
+                            if (providers && !providers.some((p) => published.includes(p))) {
                                 console.warn(
                                     '[privasys] none of the requested providers',
                                     providers, 'is configured at the identity provider; offering', published,
                                 );
-                                socialProviders = published;
                             }
                         }
                     } catch { /* social not available, that's fine */ }

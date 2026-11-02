@@ -8,6 +8,7 @@ import { WebAuthnClient } from './webauthn';
 import { attributeLabel, assuranceLabel } from './attributes-ui';
 import { isGovVerified } from './attributes';
 import { providerButtonLabel } from './providers';
+import { alternativeOrder, displayAppName } from './gate';
 import qrcode from 'qrcode-generator';
 
 // ---------------------------------------------------------------------------
@@ -349,6 +350,9 @@ const MODAL_CSS = /* css */ `
 :host(.inline) .page {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr auto;
+    /* Sized by its content, not the frame's viewport: this is the height
+       the embedding page is told to give the frame (AuthUI.sizeObserver). */
+    min-height: 0;
 }
 :host(.inline) .auth-panel {
     padding: 24px 28px;
@@ -1141,12 +1145,18 @@ export class AuthUI {
         container.appendChild(this.host);
         // Tell the host how tall the content is, on every change: an iframe
         // cannot measure a cross-origin document itself.
+        // The host fills the frame's viewport (fixed, inset 0), so its
+        // height is the frame's own, not the content's: the embedding page
+        // would be told the height it chose and the gate could never grow
+        // past it. The observed element is the rendered page, which inline
+        // CSS lets shrink to its content; render() re-points the observer
+        // at each new page element.
         if (this.cfg.onContentHeight && typeof ResizeObserver !== 'undefined') {
             const cb = this.cfg.onContentHeight;
-            this.sizeObserver = new ResizeObserver(() => {
-                if (this.host) cb(this.host.getBoundingClientRect().height);
+            this.sizeObserver = new ResizeObserver((entries) => {
+                const target = entries[entries.length - 1]?.target;
+                if (target) cb(target.getBoundingClientRect().height);
             });
-            this.sizeObserver.observe(this.host);
         }
     }
 
@@ -1157,9 +1167,7 @@ export class AuthUI {
         this.shadow.innerHTML = '';
         this.shadow.appendChild(style);
 
-        const displayName = this.cfg.appName
-            .replace(/[-_]/g, ' ')
-            .replace(/\b\w/g, c => c.toUpperCase());
+        const displayName = displayAppName(this.cfg.appName);
         const isIdle = this.state === 'idle';
 
         // Dynamic brand description based on state
@@ -1338,6 +1346,10 @@ export class AuthUI {
         );
 
         this.shadow.appendChild(page);
+        if (this.sizeObserver) {
+            this.sizeObserver.disconnect();
+            this.sizeObserver.observe(page);
+        }
     }
 
     /** Go back to idle state, cancelling any in-progress flow. */
@@ -1355,9 +1367,7 @@ export class AuthUI {
         const hasPush = !!this.cfg.pushToken && this.allowed('wallet');
         const socialProviders = this.allowed('social') ? (this.cfg.socialProviders ?? []) : [];
         const hasWallet = this.allowed('wallet');
-        const displayName = this.cfg.appName
-            .replace(/[-_]/g, ' ')
-            .replace(/\b\w/g, c => c.toUpperCase());
+        const displayName = this.cfg.app?.displayName || displayAppName(this.cfg.appName);
 
         const buttons: (HTMLElement | null | false)[] = [];
 
@@ -1383,21 +1393,14 @@ export class AuthUI {
             );
         }
 
-        // Divider before alternative methods
-        const hasAlternatives = hasWebAuthn || socialProviders.length > 0;
-        if (hasAlternatives) {
-            buttons.push(el('div', { className: 'divider' }, el('span', null, 'or')));
-        }
-
         // Passkey button
+        let passkeyButton: HTMLElement | null = null;
         if (hasWebAuthn) {
             const passkeyOp = this.getWebAuthnClient().sessions.hasPasskeyHint() ? 'authenticate' : 'register';
-            buttons.push(
-                el('button', { className: 'btn-provider', onClick: () => this.startPasskey(passkeyOp) },
-                    el('span', { html: ICON_PASSKEY }),
-                    el('span', { className: 'btn-label' }, 'Passkey'),
-                    el('span', { className: 'btn-hint' }, 'Face ID, Touch ID, Windows Hello'),
-                ),
+            passkeyButton = el('button', { className: 'btn-provider', onClick: () => this.startPasskey(passkeyOp) },
+                el('span', { html: ICON_PASSKEY }),
+                el('span', { className: 'btn-label' }, 'Passkey'),
+                el('span', { className: 'btn-hint' }, 'Face ID, Touch ID, Windows Hello'),
             );
         }
 
@@ -1413,18 +1416,30 @@ export class AuthUI {
         // and carries the full label, so the gate reads as a sign-in page for
         // that identity rather than a chooser with one entry.
         const soloSocial = !hasWallet && !hasWebAuthn && socialProviders.length === 1;
-        for (const provider of socialProviders) {
+        const socialButtons = socialProviders.map((provider) => {
             const icon = socialIcons[provider] ?? '';
-            buttons.push(
-                el('button', {
-                    className: soloSocial ? 'btn-provider primary' : 'btn-provider',
-                    onClick: () => this.startSocial(provider),
-                },
-                    icon ? el('span', { html: icon }) : null,
-                    el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial)),
-                ),
+            return el('button', {
+                className: soloSocial ? 'btn-provider primary' : 'btn-provider',
+                onClick: () => this.startSocial(provider),
+            },
+                icon ? el('span', { html: icon }) : null,
+                el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial)),
             );
+        });
+
+        // The alternatives, in the order the adopter listed the methods
+        // (`['social', 'passkey']` puts the work account first). The "or"
+        // divider separates them from the wallet above; with no wallet
+        // offered there is nothing to divide.
+        const alternatives: HTMLElement[] = [];
+        for (const method of alternativeOrder(this.cfg.methods)) {
+            if (method === 'passkey' && passkeyButton) alternatives.push(passkeyButton);
+            if (method === 'social') alternatives.push(...socialButtons);
         }
+        if (alternatives.length && buttons.length) {
+            buttons.push(el('div', { className: 'divider' }, el('span', null, 'or')));
+        }
+        buttons.push(...alternatives);
 
         return el('div', null,
             el('h2', { className: 'auth-panel-heading' }, `Sign in to ${displayName}`),

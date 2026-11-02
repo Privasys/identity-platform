@@ -280,9 +280,15 @@ function sanitiseApp(raw: unknown): AuthUIConfig['app'] {
 }
 
 const KNOWN_METHODS = ['wallet', 'passkey', 'social'] as const;
+type KnownMethod = (typeof KNOWN_METHODS)[number];
+// The adopter's list is an order as well as a filter (gate.ts), so it is
+// kept as given, less anything unknown or repeated.
 function sanitiseMethods(raw: unknown): AuthUIConfig['methods'] {
     if (!Array.isArray(raw)) return undefined;
-    const out = KNOWN_METHODS.filter((m) => raw.includes(m));
+    const out: KnownMethod[] = [];
+    for (const m of raw) {
+        if ((KNOWN_METHODS as readonly unknown[]).includes(m) && !out.includes(m as KnownMethod)) out.push(m as KnownMethod);
+    }
     return out.length ? out : undefined;
 }
 

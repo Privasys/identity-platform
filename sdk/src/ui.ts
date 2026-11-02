@@ -7,6 +7,7 @@ import { PrivasysAuth } from './client';
 import { WebAuthnClient } from './webauthn';
 import { attributeLabel, assuranceLabel } from './attributes-ui';
 import { isGovVerified } from './attributes';
+import { providerButtonLabel } from './providers';
 import qrcode from 'qrcode-generator';
 
 // ---------------------------------------------------------------------------
@@ -1407,22 +1408,20 @@ export class AuthUI {
             microsoft: ICON_MICROSOFT,
             linkedin: ICON_LINKEDIN,
         };
-        const socialNames: Record<string, string> = {
-            github: 'GitHub',
-            google: 'Google',
-            microsoft: 'Microsoft',
-            linkedin: 'LinkedIn',
-        };
+        // One provider and nothing else to choose from (methods: ['social'],
+        // providers: ['microsoft']): the button is the primary call to action
+        // and carries the full label, so the gate reads as a sign-in page for
+        // that identity rather than a chooser with one entry.
+        const soloSocial = !hasWallet && !hasWebAuthn && socialProviders.length === 1;
         for (const provider of socialProviders) {
             const icon = socialIcons[provider] ?? '';
-            const name = socialNames[provider] ?? provider;
             buttons.push(
                 el('button', {
-                    className: 'btn-provider',
+                    className: soloSocial ? 'btn-provider primary' : 'btn-provider',
                     onClick: () => this.startSocial(provider),
                 },
                     icon ? el('span', { html: icon }) : null,
-                    el('span', { className: 'btn-label' }, name),
+                    el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial)),
                 ),
             );
         }

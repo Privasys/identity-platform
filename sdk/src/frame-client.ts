@@ -57,6 +57,10 @@
 import type { SealedSessionState, SealedWebSocket } from './enclave-session';
 import { FRAME_SIZE_MESSAGE, inlineFrameHeight } from './frame-size';
 
+import type { SocialProvider } from './providers';
+
+export type { SocialProvider } from './providers';
+
 export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'identity' | 'offline_access';
 
 /**
@@ -218,6 +222,18 @@ export interface AuthFrameConfig {
      * otherwise).
      */
     methods?: readonly ('wallet' | 'passkey' | 'social')[];
+    /**
+     * Which external identity providers the `'social'` method offers,
+     * in the order given. Defaults to every provider the identity
+     * provider has available. An app whose users all sign in with one
+     * workplace identity passes a single entry, e.g.
+     * `methods: ['social'], providers: ['microsoft']`: the gate then
+     * shows one "Sign in with Microsoft" button and no chooser. A
+     * provider the identity provider does not have is left out. This
+     * only narrows the social list; it never adds a method that
+     * `methods` excluded.
+     */
+    providers?: readonly SocialProvider[];
     /**
      * Your app's identity for the gate header (`'page'` presentation):
      * your logo (https only) and display name lead the header, with

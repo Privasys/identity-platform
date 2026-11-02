@@ -1,0 +1,73 @@
+/**
+ * Which external identity providers a sign-in ceremony offers.
+ *
+ * The identity provider publishes the social providers it is configured
+ * with (GitHub, Google, Microsoft, LinkedIn). By default the gate shows
+ * every one of them. An adopter whose users sign in with one workplace
+ * identity, say a government department on Microsoft Entra ID, names that
+ * provider alone: the gate then shows a single "Sign in with Microsoft"
+ * button instead of a chooser.
+ *
+ * The list arrives from the adopter page via postMessage and is rendered
+ * inside the trusted origin, so it is checked against a closed vocabulary
+ * here, like `methods` and `pitch`.
+ */
+
+/** The external identity providers the identity provider can federate. */
+export const SOCIAL_PROVIDERS = ['github', 'google', 'microsoft', 'linkedin'] as const;
+
+export type SocialProvider = (typeof SOCIAL_PROVIDERS)[number];
+
+/** Brand-correct provider names for button labels. */
+export const SOCIAL_PROVIDER_NAMES: Record<SocialProvider, string> = {
+    github: 'GitHub',
+    google: 'Google',
+    microsoft: 'Microsoft',
+    linkedin: 'LinkedIn',
+};
+
+/**
+ * The adopter's `providers` option, reduced to known providers in the
+ * order given, without duplicates. Anything that is not a non-empty array
+ * of known names yields `undefined`, which means "no preference".
+ */
+export function sanitiseProviders(raw: unknown): readonly SocialProvider[] | undefined {
+    if (!Array.isArray(raw)) return undefined;
+    const out: SocialProvider[] = [];
+    for (const p of raw) {
+        if (typeof p !== 'string') continue;
+        const name = p.trim().toLowerCase() as SocialProvider;
+        if ((SOCIAL_PROVIDERS as readonly string[]).includes(name) && !out.includes(name)) out.push(name);
+    }
+    return out.length ? out : undefined;
+}
+
+/**
+ * The providers the gate offers: those the identity provider has
+ * available, restricted to the adopter's preference when one was given
+ * and ordered as the adopter listed them. A requested provider the
+ * identity provider does not have is left out, so a misconfiguration
+ * shows fewer buttons rather than a dead one.
+ */
+export function selectProviders(
+    available: readonly string[],
+    requested: readonly SocialProvider[] | undefined,
+): string[] {
+    if (!requested) return [...available];
+    return requested.filter((p) => available.includes(p));
+}
+
+/** The display name for a provider, falling back to the raw identifier. */
+export function providerName(provider: string): string {
+    return (SOCIAL_PROVIDER_NAMES as Record<string, string>)[provider] ?? provider;
+}
+
+/**
+ * The label of a provider button. When the provider is the only way to
+ * sign in, the button carries the full call to action; in a chooser the
+ * provider's name is enough, as it sits under a heading.
+ */
+export function providerButtonLabel(provider: string, solo: boolean): string {
+    const name = providerName(provider);
+    return solo ? `Sign in with ${name}` : name;
+}

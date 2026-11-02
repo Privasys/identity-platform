@@ -17,6 +17,7 @@
 
 import { AuthUI } from './ui';
 import { FRAME_SIZE_MESSAGE } from './frame-size';
+import { sanitiseProviders, selectProviders } from './providers';
 import type { AuthUIConfig, SignInResult } from './ui';
 import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
 import type { AuthSession } from './types';
@@ -284,6 +285,8 @@ function sanitiseMethods(raw: unknown): AuthUIConfig['methods'] {
     const out = KNOWN_METHODS.filter((m) => raw.includes(m));
     return out.length ? out : undefined;
 }
+
+// `providers` narrows the social list to a closed vocabulary; see providers.ts.
 
 function sanitisePresentation(raw: unknown): AuthUIConfig['presentation'] {
     return raw === 'inline' || raw === 'page' || raw === 'modal' ? raw : undefined;
@@ -943,6 +946,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
             caps?: string[];
             billingGrant?: string;
             attributes?: readonly string[];
+            /** Adopter preference for the social providers; sanitised below. */
+            providers?: unknown;
         } = data.config;
         const parentOrigin = e.origin;
         // The inline frame reports its content height so the embedding page
@@ -978,6 +983,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // supported, deliberately degraded mode (no attestation
         // verification) — never blanket-blocked.
         const methods = sanitiseMethods(config.methods);
+        // The adopter's preferred external identity providers, applied to
+        // the list the IdP publishes once it has been fetched below.
+        const providers = sanitiseProviders(config.providers);
 
         // Connect-mode approve: an existing wallet session whose sealed
         // voucher the enclave refused (measurement change) or that has no
@@ -1288,7 +1296,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         const provResp = await fetch(`${idpBase}/auth/social/providers`);
                         if (provResp.ok) {
                             const provData = await provResp.json();
-                            socialProviders = provData.providers ?? [];
+                            socialProviders = selectProviders(provData.providers ?? [], providers);
+                            if (providers && socialProviders.length === 0) {
+                                console.warn(
+                                    '[privasys] none of the requested providers',
+                                    providers, 'is configured at the identity provider',
+                                );
+                            }
                         }
                     } catch { /* social not available, that's fine */ }
                 }

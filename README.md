@@ -16,6 +16,7 @@ A monorepo for Privasys authentication: the **Privasys Wallet** mobile app, the 
 - **`WebAuthnClient`** — Browser-native WebAuthn passkeys (Tier 2: platform authenticators)
 - **`SessionManager`** — Session persistence and restore via `getSession()` / `clearSession()`
 - **`AuthFrame`** — Hidden iframe on `privasys.id` for cross-origin session management
+  - `methods` picks the sign-in methods (`wallet`, `passkey`, `social`); `providers` narrows the social list, so `methods: ['social'], providers: ['microsoft']` shows a single "Sign in with Microsoft" button and no chooser
 - **IIFE bundle** — `privasys-auth.iife.js` (~9KB) for vanilla JS embedding via `window.Privasys`
 
 ### Wallet Features

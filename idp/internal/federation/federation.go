@@ -31,7 +31,7 @@ import (
 
 const (
 	// KindCertificate is a certificate credential: the token exchange is
-	// signed by a key generated in the KMS. Nothing is shared.
+	// signed by a key generated here. Nothing is shared.
 	KindCertificate = "certificate"
 	// KindSecret is a client secret the customer hands over, kept wrapped.
 	KindSecret = "secret"
@@ -401,7 +401,7 @@ func (s *Service) credentialFor(entry *Entry, tokenURL string) func(ctx context.
 }
 
 // assertion builds the private_key_jwt the token endpoint verifies against the
-// certificate the customer uploaded. The KMS signs it, once per sign-in.
+// certificate the customer uploaded, once per sign-in.
 func (s *Service) assertion(ctx context.Context, cert *Certificate, clientID, tokenURL string) (string, error) {
 	b64 := base64.RawURLEncoding.EncodeToString
 	hdr, _ := json.Marshal(map[string]string{"alg": "RS256", "typ": "JWT", "x5t": cert.Thumbprint})
@@ -423,17 +423,17 @@ func (s *Service) assertion(ctx context.Context, cert *Certificate, clientID, to
 	return input + "." + b64(sig), nil
 }
 
-// kmsSigner lets x509 sign a certificate with a key that stays in the KMS.
-type kmsSigner struct {
+// serviceSigner lets x509 sign a certificate with a key the KeyService holds.
+type serviceSigner struct {
 	ctx  context.Context
 	keys KeyService
 	ref  string
 	pub  *rsa.PublicKey
 }
 
-func (k kmsSigner) Public() crypto.PublicKey { return k.pub }
+func (k serviceSigner) Public() crypto.PublicKey { return k.pub }
 
-func (k kmsSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+func (k serviceSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	if opts.HashFunc() != crypto.SHA256 {
 		return nil, errors.New("only SHA-256 signing is available")
 	}
@@ -464,7 +464,7 @@ func (s *Service) generateCertificate(ctx context.Context, clientID, provider, u
 		KeyUsage:           x509.KeyUsageDigitalSignature,
 		SignatureAlgorithm: x509.SHA256WithRSA,
 	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, pub, kmsSigner{ctx: ctx, keys: s.keys, ref: ref, pub: pub})
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, pub, serviceSigner{ctx: ctx, keys: s.keys, ref: ref, pub: pub})
 	if err != nil {
 		s.destroy(ctx, ref)
 		return nil, fmt.Errorf("certificate: %w", err)
@@ -479,7 +479,7 @@ func (s *Service) generateCertificate(ctx context.Context, clientID, provider, u
 }
 
 // seal envelope-encrypts a secret: a fresh data key encrypts it here, and the
-// KMS wraps the data key, so the row never holds anything usable by itself.
+// KeyService wraps the data key, so the row never holds anything usable by itself.
 func (s *Service) seal(ctx context.Context, secret []byte) (string, error) {
 	dek := make([]byte, 32)
 	if _, err := rand.Read(dek); err != nil {

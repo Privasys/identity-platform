@@ -94,7 +94,7 @@ func TestCertificateCredential(t *testing.T) {
 	if err := cert.CheckSignatureFrom(cert); err != nil {
 		// A self-signed leaf is not a CA, so check the signature itself.
 		if err := cert.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature); err != nil {
-			t.Fatalf("self-signed by the KMS key: %v", err)
+			t.Fatalf("self-signed by the generated key: %v", err)
 		}
 	}
 	if got := time.Until(cert.NotAfter); got < 729*24*time.Hour || got > 731*24*time.Hour {

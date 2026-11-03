@@ -401,3 +401,36 @@ func TestEmailVerifiedOnTheCode(t *testing.T) {
 		})
 	}
 }
+
+func TestMicrosoftProvedEmail(t *testing.T) {
+	token := func(claims map[string]any) string {
+		body, _ := json.Marshal(claims)
+		return "e30." + base64.RawURLEncoding.EncodeToString(body) + ".sig"
+	}
+	const oid = "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b"
+	for name, c := range map[string]struct {
+		claims map[string]any
+		want   bool
+	}{
+		"bool":         {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": true}, true},
+		"string":       {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": "1"}, true},
+		"number":       {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": 1}, true},
+		"not proved":   {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": false}, false},
+		"zero":         {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": "0"}, false},
+		"no claim":     {map[string]any{"oid": oid, "email": "a@gov.example"}, false},
+		"no address":   {map[string]any{"oid": oid, "xms_edov": true}, false},
+		"other person": {map[string]any{"oid": "someone-else", "email": "a@gov.example", "xms_edov": true}, false},
+		"no oid":       {map[string]any{"email": "a@gov.example", "xms_edov": true}, false},
+	} {
+		if addr, ok := microsoftProvedEmail(token(c.claims), oid); ok != c.want || (ok && addr != "a@gov.example") {
+			t.Errorf("%s: %q %v, want %v", name, addr, ok, c.want)
+		}
+	}
+	personal := token(map[string]any{"oid": "00000000-0000-0000-66f3-3332eca7ea81", "email": "a@outlook.example", "xms_edov": true})
+	if addr, ok := microsoftProvedEmail(personal, "66f33332eca7ea81"); !ok || addr != "a@outlook.example" {
+		t.Errorf("a personal account's two id spellings: %q %v", addr, ok)
+	}
+	if _, ok := microsoftProvedEmail("not-a-token", oid); ok {
+		t.Error("garbage must prove nothing")
+	}
+}

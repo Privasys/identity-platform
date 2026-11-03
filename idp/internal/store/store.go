@@ -348,6 +348,7 @@ func migrate(db *sql.DB) error {
 		// this identity provider is configured with; a list is enforced on
 		// the social start path, so a page cannot widen it.
 		{"social_providers", "ALTER TABLE clients ADD COLUMN social_providers TEXT NOT NULL DEFAULT '[]'"},
+		{"federation", "ALTER TABLE clients ADD COLUMN federation TEXT NOT NULL DEFAULT ''"},
 	} {
 		if !clientCols[add.col] {
 			if _, err = db.Exec(add.ddl); err != nil {

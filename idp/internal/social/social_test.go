@@ -4,9 +4,11 @@
 package social
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -252,5 +254,103 @@ func TestClientPolicy_RestrictsStartAndListing(t *testing.T) {
 	}
 	if got := list("?client_id=open"); len(got) != 2 {
 		t.Fatalf("an unrestricted client lists everything: %v", got)
+	}
+}
+
+// A client's own registration: the start path sends the person to its
+// endpoints with its upstream client id, the callback exchanges there with its
+// credential and no platform secret, and another client stays on the platform's.
+func TestFederatedRegistration(t *testing.T) {
+	var form url.Values
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			r.ParseForm()
+			form = r.PostForm
+			json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
+		case "/me":
+			json.NewEncoder(w).Encode(map[string]string{"id": "directory-id", "mail": "ada@example.com"})
+		}
+	}))
+	defer upstream.Close()
+
+	providers := NewProviders()
+	providers.Register(&Provider{Name: "microsoft", ClientID: "platform-id", ClientSecret: "platform-secret",
+		AuthURL: upstream.URL + "/platform-auth", TokenURL: upstream.URL + "/platform-token", UserInfoURL: upstream.URL + "/me", PKCE: true})
+	sessions := oidc.NewSessionStore()
+	exp := time.Now().Add(time.Minute)
+	sess, other := &oidc.AuthSession{SessionID: "own-session", ClientID: "own-client", ExpiresAt: exp}, &oidc.AuthSession{SessionID: "other-session", ClientID: "other-client", ExpiresAt: exp}
+	sessions.Create(sess)
+	sessions.Create(other)
+	h := NewHandler(providers, oidc.NewCodeStore(), sessions, "https://idp.example")
+	h.SetFederation(func(clientID, provider string, base *Provider) (*Provider, error) {
+		if clientID != "own-client" {
+			return nil, nil
+		}
+		p := *base
+		p.ClientID, p.ClientSecret = "customer-id", ""
+		p.AuthURL, p.TokenURL = upstream.URL+"/auth", upstream.URL+"/token"
+		p.Credential = func(_ context.Context, f url.Values) error { f.Set("client_assertion", "signed"); return nil }
+		return &p, nil
+	}, func(clientID string) map[string]string {
+		if clientID == "own-client" {
+			return map[string]string{"microsoft": "Contoso"}
+		}
+		return nil
+	})
+
+	start := func(sid string) *url.URL {
+		rec := httptest.NewRecorder()
+		h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider=microsoft&session_id="+sid, nil))
+		if rec.Code != http.StatusFound {
+			t.Fatalf("start: %d %s", rec.Code, rec.Body)
+		}
+		u, _ := url.Parse(rec.Header().Get("Location"))
+		return u
+	}
+	own := start(sess.SessionID)
+	if own.Query().Get("client_id") != "customer-id" || !strings.HasSuffix(own.Path, "/auth") {
+		t.Fatalf("start path: %s", own)
+	}
+	plat := start(other.SessionID)
+	if plat.Query().Get("client_id") != "platform-id" || !strings.HasSuffix(plat.Path, "/platform-auth") {
+		t.Fatalf("another client: %s", plat)
+	}
+
+	rec := httptest.NewRecorder()
+	h.HandleCallback(rec, httptest.NewRequest("GET", "/auth/social/callback?code=x&state="+own.Query().Get("state"), nil))
+	if form == nil {
+		t.Fatalf("no exchange at the client's token endpoint: %d %s", rec.Code, rec.Body)
+	}
+	if form.Get("client_id") != "customer-id" || form.Get("client_assertion") != "signed" || form.Has("client_secret") {
+		t.Fatalf("exchange: %v", form)
+	}
+
+	rec = httptest.NewRecorder()
+	h.HandleProviders(rec, httptest.NewRequest("GET", "/auth/social/providers?client_id=own-client", nil))
+	if !strings.Contains(rec.Body.String(), "Contoso") {
+		t.Fatalf("listing: %s", rec.Body)
+	}
+	rec = httptest.NewRecorder()
+	h.HandleProviders(rec, httptest.NewRequest("GET", "/auth/social/providers?client_id=other-client", nil))
+	if strings.Contains(rec.Body.String(), "display_names") {
+		t.Fatalf("listing for another client: %s", rec.Body)
+	}
+
+	// The restriction composes: an entry does not widen the client's list.
+	h.SetClientPolicy(func(string) []string { return []string{"github"} })
+	rec = httptest.NewRecorder()
+	h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider=microsoft&session_id="+sess.SessionID, nil))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("outside the list: %d", rec.Code)
+	}
+
+	// A broken entry refuses, it never falls back to the platform's registration.
+	h.SetClientPolicy(nil)
+	h.SetFederation(func(string, string, *Provider) (*Provider, error) { return nil, errors.New("broken") }, nil)
+	rec = httptest.NewRecorder()
+	h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider=microsoft&session_id="+sess.SessionID, nil))
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("broken entry: %d", rec.Code)
 	}
 }

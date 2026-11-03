@@ -42,6 +42,7 @@ import (
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/config"
 	"github.com/Privasys/idp/internal/emailverify"
+	"github.com/Privasys/idp/internal/federation"
 	"github.com/Privasys/idp/internal/fido2"
 	"github.com/Privasys/idp/internal/notifymute"
 	"github.com/Privasys/idp/internal/oidc"
@@ -388,6 +389,13 @@ func main() {
 	// A client's registration is the ceiling on the providers its users may
 	// sign in with; the page's preference can only narrow it.
 	socialHandler.SetClientPolicy(clientReg.SocialProvidersOf)
+	// A client may bring its own upstream registration for a provider.
+	federationSvc := federation.NewService(clientReg, federation.ResolveKeyService())
+	socialHandler.SetFederation(federationSvc.ProviderFor, federationSvc.DisplayNames)
+	mux.HandleFunc("POST /clients/{id}/federation/{provider}", federationSvc.HandleSet(cfg.AdminToken))
+	mux.HandleFunc("POST /clients/{id}/federation/{provider}/confirm", federationSvc.HandleConfirm(cfg.AdminToken))
+	mux.HandleFunc("GET /clients/{id}/federation", federationSvc.HandleList(cfg.AdminToken))
+	mux.HandleFunc("GET /admin/federation/expiries", federationSvc.HandleExpiries(cfg.AdminToken))
 	mux.HandleFunc("GET /auth/social", socialHandler.HandleRedirect)
 	mux.HandleFunc("GET /auth/social/callback", socialHandler.HandleCallback)
 	mux.HandleFunc("GET /auth/social/providers", socialHandler.HandleProviders)

@@ -70,7 +70,20 @@ export function providerName(provider: string): string {
  * sign in, the button carries the full call to action; in a chooser the
  * provider's name is enough, as it sits under a heading.
  */
-export function providerButtonLabel(provider: string, solo: boolean): string {
+export function providerButtonLabel(provider: string, solo: boolean, displayName?: string): string {
+    // A client with its own registration names it (its organisation), which
+    // only reads as a call to action.
+    if (displayName) return `Sign in with ${displayName}`;
     const name = providerName(provider);
     return solo ? `Sign in with ${name}` : name;
+}
+
+/** The identity provider's display names, reduced to plain short strings. */
+export function sanitiseDisplayNames(raw: unknown): Record<string, string> | undefined {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (typeof v === 'string' && v.trim() && v.length <= 64) out[k] = v.trim();
+    }
+    return Object.keys(out).length ? out : undefined;
 }

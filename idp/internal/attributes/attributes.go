@@ -339,9 +339,20 @@ func NormalizeClaims(provider string, raw map[string]interface{}) (attrs map[str
 		return
 	}
 
-	// Extract user ID from the provider-specific claim.
-	if v, ok := raw[prov.IDClaim]; ok {
+	// Extract user ID from the provider-specific claim. A provider's user
+	// info can come from more than one endpoint (Microsoft's OIDC userinfo
+	// says "sub", Microsoft Graph's /me says "id"), so when the configured
+	// claim is absent the common identifier fields stand in: a person who
+	// signed in must never be turned away for the shape of the reply.
+	if v, ok := raw[prov.IDClaim]; ok && fmt.Sprintf("%v", v) != "" {
 		userID = fmt.Sprintf("%v", v)
+	} else {
+		for _, k := range []string{"sub", "id", "user_id"} {
+			if v, ok := raw[k]; ok && fmt.Sprintf("%v", v) != "" {
+				userID = fmt.Sprintf("%v", v)
+				break
+			}
+		}
 	}
 
 	// Map provider claims to canonical keys.

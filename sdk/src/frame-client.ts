@@ -723,6 +723,10 @@ export class AuthFrame {
                     'This app requires the Privasys Wallet: the sign-in method used cannot open a sealed channel to it.');
             }
             const accessToken = result.accessToken ?? result.sessionToken;
+            // The gate's frame is gone once it has signed the person in; the
+            // persistent session frame takes over, so that audience tokens
+            // (a direct name's bearer transport) can be minted straight away.
+            if (!session) await this.getSession().catch(() => null);
             return { accessToken, session, result };
         } catch (err) {
             if (err instanceof ConnectError) throw err;
@@ -1551,7 +1555,11 @@ export class AuthFrame {
      *
      * Requires an active session — call {@link AuthFrame.getSession} first.
      */
-    getTokenForAudience(audience: string): Promise<string> {
+    async getTokenForAudience(audience: string): Promise<string> {
+        // The session iframe is what carries the request. A sign-in that has
+        // just completed tore its own frame down, so mount (or re-mount) the
+        // session frame here rather than send the caller back to getSession().
+        if (!this.sessionIframe?.contentWindow) await this.getSession();
         return new Promise((resolve, reject) => {
             if (!this.sessionIframe?.contentWindow) {
                 reject(new Error('no active session iframe; call getSession() first'));

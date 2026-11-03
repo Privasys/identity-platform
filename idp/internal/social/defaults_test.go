@@ -1,6 +1,7 @@
 package social
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -42,4 +43,19 @@ func TestDefaultProviders_IDClaimMatchesEndpoint(t *testing.T) {
 			t.Errorf("%s: user-info endpoint must be https", p.Name)
 		}
 	}
+}
+
+// A personal Microsoft account gets only the scopes the sign-in names, and
+// Graph answers 403 to its /me without User.Read.
+func TestDefaultProviders_MicrosoftAsksForUserRead(t *testing.T) {
+	for _, p := range DefaultProviders(Credentials{}) {
+		if p.Name != "microsoft" {
+			continue
+		}
+		if !slices.Contains(p.Scopes, "User.Read") {
+			t.Fatalf("scopes %v", p.Scopes)
+		}
+		return
+	}
+	t.Fatal("no microsoft provider")
 }

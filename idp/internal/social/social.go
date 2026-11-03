@@ -556,7 +556,7 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	})
 	h.sessions.Complete(entry.sessionID, userID, authCode)
 
-	log.Printf("social/%s: authenticated user %s (session %s, %d attrs)", entry.provider, userID, entry.sessionID, len(attrs))
+	log.Printf("social/%s: authenticated user %s (session %s, %d attrs, email proved %v)", entry.provider, userID, entry.sessionID, len(attrs), emailVerified)
 
 	h.callbackSuccess(w)
 }
@@ -713,8 +713,7 @@ func (h *Handler) HandleWalletLinkResult(w http.ResponseWriter, r *http.Request)
 }
 
 // microsoftProvedEmail reads Entra's xms_edov claim: the address in this ID
-// token is on a domain its tenant has verified, or belongs to a personal account
-// verified when it was created. Graph has no such statement, and any tenant's
+// token is on a domain its tenant has verified. Graph has no such statement, and any tenant's
 // administrator can set a user's "mail", so this is the only proof Microsoft
 // gives. The address comes from the token, since the claim is about that one.
 //

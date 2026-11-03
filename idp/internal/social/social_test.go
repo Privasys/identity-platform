@@ -354,3 +354,50 @@ func TestFederatedRegistration(t *testing.T) {
 		t.Fatalf("broken entry: %d", rec.Code)
 	}
 }
+
+// Graph says nothing about an address, so Microsoft's platform registration
+// proves none; a registration that vouches does, and Google's own claim counts.
+func TestEmailVerifiedOnTheCode(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
+		case "/graph":
+			json.NewEncoder(w).Encode(map[string]string{"id": "directory-id", "mail": "ada@example.com"})
+		case "/google":
+			json.NewEncoder(w).Encode(map[string]any{"sub": "g1", "email": "ada@example.com", "email_verified": true})
+		}
+	}))
+	defer upstream.Close()
+
+	for _, c := range []struct {
+		name, provider, info string
+		vouches, want        bool
+	}{
+		{"platform registration", "microsoft", "/graph", false, false},
+		{"own tenant", "microsoft", "/graph", true, true},
+		{"provider's claim", "google", "/google", false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			providers := NewProviders()
+			providers.Register(&Provider{Name: c.provider, ClientID: "id", ClientSecret: "s", AuthURL: upstream.URL + "/auth",
+				TokenURL: upstream.URL + "/token", UserInfoURL: upstream.URL + c.info, VouchesEmail: c.vouches})
+			sessions, codes := oidc.NewSessionStore(), oidc.NewCodeStore()
+			sessions.Create(&oidc.AuthSession{SessionID: "s1", ClientID: "c1", ExpiresAt: time.Now().Add(time.Minute)})
+			h := NewHandler(providers, codes, sessions, "https://idp.example")
+			rec := httptest.NewRecorder()
+			h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider="+c.provider+"&session_id=s1", nil))
+			loc, _ := url.Parse(rec.Header().Get("Location"))
+			rec = httptest.NewRecorder()
+			h.HandleCallback(rec, httptest.NewRequest("GET", "/auth/social/callback?code=x&state="+loc.Query().Get("state"), nil))
+			session, _ := sessions.Get("s1")
+			ac, ok := codes.Consume(session.AuthCode)
+			if !ok {
+				t.Fatalf("no code: %d %s", rec.Code, rec.Body)
+			}
+			if ac.EmailVerified != c.want {
+				t.Fatalf("verified %v, want %v", ac.EmailVerified, c.want)
+			}
+		})
+	}
+}

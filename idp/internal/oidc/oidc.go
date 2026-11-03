@@ -324,6 +324,10 @@ type AuthCode struct {
 	// Never persisted to any database. Keyed by OIDC claim name (e.g. "email", "name").
 	Attributes map[string]string
 
+	// EmailVerified says the provider that supplied Attributes["email"] proved
+	// it. A wallet's address is proved by its receipt instead.
+	EmailVerified bool
+
 	// SessionRelay carries per-request browser→enclave session metadata
 	// captured by the wallet during a `mode:"session-relay"` flow. Forwarded
 	// verbatim into the issued ID token under the `session` and `att_*`
@@ -399,6 +403,15 @@ func (cs *CodeStore) Consume(code string) (*AuthCode, bool) {
 // Used when the wallet relay delivers attributes after FIDO2 already created
 // the code (the FIDO2 handler creates the code without attributes; the relay
 // delivers them asynchronously via /session/complete).
+// SetEmailVerified records whether the address patched onto a code was proved.
+func (cs *CodeStore) SetEmailVerified(code string, verified bool) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	if ac, ok := cs.codes[code]; ok {
+		ac.EmailVerified = verified
+	}
+}
+
 func (cs *CodeStore) UpdateAttributes(code string, attrs map[string]string) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -1297,7 +1310,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	// value of its own.
 	emailVerified := false
 	if addr := filteredAttrs["email"]; addr != "" {
-		emailVerified = issuer.EmailReceiptProves(attrs[emailReceiptAttribute], ac.UserID, addr)
+		emailVerified = ac.EmailVerified || issuer.EmailReceiptProves(attrs[emailReceiptAttribute], ac.UserID, addr)
 	}
 
 	idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{
@@ -1330,6 +1343,11 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 			filteredAttrs = map[string]string{}
 		}
 		filteredAttrs["wallet"] = "true"
+	}
+	// The runtime in front of an app forwards a verified address only, and it
+	// reads the access token.
+	if emailVerified {
+		filteredAttrs["email_verified"] = "true"
 	}
 
 	// Issue access token (with roles and profile).

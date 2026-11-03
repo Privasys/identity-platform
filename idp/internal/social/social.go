@@ -46,6 +46,12 @@ type Provider struct {
 	// Credential, when set, authenticates the token exchange instead of
 	// ClientSecret (a client's own registration: internal/federation).
 	Credential func(ctx context.Context, form url.Values) error
+	// VouchesEmail says this registration answers for the addresses it
+	// returns, whatever the reply says: a customer's own registration on its
+	// own tenant, where the directory is the customer's. Graph's "mail" through
+	// a multi-tenant registration proves nothing, since any tenant's
+	// administrator can set it to any address.
+	VouchesEmail bool
 }
 
 // Providers maps provider names to their configuration.
@@ -502,6 +508,8 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	emailVerified := prov.VouchesEmail || providerVerified(entry.provider, raw)["email"]
+
 	// Complete the OIDC session.
 	session, ok := h.sessions.Get(entry.sessionID)
 	if !ok {
@@ -519,6 +527,7 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.codes.UpdateAttributes(session.AuthCode, attrs)
+		h.codes.SetEmailVerified(session.AuthCode, emailVerified)
 		log.Printf("social/%s: patched %d attributes on existing code for session %s",
 			entry.provider, len(attrs), entry.sessionID)
 		h.callbackSuccess(w)
@@ -536,6 +545,7 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		CodeChallengeMethod: session.CodeChallengeMethod,
 		AuthTime:            time.Now(),
 		Attributes:          attrs,
+		EmailVerified:       emailVerified,
 	})
 	h.sessions.Complete(entry.sessionID, userID, authCode)
 

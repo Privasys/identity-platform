@@ -354,7 +354,19 @@ func (s *Service) ProviderFor(clientID, provider string, base *social.Provider) 
 	login := "https://login.microsoftonline.com/" + url.PathEscape(entry.Tenant) + "/oauth2/v2.0/"
 	p.AuthURL, p.TokenURL = login+"authorize", login+"token"
 	p.Credential = s.credentialFor(entry, p.TokenURL)
+	p.VouchesEmail = ownDirectory(entry.Tenant)
 	return &p, nil
+}
+
+// ownDirectory says a registration is limited to one named tenant, whose
+// directory is the customer's own. Microsoft's shared endpoints admit other
+// tenants, whose administrators can set an address to anything.
+func ownDirectory(tenant string) bool {
+	switch strings.ToLower(tenant) {
+	case "common", "organizations", "consumers":
+		return false
+	}
+	return true
 }
 
 // credentialFor authenticates a token exchange. The secret is decrypted here,

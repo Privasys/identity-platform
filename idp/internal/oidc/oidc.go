@@ -1239,7 +1239,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 		// platform: its token is for itself alone, and carries none of the
 		// account's roles. The platform audience stays with first-party
 		// control-plane clients (Client.Platform) and legacy clients.
-		audience = ac.ClientID
+		audience = ownClientAudience(audience, ac.ClientID, reg.AppIDsOf(ac.ClientID))
 		roles = nil
 	} else if audience == "privasys-platform" {
 		// The platform keys accounts by this, never by an app's subject.
@@ -1467,7 +1467,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	audience := audienceFromScope(effectiveScope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
 	if reg.SectorOf(clientID) != "" && !reg.IsPlatform(clientID) {
-		audience = clientID
+		audience = ownClientAudience(audience, clientID, reg.AppIDsOf(clientID))
 		roles = nil
 	} else if audience == "privasys-platform" {
 		if filteredRefreshAttrs == nil {
@@ -1716,6 +1716,22 @@ func verifyPKCE(challenge, verifier string) bool {
 	h := sha256.Sum256([]byte(verifier))
 	computed := base64.RawURLEncoding.EncodeToString(h[:])
 	return computed == challenge
+}
+
+// ownClientAudience is the audience of a token for a client with its own
+// subjects: the client itself, or an attested app it stands for when it asks
+// for "app:<app id>". The registered binding is what allows that, so a client
+// can never mint for an app that is not its own; the runtime in front of the
+// app accepts that audience and no other app's.
+func ownClientAudience(requested, clientID string, appIDs []string) string {
+	if id, ok := strings.CutPrefix(requested, "app:"); ok {
+		for _, a := range appIDs {
+			if a == id {
+				return requested
+			}
+		}
+	}
+	return clientID
 }
 
 // audienceFromScope extracts the explicit `audience:<X>` token from an OIDC

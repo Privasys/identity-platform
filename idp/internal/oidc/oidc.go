@@ -1624,6 +1624,12 @@ func issueRefreshToken(db *store.DB, userID, clientID, scope, sid string) (strin
 	token := base64.RawURLEncoding.EncodeToString(b)
 	tokenHash := hashRefreshToken(token)
 
+	// The person may have signed in through a federated identity, which
+	// creates no account of its own: give them a users row so the refresh
+	// token's foreign key holds.
+	if err := db.EnsureUser(userID); err != nil {
+		return "", err
+	}
 	err := db.StoreRefreshTokenWithSID(tokenHash, userID, clientID, scope, sid, time.Now().Add(refreshTokenTTL))
 	if err != nil {
 		return "", err

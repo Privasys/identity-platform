@@ -377,48 +377,11 @@ func main() {
 
 	// Social IdP federation.
 	socialProviders := social.NewProviders()
-	socialProviders.Register(&social.Provider{
-		Name: "github", DisplayName: "GitHub",
-		AuthURL:      "https://github.com/login/oauth/authorize",
-		TokenURL:     "https://github.com/login/oauth/access_token",
-		UserInfoURL:  "https://api.github.com/user",
-		ClientID:     cfg.GitHubClientID,
-		ClientSecret: cfg.GitHubClientSecret,
-		Scopes:       []string{"read:user", "user:email"},
-		PKCE:         true,
-	})
-	socialProviders.Register(&social.Provider{
-		Name: "google", DisplayName: "Google",
-		AuthURL:      "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL:     "https://oauth2.googleapis.com/token",
-		UserInfoURL:  "https://www.googleapis.com/oauth2/v3/userinfo",
-		ClientID:     cfg.GoogleClientID,
-		ClientSecret: cfg.GoogleClientSecret,
-		Scopes:       []string{"openid", "email", "profile"},
-		PKCE:         true,
-	})
-	socialProviders.Register(&social.Provider{
-		Name: "microsoft", DisplayName: "Microsoft",
-		AuthURL:      "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-		TokenURL:     "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-		UserInfoURL:  "https://graph.microsoft.com/v1.0/me",
-		ClientID:     cfg.MicrosoftClientID,
-		ClientSecret: cfg.MicrosoftClientSecret,
-		Scopes:       []string{"openid", "email", "profile"},
-		PKCE:         true,
-	})
-	socialProviders.Register(&social.Provider{
-		Name: "linkedin", DisplayName: "LinkedIn",
-		AuthURL:      "https://www.linkedin.com/oauth/v2/authorization",
-		TokenURL:     "https://www.linkedin.com/oauth/v2/accessToken",
-		UserInfoURL:  "https://api.linkedin.com/v2/userinfo",
-		ClientID:     cfg.LinkedInClientID,
-		ClientSecret: cfg.LinkedInClientSecret,
-		Scopes:       []string{"openid", "profile", "email"},
-		// LinkedIn is a confidential client and does not support PKCE; it
-		// authenticates with the client secret only. Sending a code_verifier
-		// makes LinkedIn reject the token exchange as invalid_client.
-		PKCE: false,
+	social.RegisterDefaults(socialProviders, social.Credentials{
+		GitHubClientID: cfg.GitHubClientID, GitHubClientSecret: cfg.GitHubClientSecret,
+		GoogleClientID: cfg.GoogleClientID, GoogleClientSecret: cfg.GoogleClientSecret,
+		MicrosoftClientID: cfg.MicrosoftClientID, MicrosoftClientSecret: cfg.MicrosoftClientSecret,
+		LinkedInClientID: cfg.LinkedInClientID, LinkedInClientSecret: cfg.LinkedInClientSecret,
 	})
 
 	socialHandler := social.NewHandler(socialProviders, codeStore, sessionStore, cfg.IssuerURL)

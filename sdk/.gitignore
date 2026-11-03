@@ -1,1 +1,5 @@
 .test/
+
+# Gate check output
+test-results/
+playwright-report/

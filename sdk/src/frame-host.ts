@@ -18,6 +18,7 @@
 import { AuthUI } from './ui';
 import { FRAME_SIZE_MESSAGE } from './frame-size';
 import { sanitiseProviders, selectProviders } from './providers';
+import { sanitiseTheme } from './theme';
 import type { AuthUIConfig, SignInResult } from './ui';
 import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
 import type { AuthSession } from './types';
@@ -283,6 +284,11 @@ const KNOWN_METHODS = ['wallet', 'passkey', 'social'] as const;
 type KnownMethod = (typeof KNOWN_METHODS)[number];
 // The adopter's list is an order as well as a filter (gate.ts), so it is
 // kept as given, less anything unknown or repeated.
+function sanitiseAudience(raw: unknown): string | undefined {
+    if (typeof raw !== 'string') return undefined;
+    return /^[A-Za-z0-9._:-]{1,253}$/.test(raw) ? raw : undefined;
+}
+
 function sanitiseMethods(raw: unknown): AuthUIConfig['methods'] {
     if (!Array.isArray(raw)) return undefined;
     const out: KnownMethod[] = [];
@@ -480,6 +486,16 @@ function tokenExpMs(token: string): number | null {
 }
 
 /** Check whether an access token's exp claim is within a safety margin. */
+function tokenAudienceIs(token: string, audience: string): boolean {
+    try {
+        const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const aud = JSON.parse(atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '='))).aud;
+        return Array.isArray(aud) ? aud.includes(audience) : aud === audience;
+    } catch {
+        return false;
+    }
+}
+
 function isTokenExpired(token: string, marginMs = 30_000): boolean {
     const exp = tokenExpMs(token);
     if (exp === null) return false;
@@ -952,6 +968,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
             caps?: string[];
             billingGrant?: string;
             attributes?: readonly string[];
+            /** Adopter theme and footer choice; sanitised below. */
+            theme?: unknown;
+            legal?: unknown;
+            /** The audience of the first access token; sanitised below. */
+            audience?: unknown;
             /** Adopter preference for the social providers; sanitised below. */
             providers?: unknown;
         } = data.config;
@@ -982,6 +1003,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const presentation = sanitisePresentation(config.presentation);
         const pitch = sanitisePitch(config.pitch);
         const app = sanitiseApp(config.app);
+        const theme = sanitiseTheme(config.theme);
+        const legal = config.legal === false ? false : undefined;
         // The adopter's explicit choice of methods; when absent, the
         // OIDC path below additionally filters methods by ATTRIBUTE
         // capability (a method that cannot deliver what the app marked
@@ -1020,6 +1043,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     presentation,
                     app,
                     pitch,
+                    theme,
+                    legal,
                     approveFlow: {
                         appLabel,
                         reason: config.connect.reason ?? null,
@@ -1128,7 +1153,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 authorizeUrl.searchParams.set('code_challenge', codeChallenge);
                 authorizeUrl.searchParams.set('code_challenge_method', 'S256');
                 const scopeStr = Array.isArray(config.scope) ? config.scope.join(' ') : (config.scope || 'openid offline_access');
-                authorizeUrl.searchParams.set('scope', scopeStr);
+                // The first token is the only one the identity provider can
+                // put the person's profile in (it keeps none to renew from),
+                // so a page that needs an audience token asks for it here
+                // rather than minting one by refresh after the sign-in.
+                const audience = sanitiseAudience(config.audience);
+                authorizeUrl.searchParams.set('scope', audience ? `audience:${audience} ${scopeStr}` : scopeStr);
                 authorizeUrl.searchParams.set('response_mode', 'json');
                 // A billing grant redirects the cost of any paid attribute
                 // disclosure from this app's owner to the user who issued the
@@ -1237,6 +1267,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         presentation,
                         app,
                         pitch,
+                    theme,
+                    legal,
                         approveFlow: {
                             appLabel,
                             reason: 'attributes-widened',
@@ -1400,6 +1432,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     presentation,
                     app,
                     pitch,
+                    theme,
+                    legal,
                     methods: effectiveMethods,
                     onNavigate,
                     approveFlow: undefined,
@@ -1583,6 +1617,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
             presentation,
             app,
             pitch,
+            theme,
+            legal,
             methods,
             onNavigate,
             approveFlow: undefined,
@@ -1686,6 +1722,14 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const audience = String(data.audience || '').trim();
         if (!audience) {
             reply({ error: 'audience required' });
+            return;
+        }
+        // The first token already made for this audience is still good: it is
+        // the one carrying the profile, and a refresh would only replace it
+        // with one that does not.
+        if (session.token && tokenAudienceIs(session.token, audience) && !isTokenExpired(session.token)) {
+            const exp = tokenExpMs(session.token);
+            reply({ accessToken: session.token, expiresIn: exp === null ? 0 : Math.floor((exp - Date.now()) / 1000) });
             return;
         }
         try {

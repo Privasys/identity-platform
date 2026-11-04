@@ -297,6 +297,11 @@ func TestFederatedRegistration(t *testing.T) {
 			return map[string]string{"microsoft": "Contoso"}
 		}
 		return nil
+	}, func(clientID string) map[string]string {
+		if clientID == "own-client" {
+			return map[string]string{"microsoft": "https://contoso.example/crest.svg"}
+		}
+		return nil
 	})
 
 	start := func(sid string) *url.URL {
@@ -328,12 +333,12 @@ func TestFederatedRegistration(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	h.HandleProviders(rec, httptest.NewRequest("GET", "/auth/social/providers?client_id=own-client", nil))
-	if !strings.Contains(rec.Body.String(), "Contoso") {
+	if !strings.Contains(rec.Body.String(), "Contoso") || !strings.Contains(rec.Body.String(), `"icons":{"microsoft":"https://contoso.example/crest.svg"}`) {
 		t.Fatalf("listing: %s", rec.Body)
 	}
 	rec = httptest.NewRecorder()
 	h.HandleProviders(rec, httptest.NewRequest("GET", "/auth/social/providers?client_id=other-client", nil))
-	if strings.Contains(rec.Body.String(), "display_names") {
+	if strings.Contains(rec.Body.String(), "display_names") || strings.Contains(rec.Body.String(), "icons") {
 		t.Fatalf("listing for another client: %s", rec.Body)
 	}
 
@@ -347,7 +352,7 @@ func TestFederatedRegistration(t *testing.T) {
 
 	// A broken entry refuses, it never falls back to the platform's registration.
 	h.SetClientPolicy(nil)
-	h.SetFederation(func(string, string, *Provider) (*Provider, error) { return nil, errors.New("broken") }, nil)
+	h.SetFederation(func(string, string, *Provider) (*Provider, error) { return nil, errors.New("broken") }, nil, nil)
 	rec = httptest.NewRecorder()
 	h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider=microsoft&session_id="+sess.SessionID, nil))
 	if rec.Code != http.StatusBadGateway {

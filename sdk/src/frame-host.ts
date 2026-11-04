@@ -17,7 +17,7 @@
 
 import { AuthUI } from './ui';
 import { FRAME_SIZE_MESSAGE } from './frame-size';
-import { sanitiseDisplayNames, sanitiseProviders, selectProviders } from './providers';
+import { sanitiseDisplayNames, sanitiseIcons, sanitiseProviders, selectProviders } from './providers';
 import { sanitiseTheme } from './theme';
 import type { AuthUIConfig, SignInResult } from './ui';
 import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
@@ -1330,6 +1330,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 //    the effective methods exclude social sign-in).
                 let socialProviders: string[] = [];
                 let socialDisplayNames: Record<string, string> | undefined;
+                let socialIcons: Record<string, string> | undefined;
                 if (!effectiveMethods || effectiveMethods.includes('social')) {
                     try {
                         // Named for the client, the identity provider lists only
@@ -1345,6 +1346,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                             // the frame's, not the adopter's.
                             socialProviders = selectProviders(published, providers);
                             socialDisplayNames = sanitiseDisplayNames(provData.display_names);
+                            socialIcons = sanitiseIcons(provData.icons);
                             if (providers && !providers.some((p) => published.includes(p))) {
                                 console.warn(
                                     '[privasys] none of the requested providers',
@@ -1415,6 +1417,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     deviceTrusted,
                     socialProviders,
                     socialDisplayNames,
+                    socialIcons,
                     onSocialAuth,
                     requestedAttributes,
                     attributeRequirements,

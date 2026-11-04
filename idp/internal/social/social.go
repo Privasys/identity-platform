@@ -285,6 +285,8 @@ type Handler struct {
 	federated func(clientID, provider string, base *Provider) (*Provider, error)
 	// displayNames gives the provider names a client's gate should show.
 	displayNames func(clientID string) map[string]string
+	// icons gives the icon addresses a client's gate draws on its buttons.
+	icons func(clientID string) map[string]string
 }
 
 // SetClientPolicy installs the per-client provider restriction.
@@ -293,8 +295,8 @@ func (h *Handler) SetClientPolicy(policy func(clientID string) []string) {
 }
 
 // SetFederation installs the per-client upstream registrations.
-func (h *Handler) SetFederation(federated func(clientID, provider string, base *Provider) (*Provider, error), displayNames func(clientID string) map[string]string) {
-	h.federated, h.displayNames = federated, displayNames
+func (h *Handler) SetFederation(federated func(clientID, provider string, base *Provider) (*Provider, error), displayNames, icons func(clientID string) map[string]string) {
+	h.federated, h.displayNames, h.icons = federated, displayNames, icons
 }
 
 // allowedFor reports whether a client's users may sign in with a provider.
@@ -580,6 +582,11 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 	if h.displayNames != nil && clientID != "" {
 		if dn := h.displayNames(clientID); len(dn) > 0 {
 			out["display_names"] = dn
+		}
+	}
+	if h.icons != nil && clientID != "" {
+		if ic := h.icons(clientID); len(ic) > 0 {
+			out["icons"] = ic
 		}
 	}
 	json.NewEncoder(w).Encode(out)

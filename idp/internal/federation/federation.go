@@ -42,6 +42,23 @@ const (
 
 var tenantPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]{0,99}$`)
 
+// validIconURL accepts the address of the icon a client's gate draws on its
+// button: https only, no credentials, short. The frame renders it as an
+// image, never as markup, so the address is the whole exposure.
+func validIconURL(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	if len(raw) > 512 {
+		return errors.New("icon_url is limited to 512 characters")
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+		return errors.New("icon_url must be an https address")
+	}
+	return nil
+}
+
 // Certificate is one generated key pair and its public certificate.
 type Certificate struct {
 	KeyRef     string    `json:"key_ref"`
@@ -65,6 +82,7 @@ type Entry struct {
 	ClientID    string     `json:"client_id"`
 	Tenant      string     `json:"tenant"`
 	DisplayName string     `json:"display_name,omitempty"`
+	IconURL     string     `json:"icon_url,omitempty"`
 	Credential  Credential `json:"credential"`
 }
 
@@ -73,6 +91,7 @@ type SetRequest struct {
 	ClientID    string `json:"client_id"`
 	Tenant      string `json:"tenant"`
 	DisplayName string `json:"display_name"`
+	IconURL     string `json:"icon_url,omitempty"`
 	Credential  struct {
 		Kind   string `json:"kind"`
 		Secret string `json:"secret,omitempty"`
@@ -85,6 +104,7 @@ type View struct {
 	ClientID        string     `json:"client_id"`
 	Tenant          string     `json:"tenant"`
 	DisplayName     string     `json:"display_name,omitempty"`
+	IconURL         string     `json:"icon_url,omitempty"`
 	Kind            string     `json:"credential_kind"`
 	Certificate     string     `json:"certificate,omitempty"` // the one to upload
 	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
@@ -148,6 +168,9 @@ func (s *Service) Set(ctx context.Context, clientID, provider string, req SetReq
 	if len(req.DisplayName) > 64 {
 		return nil, errors.New("display_name is limited to 64 characters")
 	}
+	if err := validIconURL(req.IconURL); err != nil {
+		return nil, err
+	}
 	if s.keys == nil {
 		return nil, ErrNoKeyService
 	}
@@ -156,7 +179,7 @@ func (s *Service) Set(ctx context.Context, clientID, provider string, req SetReq
 		return nil, err
 	}
 	prior := entries[provider]
-	entry := &Entry{ClientID: req.ClientID, Tenant: req.Tenant, DisplayName: req.DisplayName}
+	entry := &Entry{ClientID: req.ClientID, Tenant: req.Tenant, DisplayName: req.DisplayName, IconURL: req.IconURL}
 	switch req.Credential.Kind {
 	case KindCertificate:
 		cert, err := s.generateCertificate(ctx, clientID, provider, req.ClientID)
@@ -303,6 +326,21 @@ func (s *Service) Expiries() ([]Expiry, error) {
 	return out, nil
 }
 
+// Icons gives the icon addresses a client's gate should draw on its buttons.
+func (s *Service) Icons(clientID string) map[string]string {
+	entries, err := s.entries(clientID)
+	if err != nil {
+		return nil
+	}
+	out := map[string]string{}
+	for provider, e := range entries {
+		if e.IconURL != "" {
+			out[provider] = e.IconURL
+		}
+	}
+	return out
+}
+
 // DisplayNames gives the provider names a client's gate should show.
 func (s *Service) DisplayNames(clientID string) map[string]string {
 	entries, err := s.entries(clientID)
@@ -319,7 +357,7 @@ func (s *Service) DisplayNames(clientID string) map[string]string {
 }
 
 func viewOf(provider string, e *Entry) View {
-	v := View{Provider: provider, ClientID: e.ClientID, Tenant: e.Tenant, DisplayName: e.DisplayName, Kind: e.Credential.Kind}
+	v := View{Provider: provider, ClientID: e.ClientID, Tenant: e.Tenant, DisplayName: e.DisplayName, IconURL: e.IconURL, Kind: e.Credential.Kind}
 	cert := e.Credential.Certificate
 	if e.Credential.Pending != nil {
 		cert = e.Credential.Pending

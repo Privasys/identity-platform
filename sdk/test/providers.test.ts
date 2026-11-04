@@ -5,6 +5,7 @@ import {
     providerButtonLabel,
     providerName,
     sanitiseDisplayNames,
+    sanitiseIcons,
     sanitiseProviders,
     selectProviders,
 } from '../src/providers';
@@ -56,4 +57,15 @@ test('a client\'s own registration names the button', () => {
     assert.deepEqual(sanitiseDisplayNames({ microsoft: ' Contoso ', other: 7, long: 'x'.repeat(65) }), { microsoft: 'Contoso' });
     assert.equal(sanitiseDisplayNames({}), undefined);
     assert.equal(sanitiseDisplayNames('x'), undefined);
+});
+
+test('icons are kept only as https addresses without credentials, at most 512 characters', () => {
+    assert.deepEqual(
+        sanitiseIcons({ microsoft: 'https://www.gov.im/crest.svg', github: 'http://x.example/i.svg' }),
+        { microsoft: 'https://www.gov.im/crest.svg' },
+    );
+    for (const bad of [undefined, null, 'https://x.example/i.svg', [], { microsoft: 42 }, { microsoft: 'javascript:alert(1)' },
+        { microsoft: 'https://u:p@x.example/i.svg' }, { microsoft: 'https://' + 'a'.repeat(510) }, { microsoft: 'not a url' }]) {
+        assert.equal(sanitiseIcons(bad), undefined, JSON.stringify(bad));
+    }
 });

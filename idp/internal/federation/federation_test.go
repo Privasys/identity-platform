@@ -68,6 +68,12 @@ func certRequest() SetRequest {
 	return r
 }
 
+func rotateRequest() SetRequest {
+	r := certRequest()
+	r.Credential.Rotate = true
+	return r
+}
+
 var ctx = context.Background()
 
 func parseCert(t *testing.T, p string) *x509.Certificate {
@@ -161,7 +167,7 @@ func TestRotationKeepsTheOldKeyUntilConfirmed(t *testing.T) {
 	entries, _ := s.entries("c1")
 	oldRef := entries["microsoft"].Credential.Certificate.KeyRef
 
-	second, err := s.Set(ctx, "c1", "microsoft", certRequest())
+	second, err := s.Set(ctx, "c1", "microsoft", rotateRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +183,7 @@ func TestRotationKeepsTheOldKeyUntilConfirmed(t *testing.T) {
 	}
 
 	// Rotating again before confirming drops only the unconfirmed key.
-	third, _ := s.Set(ctx, "c1", "microsoft", certRequest())
+	third, _ := s.Set(ctx, "c1", "microsoft", rotateRequest())
 	if len(keys.destroyed) != 1 || keys.destroyed[0] == oldRef {
 		t.Fatalf("destroyed: %v", keys.destroyed)
 	}
@@ -194,6 +200,89 @@ func TestRotationKeepsTheOldKeyUntilConfirmed(t *testing.T) {
 	}
 	if _, err := s.Confirm(ctx, "c1", "microsoft"); err == nil {
 		t.Fatal("nothing left to confirm")
+	}
+}
+
+func TestCertificateBeforeTheRegistrationIsKnown(t *testing.T) {
+	store, keys := memStore{}, newMemKeys()
+	s := NewService(store, keys)
+	base := &social.Provider{Name: "microsoft", ClientID: "platform", ClientSecret: "platform-secret"}
+
+	// The certificate goes out first; nothing serves until the ids arrive.
+	var prepared SetRequest
+	prepared.Credential.Kind = KindCertificate
+	prepared.DisplayName, prepared.IconURL = "Contoso", "https://contoso.example/crest.svg"
+	v, err := s.Set(ctx, "c1", "microsoft", prepared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Active || v.Certificate == "" || v.ExpiresAt == nil || v.RotationPending {
+		t.Fatalf("prepared view: %+v", v)
+	}
+	if cn := parseCert(t, v.Certificate).Subject.CommonName; cn != "Federation for sign-in client c1" {
+		t.Fatalf("common name: %q", cn)
+	}
+	if p, err := s.ProviderFor("c1", "microsoft", base); p != nil || err != nil {
+		t.Fatalf("a prepared entry must not serve: %v %v", p, err)
+	}
+	if n, i := s.DisplayNames("c1"), s.Icons("c1"); len(n) != 0 || len(i) != 0 {
+		t.Fatalf("a prepared entry must not dress the platform's button: %v %v", n, i)
+	}
+	exp, _ := s.Expiries()
+	if len(exp) != 1 {
+		t.Fatalf("the prepared certificate is watched for expiry: %v", exp)
+	}
+
+	// The ids arrive: the entry starts serving under the same certificate.
+	live := certRequest()
+	live.IconURL = "https://contoso.example/crest.svg"
+	w, err := s.Set(ctx, "c1", "microsoft", live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !w.Active || w.Certificate != v.Certificate || w.RotationPending {
+		t.Fatalf("the uploaded certificate must keep working: %+v", w)
+	}
+	p, err := s.ProviderFor("c1", "microsoft", base)
+	if err != nil || p == nil || p.ClientID != "upstream-id" {
+		t.Fatalf("provider: %+v %v", p, err)
+	}
+	if s.DisplayNames("c1")["microsoft"] != "Contoso" || s.Icons("c1")["microsoft"] != live.IconURL {
+		t.Fatal("the name and icon serve once the entry is active")
+	}
+
+	// A change of name or icon keeps the key too; only a rotation renews it.
+	live.DisplayName = "Contoso Ltd"
+	x, _ := s.Set(ctx, "c1", "microsoft", live)
+	if x.Certificate != v.Certificate || len(keys.keys) != 1 || len(keys.destroyed) != 0 {
+		t.Fatalf("renaming must not touch the key: %+v destroyed %v", x, keys.destroyed)
+	}
+	var rotateOnly SetRequest
+	rotateOnly.Credential.Kind, rotateOnly.Credential.Rotate = KindCertificate, true
+	y, err := s.Set(ctx, "c1", "microsoft", rotateOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !y.RotationPending || y.Certificate == v.Certificate {
+		t.Fatalf("rotate must renew: %+v", y)
+	}
+	if !y.Active || y.ClientID != "upstream-id" || y.Tenant != "contoso.example" || y.DisplayName != "Contoso Ltd" || y.IconURL != live.IconURL {
+		t.Fatalf("a rotation alone keeps the registration, name and icon: %+v", y)
+	}
+	if cn := parseCert(t, y.Certificate).Subject.CommonName; cn != "Federation upstream-id" {
+		t.Fatalf("the rotated certificate is named after the registration: %q", cn)
+	}
+
+	// Half the ids, or a secret before the registration exists, is refused.
+	bad := prepared
+	bad.Tenant = "contoso.example"
+	if _, err := s.Set(ctx, "c2", "microsoft", bad); err == nil {
+		t.Fatal("a tenant without a client id")
+	}
+	bad = prepared
+	bad.Credential.Kind, bad.Credential.Secret = KindSecret, "s3cret"
+	if _, err := s.Set(ctx, "c2", "microsoft", bad); err == nil {
+		t.Fatal("a secret belongs to a registration that exists")
 	}
 }
 

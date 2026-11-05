@@ -95,47 +95,6 @@ jobs:
               echo '${GHCR_TOKEN}' | sudo docker login ghcr.io -u '${GHCR_USER}' --password-stdin
               sudo docker pull \"\$IMAGE\"
 
-              # IDP_ADMIN_TOKEN must be preserved across deploys (changing it
-              # would break management-service-binary and any other admin
-               # client). Resolution order:
-              #   1. Persisted file written by a previous successful deploy.
-              #   2. Live env var of the currently-running 'idp' container
-              #      (covers the very first deploy via this workflow, when
-              #      the file doesn't exist yet but the container has been
-              #      running for a while with the token set out-of-band).
-              #   3. /etc/privasys/idp.env (legacy systemd deployment that
-              #      ran the idp as a native binary instead of docker).
-              # Whatever we resolve, we (re)write the file so step 1 wins
-              # next time, even if the container is gone.
-              ADMIN_TOKEN_FILE=/var/lib/docker/volumes/idp-data/_data/admin-token.txt
-              ADMIN_TOKEN=\$(sudo cat \"\$ADMIN_TOKEN_FILE\" 2>/dev/null || true)
-              if [ -z \"\$ADMIN_TOKEN\" ]; then
-                ADMIN_TOKEN=\$(sudo docker inspect idp --format \
-                  '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-                  | sed -n 's/^IDP_ADMIN_TOKEN=//p' | head -n1 || true)
-              fi
-              if [ -z \"\$ADMIN_TOKEN\" ]; then
-                ADMIN_TOKEN=\$(sudo docker inspect idp --format \
-                  '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-                  | sed -n 's/^VAULT_TOKEN=//p' | head -n1 || true)
-              fi
-              if [ -z \"\$ADMIN_TOKEN\" ] && sudo test -r /etc/privasys/idp.env; then
-                ADMIN_TOKEN=\$(sudo sed -n 's/^IDP_ADMIN_TOKEN=//p' /etc/privasys/idp.env | head -n1 | tr -d '\"' || true)
-              fi
-              if [ -z \"\$ADMIN_TOKEN\" ]; then
-                echo '::group::Debug: docker state on host'
-                sudo docker ps -a || true
-                echo '---'
-                sudo ls -la /var/lib/docker/volumes/idp-data/_data/ 2>/dev/null || true
-                echo '---'
-                sudo ls -la /etc/privasys/ 2>/dev/null || true
-                echo '::endgroup::'
-                echo '::error::Could not recover IDP_ADMIN_TOKEN: not on disk, not in running container env, not in /etc/privasys/idp.env. See debug listing above.'
-                exit 1
-              fi
-              echo \"\$ADMIN_TOKEN\" | sudo tee \"\$ADMIN_TOKEN_FILE\" >/dev/null
-              sudo chmod 600 \"\$ADMIN_TOKEN_FILE\"
-
               # Build the env set from two layers so a value can never be
               # silently dropped and stay dropped:
               #   1. BASE = the currently-running container's env, which keeps a
@@ -170,13 +129,21 @@ jobs:
                 \"\$ENV_LAYERS\" > \"\$ENV_FILE\"
               ENV_FILEKEYS=\$(mktemp)
               cut -d= -f1 \"\$ENV_ONFILE\" > \"\$ENV_FILEKEYS\"
-              ONLY_CONTAINER=\$(cut -d= -f1 \"\$ENV_FILE\" | grep -vxE 'IDP_PORT|IDP_ADMIN_TOKEN' \
+              ONLY_CONTAINER=\$(cut -d= -f1 \"\$ENV_FILE\" | grep -vxE 'IDP_PORT' \
                 | grep -vxFf \"\$ENV_FILEKEYS\" | paste -sd' ' - || true)
               if [ -n \"\$ONLY_CONTAINER\" ]; then
                 echo \"::warning::Only in the running container, not in /etc/privasys/idp.env: \$ONLY_CONTAINER\"
               fi
               echo \"Prepared \$(wc -l < \"\$ENV_FILE\") env vars (running container + idp.env, one line per key).\"
               rm -f \"\$ENV_LAYERS\" \"\$ENV_ONFILE\" \"\$ENV_FILEKEYS\"
+
+              # A new admin token would break the control planes and every other
+              # admin client, so refuse to deploy without one, before anything stops.
+              if ! grep -q '^IDP_ADMIN_TOKEN=.' \"\$ENV_FILE\"; then
+                rm -f \"\$ENV_FILE\"
+                echo '::error::IDP_ADMIN_TOKEN is in neither /etc/privasys/idp.env nor the running container.'
+                exit 1
+              fi
 
               echo 'Stopping previous container (if any)...'
               sudo docker stop idp 2>/dev/null || true
@@ -189,7 +156,6 @@ jobs:
                 -p 127.0.0.1:8091:8091 \
                 --env-file \"\$ENV_FILE\" \
                 -e IDP_PORT=8091 \
-                -e IDP_ADMIN_TOKEN=\"\$ADMIN_TOKEN\" \
                 -v idp-data:/data \
                 \"\$IMAGE\"
 

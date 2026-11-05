@@ -186,6 +186,7 @@ func main() {
 	// Authorization endpoint. The step-up arm lets a request carrying a
 	// session_hint push the delta of a widened attribute set to the holder's
 	// wallet instead of forcing a full QR ceremony.
+	oidc.SetClientOriginEnforcement(os.Getenv("IDP_ENFORCE_CLIENT_ORIGINS") == "true")
 	mux.HandleFunc("GET /authorize", oidc.HandleAuthorize(clientReg, sessionStore, cfg.IssuerURL, voucherMinter,
 		&oidc.AttributeStepUp{
 			Issuer:        issuer,
@@ -307,6 +308,7 @@ func main() {
 	mux.HandleFunc("POST /clients/{id}/social-providers", clients.HandleSetSocialProviders(clientReg, cfg.AdminToken))
 	// The attested apps a client with its own subjects stands for.
 	mux.HandleFunc("POST /clients/{id}/apps", clients.HandleSetAppIDs(clientReg, cfg.AdminToken))
+	mux.HandleFunc("POST /clients/{id}/origins", clients.HandleSetAllowedOrigins(clientReg, cfg.AdminToken))
 
 	// Wallet Instance Attestation: the wallet-provider JWKS (verifiers fetch it /
 	// have it provisioned), a fresh challenge, and enrolment → a holder-bound WIA.

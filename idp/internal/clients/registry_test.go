@@ -216,3 +216,27 @@ func TestSocialProviders_SetAndRead(t *testing.T) {
 		t.Fatalf("an unknown client restricts nothing here (it is refused elsewhere), got %v", got)
 	}
 }
+
+func TestAcceptsOrigin(t *testing.T) {
+	c := &Client{
+		RedirectURIs:   []string{"https://App.example/callback", "http://localhost:4200/cb", "http://evil.example/cb"},
+		AllowedOrigins: []string{"https://console.example"},
+	}
+	for origin, want := range map[string]bool{
+		"https://app.example":      true,
+		"https://console.example":  true,
+		"http://localhost:4200":    true,
+		"https://app.example:8443": false,
+		"http://app.example":       false,
+		"http://evil.example":      false,
+		"https://app.example.evil": false,
+		"https://evil.example":     false,
+		"null":                     false,
+		"":                         false,
+		"https://user@app.example": false,
+	} {
+		if got := c.AcceptsOrigin(origin); got != want {
+			t.Errorf("%q: %v, want %v", origin, got, want)
+		}
+	}
+}

@@ -1160,6 +1160,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 const audience = sanitiseAudience(config.audience);
                 authorizeUrl.searchParams.set('scope', audience ? `audience:${audience} ${scopeStr}` : scopeStr);
                 authorizeUrl.searchParams.set('response_mode', 'json');
+                // The page this frame is in, as the browser reported it: the
+                // result of this sign-in goes to that page, so the identity
+                // provider checks the client registered it.
+                authorizeUrl.searchParams.set('parent_origin', parentOrigin);
                 // A billing grant redirects the cost of any paid attribute
                 // disclosure from this app's owner to the user who issued the
                 // grant, so the person requiring the proof pays for it (a

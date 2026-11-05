@@ -343,6 +343,9 @@ func migrate(db *sql.DB) error {
 		// a client with its own subjects stands for: a sealed-session voucher
 		// carrying that client's subject is accepted only for one of them.
 		{"app_ids", "ALTER TABLE clients ADD COLUMN app_ids TEXT NOT NULL DEFAULT ''"},
+		// The page origins (JSON list) allowed to run this client's sign-in,
+		// beside the origins of its redirect URIs.
+		{"allowed_origins", "ALTER TABLE clients ADD COLUMN allowed_origins TEXT NOT NULL DEFAULT '[]'"},
 		// The external identity providers a client's users may sign in
 		// with (JSON list of provider names). Empty means every provider
 		// this identity provider is configured with; a list is enforced on

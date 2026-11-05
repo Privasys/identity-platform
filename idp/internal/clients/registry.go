@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -56,6 +57,47 @@ type Client struct {
 	// names it here, and the SDK's `providers` option stays a display
 	// preference inside this ceiling.
 	SocialProviders []string `json:"social_providers,omitempty"`
+	// AllowedOrigins is the page origins allowed to run this client's sign-in,
+	// beside the origins of its redirect URIs. A sign-in in the frame has no
+	// redirect, so the page it was embedded in is what ties it to the client.
+	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+}
+
+// NormaliseOrigin reduces a URL to its origin, lowercase. It returns "" for
+// anything that cannot be a page origin a client registers: not https, except
+// plain http on this machine for development.
+func NormaliseOrigin(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" || u.User != nil {
+		return ""
+	}
+	scheme, host := strings.ToLower(u.Scheme), strings.ToLower(u.Host)
+	switch scheme {
+	case "https":
+	case "http":
+		if name := strings.ToLower(u.Hostname()); name != "localhost" && name != "127.0.0.1" {
+			return ""
+		}
+	default:
+		return ""
+	}
+	return scheme + "://" + host
+}
+
+// AcceptsOrigin says whether a page on this origin may run the client's sign-in.
+func (c *Client) AcceptsOrigin(origin string) bool {
+	want := NormaliseOrigin(origin)
+	if want == "" {
+		return false
+	}
+	for _, list := range [][]string{c.AllowedOrigins, c.RedirectURIs} {
+		for _, u := range list {
+			if NormaliseOrigin(u) == want {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ValidRedirectURI checks if the given URI is in the client's registered redirect URIs.
@@ -80,12 +122,12 @@ func NewRegistry(db *store.DB) *Registry {
 
 // Get retrieves a client by ID.
 func (reg *Registry) Get(clientID string) (*Client, error) {
-	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID, sector, socialJSON string
+	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID, sector, socialJSON, originsJSON string
 	var billableRP, platform int
 	err := reg.db.QueryRow(
-		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id, sector, platform, social_providers FROM clients WHERE client_id = ?",
+		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id, sector, platform, social_providers, allowed_origins FROM clients WHERE client_id = ?",
 		clientID,
-	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID, &sector, &platform, &socialJSON)
+	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID, &sector, &platform, &socialJSON, &originsJSON)
 	if err != nil {
 		return nil, fmt.Errorf("client not found: %w", err)
 	}
@@ -99,6 +141,9 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 	var social []string
 	json.Unmarshal([]byte(socialJSON), &social)
 
+	var origins []string
+	json.Unmarshal([]byte(originsJSON), &origins)
+
 	return &Client{
 		ClientID:           clientID,
 		ClientName:         name,
@@ -111,6 +156,7 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 		Sector:             sector,
 		Platform:           platform != 0,
 		SocialProviders:    social,
+		AllowedOrigins:     origins,
 	}, nil
 }
 
@@ -345,6 +391,62 @@ func (reg *Registry) SetAppIDs(clientID string, ids []string) error {
 		return fmt.Errorf("unknown client %q", clientID)
 	}
 	return nil
+}
+
+// SetAllowedOrigins replaces the extra page origins allowed to run a client's
+// sign-in.
+func (reg *Registry) SetAllowedOrigins(clientID string, origins []string) error {
+	clean := []string{}
+	for _, o := range origins {
+		n := NormaliseOrigin(o)
+		if n == "" {
+			return fmt.Errorf("origin %q must be an https origin", o)
+		}
+		clean = append(clean, n)
+	}
+	raw, err := json.Marshal(clean)
+	if err != nil {
+		return err
+	}
+	res, err := reg.db.Exec("UPDATE clients SET allowed_origins = ? WHERE client_id = ?", string(raw), clientID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("unknown client %q", clientID)
+	}
+	return nil
+}
+
+// HandleSetAllowedOrigins sets the extra page origins of a client.
+//
+//	POST /clients/{id}/origins  {"origins": ["https://app.example"]}   (admin token)
+func HandleSetAllowedOrigins(reg *Registry, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminToken == "" || r.Header.Get("Authorization") != "Bearer "+adminToken {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		var req struct {
+			Origins []string `json:"origins"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 64*1024)).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
+			return
+		}
+		clientID := r.PathValue("id")
+		if err := reg.SetAllowedOrigins(clientID, req.Origins); err != nil {
+			http.Error(w, `{"error":"`+strings.ReplaceAll(err.Error(), `"`, "'")+`"}`, http.StatusBadRequest)
+			return
+		}
+		client, err := reg.Get(clientID)
+		if err != nil {
+			http.Error(w, `{"error":"client not found"}`, http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"client_id": clientID, "origins": client.AllowedOrigins})
+	}
 }
 
 // HandleSetAppIDs sets the attested apps a client stands for.

@@ -78,6 +78,24 @@ export function providerButtonLabel(provider: string, solo: boolean, displayName
     return solo ? `Sign in with ${name}` : name;
 }
 
+/**
+ * The identity provider's button icons, reduced to https addresses. The
+ * frame draws each as an image, never as markup, so the address is the
+ * whole exposure; anything else is dropped and the brand icon stays.
+ */
+export function sanitiseIcons(raw: unknown): Record<string, string> | undefined {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (typeof v !== 'string' || v.length > 512) continue;
+        let url: URL;
+        try { url = new URL(v); } catch { continue; }
+        if (url.protocol !== 'https:' || url.username || url.password) continue;
+        out[k] = url.href;
+    }
+    return Object.keys(out).length ? out : undefined;
+}
+
 /** The identity provider's display names, reduced to plain short strings. */
 export function sanitiseDisplayNames(raw: unknown): Record<string, string> | undefined {
     if (!raw || typeof raw !== 'object') return undefined;

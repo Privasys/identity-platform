@@ -299,3 +299,28 @@ func TestOwnDirectoryVouchesForEmail(t *testing.T) {
 		}
 	}
 }
+
+// A client's own registration may name the icon its gate draws on the
+// button: an https address only, listed beside the display name.
+func TestIconIsAnHTTPSAddressListedForTheGate(t *testing.T) {
+	s := NewService(memStore{}, newMemKeys())
+	req := certRequest()
+	req.IconURL = "https://www.gov.im/static/crest.svg"
+	v, err := s.Set(ctx, "c1", "microsoft", req)
+	if err != nil || v.IconURL != req.IconURL {
+		t.Fatalf("set with icon: %+v %v", v, err)
+	}
+	if s.Icons("c1")["microsoft"] != req.IconURL {
+		t.Fatalf("icons: %v", s.Icons("c1"))
+	}
+	for _, bad := range []string{"http://www.gov.im/crest.svg", "javascript:alert(1)", "https://user:pw@gov.im/x.svg", "https://" + strings.Repeat("a", 510)} {
+		req.IconURL = bad
+		if _, err := s.Set(ctx, "c2", "microsoft", req); err == nil {
+			t.Fatalf("accepted icon %q", bad)
+		}
+	}
+	req.IconURL = ""
+	if _, err := s.Set(ctx, "c3", "microsoft", req); err != nil || len(s.Icons("c3")) != 0 {
+		t.Fatalf("no icon: %v %v", s.Icons("c3"), err)
+	}
+}

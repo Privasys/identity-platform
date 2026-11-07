@@ -132,6 +132,8 @@ export interface AuthUIConfig {
     socialProviders?: string[];
     /** Names the identity provider publishes for a client's own registrations. */
     socialDisplayNames?: Record<string, string>;
+    /** Icon addresses (https, sanitised by the host) for a client's own registrations, drawn as images. */
+    socialIcons?: Record<string, string>;
     /** Callback when the user wants to start social auth. The UI calls
      *  this with the provider name; the host opens a popup. */
     onSocialAuth?: (provider: string) => Promise<void>;
@@ -547,6 +549,12 @@ const MODAL_CSS = /* css */ `
     height: 20px;
     flex-shrink: 0;
     color: #64748B;
+}
+.btn-provider img {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    object-fit: contain;
 }
 .btn-provider.primary {
     background: #0F172A;
@@ -1440,12 +1448,16 @@ export class AuthUI {
         const soloSocial = !hasWallet && !hasWebAuthn && socialProviders.length === 1;
         const govuk = this.cfg.theme?.preset === 'govuk';
         const socialButtons = socialProviders.map((provider) => {
+            // A client with its own registration may bring its organisation's
+            // icon (an https address the host sanitised), drawn as an image;
+            // the brand icon stays for everyone else.
+            const iconUrl = this.cfg.socialIcons?.[provider];
             const icon = socialIcons[provider] ?? '';
             return el('button', {
                 className: soloSocial ? 'btn-provider primary' : 'btn-provider',
                 onClick: () => this.startSocial(provider),
             },
-                icon ? el('span', { html: icon }) : null,
+                iconUrl ? el('img', { src: iconUrl, alt: '' }) : icon ? el('span', { html: icon }) : null,
                 el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial || govuk, this.cfg.socialDisplayNames?.[provider])),
             );
         });

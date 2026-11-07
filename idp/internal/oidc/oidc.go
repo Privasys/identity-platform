@@ -665,6 +665,46 @@ func subtractKeys(a, b []string) []string {
 	return out
 }
 
+// enforceClientOrigins turns the origin check from a log line into a refusal.
+var enforceClientOrigins bool
+
+// SetClientOriginEnforcement sets whether a sign-in from a page its client has
+// not registered is refused, rather than only logged.
+func SetClientOriginEnforcement(on bool) { enforceClientOrigins = on }
+
+// signInOrigin names the page running a sign-in with no redirect. A browser
+// states it in Origin when the page calls here itself. A call from the frame
+// comes from this identity provider's own origin, and the frame, which is ours,
+// reports the origin the browser gave it for its parent.
+func signInOrigin(r *http.Request, issuerURL string) string {
+	own := clients.NormaliseOrigin(issuerURL)
+	if origin := r.Header.Get("Origin"); origin != "" && clients.NormaliseOrigin(origin) != own {
+		return origin
+	}
+	return r.URL.Query().Get("parent_origin")
+}
+
+// clientOriginAllowed decides whether a sign-in with no redirect may start. Its
+// code would go to whichever page runs it, and a registered redirect URI protects
+// nothing there, so the page's origin has to be one the client registered. The
+// identity provider's own pages run any client. With no origin at all (a caller
+// that is no browser, or a frame older than this check) there is nothing to
+// compare, so it is logged and let through.
+func clientOriginAllowed(client *clients.Client, origin, issuerURL string) bool {
+	if origin == "" {
+		log.Printf("authorize: client=%s states no page origin", client.ClientID)
+		return true
+	}
+	if clients.NormaliseOrigin(origin) == clients.NormaliseOrigin(issuerURL) || client.AcceptsOrigin(origin) {
+		return true
+	}
+	if len(origin) > 200 {
+		origin = origin[:200]
+	}
+	log.Printf("authorize: client=%s origin=%q is not registered (enforced=%t)", client.ClientID, origin, enforceClientOrigins)
+	return !enforceClientOrigins
+}
+
 // HandleAuthorize handles the OIDC authorization request.
 // Creates a session with a QR payload for the Privasys Wallet app and returns
 // the session data as JSON for the SDK iframe to consume.
@@ -719,6 +759,13 @@ func HandleAuthorize(reg *clients.Registry, sessionStore *SessionStore, issuerUR
 		if redirectURI != "" && !client.ValidRedirectURI(redirectURI) {
 			errorResponse(w, http.StatusBadRequest, "invalid_request",
 				"redirect_uri does not match any registered URI")
+			return
+		}
+
+		// With no redirect, the page running the sign-in receives its result.
+		if redirectURI == "" && !clientOriginAllowed(client, signInOrigin(r, issuerURL), issuerURL) {
+			errorResponse(w, http.StatusForbidden, "unauthorized_client",
+				"This page is not registered for this client")
 			return
 		}
 

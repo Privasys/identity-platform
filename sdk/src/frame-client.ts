@@ -60,7 +60,9 @@ import { FRAME_SIZE_MESSAGE, inlineFrameHeight } from './frame-size';
 import type { SocialProvider } from './providers';
 import type { AuthTheme } from './theme';
 
-export type { SocialProvider } from './providers';
+export type { SocialProvider, OwnRegistration } from './providers';
+export type { GateChoice, GateControls, GateOptions, GateProvider, GateState } from './gate-headless';
+import { sanitiseGateState, type GateChoice, type GateControls, type GateOptions, type GateState } from './gate-headless';
 export type { AuthTheme, ThemeColour } from './theme';
 
 export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'identity' | 'offline_access';
@@ -132,7 +134,34 @@ export class InsufficientCreditsError extends Error {
     }
 }
 
+/**
+ * A page that draws its own sign-in buttons. The frame stays invisible and
+ * keeps every flow: it reports the options for this client, the page
+ * renders them in its own design and starts one, and the frame reports the
+ * flow's progress (a push sent, a QR code to show, an error). Microsoft and
+ * Google still sign in through a popup on the identity provider's origin,
+ * opened by the page at the address the frame names; the wallet still goes
+ * through the relay. `connect()` resolves as it does with the visible gate.
+ * Passkeys are not offered headless: a passkey needs a click inside the
+ * frame.
+ */
+export interface HeadlessGate {
+    /** The options for this client, once known. Draw them and keep `gate`
+     *  to start the one the person chooses. Called again on every new
+     *  sign-in attempt. */
+    onOptions: (options: GateOptions, gate: GateControls) => void;
+    /** Where the started flow is: `push-waiting` (tell them to check their
+     *  phone), `qr-scanning` (show `qrSvg`), `authenticating`, `success`,
+     *  `error` (show `error`; the person may start again), and the rest. */
+    onState?: (state: GateState) => void;
+}
+
 export interface AuthFrameConfig {
+    /**
+     * Draw the gate yourself: see {@link HeadlessGate}. With it, `container`,
+     * `presentation`, `pitch`, `theme` and `legal` have no effect.
+     */
+    headless?: HeadlessGate;
     /**
      * Opaque billing grant, forwarded to /authorize. It redirects the cost of
      * any paid attribute disclosure this sign-in triggers from this app's
@@ -542,6 +571,7 @@ export class AuthFrame {
     private readonly authOrigin: string;
     private readonly config: Omit<AuthFrameConfig, 'authOrigin' | 'container'>;
     private container: HTMLElement | null;
+    private headless: HeadlessGate | null;
     private sessionIframe: HTMLIFrameElement | null = null;
     private sessionHandler: ((e: MessageEvent) => void) | null = null;
     // Cached session payload from the last successful getSession() call.
@@ -589,9 +619,10 @@ export class AuthFrame {
     private destroyed = false;
 
     constructor(config: AuthFrameConfig) {
-        const { authOrigin, container, ...rest } = config;
+        const { authOrigin, container, headless, ...rest } = config;
         this.authOrigin = authOrigin ?? 'https://privasys.id';
         this.container = container ?? null;
+        this.headless = headless ?? null;
         this.config = rest;
         // One frame per page and app host. Renewal of the shared privasys.id
         // session is coordinated across documents by a lock and a single-use
@@ -822,6 +853,7 @@ export class AuthFrame {
             iframe.src = this.authOrigin + '/auth/';
 
             const wantsSealed = !!this.config.sessionRelay?.appHost;
+            const headless = this.headless;
 
             // Sealed mode requires the auth iframe to outlive the sign-in
             // ceremony (subsequent `session().request()` / `.stream()` calls
@@ -837,7 +869,7 @@ export class AuthFrame {
             // container's bounding rect and follow it on resize/scroll
             // until sign-in completes; once auth resolves we shrink the
             // iframe to 0×0 (invisible) but leave it parented to <body>.
-            const overlayContainer = wantsSealed ? this.container : null;
+            const overlayContainer = wantsSealed && !headless ? this.container : null;
             const reflowOverlay = (): void => {
                 if (!overlayContainer) return;
                 const r = overlayContainer.getBoundingClientRect();
@@ -854,7 +886,14 @@ export class AuthFrame {
                 }
             };
 
-            if (overlayContainer) {
+            if (headless) {
+                // The page draws the gate; the frame only runs the flows.
+                iframe.style.cssText =
+                    'position:fixed;width:0;height:0;border:none;opacity:0;pointer-events:none;';
+                iframe.allow =
+                    'publickey-credentials-get *; publickey-credentials-create *';
+                document.body.appendChild(iframe);
+            } else if (overlayContainer) {
                 // Sealed + container: absolute overlay on <body>.
                 reflowOverlay();
                 iframe.allow =
@@ -916,6 +955,47 @@ export class AuthFrame {
                 this.cancelSignIn = null;
             };
 
+            // Headless: the frame names the popup address for a social
+            // sign-in and this page, which holds the click's activation,
+            // opens it and reports how it ended. Only the identity
+            // provider's own sign-in route is ever opened.
+            const openSocialPopup = (id: string, url: string): void => {
+                const reply = (ok: boolean, error?: string): void => {
+                    iframe.contentWindow?.postMessage(
+                        { type: 'privasys:gate:popup-result', id, ok, ...(error ? { error } : {}) },
+                        this.authOrigin,
+                    );
+                };
+                if (!url.startsWith(`${this.authOrigin}/auth/social?`)) {
+                    reply(false, 'Refused sign-in address');
+                    return;
+                }
+                const w = 500, h = 650;
+                const left = window.screenX + (window.innerWidth - w) / 2;
+                const top = window.screenY + (window.innerHeight - h) / 2;
+                const popup = window.open(url, 'privasys-social', `width=${w},height=${h},left=${left},top=${top}`);
+                if (!popup) {
+                    reply(false, 'Popup blocked — please allow popups for this site');
+                    return;
+                }
+                let poll: ReturnType<typeof setInterval> | null = null;
+                const done = (ok: boolean, error?: string): void => {
+                    window.removeEventListener('message', onPopup);
+                    if (poll) clearInterval(poll);
+                    try { popup.close(); } catch { /* already closed */ }
+                    reply(ok, error);
+                };
+                const onPopup = (ev: MessageEvent): void => {
+                    if (ev.source !== popup || ev.origin !== this.authOrigin) return;
+                    if (ev.data?.type === 'privasys:social-complete') done(true);
+                    else if (ev.data?.type === 'privasys:social-error') done(false, String(ev.data.error || 'Social authentication failed'));
+                };
+                window.addEventListener('message', onPopup);
+                poll = setInterval(() => {
+                    if (popup.closed) done(false, 'Authentication cancelled');
+                }, 500);
+            };
+
             // Host-page-initiated cancel (inline embeds have no close
             // button). Removing the iframe tears down the ceremony —
             // broker WebSocket included; the IdP session expires by TTL,
@@ -953,9 +1033,10 @@ export class AuthFrame {
                                 config: {
                                     ...this.config,
                                     presentation,
+                                    ...(headless ? { headless: true } : {}),
                                     // Capabilities this client handles; the host
                                     // only uses features the client declared.
-                                    caps: ['parent-navigate'],
+                                    caps: ['parent-navigate', ...(headless ? ['headless'] : [])],
                                     ...(this.connectHint ? { connect: this.connectHint } : {}),
                                 },
                             },
@@ -969,6 +1050,30 @@ export class AuthFrame {
                         const disclosures = extractDisclosures(result.accessToken);
                         if (disclosures) result.disclosures = disclosures;
                         finishSignIn(result);
+                        break;
+                    }
+
+                    case 'privasys:gate': {
+                        if (!headless) break;
+                        const options = data.options as GateOptions;
+                        if (!options || typeof options !== 'object') break;
+                        headless.onOptions(options, {
+                            start: (choice: GateChoice) => {
+                                iframe.contentWindow?.postMessage({ type: 'privasys:gate:start', choice }, this.authOrigin);
+                            },
+                            cancel: () => this.cancel(),
+                        });
+                        break;
+                    }
+
+                    case 'privasys:gate:state': {
+                        const state = sanitiseGateState(data);
+                        if (headless && state) headless.onState?.(state);
+                        break;
+                    }
+
+                    case 'privasys:gate:popup': {
+                        if (headless) openSocialPopup(String(data.id || ''), String(data.url || ''));
                         break;
                     }
 
@@ -993,7 +1098,8 @@ export class AuthFrame {
                         // The frame reports its content height; size the inline
                         // embed to it (the overlay follows its container, the
                         // embedded iframe is sized directly). Modal frames fill
-                        // the viewport and ignore it.
+                        // the viewport and ignore it; a headless frame stays 0×0.
+                        if (headless) break;
                         const h = inlineFrameHeight(data.height);
                         if (h === null) break;
                         if (overlayContainer) {

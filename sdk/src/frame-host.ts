@@ -18,6 +18,7 @@
 import { AuthUI } from './ui';
 import { FRAME_SIZE_MESSAGE } from './frame-size';
 import { sanitiseDisplayNames, sanitiseIcons, sanitiseOwn, sanitiseProviders, selectProviders, type OwnRegistration } from './providers';
+import { sanitiseChoice, type GateState } from './gate-headless';
 import { sanitiseTheme } from './theme';
 import type { AuthUIConfig, SignInResult } from './ui';
 import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
@@ -975,6 +976,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
             audience?: unknown;
             /** Adopter preference for the social providers; sanitised below. */
             providers?: unknown;
+            /** The page draws its own gate; sanitised below. */
+            headless?: unknown;
         } = data.config;
         const parentOrigin = e.origin;
         // The inline frame reports its content height so the embedding page
@@ -988,6 +991,15 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const onNavigate = parentCaps.includes('parent-navigate')
             ? (url: string): void => {
                 window.parent.postMessage({ type: 'privasys:navigate', url }, parentOrigin);
+            }
+            : undefined;
+        // Headless: the page renders the gate itself from the options this
+        // frame reports, and follows the flow through state reports. Only
+        // a client that declared the capability gets the messages.
+        const headless = config.headless === true && parentCaps.includes('headless');
+        const onGateState = headless
+            ? (s: GateState): void => {
+                window.parent.postMessage({ type: 'privasys:gate:state', ...s }, parentOrigin);
             }
             : undefined;
 
@@ -1045,6 +1057,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     pitch,
                     theme,
                     legal,
+                    headless,
+                    onGateState,
                     approveFlow: {
                         appLabel,
                         reason: config.connect.reason ?? null,
@@ -1273,6 +1287,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         pitch,
                     theme,
                     legal,
+                        headless,
+                        onGateState,
                         approveFlow: {
                             appLabel,
                             reason: 'attributes-widened',
@@ -1370,7 +1386,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
                 // Social auth handler: opens a popup to the IdP's social redirect,
                 // then waits for the callback page to postMessage back.
-                const onSocialAuth = (provider: string, own?: boolean): Promise<void> => {
+                const openSocialPopup = (provider: string, own?: boolean): Promise<void> => {
                     return new Promise<void>((resolve, reject) => {
                         const w = 500, h = 650;
                         const left = window.screenX + (window.innerWidth - w) / 2;
@@ -1413,6 +1429,25 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         }, 500);
                     });
                 };
+                // Headless: a popup needs the click's activation, which the
+                // page has and this frame does not, so the page opens it at
+                // the address this frame names and reports how it ended.
+                const popupViaParent = (provider: string, own?: boolean): Promise<void> => {
+                    return new Promise<void>((resolve, reject) => {
+                        const id = Math.random().toString(36).slice(2);
+                        const url = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}`;
+                        const onMessage = (ev: MessageEvent) => {
+                            if (ev.source !== window.parent || ev.origin !== parentOrigin) return;
+                            if (ev.data?.type !== 'privasys:gate:popup-result' || ev.data.id !== id) return;
+                            window.removeEventListener('message', onMessage);
+                            if (ev.data.ok === true) resolve();
+                            else reject(new Error(String(ev.data.error || 'Authentication cancelled')));
+                        };
+                        window.addEventListener('message', onMessage);
+                        window.parent.postMessage({ type: 'privasys:gate:popup', id, url }, parentOrigin);
+                    });
+                };
+                const onSocialAuth = headless ? popupViaParent : openSocialPopup;
 
                 activeUI = new AuthUI({
                     ...config,
@@ -1427,6 +1462,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     socialIcons,
                     socialOwn,
                     onSocialAuth,
+                    headless,
+                    onGateState,
                     requestedAttributes,
                     attributeRequirements,
                     disclosureVouchers,
@@ -1453,6 +1490,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     approveFlow: undefined,
                 });
 
+                if (headless) {
+                    window.parent.postMessage({ type: 'privasys:gate', options: activeUI.gateOptions() }, parentOrigin);
+                }
                 uiResult = await activeUI.signIn();
 
                 // 5. Get the auth code:
@@ -1681,6 +1721,15 @@ window.addEventListener('message', async (e: MessageEvent) => {
         } finally {
             activeUI = null;
         }
+    }
+
+    // A headless page's choice: only the embedding page may make it, and
+    // the gate itself checks it against what it offers.
+    if (data.type === 'privasys:gate:start') {
+        if (e.source !== window.parent) return;
+        const choice = sanitiseChoice(data.choice);
+        if (choice && activeUI) activeUI.start(choice);
+        return;
     }
 
     if (data.type === 'privasys:check-session') {

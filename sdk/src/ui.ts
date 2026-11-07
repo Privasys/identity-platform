@@ -7,7 +7,8 @@ import { PrivasysAuth } from './client';
 import { WebAuthnClient } from './webauthn';
 import { attributeLabel, assuranceLabel } from './attributes-ui';
 import { isGovVerified } from './attributes';
-import { providerButtonLabel, type OwnRegistration } from './providers';
+import { providerButtonLabel, providerName, type OwnRegistration } from './providers';
+import type { GateChoice, GateOptions, GateProvider, GateState } from './gate-headless';
 import { themeClasses, themeProperties, themeStylesheet, type AuthTheme } from './theme';
 import { alternativeOrder, displayAppName, gateOrder } from './gate';
 import qrcode from 'qrcode-generator';
@@ -139,6 +140,12 @@ export interface AuthUIConfig {
     /** Callback when the user wants to start social auth. The UI calls
      *  this with the provider name; the host opens a popup. */
     onSocialAuth?: (provider: string, own?: boolean) => Promise<void>;
+    /** Headless: the gate renders nothing the person sees; the embedding
+     *  page draws the buttons from `gateOptions()` and calls `start()`.
+     *  No flow starts on its own except a re-approval. */
+    headless?: boolean;
+    /** Every change of state, for a headless page to narrate. */
+    onGateState?: (state: GateState) => void;
     /** URL to the app's privacy policy. Shown to the user when sharing attributes. */
     privacyPolicyUrl?: string;
     /** When true, the device is already trusted (device hint exists). The trust
@@ -1115,6 +1122,9 @@ export class AuthUI {
                 this.autoStarted = true;
                 this.autoFirstScreen = 'approve-waiting';
                 this.startApprove();
+            } else if (this.cfg.headless) {
+                // The page chooses; nothing starts until it does.
+                this.render();
             } else if (this.cfg.pushToken && this.allowed('wallet')) {
                 // Returning user (push token available): skip idle, push.
                 this.autoStarted = true;
@@ -1192,7 +1202,52 @@ export class AuthUI {
         }
     }
 
+    /** The sign-in options a headless page draws, as this gate would. */
+    gateOptions(): GateOptions {
+        const icons: Record<string, string> = { github: ICON_GITHUB, google: ICON_GOOGLE, microsoft: ICON_MICROSOFT, linkedin: ICON_LINKEDIN };
+        const social = this.allowed('social');
+        return {
+            own: social ? (this.cfg.socialOwn ?? []).map((o) => ({ ...o, icon: icons[o.provider] })) : [],
+            providers: social
+                ? (this.cfg.socialProviders ?? []).map((p) => ({ id: p as GateProvider['id'], name: providerName(p), icon: icons[p] }))
+                : [],
+            wallet: this.allowed('wallet'),
+            push: !!this.cfg.pushToken && this.allowed('wallet'),
+        };
+    }
+
+    /** Start the flow a headless page chose, if the gate offers it. A
+     *  choice outside the offer, or while a flow runs, is ignored. */
+    start(choice: GateChoice): void {
+        // While a push waits, the page may switch to the QR code, as the
+        // visible gate's "Scan QR code instead" does.
+        if (this.state === 'push-waiting' && choice.method === 'wallet' && choice.qr && this.allowed('wallet')) {
+            this.cleanup();
+            this.startWallet();
+            return;
+        }
+        if (this.state !== 'idle' && this.state !== 'error') return;
+        this.errorMsg = '';
+        if (choice.method === 'social') {
+            if (!this.allowed('social')) return;
+            const offered = choice.own
+                ? (this.cfg.socialOwn ?? []).some((o) => o.provider === choice.provider)
+                : (this.cfg.socialProviders ?? []).includes(choice.provider);
+            if (!offered) return;
+            void this.startSocial(choice.provider, !!choice.own);
+            return;
+        }
+        if (!this.allowed('wallet')) return;
+        if (this.cfg.pushToken && !choice.qr) this.startPush();
+        else this.startWallet();
+    }
+
     private render(): void {
+        this.cfg.onGateState?.({
+            state: this.state,
+            ...(this.state === 'qr-scanning' && this.qrPayload ? { qr: this.qrPayload, qrSvg: renderQRSvg(this.qrPayload) } : {}),
+            ...(this.state === 'error' && this.errorMsg ? { error: this.errorMsg } : {}),
+        });
         if (!this.shadow) return;
         // Remove old content (keep style)
         const style = this.shadow.querySelector('style')!;

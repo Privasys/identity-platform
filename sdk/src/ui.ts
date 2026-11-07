@@ -9,7 +9,7 @@ import { attributeLabel, assuranceLabel } from './attributes-ui';
 import { isGovVerified } from './attributes';
 import { providerButtonLabel } from './providers';
 import { themeClasses, themeProperties, themeStylesheet, type AuthTheme } from './theme';
-import { alternativeOrder, displayAppName } from './gate';
+import { alternativeOrder, displayAppName, gateOrder } from './gate';
 import qrcode from 'qrcode-generator';
 
 // ---------------------------------------------------------------------------
@@ -1452,19 +1452,28 @@ export class AuthUI {
 
         // The alternatives, in the order the adopter listed the methods
         // (`['social', 'passkey']` puts the work account first). The "or"
-        // divider separates them from the wallet above; with no wallet
-        // offered there is nothing to divide.
+        // divider separates them from the wallet; with no wallet offered
+        // there is nothing to divide.
         const alternatives: HTMLElement[] = [];
         for (const method of alternativeOrder(this.cfg.methods)) {
             if (method === 'passkey' && passkeyButton) alternatives.push(passkeyButton);
             if (method === 'social') alternatives.push(...socialButtons);
         }
-        if (alternatives.length && buttons.length) {
-            buttons.push(el('div', { className: 'divider' }, el('span', null, 'or')));
+        // The adopter's list also says whether the wallet leads or follows
+        // (`['social', 'wallet']` puts the work account above Privasys ID).
+        // The first button on the gate is its primary action, whichever it is.
+        const walletButtons = buttons.splice(0).filter((b): b is HTMLElement => !!b);
+        const walletFirst = gateOrder(this.cfg.methods)[0] === 'wallet' || !alternatives.length;
+        const divider = alternatives.length && walletButtons.length
+            ? [el('div', { className: 'divider' }, el('span', null, 'or'))]
+            : [];
+        if (!walletFirst && walletButtons.length) {
+            for (const b of walletButtons) b.classList.remove('primary');
+            alternatives[0].classList.add('primary');
         }
         // The preset's green is the page's one primary action.
-        if (govuk && !buttons.length && alternatives.length) alternatives[0].classList.add('primary');
-        buttons.push(...alternatives);
+        if (govuk && !walletButtons.length && alternatives.length) alternatives[0].classList.add('primary');
+        buttons.push(...(walletFirst ? [...walletButtons, ...divider, ...alternatives] : [...alternatives, ...divider, ...walletButtons]));
 
         return el('div', null,
             el('h2', { className: 'auth-panel-heading' }, `Sign in to ${displayName}`),

@@ -31,3 +31,17 @@ export function alternativeOrder(methods: readonly GateMethod[] | undefined): re
     const listed = methods.filter((m): m is 'passkey' | 'social' => m === 'passkey' || m === 'social');
     return listed.filter((m, i) => listed.indexOf(m) === i);
 }
+
+/**
+ * The order of every button on the idle gate. The adopter's `methods` list
+ * is an order as well as a filter: `['social', 'wallet']` puts the federated
+ * identity first and Privasys ID under it. Without a list, the wallet comes
+ * first, then the passkey, then the federated identities, as the gate always
+ * did. The first button is the gate's primary action.
+ */
+export function gateOrder(methods: readonly GateMethod[] | undefined): readonly GateMethod[] {
+    const defaults: readonly GateMethod[] = ['wallet', 'passkey', 'social'];
+    if (!methods) return defaults;
+    const listed = methods.filter((m): m is GateMethod => m === 'wallet' || m === 'passkey' || m === 'social');
+    return listed.filter((m, i) => listed.indexOf(m) === i);
+}

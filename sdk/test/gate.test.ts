@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alternativeOrder, displayAppName } from '../src/gate';
+import { alternativeOrder, displayAppName, gateOrder } from '../src/gate';
 
 test('a slug is shown as capitalised words', () => {
     assert.equal(displayAppName('asset-register'), 'Asset Register');
@@ -23,4 +23,11 @@ test('the alternatives follow the order the adopter listed', () => {
 
 test('without a list the passkey comes first', () => {
     assert.deepEqual(alternativeOrder(undefined), ['passkey', 'social']);
+});
+
+test('the whole gate follows the order the adopter listed, wallet included', () => {
+    assert.deepEqual(gateOrder(['social', 'wallet']), ['social', 'wallet']);
+    assert.deepEqual(gateOrder(['wallet', 'social', 'passkey']), ['wallet', 'social', 'passkey']);
+    assert.deepEqual(gateOrder(['social', 'social', 'wallet']), ['social', 'wallet']);
+    assert.deepEqual(gateOrder(undefined), ['wallet', 'passkey', 'social']);
 });

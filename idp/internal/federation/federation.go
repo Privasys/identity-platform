@@ -36,6 +36,13 @@ const (
 	// KindSecret is a client secret the customer hands over, kept wrapped.
 	KindSecret = "secret"
 
+	// ModeReplace: the client's own registration stands in for the
+	// platform's for this provider, for every user of the client.
+	// ModeBeside: it is offered as a button of its own, and the platform's
+	// registration stays on the gate for everyone else.
+	ModeReplace = "replace"
+	ModeBeside  = "beside"
+
 	certificateLifetime = 2 * 365 * 24 * time.Hour
 	assertionLifetime   = 5 * time.Minute
 )
@@ -83,6 +90,7 @@ type Entry struct {
 	Tenant      string     `json:"tenant"`
 	DisplayName string     `json:"display_name,omitempty"`
 	IconURL     string     `json:"icon_url,omitempty"`
+	Mode        string     `json:"mode,omitempty"`
 	Credential  Credential `json:"credential"`
 }
 
@@ -91,12 +99,17 @@ type Entry struct {
 // else: the platform's registration serves until the ids are set.
 func (e *Entry) Active() bool { return e.ClientID != "" }
 
+// Beside says the entry is a button of its own next to the platform's
+// registration rather than a replacement for it.
+func (e *Entry) Beside() bool { return e.Mode == ModeBeside }
+
 // SetRequest is what the admin route accepts. Secret is taken once.
 type SetRequest struct {
 	ClientID    string `json:"client_id"`
 	Tenant      string `json:"tenant"`
 	DisplayName string `json:"display_name"`
 	IconURL     string `json:"icon_url,omitempty"`
+	Mode        string `json:"mode,omitempty"` // replace (default) or beside
 	Credential  struct {
 		Kind   string `json:"kind"`
 		Secret string `json:"secret,omitempty"`
@@ -111,6 +124,7 @@ type View struct {
 	Tenant          string     `json:"tenant"`
 	DisplayName     string     `json:"display_name,omitempty"`
 	IconURL         string     `json:"icon_url,omitempty"`
+	Mode            string     `json:"mode"`
 	Kind            string     `json:"credential_kind"`
 	Active          bool       `json:"active"`                // false until the registration's ids are set
 	Certificate     string     `json:"certificate,omitempty"` // the one to upload
@@ -184,6 +198,11 @@ func (s *Service) Set(ctx context.Context, clientID, provider string, req SetReq
 	if err := validIconURL(req.IconURL); err != nil {
 		return nil, err
 	}
+	switch req.Mode {
+	case "", ModeReplace, ModeBeside:
+	default:
+		return nil, errors.New("mode must be replace or beside")
+	}
 	if s.keys == nil {
 		return nil, ErrNoKeyService
 	}
@@ -192,7 +211,7 @@ func (s *Service) Set(ctx context.Context, clientID, provider string, req SetReq
 		return nil, err
 	}
 	prior := entries[provider]
-	entry := &Entry{ClientID: req.ClientID, Tenant: req.Tenant, DisplayName: req.DisplayName, IconURL: req.IconURL}
+	entry := &Entry{ClientID: req.ClientID, Tenant: req.Tenant, DisplayName: req.DisplayName, IconURL: req.IconURL, Mode: req.Mode}
 	if prior != nil {
 		if entry.ClientID == "" {
 			entry.ClientID, entry.Tenant = prior.ClientID, prior.Tenant
@@ -203,6 +222,12 @@ func (s *Service) Set(ctx context.Context, clientID, provider string, req SetReq
 		if entry.IconURL == "" {
 			entry.IconURL = prior.IconURL
 		}
+		if entry.Mode == "" {
+			entry.Mode = prior.Mode
+		}
+	}
+	if entry.Mode == "" {
+		entry.Mode = ModeReplace
 	}
 	if entry.ClientID == "" && req.Credential.Kind != KindCertificate {
 		return nil, errors.New("client_id and tenant are required; only a certificate can be prepared before the registration exists")
@@ -367,7 +392,7 @@ func (s *Service) Icons(clientID string) map[string]string {
 	}
 	out := map[string]string{}
 	for provider, e := range entries {
-		if e.Active() && e.IconURL != "" {
+		if e.Active() && !e.Beside() && e.IconURL != "" {
 			out[provider] = e.IconURL
 		}
 	}
@@ -382,7 +407,7 @@ func (s *Service) DisplayNames(clientID string) map[string]string {
 	}
 	out := map[string]string{}
 	for provider, e := range entries {
-		if e.Active() && e.DisplayName != "" {
+		if e.Active() && !e.Beside() && e.DisplayName != "" {
 			out[provider] = e.DisplayName
 		}
 	}
@@ -390,7 +415,11 @@ func (s *Service) DisplayNames(clientID string) map[string]string {
 }
 
 func viewOf(provider string, e *Entry) View {
-	v := View{Provider: provider, ClientID: e.ClientID, Tenant: e.Tenant, DisplayName: e.DisplayName, IconURL: e.IconURL, Kind: e.Credential.Kind, Active: e.Active()}
+	mode := e.Mode
+	if mode == "" {
+		mode = ModeReplace
+	}
+	v := View{Provider: provider, ClientID: e.ClientID, Tenant: e.Tenant, DisplayName: e.DisplayName, IconURL: e.IconURL, Mode: mode, Kind: e.Credential.Kind, Active: e.Active()}
 	cert := e.Credential.Certificate
 	if e.Credential.Pending != nil {
 		cert = e.Credential.Pending
@@ -404,17 +433,49 @@ func viewOf(provider string, e *Entry) View {
 	return v
 }
 
-// ProviderFor gives the upstream registration for a client's users: the
-// client's own if it has an active entry, nil if it has none or the entry is
-// only a prepared certificate. An entry that cannot be read is an error, never
-// a silent fall back to the platform's registration.
+// Own lists the client's registrations offered as buttons of their own
+// (mode beside), for the gate.
+func (s *Service) Own(clientID string) []social.OwnRegistration {
+	entries, err := s.entries(clientID)
+	if err != nil {
+		return nil
+	}
+	out := []social.OwnRegistration{}
+	for provider, e := range entries {
+		if e.Active() && e.Beside() {
+			out = append(out, social.OwnRegistration{Provider: provider, DisplayName: e.DisplayName, IconURL: e.IconURL})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Provider < out[j].Provider })
+	return out
+}
+
+// ProviderFor gives the upstream registration for a client's users on the
+// provider's plain button: the client's own if it replaces the platform's,
+// nil otherwise.
 func (s *Service) ProviderFor(clientID, provider string, base *social.Provider) (*social.Provider, error) {
+	return s.ProviderForRoute(clientID, provider, base, false)
+}
+
+// ProviderForRoute gives the upstream registration for a sign-in. own says the
+// gate pressed the client's own button: that must be an active entry, never
+// the platform's registration in its place. On the plain button the client's
+// own entry serves only when it replaces the platform's; an entry beside it,
+// a prepared one or none at all leaves the platform's registration (nil). An
+// entry that cannot be read is an error, never a silent fall back.
+func (s *Service) ProviderForRoute(clientID, provider string, base *social.Provider, own bool) (*social.Provider, error) {
 	entries, err := s.entries(clientID)
 	if err != nil {
 		return nil, err
 	}
 	entry := entries[provider]
 	if entry == nil || !entry.Active() {
+		if own {
+			return nil, errors.New("this client has no registration of its own for " + provider)
+		}
+		return nil, nil
+	}
+	if entry.Beside() && !own {
 		return nil, nil
 	}
 	p := *base

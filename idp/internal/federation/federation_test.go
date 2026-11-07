@@ -286,6 +286,63 @@ func TestCertificateBeforeTheRegistrationIsKnown(t *testing.T) {
 	}
 }
 
+func TestBesideModeKeepsThePlatformRegistration(t *testing.T) {
+	store, keys := memStore{}, newMemKeys()
+	s := NewService(store, keys)
+	base := &social.Provider{Name: "microsoft", ClientID: "platform", ClientSecret: "platform-secret"}
+	req := certRequest()
+	req.Mode, req.IconURL = ModeBeside, "https://contoso.example/crest.svg"
+	v, err := s.Set(ctx, "c1", "microsoft", req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Mode != ModeBeside {
+		t.Fatalf("view: %+v", v)
+	}
+	// The plain button keeps the platform's registration; the own button has the client's.
+	if p, err := s.ProviderForRoute("c1", "microsoft", base, false); err != nil || p != nil {
+		t.Fatalf("plain route: %v %v", p, err)
+	}
+	own, err := s.ProviderForRoute("c1", "microsoft", base, true)
+	if err != nil || own == nil || own.ClientID != "upstream-id" {
+		t.Fatalf("own route: %+v %v", own, err)
+	}
+	// The name and icon dress the client's own button, never the platform's.
+	if len(s.DisplayNames("c1")) != 0 || len(s.Icons("c1")) != 0 {
+		t.Fatal("beside mode must not rename the platform's button")
+	}
+	o := s.Own("c1")
+	if len(o) != 1 || o[0].Provider != "microsoft" || o[0].DisplayName != "Contoso" || o[0].IconURL != req.IconURL {
+		t.Fatalf("own listing: %+v", o)
+	}
+
+	// Replace mode: the plain button is the client's own, and nothing is listed as its own.
+	req.Mode = ModeReplace
+	if _, err := s.Set(ctx, "c1", "microsoft", req); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := s.ProviderForRoute("c1", "microsoft", base, false); p == nil || p.ClientID != "upstream-id" {
+		t.Fatalf("replace: %+v", p)
+	}
+	if len(s.Own("c1")) != 0 || s.DisplayNames("c1")["microsoft"] != "Contoso" {
+		t.Fatal("replace mode lists the name on the provider itself")
+	}
+	// A view of an entry written before modes existed reads as replace.
+	if w, _ := s.List("c1"); len(w) != 1 || w[0].Mode != ModeReplace {
+		t.Fatalf("list: %+v", w)
+	}
+
+	// The own button of a client without a registration is refused, never served by the platform.
+	if _, err := s.ProviderForRoute("c2", "microsoft", base, true); err == nil {
+		t.Fatal("no own registration")
+	}
+	bad := certRequest()
+	bad.Mode = "sideways"
+	if _, err := s.Set(ctx, "c3", "microsoft", bad); err == nil {
+		t.Fatal("unknown mode")
+	}
+}
+
 func TestSecretCredentialIsWrappedAndNeverListed(t *testing.T) {
 	store, keys := memStore{}, newMemKeys()
 	s := NewService(store, keys)

@@ -83,6 +83,45 @@ export function providerButtonLabel(provider: string, solo: boolean, displayName
  * frame draws each as an image, never as markup, so the address is the
  * whole exposure; anything else is dropped and the brand icon stays.
  */
+/** An https address without credentials, at most 512 characters, or nothing. */
+function httpsAddress(raw: unknown): string | undefined {
+    if (typeof raw !== 'string' || raw.length > 512) return undefined;
+    let url: URL;
+    try { url = new URL(raw); } catch { return undefined; }
+    if (url.protocol !== 'https:' || url.username || url.password) return undefined;
+    return url.href;
+}
+
+/**
+ * A client's own registration with a provider, offered on the gate as a
+ * button of its own next to the platform's (an organisation's staff
+ * sign-in), with the organisation's name and, optionally, its icon.
+ */
+export interface OwnRegistration {
+    provider: SocialProvider;
+    displayName: string;
+    iconUrl?: string;
+}
+
+/**
+ * The identity provider's `own` listing, reduced to known providers with
+ * a name of at most 64 characters and an https icon; anything else is
+ * dropped, since the frame draws what it is given.
+ */
+export function sanitiseOwn(raw: unknown): OwnRegistration[] | undefined {
+    if (!Array.isArray(raw)) return undefined;
+    const out: OwnRegistration[] = [];
+    for (const item of raw) {
+        if (!item || typeof item !== 'object') continue;
+        const { provider, display_name: name, icon } = item as Record<string, unknown>;
+        if (typeof provider !== 'string' || !(SOCIAL_PROVIDERS as readonly string[]).includes(provider)) continue;
+        if (typeof name !== 'string' || !name.trim() || name.length > 64) continue;
+        const iconUrl = httpsAddress(icon);
+        out.push({ provider: provider as SocialProvider, displayName: name.trim(), ...(iconUrl ? { iconUrl } : {}) });
+    }
+    return out.length ? out : undefined;
+}
+
 export function sanitiseIcons(raw: unknown): Record<string, string> | undefined {
     if (!raw || typeof raw !== 'object') return undefined;
     const out: Record<string, string> = {};

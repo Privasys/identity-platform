@@ -6,6 +6,7 @@ import {
     providerName,
     sanitiseDisplayNames,
     sanitiseIcons,
+    sanitiseOwn,
     sanitiseProviders,
     selectProviders,
 } from '../src/providers';
@@ -68,4 +69,25 @@ test('icons are kept only as https addresses without credentials, at most 512 ch
         { microsoft: 'https://u:p@x.example/i.svg' }, { microsoft: 'https://' + 'a'.repeat(510) }, { microsoft: 'not a url' }]) {
         assert.equal(sanitiseIcons(bad), undefined, JSON.stringify(bad));
     }
+});
+
+test('own registrations keep known providers with a name and an https icon', () => {
+    assert.equal(sanitiseOwn(undefined), undefined);
+    assert.equal(sanitiseOwn({ provider: 'microsoft' }), undefined);
+    assert.deepEqual(
+        sanitiseOwn([
+            { provider: 'microsoft', display_name: ' Contoso Staff ', icon: 'https://contoso.example/logo.svg' },
+            { provider: 'microsoft', display_name: 'No icon' },
+            { provider: 'microsoft', display_name: 'Bad icon', icon: 'http://plain.example/x.png' },
+            { provider: 'teams', display_name: 'Unknown provider' },
+            { provider: 'google', display_name: '' },
+            { provider: 'google', display_name: 'x'.repeat(65) },
+            'nonsense',
+        ]),
+        [
+            { provider: 'microsoft', displayName: 'Contoso Staff', iconUrl: 'https://contoso.example/logo.svg' },
+            { provider: 'microsoft', displayName: 'No icon' },
+            { provider: 'microsoft', displayName: 'Bad icon' },
+        ],
+    );
 });

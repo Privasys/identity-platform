@@ -7,7 +7,7 @@ import { PrivasysAuth } from './client';
 import { WebAuthnClient } from './webauthn';
 import { attributeLabel, assuranceLabel } from './attributes-ui';
 import { isGovVerified } from './attributes';
-import { providerButtonLabel } from './providers';
+import { providerButtonLabel, type OwnRegistration } from './providers';
 import { themeClasses, themeProperties, themeStylesheet, type AuthTheme } from './theme';
 import { alternativeOrder, displayAppName, gateOrder } from './gate';
 import qrcode from 'qrcode-generator';
@@ -134,9 +134,11 @@ export interface AuthUIConfig {
     socialDisplayNames?: Record<string, string>;
     /** Icon addresses (https, sanitised by the host) for a client's own registrations, drawn as images. */
     socialIcons?: Record<string, string>;
+    /** The client's own registrations offered as buttons of their own, first among the alternatives. */
+    socialOwn?: OwnRegistration[];
     /** Callback when the user wants to start social auth. The UI calls
      *  this with the provider name; the host opens a popup. */
-    onSocialAuth?: (provider: string) => Promise<void>;
+    onSocialAuth?: (provider: string, own?: boolean) => Promise<void>;
     /** URL to the app's privacy policy. Shown to the user when sharing attributes. */
     privacyPolicyUrl?: string;
     /** When true, the device is already trusted (device hint exists). The trust
@@ -1282,7 +1284,13 @@ export class AuthUI {
         // Without a generic brand panel to carry context (inline and page
         // modes), flow states get a heading of their own above the tile.
         const flowHeading = (inline || isPage) && !isIdle && this.state !== 'success' && this.state !== 'error'
-            ? (this.method === 'passkey' ? 'Sign in with a passkey' : 'Connecting you to Privasys ID')
+            ? (this.method === 'passkey'
+                ? 'Sign in with a passkey'
+                // A government service keeps its own name over the gate; the
+                // tile below says what is happening.
+                : this.cfg.theme?.preset === 'govuk'
+                    ? `Sign in to ${this.cfg.app?.displayName || displayAppName(this.cfg.appName)}`
+                    : 'Connecting you to Privasys ID')
             : null;
 
         // Left panel content: the adopter's pitch (page mode — that panel is
@@ -1445,8 +1453,18 @@ export class AuthUI {
         // providers: ['microsoft']): the button is the primary call to action
         // and carries the full label, so the gate reads as a sign-in page for
         // that identity rather than a chooser with one entry.
-        const soloSocial = !hasWallet && !hasWebAuthn && socialProviders.length === 1;
+        const ownRegistrations = this.allowed('social') ? (this.cfg.socialOwn ?? []) : [];
+        const soloSocial = !hasWallet && !hasWebAuthn && socialProviders.length === 1 && !ownRegistrations.length;
         const govuk = this.cfg.theme?.preset === 'govuk';
+        // A client's own registrations beside the platform's (an organisation's
+        // staff sign-in) come first among the alternatives, under the
+        // organisation's name and icon; the platform's buttons follow for
+        // everyone else.
+        const ownButtons = ownRegistrations.map((own) =>
+            el('button', { className: 'btn-provider', onClick: () => this.startSocial(own.provider, true) },
+                own.iconUrl ? el('img', { src: own.iconUrl, alt: '' }) : el('span', { html: socialIcons[own.provider] ?? '' }),
+                el('span', { className: 'btn-label' }, `Sign in with ${own.displayName}`),
+            ));
         const socialButtons = socialProviders.map((provider) => {
             // A client with its own registration may bring its organisation's
             // icon (an https address the host sanitised), drawn as an image;
@@ -1469,7 +1487,7 @@ export class AuthUI {
         const alternatives: HTMLElement[] = [];
         for (const method of alternativeOrder(this.cfg.methods)) {
             if (method === 'passkey' && passkeyButton) alternatives.push(passkeyButton);
-            if (method === 'social') alternatives.push(...socialButtons);
+            if (method === 'social') alternatives.push(...ownButtons, ...socialButtons);
         }
         // The adopter's list also says whether the wallet leads or follows
         // (`['social', 'wallet']` puts the work account above Privasys ID).
@@ -1953,12 +1971,12 @@ export class AuthUI {
         }
     }
 
-    private async startSocial(provider: string): Promise<void> {
+    private async startSocial(provider: string, own = false): Promise<void> {
         if (!this.cfg.onSocialAuth) return;
         this.state = 'authenticating';
         this.render();
         try {
-            await this.cfg.onSocialAuth(provider);
+            await this.cfg.onSocialAuth(provider, own);
             this.method = 'wallet';
             this.sessionToken = '';
             this.sessionId = this.cfg.sessionId ?? '';

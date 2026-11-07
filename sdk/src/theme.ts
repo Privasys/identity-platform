@@ -133,6 +133,10 @@ export const GOVUK_CSS = /* css */ `
     transition: none;
 }
 :host(.theme-govuk) .btn-provider ~ .btn-provider { margin-top: 16px; }
+/* An organisation's name on the button ("Sign in with Contoso Staff")
+   wraps in the 364px the inline panel leaves at 19px; a wider panel keeps the
+   label on one line and still sits inside a GOV.UK two-thirds column. */
+:host(.theme-govuk.inline) .auth-panel { max-width: 480px; }
 :host(.theme-govuk) .btn-provider .btn-label { flex: 0 1 auto; color: inherit; font-weight: 400; }
 :host(.theme-govuk) .btn-provider svg { color: inherit; }
 :host(.theme-govuk) .btn-provider:hover { background: #dbdad9; border-color: transparent; box-shadow: 0 2px 0 #929191; }

@@ -196,3 +196,23 @@ t.Errorf("scope=%q: got %q, want %q", tt.scope, got, tt.want)
 }
 }
 }
+
+// A client with its own subjects mints for itself, or for an app it is bound
+// to; never for the platform, another app, or a hostname it cannot prove.
+func TestOwnClientAudience(t *testing.T) {
+	apps := []string{"0123456789abcdef0123456789abcdef"}
+	for _, c := range []struct{ requested, want string }{
+		{"app:0123456789abcdef0123456789abcdef", "app:0123456789abcdef0123456789abcdef"},
+		{"app:ffffffffffffffffffffffffffffffff", "client-1"},
+		{"privasys-platform", "client-1"},
+		{"register.example.com", "client-1"},
+		{"app:", "client-1"},
+	} {
+		if got := ownClientAudience(c.requested, "client-1", apps); got != c.want {
+			t.Errorf("%q: got %q, want %q", c.requested, got, c.want)
+		}
+	}
+	if got := ownClientAudience("app:0123456789abcdef0123456789abcdef", "client-1", nil); got != "client-1" {
+		t.Errorf("an unbound client: got %q", got)
+	}
+}

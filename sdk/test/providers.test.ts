@@ -4,6 +4,7 @@ import {
     SOCIAL_PROVIDERS,
     providerButtonLabel,
     providerName,
+    sanitiseDisplayNames,
     sanitiseProviders,
     selectProviders,
 } from '../src/providers';
@@ -47,4 +48,12 @@ test('button labels are brand-correct and carry the call to action only when alo
     assert.equal(providerButtonLabel('microsoft', true), 'Sign in with Microsoft');
     assert.equal(providerButtonLabel('linkedin', true), 'Sign in with LinkedIn');
     assert.equal(providerButtonLabel('microsoft', false), 'Microsoft');
+});
+
+test('a client\'s own registration names the button', () => {
+    assert.equal(providerButtonLabel('microsoft', false, 'Contoso Government'), 'Sign in with Contoso Government');
+    assert.equal(providerButtonLabel('microsoft', false), 'Microsoft');
+    assert.deepEqual(sanitiseDisplayNames({ microsoft: ' Contoso ', other: 7, long: 'x'.repeat(65) }), { microsoft: 'Contoso' });
+    assert.equal(sanitiseDisplayNames({}), undefined);
+    assert.equal(sanitiseDisplayNames('x'), undefined);
 });

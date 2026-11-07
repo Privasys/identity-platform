@@ -348,6 +348,7 @@ func migrate(db *sql.DB) error {
 		// this identity provider is configured with; a list is enforced on
 		// the social start path, so a page cannot widen it.
 		{"social_providers", "ALTER TABLE clients ADD COLUMN social_providers TEXT NOT NULL DEFAULT '[]'"},
+		{"federation", "ALTER TABLE clients ADD COLUMN federation TEXT NOT NULL DEFAULT ''"},
 	} {
 		if !clientCols[add.col] {
 			if _, err = db.Exec(add.ddl); err != nil {
@@ -715,6 +716,20 @@ func (db *DB) CreateServiceAccount(accountID, displayName, publicKeyPEM, keyID s
 // UserExists reports whether an account id is one of this IdP's. The one
 // forward check a shared-sector flow may make on an identifier an app hands
 // back: in that sector the subject IS the account id.
+// EnsureUser records a principal in the users table when it is not there
+// yet, so that rows which reference it (refresh tokens, roles, push tokens)
+// can be written. A federated sign-in ("microsoft:<id>", "google:<id>")
+// creates no wallet account and had no users row, so every refresh token
+// for such a person failed its foreign key.
+func (db *DB) EnsureUser(userID string) error {
+	_, err := db.Exec(
+		`INSERT INTO users (user_id) VALUES (?)
+		 ON CONFLICT(user_id) DO NOTHING`,
+		userID,
+	)
+	return err
+}
+
 func (db *DB) UserExists(userID string) bool {
 	var one int
 	return userID != "" && db.QueryRow("SELECT 1 FROM users WHERE user_id = ?", userID).Scan(&one) == nil

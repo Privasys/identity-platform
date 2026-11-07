@@ -130,6 +130,8 @@ export interface AuthUIConfig {
     /** Available social identity providers (OIDC mode). Each entry is a
      *  provider name like "github", "google", "microsoft", "linkedin". */
     socialProviders?: string[];
+    /** Names the identity provider publishes for a client's own registrations. */
+    socialDisplayNames?: Record<string, string>;
     /** Callback when the user wants to start social auth. The UI calls
      *  this with the provider name; the host opens a popup. */
     onSocialAuth?: (provider: string) => Promise<void>;
@@ -1444,7 +1446,7 @@ export class AuthUI {
                 onClick: () => this.startSocial(provider),
             },
                 icon ? el('span', { html: icon }) : null,
-                el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial || govuk)),
+                el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial || govuk, this.cfg.socialDisplayNames?.[provider])),
             );
         });
 

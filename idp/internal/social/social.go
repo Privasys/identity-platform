@@ -8,6 +8,7 @@
 package social
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -42,6 +43,9 @@ type Provider struct {
 	// authenticate with the client secret only; sending a code_verifier to such
 	// a provider is rejected as invalid_client.
 	PKCE bool
+	// Credential, when set, authenticates the token exchange instead of
+	// ClientSecret (a client's own registration: internal/federation).
+	Credential func(ctx context.Context, form url.Values) error
 }
 
 // Providers maps provider names to their configuration.
@@ -91,6 +95,9 @@ type stateEntry struct {
 	sessionID string // OIDC session_id to complete (web-SDK mode)
 	provider  string // Which social provider
 	verifier  string // PKCE code_verifier for the upstream token exchange
+	// prov is the client's own registration when it has one, so the exchange
+	// uses the registration the person was sent to.
+	prov      *Provider
 	expiresAt time.Time
 
 	// Wallet-link mode (sessionID is empty). The wallet links a provider to
@@ -133,6 +140,15 @@ func (ss *stateStore) create(sessionID, provider, verifier string) string {
 	}
 	ss.mu.Unlock()
 	return state
+}
+
+// setProvider records the registration a state was started with.
+func (ss *stateStore) setProvider(state string, prov *Provider) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	if e, ok := ss.states[state]; ok {
+		e.prov = prov
+	}
 }
 
 func (ss *stateStore) createWallet(provider, verifier, redirectURI, nonce, challenge string) string {
@@ -258,11 +274,21 @@ type Handler struct {
 	// enforced on the start path and reflected by the listing, so the
 	// sign-in gate shows only what is allowed and a page cannot widen it.
 	clientPolicy func(clientID string) []string
+	// federated gives a client's own registration for a provider, or nil when
+	// it uses the platform's (internal/federation).
+	federated func(clientID, provider string, base *Provider) (*Provider, error)
+	// displayNames gives the provider names a client's gate should show.
+	displayNames func(clientID string) map[string]string
 }
 
 // SetClientPolicy installs the per-client provider restriction.
 func (h *Handler) SetClientPolicy(policy func(clientID string) []string) {
 	h.clientPolicy = policy
+}
+
+// SetFederation installs the per-client upstream registrations.
+func (h *Handler) SetFederation(federated func(clientID, provider string, base *Provider) (*Provider, error), displayNames func(clientID string) map[string]string) {
+	h.federated, h.displayNames = federated, displayNames
 }
 
 // allowedFor reports whether a client's users may sign in with a provider.
@@ -343,6 +369,21 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The client's own registration, when it has one. A broken entry refuses
+	// the sign-in: it never falls back to the platform's registration, which
+	// the customer's policy may not allow.
+	if h.federated != nil {
+		own, err := h.federated(session.ClientID, providerName, prov)
+		if err != nil {
+			log.Printf("social/%s: federation of %s: %v", providerName, session.ClientID, err)
+			http.Error(w, "this client's sign-in is misconfigured", http.StatusBadGateway)
+			return
+		}
+		if own != nil {
+			prov = own
+		}
+	}
+
 	// Build authorization URL.
 	authURL, _ := url.Parse(prov.AuthURL)
 	q := authURL.Query()
@@ -362,6 +403,7 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 		q.Set("code_challenge_method", "S256")
 	}
 	state := h.states.create(sessionID, providerName, verifier)
+	h.states.setProvider(state, prov)
 	q.Set("state", state)
 	authURL.RawQuery = q.Encode()
 
@@ -392,10 +434,13 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prov, ok := h.providers.Get(entry.provider)
-	if !ok {
-		h.callbackError(w, "Unknown provider")
-		return
+	prov := entry.prov
+	if prov == nil {
+		prov, ok = h.providers.Get(entry.provider)
+		if !ok {
+			h.callbackError(w, "Unknown provider")
+			return
+		}
 	}
 
 	// Exchange code for access token (PKCE: send the verifier bound to state).
@@ -514,9 +559,13 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 	}
 	names := h.providersFor(clientID)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"providers": names,
-	})
+	out := map[string]interface{}{"providers": names}
+	if h.displayNames != nil && clientID != "" {
+		if dn := h.displayNames(clientID); len(dn) > 0 {
+			out["display_names"] = dn
+		}
+	}
+	json.NewEncoder(w).Encode(out)
 }
 
 // --- Wallet-link handlers ---
@@ -700,11 +749,19 @@ type tokenResponse struct {
 
 func (h *Handler) exchangeCode(prov *Provider, code, verifier string) (string, error) {
 	data := url.Values{
-		"client_id":     {prov.ClientID},
-		"client_secret": {prov.ClientSecret},
-		"code":          {code},
-		"redirect_uri":  {h.issuerURL + "/auth/social/callback"},
-		"grant_type":    {"authorization_code"},
+		"client_id":    {prov.ClientID},
+		"code":         {code},
+		"redirect_uri": {h.issuerURL + "/auth/social/callback"},
+		"grant_type":   {"authorization_code"},
+	}
+	if prov.Credential != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if err := prov.Credential(ctx, data); err != nil {
+			return "", fmt.Errorf("credential: %w", err)
+		}
+	} else {
+		data.Set("client_secret", prov.ClientSecret)
 	}
 	// Only PKCE providers get a code_verifier; LinkedIn (confidential, no PKCE)
 	// rejects the request as invalid_client when one is present.

@@ -250,7 +250,8 @@ export interface AuthFrameConfig {
     legal?: boolean;
     /**
      * The audience of the access token issued at sign-in, for an app that
-     * authorises on it (a direct name passes its hostname). The identity
+     * authorises on it: on a direct name, `app:<app id>`, which the identity
+     * provider grants a client bound to that app. The identity
      * provider keeps no profile, so the first token is the only one that can
      * carry the person's name and email; `getTokenForAudience()` returns it
      * for as long as it is valid, then mints without a profile. Store what

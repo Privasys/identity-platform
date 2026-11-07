@@ -6,8 +6,10 @@ package clients
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -207,6 +209,47 @@ func HandleSetSocialProviders(reg *Registry, adminToken string) http.HandlerFunc
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"client_id": clientID, "providers": clean})
 	}
+}
+
+// FederationOf returns a client's upstream registrations as stored
+// (internal/federation owns the shape). An unknown client has none.
+func (reg *Registry) FederationOf(clientID string) (string, error) {
+	var raw string
+	err := reg.db.QueryRow("SELECT federation FROM clients WHERE client_id = ?", clientID).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return raw, err
+}
+
+// SetFederation stores a client's upstream registrations.
+func (reg *Registry) SetFederation(clientID, raw string) error {
+	res, err := reg.db.Exec("UPDATE clients SET federation = ? WHERE client_id = ?", raw, clientID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("client not found")
+	}
+	return nil
+}
+
+// AllFederations returns every client's upstream registrations.
+func (reg *Registry) AllFederations() (map[string]string, error) {
+	rows, err := reg.db.Query("SELECT client_id, federation FROM clients WHERE federation NOT IN ('', '{}')")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var id, raw string
+		if err := rows.Scan(&id, &raw); err != nil {
+			return nil, err
+		}
+		out[id] = raw
+	}
+	return out, rows.Err()
 }
 
 // IsPlatform reports whether a client is a first-party control-plane client.

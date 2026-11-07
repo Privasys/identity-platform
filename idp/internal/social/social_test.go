@@ -283,8 +283,14 @@ func TestFederatedRegistration(t *testing.T) {
 	sessions.Create(sess)
 	sessions.Create(other)
 	h := NewHandler(providers, oidc.NewCodeStore(), sessions, "https://idp.example")
-	h.SetFederation(func(clientID, provider string, base *Provider) (*Provider, error) {
-		if clientID != "own-client" {
+	h.SetFederation(func(clientID, provider string, base *Provider, own bool) (*Provider, error) {
+		if clientID == "beside-client" && !own {
+			return nil, nil
+		}
+		if clientID != "own-client" && clientID != "beside-client" {
+			if own {
+				return nil, errors.New("no registration of its own")
+			}
 			return nil, nil
 		}
 		p := *base
@@ -302,7 +308,14 @@ func TestFederatedRegistration(t *testing.T) {
 			return map[string]string{"microsoft": "https://contoso.example/crest.svg"}
 		}
 		return nil
+	}, func(clientID string) []OwnRegistration {
+		if clientID == "beside-client" {
+			return []OwnRegistration{{Provider: "microsoft", DisplayName: "Contoso", IconURL: "https://contoso.example/crest.svg"}}
+		}
+		return nil
 	})
+	beside := &oidc.AuthSession{SessionID: "beside-session", ClientID: "beside-client", ExpiresAt: exp}
+	sessions.Create(beside)
 
 	start := func(sid string) *url.URL {
 		rec := httptest.NewRecorder()
@@ -338,8 +351,30 @@ func TestFederatedRegistration(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	h.HandleProviders(rec, httptest.NewRequest("GET", "/auth/social/providers?client_id=other-client", nil))
-	if strings.Contains(rec.Body.String(), "display_names") || strings.Contains(rec.Body.String(), "icons") {
+	if strings.Contains(rec.Body.String(), "display_names") || strings.Contains(rec.Body.String(), "icons") || strings.Contains(rec.Body.String(), `"own"`) {
 		t.Fatalf("listing for another client: %s", rec.Body)
+	}
+
+	// Beside mode: the plain button is the platform's, the own button is the
+	// client's, and the listing carries the own button separately.
+	if u := start(beside.SessionID); u.Query().Get("client_id") != "platform-id" {
+		t.Fatalf("beside, plain button: %s", u)
+	}
+	rec = httptest.NewRecorder()
+	h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider=microsoft&registration=own&session_id="+beside.SessionID, nil))
+	if u, _ := url.Parse(rec.Header().Get("Location")); rec.Code != http.StatusFound || u.Query().Get("client_id") != "customer-id" {
+		t.Fatalf("beside, own button: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	rec = httptest.NewRecorder()
+	h.HandleProviders(rec, httptest.NewRequest("GET", "/auth/social/providers?client_id=beside-client", nil))
+	if !strings.Contains(rec.Body.String(), `"own":[{"provider":"microsoft","display_name":"Contoso","icon":"https://contoso.example/crest.svg"}]`) || strings.Contains(rec.Body.String(), "display_names") {
+		t.Fatalf("beside listing: %s", rec.Body)
+	}
+	// The own button of a client without a registration is refused.
+	rec = httptest.NewRecorder()
+	h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider=microsoft&registration=own&session_id="+other.SessionID, nil))
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("own button without a registration: %d", rec.Code)
 	}
 
 	// The restriction composes: an entry does not widen the client's list.
@@ -352,7 +387,7 @@ func TestFederatedRegistration(t *testing.T) {
 
 	// A broken entry refuses, it never falls back to the platform's registration.
 	h.SetClientPolicy(nil)
-	h.SetFederation(func(string, string, *Provider) (*Provider, error) { return nil, errors.New("broken") }, nil, nil)
+	h.SetFederation(func(string, string, *Provider, bool) (*Provider, error) { return nil, errors.New("broken") }, nil, nil, nil)
 	rec = httptest.NewRecorder()
 	h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider=microsoft&session_id="+sess.SessionID, nil))
 	if rec.Code != http.StatusBadGateway {

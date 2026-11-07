@@ -393,7 +393,7 @@ func main() {
 	socialHandler.SetClientPolicy(clientReg.SocialProvidersOf)
 	// A client may bring its own upstream registration for a provider.
 	federationSvc := federation.NewService(clientReg, federation.ResolveKeyService())
-	socialHandler.SetFederation(federationSvc.ProviderFor, federationSvc.DisplayNames, federationSvc.Icons)
+	socialHandler.SetFederation(federationSvc.ProviderForRoute, federationSvc.DisplayNames, federationSvc.Icons, federationSvc.Own)
 	mux.HandleFunc("POST /clients/{id}/federation/{provider}", federationSvc.HandleSet(cfg.AdminToken))
 	mux.HandleFunc("POST /clients/{id}/federation/{provider}/confirm", federationSvc.HandleConfirm(cfg.AdminToken))
 	mux.HandleFunc("GET /clients/{id}/federation", federationSvc.HandleList(cfg.AdminToken))

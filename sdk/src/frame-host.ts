@@ -17,7 +17,7 @@
 
 import { AuthUI } from './ui';
 import { FRAME_SIZE_MESSAGE } from './frame-size';
-import { sanitiseDisplayNames, sanitiseIcons, sanitiseProviders, selectProviders } from './providers';
+import { sanitiseDisplayNames, sanitiseIcons, sanitiseOwn, sanitiseProviders, selectProviders, type OwnRegistration } from './providers';
 import { sanitiseTheme } from './theme';
 import type { AuthUIConfig, SignInResult } from './ui';
 import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
@@ -1335,6 +1335,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 let socialProviders: string[] = [];
                 let socialDisplayNames: Record<string, string> | undefined;
                 let socialIcons: Record<string, string> | undefined;
+                let socialOwn: OwnRegistration[] | undefined;
                 if (!effectiveMethods || effectiveMethods.includes('social')) {
                     try {
                         // Named for the client, the identity provider lists only
@@ -1351,6 +1352,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                             socialProviders = selectProviders(published, providers);
                             socialDisplayNames = sanitiseDisplayNames(provData.display_names);
                             socialIcons = sanitiseIcons(provData.icons);
+                            socialOwn = sanitiseOwn(provData.own);
                             if (providers && !providers.some((p) => published.includes(p))) {
                                 console.warn(
                                     '[privasys] none of the requested providers',
@@ -1368,12 +1370,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
                 // Social auth handler: opens a popup to the IdP's social redirect,
                 // then waits for the callback page to postMessage back.
-                const onSocialAuth = (provider: string): Promise<void> => {
+                const onSocialAuth = (provider: string, own?: boolean): Promise<void> => {
                     return new Promise<void>((resolve, reject) => {
                         const w = 500, h = 650;
                         const left = window.screenX + (window.innerWidth - w) / 2;
                         const top = window.screenY + (window.innerHeight - h) / 2;
-                        const popupUrl = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}`;
+                        // registration=own: the client's own registration, pressed as a button of its own.
+                        const popupUrl = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}`;
                         const popup = window.open(popupUrl, 'privasys-social', `width=${w},height=${h},left=${left},top=${top}`);
 
                         if (!popup) {
@@ -1422,6 +1425,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     socialProviders,
                     socialDisplayNames,
                     socialIcons,
+                    socialOwn,
                     onSocialAuth,
                     requestedAttributes,
                     attributeRequirements,

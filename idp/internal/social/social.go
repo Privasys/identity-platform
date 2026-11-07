@@ -282,7 +282,9 @@ type Handler struct {
 	clientPolicy func(clientID string) []string
 	// federated gives a client's own registration for a provider, or nil when
 	// it uses the platform's (internal/federation).
-	federated func(clientID, provider string, base *Provider) (*Provider, error)
+	federated func(clientID, provider string, base *Provider, own bool) (*Provider, error)
+	// own lists the client's registrations offered as buttons of their own.
+	own func(clientID string) []OwnRegistration
 	// displayNames gives the provider names a client's gate should show.
 	displayNames func(clientID string) map[string]string
 	// icons gives the icon addresses a client's gate draws on its buttons.
@@ -294,9 +296,20 @@ func (h *Handler) SetClientPolicy(policy func(clientID string) []string) {
 	h.clientPolicy = policy
 }
 
-// SetFederation installs the per-client upstream registrations.
-func (h *Handler) SetFederation(federated func(clientID, provider string, base *Provider) (*Provider, error), displayNames, icons func(clientID string) map[string]string) {
-	h.federated, h.displayNames, h.icons = federated, displayNames, icons
+// OwnRegistration is a client's own registration offered on the gate as a
+// button of its own, next to the platform's: what the button says and shows.
+type OwnRegistration struct {
+	Provider    string `json:"provider"`
+	DisplayName string `json:"display_name,omitempty"`
+	IconURL     string `json:"icon,omitempty"`
+}
+
+// SetFederation installs the per-client upstream registrations. federated
+// resolves a sign-in (own says the gate pressed the client's own button);
+// displayNames and icons dress a provider's button when the client's
+// registration replaces the platform's; own lists the buttons of their own.
+func (h *Handler) SetFederation(federated func(clientID, provider string, base *Provider, own bool) (*Provider, error), displayNames, icons func(clientID string) map[string]string, own func(clientID string) []OwnRegistration) {
+	h.federated, h.displayNames, h.icons, h.own = federated, displayNames, icons, own
 }
 
 // allowedFor reports whether a client's users may sign in with a provider.
@@ -377,11 +390,17 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The client's own registration, when it has one. A broken entry refuses
+	// The client's own registration, when it has one, or when the gate
+	// pressed the button for it (registration=own). A broken entry refuses
 	// the sign-in: it never falls back to the platform's registration, which
 	// the customer's policy may not allow.
+	ownButton := r.URL.Query().Get("registration") == "own"
+	if ownButton && h.federated == nil {
+		http.Error(w, "this client has no registration of its own", http.StatusBadRequest)
+		return
+	}
 	if h.federated != nil {
-		own, err := h.federated(session.ClientID, providerName, prov)
+		own, err := h.federated(session.ClientID, providerName, prov, ownButton)
 		if err != nil {
 			log.Printf("social/%s: federation of %s: %v", providerName, session.ClientID, err)
 			http.Error(w, "this client's sign-in is misconfigured", http.StatusBadGateway)
@@ -587,6 +606,11 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 	if h.icons != nil && clientID != "" {
 		if ic := h.icons(clientID); len(ic) > 0 {
 			out["icons"] = ic
+		}
+	}
+	if h.own != nil && clientID != "" {
+		if own := h.own(clientID); len(own) > 0 {
+			out["own"] = own
 		}
 	}
 	json.NewEncoder(w).Encode(out)

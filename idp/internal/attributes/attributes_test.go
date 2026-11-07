@@ -64,9 +64,9 @@ func TestNormalizeLocale(t *testing.T) {
 		"en_US": "en-US", // underscore + casing handled
 		"EN-gb": "en-GB", // casing
 		"fr":    "fr",
-		"en-NZ": "en",      // region not curated -> base language
-		"":      "",        // empty passthrough
-		"xx-YY": "xx-YY",   // unknown -> cleaned input
+		"en-NZ": "en",    // region not curated -> base language
+		"":      "",      // empty passthrough
+		"xx-YY": "xx-YY", // unknown -> cleaned input
 	}
 	for in, want := range cases {
 		if got := NormalizeLocale(in); got != want {
@@ -119,5 +119,45 @@ func TestNormalizeClaims_NormalisesLocale(t *testing.T) {
 	})
 	if attrs["locale"] != "en-US" {
 		t.Errorf("locale = %q, want en-US", attrs["locale"])
+	}
+}
+
+// Microsoft Graph's /me names the user "id" where the OIDC userinfo says
+// "sub"; a sign-in through either must yield the same kind of stable user id
+// and the profile attributes under their canonical keys.
+func TestNormalizeClaims_MicrosoftGraphMe(t *testing.T) {
+	attrs, userID := NormalizeClaims("microsoft", map[string]interface{}{
+		"id":                "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b",
+		"displayName":       "Ada Lovelace",
+		"givenName":         "Ada",
+		"surname":           "Lovelace",
+		"mail":              "ada@example.gov.im",
+		"userPrincipalName": "ada@example.gov.im",
+		"preferredLanguage": "en-GB",
+	})
+	if userID != "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b" {
+		t.Fatalf("user id from Graph id: got %q", userID)
+	}
+	for key, want := range map[string]string{"name": "Ada Lovelace", "given_name": "Ada", "family_name": "Lovelace", "email": "ada@example.gov.im", "locale": "en-GB"} {
+		if attrs[key] != want {
+			t.Errorf("%s: got %q, want %q", key, attrs[key], want)
+		}
+	}
+}
+
+// A Microsoft identity is keyed by Graph's directory id, the same person
+// whatever app registration signed them in; an OIDC "sub" alongside it does
+// not win, and a reply without the configured claim identifies nobody rather
+// than falling back to another field.
+func TestNormalizeClaims_MicrosoftIdentityIsGraphID(t *testing.T) {
+	_, userID := NormalizeClaims("microsoft", map[string]interface{}{"sub": "pairwise-sub", "id": "directory-id"})
+	if userID != "directory-id" {
+		t.Fatalf("user id: got %q, want the Graph id", userID)
+	}
+	if _, userID := NormalizeClaims("microsoft", map[string]interface{}{"sub": "pairwise-sub"}); userID != "" {
+		t.Fatalf("a reply without the configured claim must identify nobody, got %q", userID)
+	}
+	if _, userID := NormalizeClaims("microsoft", map[string]interface{}{"id": ""}); userID != "" {
+		t.Fatalf("an empty id identifies nobody, got %q", userID)
 	}
 }

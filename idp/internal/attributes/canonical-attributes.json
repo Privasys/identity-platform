@@ -51,6 +51,7 @@
     "microsoft": {
       "claimMap": {
         "sub":               "sub",
+        "id":                "sub",
         "name":              "name",
         "displayName":       "name",
         "given_name":        "given_name",
@@ -64,7 +65,7 @@
         "locale":            "locale",
         "preferredLanguage": "locale"
       },
-      "idClaim": "sub",
+      "idClaim": "id",
       "verificationClaims": {
         "email": "email_verified"
       }

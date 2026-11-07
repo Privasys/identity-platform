@@ -253,6 +253,51 @@ type Handler struct {
 	sessions   *oidc.SessionStore
 	issuerURL  string
 	httpClient *http.Client
+	// clientPolicy names the providers a client's users may sign in with
+	// (nil or empty: every configured one). Set from the client registry;
+	// enforced on the start path and reflected by the listing, so the
+	// sign-in gate shows only what is allowed and a page cannot widen it.
+	clientPolicy func(clientID string) []string
+}
+
+// SetClientPolicy installs the per-client provider restriction.
+func (h *Handler) SetClientPolicy(policy func(clientID string) []string) {
+	h.clientPolicy = policy
+}
+
+// allowedFor reports whether a client's users may sign in with a provider.
+// Without a policy, or with an empty list, every configured provider is
+// allowed.
+func (h *Handler) allowedFor(clientID, provider string) bool {
+	if h.clientPolicy == nil || clientID == "" {
+		return true
+	}
+	allowed := h.clientPolicy(clientID)
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, p := range allowed {
+		if p == provider {
+			return true
+		}
+	}
+	return false
+}
+
+// providersFor lists the configured providers a client's users may use,
+// in the configured order.
+func (h *Handler) providersFor(clientID string) []string {
+	names := h.providers.List()
+	if clientID == "" {
+		return names
+	}
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if h.allowedFor(clientID, n) {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 // NewHandler creates a social auth handler.
@@ -286,8 +331,15 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify session exists.
-	if _, ok := h.sessions.Get(sessionID); !ok {
+	session, ok := h.sessions.Get(sessionID)
+	if !ok {
 		http.Error(w, "session not found or expired", http.StatusBadRequest)
+		return
+	}
+	// The client's registration is the ceiling on which providers its
+	// users may sign in with; the page's preference can only narrow it.
+	if !h.allowedFor(session.ClientID, providerName) {
+		http.Error(w, "this provider is not allowed for this client", http.StatusForbidden)
 		return
 	}
 
@@ -448,9 +500,19 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleProviders returns the list of configured social providers.
-// GET /auth/social/providers?session_id=xxx
+// GET /auth/social/providers?client_id=xxx (or ?session_id=xxx)
+// Named for a client (directly, or through the OIDC session it opened), the
+// list is the client's allowed providers; otherwise every configured one.
 func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
-	names := h.providers.List()
+	clientID := r.URL.Query().Get("client_id")
+	if clientID == "" {
+		if sid := r.URL.Query().Get("session_id"); sid != "" {
+			if session, ok := h.sessions.Get(sid); ok {
+				clientID = session.ClientID
+			}
+		}
+	}
+	names := h.providersFor(clientID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"providers": names,

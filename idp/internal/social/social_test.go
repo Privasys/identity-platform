@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Privasys/idp/internal/oidc"
 )
@@ -191,5 +192,65 @@ func TestWalletLinkResult_RejectsWrongVerifier(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "PKCE") {
 		t.Errorf("expected PKCE error, got %s", rec.Body)
+	}
+}
+
+// A client's registration is the ceiling on the providers its users may
+// sign in with: the start path refuses one outside it and the listing shows
+// only the allowed ones, so a page cannot widen the choice.
+func TestClientPolicy_RestrictsStartAndListing(t *testing.T) {
+	srv, prov := fakeProvider(t)
+	_ = srv
+	providers := NewProviders()
+	providers.Register(prov)
+	providers.Register(&Provider{Name: "microsoft", ClientID: "ms-id", AuthURL: prov.AuthURL, TokenURL: prov.TokenURL, Scopes: []string{"openid"}, PKCE: true})
+	sessions := oidc.NewSessionStore()
+	h := NewHandler(providers, oidc.NewCodeStore(), sessions, "https://privasys.id")
+	h.SetClientPolicy(func(clientID string) []string {
+		if clientID == "workplace" {
+			return []string{"microsoft"}
+		}
+		return nil
+	})
+	sessions.Create(&oidc.AuthSession{SessionID: "s-work", ClientID: "workplace", ExpiresAt: time.Now().Add(time.Minute)})
+	sessions.Create(&oidc.AuthSession{SessionID: "s-open", ClientID: "open", ExpiresAt: time.Now().Add(time.Minute)})
+
+	start := func(provider, session string) int {
+		rec := httptest.NewRecorder()
+		h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider="+provider+"&session_id="+session, nil))
+		return rec.Code
+	}
+	if code := start(prov.Name, "s-work"); code != http.StatusForbidden {
+		t.Fatalf("a provider outside the client's list must be refused, got %d", code)
+	}
+	if code := start("microsoft", "s-work"); code != http.StatusFound {
+		t.Fatalf("an allowed provider starts the sign-in, got %d", code)
+	}
+	if code := start(prov.Name, "s-open"); code != http.StatusFound {
+		t.Fatalf("a client without a restriction may use any provider, got %d", code)
+	}
+
+	list := func(query string) []string {
+		rec := httptest.NewRecorder()
+		h.HandleProviders(rec, httptest.NewRequest("GET", "/auth/social/providers"+query, nil))
+		var body struct {
+			Providers []string `json:"providers"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		return body.Providers
+	}
+	if got := list(""); len(got) != 2 {
+		t.Fatalf("unnamed, every configured provider is listed: %v", got)
+	}
+	if got := list("?client_id=workplace"); len(got) != 1 || got[0] != "microsoft" {
+		t.Fatalf("named for the client, only its providers are listed: %v", got)
+	}
+	if got := list("?session_id=s-work"); len(got) != 1 || got[0] != "microsoft" {
+		t.Fatalf("named through its session, the same: %v", got)
+	}
+	if got := list("?client_id=open"); len(got) != 2 {
+		t.Fatalf("an unrestricted client lists everything: %v", got)
 	}
 }

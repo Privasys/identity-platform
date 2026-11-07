@@ -17,6 +17,7 @@
 
 import { AuthUI } from './ui';
 import { FRAME_SIZE_MESSAGE } from './frame-size';
+import { sanitiseProviders, selectProviders } from './providers';
 import type { AuthUIConfig, SignInResult } from './ui';
 import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
 import type { AuthSession } from './types';
@@ -279,11 +280,19 @@ function sanitiseApp(raw: unknown): AuthUIConfig['app'] {
 }
 
 const KNOWN_METHODS = ['wallet', 'passkey', 'social'] as const;
+type KnownMethod = (typeof KNOWN_METHODS)[number];
+// The adopter's list is an order as well as a filter (gate.ts), so it is
+// kept as given, less anything unknown or repeated.
 function sanitiseMethods(raw: unknown): AuthUIConfig['methods'] {
     if (!Array.isArray(raw)) return undefined;
-    const out = KNOWN_METHODS.filter((m) => raw.includes(m));
+    const out: KnownMethod[] = [];
+    for (const m of raw) {
+        if ((KNOWN_METHODS as readonly unknown[]).includes(m) && !out.includes(m as KnownMethod)) out.push(m as KnownMethod);
+    }
     return out.length ? out : undefined;
 }
+
+// `providers` narrows the social list to a closed vocabulary; see providers.ts.
 
 function sanitisePresentation(raw: unknown): AuthUIConfig['presentation'] {
     return raw === 'inline' || raw === 'page' || raw === 'modal' ? raw : undefined;
@@ -943,6 +952,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
             caps?: string[];
             billingGrant?: string;
             attributes?: readonly string[];
+            /** Adopter preference for the social providers; sanitised below. */
+            providers?: unknown;
         } = data.config;
         const parentOrigin = e.origin;
         // The inline frame reports its content height so the embedding page
@@ -978,6 +989,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // supported, deliberately degraded mode (no attestation
         // verification) — never blanket-blocked.
         const methods = sanitiseMethods(config.methods);
+        // The adopter's preferred external identity providers, applied to
+        // the list the IdP publishes once it has been fetched below.
+        const providers = sanitiseProviders(config.providers);
 
         // Connect-mode approve: an existing wallet session whose sealed
         // voucher the enclave refused (measurement change) or that has no
@@ -1285,10 +1299,24 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 let socialProviders: string[] = [];
                 if (!effectiveMethods || effectiveMethods.includes('social')) {
                     try {
-                        const provResp = await fetch(`${idpBase}/auth/social/providers`);
+                        // Named for the client, the identity provider lists only
+                        // the providers that client's users may sign in with.
+                        const provQuery = config.clientId ? `?client_id=${encodeURIComponent(config.clientId)}` : '';
+                        const provResp = await fetch(`${idpBase}/auth/social/providers${provQuery}`);
                         if (provResp.ok) {
                             const provData = await provResp.json();
-                            socialProviders = provData.providers ?? [];
+                            const published: string[] = provData.providers ?? [];
+                            // A preference that matches nothing yields the published
+                            // list (selectProviders): a gate with no button at all
+                            // would strand the user. Say so, since this console is
+                            // the frame's, not the adopter's.
+                            socialProviders = selectProviders(published, providers);
+                            if (providers && !providers.some((p) => published.includes(p))) {
+                                console.warn(
+                                    '[privasys] none of the requested providers',
+                                    providers, 'is configured at the identity provider; offering', published,
+                                );
+                            }
                         }
                     } catch { /* social not available, that's fine */ }
                 }

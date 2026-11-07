@@ -94,7 +94,7 @@ func TestCertificateCredential(t *testing.T) {
 	if err := cert.CheckSignatureFrom(cert); err != nil {
 		// A self-signed leaf is not a CA, so check the signature itself.
 		if err := cert.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature); err != nil {
-			t.Fatalf("self-signed by the KMS key: %v", err)
+			t.Fatalf("self-signed by the generated key: %v", err)
 		}
 	}
 	if got := time.Until(cert.NotAfter); got < 729*24*time.Hour || got > 731*24*time.Hour {
@@ -275,5 +275,27 @@ func TestExpiriesAndDisplayNames(t *testing.T) {
 	}
 	if s.DisplayNames("c1")["microsoft"] != "Contoso" {
 		t.Fatalf("names: %v", s.DisplayNames("c1"))
+	}
+}
+
+// Only a registration on a named tenant answers for the addresses it returns.
+func TestOwnDirectoryVouchesForEmail(t *testing.T) {
+	s := NewService(memStore{}, newMemKeys())
+	for tenant, want := range map[string]bool{"contoso.example": true, "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b": true, "common": false, "Organizations": false, "consumers": false} {
+		req := certRequest()
+		req.Tenant = tenant
+		if err := s.Delete(ctx, "c1", "microsoft"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Set(ctx, "c1", "microsoft", req); err != nil {
+			t.Fatal(err)
+		}
+		p, err := s.ProviderFor("c1", "microsoft", &social.Provider{Name: "microsoft"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.VouchesEmail != want {
+			t.Errorf("%s: vouches %v, want %v", tenant, p.VouchesEmail, want)
+		}
 	}
 }

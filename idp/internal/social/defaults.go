@@ -51,8 +51,11 @@ func DefaultProviders(c Credentials) []*Provider {
 			UserInfoURL:  "https://graph.microsoft.com/v1.0/me",
 			ClientID:     c.MicrosoftClientID,
 			ClientSecret: c.MicrosoftClientSecret,
-			Scopes:       []string{"openid", "email", "profile"},
-			PKCE:         true,
+			// Graph's /me needs User.Read. A work account gets it from the
+			// registration's listed permissions; a personal account only
+			// gets what the sign-in asks for, and is refused without it.
+			Scopes: []string{"openid", "email", "profile", "User.Read"},
+			PKCE:   true,
 		},
 		{
 			Name: "linkedin", DisplayName: "LinkedIn",

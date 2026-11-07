@@ -46,6 +46,12 @@ type Provider struct {
 	// Credential, when set, authenticates the token exchange instead of
 	// ClientSecret (a client's own registration: internal/federation).
 	Credential func(ctx context.Context, form url.Values) error
+	// VouchesEmail says this registration answers for the addresses it
+	// returns, whatever the reply says: a customer's own registration on its
+	// own tenant, where the directory is the customer's. Graph's "mail" through
+	// a multi-tenant registration proves nothing, since any tenant's
+	// administrator can set it to any address.
+	VouchesEmail bool
 }
 
 // Providers maps provider names to their configuration.
@@ -444,12 +450,14 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Exchange code for access token (PKCE: send the verifier bound to state).
-	token, err := h.exchangeCode(prov, code, entry.verifier)
+	exchanged, err := h.exchangeCode(prov, code, entry.verifier)
 	if err != nil {
 		log.Printf("social/%s: token exchange failed: %v", entry.provider, err)
 		h.callbackError(w, "Authentication failed — could not exchange code")
 		return
 	}
+
+	token := exchanged.AccessToken
 
 	// Fetch raw user info from the provider.
 	raw, err := h.fetchRawUserInfo(prov, token)
@@ -502,6 +510,13 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	emailVerified := prov.VouchesEmail || providerVerified(entry.provider, raw)["email"]
+	if entry.provider == "microsoft" {
+		if addr, ok := microsoftProvedEmail(exchanged.IDToken, providerUID); ok {
+			attrs["email"], emailVerified = addr, true
+		}
+	}
+
 	// Complete the OIDC session.
 	session, ok := h.sessions.Get(entry.sessionID)
 	if !ok {
@@ -519,6 +534,7 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.codes.UpdateAttributes(session.AuthCode, attrs)
+		h.codes.SetEmailVerified(session.AuthCode, emailVerified)
 		log.Printf("social/%s: patched %d attributes on existing code for session %s",
 			entry.provider, len(attrs), entry.sessionID)
 		h.callbackSuccess(w)
@@ -536,10 +552,11 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		CodeChallengeMethod: session.CodeChallengeMethod,
 		AuthTime:            time.Now(),
 		Attributes:          attrs,
+		EmailVerified:       emailVerified,
 	})
 	h.sessions.Complete(entry.sessionID, userID, authCode)
 
-	log.Printf("social/%s: authenticated user %s (session %s, %d attrs)", entry.provider, userID, entry.sessionID, len(attrs))
+	log.Printf("social/%s: authenticated user %s (session %s, %d attrs, email proved %v)", entry.provider, userID, entry.sessionID, len(attrs), emailVerified)
 
 	h.callbackSuccess(w)
 }
@@ -695,6 +712,50 @@ func (h *Handler) HandleWalletLinkResult(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// microsoftProvedEmail reads Entra's xms_edov claim: the address in this ID
+// token is on a domain its tenant has verified. Graph has no such statement, and any tenant's
+// administrator can set a user's "mail", so this is the only proof Microsoft
+// gives. The address comes from the token, since the claim is about that one.
+//
+// The token arrived directly from the token endpoint over TLS, which OIDC Core
+// 3.1.3.7 accepts in place of checking its signature. Its "oid" must name the
+// person Graph just named; a token without one does not count.
+func microsoftProvedEmail(idToken, graphID string) (string, bool) {
+	parts := strings.Split(idToken, ".")
+	if len(parts) != 3 {
+		return "", false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", false
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(raw, &claims); err != nil {
+		return "", false
+	}
+	if oid, _ := claims["oid"].(string); oid == "" || microsoftIDForm(oid) != microsoftIDForm(graphID) {
+		return "", false
+	}
+	proved := false
+	switch v := claims["xms_edov"].(type) {
+	case bool:
+		proved = v
+	case float64:
+		proved = v == 1
+	case string:
+		proved = v == "1" || strings.EqualFold(v, "true")
+	}
+	addr, _ := claims["email"].(string)
+	return addr, proved && addr != ""
+}
+
+// microsoftIDForm compares the two spellings of one person: a personal account
+// is "00000000-0000-0000-66f3-3332eca7ea81" in a token and "66f33332eca7ea81" in
+// Graph. A work account is the same GUID in both.
+func microsoftIDForm(id string) string {
+	return strings.TrimLeft(strings.ToLower(strings.ReplaceAll(id, "-", "")), "0")
+}
+
 // providerVerified returns, per canonical attribute key, whether the provider's
 // raw response marks it verified — mirrors the wallet's isProviderVerified using
 // the shared referential's verificationClaims.
@@ -745,9 +806,10 @@ func generatePKCE() (verifier, challenge string) {
 type tokenResponse struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
+	IDToken     string `json:"id_token"`
 }
 
-func (h *Handler) exchangeCode(prov *Provider, code, verifier string) (string, error) {
+func (h *Handler) exchangeCode(prov *Provider, code, verifier string) (*tokenResponse, error) {
 	data := url.Values{
 		"client_id":    {prov.ClientID},
 		"code":         {code},
@@ -758,7 +820,7 @@ func (h *Handler) exchangeCode(prov *Provider, code, verifier string) (string, e
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 		if err := prov.Credential(ctx, data); err != nil {
-			return "", fmt.Errorf("credential: %w", err)
+			return nil, fmt.Errorf("credential: %w", err)
 		}
 	} else {
 		data.Set("client_secret", prov.ClientSecret)
@@ -775,18 +837,18 @@ func (h *Handler) exchangeCode(prov *Provider, code, verifier string) (string, e
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("token request: %w", err)
+		return nil, fmt.Errorf("token request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("token response %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("token response %d: %s", resp.StatusCode, string(body))
 	}
 
 	var tok tokenResponse
 	if err := json.Unmarshal(body, &tok); err != nil {
-		return "", fmt.Errorf("parse token response: %w", err)
+		return nil, fmt.Errorf("parse token response: %w", err)
 	}
 
 	if tok.AccessToken == "" {
@@ -796,10 +858,10 @@ func (h *Handler) exchangeCode(prov *Provider, code, verifier string) (string, e
 	}
 
 	if tok.AccessToken == "" {
-		return "", fmt.Errorf("no access_token in response")
+		return nil, fmt.Errorf("no access_token in response")
 	}
 
-	return tok.AccessToken, nil
+	return &tok, nil
 }
 
 // fetchRawUserInfo calls the provider's UserInfo endpoint and returns the

@@ -354,3 +354,83 @@ func TestFederatedRegistration(t *testing.T) {
 		t.Fatalf("broken entry: %d", rec.Code)
 	}
 }
+
+// Graph says nothing about an address, so Microsoft's platform registration
+// proves none; a registration that vouches does, and Google's own claim counts.
+func TestEmailVerifiedOnTheCode(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
+		case "/graph":
+			json.NewEncoder(w).Encode(map[string]string{"id": "directory-id", "mail": "ada@example.com"})
+		case "/google":
+			json.NewEncoder(w).Encode(map[string]any{"sub": "g1", "email": "ada@example.com", "email_verified": true})
+		}
+	}))
+	defer upstream.Close()
+
+	for _, c := range []struct {
+		name, provider, info string
+		vouches, want        bool
+	}{
+		{"platform registration", "microsoft", "/graph", false, false},
+		{"own tenant", "microsoft", "/graph", true, true},
+		{"provider's claim", "google", "/google", false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			providers := NewProviders()
+			providers.Register(&Provider{Name: c.provider, ClientID: "id", ClientSecret: "s", AuthURL: upstream.URL + "/auth",
+				TokenURL: upstream.URL + "/token", UserInfoURL: upstream.URL + c.info, VouchesEmail: c.vouches})
+			sessions, codes := oidc.NewSessionStore(), oidc.NewCodeStore()
+			sessions.Create(&oidc.AuthSession{SessionID: "s1", ClientID: "c1", ExpiresAt: time.Now().Add(time.Minute)})
+			h := NewHandler(providers, codes, sessions, "https://idp.example")
+			rec := httptest.NewRecorder()
+			h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider="+c.provider+"&session_id=s1", nil))
+			loc, _ := url.Parse(rec.Header().Get("Location"))
+			rec = httptest.NewRecorder()
+			h.HandleCallback(rec, httptest.NewRequest("GET", "/auth/social/callback?code=x&state="+loc.Query().Get("state"), nil))
+			session, _ := sessions.Get("s1")
+			ac, ok := codes.Consume(session.AuthCode)
+			if !ok {
+				t.Fatalf("no code: %d %s", rec.Code, rec.Body)
+			}
+			if ac.EmailVerified != c.want {
+				t.Fatalf("verified %v, want %v", ac.EmailVerified, c.want)
+			}
+		})
+	}
+}
+
+func TestMicrosoftProvedEmail(t *testing.T) {
+	token := func(claims map[string]any) string {
+		body, _ := json.Marshal(claims)
+		return "e30." + base64.RawURLEncoding.EncodeToString(body) + ".sig"
+	}
+	const oid = "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b"
+	for name, c := range map[string]struct {
+		claims map[string]any
+		want   bool
+	}{
+		"bool":         {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": true}, true},
+		"string":       {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": "1"}, true},
+		"number":       {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": 1}, true},
+		"not proved":   {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": false}, false},
+		"zero":         {map[string]any{"oid": oid, "email": "a@gov.example", "xms_edov": "0"}, false},
+		"no claim":     {map[string]any{"oid": oid, "email": "a@gov.example"}, false},
+		"no address":   {map[string]any{"oid": oid, "xms_edov": true}, false},
+		"other person": {map[string]any{"oid": "someone-else", "email": "a@gov.example", "xms_edov": true}, false},
+		"no oid":       {map[string]any{"email": "a@gov.example", "xms_edov": true}, false},
+	} {
+		if addr, ok := microsoftProvedEmail(token(c.claims), oid); ok != c.want || (ok && addr != "a@gov.example") {
+			t.Errorf("%s: %q %v, want %v", name, addr, ok, c.want)
+		}
+	}
+	personal := token(map[string]any{"oid": "00000000-0000-0000-66f3-3332eca7ea81", "email": "a@outlook.example", "xms_edov": true})
+	if addr, ok := microsoftProvedEmail(personal, "66f33332eca7ea81"); !ok || addr != "a@outlook.example" {
+		t.Errorf("a personal account's two id spellings: %q %v", addr, ok)
+	}
+	if _, ok := microsoftProvedEmail("not-a-token", oid); ok {
+		t.Error("garbage must prove nothing")
+	}
+}

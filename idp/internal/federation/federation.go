@@ -86,6 +86,11 @@ type Entry struct {
 	Credential  Credential `json:"credential"`
 }
 
+// Active says the entry names a registration and serves sign-ins. An entry
+// prepared before the registration exists holds a certificate and nothing
+// else: the platform's registration serves until the ids are set.
+func (e *Entry) Active() bool { return e.ClientID != "" }
+
 // SetRequest is what the admin route accepts. Secret is taken once.
 type SetRequest struct {
 	ClientID    string `json:"client_id"`
@@ -95,6 +100,7 @@ type SetRequest struct {
 	Credential  struct {
 		Kind   string `json:"kind"`
 		Secret string `json:"secret,omitempty"`
+		Rotate bool   `json:"rotate,omitempty"` // generate a new key pair although one exists
 	} `json:"credential"`
 }
 
@@ -106,6 +112,7 @@ type View struct {
 	DisplayName     string     `json:"display_name,omitempty"`
 	IconURL         string     `json:"icon_url,omitempty"`
 	Kind            string     `json:"credential_kind"`
+	Active          bool       `json:"active"`                // false until the registration's ids are set
 	Certificate     string     `json:"certificate,omitempty"` // the one to upload
 	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
 	RotationPending bool       `json:"rotation_pending,omitempty"`
@@ -151,18 +158,24 @@ func (s *Service) save(clientID string, entries map[string]*Entry) error {
 	return s.store.SetFederation(clientID, string(raw))
 }
 
-// Set creates or changes a client's entry for a provider. On an entry that
-// already has a certificate, asking for one again rotates: a new key pair is
-// generated and returned for upload, and the old one keeps signing until
-// Confirm.
+// Set creates or changes a client's entry for a provider. An entry that
+// already has a certificate keeps its key, so the ids, name or icon can change
+// under a certificate already uploaded; asking to rotate generates a new key
+// pair, returned for upload, and the old one keeps signing until Confirm. A
+// certificate can be prepared before the registration exists, with no ids:
+// the entry then serves nothing until they are set. On an existing entry, a
+// field left out keeps its value; Delete is how an entry is cleared.
 func (s *Service) Set(ctx context.Context, clientID, provider string, req SetRequest) (*View, error) {
 	if provider != "microsoft" {
 		return nil, fmt.Errorf("federation is not available for provider %q", provider)
 	}
-	if req.ClientID == "" || len(req.ClientID) > 128 {
-		return nil, errors.New("client_id is required")
+	if len(req.ClientID) > 128 {
+		return nil, errors.New("client_id is limited to 128 characters")
 	}
-	if !tenantPattern.MatchString(req.Tenant) {
+	if (req.ClientID == "") != (req.Tenant == "") {
+		return nil, errors.New("client_id and tenant go together")
+	}
+	if req.Tenant != "" && !tenantPattern.MatchString(req.Tenant) {
 		return nil, errors.New("tenant must be a tenant id, a verified domain, or common")
 	}
 	if len(req.DisplayName) > 64 {
@@ -180,13 +193,33 @@ func (s *Service) Set(ctx context.Context, clientID, provider string, req SetReq
 	}
 	prior := entries[provider]
 	entry := &Entry{ClientID: req.ClientID, Tenant: req.Tenant, DisplayName: req.DisplayName, IconURL: req.IconURL}
+	if prior != nil {
+		if entry.ClientID == "" {
+			entry.ClientID, entry.Tenant = prior.ClientID, prior.Tenant
+		}
+		if entry.DisplayName == "" {
+			entry.DisplayName = prior.DisplayName
+		}
+		if entry.IconURL == "" {
+			entry.IconURL = prior.IconURL
+		}
+	}
+	if entry.ClientID == "" && req.Credential.Kind != KindCertificate {
+		return nil, errors.New("client_id and tenant are required; only a certificate can be prepared before the registration exists")
+	}
 	switch req.Credential.Kind {
 	case KindCertificate:
-		cert, err := s.generateCertificate(ctx, clientID, provider, req.ClientID)
+		entry.Credential.Kind = KindCertificate
+		if prior != nil && prior.Credential.Kind == KindCertificate && prior.Credential.Certificate != nil && !req.Credential.Rotate {
+			// The key stays: only the registration's ids, name or icon
+			// change, and the certificate already uploaded keeps working.
+			entry.Credential.Certificate, entry.Credential.Pending = prior.Credential.Certificate, prior.Credential.Pending
+			break
+		}
+		cert, err := s.generateCertificate(ctx, clientID, provider, entry.ClientID)
 		if err != nil {
 			return nil, err
 		}
-		entry.Credential.Kind = KindCertificate
 		if prior != nil && prior.Credential.Kind == KindCertificate && prior.Credential.Certificate != nil {
 			// A rotation: a pending certificate replaced before it was
 			// confirmed was never uploaded, so its key can go.
@@ -334,7 +367,7 @@ func (s *Service) Icons(clientID string) map[string]string {
 	}
 	out := map[string]string{}
 	for provider, e := range entries {
-		if e.IconURL != "" {
+		if e.Active() && e.IconURL != "" {
 			out[provider] = e.IconURL
 		}
 	}
@@ -349,7 +382,7 @@ func (s *Service) DisplayNames(clientID string) map[string]string {
 	}
 	out := map[string]string{}
 	for provider, e := range entries {
-		if e.DisplayName != "" {
+		if e.Active() && e.DisplayName != "" {
 			out[provider] = e.DisplayName
 		}
 	}
@@ -357,7 +390,7 @@ func (s *Service) DisplayNames(clientID string) map[string]string {
 }
 
 func viewOf(provider string, e *Entry) View {
-	v := View{Provider: provider, ClientID: e.ClientID, Tenant: e.Tenant, DisplayName: e.DisplayName, IconURL: e.IconURL, Kind: e.Credential.Kind}
+	v := View{Provider: provider, ClientID: e.ClientID, Tenant: e.Tenant, DisplayName: e.DisplayName, IconURL: e.IconURL, Kind: e.Credential.Kind, Active: e.Active()}
 	cert := e.Credential.Certificate
 	if e.Credential.Pending != nil {
 		cert = e.Credential.Pending
@@ -372,15 +405,16 @@ func viewOf(provider string, e *Entry) View {
 }
 
 // ProviderFor gives the upstream registration for a client's users: the
-// client's own if it has an entry, nil if it has none. An entry that cannot be
-// read is an error, never a silent fall back to the platform's registration.
+// client's own if it has an active entry, nil if it has none or the entry is
+// only a prepared certificate. An entry that cannot be read is an error, never
+// a silent fall back to the platform's registration.
 func (s *Service) ProviderFor(clientID, provider string, base *social.Provider) (*social.Provider, error) {
 	entries, err := s.entries(clientID)
 	if err != nil {
 		return nil, err
 	}
 	entry := entries[provider]
-	if entry == nil {
+	if entry == nil || !entry.Active() {
 		return nil, nil
 	}
 	p := *base
@@ -478,6 +512,15 @@ func (k serviceSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) 
 	return k.keys.Sign(k.ctx, k.ref, digest)
 }
 
+// commonName names the certificate after the registration it signs for, or
+// after the sign-in client when it is prepared before the registration exists.
+func commonName(clientID, upstreamClient string) string {
+	if upstreamClient == "" {
+		return "Federation for sign-in client " + clientID
+	}
+	return "Federation " + upstreamClient
+}
+
 func (s *Service) generateCertificate(ctx context.Context, clientID, provider, upstreamClient string) (*Certificate, error) {
 	id := make([]byte, 6)
 	if _, err := rand.Read(id); err != nil {
@@ -496,7 +539,7 @@ func (s *Service) generateCertificate(ctx context.Context, clientID, provider, u
 	now := time.Now().UTC().Truncate(time.Second)
 	tmpl := &x509.Certificate{
 		SerialNumber:       serial,
-		Subject:            pkix.Name{Organization: []string{"Privasys ID"}, CommonName: "Federation " + upstreamClient},
+		Subject:            pkix.Name{Organization: []string{"Privasys ID"}, CommonName: commonName(clientID, upstreamClient)},
 		NotBefore:          now.Add(-time.Hour),
 		NotAfter:           now.Add(certificateLifetime),
 		KeyUsage:           x509.KeyUsageDigitalSignature,

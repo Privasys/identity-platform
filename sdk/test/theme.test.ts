@@ -4,8 +4,7 @@ import { sanitiseTheme, themeClasses, themeProperties, themeRules, themeStyleshe
 
 test('a valid theme is kept', () => {
     const theme = {
-        preset: 'govuk',
-        font: `"GDS Transport", arial, sans-serif`,
+        font: `"Brand Sans", arial, sans-serif`,
         colours: { primary: '#00703c', link: '#1D7' },
         radius: 0,
     };
@@ -14,8 +13,8 @@ test('a valid theme is kept', () => {
 
 test('a bad value is dropped whole, and an empty theme is no theme', () => {
     for (const bad of [
-        undefined, null, 'govuk', 42, {},
-        { preset: 'other' },
+        undefined, null, 'theme', 42, {},
+        { preset: 'govuk' },
         { font: 'x'.repeat(201) },
         { font: '' },
         { font: 'Arial; background:url(//evil)' },
@@ -64,9 +63,7 @@ test('only the tokens set get rules, so the default gate keeps the rest', () => 
     assert.ok(themeRules({ font: 'Arial' }).includes(':host(.themed), :host(.themed) button'));
 });
 
-test('the preset is a class and a fixed sheet', () => {
-    assert.deepEqual(themeClasses({ preset: 'govuk' }), ['themed', 'theme-govuk']);
+test('a theme is one class and the rules for its own tokens', () => {
     assert.deepEqual(themeClasses({ radius: 0 }), ['themed']);
-    assert.ok(themeStylesheet({ preset: 'govuk' }).includes('#00703c'));
-    assert.ok(!themeStylesheet({ radius: 0 }).includes('#00703c'));
+    assert.equal(themeStylesheet({ radius: 0 }), themeRules({ radius: 0 }));
 });

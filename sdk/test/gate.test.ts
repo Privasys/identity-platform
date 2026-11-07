@@ -5,12 +5,12 @@ import { alternativeOrder, displayAppName, gateOrder } from '../src/gate';
 test('a slug is shown as capitalised words', () => {
     assert.equal(displayAppName('asset-register'), 'Asset Register');
     assert.equal(displayAppName('my_app'), 'My App');
-    assert.equal(displayAppName('globaml'), 'Globaml');
+    assert.equal(displayAppName('ledger'), 'Ledger');
 });
 
 test('a name written for people is shown as written', () => {
     assert.equal(displayAppName('Register of Assets and Owners'), 'Register of Assets and Owners');
-    assert.equal(displayAppName('GlobAML'), 'GlobAML');
+    assert.equal(displayAppName('LedgerOS'), 'LedgerOS');
     assert.equal(displayAppName('  Privasys Drive '), 'Privasys Drive');
 });
 

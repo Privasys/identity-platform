@@ -7,7 +7,7 @@ export type GateMethod = 'wallet' | 'passkey' | 'social';
 
 /**
  * The name the gate shows for the app. A slug (`asset-register`, `my_app`,
- * `globaml`) reads better as words with capitals; a name the adopter already
+ * `ledger`) reads better as words with capitals; a name the adopter already
  * wrote for people ("Register of Assets and Owners") is shown as written,
  * since capitalising every word would turn its "of" into "Of".
  */

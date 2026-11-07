@@ -17,8 +17,6 @@ export const THEME_COLOURS = [
 export type ThemeColour = (typeof THEME_COLOURS)[number];
 
 export interface AuthTheme {
-    /** A ready-made style. `'govuk'` follows the GOV.UK Design System's buttons, focus and links. */
-    preset?: 'govuk';
     /** A font stack. Letters, digits, spaces, commas, quotes and hyphens, at most 200 characters. */
     font?: string;
     /** Colours, as hex only (`#rgb` or `#rrggbb`). */
@@ -39,7 +37,6 @@ export function sanitiseTheme(raw: unknown): AuthTheme | undefined {
     if (!raw || typeof raw !== 'object') return undefined;
     const r = raw as Record<string, unknown>;
     const theme: AuthTheme = {};
-    if (r.preset === 'govuk') theme.preset = 'govuk';
     if (typeof r.font === 'string' && FONT.test(r.font)) theme.font = r.font;
     if (r.colours && typeof r.colours === 'object') {
         const colours: Partial<Record<ThemeColour, string>> = {};
@@ -103,106 +100,12 @@ function scopeToThemed(rule: string): string {
     return `${scoped.join(', ')} ${rule.slice(open)}`;
 }
 
-/**
- * The GOV.UK preset, read with the adopter's tokens where given. The page's
- * own font carries it: GDS Transport is licensed to gov.uk services and is
- * never embedded here, nor is the crown.
- */
-export const GOVUK_CSS = /* css */ `
-:host(.theme-govuk) {
-    font-family: var(--pv-font, Arial, sans-serif);
-    font-size: 19px;
-    color: var(--pv-text, #0b0c0c);
-    background: var(--pv-background, #fff);
-    line-height: 1.32;
-}
-:host(.theme-govuk) .auth-panel-heading { color: var(--pv-text, #0b0c0c); font-weight: 700; }
-:host(.theme-govuk) .brand-panel-name { color: var(--pv-text, #0b0c0c); }
-:host(.theme-govuk) .brand-panel-desc, :host(.theme-govuk) .brand-panel-desc strong { color: var(--pv-text, #505a5f); }
-:host(.theme-govuk) .divider { display: none; }
-:host(.theme-govuk) .btn-hint { display: none; }
-:host(.theme-govuk) .btn-provider {
-    justify-content: center;
-    font-size: 19px;
-    padding: 10px 12px;
-    border: 2px solid transparent;
-    border-radius: var(--pv-radius, 0);
-    box-shadow: 0 2px 0 #929191;
-    background: var(--pv-secondary, #f3f2f1);
-    color: var(--pv-secondaryText, #0b0c0c);
-    transition: none;
-}
-:host(.theme-govuk) .btn-provider ~ .btn-provider { margin-top: 16px; }
-/* An organisation's name on the button ("Sign in with Contoso Staff")
-   wraps in the 364px the inline panel leaves at 19px; a wider panel keeps the
-   label on one line and still sits inside a GOV.UK two-thirds column. */
-:host(.theme-govuk.inline) .auth-panel { max-width: 480px; }
-:host(.theme-govuk) .btn-provider .btn-label { flex: 0 1 auto; color: inherit; font-weight: 400; }
-:host(.theme-govuk) .btn-provider svg { color: inherit; }
-:host(.theme-govuk) .btn-provider:hover { background: #dbdad9; border-color: transparent; box-shadow: 0 2px 0 #929191; }
-:host(.theme-govuk) .btn-provider:active { transform: translateY(2px); box-shadow: none; }
-:host(.theme-govuk) .btn-provider.primary {
-    background: var(--pv-primary, #00703c);
-    color: var(--pv-primaryText, #fff);
-    box-shadow: 0 2px 0 #002d18;
-}
-:host(.theme-govuk) .btn-provider.primary .btn-label,
-:host(.theme-govuk) .btn-provider.primary svg { color: var(--pv-primaryText, #fff); }
-:host(.theme-govuk) .btn-provider.primary:hover { background: #005a30; box-shadow: 0 2px 0 #002d18; }
-:host(.theme-govuk) .btn-provider:focus-visible,
-:host(.theme-govuk) .btn-provider.primary:focus-visible,
-:host(.theme-govuk) .btn-retry:focus-visible {
-    outline: 3px solid transparent;
-    background: var(--pv-focus, #ffdd00);
-    color: var(--pv-focusText, #0b0c0c);
-    border-color: var(--pv-focus, #ffdd00);
-    box-shadow: 0 2px 0 var(--pv-focusText, #0b0c0c);
-}
-:host(.theme-govuk) .btn-provider:focus-visible .btn-label,
-:host(.theme-govuk) .btn-provider:focus-visible svg { color: var(--pv-focusText, #0b0c0c); }
-:host(.theme-govuk) .btn-retry, :host(.theme-govuk) .gate-close { border-radius: var(--pv-radius, 0); }
-:host(.theme-govuk) .btn-back { border-radius: 0; color: var(--pv-text, #0b0c0c); text-decoration: underline; }
-:host(.theme-govuk) .link-btn,
-:host(.theme-govuk) .footer a { color: var(--pv-link, #1d70b8); text-decoration: underline; }
-:host(.theme-govuk) a:focus-visible,
-:host(.theme-govuk) .link-btn:focus-visible,
-:host(.theme-govuk) .btn-back:focus-visible {
-    outline: 3px solid transparent;
-    background: var(--pv-focus, #ffdd00);
-    color: var(--pv-focusText, #0b0c0c);
-    box-shadow: 0 -2px var(--pv-focus, #ffdd00), 0 4px var(--pv-focusText, #0b0c0c);
-    text-decoration: none;
-}
-:host(.theme-govuk) .footer { font-size: 16px; color: var(--pv-text, #505a5f); border-color: var(--pv-border, #b1b4b6); }
-:host(.theme-govuk) .gate-seal { color: var(--pv-text, #505a5f); }
-:host(.theme-govuk) .gate-seal-text strong { color: var(--pv-text, #0b0c0c); }
-@media (prefers-color-scheme: dark) {
-    :host(.theme-govuk) { color: var(--pv-text, #f3f2f1); background: var(--pv-background, #0b0c0c); }
-    :host(.theme-govuk) .auth-panel-heading, :host(.theme-govuk) .brand-panel-name { color: var(--pv-text, #f3f2f1); }
-    :host(.theme-govuk) .brand-panel-desc, :host(.theme-govuk) .brand-panel-desc strong { color: var(--pv-text, #b1b4b6); }
-    :host(.theme-govuk) .btn-provider { background: var(--pv-secondary, #383f43); color: var(--pv-secondaryText, #f3f2f1); box-shadow: 0 2px 0 #0b0c0c; }
-    :host(.theme-govuk) .btn-provider:hover { background: #505a5f; box-shadow: 0 2px 0 #0b0c0c; }
-    :host(.theme-govuk) .btn-provider.primary { background: var(--pv-primary, #00703c); color: var(--pv-primaryText, #fff); box-shadow: 0 2px 0 #000; }
-    :host(.theme-govuk) .btn-provider.primary:hover { background: #005a30; }
-    :host(.theme-govuk) .btn-provider:focus-visible,
-    :host(.theme-govuk) .btn-provider.primary:focus-visible { background: var(--pv-focus, #ffdd00); color: var(--pv-focusText, #0b0c0c); box-shadow: 0 2px 0 var(--pv-focusText, #0b0c0c); }
-    :host(.theme-govuk) .btn-back { color: var(--pv-text, #f3f2f1); }
-    :host(.theme-govuk) .link-btn,
-    :host(.theme-govuk) .footer a { color: var(--pv-link, #8cb8dc); }
-    :host(.theme-govuk) .footer { color: var(--pv-text, #b1b4b6); border-color: var(--pv-border, #505a5f); }
-    :host(.theme-govuk) .gate-seal { color: var(--pv-text, #b1b4b6); }
-    :host(.theme-govuk) .gate-seal-text strong { color: var(--pv-text, #f3f2f1); }
-}
-`;
-
-/** The gate's stylesheet additions for a theme: the preset and the token rules. */
+/** The gate's stylesheet additions for a theme: the rules for its tokens. */
 export function themeStylesheet(theme: AuthTheme): string {
-    return (theme.preset === 'govuk' ? GOVUK_CSS : '') + themeRules(theme);
+    return themeRules(theme);
 }
 
 /** The classes a theme puts on the gate's host element. */
-export function themeClasses(theme: AuthTheme): string[] {
-    const classes = ['themed'];
-    if (theme.preset === 'govuk') classes.push('theme-govuk');
-    return classes;
+export function themeClasses(_theme: AuthTheme): string[] {
+    return ['themed'];
 }

@@ -512,12 +512,13 @@ const MODAL_CSS = /* css */ `
     .pitch-title { color: #F1F5F9; }
     .pitch-desc { color: #94A3B8; }
     .pitch-bullet { color: #E2E8F0; }
-    .gate-header { border-color: rgba(255,255,255,0.08); color: #64748B; }
+    .gate-header { border-color: rgba(255,255,255,0.08); color: #94A3B8; }
     .gate-header-brand { color: #F1F5F9; }
+    .gate-seal { color: #94A3B8; }
     .gate-seal-text strong { color: #E2E8F0; }
     .gate-close { border-color: rgba(255,255,255,0.12); color: #94A3B8; }
     .gate-close:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
-    .gate-request { color: #64748B; }
+    .gate-request { color: #94A3B8; }
     .gate-request strong { color: #E2E8F0; }
     .hint-warn { color: #FBBF24; }
 }
@@ -581,7 +582,7 @@ const MODAL_CSS = /* css */ `
 .btn-label { font-weight: 500; flex: 1; }
 .btn-hint {
     font-size: 11px;
-    color: #94A3B8;
+    color: #64748B;
     flex-shrink: 0;
 }
 
@@ -872,7 +873,7 @@ button:focus-visible, a:focus-visible {
     .btn-back { color: #64748B; }
     .btn-back:hover { background: rgba(255,255,255,0.06); color: #E2E8F0; }
     .brand-panel-name { color: #F1F5F9; }
-    .brand-panel-desc { color: #64748B; }
+    .brand-panel-desc { color: #94A3B8; }
     .auth-panel-heading { color: #F1F5F9; }
     .btn-provider {
         background: rgba(255,255,255,0.04);
@@ -899,7 +900,7 @@ button:focus-visible, a:focus-visible {
        invert with them or it is light-on-light and unreadable (observed
        on the mobile wallet handoff). */
     .btn-provider.primary .btn-label { color: #0F172A; }
-    .btn-hint { color: #64748B; }
+    .btn-hint { color: #94A3B8; }
     .btn-label { color: #E2E8F0; }
     .divider { color: #475569; }
     .divider::before, .divider::after { background: rgba(255,255,255,0.08); }
@@ -1339,13 +1340,7 @@ export class AuthUI {
         // Without a generic brand panel to carry context (inline and page
         // modes), flow states get a heading of their own above the tile.
         const flowHeading = (inline || isPage) && !isIdle && this.state !== 'success' && this.state !== 'error'
-            ? (this.method === 'passkey'
-                ? 'Sign in with a passkey'
-                // A government service keeps its own name over the gate; the
-                // tile below says what is happening.
-                : this.cfg.theme?.preset === 'govuk'
-                    ? `Sign in to ${this.cfg.app?.displayName || displayAppName(this.cfg.appName)}`
-                    : 'Connecting you to Privasys ID')
+            ? (this.method === 'passkey' ? 'Sign in with a passkey' : 'Connecting you to Privasys ID')
             : null;
 
         // Left panel content: the adopter's pitch (page mode — that panel is
@@ -1492,7 +1487,7 @@ export class AuthUI {
             const passkeyOp = this.getWebAuthnClient().sessions.hasPasskeyHint() ? 'authenticate' : 'register';
             passkeyButton = el('button', { className: 'btn-provider', onClick: () => this.startPasskey(passkeyOp) },
                 el('span', { html: ICON_PASSKEY }),
-                el('span', { className: 'btn-label' }, this.cfg.theme?.preset === 'govuk' ? 'Sign in with a passkey' : 'Passkey'),
+                el('span', { className: 'btn-label' }, 'Passkey'),
                 el('span', { className: 'btn-hint' }, 'Face ID, Touch ID, Windows Hello'),
             );
         }
@@ -1510,7 +1505,6 @@ export class AuthUI {
         // that identity rather than a chooser with one entry.
         const ownRegistrations = this.allowed('social') ? (this.cfg.socialOwn ?? []) : [];
         const soloSocial = !hasWallet && !hasWebAuthn && socialProviders.length === 1 && !ownRegistrations.length;
-        const govuk = this.cfg.theme?.preset === 'govuk';
         // A client's own registrations beside the platform's (an organisation's
         // staff sign-in) come first among the alternatives, under the
         // organisation's name and icon; the platform's buttons follow for
@@ -1531,7 +1525,7 @@ export class AuthUI {
                 onClick: () => this.startSocial(provider),
             },
                 iconUrl ? el('img', { src: iconUrl, alt: '' }) : icon ? el('span', { html: icon }) : null,
-                el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial || govuk, this.cfg.socialDisplayNames?.[provider])),
+                el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial, this.cfg.socialDisplayNames?.[provider])),
             );
         });
 
@@ -1556,8 +1550,6 @@ export class AuthUI {
             for (const b of walletButtons) b.classList.remove('primary');
             alternatives[0].classList.add('primary');
         }
-        // The preset's green is the page's one primary action.
-        if (govuk && !walletButtons.length && alternatives.length) alternatives[0].classList.add('primary');
         buttons.push(...(walletFirst ? [...walletButtons, ...divider, ...alternatives] : [...alternatives, ...divider, ...walletButtons]));
 
         return el('div', null,
@@ -1653,7 +1645,7 @@ export class AuthUI {
                 ),
                 hasWebAuthn ? el('button', { className: 'btn-provider', onClick: () => { this.cleanup(); this.startPasskey(this.getWebAuthnClient().sessions.hasPasskeyHint() ? 'authenticate' : 'register'); } },
                     el('span', { html: ICON_PASSKEY }),
-                    el('span', { className: 'btn-label' }, this.cfg.theme?.preset === 'govuk' ? 'Sign in with a passkey' : 'Passkey'),
+                    el('span', { className: 'btn-label' }, 'Passkey'),
                 ) : null,
             ),
         );

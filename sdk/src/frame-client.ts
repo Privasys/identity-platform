@@ -266,10 +266,10 @@ export interface AuthFrameConfig {
      */
     providers?: readonly SocialProvider[];
     /**
-     * Theme the gate: a closed set of tokens, sanitised by the frame host.
-     * `{ preset: 'govuk', font: '<your stack>' }` gives a government service
-     * its own buttons, focus state and links. The "Secured by Privasys ID"
-     * seal stays in every theme.
+     * Theme the gate: a closed set of tokens (font, colours, radius),
+     * sanitised by the frame host. The "Secured by Privasys ID" seal stays
+     * in every theme. A page that wants its own design draws the gate
+     * itself: see `headless`.
      */
     theme?: AuthTheme;
     /**

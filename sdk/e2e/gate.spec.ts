@@ -50,14 +50,18 @@ async function renderGate(page: Page, config: GateConfig): Promise<void> {
     await page.waitForTimeout(250); // the host's fade-in
 }
 
-const govuk = { presentation: 'page', theme: { preset: 'govuk', font: 'Arial, sans-serif' }, legal: false };
+const themed = {
+    presentation: 'page',
+    theme: { font: 'Arial, sans-serif', radius: 0, colours: { primary: '#0b3d91', link: '#0b3d91', focus: '#ffbf47', focusText: '#0b0c0c' } },
+    legal: false,
+};
 
 for (const scheme of ['light', 'dark'] as const) {
     test.describe(`${scheme} appearance`, () => {
         test.use({ colorScheme: scheme });
 
-        test('the preset meets WCAG 2.2 AA', async ({ page }) => {
-            await renderGate(page, govuk);
+        test('a token theme meets WCAG 2.2 AA', async ({ page }) => {
+            await renderGate(page, themed);
             const results = await new AxeBuilder({ page })
                 .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
                 .analyze();
@@ -75,22 +79,14 @@ for (const scheme of ['light', 'dark'] as const) {
         });
 
         for (const vp of VIEWPORTS) {
-            test(`the preset at ${vp.name} width`, async ({ page }) => {
+            test(`a token theme at ${vp.name} width`, async ({ page }) => {
                 await page.setViewportSize({ width: vp.width, height: vp.height });
-                await renderGate(page, govuk);
-                await expect(page).toHaveScreenshot(`govuk-${scheme}-${vp.name}.png`, { animations: 'disabled' });
+                await renderGate(page, themed);
+                await expect(page).toHaveScreenshot(`themed-${scheme}-${vp.name}.png`, { animations: 'disabled' });
             });
         }
     });
 }
-
-test('the preset labels its buttons in full and draws no divider', async ({ page }) => {
-    await renderGate(page, govuk);
-    const gate = page.locator('[data-privasys-auth]');
-    await expect(gate.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
-    await expect(gate.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible();
-    await expect(gate.locator('.divider')).toHaveCount(0);
-});
 
 test('legal: false hides the terms inline and on a page, never in a modal', async ({ page }) => {
     await renderGate(page, { presentation: 'inline', legal: false });

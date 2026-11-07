@@ -283,13 +283,14 @@ function sanitiseApp(raw: unknown): AuthUIConfig['app'] {
 
 const KNOWN_METHODS = ['wallet', 'passkey', 'social'] as const;
 type KnownMethod = (typeof KNOWN_METHODS)[number];
-// The adopter's list is an order as well as a filter (gate.ts), so it is
-// kept as given, less anything unknown or repeated.
+/** The audience of the first access token: a resource name or `app:<app id>`. */
 function sanitiseAudience(raw: unknown): string | undefined {
     if (typeof raw !== 'string') return undefined;
     return /^[A-Za-z0-9._:-]{1,253}$/.test(raw) ? raw : undefined;
 }
 
+// The adopter's list is an order as well as a filter (gate.ts), so it is
+// kept as given, less anything unknown or repeated.
 function sanitiseMethods(raw: unknown): AuthUIConfig['methods'] {
     if (!Array.isArray(raw)) return undefined;
     const out: KnownMethod[] = [];
@@ -486,7 +487,7 @@ function tokenExpMs(token: string): number | null {
     }
 }
 
-/** Check whether an access token's exp claim is within a safety margin. */
+/** Whether an access token was issued for this audience. */
 function tokenAudienceIs(token: string, audience: string): boolean {
     try {
         const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -497,6 +498,7 @@ function tokenAudienceIs(token: string, audience: string): boolean {
     }
 }
 
+/** Check whether an access token's exp claim is within a safety margin. */
 function isTokenExpired(token: string, marginMs = 30_000): boolean {
     const exp = tokenExpMs(token);
     if (exp === null) return false;
@@ -1285,8 +1287,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         presentation,
                         app,
                         pitch,
-                    theme,
-                    legal,
+                        theme,
+                        legal,
                         headless,
                         onGateState,
                         approveFlow: {

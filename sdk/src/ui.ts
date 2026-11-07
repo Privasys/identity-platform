@@ -8,6 +8,7 @@ import { WebAuthnClient } from './webauthn';
 import { attributeLabel, assuranceLabel } from './attributes-ui';
 import { isGovVerified } from './attributes';
 import { providerButtonLabel } from './providers';
+import { themeClasses, themeProperties, themeStylesheet, type AuthTheme } from './theme';
 import { alternativeOrder, displayAppName } from './gate';
 import qrcode from 'qrcode-generator';
 
@@ -53,6 +54,12 @@ export interface AuthUIConfig {
      *  length-capped by the frame host. `logoUrl` (https only) renders the
      *  consumer's logo above the title. */
     pitch?: { title?: string; description?: string; bullets?: string[]; logoUrl?: string };
+    /** Adopter theme, a closed set of tokens sanitised by the frame host. */
+    theme?: AuthTheme;
+    /** `false` hides the terms line in inline and page presentations, for a
+     *  page that carries its own terms. A modal is Privasys's own surface and
+     *  keeps it. */
+    legal?: boolean;
     /** App identity for the templated gate header (`'page'` presentation):
      *  the app's logo and display name lead the header, with "Secured by
      *  Privasys ID" as the trust seal and a Close control on the right.
@@ -827,13 +834,20 @@ const MODAL_CSS = /* css */ `
     padding: 16px 64px;
     border-top: 1px solid #E2E8F0;
     font-size: 11px;
-    color: #94A3B8;
+    color: #64748B;
     text-align: center;
+}
+
+/* Visible on every button and link, in every theme. */
+button:focus-visible, a:focus-visible {
+    outline: 2px solid #2563EB;
+    outline-offset: 2px;
 }
 
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
     :host { color: #E2E8F0; background: #0F172A; }
+    button:focus-visible, a:focus-visible { outline-color: #93C5FD; }
     .btn-close { color: #64748B; }
     .btn-close:hover { background: rgba(255,255,255,0.06); color: #94A3B8; }
     .btn-back { color: #64748B; }
@@ -884,8 +898,8 @@ const MODAL_CSS = /* css */ `
     .error-msg { color: #64748B; }
     .btn-retry { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); color: #E2E8F0; }
     .btn-retry:hover { background: rgba(255,255,255,0.07); }
-    .footer { border-color: rgba(255,255,255,0.06); color: #475569; }
-    .footer .link-btn { color: #64748B; }
+    .footer { border-color: rgba(255,255,255,0.06); color: #94A3B8; }
+    .footer .link-btn { color: #93C5FD; }
     .scan-label { color: #E2E8F0; }
 
     .error-title { color: #E2E8F0; }
@@ -1139,6 +1153,12 @@ export class AuthUI {
 
         const style = document.createElement('style');
         style.textContent = MODAL_CSS;
+        if (this.cfg.theme) {
+            // Values go on the host as properties; the sheet only reads them.
+            for (const c of themeClasses(this.cfg.theme)) this.host.classList.add(c);
+            for (const [k, v] of Object.entries(themeProperties(this.cfg.theme))) this.host.style.setProperty(k, v);
+            style.textContent += themeStylesheet(this.cfg.theme);
+        }
         this.shadow.appendChild(style);
 
         const container = this.cfg.container ?? document.body;
@@ -1336,7 +1356,7 @@ export class AuthUI {
                 content,
             ),
             // Footer spans both columns
-            el('div', { className: 'footer' },
+            (this.cfg.legal === false && (inline || isPage)) ? null : el('div', { className: 'footer' },
                 'By continuing, you agree to the ',
                 el('a', { href: 'https://privasys.org/legal/terms', target: '_blank', className: 'link-btn', style: 'font-size:inherit' }, 'Terms of Service'),
                 ' and ',
@@ -1399,7 +1419,7 @@ export class AuthUI {
             const passkeyOp = this.getWebAuthnClient().sessions.hasPasskeyHint() ? 'authenticate' : 'register';
             passkeyButton = el('button', { className: 'btn-provider', onClick: () => this.startPasskey(passkeyOp) },
                 el('span', { html: ICON_PASSKEY }),
-                el('span', { className: 'btn-label' }, 'Passkey'),
+                el('span', { className: 'btn-label' }, this.cfg.theme?.preset === 'govuk' ? 'Sign in with a passkey' : 'Passkey'),
                 el('span', { className: 'btn-hint' }, 'Face ID, Touch ID, Windows Hello'),
             );
         }
@@ -1416,6 +1436,7 @@ export class AuthUI {
         // and carries the full label, so the gate reads as a sign-in page for
         // that identity rather than a chooser with one entry.
         const soloSocial = !hasWallet && !hasWebAuthn && socialProviders.length === 1;
+        const govuk = this.cfg.theme?.preset === 'govuk';
         const socialButtons = socialProviders.map((provider) => {
             const icon = socialIcons[provider] ?? '';
             return el('button', {
@@ -1423,7 +1444,7 @@ export class AuthUI {
                 onClick: () => this.startSocial(provider),
             },
                 icon ? el('span', { html: icon }) : null,
-                el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial)),
+                el('span', { className: 'btn-label' }, providerButtonLabel(provider, soloSocial || govuk)),
             );
         });
 
@@ -1439,6 +1460,8 @@ export class AuthUI {
         if (alternatives.length && buttons.length) {
             buttons.push(el('div', { className: 'divider' }, el('span', null, 'or')));
         }
+        // The preset's green is the page's one primary action.
+        if (govuk && !buttons.length && alternatives.length) alternatives[0].classList.add('primary');
         buttons.push(...alternatives);
 
         return el('div', null,
@@ -1534,7 +1557,7 @@ export class AuthUI {
                 ),
                 hasWebAuthn ? el('button', { className: 'btn-provider', onClick: () => { this.cleanup(); this.startPasskey(this.getWebAuthnClient().sessions.hasPasskeyHint() ? 'authenticate' : 'register'); } },
                     el('span', { html: ICON_PASSKEY }),
-                    el('span', { className: 'btn-label' }, 'Passkey'),
+                    el('span', { className: 'btn-label' }, this.cfg.theme?.preset === 'govuk' ? 'Sign in with a passkey' : 'Passkey'),
                 ) : null,
             ),
         );

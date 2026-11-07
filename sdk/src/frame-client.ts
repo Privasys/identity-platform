@@ -58,8 +58,10 @@ import type { SealedSessionState, SealedWebSocket } from './enclave-session';
 import { FRAME_SIZE_MESSAGE, inlineFrameHeight } from './frame-size';
 
 import type { SocialProvider } from './providers';
+import type { AuthTheme } from './theme';
 
 export type { SocialProvider } from './providers';
+export type { AuthTheme, ThemeColour } from './theme';
 
 export type PrivasysScope = 'openid' | 'email' | 'profile' | 'phone' | 'identity' | 'offline_access';
 
@@ -234,6 +236,27 @@ export interface AuthFrameConfig {
      * `methods` excluded.
      */
     providers?: readonly SocialProvider[];
+    /**
+     * Theme the gate: a closed set of tokens, sanitised by the frame host.
+     * `{ preset: 'govuk', font: '<your stack>' }` gives a government service
+     * its own buttons, focus state and links. The "Secured by Privasys ID"
+     * seal stays in every theme.
+     */
+    theme?: AuthTheme;
+    /**
+     * `false` hides the terms line in `'inline'` and `'page'` presentations,
+     * for a page that carries its own terms. A modal keeps it.
+     */
+    legal?: boolean;
+    /**
+     * The audience of the access token issued at sign-in, for an app that
+     * authorises on it (a direct name passes its hostname). The identity
+     * provider keeps no profile, so the first token is the only one that can
+     * carry the person's name and email; `getTokenForAudience()` returns it
+     * for as long as it is valid, then mints without a profile. Store what
+     * you need on first sight.
+     */
+    audience?: string;
     /**
      * Your app's identity for the gate header (`'page'` presentation):
      * your logo (https only) and display name lead the header, with
@@ -723,6 +746,10 @@ export class AuthFrame {
                     'This app requires the Privasys Wallet: the sign-in method used cannot open a sealed channel to it.');
             }
             const accessToken = result.accessToken ?? result.sessionToken;
+            // The gate's frame is gone once it has signed the person in; the
+            // persistent session frame takes over, so that audience tokens
+            // (a direct name's bearer transport) can be minted straight away.
+            if (!session) await this.getSession().catch(() => null);
             return { accessToken, session, result };
         } catch (err) {
             if (err instanceof ConnectError) throw err;
@@ -1551,7 +1578,11 @@ export class AuthFrame {
      *
      * Requires an active session — call {@link AuthFrame.getSession} first.
      */
-    getTokenForAudience(audience: string): Promise<string> {
+    async getTokenForAudience(audience: string): Promise<string> {
+        // The session iframe is what carries the request. A sign-in that has
+        // just completed tore its own frame down, so mount (or re-mount) the
+        // session frame here rather than send the caller back to getSession().
+        if (!this.sessionIframe?.contentWindow) await this.getSession();
         return new Promise((resolve, reject) => {
             if (!this.sessionIframe?.contentWindow) {
                 reject(new Error('no active session iframe; call getSession() first'));

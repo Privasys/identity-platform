@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in: Example Service</title>
+<!--
+  A headless Privasys sign-in gate, drawn in the style of the GOV.UK Design
+  System. The page draws every button; an invisible frame on privasys.id keeps
+  the credentials and runs the flows. See README.md next to this file.
+-->
+<style>
+  :root {
+    --text: #0b0c0c; --secondary-text: #505a5f; --border: #b1b4b6;
+    --link: #1d70b8; --focus: #ffdd00; --focus-text: #0b0c0c;
+    --primary: #00703c; --primary-hover: #005a30; --primary-shadow: #002d18;
+    --secondary: #f3f2f1; --secondary-hover: #dbdad9; --secondary-shadow: #929191;
+    --error: #d4351c; --background: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text: #f3f2f1; --secondary-text: #b1b4b6; --border: #505a5f; --link: #8cb8dc;
+      --secondary: #383f43; --secondary-hover: #505a5f; --secondary-shadow: #0b0c0c;
+      --background: #0b0c0c;
+    }
+  }
+  /* GDS Transport is licensed to services on gov.uk only: use your own stack. */
+  body { margin: 0; font: 19px/1.32 Arial, Helvetica, sans-serif; color: var(--text); background: var(--background); }
+  main { max-width: 640px; margin: 0 auto; padding: 40px 15px; }
+  h1 { font-size: 36px; line-height: 1.11; margin: 0 0 30px; }
+  p { margin: 0 0 20px; }
+  .hint { color: var(--secondary-text); }
+  a { color: var(--link); }
+  a:focus, button:focus { outline: 3px solid transparent; background: var(--focus); color: var(--focus-text); box-shadow: 0 -2px var(--focus), 0 4px var(--focus-text); text-decoration: none; }
+
+  .button {
+    display: block; width: 100%; margin: 0 0 22px; padding: 8px 10px 7px; border: 2px solid transparent; border-radius: 0;
+    font: inherit; text-align: center; cursor: pointer;
+    color: var(--text); background: var(--secondary); box-shadow: 0 2px 0 var(--secondary-shadow);
+  }
+  .button:hover { background: var(--secondary-hover); }
+  .button:active { transform: translateY(2px); box-shadow: none; }
+  .button--primary { color: #fff; background: var(--primary); box-shadow: 0 2px 0 var(--primary-shadow); }
+  .button--primary:hover { background: var(--primary-hover); }
+  .button:focus:not(:active) { border-color: var(--focus); background: var(--focus); color: var(--focus-text); box-shadow: inset 0 0 0 1px var(--focus), 0 2px 0 var(--focus-text); }
+  .button[disabled] { opacity: .5; cursor: not-allowed; }
+  .link-button { padding: 0; border: 0; background: none; font: inherit; color: var(--link); text-decoration: underline; cursor: pointer; }
+
+  .inset { margin: 0 0 30px; padding: 15px; border-left: 10px solid var(--border); }
+  .error-summary { margin: 0 0 30px; padding: 15px; border: 5px solid var(--error); }
+  .error-summary h2 { font-size: 24px; margin: 0 0 15px; }
+  .qr { display: block; width: 240px; height: 240px; margin: 0 0 20px; background: #fff; padding: 10px; }
+  [hidden] { display: none !important; }
+</style>
+<!-- The hosted client: always the current release, served by the identity provider. -->
+<script src="https://privasys.id/auth/privasys-auth-client.iife.js" defer></script>
+</head>
+<body>
+<main>
+  <h1>Sign in to Example Service</h1>
+
+  <div id="error" class="error-summary" role="alert" tabindex="-1" hidden>
+    <h2>There is a problem</h2>
+    <p id="error-text"></p>
+  </div>
+
+  <!-- The options the frame reports, drawn by this page. -->
+  <div id="options" aria-live="polite"><p class="hint">Loading the ways to sign in…</p></div>
+
+  <!-- Where a started sign-in is. -->
+  <div id="progress" class="inset" aria-live="polite" hidden>
+    <p id="progress-text"></p>
+    <img id="qr" class="qr" alt="QR code to scan with the Privasys Wallet" hidden>
+    <p><button type="button" id="use-qr" class="link-button" hidden>Show a QR code instead</button></p>
+    <p><button type="button" id="cancel" class="link-button">Cancel</button></p>
+  </div>
+
+  <div id="done" hidden><p>You are signed in.</p></div>
+</main>
+
+<script>
+// Your sign-in client and app, as registered on the platform. The page's origin
+// must be one the client registered (a redirect URI's origin, or one set with
+// PUT /api/v1/oauth-clients/{client_id}/origins): the result of the sign-in
+// goes to this page, and the identity provider checks it.
+const CONFIG = {
+  apiBase: 'https://api.developer.privasys.org',
+  appName: 'example-service',
+  clientId: 'YOUR_CLIENT_ID',
+  scope: ['openid', 'email', 'profile', 'offline_access'],
+};
+
+const $ = (id) => document.getElementById(id);
+let gate = null;
+
+function button(label, primary, onClick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = primary ? 'button button--primary' : 'button';
+  b.textContent = label; // text only: nothing from the frame is parsed as markup
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+// The options for this client. The first button is the page's one primary action.
+function drawOptions(options) {
+  const list = $('options');
+  list.replaceChildren();
+  const choices = [
+    ...options.own.map((o) => ({ label: `Sign in with ${o.displayName}`, choice: { method: 'social', provider: o.provider, own: true } })),
+    ...options.providers.map((p) => ({ label: `Sign in with ${p.name}`, choice: { method: 'social', provider: p.id } })),
+    ...(options.wallet ? [{ label: 'Sign in with Privasys ID', choice: { method: 'wallet' } }] : []),
+  ];
+  choices.forEach(({ label, choice }, i) => list.append(button(label, i === 0, () => start(choice))));
+  if (options.wallet && options.push) {
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.textContent = 'Privasys ID sends a notification to your phone.';
+    list.append(hint);
+  }
+}
+
+function start(choice) {
+  $('error').hidden = true;
+  for (const b of $('options').querySelectorAll('button')) b.disabled = true;
+  gate.start(choice);
+}
+
+// What each state means to the person.
+const NARRATION = {
+  'authenticating': 'Finish signing in in the window that opened.',
+  'push-waiting': 'Check your phone and approve the request in the Privasys Wallet.',
+  'qr-scanning': 'Scan this code with the Privasys Wallet.',
+  'wallet-connected': 'Approve the request in the Privasys Wallet.',
+  'approve-waiting': 'Approve the request in the Privasys Wallet.',
+  'success': 'Signed in.',
+};
+
+function drawState(s) {
+  const idle = s.state === 'idle' || s.state === 'error';
+  $('progress').hidden = idle;
+  for (const b of $('options').querySelectorAll('button')) b.disabled = !idle;
+  if (s.state === 'error') {
+    $('error-text').textContent = s.error || 'Sign-in did not complete. Try again.';
+    $('error').hidden = false;
+    $('error').focus();
+    return;
+  }
+  $('progress-text').textContent = NARRATION[s.state] || 'Signing you in…';
+  // The QR code as an image, never inserted as markup.
+  $('qr').hidden = !s.qrSvg;
+  if (s.qrSvg) $('qr').src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s.qrSvg);
+  $('use-qr').hidden = s.state !== 'push-waiting';
+}
+
+$('use-qr').addEventListener('click', () => gate?.start({ method: 'wallet', qr: true }));
+$('cancel').addEventListener('click', () => gate?.cancel());
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const frame = new window.Privasys.AuthFrame({
+    ...CONFIG,
+    headless: {
+      // Called again for every new attempt, after a cancel or an error.
+      onOptions: (options, controls) => { gate = controls; drawOptions(options); },
+      onState: drawState,
+    },
+  });
+  for (;;) {
+    try {
+      const { accessToken } = await frame.connect();
+      $('options').hidden = true;
+      $('progress').hidden = true;
+      $('done').hidden = false;
+      // Send accessToken to your back end, which verifies it against
+      // https://privasys.id/.well-known/jwks.json.
+      void accessToken;
+      return;
+    } catch (err) {
+      // A cancel or a failed attempt: offer the options again.
+      drawState({ state: 'error', error: err && err.message });
+    }
+  }
+});
+</script>
+</body>
+</html>

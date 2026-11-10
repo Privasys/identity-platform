@@ -98,6 +98,18 @@ class NativeEmrtdModule : Module() {
                 }
         }
 
+        View(MrzScannerView::class) {
+            Events("onText", "onReady", "onCameraError")
+
+            Prop("active") { view: MrzScannerView, active: Boolean ->
+                view.setActive(active)
+            }
+
+            AsyncFunction("snapshot") { view: MrzScannerView, crop: Map<String, Double> ->
+                view.snapshot(crop["x"] ?: 0.0, crop["y"] ?: 0.0, crop["w"] ?: 1.0, crop["h"] ?: 1.0)
+            }
+        }
+
         AsyncFunction("readDocument") { documentNumber: String, dateOfBirth: String, dateOfExpiry: String, promise: Promise ->
             val activity = appContext.currentActivity
             val adapter = activity?.let { NfcAdapter.getDefaultAdapter(it) }

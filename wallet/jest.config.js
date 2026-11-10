@@ -5,7 +5,7 @@ module.exports = {
         '^.+\\.[jt]sx?$': ['babel-jest', { presets: ['babel-preset-expo'] }],
     },
     transformIgnorePatterns: [
-        'node_modules/(?!(expo|@expo|expo-modules-core|react-native|@react-native|@noble)/)',
+        'node_modules/(?!(expo|@expo|expo-modules-core|react-native|@react-native|@noble|mrz)/)',
     ],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',

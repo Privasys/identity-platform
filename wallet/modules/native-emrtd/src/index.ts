@@ -15,13 +15,17 @@
  * `isSupported()` and fall back accordingly.
  */
 
-import { parse as parseMrz } from 'mrz';
 import { Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
+import { parseMrzLines } from './mrz-lines';
 import type { EmrtdReadResult, EmrtdSupport, MrzKey, MrzScan } from './NativeEmrtd.types';
 
 export type { EmrtdReadResult, EmrtdSupport, MrzKey, MrzScan };
+export { mrzRows, pageCrop, parseMrzLines } from './mrz-lines';
+export type { FrameCrop, TextLine } from './mrz-lines';
+export { MrzScannerView } from './MrzScannerView';
+export type { MrzFrame, MrzScannerHandle, MrzScannerProps } from './MrzScannerView';
 
 interface NativeEmrtdModule {
     isSupported(): Promise<string>;
@@ -77,49 +81,4 @@ export async function scanMrz(imageBase64: string): Promise<MrzScan> {
     const fields = parseMrzLines(result.lines ?? []);
     if (!fields) throw new Error('No valid MRZ detected');
     return fields;
-}
-
-/**
- * Pick the MRZ lines out of the OCR'd text and parse them with the `mrz`
- * library, which validates each field's ICAO check digit. We only accept a
- * result whose document-number / DOB / expiry check digits pass, so an OCR
- * misread can never produce a wrong BAC key (it just isn't returned, and the
- * caller scans the next frame).
- */
-function parseMrzLines(rawLines: string[]): MrzScan | null {
-    const candidates = rawLines
-        .map((l) => l.toUpperCase().replace(/\s/g, ''))
-        .filter((l) => /^[A-Z0-9<]{28,44}$/.test(l));
-
-    // TD3 = 2 lines (~44 chars), TD1 = 3 lines (~30 chars).
-    for (const n of [2, 3]) {
-        if (candidates.length < n) continue;
-        try {
-            const res = parseMrz(candidates.slice(-n));
-            const f = res.fields;
-            // Require the check digit to PASS (true). A null/unknown result means
-            // the library could not verify it (often a garbled check-digit char),
-            // which previously slipped through and yielded a wrong BAC key.
-            const detailValid = (field: string) => {
-                const d = (res.details as Array<{ field: string; valid: boolean | null }>).find((x) => x.field === field);
-                return d?.valid === true;
-            };
-            if (
-                f.documentNumber && f.birthDate && f.expirationDate &&
-                detailValid('documentNumber') && detailValid('birthDate') && detailValid('expirationDate')
-            ) {
-                return {
-                    documentNumber: f.documentNumber,
-                    dateOfBirth: f.birthDate,
-                    dateOfExpiry: f.expirationDate,
-                    // The exact accepted MRZ lines, joined — for the enclave's
-                    // visual↔chip cross-reference (GPG45 box 3).
-                    mrz: candidates.slice(-n).join(''),
-                };
-            }
-        } catch {
-            // not these lines / not an MRZ — try the next grouping
-        }
-    }
-    return null;
 }

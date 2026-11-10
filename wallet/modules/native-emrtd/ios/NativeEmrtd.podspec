@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
   s.source_files   = '*.swift'
   s.static_framework = true
 
-  s.frameworks     = 'CoreNFC'
+  s.frameworks     = 'CoreNFC', 'AVFoundation', 'Vision'
 
   s.dependency 'ExpoModulesCore'
   # eMRTD secure messaging + DG parsing (AndyQ/NFCPassportReader, MIT).

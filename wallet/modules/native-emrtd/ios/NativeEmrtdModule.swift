@@ -121,6 +121,23 @@ public class NativeEmrtdModule: Module {
                 catch { promise.resolve("{\"error\":\"\(NativeEmrtdModule.escape(error.localizedDescription))\"}") }
             }
         }
+
+        View(MrzScannerView.self) {
+            Events("onText", "onReady", "onCameraError")
+
+            Prop("active") { (view: MrzScannerView, active: Bool) in
+                view.setActive(active)
+            }
+
+            AsyncFunction("snapshot") { (view: MrzScannerView, crop: [String: Double]) -> String in
+                return view.snapshot(
+                    x: crop["x"] ?? 0,
+                    y: crop["y"] ?? 0,
+                    width: crop["w"] ?? 1,
+                    height: crop["h"] ?? 1
+                )
+            }
+        }
     }
 
 

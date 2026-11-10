@@ -14,7 +14,6 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View as NativeView, useWindowDimensions } from 'react-native';
@@ -50,6 +49,13 @@ type CaptureState = 'positioning' | 'checking' | 'captured';
 
 // Data-page (TD3 photo page) aspect ≈ 125×88 mm ≈ 1.42:1.
 const DOC_PAGE_RATIO = 1.42;
+// An ID card (TD1) is 85.6×54 mm.
+const ID_CARD_RATIO = 1.586;
+// How long the camera may show a zone the phone cannot fully read before the
+// frame is sent to the enclave regardless.
+const UNREAD_BEFORE_SENDING_MS = 2500;
+// The camera that reads the photo page as it films. Null in a build without it.
+const MrzScanner = Emrtd.MrzScannerView;
 
 // The raw inputs the verifier reads during capture, shown on the consent screen.
 // These are transient processing inputs — consumed in the enclave and never
@@ -64,52 +70,6 @@ const KYC_INPUT_ITEMS: { key: string; icon: keyof typeof Ionicons.glyphMap; labe
     { key: 'nfc_chip', icon: 'hardware-chip-outline', labelKey: 'kyc.inputNfcChip' },
     { key: 'live_selfie', icon: 'person-outline', labelKey: 'kyc.inputSelfie' },
 ];
-
-/**
- * Crop a captured still to the on-screen guide frame (plus a generous margin) so
- * only the document page — not the surroundings — leaves the device. The preview
- * is shown "cover" (fills the viewport), so map the guide rect (screen points)
- * back to image pixels through that same cover transform. Returns base64, or null
- * to fall back to the full frame when the orientation/mapping can't be trusted —
- * a wrong crop must never break the enclave read.
- */
-async function cropDocToFrame(
-    shot: { uri?: string; width?: number; height?: number },
-    view: { winW: number; winH: number; frameLeft: number; frameTop: number; frameW: number; frameH: number },
-): Promise<string | null> {
-    const { uri, width: iw, height: ih } = shot;
-    if (!uri || !iw || !ih) return null;
-    const { winW, winH, frameLeft, frameTop, frameW, frameH } = view;
-    // Only crop when the image orientation matches the (landscape) viewport;
-    // otherwise the screen→image mapping is wrong, so fall back to the full frame.
-    if ((winW >= winH) !== (iw >= ih)) return null;
-
-    const f = Math.max(winW / iw, winH / ih);   // image px → screen pts (cover)
-    const offX = (iw * f - winW) / 2;
-    const offY = (ih * f - winH) / 2;
-    const m = frameW * 0.12;                     // generous margin around the guide
-
-    const sx = Math.max(0, frameLeft - m);
-    const sy = Math.max(0, frameTop - m);
-    const sw = Math.min(winW, frameLeft + frameW + m) - sx;
-    const sh = Math.min(winH, frameTop + frameH + m) - sy;
-
-    let ox = (sx + offX) / f;
-    let oy = (sy + offY) / f;
-    let cw = sw / f;
-    let ch = sh / f;
-    ox = Math.max(0, Math.min(ox, iw));
-    oy = Math.max(0, Math.min(oy, ih));
-    cw = Math.max(1, Math.min(cw, iw - ox));
-    ch = Math.max(1, Math.min(ch, ih - oy));
-
-    const out = await manipulateAsync(
-        uri,
-        [{ crop: { originX: ox, originY: oy, width: cw, height: ch } }],
-        { compress: 0.9, base64: true, format: SaveFormat.JPEG },
-    );
-    return out.base64 ?? null;
-}
 
 /** The raw fields the trusted-apps store compares (same set as Drive/sign-in). */
 function verifierMeasurements(v: VerifierAttestation) {
@@ -158,16 +118,15 @@ export default function KycCaptureScreen() {
     const [docImage, setDocImage] = useState('');
     const [busy, setBusy] = useState(false);
     const [permission, requestPermission] = useCameraPermissions();
+    // The selfie camera.
     const cameraRef = useRef<CameraView>(null);
-    const [cameraReady, setCameraReady] = useState(false);
-    const [cameraKey, setCameraKey] = useState(0);
-    // Toggled off→on to kick expo-camera's continuous autofocus (see the
-    // effect below); starts 'on' so behaviour is unchanged if the kick never
-    // runs.
-    const [autofocus, setAutofocus] = useState<'on' | 'off'>('on');
+    // The photo-page camera, which reads as it films.
+    const scannerRef = useRef<Emrtd.MrzScannerHandle>(null);
     const [captureState, setCaptureState] = useState<CaptureState>('positioning');
-    const captureInFlight = useRef(false);
     const captureFinished = useRef(false);
+    // Since when the camera has shown a zone the phone could not fully read
+    // (0: it is not showing one).
+    const unreadSince = useRef(0);
     // The authoritative MRZ (BAC key) comes back from the enclave once we reach
     // the read step; gate the chip scan on it.
     const [mrzReadDone, setMrzReadDone] = useState(false);
@@ -212,39 +171,6 @@ export default function KycCaptureScreen() {
     useEffect(() => {
         Emrtd.isSupported().then(setSupport).catch(() => setSupport({ supported: false }));
     }, []);
-
-    // Force a fresh camera session once the landscape layout has settled. Mounting
-    // CameraView the instant `step` becomes 'capture' coincides with the portrait
-    // →landscape flip (Stack.Screen), so the preview can come up blank/white when
-    // the session starts mid-rotation. Remounting via a changing `key` after the
-    // viewport dimensions change is the same stale-stream reset the QR scanner
-    // uses (routes/scan.tsx). Resetting cameraReady restarts the inspect loop.
-    useEffect(() => {
-        if (step !== 'capture') return;
-        setCameraReady(false);
-        setCameraKey((k) => k + 1);
-    }, [step, winW, winH]);
-
-    // Kick continuous autofocus. On iOS, expo-camera's `autofocus="on"`
-    // intermittently fails to engage on the *first* camera session, so the
-    // opening data-page still comes up soft and the only recovery the user has
-    // is to close and reopen (a fresh session where AF happens to work).
-    // Toggling the prop off→on forces the native layer to re-apply the focus
-    // mode: once as soon as the camera is ready, then on a short cadence while
-    // the user is still positioning, so a stuck focus self-heals in place. The
-    // in-flight guard avoids flipping to fixed focus during a still capture.
-    useEffect(() => {
-        if (step !== 'capture' || !cameraReady) return;
-        let cancelled = false;
-        const kick = () => {
-            if (cancelled || captureFinished.current || captureInFlight.current) return;
-            setAutofocus('off');
-            setTimeout(() => { if (!cancelled) setAutofocus('on'); }, 150);
-        };
-        kick();
-        const iv = setInterval(kick, 2000);
-        return () => { cancelled = true; clearInterval(iv); };
-    }, [step, cameraReady]);
 
     /**
      * Who is asking, from the public store. Best-effort and unauthenticated;
@@ -421,86 +347,79 @@ export default function KycCaptureScreen() {
             Alert.alert(t('connect.cameraNeededTitle'), t('kyc.cameraNeededBody'));
             return;
         }
+        if (!MrzScanner) {
+            Alert.alert(t('connect.cameraNeededTitle'), t('kyc.cameraNeededBody'));
+            return;
+        }
         setDocNumber(''); setDob(''); setExpiry(''); setDocImage('');
         setMrzReadDone(false);
         captureFinished.current = false;
-        setCameraReady(false);
+        unreadSince.current = 0;
         setCaptureState('positioning');
         setStep('capture');
     };
 
-    // One clear photo of the data page does double duty: we OCR it for the chip
-    // access key (BAC/PACE) and forward the same image to the enclave for the
-    // visual↔chip cross-reference (GPG45 box 3).
-    // CameraView does not expose raw preview frames. Sample a still roughly once
-    // per second and run on-device OCR over it. scanMrz only succeeds when the
-    // ICAO document-number, DOB and expiry check digits all validate, making it
-    // a useful signal that the passport is sharp, readable and correctly placed.
-    useEffect(() => {
-        if (step !== 'capture' || !cameraReady) return;
-        let cancelled = false;
-        let timer: ReturnType<typeof setTimeout> | undefined;
-
-        const inspectFrame = async () => {
-            if (cancelled || captureFinished.current || captureInFlight.current) return;
-            captureInFlight.current = true;
-            setCaptureState('checking');
+    // The camera reads the text of each frame as it arrives and reports it here
+    // with where it is. The page can be anywhere in view: once the lines at the
+    // bottom of it read as a machine readable zone, that same frame is cut to
+    // the page around them and kept. It does double duty: the reading gives a
+    // first chip access key (BAC/PACE), and the picture goes to the enclave for
+    // its own reading and the visual↔chip cross-reference (GPG45 box 3).
+    const onFrameText = (frame: Emrtd.MrzFrame) => {
+        if (step !== 'capture' || captureFinished.current) return;
+        const rows = Emrtd.mrzRows(frame.lines);
+        const seen = rows.length >= 2 && frame.held;
+        if (!seen) {
+            unreadSince.current = 0;
+            setCaptureState('positioning');
+            return;
+        }
+        setCaptureState('checking');
+        // Every check digit passing is what says the page is sharp and whole.
+        const mrz = Emrtd.parseMrzLines(rows.map((r) => r.text));
+        if (!mrz) {
+            // The reading on the phone falls short on some documents whose zone
+            // is plainly there. After a few seconds of that, the frame
+            // goes to the enclave anyway, whose reading is the one that counts.
+            if (!unreadSince.current) unreadSince.current = Date.now();
+            if (Date.now() - unreadSince.current < UNREAD_BEFORE_SENDING_MS) return;
+        }
+        captureFinished.current = true;
+        setCaptureState('captured');
+        // Provisional: the authoritative reading comes back from the enclave
+        // in the next step (see services/kyc.ts).
+        if (mrz) {
+            setDocNumber(mrz.documentNumber);
+            setDob(mrz.dateOfBirth);
+            setExpiry(mrz.dateOfExpiry);
+        }
+        void (async () => {
+            // Only the page leaves the phone, not what is around it. If the
+            // cut cannot be made the whole frame is sent, so a quirk in working
+            // it out never stops the reading.
+            const ratio = docType === 'id-card' ? ID_CARD_RATIO : DOC_PAGE_RATIO;
+            const crop = Emrtd.pageCrop(rows, frame, ratio);
+            const scanner = scannerRef.current;
+            let image = '';
             try {
-                // Fast, low-resolution probe purely to detect a sharp, well-placed
-                // MRZ in frame — keeps the green positioning feedback snappy.
-                const probe = await cameraRef.current?.takePictureAsync({
-                    base64: true,
-                    quality: 0.3,
-                    shutterSound: false,
-                });
-                if (!probe?.base64 || cancelled) return;
-                const mrz = await Emrtd.scanMrz(probe.base64); // throws until placed & sharp
-                if (cancelled) return;
-
-                captureFinished.current = true;
-                setCaptureState('captured');
-                // Provisional BAC/PACE key from the on-device read. This on-device
-                // scan is unreliable on some documents, so it is only a positioning
-                // trigger; the authoritative MRZ comes back from the enclave's
-                // OmniMRZ read of docImage (see services/kyc.ts) — next step.
-                setDocNumber(mrz.documentNumber);
-                setDob(mrz.dateOfBirth);
-                setExpiry(mrz.dateOfExpiry);
-
-                // Grab one clean, full-quality frame for the enclave OCR (OmniMRZ)
-                // + box-3 cross-reference. Crop it to the on-screen guide before it
-                // leaves the device, so only the document page (not the
-                // surroundings) is sent — falls back to the full frame if the crop
-                // can't be computed, so a mapping quirk never breaks the read.
-                const shot = await cameraRef.current?.takePictureAsync({
-                    base64: true,
-                    quality: 0.9,
-                    shutterSound: false,
-                });
-                const cropped = shot
-                    ? await cropDocToFrame(shot, { winW, winH, frameLeft, frameTop, frameW, frameH }).catch(() => null)
-                    : null;
-                setDocImage(cropped ?? shot?.base64 ?? probe.base64);
-
-                // Keep the green confirmation visible long enough to register.
-                await new Promise((resolve) => setTimeout(resolve, 500));
-                if (!cancelled) setStep('read');
-            } catch {
-                if (!cancelled) setCaptureState('positioning');
-            } finally {
-                captureInFlight.current = false;
-                if (!cancelled && !captureFinished.current) {
-                    timer = setTimeout(inspectFrame, 350);
-                }
+                image = (await scanner?.snapshot(crop)) ?? '';
+                if (!image) image = (await scanner?.snapshot({ x: 0, y: 0, w: 1, h: 1 })) ?? '';
+            } catch (e: any) {
+                console.warn('[KYC] snapshot failed:', e?.message);
             }
-        };
-
-        timer = setTimeout(inspectFrame, 400);
-        return () => {
-            cancelled = true;
-            if (timer) clearTimeout(timer);
-        };
-    }, [cameraReady, step]);
+            if (!image) {
+                // Nothing was kept after all: carry on looking.
+                unreadSince.current = 0;
+                captureFinished.current = false;
+                setCaptureState('positioning');
+                return;
+            }
+            setDocImage(image);
+            // Keep the green confirmation visible long enough to register.
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            setStep((s) => (s === 'capture' ? 'read' : s));
+        })();
+    };
 
     // ── Between Step 1 and Step 2: derive the BAC key from the captured image ─
     // The on-device OCR is unreliable on the OCR-B MRZ, so we send the data-page
@@ -819,19 +738,20 @@ export default function KycCaptureScreen() {
 
             {step === 'capture' && (
                 <NativeView style={[styles.flex, { backgroundColor: '#000' }]}>
-                    <CameraView
-                        key={cameraKey}
-                        ref={cameraRef}
-                        style={styles.camera}
-                        facing="back"
-                        autofocus={autofocus}
-                        active={step === 'capture'}
-                        onCameraReady={() => {
-                            console.log('[KYC] capture camera ready');
-                            setCameraReady(true);
-                        }}
-                        onMountError={(e) => console.warn('[KYC] capture camera mount error:', e?.message)}
-                    />
+                    {MrzScanner && (
+                        <MrzScanner
+                            ref={scannerRef}
+                            style={styles.camera}
+                            active={step === 'capture'}
+                            onText={(e) => onFrameText(e.nativeEvent)}
+                            onReady={() => console.log('[KYC] capture camera ready')}
+                            onCameraError={(e) => {
+                                console.warn('[KYC] capture camera error:', e.nativeEvent?.message);
+                                Alert.alert(t('connect.cameraNeededTitle'), t('kyc.cameraNeededBody'));
+                                setStep('photo');
+                            }}
+                        />
+                    )}
                     <NativeView style={[styles.captureMask, { top: 0, left: 0, right: 0, height: frameTop }]} pointerEvents="none" />
                     <NativeView
                         style={[styles.captureMask, { top: frameTop + frameH, left: 0, right: 0, bottom: 0 }]}
@@ -859,7 +779,9 @@ export default function KycCaptureScreen() {
                                 top: frameTop,
                                 width: frameW,
                                 height: frameH,
-                                borderColor: captureState === 'captured' ? '#34C759' : '#D1D5DB',
+                                borderColor: captureState === 'captured'
+                                    ? '#34C759'
+                                    : captureState === 'checking' ? '#FFFFFF' : '#9CA3AF',
                             },
                         ]}
                     >

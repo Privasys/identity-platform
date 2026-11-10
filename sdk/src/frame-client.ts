@@ -56,6 +56,7 @@
 // postMessage.
 import type { SealedSessionState, SealedWebSocket } from './enclave-session';
 import { FRAME_SIZE_MESSAGE, inlineFrameHeight } from './frame-size';
+import { headerRecord, sendDirect, type AppTransport } from './direct-request';
 
 import type { SocialProvider } from './providers';
 import type { AuthTheme } from './theme';
@@ -119,8 +120,13 @@ export class ConnectError extends Error {
 export interface ConnectResult {
     /** JWT access token for the session (existing or freshly minted). */
     accessToken: string;
-    /** Sealed transport proxy — null when `sessionRelay` is not configured. */
+    /** Sealed transport proxy — null when `sessionRelay` is not configured,
+     *  or when the person signed in without the wallet. */
     session: SealedSession | null;
+    /** How {@link AuthFrame.request} reaches the app for this person:
+     *  `sealed` after a wallet sign-in, `direct` otherwise (with
+     *  `direct` configured), null when the frame has neither. */
+    transport: AppTransport | null;
     /** Full ceremony result when an interactive sign-in ran; absent when
      *  the session was restored silently (no UI was shown). */
     result?: SignInResult;
@@ -305,6 +311,20 @@ export interface AuthFrameConfig {
      */
     sessionRelay?: { appHost: string };
     /**
+     * Also serve people who sign in without the wallet, over the app's direct
+     * name. A wallet sign-in still opens the sealed session; any other
+     * sign-in (Microsoft, Google, a passkey) gets no sealed session, and
+     * {@link AuthFrame.request} sends that person's requests over HTTPS to
+     * `origin` with an access token for `audience`. The app's manifest
+     * must declare `"direct": "private"` for its private routes to answer.
+     *
+     * `origin` defaults to the page's own origin, which is right when the
+     * page is served from the direct name. `audience` defaults to
+     * {@link AuthFrameConfig.audience}; one of them must be set, normally
+     * `app:<app id>`.
+     */
+    direct?: { origin?: string; audience?: string };
+    /**
      * Ask the user, at sign-in, to let this app spend their Privasys credits
      * on their behalf (inference, priced tools) under a monthly cap, in
      * credits (1 credit = £0.000001). The wallet shows the consent row beside
@@ -362,6 +382,25 @@ export interface SealedStreamResponse {
  * Proxy for issuing sealed requests against the enclave. Returned by
  * {@link AuthFrame.session}.
  */
+/**
+ * Response to {@link AuthFrame.request}, the same shape whichever way the
+ * request went. `transport` says which.
+ */
+export interface AppResponse {
+    status: number;
+    headers: Record<string, string>;
+    body: Uint8Array;
+    transport: AppTransport;
+}
+
+/** Response to {@link AuthFrame.stream}. */
+export interface AppStreamResponse {
+    status: number;
+    headers: Record<string, string>;
+    body: ReadableStream<Uint8Array>;
+    transport: AppTransport;
+}
+
 export interface SealedSession {
     sessionId: string;
     appHost: string;
@@ -565,6 +604,8 @@ export interface RestoredSession {
     authenticatedAt: number;
     requestedAttributes?: string[];
     scope?: string;
+    /** Present when the wallet signed this session in. */
+    pushToken?: string;
 }
 
 export class AuthFrame {
@@ -617,6 +658,8 @@ export class AuthFrame {
     // deferred until it ends so a rotated token is never lost mid-flight.
     private renewalInFlight = false;
     private destroyed = false;
+    // How request() reaches the app, decided by connect().
+    private transport: AppTransport | null = null;
 
     constructor(config: AuthFrameConfig) {
         const { authOrigin, container, headless, ...rest } = config;
@@ -624,6 +667,9 @@ export class AuthFrame {
         this.container = container ?? null;
         this.headless = headless ?? null;
         this.config = rest;
+        if (rest.direct && !(rest.direct.audience ?? rest.audience)) {
+            throw new Error('AuthFrame: direct needs an audience (direct.audience or audience), normally app:<app id>');
+        }
         // One frame per page and app host. Renewal of the shared privasys.id
         // session is coordinated across documents by a lock and a single-use
         // refresh token; several frames created and destroyed around each
@@ -729,7 +775,8 @@ export class AuthFrame {
             this.connectHint = { mode: 'approve', reason: 'attributes-widened', added };
         } else if (existing?.token) {
             if (!appHost) {
-                return { accessToken: existing.token, session: null };
+                this.transport = this.config.direct ? 'direct' : null;
+                return { accessToken: existing.token, session: null, transport: this.transport };
             }
             try {
                 const sealed = await this.resumeSession().catch(async (err: Error) => {
@@ -740,9 +787,16 @@ export class AuthFrame {
                     await new Promise((r) => setTimeout(r, 15_000));
                     return this.resumeSession();
                 });
-                return { accessToken: existing.token, session: sealed };
+                this.transport = 'sealed';
+                return { accessToken: existing.token, session: sealed, transport: 'sealed' };
             } catch (err) {
                 const msg = (err as Error).message ?? '';
+                if (this.config.direct && !existing.pushToken && msg.startsWith('no-voucher')) {
+                    // Signed in without the wallet, so there never was a
+                    // sealed session to resume: carry on over the direct name.
+                    this.transport = 'direct';
+                    return { accessToken: existing.token, session: null, transport: 'direct' };
+                }
                 if (msg.startsWith('rejected') || msg.startsWith('no-voucher')) {
                     // 2. Interactive re-approval (the gate falls back to the
                     // full ceremony internally when it can't complete).
@@ -768,12 +822,12 @@ export class AuthFrame {
             const session = (this.config.sessionRelay && result.sessionRelay)
                 ? await this.session().catch(() => null)
                 : null;
-            if (this.config.sessionRelay && !session) {
+            if (this.config.sessionRelay && !session && !this.config.direct) {
                 // The ceremony completed via a method that cannot open the
-                // sealed channel (social/passkey — possible only when the
-                // adopter explicitly overrode methods). Fail loudly: a
-                // token without the sealed transport is useless to a
-                // session-relay app and reads as a silent dead end.
+                // sealed channel (social/passkey). Without `direct` the
+                // app has no other way to be reached, so fail loudly: a
+                // token without the sealed transport reads as a silent
+                // dead end.
                 throw new ConnectError('failed',
                     'This app requires the Privasys Wallet: the sign-in method used cannot open a sealed channel to it.');
             }
@@ -782,7 +836,8 @@ export class AuthFrame {
             // persistent session frame takes over, so that audience tokens
             // (a direct name's bearer transport) can be minted straight away.
             if (!session) await this.getSession().catch(() => null);
-            return { accessToken, session, result };
+            this.transport = session ? 'sealed' : (this.config.direct ? 'direct' : null);
+            return { accessToken, session, result, transport: this.transport };
         } catch (err) {
             if (err instanceof ConnectError) throw err;
             const msg = err instanceof Error ? err.message : String(err);
@@ -841,6 +896,67 @@ export class AuthFrame {
         }
         const widened = named.filter((k) => !(k in claims));
         return widened.length ? widened : null;
+    }
+
+    /**
+     * Call one of the app's private routes, whichever way this person signed
+     * in: sealed after a wallet sign-in, over the direct name otherwise (see
+     * {@link AuthFrameConfig.direct}). `path` starts with "/" and may carry a
+     * query string; `body` is sent as is when it is bytes or a string, and
+     * as JSON otherwise. The app receives the same identity headers either
+     * way, and `X-Privasys-Transport` tells it which way the request came.
+     * Call {@link connect} first.
+     *
+     * A wallet session never falls back to direct: when its sealed session
+     * needs re-approval, the request fails until `connect()` restores it.
+     */
+    async request(method: string, path: string, body?: unknown, init?: RequestInit): Promise<AppResponse> {
+        if (this.transport === 'sealed') {
+            const r = await (await this.sealedFor()).request(method, path, body, init);
+            return { status: r.status, headers: r.headers, body: r.body, transport: 'sealed' };
+        }
+        const resp = await this.sendDirectRequest(method, path, body, init);
+        return {
+            status: resp.status,
+            headers: headerRecord(resp.headers),
+            body: new Uint8Array(await resp.arrayBuffer()),
+            transport: 'direct',
+        };
+    }
+
+    /**
+     * Streaming variant of {@link request}, for server-sent events and
+     * chunked responses. The body yields plaintext bytes either way.
+     */
+    async stream(method: string, path: string, body?: unknown, init?: RequestInit): Promise<AppStreamResponse> {
+        if (this.transport === 'sealed') {
+            const r = await (await this.sealedFor()).stream(method, path, body, init);
+            return { status: r.status, headers: r.headers, body: r.body, transport: 'sealed' };
+        }
+        const resp = await this.sendDirectRequest(method, path, body, init);
+        return {
+            status: resp.status,
+            headers: headerRecord(resp.headers),
+            body: resp.body ?? new ReadableStream<Uint8Array>({ start: (c) => c.close() }),
+            transport: 'direct',
+        };
+    }
+
+    private sealedFor(): Promise<SealedSession> {
+        return this.sealedProxy ? Promise.resolve(this.sealedProxy) : this.session();
+    }
+
+    private async sendDirectRequest(method: string, path: string, body: unknown, init?: RequestInit): Promise<Response> {
+        const direct = this.config.direct;
+        if (this.transport !== 'direct' || !direct) {
+            throw new Error('AuthFrame: request() needs a connect() that signed the person in');
+        }
+        const audience = (direct.audience ?? this.config.audience)!;
+        const token = await this.getTokenForAudience(audience);
+        return sendDirect({
+            origin: direct.origin ?? globalThis.location.origin,
+            token, method, path, body, init,
+        });
     }
 
     /**

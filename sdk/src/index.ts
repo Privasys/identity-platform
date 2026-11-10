@@ -19,6 +19,8 @@ export { SessionManager } from './session';
 export { AuthFrame, ConnectError, InsufficientCreditsError } from './frame-client';
 export type {
     AttributeDisclosure,
+    AppResponse,
+    AppStreamResponse,
     AuthFrameConfig,
     ConnectResult,
     PrivasysScope,
@@ -53,6 +55,7 @@ export {
     priceOf,
 } from './attribute-pricing';
 export type { AttributePrices, AttributeSection, AttributeSectionId } from './attribute-pricing';
+export type { AppTransport } from './direct-request';
 export { PrivasysSession } from './enclave-session';
 export type {
     EncAuthRejectReason,

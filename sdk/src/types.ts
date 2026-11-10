@@ -97,6 +97,13 @@ export interface AuthSession {
     authenticatedAt: number;
     /** Push token for the wallet that authenticated (if available). */
     pushToken?: string;
+    /**
+     * The sign-in was the wallet: the access token from the code exchange
+     * carried the identity provider's `wallet` marker. A refreshed token does
+     * not, and a later sign-in on this device keeps an earlier wallet's push
+     * token, so this is the record. Absent on a session stored before it.
+     */
+    wallet?: boolean;
     /** Broker WebSocket URL used for this session (needed for push auth). */
     brokerUrl?: string;
     /** OIDC refresh token for silent session renewal (replaces push-based renewal). */

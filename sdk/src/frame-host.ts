@@ -487,6 +487,17 @@ function tokenExpMs(token: string): number | null {
     }
 }
 
+/** Whether an access token carries the identity provider's wallet marker. */
+function tokenSaysWallet(token: string): boolean {
+    try {
+        const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const w = JSON.parse(atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '='))).wallet;
+        return w === true || w === 'true';
+    } catch {
+        return false;
+    }
+}
+
 /** Whether an access token was issued for this audience. */
 function tokenAudienceIs(token: string, audience: string): boolean {
     try {
@@ -1569,6 +1580,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     origin: config.apiBase,
                     authenticatedAt: Date.now(),
                     pushToken: uiResult?.pushToken ?? priorSession?.pushToken,
+                    // The marker, or a ceremony that brought the wallet's
+                    // sealed binding, so a wallet user is never taken for
+                    // someone without one.
+                    wallet: tokenSaysWallet(tokens.access_token)
+                        || !!uiResult?.sessionRelay || !!uiResult?.completedViaPoll,
                     brokerUrl: config.brokerUrl || priorSession?.brokerUrl || '',
                     refreshToken: tokens.refresh_token,
                     clientId,

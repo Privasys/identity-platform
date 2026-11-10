@@ -605,8 +605,9 @@ export interface RestoredSession {
     authenticatedAt: number;
     requestedAttributes?: string[];
     scope?: string;
-    /** Present when the wallet signed this session in. */
-    pushToken?: string;
+    /** Whether the wallet signed this session in; absent on a session
+     *  stored by an older frame host. */
+    wallet?: boolean;
 }
 
 export class AuthFrame {
@@ -779,6 +780,13 @@ export class AuthFrame {
                 this.transport = this.config.direct ? 'direct' : null;
                 return { accessToken: existing.token, session: null, transport: this.transport };
             }
+            if (this.config.direct && existing.wallet === false) {
+                // Signed in without the wallet, so there is no sealed
+                // session to resume and nothing to approve: carry on over
+                // the direct name, with no UI.
+                this.transport = 'direct';
+                return { accessToken: existing.token, session: null, transport: 'direct' };
+            }
             try {
                 const sealed = await this.resumeSession().catch(async (err: Error) => {
                     // The enclave budgets voucher-backed bootstraps per
@@ -792,9 +800,10 @@ export class AuthFrame {
                 return { accessToken: existing.token, session: sealed, transport: 'sealed' };
             } catch (err) {
                 const msg = (err as Error).message ?? '';
-                if (this.config.direct && !existing.pushToken && msg.startsWith('no-voucher')) {
-                    // Signed in without the wallet, so there never was a
-                    // sealed session to resume: carry on over the direct name.
+                if (this.config.direct && existing.wallet === undefined && msg.startsWith('no-voucher')) {
+                    // A session stored before the sign-in method was
+                    // recorded, and no sealed session to resume: carry on
+                    // over the direct name rather than open a gate.
                     this.transport = 'direct';
                     return { accessToken: existing.token, session: null, transport: 'direct' };
                 }

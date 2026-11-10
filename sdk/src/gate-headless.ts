@@ -44,7 +44,10 @@ export type GateChoice =
 /** Where a started sign-in is, for the page to narrate. */
 export interface GateState {
     state: 'idle' | 'push-waiting' | 'qr-scanning' | 'wallet-connected' | 'authenticating'
-        | 'approve-waiting' | 'passkey-requesting' | 'passkey-ceremony' | 'passkey-verifying' | 'success' | 'error';
+        | 'approve-waiting' | 'passkey-requesting' | 'passkey-ceremony' | 'passkey-verifying' | 'success' | 'error'
+        // After a passkey, asking for the name and email (visible gate only:
+        // a headless gate offers no passkey).
+        | 'profile-required';
     /** The wallet QR payload while `state` is `qr-scanning`. */
     qr?: string;
     /** The same QR code drawn as inline SVG, so the page needs no encoder. */

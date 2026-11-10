@@ -140,6 +140,13 @@ export interface AuthUIConfig {
     /** Callback when the user wants to start social auth. The UI calls
      *  this with the provider name; the host opens a popup. */
     onSocialAuth?: (provider: string, own?: boolean) => Promise<void>;
+    /**
+     * The client asked for the person's name or email address, which a
+     * passkey does not carry. After a passkey the gate then asks the person
+     * to sign in once with an account provider, whose answer the identity
+     * provider adds to this sign-in.
+     */
+    profileAfterPasskey?: boolean;
     /** Headless: the gate renders nothing the person sees; the embedding
      *  page draws the buttons from `gateOptions()` and calls `start()`.
      *  No flow starts on its own except a re-approval. */
@@ -192,6 +199,7 @@ export interface SignInResult {
 
 type UIState =
     | 'idle'
+    | 'profile-required'
     | 'push-waiting'
     | 'qr-scanning'
     | 'wallet-connected'
@@ -940,6 +948,14 @@ const ICON_GITHUB = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2
 const ICON_GOOGLE = `<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 001 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`;
 const ICON_MICROSOFT = `<svg viewBox="0 0 24 24"><rect fill="#F25022" x="2" y="2" width="9.5" height="9.5"/><rect fill="#7FBA00" x="12.5" y="2" width="9.5" height="9.5"/><rect fill="#00A4EF" x="2" y="12.5" width="9.5" height="9.5"/><rect fill="#FFB900" x="12.5" y="12.5" width="9.5" height="9.5"/></svg>`;
 const ICON_LINKEDIN = `<svg viewBox="0 0 24 24"><path fill="#0A66C2" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>`;
+
+/** The brand icon of each platform provider. */
+const SOCIAL_ICONS: Record<string, string> = {
+    github: ICON_GITHUB,
+    google: ICON_GOOGLE,
+    microsoft: ICON_MICROSOFT,
+    linkedin: ICON_LINKEDIN,
+};
 const ICON_CLOSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 const ICON_SHIELD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>`;
 const ICON_LOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>`;
@@ -1285,6 +1301,9 @@ export class AuthUI {
             case 'error':
                 brandDesc = 'Something went wrong. You can try again or choose a different method.';
                 break;
+            case 'profile-required':
+                brandDesc = 'One more step: confirm your name and email address with an account that holds them.';
+                break;
             default:
                 brandDesc = `<strong>${displayName}</strong> needs to verify your identity. Please choose one of the authentication options.`;
         }
@@ -1316,6 +1335,9 @@ export class AuthUI {
             case 'error':
                 content = this.renderError();
                 break;
+            case 'profile-required':
+                content = this.renderProfile();
+                break;
             default:
                 content = this.renderIdle();
         }
@@ -1340,6 +1362,7 @@ export class AuthUI {
         // Without a generic brand panel to carry context (inline and page
         // modes), flow states get a heading of their own above the tile.
         const flowHeading = (inline || isPage) && !isIdle && this.state !== 'success' && this.state !== 'error'
+            && this.state !== 'profile-required'
             ? (this.method === 'passkey' ? 'Sign in with a passkey' : 'Connecting you to Privasys ID')
             : null;
 
@@ -1493,12 +1516,7 @@ export class AuthUI {
         }
 
         // Social IdP buttons
-        const socialIcons: Record<string, string> = {
-            github: ICON_GITHUB,
-            google: ICON_GOOGLE,
-            microsoft: ICON_MICROSOFT,
-            linkedin: ICON_LINKEDIN,
-        };
+        const socialIcons = SOCIAL_ICONS;
         // One provider and nothing else to choose from (methods: ['social'],
         // providers: ['microsoft']): the button is the primary call to action
         // and carries the full label, so the gate reads as a sign-in page for
@@ -1554,6 +1572,38 @@ export class AuthUI {
 
         return el('div', null,
             el('h2', { className: 'auth-panel-heading' }, `Sign in to ${displayName}`),
+            ...buttons,
+        );
+    }
+
+    /**
+     * After a passkey, for a client that asked for the person's name or email
+     * address: the providers that can confirm them, drawn as the menu draws
+     * them. They are offered whether or not the menu offered social sign-in,
+     * since this is the only way to bring those details to a passkey.
+     */
+    private renderProfile(): HTMLElement {
+        const displayName = this.cfg.app?.displayName || displayAppName(this.cfg.appName);
+        const own = (this.cfg.socialOwn ?? []).map((o) =>
+            el('button', { className: 'btn-provider', onClick: () => this.confirmProfile(o.provider, true) },
+                o.iconUrl ? el('img', { src: o.iconUrl, alt: '' }) : el('span', { html: SOCIAL_ICONS[o.provider] ?? '' }),
+                el('span', { className: 'btn-label' }, `Sign in with ${o.displayName}`),
+            ));
+        const platform = (this.cfg.socialProviders ?? []).map((provider) => {
+            const iconUrl = this.cfg.socialIcons?.[provider];
+            const icon = SOCIAL_ICONS[provider] ?? '';
+            return el('button', { className: 'btn-provider', onClick: () => this.confirmProfile(provider) },
+                iconUrl ? el('img', { src: iconUrl, alt: '' }) : icon ? el('span', { html: icon }) : null,
+                el('span', { className: 'btn-label' }, providerButtonLabel(provider, false, this.cfg.socialDisplayNames?.[provider])),
+            );
+        });
+        const buttons = [...own, ...platform];
+        if (buttons.length) buttons[0].classList.add('primary');
+        return el('div', null,
+            el('h2', { className: 'auth-panel-heading' }, 'Confirm your name and email'),
+            el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin: 0 0 16px;' },
+                `${displayName} asks for your name and email address. A passkey does not carry them, so sign in once with one of these accounts to confirm them.`),
+            this.errorMsg ? el('div', { className: 'error-msg' }, this.errorMsg) : null,
             ...buttons,
         );
     }
@@ -2010,10 +2060,39 @@ export class AuthUI {
             }
             this.sessionToken = result.sessionToken;
             this.sessionId = result.sessionId;
+            if (this.cfg.profileAfterPasskey) {
+                if (!(this.cfg.socialOwn?.length || this.cfg.socialProviders?.length)) {
+                    // Fail loudly rather than complete a sign-in without the
+                    // details the client asked for.
+                    this.state = 'error';
+                    this.errorMsg = 'This app needs your name and email address, and no account is set up here to confirm them. Sign in with Privasys ID instead.';
+                    this.render();
+                    return;
+                }
+                this.state = 'profile-required';
+                this.render();
+                return;
+            }
             this.complete();
         } catch (err: any) {
             this.state = 'error';
             this.errorMsg = err?.message ?? 'Passkey authentication failed';
+            this.render();
+        }
+    }
+
+    /** The provider's sign-in adds the person's details to this passkey sign-in. */
+    private async confirmProfile(provider: string, own = false): Promise<void> {
+        if (!this.cfg.onSocialAuth) return;
+        this.errorMsg = '';
+        this.state = 'authenticating';
+        this.render();
+        try {
+            await this.cfg.onSocialAuth(provider, own);
+            this.complete();
+        } catch (err: any) {
+            this.state = 'profile-required';
+            this.errorMsg = err?.message ?? 'Your details were not confirmed. Try again.';
             this.render();
         }
     }

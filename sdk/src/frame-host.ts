@@ -766,110 +766,6 @@ async function generatePKCE(): Promise<{ codeVerifier: string; codeChallenge: st
     return { codeVerifier, codeChallenge };
 }
 
-// ---------------------------------------------------------------------------
-// Post-passkey profile verification
-// ---------------------------------------------------------------------------
-
-/**
- * Show an inline UI asking the user to verify their identity via a social
- * provider (Google, GitHub, etc.) after passkey authentication. The social
- * callback on the IdP patches the verified email/name onto the existing
- * auth code so the final JWT carries those claims.
- */
-function showProfileVerification(
-    idpBase: string,
-    sessionId: string,
-    socialProviders: string[],
-): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        // Build a simple inline overlay inside the iframe.
-        const overlay = document.createElement('div');
-        overlay.style.cssText =
-            'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;' +
-            'background:rgba(0,0,0,.45);z-index:10000;font-family:system-ui,sans-serif;';
-
-        const card = document.createElement('div');
-        card.style.cssText =
-            'background:#fff;border-radius:12px;padding:32px 28px;max-width:380px;width:90%;' +
-            'box-shadow:0 8px 32px rgba(0,0,0,.18);text-align:center;';
-
-        const heading = document.createElement('h2');
-        heading.textContent = 'Verify your identity';
-        heading.style.cssText = 'margin:0 0 8px;font-size:18px;color:#1a1a2e;';
-
-        const subtitle = document.createElement('p');
-        subtitle.textContent =
-            'To complete your account, sign in with one of these providers to verify your email.';
-        subtitle.style.cssText = 'margin:0 0 20px;font-size:14px;color:#666;line-height:1.4;';
-
-        card.appendChild(heading);
-        card.appendChild(subtitle);
-
-        const providerNames: Record<string, string> = {
-            github: 'GitHub', google: 'Google',
-            microsoft: 'Microsoft', linkedin: 'LinkedIn',
-        };
-
-        const openSocialPopup = (provider: string) => {
-            const w = 500, h = 650;
-            const left = window.screenX + (window.innerWidth - w) / 2;
-            const top = window.screenY + (window.innerHeight - h) / 2;
-            const popupUrl =
-                `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}` +
-                `&session_id=${encodeURIComponent(sessionId)}`;
-            const popup = window.open(
-                popupUrl, 'privasys-social',
-                `width=${w},height=${h},left=${left},top=${top}`,
-            );
-
-            if (!popup) {
-                reject(new Error('Popup blocked — please allow popups for this site'));
-                return;
-            }
-
-            const cleanup = () => {
-                window.removeEventListener('message', onMsg);
-                clearInterval(pollClosed);
-                overlay.remove();
-            };
-
-            const onMsg = (ev: MessageEvent) => {
-                if (ev.source !== popup) return;
-                if (ev.data?.type === 'privasys:social-complete') {
-                    cleanup(); popup.close(); resolve();
-                } else if (ev.data?.type === 'privasys:social-error') {
-                    cleanup(); popup.close();
-                    reject(new Error(ev.data.error || 'Social verification failed'));
-                }
-            };
-            window.addEventListener('message', onMsg);
-
-            const pollClosed = setInterval(() => {
-                if (popup.closed) {
-                    cleanup();
-                    reject(new Error('Verification cancelled'));
-                }
-            }, 500);
-        };
-
-        for (const provider of socialProviders) {
-            const btn = document.createElement('button');
-            btn.textContent = providerNames[provider] ?? provider;
-            btn.style.cssText =
-                'display:block;width:100%;padding:12px 16px;margin:8px 0;border:1px solid #ddd;' +
-                'border-radius:8px;background:#fff;font-size:14px;cursor:pointer;' +
-                'transition:background .15s;';
-            btn.onmouseenter = () => { btn.style.background = '#f5f5f5'; };
-            btn.onmouseleave = () => { btn.style.background = '#fff'; };
-            btn.onclick = () => openSocialPopup(provider);
-            card.appendChild(btn);
-        }
-
-        overlay.appendChild(card);
-        document.body.appendChild(overlay);
-    });
-}
-
 /** Poll the IdP session status until auth code is available or timeout. */
 async function pollSessionStatus(pollUrl: string, timeoutMs = 120_000): Promise<string> {
     const deadline = Date.now() + timeoutMs;
@@ -1475,6 +1371,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     socialIcons,
                     socialOwn,
                     onSocialAuth,
+                    // A passkey carries no name or email; the gate asks for
+                    // them through a provider when the client wants them.
+                    profileAfterPasskey: !!requestedAttributes?.some(
+                        (a: string) => a === 'email' || a === 'name',
+                    ),
                     headless,
                     onGateState,
                     requestedAttributes,
@@ -1518,34 +1419,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 //    - Social: the popup callback already marked it complete, so
                 //      call /session/complete to get the code (it's idempotent).
                 if (uiResult.method === 'passkey') {
-                    // Check if the relying party needs profile attributes that
-                    // passkey auth alone cannot provide (email, name).
-                    const needsProfile = requestedAttributes?.some(
-                        (a: string) => a === 'email' || a === 'name',
-                    );
-                    if (needsProfile) {
-                        // Passkey alone cannot supply verified email/name —
-                        // we MUST route the user through an external IdP
-                        // before issuing the auth code. If the IdP is not
-                        // configured with any social provider, fail loudly
-                        // instead of silently completing with a profile-less
-                        // user (regression observed in v0.2.1 where dropping
-                        // provider env vars caused new passkey users to be
-                        // created with no email/name and no way to recover).
-                        if (socialProviders.length === 0) {
-                            throw new Error(
-                                'Profile verification required (email/name) ' +
-                                'but the IdP has no external identity ' +
-                                'providers configured. Contact support.',
-                            );
-                        }
-                        // Show an inline profile-verification UI and open a
-                        // social popup so the user's verified email/name gets
-                        // attached to the auth code before token exchange.
-                        await showProfileVerification(
-                            idpBase, oidcSessionId, socialProviders,
-                        );
-                    }
+                    // A client that asked for the name or email had the gate
+                    // confirm them with a provider after the passkey
+                    // (profileAfterPasskey); the provider's callback added
+                    // them to this session.
                     code = await pollSessionStatus(pollUrl);
                 } else if (uiResult.completedViaPoll) {
                     // Same-device wallet flow: the relay died during the app

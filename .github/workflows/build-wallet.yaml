@@ -147,12 +147,13 @@ jobs:
         run: bun run sync-shared
       - name: Fail if the bundled copy was stale
         run: git diff --exit-code -- wallet/src/shared
-      # Scoped to the referential suite on purpose: fido2/integration currently
-      # fail to load under jest's react-native transform, so a blanket run would
-      # gate every wallet release on an unrelated pre-existing break.
-      - name: Test the referential
+      # The whole suite. This step once ran the referential tests alone, because
+      # two suites could not load at the time; they have long since been fixed,
+      # and the narrow run then let four suites sit broken for two weeks
+      # (2026-10-27 to 2026-11-10) with every release green.
+      - name: Test
         working-directory: wallet
-        run: bunx jest --ci --watchAll=false src/__tests__/canonical-attributes.test.ts
+        run: bunx jest --ci --watchAll=false
       # The entitlements that reach the binary, not the ones app.config.ts
       # declares. A config plugin ASSIGNING keychain-access-groups instead of
       # merging silently dropped the legacy App ID prefix groups after the Apple

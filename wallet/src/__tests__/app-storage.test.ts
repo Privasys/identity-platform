@@ -13,6 +13,9 @@
  */
 
 jest.mock('../../modules/native-ratls/src/index', () => ({ makeRaTlsFetch: jest.fn() }));
+// The attestation service reaches for native modules on import; a mint only
+// asks it to make sure an attestation is in place.
+jest.mock('@/services/wia', () => ({ ensureWia: jest.fn(async () => null) }));
 jest.mock('@/services/platform-token', () => ({
     getPlatformToken: jest.fn(async () => 'tok'),
     tokenForHost: jest.fn(async () => 'tok'),

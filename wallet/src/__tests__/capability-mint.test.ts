@@ -12,6 +12,9 @@
  */
 
 jest.mock('../../modules/native-ratls/src/index', () => ({ makeRaTlsFetch: jest.fn() }));
+// The attestation service reaches for native modules on import; a mint only
+// asks it to make sure an attestation is in place.
+jest.mock('@/services/wia', () => ({ ensureWia: jest.fn(async () => null) }));
 jest.mock('@/services/platform-token', () => ({
     getPlatformToken: jest.fn(async () => 'tok'),
     tokenForHost: jest.fn(async () => 'tok'),
@@ -26,6 +29,7 @@ jest.mock('@/services/wallet-call', () => ({
 }));
 
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
+import { ensureWia } from '@/services/wia';
 import {
     createCapability,
     isProviderRefusal,
@@ -98,6 +102,43 @@ describe('200', () => {
         answer(200, { capability_id: 'cap-2' });
         await mint(undefined);
         expect('setup' in posted).toBe(false);
+    });
+});
+
+// The attestation lasts 48 hours, so a holder two days from their last sign-in
+// used to mint at a service with no proof and be refused. A mint at a service
+// that asks for the proof now renews it first.
+describe('the instance attestation', () => {
+    const ensure = ensureWia as unknown as jest.Mock;
+    const atService = (serviceUrl?: string) =>
+        createCapability({
+            resourceHost: 'connector.apps.privasys.org',
+            subjectAppId: '3f6d1a0e-0000-4000-8000-000000000001',
+            pending: { ...pending(), service_url: serviceUrl },
+            expiresUnix: 1_900_000_000,
+        });
+
+    it('is renewed before a mint at a service that asks for the proof', async () => {
+        ensure.mockClear();
+        answer(200, { capability_id: 'cap-3' });
+        await atService('https://connector.apps.privasys.org/v1/capabilities');
+        expect(ensure).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not stop the mint when it cannot be renewed', async () => {
+        ensure.mockClear();
+        ensure.mockRejectedValueOnce(new Error('offline'));
+        answer(200, { capability_id: 'cap-4' });
+        const out = await atService('https://connector.apps.privasys.org/v1/capabilities');
+        expect(ensure).toHaveBeenCalledTimes(1);
+        expect(out.status).toBe('granted');
+    });
+
+    it('is left alone where no proof is sent, so no prompt appears for nothing', async () => {
+        ensure.mockClear();
+        answer(200, { capability_id: 'cap-5' });
+        await atService(undefined);
+        expect(ensure).not.toHaveBeenCalled();
     });
 });
 

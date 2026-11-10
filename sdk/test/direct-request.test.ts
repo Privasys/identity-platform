@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { directBody, directUrl, headerRecord, sendDirect } from '../src/direct-request';
+import { DirectWebSocket, directBody, directUrl, headerRecord, sendDirect } from '../src/direct-request';
 
 test('a path resolves on the direct origin', () => {
     assert.equal(directUrl('https://drive.example.org', '/api/files?x=1'), 'https://drive.example.org/api/files?x=1');
@@ -61,4 +61,57 @@ test('a GET sends no body, and a caller content type is kept', async () => {
     });
     assert.equal(inits[0].body, undefined);
     assert.equal(new Headers(inits[1].headers).get('content-type'), 'application/merge-patch+json');
+});
+
+class FakeSocket {
+    static last: FakeSocket | null = null;
+    readyState = 0;
+    binaryType = 'blob';
+    sent: unknown[] = [];
+    onopen: (() => void) | null = null;
+    onmessage: ((ev: { data: unknown }) => void) | null = null;
+    onerror: (() => void) | null = null;
+    onclose: ((ev: { code: number; reason: string; wasClean: boolean }) => void) | null = null;
+    constructor(readonly url: string, readonly protocols: string[]) { FakeSocket.last = this; }
+    send(d: unknown) { this.sent.push(d); }
+    close(code: number, reason: string) { this.readyState = 3; this.onclose?.({ code, reason, wasClean: true }); }
+    open() { this.readyState = 1; this.onopen?.(); }
+}
+const makeFake = (u: string, p: string[]) => new FakeSocket(u, p) as unknown as WebSocket;
+
+test('a direct socket carries the token as a subprotocol and queues until open', async () => {
+    const ws = new DirectWebSocket('https://drive.example.org', '/ws?x=1', async () => 'tok', makeFake);
+    ws.send({ a: 1 });
+    await new Promise((r) => setTimeout(r, 0));
+    const fake = FakeSocket.last!;
+    assert.equal(fake.url, 'wss://drive.example.org/ws?x=1');
+    assert.deepEqual(fake.protocols, ['privasys.v1', 'privasys.bearer.tok']);
+    assert.equal(fake.binaryType, 'arraybuffer');
+    assert.equal(fake.sent.length, 0);
+    fake.open();
+    await ws.ready;
+    assert.equal(ws.open, true);
+    assert.equal(new TextDecoder().decode(fake.sent[0] as Uint8Array), '{"a":1}');
+
+    const got: string[] = [];
+    ws.onMessage((d) => got.push(new TextDecoder().decode(d)));
+    fake.onmessage!({ data: 'text' });
+    fake.onmessage!({ data: new TextEncoder().encode('bin').buffer });
+    assert.deepEqual(got, ['text', 'bin']);
+
+    let closed: number | null = null;
+    ws.onClose((i) => { closed = i.code; });
+    ws.close();
+    assert.equal(closed, 1000);
+    assert.throws(() => ws.send('x'));
+});
+
+test('a direct socket that cannot get a token, or leaves the origin, never opens', async () => {
+    FakeSocket.last = null;
+    const noToken = new DirectWebSocket('https://d.example', '/ws', async () => { throw new Error('signed out'); }, makeFake);
+    await assert.rejects(noToken.ready, /signed out/);
+    const away = new DirectWebSocket('https://d.example', '//evil.example/ws', async () => 'tok', makeFake);
+    await assert.rejects(away.ready, /stay on the direct origin/);
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(FakeSocket.last, null);
 });

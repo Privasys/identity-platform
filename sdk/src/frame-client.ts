@@ -56,7 +56,7 @@
 // postMessage.
 import type { SealedSessionState, SealedWebSocket } from './enclave-session';
 import { FRAME_SIZE_MESSAGE, inlineFrameHeight } from './frame-size';
-import { headerRecord, sendDirect, type AppTransport } from './direct-request';
+import { DirectWebSocket, headerRecord, sendDirect, type AppTransport } from './direct-request';
 
 import type { SocialProvider } from './providers';
 import type { AuthTheme } from './theme';
@@ -314,9 +314,10 @@ export interface AuthFrameConfig {
      * Also serve people who sign in without the wallet, over the app's direct
      * name. A wallet sign-in still opens the sealed session; any other
      * sign-in (Microsoft, Google, a passkey) gets no sealed session, and
-     * {@link AuthFrame.request} sends that person's requests over HTTPS to
-     * `origin` with an access token for `audience`. The app's manifest
-     * must declare `"direct": "private"` for its private routes to answer.
+     * {@link AuthFrame.request} and {@link AuthFrame.openWebSocket} reach
+     * the app over HTTPS at `origin` with an access token for `audience`.
+     * The app's manifest must declare `"direct": "private"` for its
+     * private routes to answer.
      *
      * `origin` defaults to the page's own origin, which is right when the
      * page is served from the direct name. `audience` defaults to
@@ -940,6 +941,30 @@ export class AuthFrame {
             body: resp.body ?? new ReadableStream<Uint8Array>({ start: (c) => c.close() }),
             transport: 'direct',
         };
+    }
+
+    /**
+     * Open a WebSocket to one of the app's routes, whichever way this person
+     * signed in: sealed after a wallet sign-in, over the direct name otherwise.
+     * Both have the same interface; the app receives binary frames either way.
+     * A direct socket closes when its token expires (about an hour); open a
+     * new one on close, as with a sealed socket. Call {@link connect} first.
+     */
+    openWebSocket(path: string): SealedWebSocket {
+        if (this.transport === 'sealed') {
+            if (!this.sealedProxy) throw new Error('AuthFrame: the sealed session is not open yet');
+            return this.sealedProxy.openWebSocket(path);
+        }
+        const direct = this.config.direct;
+        if (this.transport !== 'direct' || !direct) {
+            throw new Error('AuthFrame: openWebSocket() needs a connect() that signed the person in');
+        }
+        const audience = (direct.audience ?? this.config.audience)!;
+        return new DirectWebSocket(
+            direct.origin ?? globalThis.location.origin,
+            path,
+            () => this.getTokenForAudience(audience),
+        );
     }
 
     private sealedFor(): Promise<SealedSession> {

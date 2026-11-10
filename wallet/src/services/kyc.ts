@@ -653,7 +653,7 @@ function govRecord(record: KycRecord, evidence: string): VerificationRecord {
 }
 
 /** Image data-URI for the DG2 portrait (raw base64 from the chip). */
-function portraitDataUri(b64: string): string {
+export function portraitDataUri(b64: string): string {
     return b64.startsWith('data:') ? b64 : `data:image/jpeg;base64,${b64}`;
 }
 

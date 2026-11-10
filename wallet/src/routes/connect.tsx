@@ -3570,6 +3570,12 @@ function AttributeAcquisitionView({
     const hasGovMissing = stillMissing.some(
         (attr) => assuranceFor(attr, attributeRequirements) === 'gov',
     );
+    // Importing from an account or typing a value can only supply the details
+    // that are NOT government-backed. When everything missing has to come from
+    // an ID, those two options lead nowhere, so they are not offered.
+    const hasOtherMissing = stillMissing.some(
+        (attr) => assuranceFor(attr, attributeRequirements) !== 'gov',
+    );
     // The holder's own address, waiting on a check. An email is "missing" here
     // until it is proved, so without this the screen would ask someone who has
     // an address to type it again and stay exactly as stuck.
@@ -3799,13 +3805,17 @@ function AttributeAcquisitionView({
                                         <Ionicons name="lock-closed-outline" size={16} color={p.warnText} />
                                         <Text style={acqStyles.privacyNoticeText}>{t('connect.govRequiredNotice')}</Text>
                                     </RNView>
-                                    <RNView style={acqStyles.divider}>
-                                        <RNView style={acqStyles.dividerLine} />
-                                        <Text style={acqStyles.dividerText}>or</Text>
-                                        <RNView style={acqStyles.dividerLine} />
-                                    </RNView>
+                                    {hasOtherMissing && (
+                                        <RNView style={acqStyles.divider}>
+                                            <RNView style={acqStyles.dividerLine} />
+                                            <Text style={acqStyles.dividerText}>or</Text>
+                                            <RNView style={acqStyles.dividerLine} />
+                                        </RNView>
+                                    )}
                                 </>
                             )}
+                            {hasOtherMissing && (
+                            <>
                             <Text style={acqStyles.sectionTitle}>{t('connect.importFromAccount')}</Text>
                             {Object.entries(PROVIDERS).map(([key, config]) => {
                                 const isLinking = linkingProvider === key;
@@ -3845,6 +3855,8 @@ function AttributeAcquisitionView({
                                 <Ionicons name="create-outline" size={18} color={p.action} />
                                 <Text style={acqStyles.manualButtonText}>{t('connect.enterManually')}</Text>
                             </Pressable>
+                            </>
+                            )}
                         </>
                     ) : (
                         /* Manual entry form */

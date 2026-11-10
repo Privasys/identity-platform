@@ -17,7 +17,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View as NativeView, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View as NativeView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -26,12 +26,14 @@ import { fetchStoreListing, type StoreListing } from '@/services/store-listing';
 import { FirstConnectExplainer } from '@/components/FirstConnectExplainer';
 import { useSettingsStore } from '@/stores/settings';
 import { DataRequestConsent } from '@/components/DataRequestConsent';
+import { ChipScanArt, ChipSymbolArt, PhotoPageArt } from '@/components/IdCheckArt';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { getProfileValue, setProfileValue } from '@/services/attributes';
+import { calendarDate } from '@/services/calendar-date';
 import { appIdFromOids } from '@/services/release-provenance';
 import {
-    applyGovAttributes, attestVerifier, getVerifierInfo, govAttributeCandidates, readDocumentMrz,
+    applyGovAttributes, attestVerifier, getVerifierInfo, govAttributeCandidates, portraitDataUri, readDocumentMrz,
     verifyIdentity, isRetryableCapture, type KycRecord, type VerifierAttestation,
 } from '@/services/kyc';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
@@ -39,7 +41,10 @@ import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
-type Step = 'doctype' | 'consent' | 'attest' | 'capture' | 'read' | 'selfie' | 'verifying' | 'select' | 'done';
+// doctype: is there a chip · consent · attest: the enclave · photo: what to
+// photograph · capture: the camera · read: scan the chip · review: what the chip
+// said, before anything is sent · selfie · verifying · select · done.
+type Step = 'doctype' | 'consent' | 'attest' | 'photo' | 'capture' | 'read' | 'review' | 'selfie' | 'verifying' | 'select' | 'done';
 type DocType = 'passport' | 'id-card';
 type CaptureState = 'positioning' | 'checking' | 'captured';
 
@@ -144,6 +149,9 @@ export default function KycCaptureScreen() {
     const [dob, setDob] = useState('');
     const [expiry, setExpiry] = useState('');
     const [docRead, setDocRead] = useState<Emrtd.EmrtdReadResult | null>(null);
+    // The chip photo can be JPEG 2000, which not every phone can draw: the
+    // review screen then shows the details without it.
+    const [portraitFailed, setPortraitFailed] = useState(false);
     // The captured data-page frame — sent to the enclave for the heavy OCR +
     // visual↔chip cross-reference (GPG45 box 3). The wallet stays thin (no OCR
     // lib); it just forwards the image.
@@ -291,7 +299,7 @@ export default function KycCaptureScreen() {
                 if (trusted && isAttestationMatch(res.origin, verifierMeasurements(res))) {
                     rememberVerifier(res); // refresh lastVerified
                     setVerifierAtt(res);   // send-time + session-trace state still needs it
-                    void openCapture();
+                    setStep('photo');
                     return;
                 }
                 setAttIsChanged(!!trusted);
@@ -342,6 +350,26 @@ export default function KycCaptureScreen() {
     };
 
     const docLabel = docType === 'passport' ? t('kyc.docPassportNoun') : t('kyc.docIdCardNoun');
+    const isPassport = docType === 'passport';
+
+    // A chip date is a day, not an instant (services/calendar-date.ts).
+    const longDate = (iso?: string) => {
+        const when = calendarDate(iso);
+        return when ? t('kyc.reviewDate', { when }) : (iso ?? '');
+    };
+
+    // Every screen has a way out. Close always leaves the check; these steps
+    // can also go one step back. The consent and enclave steps carry their own
+    // Cancel and Reject.
+    const backFrom: Partial<Record<Step, () => void>> = {
+        photo: () => setStep('doctype'),
+        capture: () => setStep('photo'),
+        read: () => setStep('photo'),
+        review: () => setStep('read'),
+        selfie: () => setStep('review'),
+    };
+    const goBack = busy ? undefined : backFrom[step];
+    const onCamera = step === 'capture' || step === 'selfie';
 
     // ── Step 2: read the document chip over NFC (or dev stub) ────────────────
     const handleScan = async () => {
@@ -358,7 +386,8 @@ export default function KycCaptureScreen() {
                 dateOfExpiry: expiry.trim(),
             });
             setDocRead(read);
-            setStep('selfie');
+            setPortraitFailed(false);
+            setStep('review');
         } catch (e: any) {
             console.warn('[KYC] chip read failed:', e?.message);
             // A rejected key (vs a chip/comms drop) is almost always a single
@@ -661,9 +690,6 @@ export default function KycCaptureScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
             <Stack.Screen options={{ orientation: step === 'capture' ? 'landscape' : 'portrait' }} />
-            <Pressable style={[styles.close, { top: insets.top + 12 }]} onPress={close} hitSlop={12}>
-                <Ionicons name="close" size={26} color={p.textMuted} />
-            </Pressable>
 
             {step === 'doctype' && (
                 <ScrollView
@@ -671,37 +697,10 @@ export default function KycCaptureScreen() {
                     contentContainerStyle={styles.padContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <Ionicons name="id-card-outline" size={40} color={p.action} />
-                    <Text style={styles.title}>{t('kyc.chooseDocTitle')}</Text>
-                    <Text style={styles.body}>{t('kyc.chooseDocBody')}</Text>
-
-                    <Pressable
-                        style={styles.docOption}
-                        onPress={() => { setDocType('passport'); setStep('consent'); }}
-                    >
-                        <Ionicons name="airplane-outline" size={22} color={p.action} />
-                        {/* NativeView: the themed View paints the screen background,
-                            which shows as a grey patch inside the white card. */}
-                        <NativeView style={styles.docOptionBody}>
-                            <Text style={styles.docOptionTitle}>{t('kyc.docPassport')}</Text>
-                            <Text style={styles.docOptionSub}>{t('kyc.docPassportSub')}</Text>
-                        </NativeView>
-                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-                    </Pressable>
-
-                    <Pressable
-                        style={styles.docOption}
-                        onPress={() => { setDocType('id-card'); setStep('consent'); }}
-                    >
-                        <Ionicons name="card-outline" size={22} color={p.action} />
-                        <NativeView style={styles.docOptionBody}>
-                            <Text style={styles.docOptionTitle}>{t('kyc.docIdCard')}</Text>
-                            <Text style={styles.docOptionSub}>{t('kyc.docIdCardSub')}</Text>
-                        </NativeView>
-                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-                    </Pressable>
-
-                    <Text style={styles.note}>{t('kyc.noDrivingLicences')}</Text>
+                    <Text style={styles.title}>{t(isPassport ? 'kyc.chipTitlePassport' : 'kyc.chipTitleIdCard')}</Text>
+                    <Text style={styles.body}>{t(isPassport ? 'kyc.chipBodyPassport' : 'kyc.chipBodyIdCard')}</Text>
+                    <ChipSymbolArt doc={docType} label={t('kyc.artChipSymbol')} />
+                    <Tips items={[t('kyc.chipTipOriginal'), t('kyc.chipTipNotExpired')]} />
                     {support && !support.supported && (
                         <Text style={[styles.note, { color: p.warnText }]}>
                             {support.reason
@@ -709,6 +708,17 @@ export default function KycCaptureScreen() {
                                 : t('kyc.nfcUnavailable')}
                         </Text>
                     )}
+                    <Pressable style={styles.primary} onPress={() => setStep('consent')}>
+                        <Text style={styles.primaryText}>
+                            {t(isPassport ? 'kyc.chipConfirmPassport' : 'kyc.chipConfirmIdCard')}
+                        </Text>
+                    </Pressable>
+                    <Pressable style={styles.secondary} onPress={() => setDocType(isPassport ? 'id-card' : 'passport')}>
+                        <Text style={styles.secondaryText}>
+                            {t(isPassport ? 'kyc.useIdCardInstead' : 'kyc.usePassportInstead')}
+                        </Text>
+                    </Pressable>
+                    <Text style={styles.note}>{t('kyc.noDrivingLicences')}</Text>
                 </ScrollView>
             )}
 
@@ -782,13 +792,29 @@ export default function KycCaptureScreen() {
                         }}
                         onApprove={() => {
                             rememberVerifier(verifierAtt);
-                            void openCapture();
+                            setStep('photo');
                         }}
                         onReject={close}
                         onChallenge={handleChallengeVerifier}
                         challengeInFlight={challengeInFlight}
                     />
                 )
+            )}
+
+            {step === 'photo' && (
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.padContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Text style={styles.title}>{t(isPassport ? 'kyc.photoTitlePassport' : 'kyc.photoTitleIdCard')}</Text>
+                    <Text style={styles.body}>{t(isPassport ? 'kyc.photoBodyPassport' : 'kyc.photoBodyIdCard')}</Text>
+                    <PhotoPageArt doc={docType} label={t('kyc.artPhotoPage')} />
+                    <Tips items={[t('kyc.photoTipFlat'), t('kyc.photoTipAuto')]} />
+                    <Pressable style={styles.primary} onPress={() => { void openCapture(); }}>
+                        <Text style={styles.primaryText}>{t('kyc.openCamera')}</Text>
+                    </Pressable>
+                </ScrollView>
             )}
 
             {step === 'capture' && (
@@ -864,46 +890,78 @@ export default function KycCaptureScreen() {
             )}
 
             {step === 'read' && (
-                <View style={styles.pad}>
-                    {!mrzReadDone ? (
-                        <>
-                            <ActivityIndicator size="large" color={p.action} />
-                            <Text style={styles.body}>{t('kyc.readingPhotoPage')}</Text>
-                            <Pressable style={styles.secondary} onPress={openCapture}>
-                                <Text style={styles.secondaryText}>{t('common.cancel')}</Text>
-                            </Pressable>
-                        </>
-                    ) : (
-                        <>
-                            <Ionicons name="phone-portrait-outline" size={40} color={p.action} />
-                            <Text style={styles.title}>{t('kyc.step2Title')}</Text>
-                            <Text style={styles.body}>
-                                {t('kyc.step2Body', { doc: docLabel })}
-                            </Text>
+                !mrzReadDone ? (
+                    <View style={styles.pad}>
+                        <ActivityIndicator size="large" color={p.action} />
+                        <Text style={styles.body}>{t('kyc.readingPhotoPage')}</Text>
+                        <Pressable style={styles.secondary} onPress={openCapture}>
+                            <Text style={styles.secondaryText}>{t('common.cancel')}</Text>
+                        </Pressable>
+                    </View>
+                ) : (
+                    <ScrollView
+                        style={styles.flex}
+                        contentContainerStyle={styles.padContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <Text style={styles.title}>{t('kyc.scanTitle')}</Text>
+                        <Text style={styles.body}>{t(isPassport ? 'kyc.scanBodyPassport' : 'kyc.scanBodyIdCard')}</Text>
+                        <ChipScanArt doc={docType} label={t('kyc.artChipScan')} />
+                        <Tips items={[t('kyc.scanTipCover'), t('kyc.scanTipSlide')]} />
+                        <Pressable
+                            style={[styles.primary, busy && styles.disabled]}
+                            onPress={handleScan}
+                            disabled={busy}
+                        >
+                            {busy ? (
+                                <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.primaryText}>{t('kyc.startScan')}</Text>
+                            )}
+                        </Pressable>
+                        <Pressable style={styles.secondary} onPress={openCapture} disabled={busy}>
+                            <Text style={styles.secondaryText}>{t('kyc.retakePhoto')}</Text>
+                        </Pressable>
+                    </ScrollView>
+                )
+            )}
 
-                            <View style={styles.summaryCard}>
-                                <SummaryRow label={t('kyc.summaryDocument')} value={docNumber.trim()} />
-                                <SummaryRow label={t('kyc.summaryDob')} value={dob.trim()} />
-                                <SummaryRow label={t('kyc.summaryExpiry')} value={expiry.trim()} />
-                            </View>
-
-                            <Pressable
-                                style={[styles.primary, busy && styles.disabled]}
-                                onPress={handleScan}
-                                disabled={busy}
-                            >
-                                {busy ? (
-                                    <ActivityIndicator color="#FFFFFF" />
-                                ) : (
-                                    <Text style={styles.primaryText}>{t('kyc.scanChip')}</Text>
-                                )}
-                            </Pressable>
-                            <Pressable style={styles.secondary} onPress={openCapture} disabled={busy}>
-                                <Text style={styles.secondaryText}>{t('kyc.retakePhoto')}</Text>
-                            </Pressable>
-                        </>
-                    )}
-                </View>
+            {/* What the chip said, shown before anything goes to the enclave:
+                the holder sees exactly what is about to be sent, and can stop. */}
+            {step === 'review' && docRead && (
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.padContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Text style={styles.title}>{t('kyc.reviewTitle')}</Text>
+                    <Text style={styles.body}>{t('kyc.reviewBody')}</Text>
+                    {docRead.portraitBase64 && !portraitFailed ? (
+                        <Image
+                            source={{ uri: portraitDataUri(docRead.portraitBase64) }}
+                            style={styles.reviewPhoto}
+                            onError={() => setPortraitFailed(true)}
+                            accessibilityIgnoresInvertColors
+                        />
+                    ) : null}
+                    <View style={styles.summaryCard}>
+                        <SummaryRow
+                            plain
+                            label={t('kyc.reviewName')}
+                            value={[docRead.fields.family_name?.toUpperCase(), docRead.fields.given_name].filter(Boolean).join(', ')}
+                        />
+                        <SummaryRow plain label={t('kyc.summaryDob')} value={longDate(docRead.fields.birthdate)} />
+                        <SummaryRow plain label={t('kyc.reviewExpires')} value={longDate(docRead.fields.expiry_date)} />
+                        <SummaryRow plain label={t('kyc.reviewNationality')} value={docRead.fields.nationality ?? ''} />
+                    </View>
+                    <Text style={styles.reviewSent}>{t('kyc.reviewSent')}</Text>
+                    <Pressable style={styles.primary} onPress={() => setStep('selfie')}>
+                        <Text style={styles.primaryText}>{t('kyc.continueToSelfie')}</Text>
+                    </Pressable>
+                    <Pressable style={styles.secondary} onPress={() => setStep('read')}>
+                        <Text style={styles.secondaryText}>{t('kyc.scanAgain')}</Text>
+                    </Pressable>
+                </ScrollView>
             )}
 
             {step === 'selfie' && (
@@ -958,6 +1016,31 @@ export default function KycCaptureScreen() {
                     </Pressable>
                 </View>
             )}
+
+            {/* Back and Close, drawn last so they sit above the camera preview
+                on both platforms, and inset from the notch in either
+                orientation. Over the camera they get a dark disc to stay
+                visible on any background. */}
+            {goBack && (
+                <Pressable
+                    style={[styles.nav, onCamera && styles.navOnCamera, { top: insets.top + 12, left: insets.left + 16 }]}
+                    onPress={goBack}
+                    hitSlop={12}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.goBack')}
+                >
+                    <Ionicons name="chevron-back" size={24} color={onCamera ? '#FFFFFF' : p.textMuted} />
+                </Pressable>
+            )}
+            <Pressable
+                style={[styles.nav, onCamera && styles.navOnCamera, { top: insets.top + 12, right: insets.right + 16 }]}
+                onPress={close}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
+            >
+                <Ionicons name="close" size={26} color={onCamera ? '#FFFFFF' : p.textMuted} />
+            </Pressable>
         </KeyboardAvoidingView>
     );
 }
@@ -998,15 +1081,32 @@ function PassportPageGuide({ active }: { active: boolean }) {
     );
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+/** `plain` is for words (a name, a date) rather than a code: no letter-spacing, and it wraps. */
+function SummaryRow({ label, value, plain }: { label: string; value: string; plain?: boolean }) {
     const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     return (
         <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>{label}</Text>
-            <Text style={styles.summaryValue}>{value || t('common.notSet')}</Text>
+            <Text style={plain ? styles.summaryValuePlain : styles.summaryValue}>{value || t('common.notSet')}</Text>
         </View>
+    );
+}
+
+/** The two or three things to get right on a screen, under its drawing. */
+function Tips({ items }: { items: string[] }) {
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
+    return (
+        <NativeView style={styles.tips}>
+            {items.map((item) => (
+                <NativeView key={item} style={styles.tip}>
+                    <Ionicons name="checkmark-circle-outline" size={18} color={p.textSecondary} />
+                    <Text style={styles.tipText}>{item}</Text>
+                </NativeView>
+            ))}
+        </NativeView>
     );
 }
 
@@ -1015,7 +1115,13 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     flex: { flex: 1 },
     pad: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 },
     padContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14, paddingTop: 72 },
-    close: { position: 'absolute', right: 16, zIndex: 10, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    nav: { position: 'absolute', zIndex: 10, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    navOnCamera: { backgroundColor: 'rgba(0,0,0,0.55)' },
+    tips: { alignSelf: 'stretch', gap: 8 },
+    tip: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    tipText: { flex: 1, fontSize: 14, lineHeight: 20, color: p.textSecondary },
+    reviewPhoto: { width: 108, height: 138, borderRadius: 10, backgroundColor: p.cardAlt },
+    reviewSent: { fontSize: 13, lineHeight: 19, textAlign: 'center', color: p.textSecondary },
     title: { fontSize: 22, fontWeight: '700', textAlign: 'center', color: p.textPrimary },
     body: { fontSize: 15, lineHeight: 22, textAlign: 'center', color: p.textSecondary },
     note: { fontSize: 13, color: p.warnText, textAlign: 'center' },
@@ -1081,7 +1187,8 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     capturePromptText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', textAlign: 'center' },
     capturePromptReady: { color: '#34C759', fontSize: 16, fontWeight: '700', textAlign: 'center' },
-    captureHint: { position: 'absolute', left: 32, right: 32, alignItems: 'center', gap: 4 },
+    // Clear of the Back and Close buttons in the top corners.
+    captureHint: { position: 'absolute', left: 76, right: 76, alignItems: 'center', gap: 4 },
     captureHintText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', textAlign: 'center' },
     captureHintSub: { color: 'rgba(255,255,255,0.82)', fontSize: 13, textAlign: 'center' },
     docOption: {
@@ -1097,9 +1204,10 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         borderWidth: 1, borderColor: p.border, paddingHorizontal: 16, paddingVertical: 4,
     },
     summaryRow: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12,
         paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: p.border,
     },
+    summaryValuePlain: { flexShrink: 1, fontSize: 15, fontWeight: '600', textAlign: 'right', color: p.textPrimary },
     summaryLabel: { fontSize: 14, color: p.textSecondary },
     summaryValue: { fontSize: 15, fontWeight: '600', color: p.textPrimary, letterSpacing: 1 },
 });

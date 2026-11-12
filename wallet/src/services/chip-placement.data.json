@@ -1,6 +1,6 @@
 {
   "schema": "privasys.wallet.chip-placement/1",
-  "issuedAt": "2026-11-12T00:00:00Z",
+  "issuedAt": "2026-11-12T12:30:00Z",
   "validity": {
     "GBR": { "adult": 10, "child": 5 }
   },
@@ -11,7 +11,7 @@
       "issuedFrom": "2010-01",
       "issuedTo": "2019-12",
       "positions": ["back-cover", "front-cover"],
-      "source": "https://assets.publishing.service.gov.uk/media/69257dcf2945773cf12dcfe6/2025_BasicPassportChecks_1.0.pdf",
+      "source": "https://www.gov.uk/government/publications/basic-passport-checks/basic-passport-checks-accessible",
       "quote": "The passport chip is located in the cover of the passport.",
       "note": "HM Passport Office, passports introduced in 2010 and in 2015. The source does not say which cover, so both are given."
     },
@@ -21,7 +21,7 @@
       "issuedFrom": "2020-01",
       "issuedTo": "2025-11",
       "positions": ["photo-page"],
-      "source": "https://assets.publishing.service.gov.uk/media/69257dcf2945773cf12dcfe6/2025_BasicPassportChecks_1.0.pdf",
+      "source": "https://www.gov.uk/government/publications/basic-passport-checks/basic-passport-checks-accessible",
       "quote": "On the front of this page is the Title page and on the back is the Biographical Data page. The electronic chip is embedded within this page.",
       "note": "HM Passport Office, passports introduced in 2020 (series C, phased in from early 2020). Series D, from December 2025, is not covered: the source does not state its chip position."
     },

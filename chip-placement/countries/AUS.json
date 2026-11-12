@@ -1,10 +1,6 @@
 {
   "country": "AUS",
   "name": "Australia",
-  "validity": {
-    "adult": 10,
-    "child": 5
-  },
   "rules": [
     {
       "document": "passport",

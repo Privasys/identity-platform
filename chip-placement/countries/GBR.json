@@ -1,10 +1,6 @@
 {
   "country": "GBR",
   "name": "United Kingdom",
-  "validity": {
-    "adult": 10,
-    "child": 5
-  },
   "rules": [
     {
       "document": "passport",

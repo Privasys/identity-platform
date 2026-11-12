@@ -1,7 +1,7 @@
 {
   "schema": "privasys.wallet.chip-placement/1",
-  "issuedAt": "2026-11-12T12:58:34Z",
-  "validity": {"AUS":{"adult":10,"child":5},"GBR":{"adult":10,"child":5}},
+  "issuedAt": "2026-11-12T13:02:51Z",
+  "validity": {},
   "rules": [
     {"document":"passport","country":"AUS","issuedTo":"2022-08","positions":["chip-page"]},
     {"document":"passport","country":"BRA","positions":["back-cover"]},

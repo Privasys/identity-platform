@@ -6,7 +6,20 @@ document, and that part differs from one country to the next, and from one
 design to the next within a country: the back cover, the front cover, the photo
 page, a plastic page of its own.
 
-Nothing prescribes where an issuer puts the chip, and we found no public list.
+## Why this list has to be built
+
+Where the chip sits was never part of what makes passports work together. The
+standard they follow (ICAO Doc 9303) says what the chip holds and how to talk to
+it, and leaves its place in the booklet to the issuer. It did not need to say
+more: a border gate or a desk reader lays the whole open booklet on an antenna
+the size of the page, which powers the chip wherever it is and whichever way up
+the booklet lies.
+
+A phone is a different reader. Its antenna is small, sits in one spot, and
+reaches a few centimetres. Placement only became a problem once people began
+reading their own passports with their phones, at home, with nobody to show them
+how. So no public list exists, because until then nobody needed one.
+
 This folder is one. It is open so that anyone who knows where a document's chip
 is, and can point to a page that says so, can add it.
 
@@ -53,7 +66,6 @@ already installed picks up a new entry without an update.
 {
   "country": "GBR",
   "name": "United Kingdom",
-  "validity": { "adult": 10, "child": 5 },
   "rules": [
     {
       "document": "passport",
@@ -84,7 +96,7 @@ already installed picks up a new entry without an update.
 | `quote` | The sentence on that page that says so, word for word, in its own language. |
 | `checked` | The day you read the page, `YYYY-MM-DD`. |
 | `note` | What the source does not say, and anything a reviewer should know. Optional. |
-| `validity` (per file) | Years a passport is valid for, adult and child, when a source gives them. The wallet uses it to work out the issue date (below). Defaults to 10 and 5. |
+| `validity` (per file) | Only for a state whose passports are **not** valid for 10 years (adult) and 5 (child): `{ "adult": 5, "child": 5 }`. Leave it out otherwise. See "How the wallet uses it" for why it matters. |
 
 ### Positions
 
@@ -122,11 +134,17 @@ the only one that states the position; say so in `note`.
 ## How the wallet uses it
 
 The lines of code on the document give the issuing state, the expiry date and
-the date of birth. They do not give the issue date, so the wallet works it out:
-expiry, less the years the document is valid for. Near a change of design the
-estimate could fall either side, so a rule applies when its dates reach within
-a year of it, and where two rules do, the holder is given both places, the
-likelier first.
+the date of birth. They do not give the issue date, and the issue date is what
+tells one design from the next: sources say "passports issued from March 2017",
+never "passports expiring from". So the wallet works it out: expiry, less the
+years the document is valid for, which is 10 for an adult and 5 for a child
+almost everywhere. The date of birth says which of the two applies. A state
+that uses other periods says so in `validity`, or its documents would be placed
+in the wrong design.
+
+Near a change of design the estimate could fall either side, so a rule applies
+when its dates reach within a year of it, and where two rules do, the holder is
+given both places, the likelier first.
 
 Whatever a rule says, the remaining places follow it. A rule that is out of
 date costs the holder a moment and never the check.

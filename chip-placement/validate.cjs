@@ -88,6 +88,11 @@ function validateCountry(file, code) {
     }
     if (typeof file.name !== 'string' || !file.name.trim()) fail('name must be the country in plain words');
     checkValidity(file.validity, 'validity', fail);
+    // 10 and 5 are what the wallet assumes. Writing them down again says
+    // nothing, and reads as if it did.
+    if (file.validity && (file.validity.adult ?? 10) === 10 && (file.validity.child ?? 5) === 5) {
+        fail('validity repeats the default (adult 10, child 5): leave it out');
+    }
 
     if (!Array.isArray(file.rules) || file.rules.length === 0) {
         fail('rules must hold at least one rule');

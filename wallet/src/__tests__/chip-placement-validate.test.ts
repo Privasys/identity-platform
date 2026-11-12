@@ -29,7 +29,9 @@ const rule = (over: Record<string, unknown> = {}) => ({
 
 describe('the list in this build', () => {
     it('is publishable as it stands', () => {
-        expect(validatePlacement(builtIn, NOW)).toEqual([]);
+        // Against the clock, as the deploy checks it: the list is re-dated
+        // whenever it changes, so a fixed date here would go stale.
+        expect(validatePlacement(builtIn)).toEqual([]);
     });
 
     it('loses no rule when the wallet reads it', () => {

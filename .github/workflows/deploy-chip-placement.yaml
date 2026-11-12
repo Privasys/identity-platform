@@ -9,8 +9,9 @@ name: Deploy chip placement list
 # The list says where the chip is in each document, so the wallet can tell a
 # holder where to lay their phone. Every wallet ships a copy and takes a newer
 # one from this address, so a position can be added or corrected without a
-# release. There is ONE file: the copy compiled into the next build and the copy
-# served here are the same bytes.
+# release. The list is built from chip-placement/countries/ (see the README
+# there), and there is ONE built file: the copy compiled into the next build and
+# the copy served here are the same.
 #
 # The document is SIGNED here, with the version floor's key, whose public half
 # is pinned in the wallet. Serving privasys.id is enough to replace the
@@ -45,8 +46,12 @@ jobs:
       # The wallet drops a rule it cannot read, so a typo does not break
       # loudly: the rule just stops applying. This is where it is caught. The
       # same file runs in the wallet's test suite.
+      # Every country file is checked for its source, and the committed list
+      # must be exactly what those files build.
       - name: Validate the list
-        run: node idp/chip-placement/validate.cjs "$DOC"
+        run: |
+          node chip-placement/build.cjs --check
+          node chip-placement/validate.cjs "$DOC"
 
       # A list signed by a key no shipped build carries is ignored by every
       # wallet, and looks exactly like the feature being broken.
@@ -82,7 +87,7 @@ jobs:
           WALLET_VERSION_KEY_ID: ${{ secrets.WALLET_VERSION_KEY_ID }}
         run: |
           set -euo pipefail
-          node idp/chip-placement/sign.cjs "$DOC" > /tmp/chip-placement.json
+          node chip-placement/sign.cjs "$DOC" > /tmp/chip-placement.json
           echo "signed as ${WALLET_VERSION_KEY_ID}"
           wc -c /tmp/chip-placement.json
 

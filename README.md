@@ -9,6 +9,7 @@ A monorepo for Privasys authentication: the **Privasys Wallet** mobile app, the 
 | `wallet/` | Expo / React Native mobile app (iOS & Android) |
 | `sdk/` | `@privasys/auth` — TypeScript browser SDK for relying parties |
 | `broker/` | Go WebSocket relay that pairs browser sessions with the wallet |
+| `chip-placement/` | Where the NFC chip is in each country's passport, with a source for every entry. [Contributions welcome](chip-placement/README.md) |
 
 ### SDK Features
 

@@ -1,0 +1,19 @@
+{
+  "country": "ITA",
+  "name": "Italy",
+  "rules": [
+    {
+      "document": "passport",
+      "positions": [
+        "back-cover",
+        "front-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://poliziadistato.it/articolo/pdf/10301",
+      "sourceType": "government",
+      "quote": "dotato di un microchip inserito nella copertina",
+      "checked": "2026-11-12",
+      "note": "Polizia di Stato. The source says the cover, not which one, so both are given."
+    }
+  ]
+}

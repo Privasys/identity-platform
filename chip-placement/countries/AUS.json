@@ -1,0 +1,24 @@
+{
+  "country": "AUS",
+  "name": "Australia",
+  "validity": {
+    "adult": 10,
+    "child": 5
+  },
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Series issued until the R series",
+      "issuedTo": "2022-08",
+      "positions": [
+        "chip-page"
+      ],
+      "evidence": "documented",
+      "source": "https://www.noteprinting.com/newsacrhive/2018/8/9/npas-unique-epassport-construction-stands-test-of-time",
+      "sourceType": "printer",
+      "quote": "The solution for the Australian book embedded the chip in a double-layered centre page",
+      "checked": "2026-11-12",
+      "note": "Note Printing Australia, the passport printer, in 2018, of the series issued until then. The R series, from September 2022, is not covered."
+    }
+  ]
+}

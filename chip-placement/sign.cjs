@@ -6,7 +6,7 @@
  *
  *   WALLET_VERSION_SIGNING_KEY=<pkcs8 pem> \
  *   WALLET_VERSION_KEY_ID=<id> \
- *   node sign.cjs chip-placement.data.json > envelope.json
+ *   node sign.cjs ../wallet/src/services/chip-placement.data.json > envelope.json
  *
  * The same envelope, and the same publisher key, as the version floor
  * (idp/wallet-version/sign.cjs): the wallet already pins that key and opens

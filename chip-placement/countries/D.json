@@ -1,0 +1,36 @@
+{
+  "country": "D",
+  "name": "Germany",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "ePass, 2005 to February 2017",
+      "issuedFrom": "2005-11",
+      "issuedTo": "2017-02",
+      "positions": [
+        "back-cover",
+        "front-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://bsi.bund.de/EN/Themen/Oeffentliche-Verwaltung/Elektronische-Identitaeten/Elektronische-Ausweisdokumente/Elektronischer-Reisepass/elektronischer-reisepass.html",
+      "sourceType": "government",
+      "quote": "A contactless chip (radio frequency chip) is integrated into the passport cover.",
+      "checked": "2026-11-12",
+      "note": "BSI. The source does not say which cover, so both are given."
+    },
+    {
+      "document": "passport",
+      "series": "Version issued since 1 March 2017",
+      "issuedFrom": "2017-03",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://bsi.bund.de/EN/Themen/Oeffentliche-Verwaltung/Elektronische-Identitaeten/Elektronische-Ausweisdokumente/Elektronischer-Reisepass/elektronischer-reisepass.html",
+      "sourceType": "government",
+      "quote": "the RF chip is now located in the data card",
+      "checked": "2026-11-12",
+      "note": "BSI, the version issued since 1 March 2017."
+    }
+  ]
+}

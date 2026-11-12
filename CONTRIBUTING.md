@@ -24,6 +24,7 @@ Thank you for your interest in contributing! This monorepo contains the Privasys
 | `wallet/modules/native-keys/` | Swift / Kotlin | Secure key storage module |
 | `sdk/` | TypeScript | Browser SDK (`@privasys/auth`) |
 | `broker/` | Go | WebSocket relay service |
+| `chip-placement/` | JSON | Where the chip is in each passport, one file per country. Needs no build tools beyond Node: see its [README](chip-placement/README.md) |
 
 ## Making Changes
 

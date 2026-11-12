@@ -1,0 +1,35 @@
+{
+  "country": "CAN",
+  "name": "Canada",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "ePassport, 2013 design",
+      "issuedFrom": "2013-07",
+      "issuedTo": "2023-05",
+      "positions": [
+        "back-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://www.canada.ca/en/immigration-refugees-citizenship/news/archives/backgrounders-2013/about-epassports.html",
+      "sourceType": "government",
+      "quote": "An electronic chip embedded in the back cover",
+      "checked": "2026-11-12",
+      "note": "IRCC, ePassports from 2 July 2013 until the 2023 design."
+    },
+    {
+      "document": "passport",
+      "series": "2023 design",
+      "issuedFrom": "2023-06",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://www.canada.ca/en/immigration-refugees-citizenship/news/2023/05/canada-unveils-new-passport-design-with-state-of-the-art-security-features.html",
+      "sourceType": "government",
+      "quote": "we have imbedded the electronic passport chip in a transparent window on page one",
+      "checked": "2026-11-12",
+      "note": "IRCC, the design issued from summer 2023, whose page one is the polycarbonate data page."
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "country": "NLD",
+  "name": "Netherlands",
+  "rules": [
+    {
+      "document": "passport",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://www.rijksoverheid.nl/onderwerpen/paspoort-en-identiteitskaart/vraag-en-antwoord/wat-is-een-elektronisch-reisdocument-en-welke-gegevens-bevat-de-chip-hierin",
+      "sourceType": "government",
+      "quote": "bij het paspoort in de pagina waarop uw persoonsgegevens en foto staan",
+      "checked": "2026-11-12",
+      "note": "Rijksoverheid."
+    }
+  ]
+}

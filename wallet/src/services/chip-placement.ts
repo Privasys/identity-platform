@@ -10,7 +10,9 @@
  * guess from a neighbouring series or a single specimen. A document with no
  * rule gets the order to try, which is always right, only slower.
  *
- * The rules are data (chip-placement.data.json). A newer signed copy can be
+ * The list is built from the repository's `chip-placement/` folder, where each
+ * rule sits with its source and the sentence it rests on; what is compiled in
+ * here (chip-placement.data.json) is the bare rule. A newer signed copy can be
  * fetched from privasys.id (services/chip-placement-remote.ts), so a position
  * can be corrected without a release. That copy carries position CODES only:
  * the words and drawings shown for each code are the wallet's own, so the
@@ -49,8 +51,6 @@ export interface PlacementRule {
     issuedTo?: string;
     /** Where to try, in order. */
     positions: ChipPosition[];
-    /** The page that states it. */
-    source: string;
 }
 
 export interface PlacementDoc {
@@ -123,7 +123,6 @@ export function parsePlacementDoc(input: unknown): PlacementDoc | null {
             issuedFrom: from,
             issuedTo: to,
             positions,
-            source: typeof r.source === 'string' ? r.source : '',
         });
     }
 

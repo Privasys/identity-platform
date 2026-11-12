@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * The check a chip-placement list passes before it is signed and served, run
- * here on the very file the deploy runs, and on the list in this build.
+ * The chip-placement list, from the files people write to the list the wallet
+ * reads: the checks a contribution has to pass, run here on the very files the
+ * build and the deploy run, and on the list in this build.
  */
 
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { ed25519 } from '@noble/curves/ed25519.js';
@@ -15,16 +17,79 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 import builtIn from '@/services/chip-placement.data.json';
 import { parsePlacementDoc } from '@/services/chip-placement';
 
+const FOLDER = path.resolve(__dirname, '../../../chip-placement');
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { validatePlacement, SCHEMA } = require('../../../idp/chip-placement/validate.cjs') as {
+const { validateCountry, validatePlacement, SCHEMA } = require('../../../chip-placement/validate.cjs') as {
+    validateCountry: (file: unknown, code?: string) => string[];
     validatePlacement: (doc: unknown, now?: Date) => string[];
     SCHEMA: string;
+};
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { buildContent, sameContent } = require('../../../chip-placement/build.cjs') as {
+    buildContent: () => { validity: unknown; rules: unknown[]; suggestions: unknown[] };
+    sameContent: (a: unknown, b: unknown) => boolean;
 };
 
 const NOW = new Date('2026-11-12T12:00:00Z');
 const base = (rules: unknown[]) => ({ schema: SCHEMA, issuedAt: '2026-11-01T00:00:00Z', validity: {}, rules });
-const rule = (over: Record<string, unknown> = {}) => ({
-    document: 'passport', country: 'XXA', positions: ['back-cover'], source: 'https://example.org/where', ...over,
+const built = (over: Record<string, unknown> = {}) => ({
+    document: 'passport', country: 'XXA', positions: ['back-cover'], ...over,
+});
+const written = (over: Record<string, unknown> = {}) => ({
+    country: 'XXA',
+    name: 'Example',
+    rules: [{
+        document: 'passport',
+        positions: ['back-cover'],
+        evidence: 'documented',
+        source: 'https://example.org/where-the-chip-is',
+        sourceType: 'government',
+        quote: 'The chip is in the back cover of the passport.',
+        checked: '2026-11-12',
+        ...over,
+    }],
+});
+
+describe('the country files', () => {
+    const files = readdirSync(path.join(FOLDER, 'countries')).filter((f) => f.endsWith('.json'));
+
+    it.each(files)('%s names a page and quotes it for every rule', (f) => {
+        const file = JSON.parse(readFileSync(path.join(FOLDER, 'countries', f), 'utf8'));
+        expect(validateCountry(file, f.replace(/\.json$/, ''))).toEqual([]);
+    });
+
+    it('build the list in this build, to the rule', () => {
+        // A country file changed without `node chip-placement/build.cjs` would
+        // ship a list that does not say what the folder says.
+        expect(sameContent(builtIn, buildContent())).toBe(true);
+    });
+});
+
+describe('a country file is refused', () => {
+    it.each([
+        ['with no source', { source: undefined }],
+        ['with a source that is not a page', { source: 'one passport we looked at' }],
+        ['with no sentence quoted from it', { quote: '' }],
+        ['with no day it was read', { checked: undefined }],
+        ['with a made-up kind of evidence', { evidence: 'obvious' }],
+        ['with a made-up kind of source', { sourceType: 'forum' }],
+        ['with a place the wallet has no words for', { positions: ['spine'] }],
+        ['with a year for a month', { issuedFrom: '2020' }],
+        ['with a range that ends before it starts', { issuedFrom: '2021-01', issuedTo: '2020-01' }],
+        ['with a card position on a passport', { positions: ['card'] }],
+    ])('%s', (_name, over) => {
+        expect(validateCountry(written(over), 'XXA').length).toBeGreaterThan(0);
+    });
+
+    it('when it is named after another state', () => {
+        expect(validateCountry(written(), 'XXB').length).toBeGreaterThan(0);
+    });
+
+    it('but not when it is right', () => {
+        expect(validateCountry(written(), 'XXA')).toEqual([]);
+        expect(validateCountry(written({ evidence: 'inferred', sourceType: 'printer' }), 'XXA')).toEqual([]);
+    });
 });
 
 describe('the list in this build', () => {
@@ -35,21 +100,23 @@ describe('the list in this build', () => {
     });
 
     it('loses no rule when the wallet reads it', () => {
-        // The wallet drops what it cannot read; the deploy must have refused it first.
+        // The wallet drops what it cannot read; the build must have refused it first.
         expect(parsePlacementDoc(builtIn)?.rules.length).toBe(builtIn.rules.length);
+    });
+
+    it('carries the bare rule and none of the evidence', () => {
+        for (const rule of builtIn.rules as Record<string, unknown>[]) {
+            expect(Object.keys(rule).filter((k) => !['document', 'country', 'issuedFrom', 'issuedTo', 'positions'].includes(k))).toEqual([]);
+        }
     });
 });
 
-describe('a list is refused', () => {
+describe('a built list is refused', () => {
     it.each([
-        ['with no source for a rule', rule({ source: undefined })],
-        ['with a source that is not a page', rule({ source: 'one passport we looked at' })],
-        ['with a place the wallet has no words for', rule({ positions: ['spine'] })],
-        ['with no place at all', rule({ positions: [] })],
-        ['with a full country name', rule({ country: 'France' })],
-        ['with a year for a month', rule({ issuedFrom: '2020' })],
-        ['with a range that ends before it starts', rule({ issuedFrom: '2021-01', issuedTo: '2020-01' })],
-        ['with a card position on a passport', rule({ positions: ['card'] })],
+        ['with a place the wallet has no words for', built({ positions: ['spine'] })],
+        ['with no place at all', built({ positions: [] })],
+        ['with a full country name', built({ country: 'France' })],
+        ['with a year for a month', built({ issuedFrom: '2020' })],
     ])('%s', (_name, r) => {
         expect(validatePlacement(base([r]), NOW).length).toBeGreaterThan(0);
     });
@@ -65,7 +132,7 @@ describe('a list is refused', () => {
 
 describe('a good list', () => {
     it('passes', () => {
-        expect(validatePlacement(base([rule(), rule({ document: 'id-card', positions: ['card'] })]), NOW)).toEqual([]);
+        expect(validatePlacement(base([built(), built({ document: 'id-card', positions: ['card'] })]), NOW)).toEqual([]);
     });
 
     it('signed by the deploy opens with the check the wallet uses', () => {
@@ -73,7 +140,7 @@ describe('a good list', () => {
         const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
         const out = execFileSync(
             process.execPath,
-            [path.resolve(__dirname, '../../../idp/chip-placement/sign.cjs'), path.resolve(__dirname, '../services/chip-placement.data.json')],
+            [path.join(FOLDER, 'sign.cjs'), path.resolve(__dirname, '../services/chip-placement.data.json')],
             {
                 env: {
                     ...process.env,

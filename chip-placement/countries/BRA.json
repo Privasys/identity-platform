@@ -1,0 +1,18 @@
+{
+  "country": "BRA",
+  "name": "Brazil",
+  "rules": [
+    {
+      "document": "passport",
+      "positions": [
+        "back-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://www.gov.br/pf/pt-br/assuntos/passaporte/ajuda/duvidas_/caderneta/caderneta-chip-danificado-como-identificar",
+      "sourceType": "government",
+      "quote": "Ele está localizado dentro do papel da contracapa do passaporte",
+      "checked": "2026-11-12",
+      "note": "Polícia Federal."
+    }
+  ]
+}

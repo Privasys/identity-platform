@@ -1,0 +1,34 @@
+{
+  "country": "JPN",
+  "name": "Japan",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "IC passport before the 2025 design",
+      "issuedTo": "2025-02",
+      "positions": [
+        "chip-page"
+      ],
+      "evidence": "documented",
+      "source": "https://www.pref.kyoto.jp/passport/1236840433137.html",
+      "sourceType": "government",
+      "quote": "IC旅券は、パスポート冊子中央に非接触IC（集積回路）チップを搭載したプラスチックが組み込まれ",
+      "checked": "2026-11-12",
+      "note": "Kyoto Prefecture passport office: a plastic sheet carrying the chip, in the centre of the booklet. Passports applied for before 24 March 2025."
+    },
+    {
+      "document": "passport",
+      "series": "2025 passport",
+      "issuedFrom": "2025-03",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://www.pref.kyoto.jp/passport/1236840433137.html",
+      "sourceType": "government",
+      "quote": "身分事項ページ（顔写真や所持人自署のあるページ）がプラスチック製となっており当該ページにICチップが搭載されています。",
+      "checked": "2026-11-12",
+      "note": "Kyoto Prefecture passport office, the 2025 passport (applications from 24 March 2025). Earlier passports carry the chip in a centre page, which this list has no position for."
+    }
+  ]
+}

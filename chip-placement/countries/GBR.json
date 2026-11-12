@@ -1,0 +1,41 @@
+{
+  "country": "GBR",
+  "name": "United Kingdom",
+  "validity": {
+    "adult": 10,
+    "child": 5
+  },
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Burgundy cover, designs introduced in 2010 and 2015 (series B)",
+      "issuedFrom": "2010-01",
+      "issuedTo": "2019-12",
+      "positions": [
+        "back-cover",
+        "front-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://www.gov.uk/government/publications/basic-passport-checks/basic-passport-checks-accessible",
+      "sourceType": "government",
+      "quote": "The passport chip is located in the cover of the passport.",
+      "checked": "2026-11-12",
+      "note": "HM Passport Office, passports introduced in 2010 and in 2015. The source does not say which cover, so both are given."
+    },
+    {
+      "document": "passport",
+      "series": "Series C, dark blue cover",
+      "issuedFrom": "2020-01",
+      "issuedTo": "2025-11",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://www.gov.uk/government/publications/basic-passport-checks/basic-passport-checks-accessible",
+      "sourceType": "government",
+      "quote": "On the front of this page is the Title page and on the back is the Biographical Data page. The electronic chip is embedded within this page.",
+      "checked": "2026-11-12",
+      "note": "HM Passport Office, passports introduced in 2020 (series C, phased in from early 2020). Series D, from December 2025, is not covered: the source does not state its chip position."
+    }
+  ]
+}

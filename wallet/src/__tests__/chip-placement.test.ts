@@ -132,11 +132,11 @@ describe('a list from outside', () => {
 });
 
 describe('the list in the build', () => {
-    it('parses, and every rule names where it comes from', () => {
+    // Where each rule comes from is checked on the files it is built from
+    // (chip-placement-validate.test.ts).
+    it('parses, and every rule names somewhere to try', () => {
         expect(BUILT_IN_PLACEMENT.schema).toBe(PLACEMENT_SCHEMA);
-        for (const rule of BUILT_IN_PLACEMENT.rules) {
-            expect(rule.source).toMatch(/^https:\/\//);
-            expect(rule.positions.length).toBeGreaterThan(0);
-        }
+        expect(BUILT_IN_PLACEMENT.rules.length).toBeGreaterThan(0);
+        for (const rule of BUILT_IN_PLACEMENT.rules) expect(rule.positions.length).toBeGreaterThan(0);
     });
 });

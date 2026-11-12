@@ -1,0 +1,20 @@
+{
+  "country": "USA",
+  "name": "United States",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Electronic passport book",
+      "positions": [
+        "inside-back-cover",
+        "back-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://www.signicat.com/products/identity-proofing/readid-me",
+      "sourceType": "vendor",
+      "quote": "Please be aware that the antenna in the U.S. passport is located on the inside of the back cover",
+      "checked": "2026-11-12",
+      "note": "A vendor page (Inverid/Signicat ReadID), the only one found that states the position. The Department of State final rule of 25 October 2005 (70 FR 61553) states that the front cover and spine carry anti-skimming material, which is why the booklet is opened. The Next Generation Passport is not addressed by either."
+    }
+  ]
+}

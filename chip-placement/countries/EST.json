@@ -1,0 +1,20 @@
+{
+  "country": "EST",
+  "name": "Estonia",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "2021 design",
+      "issuedFrom": "2021-01",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "inferred",
+      "source": "https://platform.keesingtechnologies.com/estonias-next-generation-e-passport-booklet/",
+      "sourceType": "trade",
+      "quote": "a contactless chip in the biodata card that meets the ICAO specifications; a polycarbonate datapage",
+      "checked": "2026-11-12",
+      "note": "Keesing states the position, but in a sentence it reuses word for word across countries, including one where the issuer says otherwise (United States). Kept as inferred for that reason."
+    }
+  ]
+}

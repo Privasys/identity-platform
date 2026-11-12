@@ -1,0 +1,20 @@
+{
+  "country": "NOR",
+  "name": "Norway",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "2020 passport",
+      "issuedFrom": "2020-10",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "inferred",
+      "source": "https://www.keesingtechnologies.com/wp-content/uploads/2020/12/Norway-infographic.pdf",
+      "sourceType": "trade",
+      "quote": "This document was first issued on October 19, 2020 and contains a contactless chip in the biodata card that meets ICAO specifications.",
+      "checked": "2026-11-12",
+      "note": "Same reused Keesing sentence as for Estonia. Kept as inferred for that reason."
+    }
+  ]
+}

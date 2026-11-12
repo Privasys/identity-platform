@@ -4,17 +4,17 @@
   "rules": [
     {
       "document": "passport",
-      "series": "Electronic passport book",
+      "series": "Electronic passport book, including the Next Generation Passport",
       "positions": [
-        "inside-back-cover",
-        "back-cover"
+        "back-cover",
+        "inside-back-cover"
       ],
       "evidence": "documented",
-      "source": "https://www.signicat.com/products/identity-proofing/readid-me",
-      "sourceType": "vendor",
-      "quote": "Please be aware that the antenna in the U.S. passport is located on the inside of the back cover",
+      "source": "https://web.archive.org/web/20241228034126/https://travel.state.gov/content/travel/en/passports/passport-help/faqs.html",
+      "sourceType": "government",
+      "quote": "Passport books have a small integrated circuit (or “chip”) in the back cover.",
       "checked": "2026-11-12",
-      "note": "A vendor page (Inverid/Signicat ReadID), the only one found that states the position. The Department of State final rule of 25 October 2005 (70 FR 61553) states that the front cover and spine carry anti-skimming material, which is why the booklet is opened. The Next Generation Passport is not addressed by either."
+      "note": "Department of State FAQ, archived copy of December 2024, in the answer on the Next Generation Passport. The final rule of 25 October 2005 (70 FR 61553) puts anti-skimming material in the front cover and spine, and a vendor (Signicat ReadID) advises opening the booklet, hence the inside of the back cover as the second place. Disputed: a Keesing infographic puts the Next Generation chip in the data page."
     }
   ]
 }

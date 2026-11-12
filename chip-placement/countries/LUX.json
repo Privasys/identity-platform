@@ -1,0 +1,20 @@
+{
+  "country": "LUX",
+  "name": "Luxembourg",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "2015 biometric passport",
+      "issuedFrom": "2015-01",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "inferred",
+      "source": "https://identityweek.net/gemalto-reveals-new-generation-electronic-passport-for-luxembourg/",
+      "sourceType": "trade",
+      "quote": "a new biometric passport for Luxembourg which integrates a new polycarbonate data page",
+      "checked": "2026-11-12",
+      "note": "Data page material only; the chip position is not stated. Month not stated."
+    }
+  ]
+}

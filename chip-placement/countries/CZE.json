@@ -1,0 +1,20 @@
+{
+  "country": "CZE",
+  "name": "Czechia",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Biometric passport",
+      "issuedFrom": "2006-09",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://archiv.mv.gov.cz/soubor/cestovni-doklady-se-strojove-citelnymi-udaji.aspx",
+      "sourceType": "government",
+      "quote": "uvnitř datové stránky je vložen bezkontaktní čip, který obsahuje biometrické údaje",
+      "checked": "2026-11-12",
+      "note": "Interior Ministry. The data page is a sewn-in polycarbonate card."
+    }
+  ]
+}

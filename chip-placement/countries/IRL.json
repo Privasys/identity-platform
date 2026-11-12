@@ -1,0 +1,20 @@
+{
+  "country": "IRL",
+  "name": "Ireland",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "2013 design",
+      "issuedFrom": "2013-10",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://git-sicherheit.de/en/news/irish-government-employs-secure-identity-solutions-from-dlrs-hid-global-and-x-infotech",
+      "sourceType": "printer",
+      "quote": "HID Global’s polycarbonate electronic data page with contactless chip inlays",
+      "checked": "2026-11-12",
+      "note": "Release by the makers (DLRS, HID Global), published 28 October 2013. No Irish government page was found."
+    }
+  ]
+}

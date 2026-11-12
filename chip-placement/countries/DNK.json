@@ -1,0 +1,20 @@
+{
+  "country": "DNK",
+  "name": "Denmark",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "2021 design",
+      "issuedFrom": "2021-01",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://www.gi-de.com/en/spotlight/transformation-trends/fun-facts-about-the-new-danish-passport",
+      "sourceType": "printer",
+      "quote": "The booklet has 32 pages, including a polycarbonate data page, which contains an electronic chip that can be scanned at immigration.",
+      "checked": "2026-11-12",
+      "note": "Giesecke+Devrient, whose Veridos makes the passport. First month of issue not stated. Earlier Danish passports are not covered."
+    }
+  ]
+}

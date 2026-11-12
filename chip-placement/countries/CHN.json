@@ -1,0 +1,19 @@
+{
+  "country": "CHN",
+  "name": "China",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Ordinary electronic passport",
+      "positions": [
+        "back-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://web.archive.org/web/20240104153604/http://cs.mfa.gov.cn/zggmcg/hz/hzjj_660445/201311/P020230710369098413130.pdf",
+      "sourceType": "government",
+      "quote": "封三是电子护照的使用提示词，内部嵌有非接触式集成电路芯片",
+      "checked": "2026-11-12",
+      "note": "Foreign Ministry consular guide, archived copy, undated. The chip is embedded in the back cover, behind its inside face. Mainland passports; Hong Kong and Macao passports are not covered."
+    }
+  ]
+}

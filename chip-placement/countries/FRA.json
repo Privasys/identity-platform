@@ -1,0 +1,21 @@
+{
+  "country": "FRA",
+  "name": "France",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Electronic passport",
+      "issuedFrom": "2006-04",
+      "positions": [
+        "back-cover",
+        "front-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://www.securetechalliance.org/imprimerie-nationale-issues-frances-first-electronic-passports-with-axalto-technology/",
+      "sourceType": "printer",
+      "quote": "a contactless chip incorporated into the passport’s cover",
+      "checked": "2026-11-12",
+      "note": "Release of 13 April 2006 by Axalto, which supplied the electronic covers of the first French electronic passports. It does not say which cover, so both are given, and no official page was found that does. It describes the 2006 passport; that later ones kept the chip in a cover rests on their data page still being laminated paper (written answer QE 18035, 17th legislature, Assemblée nationale)."
+    }
+  ]
+}

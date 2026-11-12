@@ -15,6 +15,20 @@
       "quote": "The solution for the Australian book embedded the chip in a double-layered centre page",
       "checked": "2026-11-12",
       "note": "Note Printing Australia, the passport printer, in 2018, of the series issued until then. The R series, from September 2022, is not covered."
+    },
+    {
+      "document": "passport",
+      "series": "R series",
+      "issuedFrom": "2022-09",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://web.archive.org/web/20241117010028/https://www.passports.gov.au/RSeries",
+      "sourceType": "government",
+      "quote": "other windows that include the antenna for the passport chip, which is embedded in the passport",
+      "checked": "2026-11-12",
+      "note": "Australian Passport Office, archived copy: the windows are in the polycarbonate photo page. The antenna is stated to be in that page; the chip itself only \"embedded in the passport\"."
     }
   ]
 }

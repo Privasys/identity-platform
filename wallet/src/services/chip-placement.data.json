@@ -1,21 +1,42 @@
 {
   "schema": "privasys.wallet.chip-placement/1",
-  "issuedAt": "2026-11-12T13:02:51Z",
+  "issuedAt": "2026-11-12T13:12:51Z",
   "validity": {},
   "rules": [
     {"document":"passport","country":"AUS","issuedTo":"2022-08","positions":["chip-page"]},
+    {"document":"passport","country":"AUS","issuedFrom":"2022-09","positions":["photo-page"]},
+    {"document":"passport","country":"AUT","issuedFrom":"2014-01","issuedTo":"2023-12","positions":["back-cover"]},
+    {"document":"passport","country":"AUT","issuedFrom":"2023-01","positions":["front-cover"]},
+    {"document":"passport","country":"BEL","issuedFrom":"2022-01","positions":["photo-page"]},
     {"document":"passport","country":"BRA","positions":["back-cover"]},
     {"document":"passport","country":"CAN","issuedFrom":"2013-07","issuedTo":"2023-05","positions":["back-cover"]},
     {"document":"passport","country":"CAN","issuedFrom":"2023-06","positions":["photo-page"]},
+    {"document":"passport","country":"CHE","issuedFrom":"2010-03","positions":["back-cover","front-cover"]},
+    {"document":"passport","country":"CHN","positions":["back-cover"]},
+    {"document":"passport","country":"CZE","issuedFrom":"2006-09","positions":["photo-page"]},
     {"document":"passport","country":"D","issuedFrom":"2005-11","issuedTo":"2017-02","positions":["back-cover","front-cover"]},
     {"document":"passport","country":"D","issuedFrom":"2017-03","positions":["photo-page"]},
+    {"document":"passport","country":"DNK","issuedFrom":"2021-01","positions":["photo-page"]},
+    {"document":"passport","country":"FIN","issuedFrom":"2013-01","positions":["photo-page"]},
+    {"document":"passport","country":"FRA","issuedFrom":"2006-04","positions":["back-cover","front-cover"]},
     {"document":"passport","country":"GBR","issuedFrom":"2010-01","issuedTo":"2019-12","positions":["back-cover","front-cover"]},
     {"document":"passport","country":"GBR","issuedFrom":"2020-01","issuedTo":"2025-11","positions":["photo-page"]},
+    {"document":"passport","country":"IRL","issuedFrom":"2013-10","positions":["photo-page"]},
     {"document":"passport","country":"ITA","positions":["back-cover","front-cover"]},
     {"document":"passport","country":"JPN","issuedTo":"2025-02","positions":["chip-page"]},
     {"document":"passport","country":"JPN","issuedFrom":"2025-03","positions":["photo-page"]},
+    {"document":"passport","country":"LTU","issuedFrom":"2008-01","positions":["photo-page"]},
     {"document":"passport","country":"NLD","positions":["photo-page"]},
-    {"document":"passport","country":"USA","positions":["inside-back-cover","back-cover"]}
+    {"document":"passport","country":"NZL","issuedFrom":"2009-11","positions":["chip-page","photo-page"]},
+    {"document":"passport","country":"POL","issuedFrom":"2018-01","positions":["photo-page"]},
+    {"document":"passport","country":"USA","positions":["back-cover","inside-back-cover"]}
   ],
-  "suggestions": []
+  "suggestions": [
+    {"document":"passport","country":"EST","issuedFrom":"2021-01","positions":["photo-page"]},
+    {"document":"passport","country":"GRC","issuedFrom":"2023-12","positions":["photo-page"]},
+    {"document":"passport","country":"LUX","issuedFrom":"2015-01","positions":["photo-page"]},
+    {"document":"passport","country":"MLT","issuedFrom":"2019-11","positions":["photo-page"]},
+    {"document":"passport","country":"NOR","issuedFrom":"2020-10","positions":["photo-page"]},
+    {"document":"passport","country":"ROU","issuedFrom":"2019-01","positions":["photo-page"]}
+  ]
 }

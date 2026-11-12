@@ -1,0 +1,20 @@
+{
+  "country": "BEL",
+  "name": "Belgium",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "2022 design",
+      "issuedFrom": "2022-01",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://idtechwire.com/thales-zetes-renew-e-passport-contract-belgium-100202/",
+      "sourceType": "trade",
+      "quote": "The chip in the data page will use digital security techniques to protect the individual’s personal information.",
+      "checked": "2026-11-12",
+      "note": "Trade report of October 2020 on the contract, before issue. First month of issue not verified. Open point: the validity of Belgian passports is not sourced here; if it is not 10 years the wallet misdates them and falls back to the general order."
+    }
+  ]
+}

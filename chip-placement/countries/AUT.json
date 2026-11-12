@@ -1,0 +1,35 @@
+{
+  "country": "AUT",
+  "name": "Austria",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "2014 design",
+      "issuedFrom": "2014-01",
+      "issuedTo": "2023-12",
+      "positions": [
+        "back-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://platform.keesingtechnologies.com/austria-is-now-issuing-a-new-generation-passport/",
+      "sourceType": "trade",
+      "quote": "The contactless electronic chip has been moved to the front cover (versus on the back cover, in the previous version).",
+      "checked": "2026-11-12",
+      "note": "Keesing, citing the Interior Ministry and the state printer. The source gives 2014 as the year of the previous redesign and no month for either design, so the two rules overlap in 2023."
+    },
+    {
+      "document": "passport",
+      "series": "New generation passport (2023)",
+      "issuedFrom": "2023-01",
+      "positions": [
+        "front-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://platform.keesingtechnologies.com/austria-is-now-issuing-a-new-generation-passport/",
+      "sourceType": "trade",
+      "quote": "The contactless electronic chip has been moved to the front cover (versus on the back cover, in the previous version).",
+      "checked": "2026-11-12",
+      "note": "The data page is polycarbonate and the chip is NOT in it: a counter-example to deducing the position from the data page. First month of issue not stated."
+    }
+  ]
+}

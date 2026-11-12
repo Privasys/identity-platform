@@ -1,0 +1,20 @@
+{
+  "country": "LTU",
+  "name": "Lithuania",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Passport with an electronic polycarbonate data page",
+      "issuedFrom": "2008-01",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://www.biometricupdate.com/201211/trub-continues-to-supply-for-lithuanian-epassport",
+      "sourceType": "trade",
+      "quote": "Issuance of passports with an electronic polycarbonate data page started in January 2008.",
+      "checked": "2026-11-12",
+      "note": "Supplier release via a trade outlet, 2012, which also speaks of \"polycarbonate data pages with embedded chip\". The 2019 design is not separately verified."
+    }
+  ]
+}

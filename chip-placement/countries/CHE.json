@@ -1,0 +1,21 @@
+{
+  "country": "CHE",
+  "name": "Switzerland",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Biometric passport (Pass 10 and later)",
+      "issuedFrom": "2010-03",
+      "positions": [
+        "back-cover",
+        "front-cover"
+      ],
+      "evidence": "documented",
+      "source": "https://web.archive.org/web/20241011110206/https://www.fedpol.admin.ch/fedpol/en/home/pass---identitaetskarte/pass/daten.html",
+      "sourceType": "government",
+      "quote": "Your data are stored on the chip, which is embedded in the document cover.",
+      "checked": "2026-11-12",
+      "note": "fedpol, archived copy. The source does not say which cover, so both are given. The data page is polycarbonate and the chip is NOT in it: a counter-example to deducing the position from the data page."
+    }
+  ]
+}

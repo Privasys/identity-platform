@@ -1,0 +1,20 @@
+{
+  "country": "POL",
+  "name": "Poland",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "2018 design",
+      "issuedFrom": "2018-01",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://www.infor.pl/prawo/konstytucja/obywatelstwo/767032,Nowy-wzor-paszportu-w-2018-r.html",
+      "sourceType": "trade",
+      "quote": "Strona z danymi osobowymi, wykonana z poliwęglanu, będzie posiadała warstwę elektroniczną umożliwiającą zapisanie danych biometrycznych.",
+      "checked": "2026-11-12",
+      "note": "Legal-news site reproducing the announcement. Month of first issue not verified. Earlier passports are not covered."
+    }
+  ]
+}

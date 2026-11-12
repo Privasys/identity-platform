@@ -1,0 +1,20 @@
+{
+  "country": "FIN",
+  "name": "Finland",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Passports under the 2012 and 2016 supply contracts",
+      "issuedFrom": "2013-01",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://identityweek.net/finland-inks-deal-with-gemalto/",
+      "sourceType": "trade",
+      "quote": "the holder’s digital photograph and fingerprints are stored safely in the contactless microprocessor that is embedded in the passport’s polycarbonate data page.",
+      "checked": "2026-11-12",
+      "note": "Supplier release republished by a trade outlet. A 2012 report (biometricupdate.com) says the same of the previous contract. Issue dates are not stated: 2013 is the year after that contract."
+    }
+  ]
+}

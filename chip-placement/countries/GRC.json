@@ -1,0 +1,20 @@
+{
+  "country": "GRC",
+  "name": "Greece",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "New generation passport",
+      "issuedFrom": "2023-12",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "inferred",
+      "source": "https://www.passport.gov.gr/en/npc/nea-anakoinoseis/ann-new-pass.html",
+      "sourceType": "government",
+      "quote": "the change of the personal data page, which is made of high strength polycarbonate material",
+      "checked": "2026-11-12",
+      "note": "Data page material only; the chip position is not stated."
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "country": "MLT",
+  "name": "Malta",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "Polycarbonate passport",
+      "issuedFrom": "2019-11",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "inferred",
+      "source": "https://identita.gov.mt/passport-office-sec-page-useful-info/",
+      "sourceType": "government",
+      "quote": "In November 2019, Malta launched the new polycarbonate passport with enhanced security.",
+      "checked": "2026-11-12",
+      "note": "Data page material only; the chip position is not stated."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "country": "NZL",
+  "name": "New Zealand",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "ePassport, 2009 design",
+      "issuedFrom": "2009-11",
+      "positions": [
+        "chip-page",
+        "photo-page"
+      ],
+      "evidence": "documented",
+      "source": "https://m.scoop.co.nz/stories/PA0911/S00319.htm",
+      "sourceType": "government",
+      "quote": "It also has a thick interior polycarbonate page containing the chip.",
+      "checked": "2026-11-12",
+      "note": "Government release of 23 November 2009, read on Scoop. It does not say whether that page is the photo page, so both are given. Later designs are not separately verified."
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "country": "ROU",
+  "name": "Romania",
+  "rules": [
+    {
+      "document": "passport",
+      "series": "2019 electronic passport",
+      "issuedFrom": "2019-01",
+      "positions": [
+        "photo-page"
+      ],
+      "evidence": "inferred",
+      "source": "https://platform.keesingtechnologies.com/documentchecker-romania-passport/",
+      "sourceType": "trade",
+      "quote": "The Romanian e-passport went into circulation in January 2019.",
+      "checked": "2026-11-12",
+      "note": "The same page gives \"Material datapage: polycarbonate\". The chip position is not stated."
+    }
+  ]
+}

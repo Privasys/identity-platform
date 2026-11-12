@@ -1,0 +1,100 @@
+{
+  "schema": "privasys.wallet.chip-placement/1",
+  "issuedAt": "2026-11-12T00:00:00Z",
+  "validity": {
+    "GBR": { "adult": 10, "child": 5 }
+  },
+  "rules": [
+    {
+      "document": "passport",
+      "country": "GBR",
+      "issuedFrom": "2010-01",
+      "issuedTo": "2019-12",
+      "positions": ["back-cover", "front-cover"],
+      "source": "https://assets.publishing.service.gov.uk/media/69257dcf2945773cf12dcfe6/2025_BasicPassportChecks_1.0.pdf",
+      "quote": "The passport chip is located in the cover of the passport.",
+      "note": "HM Passport Office, passports introduced in 2010 and in 2015. The source does not say which cover, so both are given."
+    },
+    {
+      "document": "passport",
+      "country": "GBR",
+      "issuedFrom": "2020-01",
+      "issuedTo": "2025-11",
+      "positions": ["photo-page"],
+      "source": "https://assets.publishing.service.gov.uk/media/69257dcf2945773cf12dcfe6/2025_BasicPassportChecks_1.0.pdf",
+      "quote": "On the front of this page is the Title page and on the back is the Biographical Data page. The electronic chip is embedded within this page.",
+      "note": "HM Passport Office, passports introduced in 2020 (series C, phased in from early 2020). Series D, from December 2025, is not covered: the source does not state its chip position."
+    },
+    {
+      "document": "passport",
+      "country": "D",
+      "issuedFrom": "2005-11",
+      "issuedTo": "2017-02",
+      "positions": ["back-cover", "front-cover"],
+      "source": "https://bsi.bund.de/EN/Themen/Oeffentliche-Verwaltung/Elektronische-Identitaeten/Elektronische-Ausweisdokumente/Elektronischer-Reisepass/elektronischer-reisepass.html",
+      "quote": "A contactless chip (radio frequency chip) is integrated into the passport cover.",
+      "note": "BSI. The source does not say which cover, so both are given."
+    },
+    {
+      "document": "passport",
+      "country": "D",
+      "issuedFrom": "2017-03",
+      "positions": ["photo-page"],
+      "source": "https://bsi.bund.de/EN/Themen/Oeffentliche-Verwaltung/Elektronische-Identitaeten/Elektronische-Ausweisdokumente/Elektronischer-Reisepass/elektronischer-reisepass.html",
+      "quote": "the RF chip is now located in the data card",
+      "note": "BSI, the version issued since 1 March 2017."
+    },
+    {
+      "document": "passport",
+      "country": "ITA",
+      "positions": ["back-cover", "front-cover"],
+      "source": "https://poliziadistato.it/articolo/pdf/10301",
+      "quote": "dotato di un microchip inserito nella copertina",
+      "note": "Polizia di Stato. The source says the cover, not which one, so both are given."
+    },
+    {
+      "document": "passport",
+      "country": "CAN",
+      "issuedFrom": "2013-07",
+      "issuedTo": "2023-05",
+      "positions": ["back-cover"],
+      "source": "https://www.canada.ca/en/immigration-refugees-citizenship/news/archives/backgrounders-2013/about-epassports.html",
+      "quote": "An electronic chip embedded in the back cover",
+      "note": "IRCC, ePassports from 2 July 2013 until the 2023 design."
+    },
+    {
+      "document": "passport",
+      "country": "CAN",
+      "issuedFrom": "2023-06",
+      "positions": ["photo-page"],
+      "source": "https://www.canada.ca/en/immigration-refugees-citizenship/news/2023/05/canada-unveils-new-passport-design-with-state-of-the-art-security-features.html",
+      "quote": "we have imbedded the electronic passport chip in a transparent window on page one",
+      "note": "IRCC, the design issued from summer 2023, whose page one is the polycarbonate data page."
+    },
+    {
+      "document": "passport",
+      "country": "JPN",
+      "issuedFrom": "2025-03",
+      "positions": ["photo-page"],
+      "source": "https://www.pref.kyoto.jp/passport/1236840433137.html",
+      "quote": "身分事項ページ（顔写真や所持人自署のあるページ）がプラスチック製となっており当該ページにICチップが搭載されています。",
+      "note": "Kyoto Prefecture passport office, the 2025 passport (applications from 24 March 2025). Earlier passports carry the chip in a centre page, which this list has no position for."
+    },
+    {
+      "document": "passport",
+      "country": "NLD",
+      "positions": ["photo-page"],
+      "source": "https://www.rijksoverheid.nl/onderwerpen/paspoort-en-identiteitskaart/vraag-en-antwoord/wat-is-een-elektronisch-reisdocument-en-welke-gegevens-bevat-de-chip-hierin",
+      "quote": "bij het paspoort in de pagina waarop uw persoonsgegevens en foto staan",
+      "note": "Rijksoverheid."
+    },
+    {
+      "document": "passport",
+      "country": "BRA",
+      "positions": ["back-cover"],
+      "source": "https://www.gov.br/pf/pt-br/assuntos/passaporte/ajuda/duvidas_/caderneta/caderneta-chip-danificado-como-identificar",
+      "quote": "Ele está localizado dentro do papel da contracapa do passaporte",
+      "note": "Polícia Federal."
+    }
+  ]
+}

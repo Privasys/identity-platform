@@ -1,0 +1,31 @@
+# Where the chip is in each document, served as static JSON from
+# privasys.id/wallet/chip-placement.json.
+#
+# Installed on idp-fr-par-1 at /etc/caddy/conf.d/chip-placement.caddy and pulled
+# into the privasys.id site block by `import conf.d/*.caddy`. Deployed by
+# .github/workflows/deploy-chip-placement.yaml; do not hand-edit on the VM.
+#
+# The wallet ships this list and takes a newer signed copy from here, so a
+# position can be corrected without a release. It is a signed envelope: this
+# host cannot produce one a wallet would accept.
+#
+# THE PATH IS EXACT, for the reason given in wallet-version.caddy: `/wallet/` is
+# the IdP's (GET /wallet/link, GET /wallet/link/result), so each document under
+# it gets its own line and never a widened glob.
+
+handle /wallet/chip-placement.json {
+    # Mutable and singular, like the version floor. An hour is short enough for
+    # a correction to reach phones the same day, and nothing here is urgent.
+    header Cache-Control "public, max-age=3600, must-revalidate"
+    header Access-Control-Allow-Origin "*"
+    header Content-Type "application/json; charset=utf-8"
+    # Public and fetched with `credentials: 'omit'`, so asking for it cannot be
+    # tied to a signed-in holder.
+    header -Set-Cookie
+    # `handle` does not strip the matched path. Rewrite to the bare filename and
+    # root at the document's own directory, so this file server can reach
+    # nothing else on the host.
+    rewrite * /chip-placement.json
+    root * /var/www/chip-placement
+    file_server
+}

@@ -1,0 +1,166 @@
+# Copyright (c) Privasys. All rights reserved.
+# Licensed under the GNU Affero General Public License v3.0.
+
+name: Deploy chip placement list
+
+# Publishes wallet/src/services/chip-placement.data.json to
+# https://privasys.id/wallet/chip-placement.json.
+#
+# The list says where the chip is in each document, so the wallet can tell a
+# holder where to lay their phone. Every wallet ships a copy and takes a newer
+# one from this address, so a position can be added or corrected without a
+# release. There is ONE file: the copy compiled into the next build and the copy
+# served here are the same bytes.
+#
+# The document is SIGNED here, with the version floor's key, whose public half
+# is pinned in the wallet. Serving privasys.id is enough to replace the
+# document and not enough to make a wallet use it.
+#
+# Run by hand for now. Reuses the WIF -> IAP path of deploy-wallet-version.yaml.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # required for google-github-actions/auth WIF
+
+concurrency:
+  group: deploy-chip-placement
+  cancel-in-progress: false
+
+env:
+  DOC: wallet/src/services/chip-placement.data.json
+  URL: https://privasys.id/wallet/chip-placement.json
+
+jobs:
+  deploy:
+    name: Deploy chip placement list
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # The wallet drops a rule it cannot read, so a typo does not break
+      # loudly: the rule just stops applying. This is where it is caught. The
+      # same file runs in the wallet's test suite.
+      - name: Validate the list
+        run: node idp/chip-placement/validate.cjs "$DOC"
+
+      # A list signed by a key no shipped build carries is ignored by every
+      # wallet, and looks exactly like the feature being broken.
+      - name: Check the signing key is pinned in the wallet
+        env:
+          WALLET_VERSION_SIGNING_KEY: ${{ secrets.WALLET_VERSION_SIGNING_KEY }}
+          WALLET_VERSION_KEY_ID: ${{ secrets.WALLET_VERSION_KEY_ID }}
+        run: |
+          set -euo pipefail
+          node - <<'JS'
+          const crypto = require('node:crypto');
+          const { readFileSync } = require('node:fs');
+          const pem = process.env.WALLET_VERSION_SIGNING_KEY;
+          const keyId = process.env.WALLET_VERSION_KEY_ID;
+          if (!pem || !keyId) {
+            console.error('WALLET_VERSION_SIGNING_KEY / WALLET_VERSION_KEY_ID are not set.');
+            process.exit(1);
+          }
+          const src = readFileSync('wallet/src/services/version-signing-keys.ts', 'utf8');
+          const pinned = {};
+          for (const m of src.matchAll(/'([\w.-]+)':\s*'([A-Za-z0-9_-]{43})'/g)) pinned[m[1]] = m[2];
+          const pub = crypto.createPublicKey(crypto.createPrivateKey(pem)).export({ format: 'jwk' }).x;
+          if (pinned[keyId] !== pub) {
+            console.error(`keyId ${keyId} is not pinned in the wallet as this key.`);
+            process.exit(1);
+          }
+          console.log(`signing key ${keyId} matches the pin in this checkout`);
+          JS
+
+      - name: Sign the list
+        env:
+          WALLET_VERSION_SIGNING_KEY: ${{ secrets.WALLET_VERSION_SIGNING_KEY }}
+          WALLET_VERSION_KEY_ID: ${{ secrets.WALLET_VERSION_KEY_ID }}
+        run: |
+          set -euo pipefail
+          node idp/chip-placement/sign.cjs "$DOC" > /tmp/chip-placement.json
+          echo "signed as ${WALLET_VERSION_KEY_ID}"
+          wc -c /tmp/chip-placement.json
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      # /tmp/chip-placement.json is the SIGNED envelope written above, not the
+      # plain list in the repo.
+      - name: Upload list and installer
+        run: |
+          gcloud compute scp \
+            /tmp/chip-placement.json \
+            idp/caddy/chip-placement.caddy \
+            idp/caddy/install-chip-placement.sh \
+            idp-fr-par-1:/tmp/ \
+            --project privasys-production \
+            --zone europe-west9-a \
+            --tunnel-through-iap \
+            --scp-flag="-O"
+
+      - name: Install list and Caddy route
+        run: |
+          gcloud compute ssh idp-fr-par-1 \
+            --project privasys-production \
+            --zone europe-west9-a \
+            --tunnel-through-iap \
+            --command "chmod +x /tmp/install-chip-placement.sh && /tmp/install-chip-placement.sh && rm -f /tmp/install-chip-placement.sh"
+
+      # A 200 proves routing. Verify the signature the way the wallet does, and
+      # that the payload is the list reviewed in this repo.
+      - name: Verify the served envelope
+        env:
+          WALLET_VERSION_SIGNING_KEY: ${{ secrets.WALLET_VERSION_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          STATUS=$(curl -sS -o /tmp/served.json -w '%{http_code}' "$URL")
+          test "$STATUS" = "200" || { echo "HTTP ${STATUS}"; exit 1; }
+          node - <<'JS'
+          const crypto = require('node:crypto');
+          const { readFileSync } = require('node:fs');
+          const env = JSON.parse(readFileSync('/tmp/served.json', 'utf8'));
+          const payload = Buffer.from(env.payload, 'base64url');
+          const pub = crypto.createPublicKey(crypto.createPrivateKey(process.env.WALLET_VERSION_SIGNING_KEY));
+          if (!crypto.verify(null, payload, pub, Buffer.from(env.sig, 'base64url'))) {
+            console.error('served signature does not verify');
+            process.exit(1);
+          }
+          const served = JSON.parse(payload.toString('utf8'));
+          const committed = JSON.parse(readFileSync(process.env.DOC, 'utf8'));
+          if (JSON.stringify(served) !== JSON.stringify(committed)) {
+            console.error('served payload is not the committed list');
+            process.exit(1);
+          }
+          console.log(`signature ok, ${served.rules.length} rule(s), issued ${served.issuedAt}`);
+          JS
+
+      - name: Check cache and CORS headers
+        run: |
+          set -euo pipefail
+          curl -sSI "$URL" | tee /tmp/headers.txt
+          grep -qi 'cache-control: public, max-age=3600, must-revalidate' /tmp/headers.txt
+          grep -qi 'access-control-allow-origin: \*' /tmp/headers.txt
+          ! grep -qi 'immutable' /tmp/headers.txt
+
+      # The routes this deploy could plausibly break: the version floor beside
+      # it, and the IdP's own /wallet/link.
+      - name: Check the neighbours still answer
+        run: |
+          set -euo pipefail
+          test "$(curl -sS -o /tmp/version.json -w '%{http_code}' https://privasys.id/wallet/version.json)" = "200"
+          grep -q '"keyId"' /tmp/version.json
+          CODE=$(curl -sS -o /tmp/link.txt -w '%{http_code}' "https://privasys.id/wallet/link" || true)
+          echo "GET /wallet/link -> ${CODE}"
+          ! grep -q '"payload"' /tmp/link.txt
+          test "${CODE}" != "404" || { echo "/wallet/link now 404s: this deploy shadowed the IdP"; exit 1; }

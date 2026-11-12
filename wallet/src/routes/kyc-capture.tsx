@@ -753,7 +753,12 @@ export default function KycCaptureScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <Stack.Screen options={{ orientation: step === 'capture' ? 'landscape' : 'portrait' }} />
+            {/* Upright throughout, the camera included. The capture used to turn
+                the screen on its side to give a whole page more room; it only
+                looks for the two lines now, and a phone is held upright over a
+                document lying on a table, so a screen on its side had its
+                wording sideways to the holder and the lines running up it. */}
+            <Stack.Screen options={{ orientation: 'portrait' }} />
 
             {/* What is about to happen and why, once, so the screens after it
                 are steps ticked off and not each a new explanation. */}
@@ -994,7 +999,7 @@ export default function KycCaptureScreen() {
                             ]}
                         />
                     ) : (
-                        <NativeView pointerEvents="none" style={[styles.linesSlot, { bottom: insets.bottom + 64 }]}>
+                        <NativeView pointerEvents="none" style={styles.linesSlot}>
                             {SAMPLE_LINES[docType].map((line) => (
                                 <Text key={line} allowFontScaling={false} numberOfLines={1} style={styles.linesSample}>
                                     {line}
@@ -1002,7 +1007,7 @@ export default function KycCaptureScreen() {
                             ))}
                         </NativeView>
                     )}
-                    <NativeView style={[styles.capturePill, { top: insets.top + 14 }]} pointerEvents="none">
+                    <NativeView style={[styles.capturePill, { top: insets.top + 64 }]} pointerEvents="none">
                         <Text style={styles.capturePillText} numberOfLines={2}>
                             {captureState === 'positioning'
                                 ? t(isPassport ? 'kyc.camLookPassport' : 'kyc.camLookIdCard')
@@ -1346,9 +1351,12 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     // Round the lines themselves, wherever they are in view.
     linesBox: { position: 'absolute', borderWidth: 3, borderRadius: 10, borderColor: '#FFFFFF' },
     linesBoxRead: { borderColor: '#34C759', backgroundColor: 'rgba(52,199,89,0.16)' },
-    // Where to put them, with a sample of what they look like.
+    // Where to put them, with a sample of what they look like. As wide as the
+    // sample and no wider, so the slot has the shape of the lines; a little
+    // below the middle, where they fall when the page fills the width.
     linesSlot: {
-        position: 'absolute', alignSelf: 'center', width: '62%', paddingVertical: 8, paddingHorizontal: 12,
+        position: 'absolute', alignSelf: 'center', top: '56%', maxWidth: '94%',
+        paddingVertical: 8, paddingHorizontal: 10,
         borderWidth: 2, borderStyle: 'dashed', borderRadius: 10, borderColor: 'rgba(255,255,255,0.8)',
         backgroundColor: 'rgba(0,0,0,0.25)',
     },
@@ -1356,9 +1364,9 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
         fontSize: 11, lineHeight: 16, color: 'rgba(255,255,255,0.85)',
     },
-    // One at the top and one at the bottom, clear of Back and Close.
+    // One under Back and Close and one at the bottom.
     capturePill: {
-        position: 'absolute', alignSelf: 'center', maxWidth: '72%', flexDirection: 'row', alignItems: 'center', gap: 8,
+        position: 'absolute', alignSelf: 'center', maxWidth: '88%', flexDirection: 'row', alignItems: 'center', gap: 8,
         backgroundColor: 'rgba(0,0,0,0.62)', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16,
     },
     capturePillText: { flexShrink: 1, color: '#FFFFFF', fontSize: 15, fontWeight: '600', textAlign: 'center' },

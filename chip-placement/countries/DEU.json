@@ -1,6 +1,9 @@
 {
-  "country": "D",
+  "country": "DEU",
   "name": "Germany",
+  "mrzCodes": [
+    "D"
+  ],
   "rules": [
     {
       "document": "passport",

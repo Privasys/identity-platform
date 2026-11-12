@@ -53,10 +53,8 @@ already installed picks up a new entry without an update.
 
 ## Adding or correcting an entry
 
-1. Find the file for the issuing state in `countries/`, or create it. The file
-   is named after the state **as the document's own lines of code write it**:
-   the three characters after `P<` on the first line of a passport. Mostly that
-   is the ISO three-letter code (`GBR`, `ITA`); Germany is `D`.
+1. Find the file for the country in `countries/`, or create it. The file is
+   named after the country's ISO 3166-1 alpha-3 code: `GBR.json`, `DEU.json`.
 2. Add a rule (see below).
 3. Run `node chip-placement/build.cjs`. It checks your file and rebuilds the
    list. Commit both.
@@ -96,6 +94,8 @@ already installed picks up a new entry without an update.
 | `quote` | The sentence on that page that says so, word for word, in its own language. |
 | `checked` | The day you read the page, `YYYY-MM-DD`. |
 | `note` | What the source does not say, and anything a reviewer should know. Optional. |
+| `country`, `name` (per file) | The ISO 3166-1 alpha-3 code, matching the file name, and the country in plain words. |
+| `mrzCodes` (per file) | Only where the document's own lines of code do not write the ISO code for the issuing state. Germany's passports write `D`, so `DEU.json` has `"mrzCodes": ["D"]`. The code is the three characters after `P<` on the first line of a passport. Leave it out otherwise. |
 | `validity` (per file) | Only for a state whose passports are **not** valid for 10 years (adult) and 5 (child): `{ "adult": 5, "child": 5 }`. Leave it out otherwise. See "How the wallet uses it" for why it matters. |
 
 ### Positions

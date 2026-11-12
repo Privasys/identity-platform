@@ -59,6 +59,14 @@ describe('the country files', () => {
         expect(validateCountry(file, f.replace(/\.json$/, ''))).toEqual([]);
     });
 
+    it('give Germany its ISO name and the wallet the code its passports write', () => {
+        const file = JSON.parse(readFileSync(path.join(FOLDER, 'countries', 'DEU.json'), 'utf8'));
+        expect(file.mrzCodes).toEqual(['D']);
+        const states = (builtIn.rules as { country: string }[]).map((r) => r.country);
+        expect(states).toContain('D');
+        expect(states).not.toContain('DEU');
+    });
+
     it('build the list in this build, to the rule', () => {
         // A country file changed without `node chip-placement/build.cjs` would
         // ship a list that does not say what the folder says.
@@ -82,13 +90,24 @@ describe('a country file is refused', () => {
         expect(validateCountry(written(over), 'XXA').length).toBeGreaterThan(0);
     });
 
-    it('when it is named after another state', () => {
+    it('when it is named after another country', () => {
         expect(validateCountry(written(), 'XXB').length).toBeGreaterThan(0);
+    });
+
+    // Files are named by ISO code. What a document's lines write instead goes
+    // in mrzCodes, which is what the wallet matches on.
+    it('when its country is not an ISO three-letter code', () => {
+        expect(validateCountry({ ...written(), country: 'D' }, 'D').length).toBeGreaterThan(0);
+    });
+
+    it('when mrzCodes only repeats the country', () => {
+        expect(validateCountry({ ...written(), mrzCodes: ['XXA'] }, 'XXA').length).toBeGreaterThan(0);
     });
 
     it('but not when it is right', () => {
         expect(validateCountry(written(), 'XXA')).toEqual([]);
         expect(validateCountry(written({ evidence: 'inferred', sourceType: 'printer' }), 'XXA')).toEqual([]);
+        expect(validateCountry({ ...written(), mrzCodes: ['X'] }, 'XXA')).toEqual([]);
     });
 });
 

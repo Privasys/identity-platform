@@ -35,7 +35,10 @@ const SOURCE_TYPES = ['government', 'printer', 'trade', 'vendor'];
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+// What a document's own lines write for its issuing state: usually the ISO
+// code, sometimes shorter (Germany is D) or one of a family (GBD, GBN, ...).
 const STATE = /^[A-Z]{1,3}$/;
+const ISO3 = /^[A-Z]{3}$/;
 
 /** What a rule must get right whether it is written by hand or built. */
 function checkRuleShape(r, at, fail) {
@@ -74,19 +77,29 @@ function checkValidity(v, at, fail) {
 
 /**
  * One file of countries/. `code` is the file's name without `.json`, which must
- * be the issuing state as the document's own lines write it.
+ * be the country's ISO 3166-1 alpha-3 code.
  */
 function validateCountry(file, code) {
     const errors = [];
     const fail = (m) => errors.push(m);
     if (!file || typeof file !== 'object' || Array.isArray(file)) return ['not a JSON object'];
 
-    if (typeof file.country !== 'string' || !STATE.test(file.country)) {
-        fail(`country must be the issuing state as the document's lines write it (GBR, D, ...), got ${JSON.stringify(file.country)}`);
+    if (typeof file.country !== 'string' || !ISO3.test(file.country)) {
+        fail(`country must be the ISO 3166-1 alpha-3 code (GBR, DEU, ...), got ${JSON.stringify(file.country)}`);
     } else if (code !== undefined && file.country !== code) {
         fail(`country is ${file.country} but the file is named ${code}.json`);
     }
     if (typeof file.name !== 'string' || !file.name.trim()) fail('name must be the country in plain words');
+    // Only where the document's lines do not write the ISO code.
+    if (file.mrzCodes !== undefined) {
+        if (!Array.isArray(file.mrzCodes) || file.mrzCodes.length === 0 || !file.mrzCodes.every((c) => typeof c === 'string' && STATE.test(c))) {
+            fail('mrzCodes must list what the lines of the document write for the issuing state, e.g. ["D"]');
+        } else if (new Set(file.mrzCodes).size !== file.mrzCodes.length) {
+            fail('mrzCodes lists a code twice');
+        } else if (file.mrzCodes.length === 1 && file.mrzCodes[0] === file.country) {
+            fail('mrzCodes repeats the country code: leave it out');
+        }
+    }
     checkValidity(file.validity, 'validity', fail);
     // 10 and 5 are what the wallet assumes. Writing them down again says
     // nothing, and reads as if it did.

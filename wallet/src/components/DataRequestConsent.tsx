@@ -30,7 +30,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react-native';
 import { Trans, useTranslation } from 'react-i18next';
 
@@ -68,6 +68,7 @@ export function DataRequestConsent({
     sectionTitle,
     sectionDescription,
     items,
+    footer,
     note,
     persistent,
     denyLabel,
@@ -94,6 +95,8 @@ export function DataRequestConsent({
     sectionTitle?: string;
     sectionDescription?: string;
     items: ConsentDataItem[];
+    /** Drawn under the items, above the note: something the approval also covers. */
+    footer?: ReactNode;
     note?: string;
     persistent?: { value: boolean; onChange: (v: boolean) => void };
     denyLabel?: string;
@@ -258,6 +261,8 @@ export function DataRequestConsent({
                         />
                     </RNView>
                 ) : null}
+
+                {footer}
 
                 {note ? <Text style={styles.note}>{note}</Text> : null}
             </ScrollView>

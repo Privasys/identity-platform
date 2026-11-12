@@ -59,4 +59,6 @@ export interface MrzScan {
     /** The full OCR'd MRZ lines, joined — sent to the enclave so it can
      *  cross-reference the visual data against the chip's DG1 (GPG45 box 3). */
     mrz: string;
+    /** The issuing state as the zone writes it (Germany is `D`). May be empty. */
+    issuingState: string;
 }

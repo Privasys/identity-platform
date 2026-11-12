@@ -30,6 +30,8 @@ import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { getProfileValue, setProfileValue } from '@/services/attributes';
 import { calendarDate } from '@/services/calendar-date';
+import { placementFor, type ChipPosition } from '@/services/chip-placement';
+import { currentPlacement, refreshPlacement } from '@/services/chip-placement-remote';
 import { appIdFromOids } from '@/services/release-provenance';
 import {
     applyGovAttributes, attestVerifier, getVerifierInfo, govAttributeCandidates, portraitDataUri, readDocumentMrz,
@@ -40,12 +42,24 @@ import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import * as Emrtd from '../../modules/native-emrtd/src/index';
 
-// doctype: is there a chip · consent · attest: the enclave · photo: what to
-// photograph · capture: the camera · read: scan the chip · review: what the chip
-// said, before anything is sent · selfie · verifying · select · done.
-type Step = 'doctype' | 'consent' | 'attest' | 'photo' | 'capture' | 'read' | 'review' | 'selfie' | 'verifying' | 'select' | 'done';
+// intro: what is about to happen and why · doctype: which document · chip: does
+// it have one · consent: what is sent and where, one approval · attest: the full
+// enclave page, on request · photo · capture: the camera · read: scan the chip ·
+// review: what the chip said, before anything is sent · selfie · verifying ·
+// select · done.
+type Step = 'intro' | 'doctype' | 'chip' | 'consent' | 'attest' | 'photo' | 'capture' | 'read' | 'review' | 'selfie' | 'verifying' | 'select' | 'done';
 type DocType = 'passport' | 'id-card';
-type CaptureState = 'positioning' | 'checking' | 'captured';
+// positioning: looking for the lines · checking: the lines are in view ·
+// enclave: the phone could not read them, the enclave is asked · captured.
+type CaptureState = 'positioning' | 'checking' | 'enclave' | 'captured';
+/** A rectangle on screen, in points. */
+type ScreenBox = { left: number; top: number; width: number; height: number };
+
+/** A sample of the lines, drawn in the slot so the holder knows what to find. */
+const SAMPLE_LINES: Record<DocType, string[]> = {
+    passport: ['P<ABC<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<', '0000000000ABC0000000A0000000<<<<<<<<<<<<<<00'],
+    'id-card': ['I<ABC0000000000<<<<<<<<<<<<<<<', '0000000A0000000ABC<<<<<<<<<<<0', 'ABC<<ABC<<<<<<<<<<<<<<<<<<<<<<'],
+};
 
 // Data-page (TD3 photo page) aspect ≈ 125×88 mm ≈ 1.42:1.
 const DOC_PAGE_RATIO = 1.42;
@@ -70,6 +84,41 @@ const KYC_INPUT_ITEMS: { key: string; icon: keyof typeof Ionicons.glyphMap; labe
     { key: 'nfc_chip', icon: 'hardware-chip-outline', labelKey: 'kyc.inputNfcChip' },
     { key: 'live_selfie', icon: 'person-outline', labelKey: 'kyc.inputSelfie' },
 ];
+
+type Placement = ReturnType<typeof placementFor>;
+
+/** The heading of the chip scan: the place to scan, when it is known. */
+function scanTitleKey(doc: DocType, placement: Placement): string {
+    if (doc === 'id-card') return 'kyc.scanTitleCard';
+    if (!placement.known) return 'kyc.scanTitle';
+    const titles: Record<ChipPosition, string> = {
+        'back-cover': 'kyc.scanTitleBackCover',
+        'front-cover': 'kyc.scanTitleFrontCover',
+        'photo-page': 'kyc.scanTitlePhotoPage',
+        card: 'kyc.scanTitle',
+    };
+    return titles[placement.positions[0]];
+}
+
+/** What to do with the document, or the order to try when its chip is not on the list. */
+function scanBodyKey(doc: DocType, placement: Placement): string {
+    if (doc === 'id-card') return 'kyc.scanBodyCard';
+    if (!placement.known) return 'kyc.scanBodyUnknown';
+    const bodies: Record<ChipPosition, string> = {
+        'back-cover': 'kyc.scanBodyBackCover',
+        'front-cover': 'kyc.scanBodyFrontCover',
+        'photo-page': 'kyc.scanBodyPhotoPage',
+        card: 'kyc.scanBodyUnknown',
+    };
+    return bodies[placement.positions[0]];
+}
+
+/** The tip that names the second place to try. */
+const TRY_NEXT_KEY: Partial<Record<ChipPosition, string>> = {
+    'back-cover': 'kyc.scanTryBackCover',
+    'front-cover': 'kyc.scanTryFrontCover',
+    'photo-page': 'kyc.scanTryPhotoPage',
+};
 
 /** The raw fields the trusted-apps store compares (same set as Drive/sign-in). */
 function verifierMeasurements(v: VerifierAttestation) {
@@ -102,7 +151,7 @@ export default function KycCaptureScreen() {
     const insets = useSafeAreaInsets();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
-    const [step, setStep] = useState<Step>('doctype');
+    const [step, setStep] = useState<Step>('intro');
     const [docType, setDocType] = useState<DocType>('passport');
     const [support, setSupport] = useState<Emrtd.EmrtdSupport | null>(null);
     const [docNumber, setDocNumber] = useState('');
@@ -127,9 +176,22 @@ export default function KycCaptureScreen() {
     // Since when the camera has shown a zone the phone could not fully read
     // (0: it is not showing one).
     const unreadSince = useRef(0);
-    // The authoritative MRZ (BAC key) comes back from the enclave once we reach
-    // the read step; gate the chip scan on it.
-    const [mrzReadDone, setMrzReadDone] = useState(false);
+    // Where the lines are on screen, to draw a box round them.
+    const [linesBox, setLinesBox] = useState<ScreenBox | null>(null);
+    // The state that issued the document, as its lines write it: with the
+    // expiry and the date of birth it says where the chip is likely to be.
+    const [docCountry, setDocCountry] = useState('');
+    // Whether the enclave has already been asked to read this photo, so a key
+    // the chip refuses is not sent round twice.
+    const enclaveRead = useRef(false);
+    // The list of chip positions: the one in the build, then a newer one from
+    // privasys.id if there is one.
+    const [placementDoc, setPlacementDoc] = useState(currentPlacement);
+    useEffect(() => {
+        let live = true;
+        void refreshPlacement().then((doc) => { if (live) setPlacementDoc(doc); });
+        return () => { live = false; };
+    }, []);
     // Post-verification: the user chooses which gov attributes to import.
     const [verifiedRecord, setVerifiedRecord] = useState<KycRecord | null>(null);
     const [candidates, setCandidates] = useState<ProfileAttribute[]>([]);
@@ -159,14 +221,7 @@ export default function KycCaptureScreen() {
      */
     const [showExplainer, setShowExplainer] = useState(false);
 
-    // Size the guide from the live landscape viewport and leave a dark margin so
-    // every edge of the document remains visible.
     const { width: winW, height: winH } = useWindowDimensions();
-    const usableH = winH - insets.top - insets.bottom;
-    const frameW = Math.min(winW * 0.94, usableH * 0.9 * DOC_PAGE_RATIO);
-    const frameH = frameW / DOC_PAGE_RATIO;
-    const frameLeft = (winW - frameW) / 2;
-    const frameTop = (winH - frameH) / 2;
 
     useEffect(() => {
         Emrtd.isSupported().then(setSupport).catch(() => setSupport({ supported: false }));
@@ -182,7 +237,7 @@ export default function KycCaptureScreen() {
      */
     useEffect(() => {
         const host = verifierAtt?.origin;
-        if (!host || step !== 'attest') return;
+        if (!host) return;
         let live = true;
         void fetchStoreListing(host).then((l) => {
             if (live) setVerifierListing(l);
@@ -190,10 +245,10 @@ export default function KycCaptureScreen() {
         return () => {
             live = false;
         };
-    }, [step, verifierAtt?.origin]);
+    }, [verifierAtt?.origin]);
 
-    // Resolve the verifier's name + origin for the consent card (no attestation
-    // yet — that is the dedicated enclave page after consent).
+    // Resolve the verifier's name + origin for the consent card, which is on
+    // show before the attestation below has finished.
     useEffect(() => {
         if (step !== 'consent' || verifierInfo) return;
         let cancelled = false;
@@ -203,17 +258,23 @@ export default function KycCaptureScreen() {
         return () => { cancelled = true; };
     }, [step, verifierInfo]);
 
-    // Enclave verification page: attest the verifier and show the holder the same
-    // "Verify Enclave" view they see at sign-in, before any document data is
-    // captured. The digest pin + attestation are re-enforced again at send time.
+    // The enclave is attested while the consent screen is on show, and the
+    // result sits on that screen under what is sent: one approval covers what
+    // goes and where it goes. The full "Verify Enclave" page of sign-in is one
+    // tap away from there. Nothing is captured until the holder has agreed with
+    // a verified enclave in front of them, and the digest pin + attestation are
+    // enforced again at send time.
     //
-    // Approval is REMEMBERED (trusted-apps store, same as Drive and sign-in):
-    // once the user has approved this verifier on this device, an unchanged
-    // attestation goes straight to capture; the approve screen only reappears
-    // when a measurement actually changed (a genuine redeploy/upgrade).
+    // Whether this is the enclave approved before is REMEMBERED (trusted-apps
+    // store, same as Drive and sign-in), and said on the screen: the same one,
+    // a changed one, or the first.
     const [attIsChanged, setAttIsChanged] = useState(false);
+    const [attIsSame, setAttIsSame] = useState(false);
+    // Also while the full page is open, so coming back from it does not start
+    // the check again.
+    const attesting = step === 'consent' || step === 'attest';
     useEffect(() => {
-        if (step !== 'attest') return;
+        if (!attesting) return;
         let cancelled = false;
         setVerifierAtt(null);
         setAttError(null);
@@ -222,14 +283,11 @@ export default function KycCaptureScreen() {
                 if (cancelled) return;
                 const { getApp, isAttestationMatch } = useTrustedAppsStore.getState();
                 const trusted = getApp(res.origin);
-                if (trusted && isAttestationMatch(res.origin, verifierMeasurements(res))) {
-                    rememberVerifier(res); // refresh lastVerified
-                    setVerifierAtt(res);   // send-time + session-trace state still needs it
-                    setStep('photo');
-                    return;
-                }
-                setAttIsChanged(!!trusted);
+                const same = !!trusted && isAttestationMatch(res.origin, verifierMeasurements(res));
+                setAttIsSame(same);
+                setAttIsChanged(!!trusted && !same);
                 setVerifierAtt(res);
+                if (same) return;
                 // First approval this wallet has ever been asked for: explain
                 // what just happened before asking them to act on it. Only here
                 // — the cards say "your wallet checked the app", which must
@@ -248,7 +306,14 @@ export default function KycCaptureScreen() {
                 setAttError(e?.message ?? t('drive.challengeFailedBody'));
             });
         return () => { cancelled = true; };
-    }, [step, attRetry]);
+    }, [attesting, attRetry]);
+
+    /** The holder agreed, with a verified enclave on screen. */
+    const agree = () => {
+        if (!verifierAtt) return;
+        rememberVerifier(verifierAtt);
+        setStep('photo');
+    };
 
     /**
      * "Challenge this enclave" on the Verify Enclave step: re-attest the
@@ -288,7 +353,9 @@ export default function KycCaptureScreen() {
     // can also go one step back. The consent and enclave steps carry their own
     // Cancel and Reject.
     const backFrom: Partial<Record<Step, () => void>> = {
-        photo: () => setStep('doctype'),
+        doctype: () => setStep('intro'),
+        chip: () => setStep('doctype'),
+        photo: () => setStep('chip'),
         capture: () => setStep('photo'),
         read: () => setStep('photo'),
         review: () => setStep('read'),
@@ -297,33 +364,65 @@ export default function KycCaptureScreen() {
     const goBack = busy ? undefined : backFrom[step];
     const onCamera = step === 'capture' || step === 'selfie';
 
+    // Where the chip is likely to be, from what the lines said.
+    const placement = useMemo(
+        () => placementFor(placementDoc, { document: docType, country: docCountry, expiry, birth: dob }),
+        [placementDoc, docType, docCountry, expiry, dob],
+    );
+
     // ── Step 2: read the document chip over NFC (or dev stub) ────────────────
-    const handleScan = async () => {
+    const handleScan = async (
+        key: Emrtd.MrzKey = { documentNumber: docNumber.trim(), dateOfBirth: dob.trim(), dateOfExpiry: expiry.trim() },
+    ) => {
         setBusy(true);
         // Log the access-field shapes (not values) so a rejected key vs a chip
         // failure is diagnosable from the in-app logs.
         console.log(
-            `[KYC] reading ${docType} chip — doc=${docNumber.trim().length}c dob=${dob.trim().length}c exp=${expiry.trim().length}c`,
+            `[KYC] reading ${docType} chip — doc=${key.documentNumber.length}c dob=${key.dateOfBirth.length}c exp=${key.dateOfExpiry.length}c`,
         );
         try {
-            const read = await Emrtd.readDocument({
-                documentNumber: docNumber.trim(),
-                dateOfBirth: dob.trim(),
-                dateOfExpiry: expiry.trim(),
-            });
+            const read = await Emrtd.readDocument(key);
             setDocRead(read);
             setPortraitFailed(false);
             setStep('review');
         } catch (e: any) {
             console.warn('[KYC] chip read failed:', e?.message);
             // A rejected key (vs a chip/comms drop) is almost always a single
-            // mistyped/misread character in the document number, so point the user
-            // straight at the usual OCR-B look-alikes and let them fix it.
+            // misread character in the document number.
             const rejectedKey = typeof e?.message === 'string' && e.message.includes('InvalidMRZKey');
+            if (rejectedKey && docImage && !enclaveRead.current) {
+                // The key came from the phone's own reading of the lines. Ask
+                // the enclave to read the same photo, and try once more if it
+                // reads them differently.
+                enclaveRead.current = true;
+                try {
+                    const mrz = await readDocumentMrz(docImage);
+                    const differs = mrz.documentNumber !== key.documentNumber
+                        || mrz.dateOfBirth !== key.dateOfBirth || mrz.dateOfExpiry !== key.dateOfExpiry;
+                    if (differs) {
+                        console.log('[KYC] the enclave read the lines differently; scanning again with its reading');
+                        setDocNumber(mrz.documentNumber);
+                        setDob(mrz.dateOfBirth);
+                        setExpiry(mrz.dateOfExpiry);
+                        await handleScan({
+                            documentNumber: mrz.documentNumber,
+                            dateOfBirth: mrz.dateOfBirth,
+                            dateOfExpiry: mrz.dateOfExpiry,
+                        });
+                        return;
+                    }
+                } catch (err: any) {
+                    console.warn('[KYC] enclave reading of the lines failed:', err?.message);
+                }
+            }
             if (rejectedKey) {
                 Alert.alert(
                     t('kyc.mrzMismatchTitle'),
                     t('kyc.mrzMismatchBody'),
+                    [
+                        { text: t('common.cancel'), style: 'cancel' },
+                        { text: t('kyc.linesAgain'), onPress: () => { void openCapture(); } },
+                    ],
                 );
             } else {
                 Alert.alert(
@@ -351,48 +450,84 @@ export default function KycCaptureScreen() {
             Alert.alert(t('connect.cameraNeededTitle'), t('kyc.cameraNeededBody'));
             return;
         }
-        setDocNumber(''); setDob(''); setExpiry(''); setDocImage('');
-        setMrzReadDone(false);
+        setDocNumber(''); setDob(''); setExpiry(''); setDocImage(''); setDocCountry('');
+        setLinesBox(null);
+        enclaveRead.current = false;
         captureFinished.current = false;
         unreadSince.current = 0;
         setCaptureState('positioning');
         setStep('capture');
     };
 
+    /**
+     * Where a part of a camera frame is on screen. The preview fills the screen
+     * and is cut to fit it, so a frame position goes through that same cut.
+     */
+    const onScreen = (rows: Emrtd.TextLine[], frame: { width: number; height: number }): ScreenBox | null => {
+        if (rows.length === 0 || !(frame.width > 0) || !(frame.height > 0)) return null;
+        const scale = Math.max(winW / frame.width, winH / frame.height);
+        const offX = (frame.width * scale - winW) / 2;
+        const offY = (frame.height * scale - winH) / 2;
+        const x0 = Math.min(...rows.map((r) => r.x)) * frame.width * scale - offX;
+        const x1 = Math.max(...rows.map((r) => r.x + r.w)) * frame.width * scale - offX;
+        const y0 = Math.min(...rows.map((r) => r.y)) * frame.height * scale - offY;
+        const y1 = Math.max(...rows.map((r) => r.y + r.h)) * frame.height * scale - offY;
+        const pad = 8;
+        return { left: x0 - pad, top: y0 - pad, width: x1 - x0 + pad * 2, height: y1 - y0 + pad * 2 };
+    };
+
+    /** The camera has what it came for: on to the chip. */
+    const linesDone = async (fields: Emrtd.MrzKey, country: string, image: string) => {
+        setDocNumber(fields.documentNumber);
+        setDob(fields.dateOfBirth);
+        setExpiry(fields.dateOfExpiry);
+        setDocCountry(country);
+        setDocImage(image);
+        setCaptureState('captured');
+        // Keep the green confirmation visible long enough to register.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        setStep((s) => (s === 'capture' ? 'read' : s));
+    };
+
+    /** Nothing usable came of this frame: carry on looking. */
+    const keepLooking = () => {
+        unreadSince.current = 0;
+        captureFinished.current = false;
+        setLinesBox(null);
+        setCaptureState('positioning');
+    };
+
     // The camera reads the text of each frame as it arrives and reports it here
     // with where it is. The page can be anywhere in view: once the lines at the
     // bottom of it read as a machine readable zone, that same frame is cut to
-    // the page around them and kept. It does double duty: the reading gives a
-    // first chip access key (BAC/PACE), and the picture goes to the enclave for
-    // its own reading and the visual↔chip cross-reference (GPG45 box 3).
+    // the page around them and kept. The reading is what unlocks the chip
+    // (BAC/PACE) and says which document this is; the picture goes to the
+    // enclave with the chip's data for the visual↔chip cross-reference (GPG45
+    // box 3).
+    //
+    // The phone's reading is used when every check digit passes. When the lines
+    // are plainly there but the phone cannot read every character, the enclave
+    // is asked to read the frame instead, from this same screen.
     const onFrameText = (frame: Emrtd.MrzFrame) => {
         if (step !== 'capture' || captureFinished.current) return;
         const rows = Emrtd.mrzRows(frame.lines);
         const seen = rows.length >= 2 && frame.held;
         if (!seen) {
             unreadSince.current = 0;
+            setLinesBox(null);
             setCaptureState('positioning');
             return;
         }
+        setLinesBox(onScreen(rows, frame));
         setCaptureState('checking');
         // Every check digit passing is what says the page is sharp and whole.
         const mrz = Emrtd.parseMrzLines(rows.map((r) => r.text));
         if (!mrz) {
-            // The reading on the phone falls short on some documents whose zone
-            // is plainly there. After a few seconds of that, the frame
-            // goes to the enclave anyway, whose reading is the one that counts.
             if (!unreadSince.current) unreadSince.current = Date.now();
             if (Date.now() - unreadSince.current < UNREAD_BEFORE_SENDING_MS) return;
         }
         captureFinished.current = true;
-        setCaptureState('captured');
-        // Provisional: the authoritative reading comes back from the enclave
-        // in the next step (see services/kyc.ts).
-        if (mrz) {
-            setDocNumber(mrz.documentNumber);
-            setDob(mrz.dateOfBirth);
-            setExpiry(mrz.dateOfExpiry);
-        }
+        setCaptureState(mrz ? 'captured' : 'enclave');
         void (async () => {
             // Only the page leaves the phone, not what is around it. If the
             // cut cannot be made the whole frame is sent, so a quirk in working
@@ -408,68 +543,51 @@ export default function KycCaptureScreen() {
                 console.warn('[KYC] snapshot failed:', e?.message);
             }
             if (!image) {
-                // Nothing was kept after all: carry on looking.
-                unreadSince.current = 0;
-                captureFinished.current = false;
-                setCaptureState('positioning');
+                // Nothing was kept after all.
+                keepLooking();
                 return;
             }
-            setDocImage(image);
-            // Keep the green confirmation visible long enough to register.
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            setStep((s) => (s === 'capture' ? 'read' : s));
-        })();
-    };
-
-    // ── Between Step 1 and Step 2: derive the BAC key from the captured image ─
-    // The on-device OCR is unreliable on the OCR-B MRZ, so we send the data-page
-    // photo to the attested enclave (OmniMRZ) and use its check-digit-validated
-    // read as the chip access key. Runs once on entering the read step; a failed
-    // read sends the user back to retake the photo.
-    useEffect(() => {
-        if (step !== 'read' || !docImage || mrzReadDone) return;
-        let cancelled = false;
-        (async () => {
-            setBusy(true);
+            // The first of the rows that make up the zone: three on a card,
+            // two on a passport.
+            const texts = rows.map((r) => r.text.toUpperCase().replace(/\s/g, ''));
+            const country = Emrtd.issuingState(texts.slice(docType === 'id-card' ? -3 : -2));
+            if (mrz) {
+                console.log('[KYC] lines read by the phone');
+                await linesDone(mrz, mrz.issuingState || country, image);
+                return;
+            }
+            // The phone could not read every character. The enclave reads the
+            // same frame (OmniMRZ, check-digit validated).
+            console.log('[KYC] lines seen but not read by the phone; asking the enclave');
+            enclaveRead.current = true;
             try {
-                const mrz = await readDocumentMrz(docImage);
-                if (cancelled) return;
-                setDocNumber(mrz.documentNumber);
-                setDob(mrz.dateOfBirth);
-                setExpiry(mrz.dateOfExpiry);
-                setMrzReadDone(true);
+                const read = await readDocumentMrz(image);
+                console.log('[KYC] lines read by the enclave');
+                await linesDone(read, country, image);
             } catch (e: any) {
-                if (cancelled) return;
-                console.warn('[KYC] enclave MRZ read failed:', e?.message);
-                // Only an unreadable capture (HTTP 422) is fixed by retaking.
-                // Everything else — a rejected attestation, a gate refusal, the
-                // enclave being unreachable — must say so, or the user retakes
-                // the photo for ever against a failure the camera cannot fix.
-                const unreadable = isRetryableCapture(e);
-                if (unreadable) {
-                    Alert.alert(
-                        t('kyc.photoPageFailedTitle'),
-                        t('kyc.photoPageFailedBody'),
-                        [{ text: t('kyc.retakePhoto'), onPress: () => { openCapture(); } }],
-                    );
-                } else {
-                    Alert.alert(
-                        t('kyc.unavailableTitle'),
-                        t('kyc.unavailableBody', {
-                            reason: e?.detail || e?.message || t('kyc.verifierRefused')
-                        }),
-                        [
-                            { text: t('common.retry'), onPress: () => { setMrzReadDone(false); } },
-                            { text: t('common.cancel'), style: 'cancel', onPress: () => { router.back(); } },
-                        ],
-                    );
+                console.warn('[KYC] enclave reading of the lines failed:', e?.message);
+                // Only an unreadable frame is fixed by another one, and the
+                // camera is still up, so it simply carries on. Everything else
+                // (a rejected attestation, a gate refusal, the enclave out of
+                // reach) must say so, or the holder films the page for ever
+                // against a failure the camera cannot fix.
+                if (isRetryableCapture(e)) {
+                    keepLooking();
+                    return;
                 }
-            } finally {
-                if (!cancelled) setBusy(false);
+                Alert.alert(
+                    t('kyc.unavailableTitle'),
+                    t('kyc.unavailableBody', {
+                        reason: e?.detail || e?.message || t('kyc.verifierRefused')
+                    }),
+                    [
+                        { text: t('common.retry'), onPress: keepLooking },
+                        { text: t('common.cancel'), style: 'cancel', onPress: () => setStep('photo') },
+                    ],
+                );
             }
         })();
-        return () => { cancelled = true; };
-    }, [step, docImage, mrzReadDone]);
+    };
 
     // ── Step 2: capture a live selfie (for the enclave face match) ──────────
     // After verification the legal names are stored as given_name_id/family_name_id
@@ -610,73 +728,159 @@ export default function KycCaptureScreen() {
         >
             <Stack.Screen options={{ orientation: step === 'capture' ? 'landscape' : 'portrait' }} />
 
+            {/* What is about to happen and why, once, so the screens after it
+                are steps ticked off and not each a new explanation. */}
+            {step === 'intro' && (
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.padContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Text style={styles.title}>{t('kyc.introTitle')}</Text>
+                    <Text style={styles.body}>{t('kyc.introBody')}</Text>
+                    <NativeView style={styles.plan}>
+                        {([1, 2, 3] as const).map((n) => (
+                            <NativeView key={n} style={styles.planRow}>
+                                <NativeView style={styles.planNumber}>
+                                    <Text style={styles.planNumberText}>{n}</Text>
+                                </NativeView>
+                                <NativeView style={styles.docOptionBody}>
+                                    <Text style={styles.planTitle}>{t(`kyc.introStep${n}Title`)}</Text>
+                                    <Text style={styles.planBody}>{t(`kyc.introStep${n}Body`)}</Text>
+                                </NativeView>
+                            </NativeView>
+                        ))}
+                    </NativeView>
+                    <Text style={styles.small}>{t('kyc.introNote')}</Text>
+                    <Pressable style={styles.primary} onPress={() => setStep('doctype')}>
+                        <Text style={styles.primaryText}>{t('kyc.introStart')}</Text>
+                    </Pressable>
+                </ScrollView>
+            )}
+
             {step === 'doctype' && (
                 <ScrollView
                     style={styles.flex}
                     contentContainerStyle={styles.padContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <Text style={styles.title}>{t(isPassport ? 'kyc.chipTitlePassport' : 'kyc.chipTitleIdCard')}</Text>
-                    <Text style={styles.body}>{t(isPassport ? 'kyc.chipBodyPassport' : 'kyc.chipBodyIdCard')}</Text>
-                    <ChipSymbolArt doc={docType} label={t('kyc.artChipSymbol')} />
-                    <Tips items={[t('kyc.chipTipOriginal'), t('kyc.chipTipNotExpired')]} />
+                    <Text style={styles.title}>{t('kyc.chooseDocTitle')}</Text>
+                    <Text style={styles.body}>{t('kyc.chooseDocHint')}</Text>
+
+                    <Pressable
+                        style={styles.docOption}
+                        onPress={() => { setDocType('passport'); setStep('chip'); }}
+                    >
+                        <Ionicons name="airplane-outline" size={22} color={p.action} />
+                        {/* NativeView: the themed View paints the screen background,
+                            which shows as a grey patch inside the white card. */}
+                        <NativeView style={styles.docOptionBody}>
+                            <Text style={styles.docOptionTitle}>{t('kyc.docPassport')}</Text>
+                            <Text style={styles.docOptionSub}>{t('kyc.docPassportHint')}</Text>
+                        </NativeView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </Pressable>
+
+                    <Pressable
+                        style={styles.docOption}
+                        onPress={() => { setDocType('id-card'); setStep('chip'); }}
+                    >
+                        <Ionicons name="card-outline" size={22} color={p.action} />
+                        <NativeView style={styles.docOptionBody}>
+                            <Text style={styles.docOptionTitle}>{t('kyc.docIdCard')}</Text>
+                            <Text style={styles.docOptionSub}>{t('kyc.docIdCardHint')}</Text>
+                        </NativeView>
+                        <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                    </Pressable>
+
+                    <Text style={styles.note}>{t('kyc.noDrivingLicences')}</Text>
                     {support && !support.supported && (
-                        <Text style={[styles.note, { color: p.warnText }]}>
+                        <Text style={styles.note}>
                             {support.reason
                                 ? t('kyc.nfcUnavailableWithReason', { reason: support.reason })
                                 : t('kyc.nfcUnavailable')}
                         </Text>
                     )}
+                </ScrollView>
+            )}
+
+            {/* A confirmation, nothing more: the document was chosen on the
+                screen before. */}
+            {step === 'chip' && (
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.padContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Text style={styles.title}>{t(isPassport ? 'kyc.chipCheckTitlePassport' : 'kyc.chipCheckTitleIdCard')}</Text>
+                    <Text style={styles.body}>{t(isPassport ? 'kyc.chipBodyPassport' : 'kyc.chipBodyIdCard')}</Text>
+                    <ChipSymbolArt doc={docType} label={t('kyc.artChipSymbol')} />
+                    <Tips items={[t('kyc.chipTipOriginal'), t('kyc.chipTipNotExpired')]} />
                     <Pressable style={styles.primary} onPress={() => setStep('consent')}>
                         <Text style={styles.primaryText}>
                             {t(isPassport ? 'kyc.chipConfirmPassport' : 'kyc.chipConfirmIdCard')}
                         </Text>
                     </Pressable>
-                    <Pressable style={styles.secondary} onPress={() => setDocType(isPassport ? 'id-card' : 'passport')}>
-                        <Text style={styles.secondaryText}>
-                            {t(isPassport ? 'kyc.useIdCardInstead' : 'kyc.usePassportInstead')}
-                        </Text>
-                    </Pressable>
-                    <Text style={styles.note}>{t('kyc.noDrivingLicences')}</Text>
                 </ScrollView>
             )}
 
+            {/* One approval: what is sent, and where it runs. The enclave is
+                checked while this is on show, and the holder cannot agree until
+                it has been. The very first approval a wallet is asked for gets
+                the "how connecting works" cards over it, once. */}
             {step === 'consent' && (
-                <DataRequestConsent
-                    appName={verifierInfo?.displayName ?? t('kyc.verifierName')}
-                    origin={verifierInfo?.origin ?? ''}
-                    appIcon="id-card-outline"
-                    sectionTitle={t('kyc.whatVerifierReads')}
-                    sectionDescription={`To verify your ${docLabel}, the Privasys identity verifier processes the following in a secure enclave and keeps nothing once done. Your data otherwise stays on this device.`}
-                    items={KYC_INPUT_ITEMS.map((i) => ({
-                        key: i.key,
-                        icon: i.icon,
-                        label: t(i.labelKey, { doc: docLabel })
-                    }))}
-                    note={t('kyc.consentNote')}
-                    denyLabel={t('common.cancel')}
-                    approveLabel={t('kyc.agreeAndContinue')}
-                    onDeny={close}
-                    onApprove={() => setStep('attest')}
-                    contentTopInset={insets.top + 36}
-                    actionsBottomInset={insets.bottom + 16}
-                />
+                showExplainer && verifierAtt ? (
+                    <FirstConnectExplainer
+                        appName={verifierAtt.displayName}
+                        onDone={() => {
+                            useSettingsStore.getState().setSeenFirstConnect(true);
+                            setShowExplainer(false);
+                        }}
+                        onSkip={() => {
+                            // A skip counts as seen. Replaying cards the user
+                            // just dismissed trains them to dismiss the approval
+                            // screen behind it too.
+                            useSettingsStore.getState().setSeenFirstConnect(true);
+                            setShowExplainer(false);
+                        }}
+                    />
+                ) : (
+                    <DataRequestConsent
+                        appName={verifierInfo?.displayName ?? t('kyc.verifierName')}
+                        origin={verifierInfo?.origin ?? ''}
+                        appIcon="id-card-outline"
+                        sectionTitle={t('kyc.sentToEnclave')}
+                        sectionDescription={t('kyc.consentIntro', { doc: docLabel })}
+                        items={KYC_INPUT_ITEMS.map((i) => ({
+                            key: i.key,
+                            icon: i.icon,
+                            label: t(i.labelKey, { doc: docLabel })
+                        }))}
+                        footer={
+                            <EnclaveBlock
+                                state={attError ? 'failed' : !verifierAtt ? 'checking' : attIsChanged ? 'changed' : attIsSame ? 'same' : 'first'}
+                                error={attError}
+                                onDetails={() => setStep('attest')}
+                                onRetry={() => setAttRetry((n) => n + 1)}
+                            />
+                        }
+                        note={t('kyc.consentNothingYet')}
+                        denyLabel={t('common.cancel')}
+                        approveLabel={t('kyc.agreeAndContinue')}
+                        approveDisabled={!verifierAtt || !!attError}
+                        onDeny={close}
+                        onApprove={agree}
+                        contentTopInset={insets.top + 36}
+                        actionsBottomInset={insets.bottom + 16}
+                    />
+                )
             )}
 
+            {/* The full enclave page, as at sign-in, for a holder who asks to
+                see it. Approving here is the same approval as on the screen it
+                was opened from. */}
             {step === 'attest' && (
-                attError ? (
-                    <View style={styles.pad}>
-                        <Ionicons name="alert-circle" size={40} color={p.danger} />
-                        <Text style={styles.title}>{t('kyc.enclaveVerifyFailed')}</Text>
-                        <Text style={styles.body}>{attError}</Text>
-                        <Pressable style={styles.primary} onPress={() => setAttRetry((n) => n + 1)}>
-                            <Text style={styles.primaryText}>{t('common.retry')}</Text>
-                        </Pressable>
-                        <Pressable style={styles.secondary} onPress={close}>
-                            <Text style={styles.secondaryText}>{t('common.cancel')}</Text>
-                        </Pressable>
-                    </View>
-                ) : !verifierAtt ? (
+                !verifierAtt ? (
                     <View style={styles.pad}>
                         <ActivityIndicator size="large" color={p.action} />
                         <Text style={styles.body}>{t('kyc.verifyingEnclave')}</Text>
@@ -709,11 +913,8 @@ export default function KycCaptureScreen() {
                             mode: verifierAtt.mode,
                             challenged: verifierAtt.challenged,
                         }}
-                        onApprove={() => {
-                            rememberVerifier(verifierAtt);
-                            setStep('photo');
-                        }}
-                        onReject={close}
+                        onApprove={agree}
+                        onReject={() => setStep('consent')}
                         onChallenge={handleChallengeVerifier}
                         challengeInFlight={challengeInFlight}
                     />
@@ -726,10 +927,10 @@ export default function KycCaptureScreen() {
                     contentContainerStyle={styles.padContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <Text style={styles.title}>{t(isPassport ? 'kyc.photoTitlePassport' : 'kyc.photoTitleIdCard')}</Text>
-                    <Text style={styles.body}>{t(isPassport ? 'kyc.photoBodyPassport' : 'kyc.photoBodyIdCard')}</Text>
+                    <Text style={styles.progress}>{t('kyc.stepOf', { n: 1 })}</Text>
+                    <Text style={styles.title}>{t(isPassport ? 'kyc.photoFirstTitlePassport' : 'kyc.photoFirstTitleIdCard')}</Text>
+                    <Text style={styles.body}>{t(isPassport ? 'kyc.photoFirstBodyPassport' : 'kyc.photoFirstBodyIdCard')}</Text>
                     <PhotoPageArt doc={docType} label={t('kyc.artPhotoPage')} />
-                    <Tips items={[t('kyc.photoTipFlat'), t('kyc.photoTipAuto')]} />
                     <Pressable style={styles.primary} onPress={() => { void openCapture(); }}>
                         <Text style={styles.primaryText}>{t('kyc.openCamera')}</Text>
                     </Pressable>
@@ -752,100 +953,91 @@ export default function KycCaptureScreen() {
                             }}
                         />
                     )}
-                    <NativeView style={[styles.captureMask, { top: 0, left: 0, right: 0, height: frameTop }]} pointerEvents="none" />
-                    <NativeView
-                        style={[styles.captureMask, { top: frameTop + frameH, left: 0, right: 0, bottom: 0 }]}
-                        pointerEvents="none"
-                    />
-                    <NativeView
-                        style={[styles.captureMask, { top: frameTop, left: 0, width: frameLeft, height: frameH }]}
-                        pointerEvents="none"
-                    />
-                    <NativeView
-                        style={[styles.captureMask, {
-                            top: frameTop,
-                            right: 0,
-                            width: frameLeft,
-                            height: frameH,
-                        }]}
-                        pointerEvents="none"
-                    />
-                    <NativeView
-                        pointerEvents="none"
-                        style={[
-                            styles.frameGuide,
-                            {
-                                left: frameLeft,
-                                top: frameTop,
-                                width: frameW,
-                                height: frameH,
-                                borderColor: captureState === 'captured'
-                                    ? '#34C759'
-                                    : captureState === 'checking' ? '#FFFFFF' : '#9CA3AF',
-                            },
-                        ]}
-                    >
-                        <PassportPageGuide active={captureState === 'captured'} />
-                    </NativeView>
-                    {captureState !== 'captured' && (
-                        <NativeView style={[styles.captureHint, { top: insets.top + 14 }]} pointerEvents="none">
-                            <Text style={styles.captureHintText}>
-                                {t('kyc.captureHint', { doc: docLabel })}
-                            </Text>
-                            <Text style={styles.captureHintSub}>{t('kyc.captureHintSub')}</Text>
+                    {/* The camera looks for the lines and nothing else, so that
+                        is all the screen shows: a slot with a sample of them
+                        while it looks, then a box round the real ones, white
+                        when seen and green when read. */}
+                    {linesBox ? (
+                        <NativeView
+                            pointerEvents="none"
+                            style={[
+                                styles.linesBox,
+                                linesBox,
+                                captureState === 'captured' && styles.linesBoxRead,
+                            ]}
+                        />
+                    ) : (
+                        <NativeView pointerEvents="none" style={[styles.linesSlot, { bottom: insets.bottom + 64 }]}>
+                            {SAMPLE_LINES[docType].map((line) => (
+                                <Text key={line} allowFontScaling={false} numberOfLines={1} style={styles.linesSample}>
+                                    {line}
+                                </Text>
+                            ))}
                         </NativeView>
                     )}
-                    <NativeView style={[styles.capturePrompt, { bottom: insets.bottom + 14 }]} pointerEvents="none">
+                    <NativeView style={[styles.capturePill, { top: insets.top + 14 }]} pointerEvents="none">
+                        <Text style={styles.capturePillText} numberOfLines={2}>
+                            {captureState === 'positioning'
+                                ? t(isPassport ? 'kyc.camLookPassport' : 'kyc.camLookIdCard')
+                                : t('kyc.camHold')}
+                        </Text>
+                    </NativeView>
+                    <NativeView style={[styles.capturePill, { bottom: insets.bottom + 14 }]} pointerEvents="none">
                         {captureState === 'captured' ? (
-                            <>
-                                <Ionicons name="checkmark-circle" size={25} color="#34C759" />
-                                <Text style={styles.capturePromptReady}>{t('kyc.captured')}</Text>
-                            </>
+                            <Ionicons name="checkmark-circle" size={20} color="#34C759" />
                         ) : (
-                            <>
-                                <ActivityIndicator size="small" color="#FFFFFF" />
-                                <Text style={styles.capturePromptText}>{t('kyc.fitInFrame')}</Text>
-                            </>
+                            <ActivityIndicator size="small" color="#FFFFFF" />
                         )}
+                        <Text style={[styles.capturePillText, captureState === 'captured' && styles.capturePillRead]}>
+                            {t(
+                                captureState === 'captured' ? 'kyc.camRead'
+                                    : captureState === 'enclave' ? 'kyc.camEnclave'
+                                        : captureState === 'checking' ? 'kyc.camReading'
+                                            : 'kyc.camLooking',
+                            )}
+                        </Text>
                     </NativeView>
                 </NativeView>
             )}
 
             {step === 'read' && (
-                !mrzReadDone ? (
-                    <View style={styles.pad}>
-                        <ActivityIndicator size="large" color={p.action} />
-                        <Text style={styles.body}>{t('kyc.readingPhotoPage')}</Text>
-                        <Pressable style={styles.secondary} onPress={openCapture}>
-                            <Text style={styles.secondaryText}>{t('common.cancel')}</Text>
-                        </Pressable>
-                    </View>
-                ) : (
-                    <ScrollView
-                        style={styles.flex}
-                        contentContainerStyle={styles.padContent}
-                        showsVerticalScrollIndicator={false}
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.padContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <NativeView style={styles.progressRow}>
+                        <Ionicons name="checkmark-circle" size={16} color={p.approve} />
+                        <Text style={[styles.progress, { color: p.approve }]}>{t('kyc.camRead')}</Text>
+                        <Text style={styles.progress}>· {t('kyc.stepOf', { n: 2 })}</Text>
+                    </NativeView>
+                    <Text style={styles.title}>{t(scanTitleKey(docType, placement))}</Text>
+                    <Text style={styles.body}>{t(scanBodyKey(docType, placement))}</Text>
+                    <ChipScanArt
+                        doc={docType}
+                        label={t('kyc.artChipScan')}
+                        open={isPassport && placement.known && placement.positions[0] === 'photo-page'}
+                        reader={Platform.OS === 'ios' ? 'top' : 'middle'}
+                    />
+                    <Tips
+                        items={[
+                            t(Platform.OS === 'ios' ? 'kyc.scanReaderTop' : 'kyc.scanReaderMiddle'),
+                            t('kyc.scanTipCover'),
+                            ...(placement.known && TRY_NEXT_KEY[placement.positions[1]] ? [t(TRY_NEXT_KEY[placement.positions[1]]!)] : []),
+                        ]}
+                    />
+                    <Pressable
+                        style={[styles.primary, busy && styles.disabled]}
+                        onPress={() => { void handleScan(); }}
+                        disabled={busy}
                     >
-                        <Text style={styles.title}>{t('kyc.scanTitle')}</Text>
-                        <Text style={styles.body}>{t(isPassport ? 'kyc.scanBodyPassport' : 'kyc.scanBodyIdCard')}</Text>
-                        <ChipScanArt doc={docType} label={t('kyc.artChipScan')} />
-                        <Tips items={[t('kyc.scanTipCover'), t('kyc.scanTipSlide')]} />
-                        <Pressable
-                            style={[styles.primary, busy && styles.disabled]}
-                            onPress={handleScan}
-                            disabled={busy}
-                        >
-                            {busy ? (
-                                <ActivityIndicator color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.primaryText}>{t('kyc.startScan')}</Text>
-                            )}
-                        </Pressable>
-                        <Pressable style={styles.secondary} onPress={openCapture} disabled={busy}>
-                            <Text style={styles.secondaryText}>{t('kyc.retakePhoto')}</Text>
-                        </Pressable>
-                    </ScrollView>
-                )
+                        {busy ? (
+                            <ActivityIndicator color="#FFFFFF" />
+                        ) : (
+                            <Text style={styles.primaryText}>{t('kyc.startScan')}</Text>
+                        )}
+                    </Pressable>
+                </ScrollView>
             )}
 
             {/* What the chip said, shown before anything goes to the enclave:
@@ -967,39 +1159,66 @@ export default function KycCaptureScreen() {
     );
 }
 
-function PassportPageGuide({ active }: { active: boolean }) {
+/**
+ * Where the check runs, on the consent screen: the result of attesting the
+ * enclave, in a sentence, with the full page one tap away.
+ *
+ * `first`: verified, never approved on this phone · `same`: verified, and the
+ * one approved before · `changed`: verified, but not the one approved before ·
+ * `checking` · `failed`.
+ */
+function EnclaveBlock({ state, error, onDetails, onRetry }: {
+    state: 'checking' | 'first' | 'same' | 'changed' | 'failed';
+    error: string | null;
+    onDetails: () => void;
+    onRetry: () => void;
+}) {
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
-    const color = active ? '#34C759' : '#C7C7C7';
-    const textLineWidths = ['88%', '95%', '82%', '92%', '76%', '96%', '85%'] as const;
-
+    const tone = state === 'changed' ? { bg: p.warnBg, border: p.warnBorder, text: p.warnText }
+        : state === 'failed' ? { bg: p.dangerBg, border: p.dangerBorder, text: p.dangerText }
+            : state === 'checking' ? { bg: p.cardAlt, border: p.border, text: p.textSecondary }
+                : { bg: p.successBg, border: p.successBorder, text: p.successText };
+    const title = state === 'checking' ? t('kyc.enclaveChecking')
+        : state === 'failed' ? t('kyc.enclaveVerifyFailed')
+            : state === 'changed' ? t('kyc.enclaveChangedTitle')
+                : t('kyc.enclaveVerified');
+    const body = state === 'checking' ? t('kyc.enclaveCheckingBody')
+        : state === 'failed' ? (error ?? '')
+            : state === 'changed' ? t('kyc.enclaveChangedBody')
+                : state === 'same' ? t('kyc.enclaveSameBody')
+                    : t('kyc.enclaveFirstBody');
     return (
-        <>
-            <NativeView style={[styles.innerSafeGuide, { borderColor: color }]} />
-            <NativeView style={[styles.passportPhotoGuide, { borderColor: color }]}>
-                <NativeView style={[styles.passportFaceGuide, { borderColor: color }]} />
+        <NativeView>
+            <Text style={styles.enclaveHeading}>{t('kyc.whereItRuns')}</Text>
+            <NativeView style={[styles.enclave, { backgroundColor: tone.bg, borderColor: tone.border }]}>
+                <NativeView style={styles.enclaveTitleRow}>
+                    {state === 'checking' ? (
+                        <ActivityIndicator size="small" color={tone.text} />
+                    ) : (
+                        <Ionicons
+                            name={state === 'failed' ? 'alert-circle' : state === 'changed' ? 'warning' : 'shield-checkmark'}
+                            size={18}
+                            color={tone.text}
+                        />
+                    )}
+                    <Text style={[styles.enclaveTitle, { color: tone.text }]}>{title}</Text>
+                </NativeView>
+                {body ? <Text style={[styles.enclaveBody, { color: tone.text }]}>{body}</Text> : null}
+                {state === 'failed' ? (
+                    <Pressable onPress={onRetry} hitSlop={8} accessibilityRole="button">
+                        <Text style={styles.enclaveLink}>{t('common.retry')}</Text>
+                    </Pressable>
+                ) : state !== 'checking' ? (
+                    <Pressable onPress={onDetails} hitSlop={8} accessibilityRole="button">
+                        <Text style={styles.enclaveLink}>
+                            {t(state === 'changed' ? 'kyc.seeWhatChanged' : 'kyc.seeAttestation')}
+                        </Text>
+                    </Pressable>
+                ) : null}
             </NativeView>
-            <NativeView style={styles.passportTextGuides}>
-                {textLineWidths.map((width, index) => (
-                    <NativeView
-                        key={index}
-                        style={[styles.passportTextLine, { backgroundColor: color, width }]}
-                    />
-                ))}
-            </NativeView>
-            <NativeView style={[styles.passportMrzGuide, { borderColor: color }]}>
-                <Text style={[styles.passportMrzText, { color }]}>
-                    {'<<<<<<<<<<<<<<<<<<<<<<<<<<<<'}
-                </Text>
-                <Text style={[styles.passportMrzText, { color }]}>
-                    {'<<<<<<<<<<<<<<<<<<<<<<<<<<<<'}
-                </Text>
-            </NativeView>
-            <NativeView style={[styles.guideCorner, styles.guideCornerTopLeft, { borderColor: active ? '#34C759' : '#F3F4F6' }]} />
-            <NativeView style={[styles.guideCorner, styles.guideCornerTopRight, { borderColor: active ? '#34C759' : '#F3F4F6' }]} />
-            <NativeView style={[styles.guideCorner, styles.guideCornerBottomRight, { borderColor: active ? '#34C759' : '#F3F4F6' }]} />
-            <NativeView style={[styles.guideCorner, styles.guideCornerBottomLeft, { borderColor: active ? '#34C759' : '#F3F4F6' }]} />
-        </>
+        </NativeView>
     );
 }
 
@@ -1041,11 +1260,33 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     navOnCamera: { backgroundColor: 'rgba(0,0,0,0.55)' },
     tips: { alignSelf: 'stretch', gap: 8 },
     tip: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-    tipText: { flex: 1, fontSize: 14, lineHeight: 20, color: p.textSecondary },
+    // Sizes follow the sign-in and approval screens, whose lead sentence is 17.
+    tipText: { flex: 1, fontSize: 15, lineHeight: 21, color: p.textSecondary },
     reviewPhoto: { width: 108, height: 138, borderRadius: 10, backgroundColor: p.cardAlt },
-    reviewSent: { fontSize: 13, lineHeight: 19, textAlign: 'center', color: p.textSecondary },
+    reviewSent: { fontSize: 14, lineHeight: 20, textAlign: 'center', color: p.textSecondary },
     title: { fontSize: 22, fontWeight: '700', textAlign: 'center', color: p.textPrimary },
-    body: { fontSize: 15, lineHeight: 22, textAlign: 'center', color: p.textSecondary },
+    body: { fontSize: 17, lineHeight: 26, textAlign: 'center', color: p.textSecondary },
+    small: { fontSize: 14, lineHeight: 20, textAlign: 'center', color: p.textMuted },
+    progressRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    progress: { fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: p.textMuted },
+    plan: { alignSelf: 'stretch', gap: 14, marginVertical: 4 },
+    planRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    planNumber: {
+        width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: p.cardAlt,
+    },
+    planNumberText: { fontSize: 14, fontWeight: '700', color: p.action },
+    planTitle: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
+    planBody: { fontSize: 14, lineHeight: 20, color: p.textSecondary, marginTop: 2 },
+    enclaveHeading: {
+        fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase',
+        color: p.textMuted, marginTop: 20, marginBottom: 8,
+    },
+    enclave: { borderWidth: 1, borderRadius: 12, padding: 14, gap: 6 },
+    enclaveTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    enclaveTitle: { flex: 1, fontSize: 15, fontWeight: '700' },
+    enclaveBody: { fontSize: 13.5, lineHeight: 19 },
+    enclaveLink: { fontSize: 14, fontWeight: '600', color: p.action, marginTop: 2 },
     note: { fontSize: 13, color: p.warnText, textAlign: 'center' },
     orText: { fontSize: 13, color: p.textMuted, textAlign: 'center' },
     input: {
@@ -1069,50 +1310,26 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         borderWidth: 3, borderColor: 'rgba(255,255,255,0.85)', borderStyle: 'dashed',
     },
     selfieText: { color: '#FFFFFF', fontSize: 15, textAlign: 'center' },
-    captureMask: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.3)' },
-    frameGuide: {
-        position: 'absolute', borderWidth: 3, borderRadius: 14,
-        backgroundColor: 'transparent',
+    // Round the lines themselves, wherever they are in view.
+    linesBox: { position: 'absolute', borderWidth: 3, borderRadius: 10, borderColor: '#FFFFFF' },
+    linesBoxRead: { borderColor: '#34C759', backgroundColor: 'rgba(52,199,89,0.16)' },
+    // Where to put them, with a sample of what they look like.
+    linesSlot: {
+        position: 'absolute', alignSelf: 'center', width: '62%', paddingVertical: 8, paddingHorizontal: 12,
+        borderWidth: 2, borderStyle: 'dashed', borderRadius: 10, borderColor: 'rgba(255,255,255,0.8)',
+        backgroundColor: 'rgba(0,0,0,0.25)',
     },
-    innerSafeGuide: {
-        position: 'absolute', left: '2.7%', right: '2.7%', top: '3.8%', bottom: '3.8%',
-        borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, opacity: 0.72,
-    },
-    passportPhotoGuide: {
-        position: 'absolute', left: '6.8%', top: '16%', width: '25%', height: '46%',
-        borderWidth: 1.5, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
-    },
-    passportFaceGuide: {
-        width: '46%', height: '49%', borderWidth: 1.5, borderRadius: 999, opacity: 0.8,
-    },
-    passportTextGuides: {
-        position: 'absolute', left: '37%', right: '7%', top: '17%', height: '45%',
-        justifyContent: 'space-between',
-    },
-    passportTextLine: { height: 2, borderRadius: 2, opacity: 0.82 },
-    passportMrzGuide: {
-        position: 'absolute', left: '6.8%', right: '6.8%', bottom: '10.5%', height: '15.5%',
-        borderWidth: 1.5, borderRadius: 6, justifyContent: 'center', paddingHorizontal: '3%',
-    },
-    passportMrzText: {
+    linesSample: {
         fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
-        fontSize: 12, lineHeight: 15, letterSpacing: 0.3, opacity: 0.9,
+        fontSize: 11, lineHeight: 16, color: 'rgba(255,255,255,0.85)',
     },
-    guideCorner: { position: 'absolute', width: 34, height: 34 },
-    guideCornerTopLeft: { left: -3, top: -3, borderLeftWidth: 5, borderTopWidth: 5, borderTopLeftRadius: 14 },
-    guideCornerTopRight: { right: -3, top: -3, borderRightWidth: 5, borderTopWidth: 5, borderTopRightRadius: 14 },
-    guideCornerBottomRight: { right: -3, bottom: -3, borderRightWidth: 5, borderBottomWidth: 5, borderBottomRightRadius: 14 },
-    guideCornerBottomLeft: { left: -3, bottom: -3, borderLeftWidth: 5, borderBottomWidth: 5, borderBottomLeftRadius: 14 },
-    capturePrompt: {
-        position: 'absolute', left: 64, right: 64, flexDirection: 'row',
-        alignItems: 'center', justifyContent: 'center', gap: 9,
+    // One at the top and one at the bottom, clear of Back and Close.
+    capturePill: {
+        position: 'absolute', alignSelf: 'center', maxWidth: '72%', flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: 'rgba(0,0,0,0.62)', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16,
     },
-    capturePromptText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', textAlign: 'center' },
-    capturePromptReady: { color: '#34C759', fontSize: 16, fontWeight: '700', textAlign: 'center' },
-    // Clear of the Back and Close buttons in the top corners.
-    captureHint: { position: 'absolute', left: 76, right: 76, alignItems: 'center', gap: 4 },
-    captureHintText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', textAlign: 'center' },
-    captureHintSub: { color: 'rgba(255,255,255,0.82)', fontSize: 13, textAlign: 'center' },
+    capturePillText: { flexShrink: 1, color: '#FFFFFF', fontSize: 15, fontWeight: '600', textAlign: 'center' },
+    capturePillRead: { color: '#34C759' },
     docOption: {
         flexDirection: 'row', alignItems: 'center', gap: 14, alignSelf: 'stretch',
         backgroundColor: p.card, borderRadius: 12, borderWidth: 1, borderColor: p.border,

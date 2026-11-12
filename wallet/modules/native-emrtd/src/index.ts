@@ -22,7 +22,7 @@ import { parseMrzLines } from './mrz-lines';
 import type { EmrtdReadResult, EmrtdSupport, MrzKey, MrzScan } from './NativeEmrtd.types';
 
 export type { EmrtdReadResult, EmrtdSupport, MrzKey, MrzScan };
-export { mrzRows, pageCrop, parseMrzLines } from './mrz-lines';
+export { issuingState, mrzRows, pageCrop, parseMrzLines } from './mrz-lines';
 export type { FrameCrop, TextLine } from './mrz-lines';
 export { MrzScannerView } from './MrzScannerView';
 export type { MrzFrame, MrzScannerHandle, MrzScannerProps } from './MrzScannerView';

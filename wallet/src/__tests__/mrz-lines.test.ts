@@ -48,7 +48,14 @@ describe('reading the zone', () => {
             documentNumber: 'L898902C3',
             dateOfBirth: '740812',
             dateOfExpiry: '120415',
+            // The library withholds a state it does not know, and UTO is not one.
+            issuingState: 'UTO',
         });
+    });
+
+    it('reads a one-letter state without its filler', () => {
+        const german = 'P<D<<MUSTERMANN<<ERIKA<<<<<<<<<<<<<<<<<<<<<<';
+        expect(parseMrzLines([german, NUMBERS])?.issuingState).toBe('D');
     });
 
     // A wrong key would be refused by the chip after a slow scan, so a misread

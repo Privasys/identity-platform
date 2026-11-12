@@ -174,10 +174,24 @@ export function PhotoPageArt({ doc, label }: { doc: IdDoc; label: string }) {
     );
 }
 
-/** How to scan: the phone slides onto the closed document while the chip is read. */
-export function ChipScanArt({ doc, label }: { doc: IdDoc; label: string }) {
+/**
+ * How to scan: the phone slides onto the document while the chip is read.
+ *
+ * `open` draws a passport open at its photo page, for a chip that is inside
+ * that page; otherwise it is closed. `reader` is where this phone's reader is,
+ * which decides how far onto the document the phone comes to rest: its top
+ * edge on the document, or its middle.
+ */
+export function ChipScanArt({ doc, label, open = false, reader = 'top' }: {
+    doc: IdDoc; label: string; open?: boolean; reader?: 'top' | 'middle';
+}) {
     const t = useLoop(4000, 0.7);
-    const slide = t.interpolate({ inputRange: [0, 0.08, 0.38, 0.9, 1], outputRange: [70, 70, 0, 0, 70] });
+    const passport = doc === 'passport';
+    // The middle of the document, and where the phone's top edge rests so its
+    // reader sits there.
+    const centre = !passport ? 96 : open ? 107 : 89;
+    const rest = reader === 'top' ? centre - 14 : centre - 62;
+    const slide = t.interpolate({ inputRange: [0, 0.08, 0.38, 0.9, 1], outputRange: [60, 60, 0, 0, 60] });
     const wave = (d: number) => ({
         opacity: t.interpolate({ inputRange: [0, 0.4 + d, 0.55 + d, 0.85 + d, 1], outputRange: [0, 0, 0.9, 0, 0] }),
         transform: [{ scale: t.interpolate({ inputRange: [0, 0.4 + d, 0.85 + d, 1], outputRange: [0.6, 0.6, 1.5, 1.5] }) }],
@@ -186,13 +200,28 @@ export function ChipScanArt({ doc, label }: { doc: IdDoc; label: string }) {
         t.interpolate({ inputRange: [0, 0.42 + i * 0.06, 0.5 + i * 0.06, 0.92, 1], outputRange: [0.25, 0.25, 1, 1, 0.25] });
     return (
         <Frame label={label} height={220}>
-            {doc === 'passport' ? <Cover left={74} top={14} width={112} height={150} /> : <Card left={62} top={52} width={136} height={88} />}
+            {!passport ? (
+                <Card left={62} top={52} width={136} height={88} />
+            ) : open ? (
+                <>
+                    <View style={[styles.sheet, { top: 2, height: 58, backgroundColor: PAPER_BACK }]} />
+                    <View style={[styles.sheet, { top: 62, height: 90, backgroundColor: PAPER }]}>
+                        <View style={{ position: 'absolute', left: 12, top: 12, width: 34, height: 42, borderRadius: 3, backgroundColor: GREY }} />
+                        <View style={[styles.rule, { left: 56, top: 14, width: 96 }]} />
+                        <View style={[styles.rule, { left: 56, top: 26, width: 76 }]} />
+                        <View style={[styles.rule, { left: 12, top: 66, width: 154 }]} />
+                        <View style={[styles.rule, { left: 12, top: 76, width: 154 }]} />
+                    </View>
+                </>
+            ) : (
+                <Cover left={74} top={14} width={112} height={150} />
+            )}
             {[0, 0.05, 0.1].map((d, i) => (
-                <Animated.View key={d} style={[styles.wave, { left: 114 - i * 10, top: 96 - i * 10, width: 32 + i * 20, height: 32 + i * 20, borderRadius: 16 + i * 10 }, wave(d)]} />
+                <Animated.View key={d} style={[styles.wave, { left: 114 - i * 10, top: centre - 16 - i * 10, width: 32 + i * 20, height: 32 + i * 20, borderRadius: 16 + i * 10 }, wave(d)]} />
             ))}
-            <Animated.View style={[styles.phonePortrait, { transform: [{ translateY: slide }] }]}>
+            <Animated.View style={[styles.phonePortrait, { top: rest, transform: [{ translateY: slide }] }]}>
                 <View style={styles.phoneSpeaker} />
-                <View style={styles.phoneReader} />
+                <View style={[styles.phoneReader, reader === 'middle' && { marginTop: 34 }]} />
                 <View style={styles.dots}>
                     {[0, 1, 2, 3, 4].map((i) => (
                         <Animated.View key={i} style={[styles.dot, { opacity: dot(i) }]} />
@@ -204,7 +233,9 @@ export function ChipScanArt({ doc, label }: { doc: IdDoc; label: string }) {
 }
 
 const styles = StyleSheet.create({
-    frame: { width: 260, alignSelf: 'center' },
+    // Cut to its own box, so a part that slides in never lands on the text
+    // under the drawing.
+    frame: { width: 260, alignSelf: 'center', overflow: 'hidden' },
     pointer: { position: 'absolute', height: 3, borderRadius: 2, backgroundColor: STEEL },
     lens: {
         position: 'absolute', left: 20, top: 54, width: 100, height: 100, borderRadius: 50,
@@ -225,7 +256,7 @@ const styles = StyleSheet.create({
         backgroundColor: LIGHT, borderWidth: 5, borderColor: STEEL, alignItems: 'center',
     },
     phoneSpeaker: { marginTop: 4, width: 24, height: 5, borderRadius: 3, backgroundColor: STEEL },
-    phoneReader: { marginTop: 22, width: 52, height: 34, borderRadius: 6, borderWidth: 3, borderColor: BLUE },
-    dots: { flexDirection: 'row', gap: 4, marginTop: 14 },
+    phoneReader: { marginTop: 4, width: 52, height: 26, borderRadius: 6, borderWidth: 3, borderColor: BLUE },
+    dots: { flexDirection: 'row', gap: 4, marginTop: 10 },
     dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: BLUE },
 });

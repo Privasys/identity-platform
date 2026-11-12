@@ -99,6 +99,7 @@ export function parseMrzLines(rawLines: string[]): MrzScan | null {
                     // The exact accepted MRZ lines, joined — for the enclave's
                     // visual↔chip cross-reference (GPG45 box 3).
                     mrz: candidates.slice(-n).join(''),
+                    issuingState: issuingState(candidates.slice(-n)),
                 };
             }
         } catch {
@@ -106,6 +107,16 @@ export function parseMrzLines(rawLines: string[]): MrzScan | null {
         }
     }
     return null;
+}
+
+/**
+ * The state that issued the document, as the zone writes it: characters three
+ * to five of the first row, on a passport and on a card alike, with the filler
+ * dropped (Germany is `D`). Read straight from the row, because the `mrz`
+ * library withholds a code it does not recognise and a specimen has one.
+ */
+export function issuingState(rows: string[]): string {
+    return (rows[0] ?? '').slice(2, 5).replace(/[^A-Z]/g, '');
 }
 
 /** How much of the page's width the zone's rows span, on both sizes of

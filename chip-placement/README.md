@@ -95,7 +95,7 @@ already installed picks up a new entry without an update.
 | `checked` | The day you read the page, `YYYY-MM-DD`. |
 | `note` | What the source does not say, and anything a reviewer should know. Optional. |
 | `country`, `name` (per file) | The ISO 3166-1 alpha-3 code, matching the file name, and the country in plain words. |
-| `validity` (per file) | Only for a state whose passports are **not** valid for 10 years (adult) and 5 (child): `{ "adult": 5, "child": 5 }`. Leave it out otherwise. See "How the wallet uses it" for why it matters. |
+| `validity` (per file) | Only for a country whose passports are, or once were, not valid for the usual periods. See "How long a passport is valid" below. Leave it out otherwise. |
 
 ### Positions
 
@@ -115,6 +115,39 @@ Shielding is a position and not a yes/no field on purpose. A wallet that does
 not know a position drops the rule and falls back to trying each place; a field
 it did not know would be ignored, and the holder told to scan a closed cover
 that blocks the signal.
+
+### How long a passport is valid
+
+The wallet dates a passport from its expiry, so it has to know how long that
+country's passports run. It assumes the usual: **10 years for an adult, 5 for a
+child, and the adult passport from the age of 16.** Where a country differs, or
+differed for a while, say so in `validity`, as a list of periods, each sourced
+like a rule:
+
+```json
+"validity": [
+  {
+    "issuedTo": "2015-10",
+    "adult": 5,
+    "source": "https://...",
+    "sourceType": "government",
+    "quote": "the sentence that says so",
+    "checked": "2026-11-12"
+  },
+  { "issuedFrom": "2015-11", "adult": 10, "source": "...", "sourceType": "government", "quote": "...", "checked": "2026-11-12" }
+]
+```
+
+| Field | |
+|---|---|
+| `adult`, `child` | Years the passport is valid. Give only what differs from the usual. |
+| `adultAge` | The age from which a holder is issued the adult passport: 16 in the United Kingdom, 18 in many countries. |
+| `issuedFrom`, `issuedTo` | The months of issue the period held for. Countries change these over time; give each period its dates. Leave both out for one that has always held. |
+| `source`, `sourceType`, `quote`, `checked`, `note` | As for a rule. |
+
+It matters most near a change of design. A country that issues five-year
+passports, read as if they ran for ten, has each one placed five years too
+early, and possibly under the previous design.
 
 ### Evidence
 
@@ -136,10 +169,11 @@ The lines of code on the document give the issuing state, the expiry date and
 the date of birth. They do not give the issue date, and the issue date is what
 tells one design from the next: sources say "passports issued from March 2017",
 never "passports expiring from". So the wallet works it out: expiry, less the
-years the document is valid for, which is 10 for an adult and 5 for a child
-almost everywhere. The date of birth says which of the two applies. A state
-that uses other periods says so in `validity`, or its documents would be placed
-in the wrong design.
+years the document is valid for, usually 10 for an adult and 5 for a child. The
+date of birth says which of the two applies. A country that uses other periods,
+or another age for the adult passport, says so in `validity`. Where the periods
+changed over time, the wallet tries each and keeps the one whose answer falls
+inside its own dates.
 
 Countries are ISO codes throughout, in these files and in the built list. A few
 documents write something else for their issuing state in their own lines of

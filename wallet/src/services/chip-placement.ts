@@ -53,12 +53,34 @@ export interface PlacementRule {
     positions: ChipPosition[];
 }
 
+/**
+ * How long a state's documents were valid, for documents issued in some span
+ * of time. States change this (a ten-year passport becomes a five-year one and
+ * back), and they differ on the age from which a holder gets the adult one, so
+ * each is given with the months of issue it held for. What is left out is the
+ * usual: ten years, five for a child, adult from sixteen.
+ */
+export interface ValidityPeriod {
+    /** First and last month of issue this held for, `YYYY-MM`. Open when absent. */
+    issuedFrom?: string;
+    issuedTo?: string;
+    /** Years an adult's document is valid. */
+    adult?: number;
+    /** Years a child's document is valid. */
+    child?: number;
+    /** The age from which a holder is issued the adult one. */
+    adultAge?: number;
+}
+
+/** What holds where a state says nothing else. */
+export const USUAL_VALIDITY = { adult: 10, child: 5, adultAge: 16 } as const;
+
 export interface PlacementDoc {
     schema: string;
     /** ISO time. A copy is only taken over a newer one. */
     issuedAt: string;
-    /** Years a document is valid for, by issuing state, when it is not 10 and 5. */
-    validity?: Record<string, { adult?: number; child?: number }>;
+    /** How long a state's documents are valid, where or when it is not the usual. */
+    validity?: Record<string, ValidityPeriod[]>;
     /** What a source states. */
     rules: PlacementRule[];
     /** What is deduced from something a source states, such as a polycarbonate data page. */
@@ -126,13 +148,27 @@ export function parsePlacementDoc(input: unknown): PlacementDoc | null {
     if (typeof doc.issuedAt !== 'string' || !Number.isFinite(Date.parse(doc.issuedAt))) return null;
     if (!Array.isArray(doc.rules)) return null;
 
-    const validity: PlacementDoc['validity'] = {};
+    const validity: NonNullable<PlacementDoc['validity']> = {};
     if (doc.validity && typeof doc.validity === 'object') {
+        const within = (n: unknown, max: number) => (typeof n === 'number' && n > 0 && n <= max ? n : undefined);
         for (const [country, v] of Object.entries(doc.validity as Record<string, unknown>)) {
-            if (!v || typeof v !== 'object') continue;
-            const { adult, child } = v as Record<string, unknown>;
-            const years = (n: unknown) => (typeof n === 'number' && n > 0 && n <= 20 ? n : undefined);
-            validity[country] = { adult: years(adult), child: years(child) };
+            // One period, as lists before 1.4.46 wrote it, or several.
+            const periods: ValidityPeriod[] = [];
+            for (const raw of Array.isArray(v) ? v : [v]) {
+                if (!raw || typeof raw !== 'object') continue;
+                const p = raw as Record<string, unknown>;
+                const from = typeof p.issuedFrom === 'string' ? p.issuedFrom : undefined;
+                const to = typeof p.issuedTo === 'string' ? p.issuedTo : undefined;
+                if ((from && monthIndex(from) === null) || (to && monthIndex(to) === null)) continue;
+                periods.push({
+                    issuedFrom: from,
+                    issuedTo: to,
+                    adult: within(p.adult, 20),
+                    child: within(p.child, 20),
+                    adultAge: within(p.adultAge, 30),
+                });
+            }
+            if (periods.length > 0) validity[country] = periods;
         }
     }
     return {
@@ -177,8 +213,8 @@ function parseRules(list: unknown[]): PlacementRule[] {
 export const BUILT_IN_PLACEMENT: PlacementDoc =
     parsePlacementDoc(builtIn) ?? { schema: PLACEMENT_SCHEMA, issuedAt: '1970-01-01T00:00:00Z', rules: [] };
 
-/** A machine readable date, `YYMMDD`, as year and month. */
-function mrzDate(value: string, kind: 'birth' | 'expiry', now: Date): { year: number; month: number } | null {
+/** A machine readable date, `YYMMDD`, as a count of months. */
+function mrzMonth(value: string, kind: 'birth' | 'expiry', now: Date): number | null {
     const m = /^(\d{2})(\d{2})\d{2}$/.exec(value.trim());
     if (!m) return null;
     const yy = Number(m[1]);
@@ -188,7 +224,21 @@ function mrzDate(value: string, kind: 'birth' | 'expiry', now: Date): { year: nu
     // past, so a year ahead of now belongs to the last one.
     let year = 2000 + yy;
     if (kind === 'birth' && year > now.getFullYear()) year -= 100;
-    return { year, month };
+    return year * 12 + (month - 1);
+}
+
+/**
+ * When the document was issued under one set of validity periods: the adult
+ * one if the holder had reached the adult age when it would have begun, the
+ * child one otherwise. Without a birth date, the commoner case.
+ */
+function issuedUnder(period: ValidityPeriod, expiry: number, born: number | null): number {
+    const adult = period.adult ?? USUAL_VALIDITY.adult;
+    const child = period.child ?? USUAL_VALIDITY.child;
+    const adultAge = period.adultAge ?? USUAL_VALIDITY.adultAge;
+    const asAdult = expiry - adult * 12;
+    const wasAdult = born === null ? true : asAdult - born >= adultAge * 12;
+    return wasAdult ? asAdult : expiry - child * 12;
 }
 
 /**
@@ -196,6 +246,10 @@ function mrzDate(value: string, kind: 'birth' | 'expiry', now: Date): { year: nu
  * machine readable zone does say. The issue date is printed on the page but is
  * not in the zone; the expiry is, and a document is valid for a known number of
  * years that depends on whether its holder was a child.
+ *
+ * Where a state changed its periods over time, the one that applies is itself
+ * dated by issue, which is the unknown. So each is tried, the most recent
+ * first, and the one kept is the one whose answer falls inside its own dates.
  */
 export function estimateIssueMonth(
     doc: PlacementDoc,
@@ -204,15 +258,19 @@ export function estimateIssueMonth(
     birth: string,
     now: Date = new Date(),
 ): number | null {
-    const exp = mrzDate(expiry, 'expiry', now);
-    if (!exp) return null;
-    const adult = doc.validity?.[country]?.adult ?? 10;
-    const child = doc.validity?.[country]?.child ?? 5;
-    const born = mrzDate(birth, 'birth', now);
-    // Adult if they were sixteen or over when an adult document would have
-    // been issued. Without a birth date, assume the commoner case.
-    const adultAtIssue = born ? exp.year - adult - born.year >= 16 : true;
-    return exp.year * 12 + (exp.month - 1) - (adultAtIssue ? adult : child) * 12;
+    const exp = mrzMonth(expiry, 'expiry', now);
+    if (exp === null) return null;
+    const born = mrzMonth(birth, 'birth', now);
+    const periods = [...(doc.validity?.[country] ?? [])].sort(
+        (a, b) => (monthIndex(b.issuedFrom) ?? -Infinity) - (monthIndex(a.issuedFrom) ?? -Infinity),
+    );
+    for (const period of periods) {
+        const issued = issuedUnder(period, exp, born);
+        const from = monthIndex(period.issuedFrom);
+        const to = monthIndex(period.issuedTo);
+        if ((from === null || issued >= from) && (to === null || issued <= to)) return issued;
+    }
+    return issuedUnder({}, exp, born);
 }
 
 /** A rule of the document's state, with how far its dates are from the document. */

@@ -64,14 +64,51 @@ function checkRuleShape(r, at, fail) {
     }
 }
 
-function checkValidity(v, at, fail) {
-    if (v === undefined) return;
-    if (!v || typeof v !== 'object' || Array.isArray(v)) return fail(`${at}: validity must be an object`);
-    for (const k of ['adult', 'child']) {
+// What the wallet assumes where a country says nothing else: ten years, five
+// for a child, the adult document from sixteen.
+const USUAL = { adult: 10, child: 5, adultAge: 16 };
+
+/** The numbers and dates of one validity period, written by hand or built. */
+function checkPeriod(v, at, fail) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return fail(`${at}: not an object`);
+    for (const [k, max] of [['adult', 20], ['child', 20], ['adultAge', 30]]) {
         const n = v[k];
-        if (n !== undefined && !(Number.isInteger(n) && n > 0 && n <= 20)) {
-            fail(`${at}: validity.${k} must be a whole number of years, got ${JSON.stringify(n)}`);
+        if (n !== undefined && !(Number.isInteger(n) && n > 0 && n <= max)) {
+            fail(`${at}: ${k} must be a whole number of years, got ${JSON.stringify(n)}`);
         }
+    }
+    for (const k of ['issuedFrom', 'issuedTo']) {
+        if (v[k] !== undefined && !(typeof v[k] === 'string' && MONTH.test(v[k]))) {
+            fail(`${at}: ${k} must be YYYY-MM, got ${JSON.stringify(v[k])}`);
+        }
+    }
+    if (typeof v.issuedFrom === 'string' && typeof v.issuedTo === 'string' && v.issuedFrom > v.issuedTo) {
+        fail(`${at}: issuedFrom is after issuedTo`);
+    }
+    if (v.adult === undefined && v.child === undefined && v.adultAge === undefined) {
+        fail(`${at}: must give at least one of adult, child, adultAge`);
+    }
+}
+
+/** Where something comes from: the page, the sentence, the day it was read. */
+function checkSource(r, at, fail, now) {
+    if (typeof r.source !== 'string' || !/^https:\/\/\S+$/.test(r.source)) {
+        fail(`${at}: source must be the https page that states this`);
+    }
+    if (!SOURCE_TYPES.includes(r.sourceType)) fail(`${at}: sourceType must be one of ${SOURCE_TYPES.join(', ')}`);
+    if (typeof r.quote !== 'string' || r.quote.trim().length < 10) {
+        fail(`${at}: quote must be the sentence on that page that says so, word for word`);
+    }
+    if (typeof r.checked !== 'string' || !DAY.test(r.checked)) {
+        fail(`${at}: checked must be the day the page was last read, YYYY-MM-DD`);
+    } else if (Date.parse(`${r.checked}T00:00:00Z`) > now.getTime()) {
+        // A page cannot have been read tomorrow.
+        fail(`${at}: checked is in the future: ${r.checked}`);
+    }
+    // A vendor's guidance is the weakest kind of source. It is accepted, with
+    // a word on why nothing better was used.
+    if (r.sourceType === 'vendor' && !(typeof r.note === 'string' && r.note.trim())) {
+        fail(`${at}: a vendor source needs a note saying why no better one was used`);
     }
 }
 
@@ -79,7 +116,7 @@ function checkValidity(v, at, fail) {
  * One file of countries/. `code` is the file's name without `.json`, which must
  * be the country's ISO 3166-1 alpha-3 code.
  */
-function validateCountry(file, code) {
+function validateCountry(file, code, now = new Date()) {
     const errors = [];
     const fail = (m) => errors.push(m);
     if (!file || typeof file !== 'object' || Array.isArray(file)) return ['not a JSON object'];
@@ -90,11 +127,25 @@ function validateCountry(file, code) {
         fail(`country is ${file.country} but the file is named ${code}.json`);
     }
     if (typeof file.name !== 'string' || !file.name.trim()) fail('name must be the country in plain words');
-    checkValidity(file.validity, 'validity', fail);
-    // 10 and 5 are what the wallet assumes. Writing them down again says
-    // nothing, and reads as if it did.
-    if (file.validity && (file.validity.adult ?? 10) === 10 && (file.validity.child ?? 5) === 5) {
-        fail('validity repeats the default (adult 10, child 5): leave it out');
+    // How long the documents are valid, where or when it is not the usual.
+    // Sourced like a rule: it decides which rule a document falls under.
+    if (file.validity !== undefined) {
+        if (!Array.isArray(file.validity) || file.validity.length === 0) {
+            fail('validity must be a list of periods');
+        } else {
+            file.validity.forEach((v, i) => {
+                const at = `validity[${i}]`;
+                checkPeriod(v, at, fail);
+                if (v && typeof v === 'object' && !Array.isArray(v)) checkSource(v, at, fail, now);
+            });
+            // The usual, for all time, says nothing and reads as if it did.
+            const only = file.validity[0];
+            if (file.validity.length === 1 && only && typeof only === 'object' && !only.issuedFrom && !only.issuedTo
+                && (only.adult ?? USUAL.adult) === USUAL.adult && (only.child ?? USUAL.child) === USUAL.child
+                && (only.adultAge ?? USUAL.adultAge) === USUAL.adultAge) {
+                fail(`validity repeats the usual (adult ${USUAL.adult}, child ${USUAL.child}, adult from ${USUAL.adultAge}): leave it out`);
+            }
+        }
     }
 
     if (!Array.isArray(file.rules) || file.rules.length === 0) {
@@ -106,16 +157,7 @@ function validateCountry(file, code) {
         if (!r || typeof r !== 'object') return fail(`${at}: not an object`);
         checkRuleShape(r, at, fail);
         if (!EVIDENCE.includes(r.evidence)) fail(`${at}: evidence must be one of ${EVIDENCE.join(', ')}`);
-        if (typeof r.source !== 'string' || !/^https:\/\/\S+$/.test(r.source)) {
-            fail(`${at}: source must be the https page that states this`);
-        }
-        if (!SOURCE_TYPES.includes(r.sourceType)) fail(`${at}: sourceType must be one of ${SOURCE_TYPES.join(', ')}`);
-        if (typeof r.quote !== 'string' || r.quote.trim().length < 10) {
-            fail(`${at}: quote must be the sentence on that page that says so, word for word`);
-        }
-        if (typeof r.checked !== 'string' || !DAY.test(r.checked)) {
-            fail(`${at}: checked must be the day the page was last read, YYYY-MM-DD`);
-        }
+        checkSource(r, at, fail, now);
     });
     return errors;
 }
@@ -143,7 +185,8 @@ function validatePlacement(doc, now = new Date()) {
     } else {
         for (const [country, v] of Object.entries(validity)) {
             if (!ISO3.test(country)) fail(`validity: ${JSON.stringify(country)} is not an ISO 3166-1 alpha-3 code`);
-            checkValidity(v, `validity.${country}`, fail);
+            if (!Array.isArray(v) || v.length === 0) fail(`validity.${country} must be a list of periods`);
+            else v.forEach((period, i) => checkPeriod(period, `validity.${country}[${i}]`, fail));
         }
     }
 
@@ -165,7 +208,7 @@ function validatePlacement(doc, now = new Date()) {
     return errors;
 }
 
-module.exports = { validateCountry, validatePlacement, SCHEMA, POSITIONS, EVIDENCE };
+module.exports = { validateCountry, validatePlacement, SCHEMA, POSITIONS, EVIDENCE, USUAL };
 
 if (require.main === module) {
     const { readFileSync, readdirSync } = require('node:fs');

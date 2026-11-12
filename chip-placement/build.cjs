@@ -48,7 +48,13 @@ function buildContent(dir = COUNTRIES) {
         const file = JSON.parse(readFileSync(path.join(dir, f), 'utf8'));
         const errors = validateCountry(file, code);
         if (errors.length > 0) throw new Error(`countries/${f}:\n  ${errors.join('\n  ')}`);
-        if (file.validity && Object.keys(file.validity).length > 0) validity[code] = file.validity;
+        if (file.validity) {
+            validity[code] = file.validity.map((v) => {
+                const out = {};
+                for (const k of ['issuedFrom', 'issuedTo', 'adult', 'child', 'adultAge']) if (v[k] !== undefined) out[k] = v[k];
+                return out;
+            });
+        }
         for (const r of file.rules) (r.evidence === 'inferred' ? suggestions : rules).push(bare(code, r));
     }
     return { validity, rules, suggestions };

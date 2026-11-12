@@ -54,6 +54,34 @@ describe('the issue date', () => {
     });
 
     it('follows the validity a state is known to use', () => {
+        const d = doc([], { XXA: [{ adult: 5, child: 5 }] });
+        expect(estimateIssueMonth(d, 'XXA', '280411', '850828', NOW)).toBe(month(2023, 4));
+    });
+
+    // The same person, sixteen at issue: an adult where the adult document is
+    // given from sixteen, a child where it is given from eighteen.
+    it('follows the age from which a state issues the adult document', () => {
+        // Born June 2010, expires June 2036.
+        expect(estimateIssueMonth(doc([]), 'XXA', '360601', '100601', NOW)).toBe(month(2026, 6));
+        const eighteen = doc([], { XXA: [{ adultAge: 18 }] });
+        expect(estimateIssueMonth(eighteen, 'XXA', '360601', '100601', NOW)).toBe(month(2031, 6));
+    });
+
+    // A state that issued five-year passports until 2015 and ten-year ones
+    // since. Which applies depends on the issue date, which is the unknown:
+    // the one kept is the one whose answer falls inside its own dates.
+    it('follows a validity that changed over time', () => {
+        const d = doc([], { XXA: [
+            { issuedTo: '2015-10', adult: 5, child: 5 },
+            { issuedFrom: '2015-11', adult: 10, child: 5 },
+        ] });
+        // Expires 2030: under ten years, issued 2020, which is in the second period.
+        expect(estimateIssueMonth(d, 'XXA', '300601', '800101', NOW)).toBe(month(2020, 6));
+        // Expires 2019: ten years back is 2009, outside the second period; five back is 2014.
+        expect(estimateIssueMonth(d, 'XXA', '190601', '800101', NOW)).toBe(month(2014, 6));
+    });
+
+    it('reads the single period that lists before 1.4.46 wrote', () => {
         const d = doc([], { XXA: { adult: 5, child: 5 } });
         expect(estimateIssueMonth(d, 'XXA', '280411', '850828', NOW)).toBe(month(2023, 4));
     });

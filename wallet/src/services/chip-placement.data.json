@@ -1,12 +1,12 @@
 {
   "schema": "privasys.wallet.chip-placement/1",
-  "issuedAt": "2026-11-12T13:54:45Z",
+  "issuedAt": "2026-11-12T14:17:22Z",
   "validity": {},
   "rules": [
     {"document":"passport","country":"AUS","issuedTo":"2022-08","positions":["chip-page"]},
     {"document":"passport","country":"AUS","issuedFrom":"2022-09","positions":["photo-page"]},
-    {"document":"passport","country":"AUT","issuedFrom":"2014-01","issuedTo":"2023-12","positions":["back-cover"]},
-    {"document":"passport","country":"AUT","issuedFrom":"2023-01","positions":["front-cover"]},
+    {"document":"passport","country":"AUT","issuedFrom":"2014-01","issuedTo":"2023-11","positions":["back-cover"]},
+    {"document":"passport","country":"AUT","issuedFrom":"2023-12","positions":["front-cover"]},
     {"document":"passport","country":"BEL","issuedFrom":"2022-01","positions":["photo-page"]},
     {"document":"passport","country":"BRA","positions":["back-cover"]},
     {"document":"passport","country":"CAN","issuedFrom":"2013-07","issuedTo":"2023-05","positions":["back-cover"]},

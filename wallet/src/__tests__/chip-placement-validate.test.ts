@@ -51,6 +51,14 @@ const written = (over: Record<string, unknown> = {}) => ({
     }],
 });
 
+/** Where a validity period comes from, as a rule's own source is given. */
+const SOURCED = {
+    source: 'https://example.org/how-long-a-passport-lasts',
+    sourceType: 'government',
+    quote: 'Passports are valid for five years from the date of issue.',
+    checked: '2026-11-12',
+};
+
 describe('the country files', () => {
     const files = readdirSync(path.join(FOLDER, 'countries')).filter((f) => f.endsWith('.json'));
 
@@ -98,6 +106,35 @@ describe('a country file is refused', () => {
         expect(validateCountry({ ...written(), country: 'D' }, 'D').length).toBeGreaterThan(0);
     });
 
+
+    it('with a day read that has not happened yet', () => {
+        expect(validateCountry(written({ checked: '2099-01-01' }), 'XXA').length).toBeGreaterThan(0);
+    });
+
+    // The weakest kind of source is accepted, with a word on why.
+    it('with a vendor source and no note on why nothing better was used', () => {
+        expect(validateCountry(written({ sourceType: 'vendor' }), 'XXA').length).toBeGreaterThan(0);
+        expect(validateCountry(written({ sourceType: 'vendor', note: 'The only page found that states it.' }), 'XXA')).toEqual([]);
+    });
+
+    // How long a document is valid decides which rule it falls under, so it
+    // is sourced like one.
+    it('with a validity that has no source', () => {
+        expect(validateCountry({ ...written(), validity: [{ adult: 5 }] }, 'XXA').length).toBeGreaterThan(0);
+    });
+
+    it('with a validity that only repeats the usual', () => {
+        const usual = { adult: 10, child: 5, adultAge: 16, ...SOURCED };
+        expect(validateCountry({ ...written(), validity: [usual] }, 'XXA').length).toBeGreaterThan(0);
+    });
+
+    it('but not with a validity that differs, or that is dated', () => {
+        expect(validateCountry({ ...written(), validity: [{ adultAge: 18, ...SOURCED }] }, 'XXA')).toEqual([]);
+        expect(validateCountry({
+            ...written(),
+            validity: [{ issuedTo: '2015-10', adult: 5, ...SOURCED }, { issuedFrom: '2015-11', adult: 10, ...SOURCED }],
+        }, 'XXA')).toEqual([]);
+    });
 
     it('but not when it is right', () => {
         expect(validateCountry(written(), 'XXA')).toEqual([]);

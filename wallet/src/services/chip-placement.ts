@@ -44,7 +44,7 @@ export type ChipPosition = (typeof CHIP_POSITIONS)[number];
 
 export interface PlacementRule {
     document: PlacementDocument;
-    /** Issuing state as the machine readable zone writes it (Germany is `D`). */
+    /** Issuing state, ISO 3166-1 alpha-3. */
     country: string;
     /** First and last month of issue this holds for, `YYYY-MM`. Open when absent. */
     issuedFrom?: string;
@@ -67,6 +67,18 @@ export interface Placement {
     positions: ChipPosition[];
     /** False when no rule matched and this is the general order. */
     known: boolean;
+}
+
+/**
+ * What a document writes for its issuing state, where that is not the ISO
+ * 3166-1 alpha-3 code the list is keyed on. German documents write `D`.
+ */
+const WRITTEN_AS: Readonly<Record<string, string>> = { D: 'DEU' };
+
+/** The issuing state read off a document, as its ISO 3166-1 alpha-3 code. */
+export function isoCountry(written: string | undefined): string {
+    const code = (written ?? '').replace(/</g, '').toUpperCase();
+    return WRITTEN_AS[code] ?? code;
 }
 
 /** The order that finds any chip: used whenever nothing better is known. */
@@ -106,7 +118,7 @@ export function parsePlacementDoc(input: unknown): PlacementDoc | null {
         if (!raw || typeof raw !== 'object') continue;
         const r = raw as Record<string, unknown>;
         if (r.document !== 'passport' && r.document !== 'id-card') continue;
-        if (typeof r.country !== 'string' || !/^[A-Z]{1,3}$/.test(r.country)) continue;
+        if (typeof r.country !== 'string' || !/^[A-Z]{3}$/.test(r.country)) continue;
         if (!Array.isArray(r.positions)) continue;
         const positions = (r.positions as unknown[]).filter(
             (p): p is ChipPosition => typeof p === 'string' && (CHIP_POSITIONS as readonly string[]).includes(p),
@@ -193,7 +205,7 @@ export function placementFor(
     now: Date = new Date(),
 ): Placement {
     const fallback: Placement = { positions: ORDER_TO_TRY[subject.document], known: false };
-    const country = subject.country?.replace(/</g, '').toUpperCase();
+    const country = isoCountry(subject.country);
     if (!country) return fallback;
 
     const rules = doc.rules.filter((r) => r.document === subject.document && r.country === country);

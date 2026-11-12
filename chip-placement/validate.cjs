@@ -35,9 +35,9 @@ const SOURCE_TYPES = ['government', 'printer', 'trade', 'vendor'];
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
-// What a document's own lines write for its issuing state: usually the ISO
-// code, sometimes shorter (Germany is D) or one of a family (GBD, GBN, ...).
-const STATE = /^[A-Z]{1,3}$/;
+// ISO 3166-1 alpha-3, in the country files and in the built list alike. A
+// document whose own lines write something else for its issuing state
+// (Germany's write D) is mapped to the ISO code by the wallet when it reads it.
 const ISO3 = /^[A-Z]{3}$/;
 
 /** What a rule must get right whether it is written by hand or built. */
@@ -90,16 +90,6 @@ function validateCountry(file, code) {
         fail(`country is ${file.country} but the file is named ${code}.json`);
     }
     if (typeof file.name !== 'string' || !file.name.trim()) fail('name must be the country in plain words');
-    // Only where the document's lines do not write the ISO code.
-    if (file.mrzCodes !== undefined) {
-        if (!Array.isArray(file.mrzCodes) || file.mrzCodes.length === 0 || !file.mrzCodes.every((c) => typeof c === 'string' && STATE.test(c))) {
-            fail('mrzCodes must list what the lines of the document write for the issuing state, e.g. ["D"]');
-        } else if (new Set(file.mrzCodes).size !== file.mrzCodes.length) {
-            fail('mrzCodes lists a code twice');
-        } else if (file.mrzCodes.length === 1 && file.mrzCodes[0] === file.country) {
-            fail('mrzCodes repeats the country code: leave it out');
-        }
-    }
     checkValidity(file.validity, 'validity', fail);
     // 10 and 5 are what the wallet assumes. Writing them down again says
     // nothing, and reads as if it did.
@@ -152,7 +142,7 @@ function validatePlacement(doc, now = new Date()) {
         fail('validity must be an object');
     } else {
         for (const [country, v] of Object.entries(validity)) {
-            if (!STATE.test(country)) fail(`validity: ${JSON.stringify(country)} is not an issuing state code`);
+            if (!ISO3.test(country)) fail(`validity: ${JSON.stringify(country)} is not an ISO 3166-1 alpha-3 code`);
             checkValidity(v, `validity.${country}`, fail);
         }
     }
@@ -166,8 +156,8 @@ function validatePlacement(doc, now = new Date()) {
         doc[list].forEach((r, i) => {
             const at = `${list}[${i}]`;
             if (!r || typeof r !== 'object') return fail(`${at}: not an object`);
-            if (typeof r.country !== 'string' || !STATE.test(r.country)) {
-                fail(`${at}: country must be an issuing state code, got ${JSON.stringify(r.country)}`);
+            if (typeof r.country !== 'string' || !ISO3.test(r.country)) {
+                fail(`${at}: country must be an ISO 3166-1 alpha-3 code, got ${JSON.stringify(r.country)}`);
             }
             checkRuleShape(r, at, fail);
         });

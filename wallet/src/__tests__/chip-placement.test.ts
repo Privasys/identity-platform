@@ -106,9 +106,16 @@ describe('a rule', () => {
         expect(placementFor(d, { document: 'passport', country: 'XXB' }, NOW).positions[0]).toBe('chip-page');
     });
 
-    it('is found for a state written with filler', () => {
-        const d = doc([{ document: 'passport', country: 'D', positions: ['front-cover'], source: 's' }]);
+    // German documents write D for the issuing state. The list is keyed on
+    // ISO codes, so the wallet reads D as DEU.
+    it('is found for a document that does not write its ISO code', () => {
+        const d = doc([{ document: 'passport', country: 'DEU', positions: ['front-cover'] }]);
         expect(placementFor(d, { document: 'passport', country: 'D<<' }, NOW).known).toBe(true);
+        expect(placementFor(d, { document: 'passport', country: 'DEU' }, NOW).known).toBe(true);
+    });
+
+    it('is dropped when its country is not an ISO three-letter code', () => {
+        expect(doc([{ document: 'passport', country: 'D', positions: ['front-cover'] }]).rules).toEqual([]);
     });
 });
 

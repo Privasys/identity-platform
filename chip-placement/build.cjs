@@ -48,12 +48,8 @@ function buildContent(dir = COUNTRIES) {
         const file = JSON.parse(readFileSync(path.join(dir, f), 'utf8'));
         const errors = validateCountry(file, code);
         if (errors.length > 0) throw new Error(`countries/${f}:\n  ${errors.join('\n  ')}`);
-        // The wallet matches on what the document's own lines write for the
-        // issuing state, which is the ISO code unless the file says otherwise.
-        for (const state of file.mrzCodes ?? [code]) {
-            if (file.validity && Object.keys(file.validity).length > 0) validity[state] = file.validity;
-            for (const r of file.rules) (r.evidence === 'inferred' ? suggestions : rules).push(bare(state, r));
-        }
+        if (file.validity && Object.keys(file.validity).length > 0) validity[code] = file.validity;
+        for (const r of file.rules) (r.evidence === 'inferred' ? suggestions : rules).push(bare(code, r));
     }
     return { validity, rules, suggestions };
 }

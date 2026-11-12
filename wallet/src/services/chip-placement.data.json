@@ -1,6 +1,6 @@
 {
   "schema": "privasys.wallet.chip-placement/1",
-  "issuedAt": "2026-11-12T13:12:51Z",
+  "issuedAt": "2026-11-12T13:54:45Z",
   "validity": {},
   "rules": [
     {"document":"passport","country":"AUS","issuedTo":"2022-08","positions":["chip-page"]},
@@ -14,8 +14,8 @@
     {"document":"passport","country":"CHE","issuedFrom":"2010-03","positions":["back-cover","front-cover"]},
     {"document":"passport","country":"CHN","positions":["back-cover"]},
     {"document":"passport","country":"CZE","issuedFrom":"2006-09","positions":["photo-page"]},
-    {"document":"passport","country":"D","issuedFrom":"2005-11","issuedTo":"2017-02","positions":["back-cover","front-cover"]},
-    {"document":"passport","country":"D","issuedFrom":"2017-03","positions":["photo-page"]},
+    {"document":"passport","country":"DEU","issuedFrom":"2005-11","issuedTo":"2017-02","positions":["back-cover","front-cover"]},
+    {"document":"passport","country":"DEU","issuedFrom":"2017-03","positions":["photo-page"]},
     {"document":"passport","country":"DNK","issuedFrom":"2021-01","positions":["photo-page"]},
     {"document":"passport","country":"FIN","issuedFrom":"2013-01","positions":["photo-page"]},
     {"document":"passport","country":"FRA","issuedFrom":"2006-04","positions":["back-cover","front-cover"]},

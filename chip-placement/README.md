@@ -95,7 +95,6 @@ already installed picks up a new entry without an update.
 | `checked` | The day you read the page, `YYYY-MM-DD`. |
 | `note` | What the source does not say, and anything a reviewer should know. Optional. |
 | `country`, `name` (per file) | The ISO 3166-1 alpha-3 code, matching the file name, and the country in plain words. |
-| `mrzCodes` (per file) | Only where the document's own lines of code do not write the ISO code for the issuing state. Germany's passports write `D`, so `DEU.json` has `"mrzCodes": ["D"]`. The code is the three characters after `P<` on the first line of a passport. Leave it out otherwise. |
 | `validity` (per file) | Only for a state whose passports are **not** valid for 10 years (adult) and 5 (child): `{ "adult": 5, "child": 5 }`. Leave it out otherwise. See "How the wallet uses it" for why it matters. |
 
 ### Positions
@@ -141,6 +140,11 @@ years the document is valid for, which is 10 for an adult and 5 for a child
 almost everywhere. The date of birth says which of the two applies. A state
 that uses other periods says so in `validity`, or its documents would be placed
 in the wrong design.
+
+Countries are ISO codes throughout, in these files and in the built list. A few
+documents write something else for their issuing state in their own lines of
+code (German passports write `D`); the wallet turns that into the ISO code when
+it reads the document, so nothing here needs to know.
 
 Near a change of design the estimate could fall either side, so a rule applies
 when its dates reach within a year of it, and where two rules do, the holder is

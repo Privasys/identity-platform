@@ -753,12 +753,14 @@ export default function KycCaptureScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            {/* Upright throughout, the camera included. The capture used to turn
-                the screen on its side to give a whole page more room; it only
-                looks for the two lines now, and a phone is held upright over a
-                document lying on a table, so a screen on its side had its
-                wording sideways to the holder and the lines running up it. */}
-            <Stack.Screen options={{ orientation: 'portrait' }} />
+            {/* The camera follows the phone: upright as it opens, like the rest
+                of the check, and on its side if the holder turns it that way.
+                It used to be forced onto its side, from when it wanted a whole
+                page in view. A phone is held upright over a document on a
+                table, so that put the wording sideways to the holder and the
+                two lines running up the screen, where they did not read. Every
+                other step stays upright. */}
+            <Stack.Screen options={{ orientation: step === 'capture' ? 'all' : 'portrait' }} />
 
             {/* What is about to happen and why, once, so the screens after it
                 are steps ticked off and not each a new explanation. */}

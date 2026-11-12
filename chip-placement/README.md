@@ -123,9 +123,9 @@ that blocks the signal.
 - **`inferred`**: the source states something the position is deduced from,
   typically that the data page is polycarbonate, where the chip is usually
   laminated in. That is a good guess and not a fact: some passports with such a
-  page carry the chip in a cover or in a separate page. These go to a separate
-  part of the built list (`suggestions`), which a wallet shows as a place to
-  try first once it has the wording for it.
+  page carry the chip in a cover (Austria since 2023, Switzerland). These go to
+  a separate part of the built list (`suggestions`), and the wallet offers them
+  as a place to try first.
 
 Prefer a government or printer source. A vendor's page is accepted when it is
 the only one that states the position; say so in `note`.
@@ -146,12 +146,27 @@ documents write something else for their issuing state in their own lines of
 code (German passports write `D`); the wallet turns that into the ISO code when
 it reads the document, so nothing here needs to know.
 
-Near a change of design the estimate could fall either side, so a rule applies
-when its dates reach within a year of it, and where two rules do, the holder is
-given both places, the likelier first.
+What the holder is then told depends on how far the list can be relied on for
+that document:
 
-Whatever a rule says, the remaining places follow it. A rule that is out of
-date costs the holder a moment and never the check.
+- **A `documented` rule's dates hold the issue date.** The wallet says where the
+  chip is, as a fact: "Scan the photo page. The chip is inside that page."
+  The estimate can be a few months out, so a rule that reaches within a year of
+  it is given as the next place to try.
+- **No rule's dates hold it, but the country has rules.** The nearest one in
+  time is used, which for a document newer than every rule is the most recent.
+  A country's designs follow one another, and the next usually keeps the chip
+  where the last had it. But no source states it for this document, so the
+  wallet offers it: "Try the photo page first."
+- **The only lead is `inferred`.** Offered the same way, never stated.
+- **The country has no entry.** The general order.
+
+This is why an end date matters. If a new design has started and you do not
+know where its chip is, close the old rule with `issuedTo`: holders of the new
+design then get the old position as a suggestion and not as a fact.
+
+Whatever leads, the remaining places follow it. A lead that is wrong costs the
+holder a moment and never the check.
 
 ## Publishing
 

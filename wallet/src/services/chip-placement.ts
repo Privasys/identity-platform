@@ -59,14 +59,27 @@ export interface PlacementDoc {
     issuedAt: string;
     /** Years a document is valid for, by issuing state, when it is not 10 and 5. */
     validity?: Record<string, { adult?: number; child?: number }>;
+    /** What a source states. */
     rules: PlacementRule[];
+    /** What is deduced from something a source states, such as a polycarbonate data page. */
+    suggestions?: PlacementRule[];
 }
 
+/**
+ * How far the first place can be relied on, which decides how it is worded.
+ *
+ * `documented`: a source states it for a document of this age. Said as a fact.
+ * `suggested`:  the best lead there is, and no more: a rule for a neighbouring
+ *               design of the same state, or a position deduced and not stated.
+ *               Said as "try this first".
+ * `none`:       nothing is known of this state's documents. The general order.
+ */
+export type PlacementConfidence = 'documented' | 'suggested' | 'none';
+
 export interface Placement {
-    /** Where to try, in order: what a rule says first, then everywhere else. Never empty. */
+    /** Where to try, in order: the lead first, then everywhere else. Never empty. */
     positions: ChipPosition[];
-    /** False when no rule matched and this is the general order. */
-    known: boolean;
+    confidence: PlacementConfidence;
 }
 
 /**
@@ -113,8 +126,28 @@ export function parsePlacementDoc(input: unknown): PlacementDoc | null {
     if (typeof doc.issuedAt !== 'string' || !Number.isFinite(Date.parse(doc.issuedAt))) return null;
     if (!Array.isArray(doc.rules)) return null;
 
+    const validity: PlacementDoc['validity'] = {};
+    if (doc.validity && typeof doc.validity === 'object') {
+        for (const [country, v] of Object.entries(doc.validity as Record<string, unknown>)) {
+            if (!v || typeof v !== 'object') continue;
+            const { adult, child } = v as Record<string, unknown>;
+            const years = (n: unknown) => (typeof n === 'number' && n > 0 && n <= 20 ? n : undefined);
+            validity[country] = { adult: years(adult), child: years(child) };
+        }
+    }
+    return {
+        schema: PLACEMENT_SCHEMA,
+        issuedAt: doc.issuedAt,
+        validity,
+        rules: parseRules(doc.rules),
+        suggestions: Array.isArray(doc.suggestions) ? parseRules(doc.suggestions) : [],
+    };
+}
+
+/** The rules of a list that this build can read; the others are dropped. */
+function parseRules(list: unknown[]): PlacementRule[] {
     const rules: PlacementRule[] = [];
-    for (const raw of doc.rules as unknown[]) {
+    for (const raw of list) {
         if (!raw || typeof raw !== 'object') continue;
         const r = raw as Record<string, unknown>;
         if (r.document !== 'passport' && r.document !== 'id-card') continue;
@@ -137,17 +170,7 @@ export function parsePlacementDoc(input: unknown): PlacementDoc | null {
             positions,
         });
     }
-
-    const validity: PlacementDoc['validity'] = {};
-    if (doc.validity && typeof doc.validity === 'object') {
-        for (const [country, v] of Object.entries(doc.validity as Record<string, unknown>)) {
-            if (!v || typeof v !== 'object') continue;
-            const { adult, child } = v as Record<string, unknown>;
-            const years = (n: unknown) => (typeof n === 'number' && n > 0 && n <= 20 ? n : undefined);
-            validity[country] = { adult: years(adult), child: years(child) };
-        }
-    }
-    return { schema: PLACEMENT_SCHEMA, issuedAt: doc.issuedAt, validity, rules };
+    return rules;
 }
 
 /** The list compiled into this build. */
@@ -192,50 +215,78 @@ export function estimateIssueMonth(
     return exp.year * 12 + (exp.month - 1) - (adultAtIssue ? adult : child) * 12;
 }
 
+/** A rule of the document's state, with how far its dates are from the document. */
+interface Candidate {
+    rule: PlacementRule;
+    /** Months between the estimated issue date and the rule's range. 0 inside it. */
+    distance: number;
+    /** Deduced and not stated. */
+    inferred: boolean;
+    /** The rule's first month, to tell the more recent of two. */
+    from: number;
+}
+
 /**
  * Where to lay the phone for this document.
  *
- * The issue date is an estimate, so a rule is taken when its range reaches
- * within a year of it. Where two rules do (a document issued near a change of
- * design), both are given, the likelier first.
+ * A rule whose dates hold the document's estimated issue date is what a source
+ * states for it: `documented`. The estimate can be out by some months, so the
+ * rules that reach within a year of it follow, for a document issued near a
+ * change of design.
+ *
+ * When no rule's dates hold it, the state's rules are still the best lead: its
+ * designs follow one another, and the next usually keeps the chip where the
+ * last had it. The nearest rule in time is used, which for a document newer
+ * than every rule is the most recent one. So is a position that is only
+ * deduced. But none of that is what a source states for this document, so it
+ * is `suggested`, and worded as somewhere to try first.
+ *
+ * Whatever leads, the rest of the general order follows it. A lead that is
+ * wrong should cost the holder a moment, not the check.
  */
 export function placementFor(
     doc: PlacementDoc,
     subject: { document: PlacementDocument; country?: string; expiry?: string; birth?: string },
     now: Date = new Date(),
 ): Placement {
-    const fallback: Placement = { positions: ORDER_TO_TRY[subject.document], known: false };
+    const general = ORDER_TO_TRY[subject.document];
     const country = isoCountry(subject.country);
-    if (!country) return fallback;
-
-    const rules = doc.rules.filter((r) => r.document === subject.document && r.country === country);
-    if (rules.length === 0) return fallback;
+    const ofState = (list: PlacementRule[] | undefined) =>
+        (list ?? []).filter((r) => r.document === subject.document && r.country === country);
+    const stated = country ? ofState(doc.rules) : [];
+    const deduced = country ? ofState(doc.suggestions) : [];
+    if (stated.length === 0 && deduced.length === 0) return { positions: general, confidence: 'none' };
 
     const issued = subject.expiry ? estimateIssueMonth(doc, country, subject.expiry, subject.birth ?? '', now) : null;
-    const ranked: { rule: PlacementRule; distance: number }[] = [];
-    for (const rule of rules) {
+    const candidate = (rule: PlacementRule, inferred: boolean): Candidate => {
         const from = monthIndex(rule.issuedFrom);
         const to = monthIndex(rule.issuedTo);
-        if (from === null && to === null) {
-            ranked.push({ rule, distance: 0 });
-            continue;
+        let distance = 0;
+        if (from !== null || to !== null) {
+            // A rule bounded in time is not known to hold for a document of unknown age.
+            if (issued === null) distance = Number.POSITIVE_INFINITY;
+            else if (from !== null && issued < from) distance = from - issued;
+            else if (to !== null && issued > to) distance = issued - to;
         }
-        // A rule bounded in time says nothing about a document of unknown age.
-        if (issued === null) continue;
-        const distance = from !== null && issued < from ? from - issued : to !== null && issued > to ? issued - to : 0;
-        if (distance <= ESTIMATE_SLACK_MONTHS) ranked.push({ rule, distance });
-    }
-    if (ranked.length === 0) return fallback;
+        return { rule, distance, inferred, from: from ?? Number.NEGATIVE_INFINITY };
+    };
+    const all = [...stated.map((r) => candidate(r, false)), ...deduced.map((r) => candidate(r, true))];
+    // Nearest in time first; of two as near, what is stated, then the more recent.
+    all.sort((a, b) =>
+        (a.distance === b.distance ? 0 : a.distance - b.distance) || Number(a.inferred) - Number(b.inferred) || b.from - a.from);
 
-    ranked.sort((a, b) => a.distance - b.distance);
+    const holds = all.some((c) => !c.inferred && c.distance === 0);
+    let leads = all.filter((c) => c.distance <= ESTIMATE_SLACK_MONTHS);
+    // No rule reaches the document: take the nearest, or the most recent when
+    // the document's age is not known.
+    if (leads.length === 0) {
+        leads = [Number.isFinite(all[0].distance) ? all[0] : [...all].sort((a, b) => b.from - a.from)[0]];
+    }
+
     const positions: ChipPosition[] = [];
-    for (const { rule } of ranked) {
+    for (const { rule } of leads) {
         for (const p of rule.positions) if (!positions.includes(p)) positions.push(p);
     }
-    // Then the rest of the general order. A rule can be out of date, or the
-    // estimate of the issue date out by more than allowed for, and the holder
-    // must still be led to the chip: a wrong rule should cost time, not the
-    // check.
-    for (const p of ORDER_TO_TRY[subject.document]) if (!positions.includes(p)) positions.push(p);
-    return { positions, known: true };
+    for (const p of general) if (!positions.includes(p)) positions.push(p);
+    return { positions, confidence: holds ? 'documented' : 'suggested' };
 }

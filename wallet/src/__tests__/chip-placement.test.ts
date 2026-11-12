@@ -30,7 +30,7 @@ const month = (y: number, m: number) => y * 12 + (m - 1);
 describe('a document with no rule', () => {
     it('gets the order to try, and says it is not known', () => {
         const p = placementFor(doc([]), { document: 'passport', country: 'XXA', expiry: '300101', birth: '800101' }, NOW);
-        expect(p).toEqual({ positions: ['back-cover', 'photo-page', 'front-cover'], known: false });
+        expect(p).toEqual({ positions: ['back-cover', 'photo-page', 'front-cover'], confidence: 'none' });
     });
 
     it('is a card when it is a card', () => {
@@ -39,7 +39,7 @@ describe('a document with no rule', () => {
 
     it('is not helped by another document of the same state', () => {
         const d = doc([{ document: 'id-card', country: 'XXA', positions: ['card'], source: 's' }]);
-        expect(placementFor(d, { document: 'passport', country: 'XXA', expiry: '300101' }, NOW).known).toBe(false);
+        expect(placementFor(d, { document: 'passport', country: 'XXA', expiry: '300101' }, NOW).confidence).toBe('none');
     });
 });
 
@@ -74,7 +74,7 @@ describe('a rule', () => {
         // Expires 2034, so issued 2024.
         const p = placementFor(changed, { document: 'passport', country: 'XXA', expiry: '340601', birth: '800101' }, NOW);
         // What the rule says first, then everywhere else a chip can be.
-        expect(p).toEqual({ positions: ['photo-page', 'back-cover', 'front-cover'], known: true });
+        expect(p).toEqual({ positions: ['photo-page', 'back-cover', 'front-cover'], confidence: 'documented' });
     });
 
     it('gives both places near a change of design, the likelier first', () => {
@@ -87,12 +87,16 @@ describe('a rule', () => {
         const d = doc([{ document: 'passport', country: 'XXB', positions: ['front-cover'], source: 's' }]);
         expect(placementFor(d, { document: 'passport', country: 'XXB' }, NOW)).toEqual({
             positions: ['front-cover', 'back-cover', 'photo-page'],
-            known: true,
+            confidence: 'documented',
         });
     });
 
-    it('with dates says nothing about a document of unknown age', () => {
-        expect(placementFor(changed, { document: 'passport', country: 'XXA' }, NOW).known).toBe(false);
+    // Nothing dates the document, so no rule is known to hold for it. The
+    // state's most recent design is still the best lead.
+    it('with dates is only a lead for a document of unknown age: the most recent one', () => {
+        const p = placementFor(changed, { document: 'passport', country: 'XXA' }, NOW);
+        expect(p.confidence).toBe('suggested');
+        expect(p.positions[0]).toBe('photo-page');
     });
 
     // A shielded cover is a place of its own, read with the booklet open. A
@@ -110,12 +114,71 @@ describe('a rule', () => {
     // ISO codes, so the wallet reads D as DEU.
     it('is found for a document that does not write its ISO code', () => {
         const d = doc([{ document: 'passport', country: 'DEU', positions: ['front-cover'] }]);
-        expect(placementFor(d, { document: 'passport', country: 'D<<' }, NOW).known).toBe(true);
-        expect(placementFor(d, { document: 'passport', country: 'DEU' }, NOW).known).toBe(true);
+        expect(placementFor(d, { document: 'passport', country: 'D<<' }, NOW).confidence).toBe('documented');
+        expect(placementFor(d, { document: 'passport', country: 'DEU' }, NOW).confidence).toBe('documented');
     });
 
     it('is dropped when its country is not an ISO three-letter code', () => {
         expect(doc([{ document: 'passport', country: 'D', positions: ['front-cover'] }]).rules).toEqual([]);
+    });
+});
+
+describe('a document no rule covers', () => {
+    // A design that ended, and a later one whose chip no source places yet.
+    const ended = doc([
+        { document: 'passport', country: 'XXA', issuedFrom: '2010-01', issuedTo: '2019-12', positions: ['back-cover'] },
+        { document: 'passport', country: 'XXA', issuedFrom: '2020-01', issuedTo: '2025-11', positions: ['photo-page'] },
+    ]);
+
+    it('just past the last rule gets it as a lead, not as a fact', () => {
+        // Expires March 2036, so issued about March 2026: four months past.
+        const p = placementFor(ended, { document: 'passport', country: 'XXA', expiry: '360301', birth: '800101' }, NOW);
+        expect(p).toEqual({ positions: ['photo-page', 'back-cover', 'front-cover'], confidence: 'suggested' });
+    });
+
+    it('long past the last rule still gets the most recent one, as a lead', () => {
+        // Expires 2040, so issued about 2030.
+        const p = placementFor(ended, { document: 'passport', country: 'XXA', expiry: '400601', birth: '800101' }, NOW);
+        expect(p).toEqual({ positions: ['photo-page', 'back-cover', 'front-cover'], confidence: 'suggested' });
+    });
+
+    it('older than the first rule gets the earliest one, as a lead', () => {
+        const p = placementFor(ended, { document: 'passport', country: 'XXA', expiry: '180601', birth: '800101' }, NOW);
+        expect(p.confidence).toBe('suggested');
+        expect(p.positions[0]).toBe('back-cover');
+    });
+
+    it('inside a rule is a fact, whatever lies near it', () => {
+        const p = placementFor(ended, { document: 'passport', country: 'XXA', expiry: '340601', birth: '800101' }, NOW);
+        expect(p.confidence).toBe('documented');
+    });
+});
+
+describe('a position that is deduced and not stated', () => {
+    const parsed = (rules: unknown[], suggestions: unknown[]) => {
+        const d = parsePlacementDoc({ schema: PLACEMENT_SCHEMA, issuedAt: '2026-11-01T00:00:00Z', rules, suggestions });
+        if (!d) throw new Error('fixture did not parse');
+        return d;
+    };
+
+    it('is a lead, never a fact, even when its dates hold the document', () => {
+        const d = parsed([], [{ document: 'passport', country: 'XXA', issuedFrom: '2019-01', positions: ['photo-page'] }]);
+        const p = placementFor(d, { document: 'passport', country: 'XXA', expiry: '340601', birth: '800101' }, NOW);
+        expect(p).toEqual({ positions: ['photo-page', 'back-cover', 'front-cover'], confidence: 'suggested' });
+    });
+
+    it('gives way to what a source states for the same document', () => {
+        const d = parsed(
+            [{ document: 'passport', country: 'XXA', issuedFrom: '2019-01', positions: ['front-cover'] }],
+            [{ document: 'passport', country: 'XXA', issuedFrom: '2019-01', positions: ['photo-page'] }],
+        );
+        const p = placementFor(d, { document: 'passport', country: 'XXA', expiry: '340601', birth: '800101' }, NOW);
+        expect(p.confidence).toBe('documented');
+        expect(p.positions[0]).toBe('front-cover');
+    });
+
+    it('is not read from a list that has none', () => {
+        expect(parsed([], []).suggestions).toEqual([]);
     });
 });
 

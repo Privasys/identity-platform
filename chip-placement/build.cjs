@@ -13,9 +13,9 @@
  * else. It is the one file compiled into the app and, signed, served from
  * privasys.id.
  *
- * `documented` rules go to `rules`. `inferred` ones go to `suggestions`, a part
- * of the list a wallet reads only once it can word them as "try this first";
- * a wallet that cannot simply does not see them.
+ * `documented` rules go to `rules`. `inferred` ones go to `suggestions`, which
+ * the wallet words as "try this first". Wallets before 1.4.46 had no such
+ * wording and do not read that part of the list at all.
  *
  * The list is re-dated only when its content changes, so building twice in a
  * row changes nothing.

@@ -90,7 +90,21 @@ type Placement = ReturnType<typeof placementFor>;
 /** The heading of the chip scan: the place to scan, when it is known. */
 function scanTitleKey(doc: DocType, placement: Placement): string {
     if (doc === 'id-card') return 'kyc.scanTitleCard';
-    if (!placement.known) return 'kyc.scanTitle';
+    if (placement.confidence === 'none') return 'kyc.scanTitle';
+    const first = placement.positions[0];
+    // A lead that no source states for this document is offered, not asserted.
+    if (placement.confidence === 'suggested') {
+        const suggested: Record<ChipPosition, string> = {
+            'back-cover': 'kyc.scanFirstBackCover',
+            'front-cover': 'kyc.scanFirstFrontCover',
+            'photo-page': 'kyc.scanFirstPhotoPage',
+            'chip-page': 'kyc.scanFirstChipPage',
+            'inside-back-cover': 'kyc.scanFirstInsideBackCover',
+            'inside-front-cover': 'kyc.scanFirstInsideFrontCover',
+            card: 'kyc.scanTitle',
+        };
+        return suggested[first];
+    }
     const titles: Record<ChipPosition, string> = {
         'back-cover': 'kyc.scanTitleBackCover',
         'front-cover': 'kyc.scanTitleFrontCover',
@@ -100,13 +114,14 @@ function scanTitleKey(doc: DocType, placement: Placement): string {
         'inside-front-cover': 'kyc.scanTitleInsideFrontCover',
         card: 'kyc.scanTitle',
     };
-    return titles[placement.positions[0]];
+    return titles[first];
 }
 
 /** What to do with the document, or the order to try when its chip is not on the list. */
 function scanBodyKey(doc: DocType, placement: Placement): string {
     if (doc === 'id-card') return 'kyc.scanBodyCard';
-    if (!placement.known) return 'kyc.scanBodyUnknown';
+    if (placement.confidence === 'none') return 'kyc.scanBodyUnknown';
+    if (placement.confidence === 'suggested') return 'kyc.scanSuggestedBody';
     const bodies: Record<ChipPosition, string> = {
         'back-cover': 'kyc.scanBodyBackCover',
         'front-cover': 'kyc.scanBodyFrontCover',
@@ -1028,14 +1043,20 @@ export default function KycCaptureScreen() {
                     <ChipScanArt
                         doc={docType}
                         label={t('kyc.artChipScan')}
-                        open={isPassport && placement.known && OPEN_POSITIONS.includes(placement.positions[0])}
+                        open={isPassport && placement.confidence !== 'none' && OPEN_POSITIONS.includes(placement.positions[0])}
                         reader={Platform.OS === 'ios' ? 'top' : 'middle'}
                     />
                     <Tips
                         items={[
                             t(Platform.OS === 'ios' ? 'kyc.scanReaderTop' : 'kyc.scanReaderMiddle'),
                             t('kyc.scanTipCover'),
-                            ...(placement.known && TRY_NEXT_KEY[placement.positions[1]] ? [t(TRY_NEXT_KEY[placement.positions[1]]!)] : []),
+                            // Where to go next. Two places when the first is only a
+                            // lead, so the holder is never left without one.
+                            ...(placement.confidence === 'none' ? [] : placement.positions
+                                .slice(1, placement.confidence === 'suggested' ? 3 : 2)
+                                .map((pos) => TRY_NEXT_KEY[pos])
+                                .filter((key): key is string => !!key)
+                                .map((key) => t(key))),
                         ]}
                     />
                     <Pressable

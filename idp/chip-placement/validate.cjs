@@ -19,7 +19,9 @@
  */
 
 const SCHEMA = 'privasys.wallet.chip-placement/1';
-const POSITIONS = ['back-cover', 'front-cover', 'photo-page', 'card'];
+// Keep in step with CHIP_POSITIONS in wallet/src/services/chip-placement.ts.
+// A wallet older than a position drops the rules that use it, by design.
+const POSITIONS = ['back-cover', 'front-cover', 'photo-page', 'chip-page', 'inside-back-cover', 'inside-front-cover', 'card'];
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 /** Problems found, in the order they were found. Empty means publishable. */

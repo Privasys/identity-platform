@@ -95,6 +95,17 @@ describe('a rule', () => {
         expect(placementFor(changed, { document: 'passport', country: 'XXA' }, NOW).known).toBe(false);
     });
 
+    // A shielded cover is a place of its own, read with the booklet open. A
+    // wallet that did not know the place would drop the rule, not misread it.
+    it('can name the inside of a cover, and a page of its own', () => {
+        const d = doc([
+            { document: 'passport', country: 'XXA', positions: ['inside-back-cover'], source: 's' },
+            { document: 'passport', country: 'XXB', positions: ['chip-page'], source: 's' },
+        ]);
+        expect(placementFor(d, { document: 'passport', country: 'XXA' }, NOW).positions[0]).toBe('inside-back-cover');
+        expect(placementFor(d, { document: 'passport', country: 'XXB' }, NOW).positions[0]).toBe('chip-page');
+    });
+
     it('is found for a state written with filler', () => {
         const d = doc([{ document: 'passport', country: 'D', positions: ['front-cover'], source: 's' }]);
         expect(placementFor(d, { document: 'passport', country: 'D<<' }, NOW).known).toBe(true);

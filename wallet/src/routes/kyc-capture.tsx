@@ -95,6 +95,9 @@ function scanTitleKey(doc: DocType, placement: Placement): string {
         'back-cover': 'kyc.scanTitleBackCover',
         'front-cover': 'kyc.scanTitleFrontCover',
         'photo-page': 'kyc.scanTitlePhotoPage',
+        'chip-page': 'kyc.scanTitleChipPage',
+        'inside-back-cover': 'kyc.scanTitleInsideBackCover',
+        'inside-front-cover': 'kyc.scanTitleInsideFrontCover',
         card: 'kyc.scanTitle',
     };
     return titles[placement.positions[0]];
@@ -108,6 +111,9 @@ function scanBodyKey(doc: DocType, placement: Placement): string {
         'back-cover': 'kyc.scanBodyBackCover',
         'front-cover': 'kyc.scanBodyFrontCover',
         'photo-page': 'kyc.scanBodyPhotoPage',
+        'chip-page': 'kyc.scanBodyChipPage',
+        'inside-back-cover': 'kyc.scanBodyInsideBackCover',
+        'inside-front-cover': 'kyc.scanBodyInsideFrontCover',
         card: 'kyc.scanBodyUnknown',
     };
     return bodies[placement.positions[0]];
@@ -118,7 +124,13 @@ const TRY_NEXT_KEY: Partial<Record<ChipPosition, string>> = {
     'back-cover': 'kyc.scanTryBackCover',
     'front-cover': 'kyc.scanTryFrontCover',
     'photo-page': 'kyc.scanTryPhotoPage',
+    'chip-page': 'kyc.scanTryChipPage',
+    'inside-back-cover': 'kyc.scanTryInsideBackCover',
+    'inside-front-cover': 'kyc.scanTryInsideFrontCover',
 };
+
+/** The places reached with the booklet open, which is how the drawing shows it. */
+const OPEN_POSITIONS: ChipPosition[] = ['photo-page', 'chip-page', 'inside-back-cover', 'inside-front-cover'];
 
 /** The raw fields the trusted-apps store compares (same set as Drive/sign-in). */
 function verifierMeasurements(v: VerifierAttestation) {
@@ -1016,7 +1028,7 @@ export default function KycCaptureScreen() {
                     <ChipScanArt
                         doc={docType}
                         label={t('kyc.artChipScan')}
-                        open={isPassport && placement.known && placement.positions[0] === 'photo-page'}
+                        open={isPassport && placement.known && OPEN_POSITIONS.includes(placement.positions[0])}
                         reader={Platform.OS === 'ios' ? 'top' : 'middle'}
                     />
                     <Tips

@@ -25,8 +25,19 @@ export const PLACEMENT_SCHEMA = 'privasys.wallet.chip-placement/1';
 
 export type PlacementDocument = 'passport' | 'id-card';
 
-/** The places the wallet has words and a drawing for. */
-export const CHIP_POSITIONS = ['back-cover', 'front-cover', 'photo-page', 'card'] as const;
+/**
+ * The places the wallet has words and a drawing for.
+ *
+ * `chip-page` is a stiff page of its own inside the booklet. The two `inside-`
+ * places are a cover that is shielded, so the booklet has to be opened and the
+ * phone laid on the inside of it. They are places and not a flag on a rule on
+ * purpose: a wallet that does not know a place drops the rule and gives the
+ * general order, whereas a flag it did not know would be ignored and the
+ * holder told to scan a closed cover that blocks the signal.
+ */
+export const CHIP_POSITIONS = [
+    'back-cover', 'front-cover', 'photo-page', 'chip-page', 'inside-back-cover', 'inside-front-cover', 'card',
+] as const;
 export type ChipPosition = (typeof CHIP_POSITIONS)[number];
 
 export interface PlacementRule {

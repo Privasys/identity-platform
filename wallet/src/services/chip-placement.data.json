@@ -1,8 +1,15 @@
 {
   "schema": "privasys.wallet.chip-placement/1",
-  "issuedAt": "2026-11-12T12:30:00Z",
+  "issuedAt": "2026-11-12T12:46:00Z",
   "validity": {
-    "GBR": { "adult": 10, "child": 5 }
+    "GBR": {
+      "adult": 10,
+      "child": 5
+    },
+    "AUS": {
+      "adult": 10,
+      "child": 5
+    }
   },
   "rules": [
     {
@@ -10,7 +17,10 @@
       "country": "GBR",
       "issuedFrom": "2010-01",
       "issuedTo": "2019-12",
-      "positions": ["back-cover", "front-cover"],
+      "positions": [
+        "back-cover",
+        "front-cover"
+      ],
       "source": "https://www.gov.uk/government/publications/basic-passport-checks/basic-passport-checks-accessible",
       "quote": "The passport chip is located in the cover of the passport.",
       "note": "HM Passport Office, passports introduced in 2010 and in 2015. The source does not say which cover, so both are given."
@@ -20,7 +30,9 @@
       "country": "GBR",
       "issuedFrom": "2020-01",
       "issuedTo": "2025-11",
-      "positions": ["photo-page"],
+      "positions": [
+        "photo-page"
+      ],
       "source": "https://www.gov.uk/government/publications/basic-passport-checks/basic-passport-checks-accessible",
       "quote": "On the front of this page is the Title page and on the back is the Biographical Data page. The electronic chip is embedded within this page.",
       "note": "HM Passport Office, passports introduced in 2020 (series C, phased in from early 2020). Series D, from December 2025, is not covered: the source does not state its chip position."
@@ -30,7 +42,10 @@
       "country": "D",
       "issuedFrom": "2005-11",
       "issuedTo": "2017-02",
-      "positions": ["back-cover", "front-cover"],
+      "positions": [
+        "back-cover",
+        "front-cover"
+      ],
       "source": "https://bsi.bund.de/EN/Themen/Oeffentliche-Verwaltung/Elektronische-Identitaeten/Elektronische-Ausweisdokumente/Elektronischer-Reisepass/elektronischer-reisepass.html",
       "quote": "A contactless chip (radio frequency chip) is integrated into the passport cover.",
       "note": "BSI. The source does not say which cover, so both are given."
@@ -39,7 +54,9 @@
       "document": "passport",
       "country": "D",
       "issuedFrom": "2017-03",
-      "positions": ["photo-page"],
+      "positions": [
+        "photo-page"
+      ],
       "source": "https://bsi.bund.de/EN/Themen/Oeffentliche-Verwaltung/Elektronische-Identitaeten/Elektronische-Ausweisdokumente/Elektronischer-Reisepass/elektronischer-reisepass.html",
       "quote": "the RF chip is now located in the data card",
       "note": "BSI, the version issued since 1 March 2017."
@@ -47,7 +64,10 @@
     {
       "document": "passport",
       "country": "ITA",
-      "positions": ["back-cover", "front-cover"],
+      "positions": [
+        "back-cover",
+        "front-cover"
+      ],
       "source": "https://poliziadistato.it/articolo/pdf/10301",
       "quote": "dotato di un microchip inserito nella copertina",
       "note": "Polizia di Stato. The source says the cover, not which one, so both are given."
@@ -57,7 +77,9 @@
       "country": "CAN",
       "issuedFrom": "2013-07",
       "issuedTo": "2023-05",
-      "positions": ["back-cover"],
+      "positions": [
+        "back-cover"
+      ],
       "source": "https://www.canada.ca/en/immigration-refugees-citizenship/news/archives/backgrounders-2013/about-epassports.html",
       "quote": "An electronic chip embedded in the back cover",
       "note": "IRCC, ePassports from 2 July 2013 until the 2023 design."
@@ -66,7 +88,9 @@
       "document": "passport",
       "country": "CAN",
       "issuedFrom": "2023-06",
-      "positions": ["photo-page"],
+      "positions": [
+        "photo-page"
+      ],
       "source": "https://www.canada.ca/en/immigration-refugees-citizenship/news/2023/05/canada-unveils-new-passport-design-with-state-of-the-art-security-features.html",
       "quote": "we have imbedded the electronic passport chip in a transparent window on page one",
       "note": "IRCC, the design issued from summer 2023, whose page one is the polycarbonate data page."
@@ -74,8 +98,21 @@
     {
       "document": "passport",
       "country": "JPN",
+      "issuedTo": "2025-02",
+      "positions": [
+        "chip-page"
+      ],
+      "source": "https://www.pref.kyoto.jp/passport/1236840433137.html",
+      "quote": "IC旅券は、パスポート冊子中央に非接触IC（集積回路）チップを搭載したプラスチックが組み込まれ",
+      "note": "Kyoto Prefecture passport office: a plastic sheet carrying the chip, in the centre of the booklet. Passports applied for before 24 March 2025."
+    },
+    {
+      "document": "passport",
+      "country": "JPN",
       "issuedFrom": "2025-03",
-      "positions": ["photo-page"],
+      "positions": [
+        "photo-page"
+      ],
       "source": "https://www.pref.kyoto.jp/passport/1236840433137.html",
       "quote": "身分事項ページ（顔写真や所持人自署のあるページ）がプラスチック製となっており当該ページにICチップが搭載されています。",
       "note": "Kyoto Prefecture passport office, the 2025 passport (applications from 24 March 2025). Earlier passports carry the chip in a centre page, which this list has no position for."
@@ -83,7 +120,9 @@
     {
       "document": "passport",
       "country": "NLD",
-      "positions": ["photo-page"],
+      "positions": [
+        "photo-page"
+      ],
       "source": "https://www.rijksoverheid.nl/onderwerpen/paspoort-en-identiteitskaart/vraag-en-antwoord/wat-is-een-elektronisch-reisdocument-en-welke-gegevens-bevat-de-chip-hierin",
       "quote": "bij het paspoort in de pagina waarop uw persoonsgegevens en foto staan",
       "note": "Rijksoverheid."
@@ -91,10 +130,34 @@
     {
       "document": "passport",
       "country": "BRA",
-      "positions": ["back-cover"],
+      "positions": [
+        "back-cover"
+      ],
       "source": "https://www.gov.br/pf/pt-br/assuntos/passaporte/ajuda/duvidas_/caderneta/caderneta-chip-danificado-como-identificar",
       "quote": "Ele está localizado dentro do papel da contracapa do passaporte",
       "note": "Polícia Federal."
+    },
+    {
+      "document": "passport",
+      "country": "AUS",
+      "issuedTo": "2022-08",
+      "positions": [
+        "chip-page"
+      ],
+      "source": "https://www.noteprinting.com/newsacrhive/2018/8/9/npas-unique-epassport-construction-stands-test-of-time",
+      "quote": "The solution for the Australian book embedded the chip in a double-layered centre page",
+      "note": "Note Printing Australia, the passport printer, in 2018, of the series issued until then. The R series, from September 2022, is not covered."
+    },
+    {
+      "document": "passport",
+      "country": "USA",
+      "positions": [
+        "inside-back-cover",
+        "back-cover"
+      ],
+      "source": "https://www.signicat.com/products/identity-proofing/readid-me",
+      "quote": "Please be aware that the antenna in the U.S. passport is located on the inside of the back cover",
+      "note": "A vendor page (Inverid/Signicat ReadID), the only one found that states the position. The Department of State final rule of 25 October 2005 (70 FR 61553) states that the front cover and spine carry anti-skimming material, which is why the booklet is opened. The Next Generation Passport is not addressed by either."
     }
   ]
 }

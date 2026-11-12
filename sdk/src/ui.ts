@@ -9,6 +9,7 @@ import { attributeLabel, assuranceLabel } from './attributes-ui';
 import { isGovVerified } from './attributes';
 import { providerButtonLabel, providerName, type OwnRegistration } from './providers';
 import type { GateChoice, GateOptions, GateProvider, GateState } from './gate-headless';
+import { finishOnSuccess } from './gate-headless';
 import { themeClasses, themeProperties, themeStylesheet, type AuthTheme } from './theme';
 import { alternativeOrder, displayAppName, gateOrder } from './gate';
 import qrcode from 'qrcode-generator';
@@ -2123,9 +2124,15 @@ export class AuthUI {
         // push token, already trusted, or the ceremony itself ran over a
         // push notification (cfg.pushToken) — the latter counts as trust,
         // so the device hint is (re)saved.
-        const viaPush = !!this.cfg.pushToken;
-        if (!this.pushToken || this.cfg.deviceTrusted || viaPush) {
-            setTimeout(() => this.finishWithTrust(viaPush || !!this.cfg.deviceTrusted), 1200);
+        // A headless gate never asks: the person cannot see the question.
+        const end = finishOnSuccess({
+            pushToken: this.pushToken,
+            deviceTrusted: this.cfg.deviceTrusted,
+            viaPush: !!this.cfg.pushToken,
+            headless: this.cfg.headless,
+        });
+        if (end.now) {
+            setTimeout(() => this.finishWithTrust(end.trust), 1200);
         }
     }
 

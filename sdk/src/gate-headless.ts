@@ -93,3 +93,25 @@ export function sanitiseGateState(raw: unknown): GateState | null {
     if (typeof s.error === 'string' && s.error) out.error = s.error.slice(0, 300);
     return out;
 }
+
+/**
+ * How a completed sign-in ends: at once (and whether the device is then
+ * remembered), or by asking "Trust this device?". The question is drawn in
+ * the gate, so a headless gate, which draws nothing the person sees, never
+ * asks it: waiting for an answer nobody can give would leave the page at
+ * "success" for ever. A device trusted only by a headless sign-in is not
+ * remembered; the next sign-in shows the code again.
+ */
+export function finishOnSuccess(o: {
+    /** The wallet's push token, present after a wallet sign-in. */
+    pushToken?: string;
+    /** The device is already trusted (a device hint exists). */
+    deviceTrusted?: boolean;
+    /** The ceremony itself ran over a push notification. */
+    viaPush?: boolean;
+    headless?: boolean;
+}): { now: true; trust: boolean } | { now: false } {
+    const trust = !!o.viaPush || !!o.deviceTrusted;
+    if (!o.pushToken || trust || o.headless) return { now: true, trust };
+    return { now: false };
+}

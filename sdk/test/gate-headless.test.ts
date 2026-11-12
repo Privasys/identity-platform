@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitiseChoice, sanitiseGateState } from '../src/gate-headless';
+import { finishOnSuccess, sanitiseChoice, sanitiseGateState } from '../src/gate-headless';
 
 test('a choice over postMessage is reduced to a well-formed one', () => {
     assert.deepEqual(sanitiseChoice({ method: 'wallet' }), { method: 'wallet' });
@@ -20,4 +20,16 @@ test('a state report carries only the named fields', () => {
     assert.deepEqual(sanitiseGateState({ state: 'push-waiting', qrSvg: 'javascript:alert(1)' }), { state: 'push-waiting' });
     assert.equal(sanitiseGateState({ state: 'exploding' }), null);
     assert.equal(sanitiseGateState(undefined), null);
+});
+
+test('a headless gate finishes a first wallet sign-in without asking to trust the device', () => {
+    // The QR sign-in on an untrusted device: a visible gate asks.
+    assert.deepEqual(finishOnSuccess({ pushToken: 'p' }), { now: false });
+    // A headless gate cannot ask, so it finishes, and does not remember the device.
+    assert.deepEqual(finishOnSuccess({ pushToken: 'p', headless: true }), { now: true, trust: false });
+    // Already trusted, or signed in over a push: finish and keep the trust.
+    assert.deepEqual(finishOnSuccess({ pushToken: 'p', deviceTrusted: true }), { now: true, trust: true });
+    assert.deepEqual(finishOnSuccess({ pushToken: 'p', viaPush: true, headless: true }), { now: true, trust: true });
+    // No wallet involved: nothing to trust.
+    assert.deepEqual(finishOnSuccess({}), { now: true, trust: false });
 });

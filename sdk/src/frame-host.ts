@@ -21,7 +21,7 @@ import { sanitiseDisplayNames, sanitiseIcons, sanitiseOwn, sanitiseProviders, se
 import { sanitiseChoice, type GateState } from './gate-headless';
 import { sanitiseTheme } from './theme';
 import type { AuthUIConfig, SignInResult } from './ui';
-import { SessionManager, SESSIONS_STORAGE_KEY, deviceLabel, type DeviceHint } from './session';
+import { SessionManager, SESSIONS_STORAGE_KEY, cleanDeviceLabel, deviceLabel, type DeviceHint } from './session';
 import type { AuthSession } from './types';
 import { PrivasysSession, type EncAuthEnvelope, type SealedWebSocket } from './enclave-session';
 
@@ -617,7 +617,7 @@ function runDevicePopup(): void {
             if (token) {
                 sessions.saveDeviceHint(token,
                     typeof d.brokerUrl === 'string' ? d.brokerUrl.slice(0, 512) : '',
-                    typeof d.label === 'string' ? d.label : undefined);
+                    cleanDeviceLabel(d.label));
             }
         } else if (d.op === 'forget') {
             if (token) sessions.forgetDevice(token);
@@ -1563,8 +1563,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         sessions.forgetDevice(token);
                         await askDevicePopup(openDevicePopup, { op: 'forget', pushToken: token });
                     },
-                    rememberDevice: async (token: string) => {
-                        await askDevicePopup(openDevicePopup, { op: 'store', pushToken: token, brokerUrl: config.brokerUrl || '' });
+                    rememberDevice: async (token: string, label?: string) => {
+                        await askDevicePopup(openDevicePopup, { op: 'store', pushToken: token, brokerUrl: config.brokerUrl || '', ...(label ? { label } : {}) });
                     },
                     // A passkey carries no name or email; the gate asks for
                     // them through a provider when the client wants them.
@@ -1667,7 +1667,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 if (session.pushToken && session.brokerUrl) {
                     if (uiResult?.trustDevice || deviceTrusted) {
                         // A wallet found through the popup keeps the name it has there.
-                        sessions.saveDeviceHint(session.pushToken, session.brokerUrl, deviceLabels.get(session.pushToken));
+                        // The wallet's own name for the phone wins: it is current.
+                        sessions.saveDeviceHint(session.pushToken, session.brokerUrl,
+                            uiResult?.deviceLabel ?? deviceLabels.get(session.pushToken));
                     }
                 }
                 scheduleRenewal(session, parentOrigin);

@@ -3,7 +3,7 @@
 
 import type { AuthConfig, AuthEvents, AuthResult, AuthState, AttestationInfo, SessionRelayBinding } from './types';
 import { generateQRPayload } from './qr';
-import { SessionManager } from './session';
+import { SessionManager, cleanDeviceLabel } from './session';
 
 const DEFAULT_TIMEOUT = 120_000;
 
@@ -248,6 +248,7 @@ export class PrivasysAuth {
                     sessionId,
                     attestation: msg.attestation as AttestationInfo | undefined,
                     pushToken: (msg.pushToken as string | undefined) || undefined,
+                    deviceLabel: cleanDeviceLabel(msg.deviceLabel),
                     attributes: (msg.attributes as Record<string, string> | undefined) || undefined,
                     sessionRelay: (msg.sessionRelay as SessionRelayBinding | undefined) || undefined,
                 };

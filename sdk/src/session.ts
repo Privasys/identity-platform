@@ -29,6 +29,14 @@ export interface DeviceHint {
     label?: string;
 }
 
+/** A wallet's name for its phone, as text of at most 80 characters, or nothing. */
+export function cleanDeviceLabel(raw: unknown): string | undefined {
+    if (typeof raw !== 'string') return undefined;
+    // Holder-supplied text: no control characters, one line.
+    const label = raw.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, 80);
+    return label || undefined;
+}
+
 /** What to call a remembered wallet on the gate. */
 export function deviceLabel(d: Pick<DeviceHint, 'label' | 'addedAt' | 'updatedAt'>): string {
     if (d.label) return d.label;

@@ -162,7 +162,7 @@ export interface AuthUIConfig {
     /** Remember the phone for every site in this browser, the same way.
      *  Called inside the click on "Trust this device"; the gate waits for it
      *  before it finishes, so the frame is still there to answer the popup. */
-    rememberDevice?: (pushToken: string) => Promise<void> | void;
+    rememberDevice?: (pushToken: string, label?: string) => Promise<void> | void;
     /**
      * The client asked for the person's name or email address, which a
      * passkey does not carry. After a passkey the gate then asks the person
@@ -202,6 +202,8 @@ export interface SignInResult {
     sessionId: string;
     /** Push token for sending future auth requests (wallet only). */
     pushToken?: string;
+    /** The wallet's name for this phone, when it sent one. */
+    deviceLabel?: string;
     /** Profile attributes from the wallet (keyed by OIDC claim name). */
     attributes?: Record<string, string>;
     /** Whether the user chose to trust this device for future push-based sign-in. */
@@ -1083,6 +1085,7 @@ export class AuthUI {
     private sessionId = '';
     private attestation: AttestationInfo | undefined;
     private pushToken: string | undefined;
+    private deviceLabel: string | undefined;
     private attributes: Record<string, string> | undefined;
     private sessionRelay: SessionRelayBinding | undefined;
     private method: 'wallet' | 'passkey' = 'wallet';
@@ -2066,7 +2069,7 @@ export class AuthUI {
                 el('button', { className: 'btn-provider primary', onClick: () => {
                     if (this.lookingUp) return;
                     this.lookingUp = true;
-                    const stored = this.pushToken ? this.cfg.rememberDevice?.(this.pushToken) : undefined;
+                    const stored = this.pushToken ? this.cfg.rememberDevice?.(this.pushToken, this.deviceLabel) : undefined;
                     void Promise.resolve(stored).catch(() => undefined).then(() => {
                         this.lookingUp = false;
                         this.finishWithTrust(true);
@@ -2142,6 +2145,7 @@ export class AuthUI {
                 this.attestation = result.attestation;
                 this.sessionId = result.sessionId;
                 this.pushToken = result.pushToken;
+                this.deviceLabel = result.deviceLabel;
                 this.attributes = result.attributes;
                 this.sessionRelay = result.sessionRelay;
                 this.complete();
@@ -2170,6 +2174,7 @@ export class AuthUI {
                 this.attestation = result.attestation;
                 this.sessionId = result.sessionId;
                 this.pushToken = result.pushToken;
+                this.deviceLabel = result.deviceLabel;
                 this.attributes = result.attributes;
                 this.sessionRelay = result.sessionRelay;
                 this.complete();
@@ -2298,6 +2303,7 @@ export class AuthUI {
             attestation: this.attestation,
             sessionId: this.sessionId,
             pushToken: this.pushToken,
+            deviceLabel: this.deviceLabel,
             attributes: this.attributes,
             trustDevice: trust,
             sessionRelay: this.sessionRelay,

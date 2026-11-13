@@ -60,6 +60,9 @@ export interface AuthResult {
     sessionId: string;
     /** Push token for sending future auth requests (wallet only). */
     pushToken?: string;
+    /** The name the wallet gives this phone (its model, or what the holder
+     *  renamed it to). Absent from wallets that predate it. */
+    deviceLabel?: string;
     /** Profile attributes from the wallet or social IdP (keyed by OIDC claim name). */
     attributes?: Record<string, string>;
     /**

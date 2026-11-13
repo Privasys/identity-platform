@@ -62,3 +62,13 @@ test('no more than eight wallets are kept', () => {
     for (let i = 0; i < 12; i++) m.saveDeviceHint(`phone-${i}`, 'wss://b');
     assert.equal(m.getDevices().length, 8);
 });
+
+test("a wallet's name for its phone is kept as one line of plain text", async () => {
+    const { cleanDeviceLabel } = await import('../src/session');
+    assert.equal(cleanDeviceLabel('  iPhone 15 Pro  '), 'iPhone 15 Pro');
+    assert.equal(cleanDeviceLabel('Pixel\n8\tPro'), 'Pixel 8 Pro');
+    assert.equal(cleanDeviceLabel('x'.repeat(200))?.length, 80);
+    for (const bad of [undefined, null, 42, {}, '', '   ']) assert.equal(cleanDeviceLabel(bad), undefined);
+    // Markup stays text: the gate sets it as a text node.
+    assert.equal(cleanDeviceLabel('<img src=x onerror=alert(1)>'), '<img src=x onerror=alert(1)>');
+});

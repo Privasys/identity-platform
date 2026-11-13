@@ -26,21 +26,40 @@ type SessionListener = (sessions: AuthSession[]) => void;
  */
 export class SessionManager {
     private listeners = new Set<SessionListener>();
+    // The client every lookup is for, once a page has named one (forClient).
+    private clientId: string | null = null;
+
+    /**
+     * Limit lookups to one client's sessions. Sessions are kept per rpId AND
+     * client: two apps that share an rpId each have their own, and a page
+     * speaking for one client is never given, and never replaces, a session
+     * minted for another. A page that names no client (an older client
+     * script) gets the most recent session for the rpId, as before.
+     */
+    forClient(clientId: string | null): void {
+        this.clientId = clientId || null;
+    }
+
+    private mine(s: AuthSession, rpId: string): boolean {
+        return s.rpId === rpId && (this.clientId === null || s.clientId === this.clientId);
+    }
 
     /** Store a new session after successful authentication. */
     store(session: AuthSession): void {
         const sessions = this.getAll();
-        // Replace existing session for the same rpId
-        const idx = sessions.findIndex((s) => s.rpId === session.rpId);
+        // Replace the existing session for the same rpId and client
+        const idx = sessions.findIndex((s) => s.rpId === session.rpId && (s.clientId ?? '') === (session.clientId ?? ''));
         if (idx >= 0) sessions[idx] = session;
         else sessions.push(session);
         this.persist(sessions);
         this.notify(sessions);
     }
 
-    /** Get the session for a specific RP, or undefined if none. */
+    /** Get the session for a specific RP (and the named client), or undefined if none. */
     get(rpId: string): AuthSession | undefined {
-        return this.getAll().find((s) => s.rpId === rpId);
+        return this.getAll()
+            .filter((s) => this.mine(s, rpId))
+            .sort((a, b) => b.authenticatedAt - a.authenticatedAt)[0];
     }
 
     /** Get all stored sessions. */
@@ -74,7 +93,7 @@ export class SessionManager {
 
     /** Remove a session by rpId (device hint is kept). */
     remove(rpId: string): void {
-        const sessions = this.getAll().filter((s) => s.rpId !== rpId);
+        const sessions = this.getAll().filter((s) => !this.mine(s, rpId));
         this.persist(sessions);
         this.notify(sessions);
     }

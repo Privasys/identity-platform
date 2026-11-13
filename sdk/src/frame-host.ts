@@ -487,6 +487,49 @@ function tokenExpMs(token: string): number | null {
     }
 }
 
+// What the identity provider said about a page and a client, for this
+// document's life. Only a yes is kept: a refusal or a failed lookup is asked
+// again, so registering an origin takes effect without a reload.
+const pageVerdicts = new Set<string>();
+
+/**
+ * Whether the page at `pageOrigin` is one `clientId` registered: its
+ * redirect URIs' origins and its allowed origins, the list a sign-in with no
+ * redirect is checked against. The identity provider answers, logs a page it
+ * does not know, and refuses it once that check is enforced. A lookup that
+ * fails is a no: nothing else here works without the identity provider.
+ */
+async function pageIsClients(clientId: string, pageOrigin: string): Promise<boolean> {
+    const key = `${clientId}|${pageOrigin}`;
+    if (pageVerdicts.has(key)) return true;
+    try {
+        const u = new URL('/session/client-origin', globalThis.location.origin);
+        u.searchParams.set('client_id', clientId);
+        u.searchParams.set('origin', pageOrigin);
+        const resp = await fetch(u.toString(), { cache: 'no-store' });
+        if (!resp.ok) return false;
+        const body = await resp.json().catch(() => null);
+        if (body?.allowed !== true) return false;
+        pageVerdicts.add(key);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * The stored session this page may use, or undefined. A session belongs to a
+ * client, and only that client's own pages are given it: every page under one
+ * registrable domain shares this frame's storage, so without this a page
+ * could take another app's session by naming its rpId. A session with no
+ * client (an opaque token from before OIDC) has no list to check.
+ */
+async function sessionForPage(rpId: string, pageOrigin: string): Promise<AuthSession | undefined> {
+    const session = sessions.get(rpId);
+    if (!session?.clientId) return session;
+    return (await pageIsClients(session.clientId, pageOrigin)) ? session : undefined;
+}
+
 /** Whether an access token carries the identity provider's wallet marker. */
 function tokenSaysWallet(token: string): boolean {
     try {
@@ -867,6 +910,10 @@ function sanitiseSpend(v: unknown): { cap?: number } {
 window.addEventListener('message', async (e: MessageEvent) => {
     const data = e.data;
     if (!data || typeof data.type !== 'string') return;
+    // The client this page speaks for: every session lookup below is for it
+    // (SessionManager.forClient). One frame serves one AuthFrame, so one client.
+    const named = data.type === 'privasys:init' ? data.config?.clientId : data.clientId;
+    if (typeof named === 'string' && named) sessions.forClient(named);
 
     if (data.type === 'privasys:init') {
         const config: AuthUIConfig & {
@@ -1628,7 +1675,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
     }
 
     if (data.type === 'privasys:check-session') {
-        let session = sessions.get(data.rpId);
+        let session = await sessionForPage(data.rpId, e.origin);
 
         // If the access token is inside the renewal margin and we have a
         // refresh token, renew inline (under the cross-document lock)
@@ -1643,8 +1690,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
             scheduleRenewal(session, e.origin);
         }
 
+        // The refresh token stays here: the page has no use for it, and this
+        // frame does every renewal and every mint.
         window.parent.postMessage(
-            { type: 'privasys:session', session: session || null },
+            { type: 'privasys:session', session: session ? { ...session, refreshToken: undefined } : null },
             e.origin,
         );
     }
@@ -1672,7 +1721,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 { type: 'privasys:token-for-audience:response', id, ...payload },
                 e.origin,
             );
-        const session = sessions.get(data.rpId);
+        const session = await sessionForPage(data.rpId, e.origin);
         if (!session?.refreshToken || !session?.clientId) {
             reply({ error: 'no refresh token in session' });
             return;
@@ -1749,6 +1798,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 e.origin,
             );
         try {
+            if (!(await sessionForPage(String(data.rpId || ''), e.origin))) throw new Error('no-session');
             await requestVoucherPush({
                 rpId: String(data.rpId || ''),
                 appName: String(data.appName || data.rpId || ''),
@@ -1811,6 +1861,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const rpId = String(data.rpId || '');
         if (!appHost || !rpId) {
             reply({ error: 'appHost and rpId required' });
+            return;
+        }
+        if (!(await sessionForPage(rpId, e.origin))) {
+            reply({ error: 'no-session' });
             return;
         }
         if (activeSession && activeSession.appHost === appHost) {

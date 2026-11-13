@@ -187,6 +187,9 @@ func main() {
 	// session_hint push the delta of a widened attribute set to the holder's
 	// wallet instead of forcing a full QR ceremony.
 	oidc.SetClientOriginEnforcement(os.Getenv("IDP_ENFORCE_CLIENT_ORIGINS") == "true")
+	// The sign-in frame asks whether a page is one of a client's own before
+	// it gives that page a stored session.
+	mux.HandleFunc("GET /session/client-origin", oidc.HandleClientOrigin(clientReg, cfg.IssuerURL))
 	mux.HandleFunc("GET /authorize", oidc.HandleAuthorize(clientReg, sessionStore, cfg.IssuerURL, voucherMinter,
 		&oidc.AttributeStepUp{
 			Issuer:        issuer,

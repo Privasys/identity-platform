@@ -1502,6 +1502,7 @@ export class AuthFrame {
                             id,
                             appHost,
                             rpId: this.rpId,
+                            clientId: this.config.clientId,
                             // The spend ask travels with the resume so the host
                             // can refuse a SILENT one for an app the holder has
                             // never allowed to spend. Without this the ask only
@@ -1697,7 +1698,7 @@ export class AuthFrame {
 
                 if (data.type === 'privasys:ready') {
                     iframe.contentWindow!.postMessage(
-                        { type: 'privasys:check-session', rpId: this.rpId },
+                        { type: 'privasys:check-session', rpId: this.rpId, clientId: this.config.clientId },
                         this.authOrigin,
                     );
                 } else if (data.type === 'privasys:session') {
@@ -1772,7 +1773,7 @@ export class AuthFrame {
                 };
                 window.addEventListener('message', handler);
                 this.sessionIframe.contentWindow.postMessage(
-                    { type: 'privasys:clear-session', rpId: this.rpId },
+                    { type: 'privasys:clear-session', rpId: this.rpId, clientId: this.config.clientId },
                     this.authOrigin,
                 );
                 setTimeout(() => {
@@ -1806,7 +1807,7 @@ export class AuthFrame {
 
                 if (data.type === 'privasys:ready') {
                     iframe.contentWindow!.postMessage(
-                        { type: 'privasys:clear-session', rpId: this.rpId },
+                        { type: 'privasys:clear-session', rpId: this.rpId, clientId: this.config.clientId },
                         this.authOrigin,
                     );
                 } else if (data.type === 'privasys:session-cleared') {
@@ -1864,7 +1865,7 @@ export class AuthFrame {
             }, 15_000);
             window.addEventListener('message', handler);
             target.postMessage(
-                { type: 'privasys:get-token-for-audience', id, rpId: this.rpId, audience },
+                { type: 'privasys:get-token-for-audience', id, rpId: this.rpId, clientId: this.config.clientId, audience },
                 this.authOrigin,
             );
         });

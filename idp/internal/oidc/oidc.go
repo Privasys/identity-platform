@@ -705,6 +705,28 @@ func clientOriginAllowed(client *clients.Client, origin, issuerURL string) bool 
 	return !enforceClientOrigins
 }
 
+// HandleClientOrigin answers GET /session/client-origin?client_id=&origin=: may
+// the page at origin use client_id's stored session. The sign-in frame asks
+// before it gives a page a session it holds, renews it or mints from it: a
+// browser gives that frame one storage for every page under a registrable
+// domain, so the frame has to know which pages are the client's own. Same
+// list, same log line and same enforcement as a sign-in with no redirect; the
+// answer says no more than a sign-in attempt from that page would.
+func HandleClientOrigin(reg *clients.Registry, issuerURL string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		allowed := false
+		if origin := q.Get("origin"); origin != "" {
+			if client, err := reg.Get(q.Get("client_id")); err == nil {
+				allowed = clientOriginAllowed(client, origin, issuerURL)
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(map[string]bool{"allowed": allowed})
+	}
+}
+
 // HandleAuthorize handles the OIDC authorization request.
 // Creates a session with a QR payload for the Privasys Wallet app and returns
 // the session data as JSON for the SDK iframe to consume.

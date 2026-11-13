@@ -1,7 +1,9 @@
 package oidc
 
 import (
+	"encoding/json"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/Privasys/idp/internal/clients"
@@ -46,6 +48,43 @@ func TestClientOriginAllowed(t *testing.T) {
 		SetClientOriginEnforcement(true)
 		if got := clientOriginAllowed(client, c.origin, testIssuer); got != c.enforce {
 			t.Errorf("%q enforced: %v, want %v", c.origin, got, c.enforce)
+		}
+	}
+}
+
+// The frame asks before it gives a page a stored session: the client's own
+// pages get a yes, any other page a yes only while the check is not enforced.
+func TestHandleClientOrigin(t *testing.T) {
+	reg, _, _ := newDeviceTestEnv(t)
+	h := HandleClientOrigin(reg, testIssuer)
+	defer SetClientOriginEnforcement(false)
+	ask := func(clientID, origin string) bool {
+		t.Helper()
+		q := url.Values{"client_id": {clientID}, "origin": {origin}}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", "/session/client-origin?"+q.Encode(), nil))
+		var body struct{ Allowed bool }
+		if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		return body.Allowed
+	}
+	for _, c := range []struct {
+		client, origin    string
+		logging, enforced bool
+	}{
+		{"privasys-cli", "https://privasys.id", true, true},
+		{"privasys-cli", "https://evil.example", true, false},
+		{"privasys-cli", "", false, false},
+		{"no-such-client", "https://privasys.id", false, false},
+	} {
+		SetClientOriginEnforcement(false)
+		if got := ask(c.client, c.origin); got != c.logging {
+			t.Errorf("%s %q while logging: %v, want %v", c.client, c.origin, got, c.logging)
+		}
+		SetClientOriginEnforcement(true)
+		if got := ask(c.client, c.origin); got != c.enforced {
+			t.Errorf("%s %q enforced: %v, want %v", c.client, c.origin, got, c.enforced)
 		}
 	}
 }

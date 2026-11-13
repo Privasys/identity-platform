@@ -86,6 +86,19 @@ export interface LocalDevice {
     secret: string;
     name: string;
     createdAt: number;
+    /** Set once the holder names this phone in the wallet; until then the name follows the OS. */
+    renamed?: boolean;
+}
+
+/**
+ * The name the OS gives this phone. Android returns the name the user set; iOS
+ * 16 and later return only "iPhone" without an entitlement we do not ask for,
+ * so a generic answer falls back to the model.
+ */
+function osDeviceName(): string {
+    const n = Device.deviceName?.trim();
+    if (n && !/^(iphone|ipad|ipod( touch)?)$/i.test(n)) return n.slice(0, 40);
+    return Device.modelName || 'Phone';
 }
 
 let cachedDevice: LocalDevice | null = null;
@@ -96,13 +109,19 @@ export async function ensureDevice(): Promise<LocalDevice> {
     const held = await readJson<LocalDevice | null>(DEVICE_KEY, null);
     if (held?.id && held.secret) {
         cachedDevice = held;
-        return held;
+        const os = osDeviceName();
+        if (!held.renamed && os !== held.name) {
+            // Renamed in the OS settings: follow it.
+            cachedDevice = { ...held, name: os };
+            await SecureStore.setItemAsync(DEVICE_KEY, JSON.stringify(cachedDevice));
+            await saveLocalRegistry(upsertDevice(await localRegistry(), cachedDevice));
+        }
+        return cachedDevice;
     }
     const device: LocalDevice = {
         id: bytesToBase64url(random(16)),
         secret: bytesToBase64url(random(32)),
-        // The model, not Device.deviceName: that is often the owner's name.
-        name: Device.modelName || 'Phone',
+        name: osDeviceName(),
         createdAt: Math.floor(Date.now() / 1000),
     };
     await SecureStore.setItemAsync(DEVICE_KEY, JSON.stringify(device));
@@ -119,10 +138,15 @@ export async function deviceLabel(): Promise<string | undefined> {
     }
 }
 
-/** Rename this phone (shown on the holder's other phones after the next sync). */
+/**
+ * Rename this phone. Shown on the holder's other phones after the next sync,
+ * and on the sign-in gate of browsers it signs in to. An empty name goes back
+ * to following the OS.
+ */
 export async function renameDevice(name: string): Promise<void> {
     const d = await ensureDevice();
-    cachedDevice = { ...d, name: name.trim().slice(0, 40) || d.name };
+    const n = name.trim().slice(0, 40);
+    cachedDevice = n ? { ...d, name: n, renamed: true } : { ...d, name: osDeviceName(), renamed: false };
     await SecureStore.setItemAsync(DEVICE_KEY, JSON.stringify(cachedDevice));
     const reg = await localRegistry();
     await saveLocalRegistry(upsertDevice(reg, cachedDevice));
@@ -328,7 +352,7 @@ export async function syncRegistry(session: string | null = mainSession()): Prom
     if (!session) return local;
     for (let attempt = 0; attempt < 3; attempt++) {
         const { reg: remote, version } = await fetchRemote(session);
-        const merged = remote ? mergeRegistries(remote, local) : local;
+        const merged = remote ? keepRemoteNames(mergeRegistries(remote, local), remote) : local;
         await saveLocalRegistry(merged);
         await SecureStore.setItemAsync(REGISTRY_VERSION_KEY, String(version));
         if (remote && sameRegistry(merged, remote)) return merged;
@@ -346,6 +370,20 @@ export async function syncRegistry(session: string | null = mainSession()): Prom
         local = merged; // another phone wrote first: merge again
     }
     throw new Error('the registry kept changing; try again');
+}
+
+/**
+ * Each phone owns its own name. The local copy merges last so this phone's name
+ * wins, but its copies of the OTHER phones' names may be out of date, and must
+ * not undo a rename made on that phone.
+ */
+function keepRemoteNames(merged: Registry, remote: Registry): Registry {
+    const me = cachedDevice?.id;
+    const names = new Map(remote.devices.map((d) => [d.id, d.name]));
+    return {
+        ...merged,
+        devices: merged.devices.map((d) => (d.id !== me && names.get(d.id) ? { ...d, name: names.get(d.id)! } : d)),
+    };
 }
 
 /** Replace the registry outright (after a revocation), keeping the merge rules. */

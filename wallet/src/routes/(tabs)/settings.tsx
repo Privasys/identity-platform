@@ -34,7 +34,7 @@ export default function SettingsScreen() {
     const verificationMode = useSettingsStore((s) => s.verificationMode);
     const setVerificationMode = useSettingsStore((s) => s.setVerificationMode);
     const pushToken = useExpoPushToken();
-    // The Devices section appears only for a holder with more than one phone.
+    // Devices shows from the first phone: it is where the phone is named.
     const [phones, setPhones] = useState(0);
     useFocusEffect(
         useCallback(() => {
@@ -132,7 +132,7 @@ export default function SettingsScreen() {
                     </>
                 ) : null}
 
-                {phones > 1 ? (
+                {phones > 0 ? (
                     <>
                         <Text style={styles.sectionTitle}>{t('devices.settingsTitle')}</Text>
                         <Text style={styles.sectionDescription}>{t('devices.settingsDescription')}</Text>

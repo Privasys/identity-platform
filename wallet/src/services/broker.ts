@@ -31,6 +31,11 @@ export interface BrokerConnection {
  *                      from `/__privasys/session-bootstrap`. When set, the SDK
  *                      iframe completes the ECDH handshake and instantiates a
  *                      `PrivasysSession` for sealed CBOR-AES-GCM requests.
+ * @param deviceLabel  This phone's name in the wallet (the model unless the
+ *                      holder renamed it). The sign-in gate keeps it in the
+ *                      browser beside the push token, to name this phone when
+ *                      the browser knows several. Never the OS device name,
+ *                      which is often the owner's own name.
  */
 export function relaySessionToken(
     brokerUrl: string,
@@ -39,6 +44,7 @@ export function relaySessionToken(
     pushToken: string | null,
     attributes?: Record<string, string>,
     sessionRelay?: { sessionId: string; encPub: string; expiresAt?: number },
+    deviceLabel?: string,
 ): Promise<void> {
     return new Promise((resolve, reject) => {
         let settled = false;
@@ -66,6 +72,10 @@ export function relaySessionToken(
             }
             if (sessionRelay) {
                 msg.sessionRelay = sessionRelay;
+            }
+            const label = deviceLabel?.trim().slice(0, 80);
+            if (label) {
+                msg.deviceLabel = label;
             }
             ws.send(JSON.stringify(msg));
             settled = true;

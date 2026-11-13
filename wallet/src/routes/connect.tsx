@@ -60,6 +60,7 @@ import {
     type DependencyConsentItem,
 } from '@/services/dependency-consent';
 import { relaySessionToken } from '@/services/broker';
+import { deviceLabel } from '@/services/devices';
 import { fetchStoreListing, type StoreListing } from '@/services/store-listing';
 import {
     completeAttributeApproval,
@@ -2426,6 +2427,7 @@ function ConnectFlow() {
                 pushToken,
                 attributes,
                 result.sessionRelay,
+                await deviceLabel(),
             );
 
             // IdP-brokered flows: ALSO patch the attributes onto the auth code
@@ -2607,6 +2609,7 @@ function ConnectFlow() {
                 pushToken,
                 attributes,
                 result.sessionRelay,
+                await deviceLabel(),
             );
 
             // Device-flow attribute delivery (see patchSessionAttributes).
@@ -2848,6 +2851,7 @@ function ConnectFlow() {
                 pushToken,
                 attributes,
                 pending.sessionRelay,
+                await deviceLabel(),
             );
 
             // Device-flow attribute delivery (see patchSessionAttributes).

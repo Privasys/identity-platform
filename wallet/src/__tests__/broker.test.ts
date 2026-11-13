@@ -94,6 +94,35 @@ describe('relaySessionToken', () => {
         await promise;
     });
 
+    it('sends the device label beside the push token, trimmed and capped at 80', async () => {
+        const promise = relaySessionToken(
+            'wss://broker.example.com/relay',
+            'sess-789',
+            'tok-ghi',
+            'push-xyz',
+            undefined,
+            undefined,
+            '  ' + 'x'.repeat(100) + '  ',
+        );
+
+        await tick();
+        const authMsg = JSON.parse(FakeWebSocket.instances[0].sent[0]);
+        expect(authMsg.pushToken).toBe('push-xyz');
+        expect(authMsg.deviceLabel).toBe('x'.repeat(80));
+
+        await promise;
+    });
+
+    it('omits a blank device label', async () => {
+        const promise = relaySessionToken('wss://broker.example.com/relay', 'sess-790', 'tok-jkl', null, undefined, undefined, '   ');
+
+        await tick();
+        const authMsg = JSON.parse(FakeWebSocket.instances[0].sent[0]);
+        expect('deviceLabel' in authMsg).toBe(false);
+
+        await promise;
+    });
+
     it('sends on browser-waiting if open has not yet sent (wallet-first / push flow)', async () => {
         // WebSocket that never auto-opens — simulates wallet connecting
         // before browser, so onopen fires but browser isn't there yet.

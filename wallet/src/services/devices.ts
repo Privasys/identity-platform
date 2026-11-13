@@ -110,6 +110,15 @@ export async function ensureDevice(): Promise<LocalDevice> {
     return device;
 }
 
+/** This phone's name, for a sign-in gate to show. Undefined if it cannot be read. */
+export async function deviceLabel(): Promise<string | undefined> {
+    try {
+        return (await ensureDevice()).name;
+    } catch {
+        return undefined;
+    }
+}
+
 /** Rename this phone (shown on the holder's other phones after the next sync). */
 export async function renameDevice(name: string): Promise<void> {
     const d = await ensureDevice();

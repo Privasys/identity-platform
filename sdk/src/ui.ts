@@ -149,7 +149,16 @@ export interface AuthUIConfig {
      * only allows a popup then. Resolves null when nothing is remembered or
      * the popup could not open.
      */
-    lookupDevice?: () => Promise<{ pushToken: string } | null>;
+    lookupDevice?: () => Promise<{ pushToken: string; label: string }[]>;
+    /**
+     * The wallets this browser remembers on this site, the most recently
+     * used first. With several, the gate shows one button each and starts
+     * nothing by itself; with one, `pushToken` is it.
+     */
+    devices?: { pushToken: string; label: string }[];
+    /** Forget a remembered wallet, here and for every site. Called inside
+     *  the click on "Forget". */
+    forgetDevice?: (pushToken: string) => Promise<void> | void;
     /** Remember the phone for every site in this browser, the same way.
      *  Called inside the click on "Trust this device"; the gate waits for it
      *  before it finishes, so the frame is still there to answer the popup. */
@@ -1156,8 +1165,9 @@ export class AuthUI {
             } else if (this.cfg.headless) {
                 // The page chooses; nothing starts until it does.
                 this.render();
-            } else if (this.cfg.pushToken && this.allowed('wallet')) {
+            } else if (this.cfg.pushToken && this.allowed('wallet') && this.chooser().length < 2) {
                 // Returning user (push token available): skip idle, push.
+                // With several wallets remembered the person chooses first.
                 this.autoStarted = true;
                 this.autoFirstScreen = 'push-waiting';
                 this.startPush();
@@ -1246,7 +1256,42 @@ export class AuthUI {
                 : [],
             wallet: this.allowed('wallet'),
             push: !!this.cfg.pushToken && this.allowed('wallet'),
+            ...(this.chooser().length > 1
+                ? { wallets: this.chooser().map((d, i) => ({ id: String(i), label: d.label })) }
+                : {}),
         };
+    }
+
+    /** The remembered wallets to choose from, when the wallet is offered. */
+    private chooser(): { pushToken: string; label: string }[] {
+        return this.allowed('wallet') ? (this.cfg.devices ?? []) : [];
+    }
+
+    // The person asked for another Privasys ID than the remembered ones: the
+    // QR sign-in that follows asks whether to remember it, as a first one does.
+    private addingDevice = false;
+
+    private pushTo(device: { pushToken: string }): void {
+        this.addingDevice = false;
+        this.cfg.pushToken = device.pushToken;
+        this.startPush();
+    }
+
+    private useAnotherWallet(): void {
+        this.addingDevice = true;
+        this.cfg.pushToken = undefined;
+        this.startWallet();
+    }
+
+    private forget(device: { pushToken: string }): void {
+        if (this.lookingUp) return;
+        this.lookingUp = true;
+        void Promise.resolve(this.cfg.forgetDevice?.(device.pushToken)).catch(() => undefined).then(() => {
+            this.lookingUp = false;
+            this.cfg.devices = (this.cfg.devices ?? []).filter((d) => d.pushToken !== device.pushToken);
+            this.cfg.pushToken = this.cfg.devices[0]?.pushToken;
+            if (this.state === 'idle') this.render();
+        });
     }
 
     /** Start the flow a headless page chose, if the gate offers it. A
@@ -1271,8 +1316,11 @@ export class AuthUI {
             return;
         }
         if (!this.allowed('wallet')) return;
-        if (this.cfg.pushToken && !choice.qr) this.startPush();
+        const chosen = choice.wallet !== undefined ? this.chooser()[Number(choice.wallet)] : undefined;
+        if (chosen && !choice.qr) this.pushTo(chosen);
+        else if (choice.qr && this.chooser().length > 1) this.useAnotherWallet();
         else if (choice.qr) this.startWallet();
+        else if (this.cfg.pushToken) this.startPush();
         else void this.startWalletFromClick();
     }
 
@@ -1288,12 +1336,19 @@ export class AuthUI {
         if (this.lookingUp) return;
         if (!this.cfg.pushToken && this.cfg.lookupDevice && !isMobileDevice()) {
             this.lookingUp = true;
-            const known = await this.cfg.lookupDevice().catch(() => null);
+            const known = await this.cfg.lookupDevice().catch(() => []);
             this.lookingUp = false;
             if (this.state !== 'idle' && this.state !== 'error') return;
-            if (known?.pushToken) {
-                this.cfg.pushToken = known.pushToken;
-                this.startPush();
+            if (known.length > 1 && !this.cfg.headless) {
+                // Several wallets are known to this browser: let the person choose.
+                this.cfg.devices = known;
+                this.cfg.pushToken = known[0].pushToken;
+                this.state = 'idle';
+                this.render();
+                return;
+            }
+            if (known.length) {
+                this.pushTo(known[0]);
                 return;
             }
         }
@@ -1523,8 +1578,34 @@ export class AuthUI {
 
         const buttons: (HTMLElement | null | false)[] = [];
 
+        // Several remembered wallets: one button each, the last used here
+        // first, then the way to add another.
+        const several = this.chooser();
+        if (several.length > 1) {
+            several.forEach((d, i) => {
+                buttons.push(
+                    el('button', { className: `btn-provider ${i === 0 ? 'primary' : ''}`, onClick: () => this.pushTo(d) },
+                        el('span', { html: ICON_PHONE }),
+                        el('span', { className: 'btn-label' }, d.label),
+                        el('span', { className: 'btn-hint' }, 'Notification'),
+                    ),
+                    this.cfg.forgetDevice ? el('button', {
+                        className: 'link-btn',
+                        style: 'font-size: 12px; display: block; margin: 0 2px 12px auto; padding: 2px 0;',
+                        onClick: () => this.forget(d),
+                    }, 'Forget') : null,
+                );
+            });
+            buttons.push(
+                el('button', { className: 'btn-provider', onClick: () => this.useAnotherWallet() },
+                    el('span', { html: ICON_LOGO }),
+                    el('span', { className: 'btn-label' }, 'Use another Privasys ID'),
+                ),
+            );
+        }
+
         // Push-first: returning user with push token
-        if (hasPush) {
+        if (hasPush && several.length < 2) {
             buttons.push(
                 el('button', { className: 'btn-provider primary', onClick: () => this.startPush() },
                     el('span', { html: ICON_PHONE }),
@@ -1535,7 +1616,7 @@ export class AuthUI {
         }
 
         // Primary wallet/QR button — Privasys logo in the button
-        if (hasWallet) {
+        if (hasWallet && several.length < 2) {
             const altLabel = isMobileDevice() ? 'Open in Privasys Wallet instead' : 'Scan QR code instead';
             buttons.push(
                 el('button', { className: `btn-provider ${hasPush ? '' : 'primary'}`, onClick: () => { if (hasPush) this.startWallet(); else void this.startWalletFromClick(); } },
@@ -1944,7 +2025,7 @@ export class AuthUI {
         // approval (cfg.pushToken) — the device already behaves as trusted,
         // so the question is contradictory. Only first-time wallet auth
         // (QR) on an untrusted device earns the prompt.
-        const showTrust = !!this.pushToken && !this.cfg.deviceTrusted && !this.cfg.pushToken;
+        const showTrust = !!this.pushToken && (!this.cfg.deviceTrusted || this.addingDevice) && !this.cfg.pushToken;
         const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
 
         return el('div', null,
@@ -2175,7 +2256,7 @@ export class AuthUI {
         // A headless gate never asks: the person cannot see the question.
         const end = finishOnSuccess({
             pushToken: this.pushToken,
-            deviceTrusted: this.cfg.deviceTrusted,
+            deviceTrusted: this.cfg.deviceTrusted && !this.addingDevice,
             viaPush: !!this.cfg.pushToken,
             headless: this.cfg.headless,
         });

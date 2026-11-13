@@ -34,12 +34,16 @@ export interface GateOptions {
     /** Whether this device holds a wallet push binding: a wallet sign-in
      *  then goes by notification, with the QR code as the alternative. */
     push: boolean;
+    /** The wallets this browser remembers on this site, the most recently
+     *  used first, when there are several: draw one button each and start
+     *  the chosen one by its `id`. With one or none, `push` says it all. */
+    wallets?: { id: string; label: string }[];
 }
 
 /** What the page asks the frame to start. */
 export type GateChoice =
     | { method: 'social'; provider: string; own?: boolean }
-    | { method: 'wallet'; qr?: boolean };
+    | { method: 'wallet'; qr?: boolean; wallet?: string };
 
 /** Where a started sign-in is, for the page to narrate. */
 export interface GateState {
@@ -69,7 +73,13 @@ export interface GateControls {
 export function sanitiseChoice(raw: unknown): GateChoice | null {
     if (!raw || typeof raw !== 'object') return null;
     const c = raw as Record<string, unknown>;
-    if (c.method === 'wallet') return { method: 'wallet', ...(c.qr === true ? { qr: true } : {}) };
+    if (c.method === 'wallet') {
+        return {
+            method: 'wallet',
+            ...(c.qr === true ? { qr: true } : {}),
+            ...(typeof c.wallet === 'string' && /^[0-9]{1,2}$/.test(c.wallet) ? { wallet: c.wallet } : {}),
+        };
+    }
     if (c.method === 'social' && typeof c.provider === 'string' && /^[a-z]{1,32}$/.test(c.provider)) {
         return { method: 'social', provider: c.provider, ...(c.own === true ? { own: true } : {}) };
     }

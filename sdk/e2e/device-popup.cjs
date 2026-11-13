@@ -115,6 +115,50 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
   check('the popup closed itself', !pop || pop.isClosed());
   await page.close();
 
+  // 3b. A second wallet, with a name: a new site offers the choice.
+  const askPopup = async (ask) => {
+    const o = await ctx.newPage();
+    await o.goto('https://idp.test/auth/');
+    await o.evaluate((ask) => new Promise((resolve) => {
+      addEventListener('message', (e) => {
+        if (e.origin !== location.origin) return;
+        if (e.data.type === 'privasys:device:hello') e.source.postMessage({ type: 'privasys:device:ask', id: 'x2', ...ask }, location.origin);
+        if (e.data.type === 'privasys:device:answer' && e.data.id === 'x2') resolve(true);
+      });
+      window.open('/auth/#device', 'privasys-device', 'width=420,height=240');
+    }), ask);
+    await o.close();
+  };
+  await askPopup({ op: 'store', pushToken: 'ExponentPushToken[work]', brokerUrl: 'wss://broker.test/relay', label: 'Work phone' });
+  page = await ctx.newPage();
+  await page.goto('https://site-d.test/');
+  await page.waitForTimeout(1500);
+  await clickWallet(page);
+  await page.waitForTimeout(2500);
+  text = await gateText(page);
+  check('with two wallets remembered a new site shows the choice', /Work phone/.test(text) && /Phone added/.test(text) && /Use another Privasys ID/.test(text), text.slice(0, 160));
+  if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  const gate = page.frameLocator('iframe');
+  await gate.getByRole('button', { name: /Phone added/ }).click();
+  await page.waitForTimeout(2000);
+  text = await gateText(page);
+  check('choosing a wallet sends its notification', /Push notification failed|notification|check your phone/i.test(text) && !/Use another Privasys ID/.test(text), text.slice(0, 120));
+  await page.close();
+
+  // 3c. "Forget" removes a wallet here and from the identity provider's own storage.
+  page = await ctx.newPage();
+  await page.goto('https://site-e.test/');
+  await page.waitForTimeout(1500);
+  await clickWallet(page);
+  await page.waitForTimeout(2500);
+  await page.frameLocator('iframe').getByRole('button', { name: 'Forget' }).first().click();
+  await page.waitForTimeout(2500);
+  const left = JSON.parse((await hintAtTopLevel()) || '[]');
+  check('"Forget" removes that wallet for every site', left.length === 1 && left[0].pushToken === 'ExponentPushToken[abc]', JSON.stringify(left.map((d) => d.pushToken)));
+  text = await gateText(page);
+  check('with one wallet left the gate shows its single button again', !/Use another Privasys ID/.test(text), text.slice(0, 120));
+  await page.close();
+
   // 4. A page of another origin cannot use the popup: it gets no answer.
   page = await ctx.newPage();
   await page.goto('https://site-c.test/');

@@ -10,12 +10,30 @@ export const SESSIONS_STORAGE_KEY = 'privasys_sessions';
 const STORAGE_KEY = SESSIONS_STORAGE_KEY;
 const HINTS_KEY = 'privasys_device_hints';
 const PASSKEY_HINT_KEY = 'privasys_passkey';
+/** More remembered wallets than this and the oldest is dropped. */
+const MAX_DEVICES = 8;
 
-/** Persists across session expiry so returning users get push instead of QR. */
-interface DeviceHint {
+/**
+ * A wallet this browser remembers, so a returning person gets a notification
+ * instead of a QR code. Persists across session expiry and sign-out. Several
+ * can be remembered: two people on one computer, or one person's two phones.
+ */
+export interface DeviceHint {
     pushToken: string;
     brokerUrl: string;
+    /** When it was last used here; the most recent leads. */
     updatedAt: number;
+    /** When it was first remembered. */
+    addedAt?: number;
+    /** The name the wallet gave for it, when it gave one. */
+    label?: string;
+}
+
+/** What to call a remembered wallet on the gate. */
+export function deviceLabel(d: Pick<DeviceHint, 'label' | 'addedAt' | 'updatedAt'>): string {
+    if (d.label) return d.label;
+    const added = new Date(d.addedAt ?? d.updatedAt);
+    return `Phone added ${added.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
 }
 
 type SessionListener = (sessions: AuthSession[]) => void;
@@ -112,26 +130,56 @@ export class SessionManager {
 
     // ── Device hints (survive session expiry) ─────────────────────────
 
-    /** Save a device hint so returning users can re-auth via push. */
-    saveDeviceHint(pushToken: string, brokerUrl: string): void {
-        const hint: DeviceHint = { pushToken, brokerUrl, updatedAt: Date.now() };
-        try {
-            localStorage.setItem(HINTS_KEY, JSON.stringify(hint));
-        } catch { /* storage full or unavailable */ }
-    }
-
-    /** Get the stored device hint, if any. */
-    getDeviceHint(): DeviceHint | undefined {
+    /** Every remembered wallet, the most recently used first. A single hint
+     *  stored by an older version reads as a list of one. */
+    getDevices(): DeviceHint[] {
         try {
             const raw = localStorage.getItem(HINTS_KEY);
-            if (!raw) return undefined;
-            return JSON.parse(raw) as DeviceHint;
+            if (!raw) return [];
+            const parsed = JSON.parse(raw) as DeviceHint | DeviceHint[];
+            const list = Array.isArray(parsed) ? parsed : [parsed];
+            return list
+                .filter((d) => d && typeof d.pushToken === 'string' && d.pushToken)
+                .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
         } catch {
-            return undefined;
+            return [];
         }
     }
 
-    /** Explicitly clear the device hint (e.g. user logs out of all sessions). */
+    private putDevices(devices: DeviceHint[]): void {
+        try {
+            if (devices.length) localStorage.setItem(HINTS_KEY, JSON.stringify(devices.slice(0, MAX_DEVICES)));
+            else localStorage.removeItem(HINTS_KEY);
+        } catch { /* storage full or unavailable */ }
+    }
+
+    /** Remember a wallet, or mark a remembered one as just used. Its label
+     *  and first date are kept unless a new label is given. */
+    saveDeviceHint(pushToken: string, brokerUrl: string, label?: string): void {
+        const now = Date.now();
+        const devices = this.getDevices();
+        const known = devices.find((d) => d.pushToken === pushToken);
+        const hint: DeviceHint = {
+            pushToken,
+            brokerUrl: brokerUrl || known?.brokerUrl || '',
+            updatedAt: now,
+            addedAt: known?.addedAt ?? known?.updatedAt ?? now,
+            ...((label || known?.label) ? { label: (label || known?.label)!.slice(0, 80) } : {}),
+        };
+        this.putDevices([hint, ...devices.filter((d) => d.pushToken !== pushToken)]);
+    }
+
+    /** The most recently used remembered wallet, if any. */
+    getDeviceHint(): DeviceHint | undefined {
+        return this.getDevices()[0];
+    }
+
+    /** Forget one remembered wallet. */
+    forgetDevice(pushToken: string): void {
+        this.putDevices(this.getDevices().filter((d) => d.pushToken !== pushToken));
+    }
+
+    /** Forget every remembered wallet. */
     clearDeviceHint(): void {
         localStorage.removeItem(HINTS_KEY);
     }

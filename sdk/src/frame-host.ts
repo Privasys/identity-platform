@@ -21,7 +21,7 @@ import { sanitiseDisplayNames, sanitiseIcons, sanitiseOwn, sanitiseProviders, se
 import { sanitiseChoice, type GateState } from './gate-headless';
 import { sanitiseTheme } from './theme';
 import type { AuthUIConfig, SignInResult } from './ui';
-import { SessionManager, SESSIONS_STORAGE_KEY } from './session';
+import { SessionManager, SESSIONS_STORAGE_KEY, deviceLabel, type DeviceHint } from './session';
 import type { AuthSession } from './types';
 import { PrivasysSession, type EncAuthEnvelope, type SealedWebSocket } from './enclave-session';
 
@@ -546,21 +546,33 @@ async function sessionForPage(rpId: string, pageOrigin: string): Promise<AuthSes
 const DEVICE_POPUP_HASH = '#device';
 const DEVICE_POPUP_URL = `${globalThis.location.origin}/auth/${DEVICE_POPUP_HASH}`;
 const DEVICE_POPUP_WAIT_MS = 5_000;
+// Names of wallets the popup reported, kept so a wallet first used on this
+// site is remembered here under the name it has everywhere else.
+const deviceLabels = new Map<string, string>();
 
-type DeviceAsk = { op: 'read' } | { op: 'store'; pushToken: string; brokerUrl: string };
+type DeviceAsk =
+    | { op: 'read' }
+    | { op: 'store'; pushToken: string; brokerUrl: string; label?: string }
+    | { op: 'forget'; pushToken: string };
+type KnownDevice = { pushToken: string; brokerUrl: string; label: string };
+
+/** A remembered wallet as the gate shows it. */
+function shown(d: DeviceHint): KnownDevice {
+    return { pushToken: d.pushToken, brokerUrl: d.brokerUrl, label: deviceLabel(d) };
+}
 
 /**
  * Open the device popup and ask it one thing. `open` runs synchronously, so
  * a caller inside a click keeps the click's permission to open a window; it
- * resolves false when the popup could not open. Resolves the remembered phone
- * for a read (null when none, or on any failure), null for a store.
+ * resolves false when the popup could not open. Resolves the remembered
+ * wallets for a read (none on any failure), and none for a store or a forget.
  */
-function askDevicePopup(open: () => boolean | Promise<boolean>, ask: DeviceAsk): Promise<{ pushToken: string; brokerUrl: string } | null> {
+function askDevicePopup(open: () => boolean | Promise<boolean>, ask: DeviceAsk): Promise<KnownDevice[]> {
     return new Promise((resolve) => {
         const own = globalThis.location.origin;
         const id = Math.random().toString(36).slice(2);
         let done = false;
-        const finish = (v: { pushToken: string; brokerUrl: string } | null) => {
+        const finish = (v: KnownDevice[]) => {
             if (done) return;
             done = true;
             window.removeEventListener('message', onMessage);
@@ -573,15 +585,22 @@ function askDevicePopup(open: () => boolean | Promise<boolean>, ask: DeviceAsk):
             if (d?.type === 'privasys:device:hello') {
                 (ev.source as Window).postMessage({ type: 'privasys:device:ask', id, ...ask }, own);
             } else if (d?.type === 'privasys:device:answer' && d.id === id) {
-                const h = d.hint;
-                finish(h && typeof h.pushToken === 'string' && h.pushToken
-                    ? { pushToken: h.pushToken, brokerUrl: typeof h.brokerUrl === 'string' ? h.brokerUrl : '' }
-                    : null);
+                const list: unknown[] = Array.isArray(d.devices) ? d.devices : [];
+                finish(list.slice(0, 8).flatMap((h) => {
+                    const k = h as Partial<KnownDevice> | null;
+                    return k && typeof k.pushToken === 'string' && k.pushToken
+                        ? [{
+                            pushToken: k.pushToken,
+                            brokerUrl: typeof k.brokerUrl === 'string' ? k.brokerUrl : '',
+                            label: typeof k.label === 'string' && k.label ? k.label.slice(0, 80) : 'Phone',
+                        }]
+                        : [];
+                }));
             }
         };
         window.addEventListener('message', onMessage);
-        const timer = setTimeout(() => finish(null), DEVICE_POPUP_WAIT_MS);
-        Promise.resolve(open()).then((opened) => { if (!opened) finish(null); }, () => finish(null));
+        const timer = setTimeout(() => finish([]), DEVICE_POPUP_WAIT_MS);
+        Promise.resolve(open()).then((opened) => { if (!opened) finish([]); }, () => finish([]));
     });
 }
 
@@ -592,16 +611,20 @@ function runDevicePopup(): void {
         if (ev.origin !== own || !ev.source) return;
         const d = ev.data;
         if (d?.type !== 'privasys:device:ask' || typeof d.id !== 'string') return;
-        let hint: { pushToken: string; brokerUrl: string } | null = null;
+        let devices: KnownDevice[] = [];
+        const token = typeof d.pushToken === 'string' && d.pushToken && d.pushToken.length <= 4096 ? d.pushToken : '';
         if (d.op === 'store') {
-            if (typeof d.pushToken === 'string' && d.pushToken && d.pushToken.length <= 4096) {
-                sessions.saveDeviceHint(d.pushToken, typeof d.brokerUrl === 'string' ? d.brokerUrl.slice(0, 512) : '');
+            if (token) {
+                sessions.saveDeviceHint(token,
+                    typeof d.brokerUrl === 'string' ? d.brokerUrl.slice(0, 512) : '',
+                    typeof d.label === 'string' ? d.label : undefined);
             }
+        } else if (d.op === 'forget') {
+            if (token) sessions.forgetDevice(token);
         } else {
-            const known = sessions.getDeviceHint();
-            if (known?.pushToken) hint = { pushToken: known.pushToken, brokerUrl: known.brokerUrl };
+            devices = sessions.getDevices().map(shown);
         }
-        (ev.source as Window).postMessage({ type: 'privasys:device:answer', id: d.id, hint }, own);
+        (ev.source as Window).postMessage({ type: 'privasys:device:answer', id: d.id, devices }, own);
         window.close();
     });
     // The frame is the opener itself (a visible gate), or a frame inside it
@@ -1530,7 +1553,16 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     socialIcons,
                     socialOwn,
                     onSocialAuth,
-                    lookupDevice: () => askDevicePopup(openDevicePopup, { op: 'read' }),
+                    devices: sessions.getDevices().map(shown),
+                    lookupDevice: async () => {
+                        const found = await askDevicePopup(openDevicePopup, { op: 'read' });
+                        for (const d of found) deviceLabels.set(d.pushToken, d.label);
+                        return found;
+                    },
+                    forgetDevice: async (token: string) => {
+                        sessions.forgetDevice(token);
+                        await askDevicePopup(openDevicePopup, { op: 'forget', pushToken: token });
+                    },
                     rememberDevice: async (token: string) => {
                         await askDevicePopup(openDevicePopup, { op: 'store', pushToken: token, brokerUrl: config.brokerUrl || '' });
                     },
@@ -1634,7 +1666,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 sessions.store(session);
                 if (session.pushToken && session.brokerUrl) {
                     if (uiResult?.trustDevice || deviceTrusted) {
-                        sessions.saveDeviceHint(session.pushToken, session.brokerUrl);
+                        // A wallet found through the popup keeps the name it has there.
+                        sessions.saveDeviceHint(session.pushToken, session.brokerUrl, deviceLabels.get(session.pushToken));
                     }
                 }
                 scheduleRenewal(session, parentOrigin);
@@ -1815,9 +1848,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
     }
 
     if (data.type === 'privasys:clear-session') {
+        // Signing out ends the session. The remembered wallets stay: each is
+        // forgotten by itself, from the gate.
         cancelRenewal(data.rpId);
         sessions.remove(data.rpId);
-        sessions.clearDeviceHint();
         window.parent.postMessage(
             { type: 'privasys:session-cleared' },
             e.origin,

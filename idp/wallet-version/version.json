@@ -1,242 +1,242 @@
 {
   "schema": 1,
-  "issuedAt": "2026-10-26T15:30:46Z",
+  "issuedAt": "2026-11-13T14:17:42Z",
   "platforms": {
     "ios": {
-      "minimum": "1.4.38",
+      "minimum": "1.4.47",
       "level": "required"
     },
     "android": {
-      "minimum": "1.4.38",
+      "minimum": "1.4.47",
       "level": "required"
     }
   },
   "notice": {
-    "id": "2026-10-26-wallet-1.4.38",
+    "id": "2026-11-13-wallet-1.4.47",
     "text": {
       "en-GB": {
         "title": "Update to keep using Privasys Wallet",
-        "body": "This version cannot prove a verified detail, such as being over 18, to the apps that ask for it. The update keeps your identities and data.",
+        "body": "This version can refuse a sign-in when your last one was more than two days ago, and its ID check is harder to complete. The update keeps your identities and data.",
         "changes": [
-          "Proving you are over 18, or another verified detail, works again",
-          "When an app asks for something you have not verified yet, the ID check comes first and the sign-in after",
-          "If a detail an app requires cannot be shared, nothing is shared"
+          "The ID check is simpler: the camera reads the lines on your document by itself, and you are shown where the chip is",
+          "You see what the chip says before anything is sent",
+          "Signing in works again when your last sign-in was two or more days ago"
         ]
       },
       "bg": {
         "title": "Актуализирайте, за да продължите да използвате Privasys Wallet",
-        "body": "Тази версия не може да доказва проверени данни, например че сте над 18 години, пред приложенията, които ги изискват. Актуализацията запазва вашите идентичности и данни.",
+        "body": "Тази версия може да откаже влизане, ако последното ви е било преди повече от два дни, а проверката на документа с нея е по-трудна. Актуализацията запазва вашите идентичности и данни.",
         "changes": [
-          "Доказването, че сте над 18 години, или на други проверени данни отново работи",
-          "Когато приложение поиска нещо, което още не сте проверили, първо идва проверката на документа, а след това влизането",
-          "Ако задължителни данни не могат да бъдат споделени, не се споделя нищо"
+          "Проверката на документа е по-лесна: камерата сама разчита редовете на документа ви и ви се показва къде е чипът",
+          "Виждате какво съдържа чипът, преди да бъде изпратено каквото и да е",
+          "Влизането отново работи, когато последното ви влизане е било преди два или повече дни"
         ]
       },
       "cs": {
         "title": "Aktualizujte, abyste mohli dál používat Privasys Wallet",
-        "body": "Tato verze neumí aplikacím, které o to žádají, prokázat ověřený údaj, například že je vám přes 18 let. Aktualizace zachová vaše identity i data.",
+        "body": "Tato verze může odmítnout přihlášení, pokud to poslední proběhlo před více než dvěma dny, a kontrola dokladu je v ní obtížnější. Aktualizace zachová vaše identity i data.",
         "changes": [
-          "Prokázání, že je vám přes 18 let, nebo jiného ověřeného údaje opět funguje",
-          "Když aplikace žádá něco, co ještě nemáte ověřené, nejdřív proběhne kontrola dokladu a až potom přihlášení",
-          "Pokud nelze sdílet údaj, který aplikace vyžaduje, nesdílí se nic"
+          "Kontrola dokladu je jednodušší: fotoaparát sám přečte řádky na vašem dokladu a ukáže se vám, kde je čip",
+          "Než se cokoli odešle, uvidíte, co obsahuje čip",
+          "Přihlášení opět funguje, i když jste se naposledy přihlásili před dvěma a více dny"
         ]
       },
       "cy": {
         "title": "Diweddarwch i barhau i ddefnyddio Privasys Wallet",
-        "body": "Ni all y fersiwn hon brofi manylyn wedi'i ddilysu, fel bod dros 18 oed, i'r apiau sy'n gofyn amdano. Mae'r diweddariad yn cadw eich hunaniaethau a'ch data.",
+        "body": "Gall y fersiwn hon wrthod mewngofnodi os oedd eich un diwethaf fwy na deuddydd yn ôl, ac mae ei gwiriad ID yn anoddach i'w gwblhau. Mae'r diweddariad yn cadw eich hunaniaethau a'ch data.",
         "changes": [
-          "Mae profi eich bod dros 18 oed, neu fanylyn arall wedi'i ddilysu, yn gweithio eto",
-          "Pan fydd ap yn gofyn am rywbeth nad ydych wedi'i ddilysu eto, daw'r gwiriad ID yn gyntaf a'r mewngofnodi wedyn",
-          "Os na ellir rhannu manylyn y mae ap yn ei fynnu, ni rennir dim"
+          "Mae'r gwiriad ID yn symlach: mae'r camera'n darllen y llinellau ar eich dogfen ar ei ben ei hun, a dangosir i chi ble mae'r sglodyn",
+          "Rydych chi'n gweld beth mae'r sglodyn yn ei ddweud cyn i ddim gael ei anfon",
+          "Mae mewngofnodi'n gweithio eto pan oedd eich mewngofnodi diwethaf ddeuddydd neu fwy yn ôl"
         ]
       },
       "da": {
         "title": "Opdater for at blive ved med at bruge Privasys Wallet",
-        "body": "Denne version kan ikke bevise en verificeret oplysning, for eksempel at du er over 18, over for de apps, der beder om den. Opdateringen bevarer dine identiteter og data.",
+        "body": "Denne version kan afvise et login, hvis dit seneste var for mere end to dage siden, og dens id-kontrol er sværere at gennemføre. Opdateringen bevarer dine identiteter og data.",
         "changes": [
-          "Det virker igen at bevise, at du er over 18, eller en anden verificeret oplysning",
-          "Når en app beder om noget, du endnu ikke har verificeret, kommer id-kontrollen først og login bagefter",
-          "Hvis en oplysning, som en app kræver, ikke kan deles, deles intet"
+          "Id-kontrollen er enklere: kameraet læser selv linjerne på dit dokument, og du får vist, hvor chippen sidder",
+          "Du ser, hvad chippen indeholder, før noget sendes",
+          "Login virker igen, når dit seneste login var for to dage siden eller mere"
         ]
       },
       "de": {
         "title": "Aktualisieren Sie, um Privasys Wallet weiter zu nutzen",
-        "body": "Diese Version kann Apps, die danach fragen, keine geprüfte Angabe nachweisen, etwa dass Sie über 18 sind. Die Aktualisierung behält Ihre Identitäten und Daten.",
+        "body": "Diese Version kann eine Anmeldung ablehnen, wenn Ihre letzte mehr als zwei Tage zurückliegt, und ihre Ausweisprüfung ist schwerer abzuschließen. Die Aktualisierung behält Ihre Identitäten und Daten.",
         "changes": [
-          "Der Nachweis, dass Sie über 18 sind, oder einer anderen geprüften Angabe funktioniert wieder",
-          "Fragt eine App nach etwas, das Sie noch nicht geprüft haben, kommt zuerst die Ausweisprüfung und danach die Anmeldung",
-          "Kann eine von einer App verlangte Angabe nicht geteilt werden, wird nichts geteilt"
+          "Die Ausweisprüfung ist einfacher: Die Kamera liest die Zeilen auf Ihrem Dokument selbst, und Ihnen wird gezeigt, wo der Chip ist",
+          "Sie sehen, was der Chip enthält, bevor etwas gesendet wird",
+          "Die Anmeldung funktioniert wieder, wenn Ihre letzte zwei oder mehr Tage zurückliegt"
         ]
       },
       "el": {
         "title": "Ενημερώστε για να συνεχίσετε να χρησιμοποιείτε το Privasys Wallet",
-        "body": "Αυτή η έκδοση δεν μπορεί να αποδείξει ένα επαληθευμένο στοιχείο, όπως ότι είστε άνω των 18, στις εφαρμογές που το ζητούν. Η ενημέρωση διατηρεί τις ταυτότητες και τα δεδομένα σας.",
+        "body": "Αυτή η έκδοση μπορεί να αρνηθεί μια σύνδεση αν η τελευταία σας έγινε πριν από περισσότερες από δύο ημέρες, και ο έλεγχος ταυτότητάς της ολοκληρώνεται πιο δύσκολα. Η ενημέρωση διατηρεί τις ταυτότητες και τα δεδομένα σας.",
         "changes": [
-          "Η απόδειξη ότι είστε άνω των 18, ή άλλου επαληθευμένου στοιχείου, λειτουργεί ξανά",
-          "Όταν μια εφαρμογή ζητά κάτι που δεν έχετε επαληθεύσει ακόμη, πρώτα γίνεται ο έλεγχος ταυτότητας και μετά η σύνδεση",
-          "Αν ένα στοιχείο που απαιτεί μια εφαρμογή δεν μπορεί να κοινοποιηθεί, δεν κοινοποιείται τίποτα"
+          "Ο έλεγχος ταυτότητας είναι πιο απλός: η κάμερα διαβάζει μόνη της τις γραμμές του εγγράφου σας και βλέπετε πού βρίσκεται το τσιπ",
+          "Βλέπετε τι περιέχει το τσιπ πριν σταλεί οτιδήποτε",
+          "Η σύνδεση λειτουργεί ξανά όταν η τελευταία σας σύνδεση έγινε πριν από δύο ή περισσότερες ημέρες"
         ]
       },
       "es": {
         "title": "Actualiza para seguir usando Privasys Wallet",
-        "body": "Esta versión no puede demostrar un dato verificado, como que eres mayor de 18 años, a las apps que lo piden. La actualización conserva tus identidades y tus datos.",
+        "body": "Esta versión puede rechazar un inicio de sesión si el último fue hace más de dos días, y su comprobación del documento es más difícil de completar. La actualización conserva tus identidades y tus datos.",
         "changes": [
-          "Vuelve a funcionar demostrar que eres mayor de 18 años u otro dato verificado",
-          "Cuando una app pide algo que aún no has verificado, primero se hace la comprobación del documento y después el inicio de sesión",
-          "Si no se puede compartir un dato que una app exige, no se comparte nada"
+          "La comprobación del documento es más sencilla: la cámara lee sola las líneas de tu documento y se te muestra dónde está el chip",
+          "Ves lo que contiene el chip antes de que se envíe nada",
+          "Iniciar sesión vuelve a funcionar cuando tu último inicio de sesión fue hace dos días o más"
         ]
       },
       "et": {
         "title": "Värskendage, et Privasys Walleti kasutamist jätkata",
-        "body": "See versioon ei suuda seda küsivatele rakendustele tõendada kontrollitud andmeid, näiteks et olete üle 18-aastane. Värskendus säilitab teie identiteedid ja andmed.",
+        "body": "See versioon võib sisselogimisest keelduda, kui teie eelmine oli rohkem kui kaks päeva tagasi, ja selle isikutuvastust on raskem lõpetada. Värskendus säilitab teie identiteedid ja andmed.",
         "changes": [
-          "Üle 18-aastaseks olemise või muude kontrollitud andmete tõendamine töötab taas",
-          "Kui rakendus küsib midagi, mida te pole veel kontrollinud, tuleb esmalt isikutuvastus ja seejärel sisselogimine",
-          "Kui rakenduse nõutud andmeid ei saa jagada, ei jagata midagi"
+          "Isikutuvastus on lihtsam: kaamera loeb dokumendi read ise ja teile näidatakse, kus kiip asub",
+          "Näete enne millegi saatmist, mida kiip sisaldab",
+          "Sisselogimine töötab taas, kui teie eelmine sisselogimine oli kaks või enam päeva tagasi"
         ]
       },
       "fi": {
         "title": "Päivitä jatkaaksesi Privasys Walletin käyttöä",
-        "body": "Tämä versio ei pysty todistamaan vahvistettua tietoa, kuten että olet yli 18-vuotias, sitä pyytäville sovelluksille. Päivitys säilyttää identiteettisi ja tietosi.",
+        "body": "Tämä versio voi hylätä kirjautumisen, jos edellinen oli yli kaksi päivää sitten, ja sen henkilöllisyyden tarkistus on vaikeampi suorittaa. Päivitys säilyttää identiteettisi ja tietosi.",
         "changes": [
-          "Yli 18 vuoden iän tai muun vahvistetun tiedon todistaminen toimii taas",
-          "Kun sovellus pyytää jotain, mitä et ole vielä vahvistanut, henkilöllisyyden tarkistus tulee ensin ja kirjautuminen sen jälkeen",
-          "Jos sovelluksen vaatimaa tietoa ei voi jakaa, mitään ei jaeta"
+          "Henkilöllisyyden tarkistus on yksinkertaisempi: kamera lukee asiakirjasi rivit itse, ja sinulle näytetään, missä siru on",
+          "Näet, mitä siru sisältää, ennen kuin mitään lähetetään",
+          "Kirjautuminen toimii taas, kun edellisestä kirjautumisestasi on kaksi päivää tai enemmän"
         ]
       },
       "fr": {
         "title": "Mettez à jour pour continuer à utiliser Privasys Wallet",
-        "body": "Cette version ne peut pas prouver une information vérifiée, comme le fait d'avoir plus de 18 ans, aux applications qui la demandent. La mise à jour conserve vos identités et vos données.",
+        "body": "Cette version peut refuser une connexion si votre dernière date de plus de deux jours, et sa vérification d'identité est plus difficile à mener à bout. La mise à jour conserve vos identités et vos données.",
         "changes": [
-          "Prouver que vous avez plus de 18 ans, ou une autre information vérifiée, fonctionne de nouveau",
-          "Quand une application demande une information que vous n'avez pas encore vérifiée, la vérification d'identité vient d'abord et la connexion ensuite",
-          "Si une information exigée par une application ne peut pas être partagée, rien n'est partagé"
+          "La vérification d'identité est plus simple : l'appareil photo lit seul les lignes de votre document, et l'emplacement de la puce vous est indiqué",
+          "Vous voyez ce que contient la puce avant tout envoi",
+          "La connexion fonctionne de nouveau lorsque votre dernière connexion date de deux jours ou plus"
         ]
       },
       "ga": {
         "title": "Nuashonraigh chun leanúint ar aghaidh ag úsáid Privasys Wallet",
-        "body": "Ní féidir leis an leagan seo sonra fíoraithe, mar shampla go bhfuil tú os cionn 18, a chruthú do na haipeanna a iarrann é. Coinníonn an nuashonrú d'aitheantais agus do shonraí.",
+        "body": "Is féidir leis an leagan seo síniú isteach a dhiúltú más mó ná dhá lá ó shínigh tú isteach go deireanach, agus is deacra a sheiceáil aitheantais a chríochnú. Coinníonn an nuashonrú d'aitheantais agus do shonraí.",
         "changes": [
-          "Oibríonn sé arís a chruthú go bhfuil tú os cionn 18, nó sonra fíoraithe eile",
-          "Nuair a iarrann aip rud nár fhíoraigh tú fós, tagann an seiceáil aitheantais ar dtús agus an síniú isteach ina dhiaidh",
-          "Mura féidir sonra a éilíonn aip a roinnt, ní roinntear aon rud"
+          "Tá an seiceáil aitheantais níos simplí: léann an ceamara na línte ar do dhoiciméad as a stuaim féin, agus taispeántar duit cá bhfuil an sliseanna",
+          "Feiceann tú cad atá ar an sliseanna sula seoltar aon rud",
+          "Oibríonn síniú isteach arís nuair a bhí do shíniú isteach deireanach dhá lá ó shin nó níos mó"
         ]
       },
       "hr": {
         "title": "Ažurirajte kako biste nastavili koristiti Privasys Wallet",
-        "body": "Ova verzija ne može aplikacijama koje to traže dokazati provjereni podatak, na primjer da imate više od 18 godina. Ažuriranje zadržava vaše identitete i podatke.",
+        "body": "Ova verzija može odbiti prijavu ako je vaša posljednja bila prije više od dva dana, a provjeru isprave u njoj teže je dovršiti. Ažuriranje zadržava vaše identitete i podatke.",
         "changes": [
-          "Dokazivanje da imate više od 18 godina, ili drugog provjerenog podatka, ponovno radi",
-          "Kad aplikacija traži nešto što još niste provjerili, najprije slijedi provjera isprave, a zatim prijava",
-          "Ako se podatak koji aplikacija zahtijeva ne može podijeliti, ne dijeli se ništa"
+          "Provjera isprave je jednostavnija: kamera sama čita retke na vašoj ispravi i prikazuje vam se gdje je čip",
+          "Vidite što sadrži čip prije nego što se išta pošalje",
+          "Prijava ponovno radi kada je vaša posljednja prijava bila prije dva ili više dana"
         ]
       },
       "hu": {
         "title": "Frissítsen, hogy tovább használhassa a Privasys Walletet",
-        "body": "Ez a verzió nem tud igazolni ellenőrzött adatot, például hogy elmúlt 18 éves, az azt kérő alkalmazásoknak. A frissítés megőrzi az identitásait és adatait.",
+        "body": "Ez a verzió elutasíthatja a bejelentkezést, ha az előző több mint két napja volt, és az igazolványellenőrzést nehezebb vele elvégezni. A frissítés megőrzi az identitásait és adatait.",
         "changes": [
-          "Ismét működik annak igazolása, hogy elmúlt 18 éves, vagy más ellenőrzött adaté",
-          "Ha egy alkalmazás olyasmit kér, amit még nem ellenőrzött, előbb az igazolványellenőrzés jön, utána a bejelentkezés",
-          "Ha egy alkalmazás által megkövetelt adat nem osztható meg, semmi sem kerül megosztásra"
+          "Az igazolványellenőrzés egyszerűbb: a kamera magától olvassa be az okmány sorait, és látja, hol van a chip",
+          "Látja, mit tartalmaz a chip, mielőtt bármi elküldésre kerülne",
+          "A bejelentkezés ismét működik, ha az előző bejelentkezése két vagy több napja volt"
         ]
       },
       "it": {
         "title": "Aggiorna per continuare a usare Privasys Wallet",
-        "body": "Questa versione non riesce a dimostrare un dato verificato, come avere più di 18 anni, alle app che lo chiedono. L'aggiornamento conserva le tue identità e i tuoi dati.",
+        "body": "Questa versione può rifiutare un accesso se l'ultimo risale a più di due giorni fa, e il suo controllo del documento è più difficile da completare. L'aggiornamento conserva le tue identità e i tuoi dati.",
         "changes": [
-          "Dimostrare di avere più di 18 anni, o un altro dato verificato, funziona di nuovo",
-          "Quando un'app chiede qualcosa che non hai ancora verificato, prima viene il controllo del documento e poi l'accesso",
-          "Se un dato richiesto da un'app non può essere condiviso, non viene condiviso nulla"
+          "Il controllo del documento è più semplice: la fotocamera legge da sola le righe del tuo documento e ti viene mostrato dove si trova il chip",
+          "Vedi cosa contiene il chip prima che venga inviato qualcosa",
+          "L'accesso funziona di nuovo quando il tuo ultimo accesso risale a due o più giorni fa"
         ]
       },
       "lt": {
         "title": "Atnaujinkite, kad galėtumėte toliau naudoti Privasys Wallet",
-        "body": "Ši versija negali programėlėms, kurios to prašo, įrodyti patikrinto duomens, pavyzdžiui, kad jums daugiau nei 18 metų. Atnaujinimas išsaugo jūsų tapatybes ir duomenis.",
+        "body": "Ši versija gali atmesti prisijungimą, jei paskutinį kartą prisijungėte daugiau nei prieš dvi dienas, o dokumento patikrinimą su ja sunkiau užbaigti. Atnaujinimas išsaugo jūsų tapatybes ir duomenis.",
         "changes": [
-          "Vėl veikia įrodymas, kad jums daugiau nei 18 metų, ar kito patikrinto duomens įrodymas",
-          "Kai programėlė prašo to, ko dar nepatikrinote, pirmiausia atliekamas dokumento patikrinimas, o tada prisijungimas",
-          "Jei programėlės reikalaujamo duomens negalima pateikti, nepateikiama nieko"
+          "Dokumento patikrinimas paprastesnis: kamera pati nuskaito dokumento eilutes, o jums parodoma, kur yra lustas",
+          "Prieš ką nors išsiunčiant matote, ką turi lustas",
+          "Prisijungimas vėl veikia, kai paskutinį kartą prisijungėte prieš dvi ar daugiau dienų"
         ]
       },
       "lv": {
         "title": "Atjauniniet, lai turpinātu lietot Privasys Wallet",
-        "body": "Šī versija nevar pierādīt pārbaudītus datus, piemēram, ka esat vecāks par 18 gadiem, lietotnēm, kas tos pieprasa. Atjauninājums saglabā jūsu identitātes un datus.",
+        "body": "Šī versija var atteikt pierakstīšanos, ja iepriekšējā bija pirms vairāk nekā divām dienām, un dokumenta pārbaudi ar to ir grūtāk pabeigt. Atjauninājums saglabā jūsu identitātes un datus.",
         "changes": [
-          "Atkal darbojas pierādīšana, ka esat vecāks par 18 gadiem, vai citu pārbaudītu datu pierādīšana",
-          "Ja lietotne pieprasa kaut ko, ko vēl neesat pārbaudījis, vispirms notiek dokumenta pārbaude un pēc tam pierakstīšanās",
-          "Ja lietotnes pieprasītos datus nevar kopīgot, netiek kopīgots nekas"
+          "Dokumenta pārbaude ir vienkāršāka: kamera pati nolasa dokumenta rindas, un jums tiek parādīts, kur atrodas mikroshēma",
+          "Pirms kaut kas tiek nosūtīts, jūs redzat, ko satur mikroshēma",
+          "Pierakstīšanās atkal darbojas, ja iepriekšējā pierakstīšanās bija pirms divām vai vairāk dienām"
         ]
       },
       "mt": {
         "title": "Aġġorna biex tibqa' tuża Privasys Wallet",
-        "body": "Din il-verżjoni ma tistax tipprova dettall ivverifikat, bħal li għandek aktar minn 18-il sena, lill-apps li jitolbuh. L-aġġornament iżomm l-identitajiet u d-dejta tiegħek.",
+        "body": "Din il-verżjoni tista' tirrifjuta dħul jekk l-aħħar wieħed tiegħek kien aktar minn jumejn ilu, u l-kontroll tal-ID tagħha huwa aktar diffiċli biex jitlesta. L-aġġornament iżomm l-identitajiet u d-dejta tiegħek.",
         "changes": [
-          "Li tipprova li għandek aktar minn 18-il sena, jew dettall ivverifikat ieħor, jerġa' jaħdem",
-          "Meta app titlob xi ħaġa li għadek ma vverifikajtx, l-ewwel jiġi l-kontroll tal-ID u mbagħad id-dħul",
-          "Jekk dettall li titlob app ma jistax jinqasam, ma jinqasam xejn"
+          "Il-kontroll tal-ID huwa aktar sempliċi: il-kamera taqra l-linji fuq id-dokument tiegħek waħedha, u jintwerielek fejn hija ċ-ċippa",
+          "Tara x'fiha ċ-ċippa qabel ma jintbagħat xejn",
+          "Id-dħul jerġa' jaħdem meta l-aħħar dħul tiegħek kien jumejn ilu jew aktar"
         ]
       },
       "nl": {
         "title": "Werk bij om Privasys Wallet te blijven gebruiken",
-        "body": "Deze versie kan een geverifieerd gegeven, zoals dat je ouder bent dan 18, niet aantonen aan de apps die erom vragen. De update bewaart je identiteiten en gegevens.",
+        "body": "Deze versie kan een aanmelding weigeren als je laatste meer dan twee dagen geleden was, en de id-controle is ermee lastiger af te ronden. De update bewaart je identiteiten en gegevens.",
         "changes": [
-          "Aantonen dat je ouder bent dan 18, of een ander geverifieerd gegeven, werkt weer",
-          "Als een app vraagt om iets wat je nog niet hebt geverifieerd, komt eerst de id-controle en daarna de aanmelding",
-          "Als een gegeven dat een app vereist niet gedeeld kan worden, wordt er niets gedeeld"
+          "De id-controle is eenvoudiger: de camera leest zelf de regels op je document en je ziet waar de chip zit",
+          "Je ziet wat er op de chip staat voordat er iets wordt verstuurd",
+          "Aanmelden werkt weer als je laatste aanmelding twee of meer dagen geleden was"
         ]
       },
       "pl": {
         "title": "Zaktualizuj, aby dalej korzystać z Privasys Wallet",
-        "body": "Ta wersja nie potrafi udowodnić aplikacjom, które o to proszą, zweryfikowanej informacji, na przykład że masz ukończone 18 lat. Aktualizacja zachowuje Twoje tożsamości i dane.",
+        "body": "Ta wersja może odrzucić logowanie, jeśli ostatnie było ponad dwa dni temu, a sprawdzenie dokumentu jest w niej trudniejsze do ukończenia. Aktualizacja zachowuje Twoje tożsamości i dane.",
         "changes": [
-          "Udowodnienie, że masz ukończone 18 lat, lub innej zweryfikowanej informacji znów działa",
-          "Gdy aplikacja prosi o coś, czego jeszcze nie zweryfikowałeś, najpierw następuje sprawdzenie dokumentu, a potem logowanie",
-          "Jeśli wymaganej przez aplikację informacji nie można udostępnić, nic nie zostaje udostępnione"
+          "Sprawdzenie dokumentu jest prostsze: aparat sam odczytuje wiersze na dokumencie i widzisz, gdzie jest chip",
+          "Widzisz, co zawiera chip, zanim cokolwiek zostanie wysłane",
+          "Logowanie znów działa, gdy ostatnie logowanie było dwa lub więcej dni temu"
         ]
       },
       "pt": {
         "title": "Atualize para continuar a usar a Privasys Wallet",
-        "body": "Esta versão não consegue provar um dado verificado, como ter mais de 18 anos, às apps que o pedem. A atualização mantém as suas identidades e dados.",
+        "body": "Esta versão pode recusar um início de sessão se o último foi há mais de dois dias, e a verificação do documento é mais difícil de concluir. A atualização mantém as suas identidades e dados.",
         "changes": [
-          "Provar que tem mais de 18 anos, ou outro dado verificado, volta a funcionar",
-          "Quando uma app pede algo que ainda não verificou, primeiro vem a verificação do documento e depois o início de sessão",
-          "Se um dado que uma app exige não puder ser partilhado, nada é partilhado"
+          "A verificação do documento é mais simples: a câmara lê sozinha as linhas do seu documento e é-lhe mostrado onde está o chip",
+          "Vê o que o chip contém antes de qualquer envio",
+          "O início de sessão volta a funcionar quando o último foi há dois dias ou mais"
         ]
       },
       "ro": {
         "title": "Actualizează ca să folosești în continuare Privasys Wallet",
-        "body": "Această versiune nu poate dovedi o informație verificată, de exemplu că ai peste 18 ani, aplicațiilor care o cer. Actualizarea îți păstrează identitățile și datele.",
+        "body": "Această versiune poate refuza o conectare dacă ultima a avut loc acum mai bine de două zile, iar verificarea actului este mai greu de dus la capăt. Actualizarea îți păstrează identitățile și datele.",
         "changes": [
-          "Dovedirea că ai peste 18 ani, sau a altei informații verificate, funcționează din nou",
-          "Când o aplicație cere ceva ce nu ai verificat încă, întâi are loc verificarea actului și apoi conectarea",
-          "Dacă o informație cerută de o aplicație nu poate fi partajată, nu se partajează nimic"
+          "Verificarea actului e mai simplă: camera citește singură rândurile de pe act și ți se arată unde este cipul",
+          "Vezi ce conține cipul înainte să se trimită ceva",
+          "Conectarea funcționează din nou când ultima conectare a fost acum două zile sau mai mult"
         ]
       },
       "sk": {
         "title": "Aktualizujte, aby ste mohli ďalej používať Privasys Wallet",
-        "body": "Táto verzia nedokáže aplikáciám, ktoré o to žiadajú, preukázať overený údaj, napríklad že máte viac ako 18 rokov. Aktualizácia zachová vaše identity aj údaje.",
+        "body": "Táto verzia môže odmietnuť prihlásenie, ak to posledné bolo pred viac ako dvoma dňami, a kontrola dokladu sa v nej dokončuje ťažšie. Aktualizácia zachová vaše identity aj údaje.",
         "changes": [
-          "Preukázanie, že máte viac ako 18 rokov, alebo iného overeného údaja opäť funguje",
-          "Keď aplikácia žiada niečo, čo ešte nemáte overené, najprv prebehne kontrola dokladu a až potom prihlásenie",
-          "Ak nemožno zdieľať údaj, ktorý aplikácia vyžaduje, nezdieľa sa nič"
+          "Kontrola dokladu je jednoduchšia: fotoaparát sám prečíta riadky na vašom doklade a ukáže sa vám, kde je čip",
+          "Skôr než sa čokoľvek odošle, uvidíte, čo obsahuje čip",
+          "Prihlásenie opäť funguje, aj keď ste sa naposledy prihlásili pred dvoma alebo viacerými dňami"
         ]
       },
       "sl": {
         "title": "Posodobite, da boste lahko še naprej uporabljali Privasys Wallet",
-        "body": "Ta različica aplikacijam, ki to zahtevajo, ne more dokazati preverjenega podatka, na primer da ste starejši od 18 let. Posodobitev ohrani vaše identitete in podatke.",
+        "body": "Ta različica lahko zavrne prijavo, če je bila vaša zadnja pred več kot dvema dnevoma, preverjanje dokumenta pa je z njo težje dokončati. Posodobitev ohrani vaše identitete in podatke.",
         "changes": [
-          "Dokazovanje, da ste starejši od 18 let, ali drugega preverjenega podatka spet deluje",
-          "Ko aplikacija zahteva nekaj, česar še niste preverili, najprej sledi preverjanje dokumenta in nato prijava",
-          "Če podatka, ki ga aplikacija zahteva, ni mogoče deliti, se ne deli nič"
+          "Preverjanje dokumenta je preprostejše: kamera sama prebere vrstice na vašem dokumentu, prikaže pa se vam tudi, kje je čip",
+          "Preden se karkoli pošlje, vidite, kaj vsebuje čip",
+          "Prijava spet deluje, ko je bila vaša zadnja prijava pred dvema ali več dnevi"
         ]
       },
       "sv": {
         "title": "Uppdatera för att fortsätta använda Privasys Wallet",
-        "body": "Den här versionen kan inte bevisa en verifierad uppgift, till exempel att du är över 18, för de appar som ber om den. Uppdateringen behåller dina identiteter och data.",
+        "body": "Den här versionen kan neka en inloggning om din senaste var för mer än två dagar sedan, och dess id-kontroll är svårare att slutföra. Uppdateringen behåller dina identiteter och data.",
         "changes": [
-          "Att bevisa att du är över 18, eller en annan verifierad uppgift, fungerar igen",
-          "När en app ber om något du ännu inte har verifierat kommer id-kontrollen först och inloggningen efter",
-          "Om en uppgift som en app kräver inte kan delas, delas ingenting"
+          "Id-kontrollen är enklare: kameran läser själv raderna på ditt dokument och du får se var chippet sitter",
+          "Du ser vad chippet innehåller innan något skickas",
+          "Inloggning fungerar igen när din senaste inloggning var för två dagar sedan eller mer"
         ]
       }
     }

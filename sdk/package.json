@@ -42,6 +42,7 @@
         "build:frame-client": "esbuild src/frame-client.ts --bundle --format=iife --global-name=Privasys --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth-client.iife.js",
         "dev": "tsc --watch",
         "test:gate": "playwright test",
+        "test:popup": "node e2e/device-popup.cjs",
         "test": "esbuild test/*.test.ts --bundle --platform=node --format=esm --outdir=.test --out-extension:.js=.mjs --log-level=warning && node --test \".test/*.test.mjs\""
     },
     "peerDependencies": {

@@ -142,6 +142,19 @@ export interface AuthUIConfig {
      *  this with the provider name; the host opens a popup. */
     onSocialAuth?: (provider: string, own?: boolean) => Promise<void>;
     /**
+     * Ask whether this browser already knows the person's phone, on a site
+     * whose own copy of the gate's storage does not. The host opens a short
+     * popup on the identity provider's origin, which sees the one storage
+     * every site shares; it must be called inside the click, since a browser
+     * only allows a popup then. Resolves null when nothing is remembered or
+     * the popup could not open.
+     */
+    lookupDevice?: () => Promise<{ pushToken: string } | null>;
+    /** Remember the phone for every site in this browser, the same way.
+     *  Called inside the click on "Trust this device"; the gate waits for it
+     *  before it finishes, so the frame is still there to answer the popup. */
+    rememberDevice?: (pushToken: string) => Promise<void> | void;
+    /**
      * The client asked for the person's name or email address, which a
      * passkey does not carry. After a passkey the gate then asks the person
      * to sign in once with an account provider, whose answer the identity
@@ -1148,9 +1161,11 @@ export class AuthUI {
                 this.autoStarted = true;
                 this.autoFirstScreen = 'push-waiting';
                 this.startPush();
-            } else if (this.singleOption() === 'wallet') {
+            } else if (this.singleOption() === 'wallet' && !(this.cfg.lookupDevice && !isMobileDevice())) {
                 // The site's own chooser already picked Privasys (methods:
                 // ['wallet'] with no push token) — go straight to the QR.
+                // Where the host can look the phone up, the one button shows
+                // instead: the lookup is a popup, and a popup needs a click.
                 this.autoStarted = true;
                 this.autoFirstScreen = 'qr-scanning';
                 this.startWallet();
@@ -1257,7 +1272,32 @@ export class AuthUI {
         }
         if (!this.allowed('wallet')) return;
         if (this.cfg.pushToken && !choice.qr) this.startPush();
-        else this.startWallet();
+        else if (choice.qr) this.startWallet();
+        else void this.startWalletFromClick();
+    }
+
+    private lookingUp = false;
+
+    /**
+     * The wallet button with no phone known on this site: ask the host
+     * whether this browser knows one (a popup, so this runs inside the
+     * click), and send the notification if it does. Otherwise the QR code,
+     * as before. A phone needs no lookup: the wallet opens on it directly.
+     */
+    private async startWalletFromClick(): Promise<void> {
+        if (this.lookingUp) return;
+        if (!this.cfg.pushToken && this.cfg.lookupDevice && !isMobileDevice()) {
+            this.lookingUp = true;
+            const known = await this.cfg.lookupDevice().catch(() => null);
+            this.lookingUp = false;
+            if (this.state !== 'idle' && this.state !== 'error') return;
+            if (known?.pushToken) {
+                this.cfg.pushToken = known.pushToken;
+                this.startPush();
+                return;
+            }
+        }
+        this.startWallet();
     }
 
     private render(): void {
@@ -1498,7 +1538,7 @@ export class AuthUI {
         if (hasWallet) {
             const altLabel = isMobileDevice() ? 'Open in Privasys Wallet instead' : 'Scan QR code instead';
             buttons.push(
-                el('button', { className: `btn-provider ${hasPush ? '' : 'primary'}`, onClick: () => this.startWallet() },
+                el('button', { className: `btn-provider ${hasPush ? '' : 'primary'}`, onClick: () => { if (hasPush) this.startWallet(); else void this.startWalletFromClick(); } },
                     el('span', { html: ICON_LOGO }),
                     el('span', { className: 'btn-label' }, hasPush ? altLabel : 'Continue with Privasys ID'),
                 ),
@@ -1921,7 +1961,15 @@ export class AuthUI {
                 el('p', { className: 'scan-hint', style: 'margin-bottom: 16px; max-width: none;' },
                     'Next time, we\u2019ll send a notification to your phone instead of showing a QR code.',
                 ),
-                el('button', { className: 'btn-provider primary', onClick: () => this.finishWithTrust(true) },
+                el('button', { className: 'btn-provider primary', onClick: () => {
+                    if (this.lookingUp) return;
+                    this.lookingUp = true;
+                    const stored = this.pushToken ? this.cfg.rememberDevice?.(this.pushToken) : undefined;
+                    void Promise.resolve(stored).catch(() => undefined).then(() => {
+                        this.lookingUp = false;
+                        this.finishWithTrust(true);
+                    });
+                } },
                     el('span', { html: ICON_SHIELD }),
                     el('span', { className: 'btn-label' }, 'Trust this device'),
                 ),

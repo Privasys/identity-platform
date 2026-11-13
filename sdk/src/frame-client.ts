@@ -1116,6 +1116,15 @@ export class AuthFrame {
                         this.authOrigin,
                     );
                 };
+                if (url === `${this.authOrigin}/auth/#device`) {
+                    // The frame's own lookup of a phone this browser already
+                    // knows: the popup talks to the frame and closes itself.
+                    const w = 420, h = 240;
+                    const left = window.screenX + (window.innerWidth - w) / 2;
+                    const top = window.screenY + (window.innerHeight - h) / 2;
+                    reply(!!window.open(url, 'privasys-device', `width=${w},height=${h},left=${left},top=${top}`));
+                    return;
+                }
                 if (!url.startsWith(`${this.authOrigin}/auth/social?`)) {
                     reply(false, 'Refused sign-in address');
                     return;

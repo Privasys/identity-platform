@@ -530,6 +530,97 @@ async function sessionForPage(rpId: string, pageOrigin: string): Promise<AuthSes
     return (await pageIsClients(session.clientId, pageOrigin)) ? session : undefined;
 }
 
+// ── The device popup ─────────────────────────────────────────────────────
+//
+// A browser gives this frame a separate storage on every site that embeds
+// it, so on a site the person has never signed in to, the frame cannot tell
+// that their phone is already known. A window on this origin that is NOT
+// embedded sees one storage, the same whichever site opened it. So the phone
+// is remembered there, and read through a short popup of this same page
+// (DEVICE_POPUP_HASH), opened inside the click on the wallet button.
+//
+// The popup announces itself to the windows of this origin in its opener; the
+// frame that is waiting answers with what it wants (read, or store this
+// phone), the popup does it and closes. Every message is posted to this
+// origin only, so the embedding page takes no part and learns nothing.
+const DEVICE_POPUP_HASH = '#device';
+const DEVICE_POPUP_URL = `${globalThis.location.origin}/auth/${DEVICE_POPUP_HASH}`;
+const DEVICE_POPUP_WAIT_MS = 5_000;
+
+type DeviceAsk = { op: 'read' } | { op: 'store'; pushToken: string; brokerUrl: string };
+
+/**
+ * Open the device popup and ask it one thing. `open` runs synchronously, so
+ * a caller inside a click keeps the click's permission to open a window; it
+ * resolves false when the popup could not open. Resolves the remembered phone
+ * for a read (null when none, or on any failure), null for a store.
+ */
+function askDevicePopup(open: () => boolean | Promise<boolean>, ask: DeviceAsk): Promise<{ pushToken: string; brokerUrl: string } | null> {
+    return new Promise((resolve) => {
+        const own = globalThis.location.origin;
+        const id = Math.random().toString(36).slice(2);
+        let done = false;
+        const finish = (v: { pushToken: string; brokerUrl: string } | null) => {
+            if (done) return;
+            done = true;
+            window.removeEventListener('message', onMessage);
+            clearTimeout(timer);
+            resolve(v);
+        };
+        const onMessage = (ev: MessageEvent) => {
+            if (ev.origin !== own || !ev.source || ev.source === window.parent) return;
+            const d = ev.data;
+            if (d?.type === 'privasys:device:hello') {
+                (ev.source as Window).postMessage({ type: 'privasys:device:ask', id, ...ask }, own);
+            } else if (d?.type === 'privasys:device:answer' && d.id === id) {
+                const h = d.hint;
+                finish(h && typeof h.pushToken === 'string' && h.pushToken
+                    ? { pushToken: h.pushToken, brokerUrl: typeof h.brokerUrl === 'string' ? h.brokerUrl : '' }
+                    : null);
+            }
+        };
+        window.addEventListener('message', onMessage);
+        const timer = setTimeout(() => finish(null), DEVICE_POPUP_WAIT_MS);
+        Promise.resolve(open()).then((opened) => { if (!opened) finish(null); }, () => finish(null));
+    });
+}
+
+/** Opened as the device popup: do what the waiting frame asks, then close. */
+function runDevicePopup(): void {
+    const own = globalThis.location.origin;
+    window.addEventListener('message', (ev: MessageEvent) => {
+        if (ev.origin !== own || !ev.source) return;
+        const d = ev.data;
+        if (d?.type !== 'privasys:device:ask' || typeof d.id !== 'string') return;
+        let hint: { pushToken: string; brokerUrl: string } | null = null;
+        if (d.op === 'store') {
+            if (typeof d.pushToken === 'string' && d.pushToken && d.pushToken.length <= 4096) {
+                sessions.saveDeviceHint(d.pushToken, typeof d.brokerUrl === 'string' ? d.brokerUrl.slice(0, 512) : '');
+            }
+        } else {
+            const known = sessions.getDeviceHint();
+            if (known?.pushToken) hint = { pushToken: known.pushToken, brokerUrl: known.brokerUrl };
+        }
+        (ev.source as Window).postMessage({ type: 'privasys:device:answer', id: d.id, hint }, own);
+        window.close();
+    });
+    // The frame is the opener itself (a visible gate), or a frame inside it
+    // (a headless page opened this window for its frame).
+    const targets: Window[] = [];
+    try {
+        const opener = window.opener as Window | null;
+        if (opener) {
+            targets.push(opener);
+            for (let i = 0; i < opener.length; i++) targets.push(opener[i] as unknown as Window);
+        }
+    } catch { /* an opener that cannot be walked: nothing to announce to */ }
+    for (const t of targets) {
+        try { t.postMessage({ type: 'privasys:device:hello' }, own); } catch { /* not ours */ }
+    }
+    // Nobody asked: do not leave an empty window behind.
+    setTimeout(() => window.close(), DEVICE_POPUP_WAIT_MS);
+}
+
 /** Whether an access token carries the identity provider's wallet marker. */
 function tokenSaysWallet(token: string): boolean {
     try {
@@ -1404,6 +1495,27 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     });
                 };
                 const onSocialAuth = headless ? popupViaParent : openSocialPopup;
+                // The device popup: this frame opens it inside the click; a
+                // headless page opens it for the frame, as it does a social one.
+                const openDevicePopup = (): boolean | Promise<boolean> => {
+                    if (!headless) {
+                        const w = 420, h = 240;
+                        const left = window.screenX + (window.innerWidth - w) / 2;
+                        const top = window.screenY + (window.innerHeight - h) / 2;
+                        return !!window.open(DEVICE_POPUP_URL, 'privasys-device', `width=${w},height=${h},left=${left},top=${top}`);
+                    }
+                    return new Promise<boolean>((resolve) => {
+                        const id = Math.random().toString(36).slice(2);
+                        const onResult = (ev: MessageEvent) => {
+                            if (ev.source !== window.parent || ev.origin !== parentOrigin) return;
+                            if (ev.data?.type !== 'privasys:gate:popup-result' || ev.data.id !== id) return;
+                            window.removeEventListener('message', onResult);
+                            resolve(ev.data.ok === true);
+                        };
+                        window.addEventListener('message', onResult);
+                        window.parent.postMessage({ type: 'privasys:gate:popup', id, url: DEVICE_POPUP_URL }, parentOrigin);
+                    });
+                };
 
                 activeUI = new AuthUI({
                     ...config,
@@ -1418,6 +1530,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     socialIcons,
                     socialOwn,
                     onSocialAuth,
+                    lookupDevice: () => askDevicePopup(openDevicePopup, { op: 'read' }),
+                    rememberDevice: async (token: string) => {
+                        await askDevicePopup(openDevicePopup, { op: 'store', pushToken: token, brokerUrl: config.brokerUrl || '' });
+                    },
                     // A passkey carries no name or email; the gate asks for
                     // them through a provider when the client wants them.
                     profileAfterPasskey: !!requestedAttributes?.some(
@@ -2066,5 +2182,10 @@ async function installSessionRelay(
     }
 }
 
-// Signal to parent that the iframe is ready to receive messages
-window.parent.postMessage({ type: 'privasys:ready' }, '*');
+if (window.opener && window.parent === window && globalThis.location.hash === DEVICE_POPUP_HASH) {
+    // This page was opened as the device popup, not embedded as the gate.
+    runDevicePopup();
+} else {
+    // Signal to parent that the iframe is ready to receive messages
+    window.parent.postMessage({ type: 'privasys:ready' }, '*');
+}

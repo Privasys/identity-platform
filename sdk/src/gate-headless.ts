@@ -42,7 +42,9 @@ export interface GateOptions {
 
 /** What the page asks the frame to start. */
 export type GateChoice =
-    | { method: 'social'; provider: string; own?: boolean }
+    // `chooseAccount`: have the provider show its account picker, for a
+    // person it would otherwise sign straight in with the wrong account.
+    | { method: 'social'; provider: string; own?: boolean; chooseAccount?: boolean }
     | { method: 'wallet'; qr?: boolean; wallet?: string };
 
 /** Where a started sign-in is, for the page to narrate. */
@@ -81,7 +83,12 @@ export function sanitiseChoice(raw: unknown): GateChoice | null {
         };
     }
     if (c.method === 'social' && typeof c.provider === 'string' && /^[a-z]{1,32}$/.test(c.provider)) {
-        return { method: 'social', provider: c.provider, ...(c.own === true ? { own: true } : {}) };
+        return {
+            method: 'social',
+            provider: c.provider,
+            ...(c.own === true ? { own: true } : {}),
+            ...(c.chooseAccount === true ? { chooseAccount: true } : {}),
+        };
     }
     return null;
 }

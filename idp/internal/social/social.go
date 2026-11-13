@@ -418,6 +418,12 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 	q.Set("redirect_uri", h.issuerURL+"/auth/social/callback")
 	q.Set("response_type", "code")
 	q.Set("scope", strings.Join(prov.Scopes, " "))
+	// account=choose: the person asked for another account than the one the
+	// provider would pick by itself. A provider that signs a person in
+	// silently when one account is on the browser then shows its picker.
+	if r.URL.Query().Get("account") == "choose" && hasAccountPicker(providerName) {
+		q.Set("prompt", "select_account")
+	}
 
 	// PKCE on the upstream leg when the provider supports it. Confidential
 	// providers that don't (e.g. LinkedIn) authenticate with the client secret
@@ -435,6 +441,16 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 	authURL.RawQuery = q.Encode()
 
 	http.Redirect(w, r, authURL.String(), http.StatusFound)
+}
+
+// hasAccountPicker reports whether a provider honours prompt=select_account.
+// LinkedIn has no such prompt.
+func hasAccountPicker(provider string) bool {
+	switch provider {
+	case "google", "microsoft", "github":
+		return true
+	}
+	return false
 }
 
 // HandleCallback processes the OAuth2 callback from the provider.

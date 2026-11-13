@@ -70,6 +70,11 @@ export function providerName(provider: string): string {
  * sign in, the button carries the full call to action; in a chooser the
  * provider's name is enough, as it sits under a heading.
  */
+/** Whether a provider can be asked to show its own account picker. */
+export function hasAccountPicker(provider: string): boolean {
+    return provider === 'google' || provider === 'microsoft' || provider === 'github';
+}
+
 export function providerButtonLabel(provider: string, solo: boolean, displayName?: string): string {
     // A client with its own registration names it (its organisation), which
     // only reads as a call to action.

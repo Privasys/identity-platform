@@ -7,7 +7,7 @@ import { PrivasysAuth } from './client';
 import { WebAuthnClient } from './webauthn';
 import { attributeLabel, assuranceLabel } from './attributes-ui';
 import { isGovVerified } from './attributes';
-import { providerButtonLabel, providerName, type OwnRegistration } from './providers';
+import { hasAccountPicker, providerButtonLabel, providerName, type OwnRegistration } from './providers';
 import type { GateChoice, GateOptions, GateProvider, GateState } from './gate-headless';
 import { finishOnSuccess } from './gate-headless';
 import { themeClasses, themeProperties, themeStylesheet, type AuthTheme } from './theme';
@@ -140,7 +140,7 @@ export interface AuthUIConfig {
     socialOwn?: OwnRegistration[];
     /** Callback when the user wants to start social auth. The UI calls
      *  this with the provider name; the host opens a popup. */
-    onSocialAuth?: (provider: string, own?: boolean) => Promise<void>;
+    onSocialAuth?: (provider: string, own?: boolean, chooseAccount?: boolean) => Promise<void>;
     /**
      * Ask whether this browser already knows the person's phone, on a site
      * whose own copy of the gate's storage does not. The host opens a short
@@ -1312,7 +1312,7 @@ export class AuthUI {
                 ? (this.cfg.socialOwn ?? []).some((o) => o.provider === choice.provider)
                 : (this.cfg.socialProviders ?? []).includes(choice.provider);
             if (!offered) return;
-            void this.startSocial(choice.provider, !!choice.own);
+            void this.startSocial(choice.provider, !!choice.own, !!choice.chooseAccount);
             return;
         }
         if (!this.allowed('wallet')) return;
@@ -1691,6 +1691,27 @@ export class AuthUI {
             alternatives[0].classList.add('primary');
         }
         buttons.push(...(walletFirst ? [...walletButtons, ...divider, ...alternatives] : [...alternatives, ...divider, ...walletButtons]));
+
+        // A provider signs a person straight in when one account is on the
+        // browser, which may be the wrong one. "Use another account" has it
+        // show its own account picker. With one provider button the link
+        // starts it; with several it arms the next one pressed.
+        const pickers = [
+            ...ownRegistrations.map((o) => ({ provider: o.provider, own: true, name: o.displayName })),
+            ...socialProviders.map((p) => ({ provider: p, own: false, name: this.cfg.socialDisplayNames?.[p] ?? providerName(p) })),
+        ].filter((p) => hasAccountPicker(p.provider));
+        const linkStyle = 'margin-top: 4px; font-size: 13px; display: block; text-align: center; width: 100%;';
+        if (pickers.length === 1 && ownRegistrations.length + socialProviders.length === 1) {
+            const only = pickers[0];
+            buttons.push(el('button', { className: 'link-btn', style: linkStyle,
+                onClick: () => this.startSocial(only.provider, only.own, true) }, `Use another ${only.name} account`));
+        } else if (pickers.length) {
+            buttons.push(this.chooseAccount
+                ? el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin: 4px 0 0;' },
+                    `Choose ${pickers.map((p) => p.name).join(' or ')} above. It will ask which account to use.`)
+                : el('button', { className: 'link-btn', style: linkStyle,
+                    onClick: () => { this.chooseAccount = true; this.render(); } }, 'Use another account'));
+        }
 
         return el('div', null,
             el('h2', { className: 'auth-panel-heading' }, `Sign in to ${displayName}`),
@@ -2227,12 +2248,17 @@ export class AuthUI {
         }
     }
 
-    private async startSocial(provider: string, own = false): Promise<void> {
+    // "Use another account" was pressed: the next provider button asks the
+    // provider for its account picker.
+    private chooseAccount = false;
+
+    private async startSocial(provider: string, own = false, chooseAccount = this.chooseAccount): Promise<void> {
         if (!this.cfg.onSocialAuth) return;
+        this.chooseAccount = false;
         this.state = 'authenticating';
         this.render();
         try {
-            await this.cfg.onSocialAuth(provider, own);
+            await this.cfg.onSocialAuth(provider, own, chooseAccount && hasAccountPicker(provider));
             this.method = 'wallet';
             this.sessionToken = '';
             this.sessionId = this.cfg.sessionId ?? '';

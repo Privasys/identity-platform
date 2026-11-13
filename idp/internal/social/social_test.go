@@ -474,3 +474,41 @@ func TestMicrosoftProvedEmail(t *testing.T) {
 		t.Error("garbage must prove nothing")
 	}
 }
+
+// "Use another account": the provider is asked for its account picker only
+// when the gate says so, and only where the provider has one.
+func TestAccountPicker(t *testing.T) {
+	_, prov := fakeProvider(t)
+	providers := NewProviders()
+	for _, name := range []string{"microsoft", "google", "linkedin"} {
+		providers.Register(&Provider{Name: name, ClientID: name + "-id", AuthURL: prov.AuthURL, TokenURL: prov.TokenURL, Scopes: []string{"openid"}, PKCE: true})
+	}
+	sessions := oidc.NewSessionStore()
+	h := NewHandler(providers, oidc.NewCodeStore(), sessions, "https://privasys.id")
+	sessions.Create(&oidc.AuthSession{SessionID: "s1", ClientID: "open", ExpiresAt: time.Now().Add(time.Minute)})
+
+	prompt := func(query string) string {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?session_id=s1&"+query, nil))
+		if rec.Code != http.StatusFound {
+			t.Fatalf("%s: status %d", query, rec.Code)
+		}
+		u, err := url.Parse(rec.Header().Get("Location"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u.Query().Get("prompt")
+	}
+	for query, want := range map[string]string{
+		"provider=microsoft":                "",
+		"provider=microsoft&account=choose": "select_account",
+		"provider=google&account=choose":    "select_account",
+		"provider=linkedin&account=choose":  "",
+		"provider=google&account=other":     "",
+	} {
+		if got := prompt(query); got != want {
+			t.Errorf("%s: prompt %q, want %q", query, got, want)
+		}
+	}
+}

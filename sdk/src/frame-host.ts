@@ -1456,13 +1456,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
                 // Social auth handler: opens a popup to the IdP's social redirect,
                 // then waits for the callback page to postMessage back.
-                const openSocialPopup = (provider: string, own?: boolean): Promise<void> => {
+                const openSocialPopup = (provider: string, own?: boolean, chooseAccount?: boolean): Promise<void> => {
                     return new Promise<void>((resolve, reject) => {
                         const w = 500, h = 650;
                         const left = window.screenX + (window.innerWidth - w) / 2;
                         const top = window.screenY + (window.innerHeight - h) / 2;
                         // registration=own: the client's own registration, pressed as a button of its own.
-                        const popupUrl = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}`;
+                        const popupUrl = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}${chooseAccount ? '&account=choose' : ''}`;
                         const popup = window.open(popupUrl, 'privasys-social', `width=${w},height=${h},left=${left},top=${top}`);
 
                         if (!popup) {
@@ -1502,10 +1502,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 // Headless: a popup needs the click's activation, which the
                 // page has and this frame does not, so the page opens it at
                 // the address this frame names and reports how it ended.
-                const popupViaParent = (provider: string, own?: boolean): Promise<void> => {
+                const popupViaParent = (provider: string, own?: boolean, chooseAccount?: boolean): Promise<void> => {
                     return new Promise<void>((resolve, reject) => {
                         const id = Math.random().toString(36).slice(2);
-                        const url = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}`;
+                        const url = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}${chooseAccount ? '&account=choose' : ''}`;
                         const onMessage = (ev: MessageEvent) => {
                             if (ev.source !== window.parent || ev.origin !== parentOrigin) return;
                             if (ev.data?.type !== 'privasys:gate:popup-result' || ev.data.id !== id) return;

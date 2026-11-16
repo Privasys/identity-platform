@@ -1313,6 +1313,14 @@
     "presented": "Amit megosztottak Önnel",
     "signNote": "Válaszát az azonosítókulcsával aláírjuk, és csak a(z) {{app}} kapja meg.",
     "openInApp": "Megnyitás itt: {{app}}",
+    "checking": "Annak ellenőrzése, hogy ez az alkalmazás küldte",
+    "reviewAttestation": "{{host}} hitelesítésének megtekintése",
+    "refused": {
+      "not-the-app": "Ez nem a(z) {{app}} saját szerveréről érkezett, ezért itt nem lehet rá válaszolni.",
+      "unverified": "A(z) {{app}} szerverét nem sikerült ellenőrizni, ezért itt nem lehet rá válaszolni.",
+      "not-confirmed": "A(z) {{app}} nem erősíti meg, hogy ezt küldte, ezért itt nem lehet rá válaszolni.",
+      "unreachable": "A(z) {{app}} nem érhető el, hogy megerősítse, ezt küldte. Próbálja újra egy kicsit később."
+    },
     "sent": "Válaszát elküldtük ide: {{app}}",
     "sentAs": {
       "approve": "Jóváhagyta.",
@@ -1337,7 +1345,9 @@
       "gone": "Erre már válaszoltak, vagy lejárt.",
       "not-the-app": "A válaszoló alkalmazás nem a(z) {{app}}, ezért semmi sem lett elküldve.",
       "unreachable": "A(z) {{app}} nem érhető el. Próbálja újra egy kicsit később.",
-      "cancelled": "Semmi sem lett elküldve."
+      "cancelled": "Semmi sem lett elküldve.",
+      "unverified": "A(z) {{app}} szerverét nem sikerült ellenőrizni, ezért itt nem lehet rá válaszolni.",
+      "not-confirmed": "A(z) {{app}} nem erősíti meg, hogy ezt küldte, ezért itt nem lehet rá válaszolni."
     }
   },
   "devices": {

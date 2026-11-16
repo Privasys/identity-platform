@@ -27,6 +27,10 @@ export interface WaitingAppMessage extends AppMessageContent {
     appId?: string;
     appName?: string;
     appHost?: string;
+    /** For a form: the app's short name and its platform hostname (built
+     *  from that name), where the form is confirmed and answered. */
+    appSlug?: string;
+    platformHost?: string;
     /** Where opening it goes, or undefined when it carries no usable link. */
     link?: string;
     /** For an app-form: the form, only when it parsed and its digest is the
@@ -42,6 +46,8 @@ export interface ListedMessage {
     app_id?: unknown;
     app_name?: unknown;
     app_host?: unknown;
+    app_slug?: unknown;
+    app_platform_host?: unknown;
     form_digest?: unknown;
     sealed?: unknown;
     created_at?: unknown;
@@ -63,6 +69,8 @@ export async function readMessage(r: ListedMessage): Promise<WaitingAppMessage |
         appId: typeof r.app_id === 'string' ? r.app_id : undefined,
         appName: typeof r.app_name === 'string' ? r.app_name : undefined,
         appHost,
+        appSlug: typeof r.app_slug === 'string' ? r.app_slug : undefined,
+        platformHost: typeof r.app_platform_host === 'string' ? r.app_platform_host : undefined,
         createdAt: typeof r.created_at === 'number' ? r.created_at : 0,
     };
     if (type === APP_FORM_TYPE) {

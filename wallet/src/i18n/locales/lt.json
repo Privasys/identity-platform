@@ -1348,6 +1348,14 @@
     "presented": "Ką jie su jumis pasidalijo",
     "signNote": "Jūsų atsakymas pasirašomas jūsų prieigos raktu ir siunčiamas tik programėlei {{app}}.",
     "openInApp": "Atidaryti programėlėje {{app}}",
+    "checking": "Tikrinama, ar tai išsiuntė ši programėlė",
+    "reviewAttestation": "Peržiūrėti {{host}} atestaciją",
+    "refused": {
+      "not-the-app": "Tai atėjo ne iš paties {{app}} serverio, todėl čia atsakyti negalima.",
+      "unverified": "Nepavyko patikrinti {{app}} serverio, todėl čia atsakyti negalima.",
+      "not-confirmed": "{{app}} nepatvirtina, kad tai išsiuntė, todėl čia atsakyti negalima.",
+      "unreachable": "Nepavyko pasiekti {{app}}, kad patvirtintų, jog tai išsiuntė. Netrukus bandykite dar kartą."
+    },
     "sent": "Jūsų atsakymas išsiųstas programėlei {{app}}",
     "sentAs": {
       "approve": "Patvirtinote.",
@@ -1372,7 +1380,9 @@
       "gone": "Į tai jau atsakyta arba baigėsi galiojimas.",
       "not-the-app": "Atsakiusi programėlė nėra {{app}}, todėl nieko neišsiųsta.",
       "unreachable": "Nepavyko pasiekti {{app}}. Netrukus bandykite dar kartą.",
-      "cancelled": "Nieko neišsiųsta."
+      "cancelled": "Nieko neišsiųsta.",
+      "unverified": "Nepavyko patikrinti {{app}} serverio, todėl čia atsakyti negalima.",
+      "not-confirmed": "{{app}} nepatvirtina, kad tai išsiuntė, todėl čia atsakyti negalima."
     }
   },
   "devices": {

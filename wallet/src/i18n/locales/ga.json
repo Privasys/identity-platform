@@ -1396,6 +1396,14 @@
     "presented": "An méid a roinneadh leat",
     "signNote": "Sínítear do fhreagra le d’eochair rochtana agus seoltar é chuig {{app}} amháin.",
     "openInApp": "Oscail in {{app}}",
+    "checking": "Ag seiceáil gurb í an aip seo a sheol é",
+    "reviewAttestation": "Féach ar fhianú {{host}}",
+    "refused": {
+      "not-the-app": "Níor tháinig sé seo ó fhreastalaí {{app}} féin, mar sin ní féidir é a fhreagairt anseo.",
+      "unverified": "Níorbh fhéidir freastalaí {{app}} a fhíorú, mar sin ní féidir é seo a fhreagairt anseo.",
+      "not-confirmed": "Ní dheimhníonn {{app}} gur sheol sé é seo, mar sin ní féidir é a fhreagairt anseo.",
+      "unreachable": "Níorbh fhéidir teacht ar {{app}} chun a dheimhniú gur sheol sé é seo. Bain triail eile as i gceann nóiméid."
+    },
     "sent": "Seoladh do fhreagra chuig {{app}}",
     "sentAs": {
       "approve": "Cheadaigh tú.",
@@ -1420,7 +1428,9 @@
       "gone": "Tugadh freagra air seo cheana, nó tá sé imithe in éag.",
       "not-the-app": "Ní hé {{app}} an aip a d’fhreagair, mar sin níor seoladh aon rud.",
       "unreachable": "Níorbh fhéidir teacht ar {{app}}. Bain triail eile as i gceann nóiméid.",
-      "cancelled": "Níor seoladh aon rud."
+      "cancelled": "Níor seoladh aon rud.",
+      "unverified": "Níorbh fhéidir freastalaí {{app}} a fhíorú, mar sin ní féidir é seo a fhreagairt anseo.",
+      "not-confirmed": "Ní dheimhníonn {{app}} gur sheol sé é seo, mar sin ní féidir é a fhreagairt anseo."
     }
   },
   "devices": {

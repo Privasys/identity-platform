@@ -197,6 +197,7 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
                 id, type: APP_FORM_TYPE, kind: data.kind, app_id: data.app_id,
                 app_name: typeof data.app_name === 'string' ? data.app_name : undefined,
                 app_host: data.app_host, sealed: data.sealed,
+                app_slug: data.app_slug, app_platform_host: data.app_platform_host,
             });
             if (m) useAppMessagesStore.getState().remember(m);
         } catch (e) {

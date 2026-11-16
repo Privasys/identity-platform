@@ -1361,6 +1361,14 @@
     "presented": "Co Ci udostępniono",
     "signNote": "Twoja odpowiedź jest podpisywana Twoim kluczem dostępu i wysyłana tylko do {{app}}.",
     "openInApp": "Otwórz w {{app}}",
+    "checking": "Sprawdzanie, czy wysłała to ta aplikacja",
+    "reviewAttestation": "Zobacz atestację {{host}}",
+    "refused": {
+      "not-the-app": "To nie pochodzi z własnego serwera {{app}}, więc nie można tu na to odpowiedzieć.",
+      "unverified": "Nie udało się zweryfikować serwera {{app}}, więc nie można tu na to odpowiedzieć.",
+      "not-confirmed": "{{app}} nie potwierdza, że to wysłała, więc nie można tu na to odpowiedzieć.",
+      "unreachable": "Nie można połączyć się z {{app}}, aby potwierdzić, że to wysłała. Spróbuj ponownie za chwilę."
+    },
     "sent": "Twoja odpowiedź została wysłana do {{app}}",
     "sentAs": {
       "approve": "Zatwierdzono.",
@@ -1385,7 +1393,9 @@
       "gone": "Na to już odpowiedziano albo wygasło.",
       "not-the-app": "Aplikacja, która odpowiedziała, to nie {{app}}, więc nic nie zostało wysłane.",
       "unreachable": "Nie można połączyć się z {{app}}. Spróbuj ponownie za chwilę.",
-      "cancelled": "Nic nie zostało wysłane."
+      "cancelled": "Nic nie zostało wysłane.",
+      "unverified": "Nie udało się zweryfikować serwera {{app}}, więc nie można tu na to odpowiedzieć.",
+      "not-confirmed": "{{app}} nie potwierdza, że to wysłała, więc nie można tu na to odpowiedzieć."
     }
   },
   "devices": {

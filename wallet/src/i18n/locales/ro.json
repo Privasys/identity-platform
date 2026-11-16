@@ -1348,6 +1348,14 @@
     "presented": "Ce ți-au comunicat",
     "signNote": "Răspunsul tău este semnat cu cheia ta de acces și trimis doar către {{app}}.",
     "openInApp": "Deschide în {{app}}",
+    "checking": "Se verifică dacă această aplicație a trimis-o",
+    "reviewAttestation": "Vezi atestarea pentru {{host}}",
+    "refused": {
+      "not-the-app": "Aceasta nu a venit de pe serverul propriu al {{app}}, așa că nu i se poate răspunde aici.",
+      "unverified": "Serverul {{app}} nu a putut fi verificat, așa că nu i se poate răspunde aici.",
+      "not-confirmed": "{{app}} nu confirmă că a trimis-o, așa că nu i se poate răspunde aici.",
+      "unreachable": "{{app}} nu poate fi contactată pentru a confirma că a trimis-o. Încearcă din nou peste puțin timp."
+    },
     "sent": "Răspunsul tău a fost trimis către {{app}}",
     "sentAs": {
       "approve": "Ai aprobat.",
@@ -1372,7 +1380,9 @@
       "gone": "S-a răspuns deja la aceasta sau a expirat.",
       "not-the-app": "Aplicația care a răspuns nu este {{app}}, așa că nu s-a trimis nimic.",
       "unreachable": "{{app}} nu poate fi contactată. Încearcă din nou peste puțin timp.",
-      "cancelled": "Nu s-a trimis nimic."
+      "cancelled": "Nu s-a trimis nimic.",
+      "unverified": "Serverul {{app}} nu a putut fi verificat, așa că nu i se poate răspunde aici.",
+      "not-confirmed": "{{app}} nu confirmă că a trimis-o, așa că nu i se poate răspunde aici."
     }
   },
   "devices": {

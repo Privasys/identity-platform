@@ -1348,6 +1348,14 @@
     "presented": "Što su podijelili s vama",
     "signNote": "Vaš odgovor potpisuje se vašim pristupnim ključem i šalje samo aplikaciji {{app}}.",
     "openInApp": "Otvori u aplikaciji {{app}}",
+    "checking": "Provjerava se je li ovo poslala ta aplikacija",
+    "reviewAttestation": "Pregledaj atestaciju za {{host}}",
+    "refused": {
+      "not-the-app": "Ovo nije došlo s vlastitog poslužitelja aplikacije {{app}} pa se ovdje ne može odgovoriti.",
+      "unverified": "Poslužitelj aplikacije {{app}} nije se mogao provjeriti pa se ovdje ne može odgovoriti.",
+      "not-confirmed": "Aplikacija {{app}} ne potvrđuje da je ovo poslala pa se ovdje ne može odgovoriti.",
+      "unreachable": "Aplikacija {{app}} nije dostupna da potvrdi da je ovo poslala. Pokušajte ponovno za trenutak."
+    },
     "sent": "Vaš je odgovor poslan aplikaciji {{app}}",
     "sentAs": {
       "approve": "Odobrili ste.",
@@ -1372,7 +1380,9 @@
       "gone": "Na ovo je već odgovoreno ili je isteklo.",
       "not-the-app": "Aplikacija koja je odgovorila nije {{app}} pa ništa nije poslano.",
       "unreachable": "Aplikacija {{app}} nije dostupna. Pokušajte ponovno za trenutak.",
-      "cancelled": "Ništa nije poslano."
+      "cancelled": "Ništa nije poslano.",
+      "unverified": "Poslužitelj aplikacije {{app}} nije se mogao provjeriti pa se ovdje ne može odgovoriti.",
+      "not-confirmed": "Aplikacija {{app}} ne potvrđuje da je ovo poslala pa se ovdje ne može odgovoriti."
     }
   },
   "devices": {

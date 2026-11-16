@@ -1324,6 +1324,14 @@
     "presented": "What they shared with you",
     "signNote": "Your answer is signed with your passkey and sent only to {{app}}.",
     "openInApp": "Open in {{app}}",
+    "checking": "Checking that this app sent it",
+    "reviewAttestation": "Review the attestation of {{host}}",
+    "refused": {
+      "not-the-app": "This did not come from {{app}}’s own server, so it cannot be answered here.",
+      "unverified": "{{app}}’s server could not be verified, so this cannot be answered here.",
+      "not-confirmed": "{{app}} does not confirm it sent this, so it cannot be answered here.",
+      "unreachable": "{{app}} could not be reached to confirm it sent this. Try again in a moment."
+    },
     "sent": "Your answer was sent to {{app}}",
     "sentAs": {
       "approve": "You approved.",
@@ -1348,7 +1356,9 @@
       "gone": "This was already answered, or has expired.",
       "not-the-app": "The app that answered is not {{app}}, so nothing was sent.",
       "unreachable": "{{app}} could not be reached. Try again in a moment.",
-      "cancelled": "Nothing was sent."
+      "cancelled": "Nothing was sent.",
+      "unverified": "{{app}}’s server could not be verified, so this cannot be answered here.",
+      "not-confirmed": "{{app}} does not confirm it sent this, so it cannot be answered here."
     }
   },
   "devices": {

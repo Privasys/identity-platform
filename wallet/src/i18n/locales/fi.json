@@ -1313,6 +1313,14 @@
     "presented": "Mitä he jakoivat kanssasi",
     "signNote": "Vastauksesi allekirjoitetaan pääsyavaimellasi ja lähetetään vain sovellukselle {{app}}.",
     "openInApp": "Avaa sovelluksessa {{app}}",
+    "checking": "Tarkistetaan, että tämä sovellus lähetti sen",
+    "reviewAttestation": "Tarkastele kohteen {{host}} todennusta",
+    "refused": {
+      "not-the-app": "Tämä ei tullut sovelluksen {{app}} omalta palvelimelta, joten siihen ei voi vastata täällä.",
+      "unverified": "Sovelluksen {{app}} palvelinta ei voitu varmentaa, joten tähän ei voi vastata täällä.",
+      "not-confirmed": "{{app}} ei vahvista lähettäneensä tätä, joten siihen ei voi vastata täällä.",
+      "unreachable": "Sovellukseen {{app}} ei saatu yhteyttä sen vahvistamiseksi. Yritä hetken päästä uudelleen."
+    },
     "sent": "Vastauksesi lähetettiin sovellukselle {{app}}",
     "sentAs": {
       "approve": "Hyväksyit.",
@@ -1337,7 +1345,9 @@
       "gone": "Tähän on jo vastattu, tai se on vanhentunut.",
       "not-the-app": "Vastannut sovellus ei ole {{app}}, joten mitään ei lähetetty.",
       "unreachable": "Sovellukseen {{app}} ei saatu yhteyttä. Yritä hetken päästä uudelleen.",
-      "cancelled": "Mitään ei lähetetty."
+      "cancelled": "Mitään ei lähetetty.",
+      "unverified": "Sovelluksen {{app}} palvelinta ei voitu varmentaa, joten tähän ei voi vastata täällä.",
+      "not-confirmed": "{{app}} ei vahvista lähettäneensä tätä, joten siihen ei voi vastata täällä."
     }
   },
   "devices": {

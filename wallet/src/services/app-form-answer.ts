@@ -2,31 +2,45 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Answering an app form (services/app-form): begin at the IdP, sign with the
- * identity's passkey, take the answer token, and hand it to the attested app.
- * Kept apart from the parser so the stores that only read forms do not load
- * the native modules this needs.
+ * Checking and answering an app form (services/app-form). Kept apart from the
+ * parser so the stores that only read forms do not load the native modules
+ * this needs.
+ *
+ * Before a form is shown, the wallet establishes that the app itself sent it,
+ * without trusting the platform for that:
+ *   1. the host is exactly `<app name>.apps[.test].privasys.org`, the app's own
+ *      platform hostname (never a custom domain, whose TLS may end at the
+ *      gateway);
+ *   2. the enclave there attests the app id the notification named;
+ *   3. its attestation is verified through the attestation service, in the
+ *      holder's chosen mode;
+ *   4. inside that channel the app confirms it has this exact form open (by
+ *      its reference and the SHA-256 of the form string).
+ * Only then are the buttons offered, and the answer goes to that same host.
  */
 
-import { inspectAttestation } from '@/services/attestation';
+import { attestEnclave, inspectAttestation, type AttestationResult } from '@/services/attestation';
 import { resolveStepUpCredential, type StepUpAssertionOptions } from '@/services/attribute-approval-api';
+import { getAttestationServerToken } from '@/services/app-attest';
 import { signVaultAssertion } from '@/services/fido2';
 import { getCachedPlatformToken } from '@/services/platform-token';
 import { appIdFromOids } from '@/services/release-provenance';
-import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
+import { useSettingsStore } from '@/stores/settings';
 import type { AppForm } from '@/services/app-form';
-
+import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 const IDP_ORIGIN = new URL(IDP_BASE).hostname;
 
-/** Why an answer did not reach the app, in terms the screen can explain. */
+/** Why a form could not be shown or answered, in terms the screen can explain. */
 export type AnswerFailure =
     | 'signed-out' // no privasys.id session on this phone
     | 'no-passkey' // this phone holds no passkey for the identity
     | 'mismatch' // what the IdP would bind is not what the holder saw
     | 'gone' // already answered, expired, or not this holder's
-    | 'not-the-app' // the attested host is not the app that asked
+    | 'not-the-app' // the host is not this app's own, or attests another app
+    | 'unverified' // the app's attestation did not verify
+    | 'not-confirmed' // the attested app does not have this form open
     | 'unreachable' // the app could not be reached or refused the answer
     | 'cancelled'; // the holder did not complete the biometric
 
@@ -37,14 +51,16 @@ export class AnswerError extends Error {
 }
 
 /**
- * Where an answer may go: an app's own platform hostname, one label under
- * the platform's enclave zones, and nothing else. Not a custom domain (its TLS
- * may end at the gateway), not a deeper name, no port. The platform names the
- * host; this pins it to the zones only an attested enclave answers on, so a
- * compromised control plane cannot point an answer anywhere else, and the
- * attestation below then proves which app is there.
+ * An app's own platform hostname: one label under the platform's enclave
+ * zones, no port. Not a custom domain, not a deeper name.
  */
 export const ANSWER_HOST = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.apps(\.test)?\.privasys\.org$/;
+
+/** Whether `host` is exactly the platform hostname of the app named `slug`. */
+export function hostIsApp(host: string | undefined, slug: string | undefined): boolean {
+    if (!host || !slug || !ANSWER_HOST.test(host)) return false;
+    return host === `${slug}.apps.privasys.org` || host === `${slug}.apps.test.privasys.org`;
+}
 
 /** Normalise an app id to its dashless lowercase form, for comparing. */
 function sameApp(a: string, b: string): boolean {
@@ -52,19 +68,84 @@ function sameApp(a: string, b: string): boolean {
     return !!a && !!b && n(a) === n(b);
 }
 
+/** What the screen shows once a form is confirmed, and links to. */
+export interface ConfirmedSource {
+    host: string;
+    attestation: AttestationResult;
+    mode: 'deterministic' | 'challenge';
+    challenged: boolean;
+}
+
 /**
- * Answer a form with one of its actions. `messageId` is the IdP's id for the
- * sent form; `form` is the form as the holder saw it; `appId` the app the
- * platform says sent it. Resolves once the app has accepted the answer.
+ * Establish that the app named `appId`, at its own host, sent this form.
+ * Resolves with the verified attestation for the screen to offer, or throws an
+ * AnswerError saying which step failed.
+ */
+export async function confirmFormSource(args: {
+    form: AppForm;
+    appId: string;
+    appSlug?: string;
+    platformHost?: string;
+}): Promise<ConfirmedSource> {
+    const { form, appId, appSlug, platformHost } = args;
+    const host = platformHost ?? '';
+    // 1. The app's own host, built from its own name.
+    if (!hostIsApp(host, appSlug)) throw new AnswerError('not-the-app');
+    // 2. The enclave there is the app the notification named.
+    let inspected: AttestationResult;
+    try {
+        inspected = await inspectAttestation(host);
+    } catch {
+        throw new AnswerError('unreachable', 'the app could not be reached');
+    }
+    if (!sameApp(appIdFromOids(inspected.custom_oids) ?? '', appId)) throw new AnswerError('not-the-app');
+    // 3. Its attestation verifies, in the holder's mode.
+    const mode = useSettingsStore.getState().verificationMode;
+    const outcome = await attestEnclave(host, {
+        tee: inspected.tee_type ?? 'tdx',
+        mode,
+        attestationServerToken: await getAttestationServerToken(),
+    });
+    if (outcome.status !== 'verified' || !outcome.result) throw new AnswerError('unverified', outcome.message);
+    // 4. The app confirms, inside that channel, that it has this form open.
+    const raFetch = makeRaTlsFetch({ enclaveHost: host, platformFetch: fetch });
+    let res: Response;
+    try {
+        res = await raFetch(
+            `https://${host}/.well-known/privasys/app-form?id=${encodeURIComponent(form.id)}&digest=${form.digest}`,
+        );
+    } catch {
+        throw new AnswerError('unreachable', 'the app could not be reached');
+    }
+    if (!res.ok) throw new AnswerError('not-confirmed', `the app does not have this form open (${res.status})`);
+    let body: { form_id?: unknown; form_digest?: unknown; open?: unknown };
+    try {
+        body = await res.json();
+    } catch {
+        throw new AnswerError('not-confirmed');
+    }
+    if (body.open !== true || body.form_id !== form.id || body.form_digest !== form.digest) {
+        throw new AnswerError('not-confirmed');
+    }
+    return { host, attestation: { ...inspected, ...outcome.result }, mode, challenged: outcome.challenged };
+}
+
+/**
+ * Answer a form with one of its actions, to the host `confirmFormSource`
+ * verified. `messageId` is the IdP's id for the sent form; `form` is the form
+ * as the holder saw it; `appId` the app that confirmed it. Resolves once the
+ * app has accepted the answer.
  */
 export async function answerForm(args: {
     messageId: string;
     form: AppForm;
     appId: string;
+    host: string;
     action: string;
 }): Promise<void> {
-    const { messageId, form, appId, action } = args;
+    const { messageId, form, appId, host, action } = args;
     if (!form.actions.some((a) => a.id === action)) throw new AnswerError('mismatch');
+    if (!ANSWER_HOST.test(host)) throw new AnswerError('not-the-app');
     const token = await getCachedPlatformToken();
     if (!token) throw new AnswerError('signed-out');
     const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -108,17 +189,18 @@ export async function answerForm(args: {
     if (answerRes.status === 404 || answerRes.status === 409) throw new AnswerError('gone');
     if (!answerRes.ok) throw new AnswerError('unreachable', `answer failed (${answerRes.status})`);
     const answered = (await answerRes.json()) as { answer: string; app_id: string; app_platform_host: string };
-    if (!sameApp(answered.app_id, appId) || !answered.app_platform_host) throw new AnswerError('mismatch');
+    // The answer goes where the form was confirmed, and nowhere the IdP names
+    // instead.
+    if (!sameApp(answered.app_id, appId) || answered.app_platform_host !== host) throw new AnswerError('mismatch');
 
-    // 4. Attest the app's own host and check it is the app that asked, then
-    //    hand it the answer inside that channel.
-    const host = answered.app_platform_host;
-    if (!ANSWER_HOST.test(host)) throw new AnswerError('not-the-app');
+    // 4. Over a fresh attested channel to the same host: the app id there is
+    //    checked again, since the enclave may have changed since the form was
+    //    confirmed.
     let attestedApp: string | undefined;
     try {
         attestedApp = appIdFromOids((await inspectAttestation(host)).custom_oids) ?? undefined;
     } catch {
-        throw new AnswerError('unreachable', 'the app could not be attested');
+        throw new AnswerError('unreachable', 'the app could not be reached');
     }
     if (!attestedApp || !sameApp(attestedApp, appId)) throw new AnswerError('not-the-app');
     const raFetch = makeRaTlsFetch({ enclaveHost: host, platformFetch: fetch });

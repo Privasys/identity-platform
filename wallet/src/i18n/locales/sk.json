@@ -1348,6 +1348,14 @@
     "presented": "Čo s vami zdieľali",
     "signNote": "Vaša odpoveď sa podpíše vaším prístupovým kľúčom a odošle sa iba do {{app}}.",
     "openInApp": "Otvoriť v {{app}}",
+    "checking": "Overuje sa, že to poslala táto aplikácia",
+    "reviewAttestation": "Zobraziť atestáciu {{host}}",
+    "refused": {
+      "not-the-app": "Toto neprišlo z vlastného servera {{app}}, preto sa na to tu nedá odpovedať.",
+      "unverified": "Server {{app}} sa nepodarilo overiť, preto sa na to tu nedá odpovedať.",
+      "not-confirmed": "{{app}} nepotvrdzuje, že to poslala, preto sa na to tu nedá odpovedať.",
+      "unreachable": "{{app}} sa nepodarilo zastihnúť, aby potvrdila, že to poslala. Skúste to o chvíľu znova."
+    },
     "sent": "Vaša odpoveď bola odoslaná do {{app}}",
     "sentAs": {
       "approve": "Schválili ste.",
@@ -1372,7 +1380,9 @@
       "gone": "Na toto už bolo odpovedané, alebo platnosť vypršala.",
       "not-the-app": "Aplikácia, ktorá odpovedala, nie je {{app}}, preto sa nič neodoslalo.",
       "unreachable": "{{app}} nie je dostupná. Skúste to o chvíľu znova.",
-      "cancelled": "Nič sa neodoslalo."
+      "cancelled": "Nič sa neodoslalo.",
+      "unverified": "Server {{app}} sa nepodarilo overiť, preto sa na to tu nedá odpovedať.",
+      "not-confirmed": "{{app}} nepotvrdzuje, že to poslala, preto sa na to tu nedá odpovedať."
     }
   },
   "devices": {

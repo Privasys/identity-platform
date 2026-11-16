@@ -1348,6 +1348,14 @@
     "presented": "Ko viņi ar jums kopīgoja",
     "signNote": "Jūsu atbilde tiek parakstīta ar jūsu piekļuves atslēgu un nosūtīta tikai lietotnei {{app}}.",
     "openInApp": "Atvērt lietotnē {{app}}",
+    "checking": "Tiek pārbaudīts, vai to nosūtīja šī lietotne",
+    "reviewAttestation": "Skatīt {{host}} apliecinājumu",
+    "refused": {
+      "not-the-app": "Tas nenāca no lietotnes {{app}} servera, tāpēc šeit uz to nevar atbildēt.",
+      "unverified": "Lietotnes {{app}} serveri neizdevās pārbaudīt, tāpēc šeit uz to nevar atbildēt.",
+      "not-confirmed": "{{app}} neapstiprina, ka to nosūtīja, tāpēc šeit uz to nevar atbildēt.",
+      "unreachable": "Lietotne {{app}} nav sasniedzama, lai apstiprinātu, ka to nosūtīja. Pēc brīža mēģiniet vēlreiz."
+    },
     "sent": "Jūsu atbilde tika nosūtīta lietotnei {{app}}",
     "sentAs": {
       "approve": "Jūs apstiprinājāt.",
@@ -1372,7 +1380,9 @@
       "gone": "Uz šo jau ir atbildēts, vai tā derīgums ir beidzies.",
       "not-the-app": "Lietotne, kas atbildēja, nav {{app}}, tāpēc nekas netika nosūtīts.",
       "unreachable": "Lietotne {{app}} nav sasniedzama. Pēc brīža mēģiniet vēlreiz.",
-      "cancelled": "Nekas netika nosūtīts."
+      "cancelled": "Nekas netika nosūtīts.",
+      "unverified": "Lietotnes {{app}} serveri neizdevās pārbaudīt, tāpēc šeit uz to nevar atbildēt.",
+      "not-confirmed": "{{app}} neapstiprina, ka to nosūtīja, tāpēc šeit uz to nevar atbildēt."
     }
   },
   "devices": {

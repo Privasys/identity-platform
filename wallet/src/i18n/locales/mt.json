@@ -1396,6 +1396,14 @@
     "presented": "Dak li qasmu miegħek",
     "signNote": "It-tweġiba tiegħek tiġi ffirmata bil-passkey tiegħek u tintbagħat lil {{app}} biss.",
     "openInApp": "Iftaħ f’{{app}}",
+    "checking": "Qed jiġi ċċekkjat li din l-app bagħtitu",
+    "reviewAttestation": "Ara l-attestazzjoni ta’ {{host}}",
+    "refused": {
+      "not-the-app": "Dan ma ġiex mis-server ta’ {{app}} stess, għalhekk ma jistax jitwieġeb hawn.",
+      "unverified": "Is-server ta’ {{app}} ma setax jiġi vverifikat, għalhekk dan ma jistax jitwieġeb hawn.",
+      "not-confirmed": "{{app}} ma tikkonfermax li bagħtet dan, għalhekk ma jistax jitwieġeb hawn.",
+      "unreachable": "{{app}} ma setgħetx tintlaħaq biex tikkonferma li bagħtet dan. Erġa’ pprova fi ftit."
+    },
     "sent": "It-tweġiba tiegħek intbagħtet lil {{app}}",
     "sentAs": {
       "approve": "Approvajt.",
@@ -1420,7 +1428,9 @@
       "gone": "Diġà ngħatat tweġiba għal dan, jew skada.",
       "not-the-app": "L-app li wieġbet mhijiex {{app}}, għalhekk ma ntbagħat xejn.",
       "unreachable": "{{app}} ma setgħetx tintlaħaq. Erġa’ pprova fi ftit.",
-      "cancelled": "Ma ntbagħat xejn."
+      "cancelled": "Ma ntbagħat xejn.",
+      "unverified": "Is-server ta’ {{app}} ma setax jiġi vverifikat, għalhekk dan ma jistax jitwieġeb hawn.",
+      "not-confirmed": "{{app}} ma tikkonfermax li bagħtet dan, għalhekk ma jistax jitwieġeb hawn."
     }
   },
   "devices": {

@@ -1313,6 +1313,14 @@
     "presented": "Wat ze met je hebben gedeeld",
     "signNote": "Je antwoord wordt ondertekend met je toegangssleutel en alleen naar {{app}} gestuurd.",
     "openInApp": "Openen in {{app}}",
+    "checking": "Controleren of deze app het heeft gestuurd",
+    "reviewAttestation": "Attestatie van {{host}} bekijken",
+    "refused": {
+      "not-the-app": "Dit kwam niet van de eigen server van {{app}}, dus je kunt het hier niet beantwoorden.",
+      "unverified": "De server van {{app}} kon niet worden geverifieerd, dus je kunt dit hier niet beantwoorden.",
+      "not-confirmed": "{{app}} bevestigt niet dat het dit heeft gestuurd, dus je kunt het hier niet beantwoorden.",
+      "unreachable": "{{app}} is niet bereikbaar om te bevestigen dat het dit heeft gestuurd. Probeer het zo opnieuw."
+    },
     "sent": "Je antwoord is naar {{app}} gestuurd",
     "sentAs": {
       "approve": "Je hebt goedgekeurd.",
@@ -1337,7 +1345,9 @@
       "gone": "Hierop is al geantwoord, of het is verlopen.",
       "not-the-app": "De app die antwoordde is niet {{app}}, dus er is niets verstuurd.",
       "unreachable": "{{app}} is niet bereikbaar. Probeer het zo opnieuw.",
-      "cancelled": "Er is niets verstuurd."
+      "cancelled": "Er is niets verstuurd.",
+      "unverified": "De server van {{app}} kon niet worden geverifieerd, dus je kunt dit hier niet beantwoorden.",
+      "not-confirmed": "{{app}} bevestigt niet dat het dit heeft gestuurd, dus je kunt het hier niet beantwoorden."
     }
   },
   "devices": {

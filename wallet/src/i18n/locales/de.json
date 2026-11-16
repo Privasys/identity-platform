@@ -1313,6 +1313,14 @@
     "presented": "Was man mit Ihnen geteilt hat",
     "signNote": "Ihre Antwort wird mit Ihrem Passkey signiert und nur an {{app}} gesendet.",
     "openInApp": "In {{app}} öffnen",
+    "checking": "Es wird geprüft, ob diese App es gesendet hat",
+    "reviewAttestation": "Attestierung von {{host}} ansehen",
+    "refused": {
+      "not-the-app": "Dies kam nicht vom eigenen Server von {{app}} und kann hier daher nicht beantwortet werden.",
+      "unverified": "Der Server von {{app}} konnte nicht verifiziert werden, daher kann dies hier nicht beantwortet werden.",
+      "not-confirmed": "{{app}} bestätigt nicht, dies gesendet zu haben, daher kann es hier nicht beantwortet werden.",
+      "unreachable": "{{app}} war nicht erreichbar, um zu bestätigen, dass es dies gesendet hat. Versuchen Sie es gleich noch einmal."
+    },
     "sent": "Ihre Antwort wurde an {{app}} gesendet",
     "sentAs": {
       "approve": "Sie haben genehmigt.",
@@ -1337,7 +1345,9 @@
       "gone": "Darauf wurde bereits geantwortet, oder es ist abgelaufen.",
       "not-the-app": "Die antwortende App ist nicht {{app}}, daher wurde nichts gesendet.",
       "unreachable": "{{app}} ist nicht erreichbar. Versuchen Sie es gleich noch einmal.",
-      "cancelled": "Es wurde nichts gesendet."
+      "cancelled": "Es wurde nichts gesendet.",
+      "unverified": "Der Server von {{app}} konnte nicht verifiziert werden, daher kann dies hier nicht beantwortet werden.",
+      "not-confirmed": "{{app}} bestätigt nicht, dies gesendet zu haben, daher kann es hier nicht beantwortet werden."
     }
   },
   "devices": {

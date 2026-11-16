@@ -1372,6 +1372,14 @@
     "presented": "Kaj so delili z vami",
     "signNote": "Vaš odgovor je podpisan z vašim ključem za dostop in poslan samo aplikaciji {{app}}.",
     "openInApp": "Odpri v aplikaciji {{app}}",
+    "checking": "Preverja se, ali je to poslala ta aplikacija",
+    "reviewAttestation": "Oglejte si overitev za {{host}}",
+    "refused": {
+      "not-the-app": "To ni prišlo z lastnega strežnika aplikacije {{app}}, zato tukaj ni mogoče odgovoriti.",
+      "unverified": "Strežnika aplikacije {{app}} ni bilo mogoče preveriti, zato tukaj ni mogoče odgovoriti.",
+      "not-confirmed": "Aplikacija {{app}} ne potrjuje, da je to poslala, zato tukaj ni mogoče odgovoriti.",
+      "unreachable": "Aplikacija {{app}} ni dosegljiva, da bi potrdila, da je to poslala. Poskusite znova čez trenutek."
+    },
     "sent": "Vaš odgovor je bil poslan aplikaciji {{app}}",
     "sentAs": {
       "approve": "Odobrili ste.",
@@ -1396,7 +1404,9 @@
       "gone": "Na to je že bilo odgovorjeno ali je poteklo.",
       "not-the-app": "Aplikacija, ki je odgovorila, ni {{app}}, zato ni bilo poslano nič.",
       "unreachable": "Aplikacija {{app}} ni dosegljiva. Poskusite znova čez trenutek.",
-      "cancelled": "Ni bilo poslano nič."
+      "cancelled": "Ni bilo poslano nič.",
+      "unverified": "Strežnika aplikacije {{app}} ni bilo mogoče preveriti, zato tukaj ni mogoče odgovoriti.",
+      "not-confirmed": "Aplikacija {{app}} ne potrjuje, da je to poslala, zato tukaj ni mogoče odgovoriti."
     }
   },
   "devices": {

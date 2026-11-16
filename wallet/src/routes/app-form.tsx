@@ -5,30 +5,44 @@
  * A question an app asked the holder, drawn from the app's form and answered
  * here (services/app-form). Everything on this screen is a native component
  * the wallet chose: the app's words appear only as plain text under the app's
- * platform-verified name, attribute values under the wallet's own labels, and
- * every button carries the wallet's label for its kind. Answering signs with
- * the identity's passkey and goes to the app over attested RA-TLS.
+ * name, attribute values under the wallet's own labels, and every button
+ * carries the wallet's label for its kind.
+ *
+ * Nothing can be answered until the wallet has established, without trusting
+ * the platform, that the app itself sent the form: its own hostname, the app
+ * id attested there, a verified attestation, and the app confirming the form
+ * inside that channel (services/app-form-answer). The verified hostname is
+ * shown and opens the attestation for the holder to review.
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { AttestationView } from '@/components/AttestationView';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { isDeclining, type FormBlock } from '@/services/app-form';
-import { answerForm, AnswerError, type AnswerFailure } from '@/services/app-form-answer';
+import {
+    answerForm,
+    AnswerError,
+    confirmFormSource,
+    type AnswerFailure,
+    type ConfirmedSource,
+} from '@/services/app-form-answer';
 import { attributeLabel } from '@/services/attributes';
 import { useAppMessagesStore } from '@/stores/app-messages';
 
 type Phase =
-    | { kind: 'ready' }
-    | { kind: 'busy'; action: string }
+    | { kind: 'checking' }
+    | { kind: 'ready'; source: ConfirmedSource }
+    | { kind: 'busy'; source: ConfirmedSource; action: string }
     | { kind: 'done'; actionKind: string }
-    | { kind: 'failed'; reason: AnswerFailure };
+    | { kind: 'refused'; reason: AnswerFailure }
+    | { kind: 'failed'; source: ConfirmedSource; reason: AnswerFailure };
 
 export default function AppFormScreen() {
     const { t } = useTranslation();
@@ -41,7 +55,8 @@ export default function AppFormScreen() {
     const refresh = useAppMessagesStore((s) => s.refresh);
     const forget = useAppMessagesStore((s) => s.forget);
     const [looked, setLooked] = useState(false);
-    const [phase, setPhase] = useState<Phase>({ kind: 'ready' });
+    const [phase, setPhase] = useState<Phase>({ kind: 'checking' });
+    const [reviewing, setReviewing] = useState(false);
 
     // Opened from Access the form is already listed; from a push it may not
     // be yet, so look once.
@@ -53,20 +68,34 @@ export default function AppFormScreen() {
     const app = message?.appName || t('access.messageSomeApp');
     const form = message?.form;
 
-    const answer = async (actionId: string, actionKind: string) => {
+    // Establish that the app sent it before anything can be answered.
+    useEffect(() => {
+        if (!message || !form || !message.appId || phase.kind !== 'checking') return;
+        let live = true;
+        confirmFormSource({ form, appId: message.appId, appSlug: message.appSlug, platformHost: message.platformHost })
+            .then((source) => live && setPhase({ kind: 'ready', source }))
+            .catch((e) => live && setPhase({ kind: 'refused', reason: e instanceof AnswerError ? e.reason : 'unreachable' }));
+        return () => {
+            live = false;
+        };
+    }, [message, form, phase.kind]);
+
+    const answer = async (source: ConfirmedSource, actionId: string, actionKind: string) => {
         if (!message || !form || !message.appId) return;
-        setPhase({ kind: 'busy', action: actionId });
+        setPhase({ kind: 'busy', source, action: actionId });
         try {
-            await answerForm({ messageId: message.id, form, appId: message.appId, action: actionId });
+            await answerForm({ messageId: message.id, form, appId: message.appId, host: source.host, action: actionId });
             forget(message.id);
             setPhase({ kind: 'done', actionKind });
         } catch (e) {
             const reason = e instanceof AnswerError ? e.reason : 'unreachable';
             if (reason === 'gone') forget(message.id);
             // A cancelled biometric is not a failure worth a message: back to the form.
-            setPhase(reason === 'cancelled' ? { kind: 'ready' } : { kind: 'failed', reason });
+            setPhase(reason === 'cancelled' ? { kind: 'ready', source } : { kind: 'failed', source, reason });
         }
     };
+
+    const source = phase.kind === 'ready' || phase.kind === 'busy' || phase.kind === 'failed' ? phase.source : undefined;
 
     const body = (() => {
         if (phase.kind === 'done') {
@@ -91,44 +120,68 @@ export default function AppFormScreen() {
         return (
             <>
                 <RNView style={styles.from}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color={p.textSecondary} />
                     <Text style={styles.fromText}>{t('appForm.from', { app })}</Text>
+                    {phase.kind === 'checking' ? (
+                        <RNView style={styles.hostRow}>
+                            <ActivityIndicator size="small" color={p.textSecondary} />
+                            <Text style={styles.hostChecking}>{t('appForm.checking')}</Text>
+                        </RNView>
+                    ) : source ? (
+                        <Pressable
+                            style={styles.hostRow}
+                            onPress={() => setReviewing(true)}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('appForm.reviewAttestation', { host: source.host })}
+                        >
+                            <Ionicons name="shield-checkmark" size={16} color={p.green} />
+                            <Text style={styles.hostVerified}>{source.host}</Text>
+                            <Ionicons name="chevron-forward" size={14} color={p.textSecondary} />
+                        </Pressable>
+                    ) : null}
                 </RNView>
-                <RNView style={styles.card}>
+
+                <RNView style={[styles.card, phase.kind === 'refused' && styles.cardDimmed]}>
                     <Text style={styles.title}>{form.title}</Text>
                     {form.blocks.map((b, i) => (
                         <Block key={i} block={b} styles={styles} t={t} />
                     ))}
                 </RNView>
 
+                {phase.kind === 'refused' ? (
+                    <Text style={styles.error}>{t(`appForm.refused.${phase.reason}`, { app })}</Text>
+                ) : null}
                 {phase.kind === 'failed' ? (
                     <Text style={styles.error}>{t(`appForm.failed.${phase.reason}`, { app })}</Text>
                 ) : null}
 
-                <RNView style={styles.actions}>
-                    {form.actions.map((a) => {
-                        const declining = isDeclining(a.kind);
-                        const busy = phase.kind === 'busy' && phase.action === a.id;
-                        return (
-                            <Pressable
-                                key={a.id}
-                                disabled={phase.kind === 'busy'}
-                                onPress={() => void answer(a.id, a.kind)}
-                                style={[styles.button, declining ? styles.buttonDecline : styles.buttonPrimary]}
-                                accessibilityRole="button"
-                            >
-                                {busy ? (
-                                    <ActivityIndicator color={declining ? p.danger : '#fff'} />
-                                ) : (
-                                    <Text style={declining ? styles.buttonDeclineText : styles.buttonPrimaryText}>
-                                        {t(`appForm.action.${a.kind}`)}
-                                    </Text>
-                                )}
-                            </Pressable>
-                        );
-                    })}
-                </RNView>
-                <Text style={styles.note}>{t('appForm.signNote', { app })}</Text>
+                {source ? (
+                    <>
+                        <RNView style={styles.actions}>
+                            {form.actions.map((a) => {
+                                const declining = isDeclining(a.kind);
+                                const busy = phase.kind === 'busy' && phase.action === a.id;
+                                return (
+                                    <Pressable
+                                        key={a.id}
+                                        disabled={phase.kind === 'busy'}
+                                        onPress={() => void answer(source, a.id, a.kind)}
+                                        style={[styles.button, declining ? styles.buttonDecline : styles.buttonPrimary]}
+                                        accessibilityRole="button"
+                                    >
+                                        {busy ? (
+                                            <ActivityIndicator color={declining ? p.danger : '#fff'} />
+                                        ) : (
+                                            <Text style={declining ? styles.buttonDeclineText : styles.buttonPrimaryText}>
+                                                {t(`appForm.action.${a.kind}`)}
+                                            </Text>
+                                        )}
+                                    </Pressable>
+                                );
+                            })}
+                        </RNView>
+                        <Text style={styles.note}>{t('appForm.signNote', { app })}</Text>
+                    </>
+                ) : null}
 
                 {message.link ? (
                     <Pressable onPress={() => void Linking.openURL(message.link!)} style={styles.link} hitSlop={8}>
@@ -151,6 +204,22 @@ export default function AppFormScreen() {
                     </Pressable>
                 ) : null}
             </ScrollView>
+
+            {source ? (
+                <Modal visible={reviewing} animationType="slide" onRequestClose={() => setReviewing(false)}>
+                    <AttestationView
+                        attestation={source.attestation}
+                        rpId={source.host}
+                        displayName={message?.appName}
+                        isChanged={false}
+                        verificationLevel="fresh-as-verified"
+                        verification={{ status: 'verified', mode: source.mode, challenged: source.challenged }}
+                        reviewOnly
+                        onApprove={() => setReviewing(false)}
+                        onReject={() => setReviewing(false)}
+                    />
+                </Modal>
+            ) : null}
         </RNView>
     );
 }
@@ -204,9 +273,13 @@ const makeStyles = (p: Palette) =>
         spinner: { marginTop: 40 },
         centre: { alignItems: 'center', gap: 10, marginTop: 40 },
         doneTitle: { fontSize: 18, fontWeight: '700', color: p.textPrimary, textAlign: 'center' },
-        from: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-        fromText: { fontSize: 13, color: p.textSecondary },
+        from: { gap: 4 },
+        fromText: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+        hostRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+        hostChecking: { fontSize: 13, color: p.textSecondary },
+        hostVerified: { fontSize: 13, color: p.textSecondary, flexShrink: 1 },
         card: { backgroundColor: p.card, borderRadius: 14, padding: 18, gap: 12, borderWidth: 1, borderColor: p.border },
+        cardDimmed: { opacity: 0.55 },
         title: { fontSize: 18, fontWeight: '700', color: p.textPrimary },
         text: { fontSize: 14.5, lineHeight: 21, color: p.textPrimary },
         divider: { height: StyleSheet.hairlineWidth, backgroundColor: p.border },

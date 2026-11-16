@@ -1420,6 +1420,14 @@
     "presented": "Yr hyn a rannwyd gyda chi",
     "signNote": "Mae eich ateb wedi’i lofnodi â’ch allwedd mynediad a’i anfon at {{app}} yn unig.",
     "openInApp": "Agor yn {{app}}",
+    "checking": "Yn gwirio mai’r ap hwn a’i hanfonodd",
+    "reviewAttestation": "Adolygu ardystiad {{host}}",
+    "refused": {
+      "not-the-app": "Ni ddaeth hyn o weinydd {{app}} ei hun, felly ni ellir ei ateb yma.",
+      "unverified": "Nid oedd modd gwirio gweinydd {{app}}, felly ni ellir ateb hyn yma.",
+      "not-confirmed": "Nid yw {{app}} yn cadarnhau iddo anfon hyn, felly ni ellir ei ateb yma.",
+      "unreachable": "Nid oedd modd cyrraedd {{app}} i gadarnhau iddo anfon hyn. Rhowch gynnig arall arni mewn munud."
+    },
     "sent": "Anfonwyd eich ateb at {{app}}",
     "sentAs": {
       "approve": "Fe wnaethoch gymeradwyo.",
@@ -1444,7 +1452,9 @@
       "gone": "Mae hyn eisoes wedi’i ateb, neu wedi dod i ben.",
       "not-the-app": "Nid {{app}} yw’r ap a atebodd, felly ni anfonwyd dim.",
       "unreachable": "Nid oedd modd cyrraedd {{app}}. Rhowch gynnig arall arni mewn munud.",
-      "cancelled": "Ni anfonwyd dim."
+      "cancelled": "Ni anfonwyd dim.",
+      "unverified": "Nid oedd modd gwirio gweinydd {{app}}, felly ni ellir ateb hyn yma.",
+      "not-confirmed": "Nid yw {{app}} yn cadarnhau iddo anfon hyn, felly ni ellir ei ateb yma."
     }
   },
   "devices": {

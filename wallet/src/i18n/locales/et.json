@@ -1324,6 +1324,14 @@
     "presented": "Mida nad teiega jagasid",
     "signNote": "Teie vastus allkirjastatakse teie pääsuvõtmega ja saadetakse ainult rakendusele {{app}}.",
     "openInApp": "Ava rakenduses {{app}}",
+    "checking": "Kontrollitakse, et selle saatis see rakendus",
+    "reviewAttestation": "Vaata domeeni {{host}} atesteeringut",
+    "refused": {
+      "not-the-app": "See ei tulnud rakenduse {{app}} enda serverist, seega ei saa sellele siin vastata.",
+      "unverified": "Rakenduse {{app}} serverit ei õnnestunud kontrollida, seega ei saa sellele siin vastata.",
+      "not-confirmed": "{{app}} ei kinnita, et saatis selle, seega ei saa sellele siin vastata.",
+      "unreachable": "Rakendusega {{app}} ei saanud ühendust, et kinnitada, et see saatis selle. Proovige hetke pärast uuesti."
+    },
     "sent": "Teie vastus saadeti rakendusele {{app}}",
     "sentAs": {
       "approve": "Te kiitsite heaks.",
@@ -1348,7 +1356,9 @@
       "gone": "Sellele on juba vastatud või see on aegunud.",
       "not-the-app": "Vastanud rakendus ei ole {{app}}, seega ei saadetud midagi.",
       "unreachable": "Rakendusega {{app}} ei saanud ühendust. Proovige hetke pärast uuesti.",
-      "cancelled": "Midagi ei saadetud."
+      "cancelled": "Midagi ei saadetud.",
+      "unverified": "Rakenduse {{app}} serverit ei õnnestunud kontrollida, seega ei saa sellele siin vastata.",
+      "not-confirmed": "{{app}} ei kinnita, et saatis selle, seega ei saa sellele siin vastata."
     }
   },
   "devices": {

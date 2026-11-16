@@ -1313,6 +1313,14 @@
     "presented": "Det de har delat med dig",
     "signNote": "Ditt svar signeras med din nyckel och skickas bara till {{app}}.",
     "openInApp": "Öppna i {{app}}",
+    "checking": "Kontrollerar att den här appen skickade det",
+    "reviewAttestation": "Visa attesteringen för {{host}}",
+    "refused": {
+      "not-the-app": "Det här kom inte från {{app}}s egen server, så det går inte att svara på här.",
+      "unverified": "{{app}}s server kunde inte verifieras, så det går inte att svara på det här.",
+      "not-confirmed": "{{app}} bekräftar inte att den skickade det här, så det går inte att svara på här.",
+      "unreachable": "{{app}} gick inte att nå för att bekräfta att den skickade det här. Försök igen om en stund."
+    },
     "sent": "Ditt svar har skickats till {{app}}",
     "sentAs": {
       "approve": "Du godkände.",
@@ -1337,7 +1345,9 @@
       "gone": "Det här är redan besvarat eller har gått ut.",
       "not-the-app": "Appen som svarade är inte {{app}}, så inget skickades.",
       "unreachable": "{{app}} gick inte att nå. Försök igen om en stund.",
-      "cancelled": "Inget skickades."
+      "cancelled": "Inget skickades.",
+      "unverified": "{{app}}s server kunde inte verifieras, så det går inte att svara på det här.",
+      "not-confirmed": "{{app}} bekräftar inte att den skickade det här, så det går inte att svara på här."
     }
   },
   "devices": {

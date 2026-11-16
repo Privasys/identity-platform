@@ -9,7 +9,9 @@ jest.mock('../services/notify-seal', () => ({
     }),
 }));
 jest.mock('../services/platform-token', () => ({ getCachedPlatformToken: jest.fn(async () => 'tok') }));
-jest.mock('../services/attestation', () => ({ inspectAttestation: jest.fn() }));
+jest.mock('../services/attestation', () => ({ inspectAttestation: jest.fn(), attestEnclave: jest.fn() }));
+jest.mock('../services/app-attest', () => ({ getAttestationServerToken: jest.fn(async () => 'as') }));
+jest.mock('../stores/settings', () => ({ useSettingsStore: { getState: () => ({ verificationMode: 'deterministic' }) } }));
 jest.mock('../services/fido2', () => ({ signVaultAssertion: jest.fn(async () => ({ id: 'c' })) }));
 jest.mock('../services/attribute-approval-api', () => ({
     resolveStepUpCredential: jest.fn(() => ({ keyAlias: 'k', credentialId: 'c', serverRpId: 'privasys.id' })),
@@ -20,7 +22,9 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
 import { formDigest, parseForm } from '../services/app-form';
-import { answerForm, AnswerError } from '../services/app-form-answer';
+import { answerForm, AnswerError, confirmFormSource, hostIsApp } from '../services/app-form-answer';
+import { attestEnclave, inspectAttestation } from '../services/attestation';
+import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 import { signVaultAssertion } from '../services/fido2';
 import { readMessage } from '../stores/app-messages';
 
@@ -97,12 +101,12 @@ describe('answerForm', () => {
     ])('refuses to sign when the IdP would bind %s', async (_name, over) => {
         beginReturns(over);
         (signVaultAssertion as jest.Mock).mockClear();
-        await expect(answerForm({ messageId: 'm1', form, appId: APP, action: 'approve' })).rejects.toMatchObject({ reason: 'mismatch' });
+        await expect(answerForm({ messageId: 'm1', form, appId: APP, host: 'drive.apps.privasys.org', action: 'approve' })).rejects.toMatchObject({ reason: 'mismatch' });
         expect(signVaultAssertion).not.toHaveBeenCalled();
     });
 
     it('never offers an action the form does not have', async () => {
-        await expect(answerForm({ messageId: 'm1', form, appId: APP, action: 'wipe' })).rejects.toBeInstanceOf(AnswerError);
+        await expect(answerForm({ messageId: 'm1', form, appId: APP, host: 'drive.apps.privasys.org', action: 'wipe' })).rejects.toBeInstanceOf(AnswerError);
     });
 });
 
@@ -125,5 +129,61 @@ describe('ANSWER_HOST', () => {
         ]) {
             expect(ANSWER_HOST.test(bad)).toBe(false);
         }
+    });
+});
+
+
+describe('hostIsApp', () => {
+    it('is the app’s own name under the enclave zones, nothing else', () => {
+        expect(hostIsApp('drive-demo.apps.test.privasys.org', 'drive-demo')).toBe(true);
+        expect(hostIsApp('drive.apps.privasys.org', 'drive')).toBe(true);
+        expect(hostIsApp('globaml.apps.privasys.org', 'drive')).toBe(false);
+        expect(hostIsApp('drive-demo.apps.privasys.org', 'drive')).toBe(false);
+        expect(hostIsApp('drive.apps.privasys.org', undefined)).toBe(false);
+        expect(hostIsApp('drive.test.privasys.org', 'drive')).toBe(false);
+    });
+});
+
+describe('confirmFormSource', () => {
+    const form = parseForm(GOOD)!;
+    const APP = '11111111-2222-3333-4444-555555555555';
+    const APP_HEX = '11111111222233334444555555555555';
+    const HOST = 'drive.apps.test.privasys.org';
+    const oids = (hex: string) => ({ custom_oids: [{ oid: '1.3.6.1.4.1.65230.4.1', value_hex: hex }], tee_type: 'tdx' });
+    const confirmWith = (status: number, body: unknown) =>
+        (makeRaTlsFetch as jest.Mock).mockReturnValue(async () => ({ ok: status === 200, status, json: async () => body }));
+
+    beforeEach(() => {
+        (inspectAttestation as jest.Mock).mockResolvedValue(oids(APP_HEX));
+        (attestEnclave as jest.Mock).mockResolvedValue({ status: 'verified', mode: 'deterministic', challenged: false, result: {} });
+        confirmWith(200, { open: true, form_id: form.id, form_digest: form.digest });
+    });
+
+    it('confirms when the app at its own host has this form open', async () => {
+        await expect(confirmFormSource({ form, appId: APP, appSlug: 'drive', platformHost: HOST })).resolves.toMatchObject({ host: HOST });
+    });
+
+    it('refuses a host that is not the app’s own', async () => {
+        await expect(confirmFormSource({ form, appId: APP, appSlug: 'globaml', platformHost: HOST })).rejects.toMatchObject({ reason: 'not-the-app' });
+        expect(inspectAttestation).not.toHaveBeenCalledWith('evil.example');
+    });
+
+    it('refuses another app attested at that host', async () => {
+        (inspectAttestation as jest.Mock).mockResolvedValue(oids('99999999222233334444555555555555'));
+        await expect(confirmFormSource({ form, appId: APP, appSlug: 'drive', platformHost: HOST })).rejects.toMatchObject({ reason: 'not-the-app' });
+    });
+
+    it('refuses an attestation that does not verify', async () => {
+        (attestEnclave as jest.Mock).mockResolvedValue({ status: 'failed', mode: 'deterministic', challenged: false });
+        await expect(confirmFormSource({ form, appId: APP, appSlug: 'drive', platformHost: HOST })).rejects.toMatchObject({ reason: 'unverified' });
+    });
+
+    it.each([
+        ['does not know it', 404, {}],
+        ['has another digest', 200, { open: true, form_id: 'req_1', form_digest: 'ff'.repeat(32) }],
+        ['says it is closed', 200, { open: false, form_id: 'req_1' }],
+    ])('refuses when the app %s', async (_n, status, body) => {
+        confirmWith(status as number, body);
+        await expect(confirmFormSource({ form, appId: APP, appSlug: 'drive', platformHost: HOST })).rejects.toMatchObject({ reason: 'not-confirmed' });
     });
 });

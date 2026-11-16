@@ -1337,6 +1337,14 @@
     "presented": "Cosa hanno condiviso con te",
     "signNote": "La tua risposta viene firmata con la tua passkey e inviata solo a {{app}}.",
     "openInApp": "Apri in {{app}}",
+    "checking": "Verifica che sia stata questa app a inviarlo",
+    "reviewAttestation": "Rivedi l’attestazione di {{host}}",
+    "refused": {
+      "not-the-app": "Questo non proviene dal server di {{app}}, quindi non si può rispondere qui.",
+      "unverified": "Non è stato possibile verificare il server di {{app}}, quindi non si può rispondere qui.",
+      "not-confirmed": "{{app}} non conferma di averlo inviato, quindi non si può rispondere qui.",
+      "unreachable": "{{app}} non è raggiungibile per confermare di averlo inviato. Riprova tra poco."
+    },
     "sent": "La tua risposta è stata inviata a {{app}}",
     "sentAs": {
       "approve": "Hai approvato.",
@@ -1361,7 +1369,9 @@
       "gone": "Hai già risposto, oppure è scaduta.",
       "not-the-app": "L’app che ha risposto non è {{app}}, quindi non è stato inviato nulla.",
       "unreachable": "{{app}} non è raggiungibile. Riprova tra poco.",
-      "cancelled": "Non è stato inviato nulla."
+      "cancelled": "Non è stato inviato nulla.",
+      "unverified": "Non è stato possibile verificare il server di {{app}}, quindi non si può rispondere qui.",
+      "not-confirmed": "{{app}} non conferma di averlo inviato, quindi non si può rispondere qui."
     }
   },
   "devices": {

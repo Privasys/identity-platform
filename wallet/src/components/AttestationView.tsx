@@ -152,6 +152,7 @@ export function AttestationView({
     onReject,
     onChallenge,
     challengeInFlight,
+    reviewOnly,
 }: {
     attestation: AttestationResult;
     rpId: string;
@@ -226,6 +227,9 @@ export function AttestationView({
     /** When provided (deterministic mode), offers a fresh challenge-mode run. */
     onChallenge?: () => void;
     challengeInFlight?: boolean;
+    /** Only to review an attestation already relied on: no approve, no
+     *  override, one Close (which calls onReject). */
+    reviewOnly?: boolean;
 }) {
     const { t } = useTranslation();
     const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -769,6 +773,15 @@ export function AttestationView({
                 status: Approve when verified, Continue anyway when the service
                 was unreachable, and — when the verdict is a definite failure —
                 an override buried behind Advanced. */}
+            {reviewOnly ? (
+                <RNView style={[styles.bottomActions, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+                    <RNView style={styles.buttonRow}>
+                        <Pressable style={styles.approveButton} onPress={onReject}>
+                            <Text style={styles.approveButtonText}>{t('common.close')}</Text>
+                        </Pressable>
+                    </RNView>
+                </RNView>
+            ) : (
             <RNView style={[styles.bottomActions, { paddingBottom: Math.max(insets.bottom, 20) }]}>
                 {isInvalid && (
                     <>
@@ -809,6 +822,7 @@ export function AttestationView({
                     ) : null}
                 </RNView>
             </RNView>
+            )}
         </RNView>
     );
 }

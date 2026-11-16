@@ -179,6 +179,28 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			}
 			kind, form = k, f
 		}
+		// An approval is checked the same way, and needs the same attested
+		// host: its answer goes there, and the wallet confirms it there.
+		var approval appmessages.Approval
+		isApproval := req.Type == appmessages.ApprovalType
+		if isApproval {
+			a, err := appmessages.ParseApprovalPayload(req.Payload)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			if !appmessages.HostIsApp(req.AppPlatformHost, req.AppSlug) {
+				writeError(w, http.StatusBadRequest, "an approval needs the app's platform host, exactly <app name>.apps[.test].privasys.org")
+				return
+			}
+			// Presence is built in a second step; until then an app learns it here,
+			// not from a holder stuck on a screen that cannot complete.
+			if a.Assurance == appmessages.AssuranceGovPresence {
+				writeError(w, http.StatusBadRequest, "assurance gov-presence is not available yet; use device")
+				return
+			}
+			kind, approval = "request", a
+		}
 		// The subject the app addressed, before it is resolved to an account:
 		// a form's answer names the person in the app's own terms.
 		appSub := req.Sub
@@ -223,7 +245,7 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 		// push token is exactly the one who can only find it by listing.
 		messageID := ""
 		isForm := req.Type == appmessages.FormType
-		if msgs != nil && (appmessages.Waits(kind) || isForm) {
+		if msgs != nil && (appmessages.Waits(kind) || isForm || isApproval) {
 			sealed := ""
 			for _, t := range targets {
 				if t.EncPub == "" {
@@ -239,6 +261,11 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			}
 			if isForm {
 				m.FormID, m.FormDigest, m.Actions = form.ID, form.Digest, form.Actions
+				m.PlatformHost, m.AppSub, m.AppSlug = req.AppPlatformHost, appSub, req.AppSlug
+			}
+			if isApproval {
+				m.FormID, m.FormDigest, m.Actions = approval.ID, approval.Digest, appmessages.Decisions
+				m.ActDigest, m.Assurance, m.TTL = approval.ActDigest, approval.Assurance, approval.TTL
 				m.PlatformHost, m.AppSub, m.AppSlug = req.AppPlatformHost, appSub, req.AppSlug
 			}
 			id, err := msgs.Put(req.Sub, m)
@@ -260,6 +287,9 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 		if req.Type == appmessages.Type || req.Type == appmessages.FormType {
 			body = appmessages.BannerBody(kind)
 		}
+		if isApproval {
+			body = "Asks you to approve something."
+		}
 		status := "sent-unsealed"
 		delivered := 0
 		for _, t := range targets {
@@ -275,12 +305,12 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			// An app message names the host the platform verified (the wallet
 			// links only there), its kind, and the listed copy to dismiss once
 			// opened. The path and anything presented stay sealed.
-			if req.Type == appmessages.Type || req.Type == appmessages.FormType {
+			if req.Type == appmessages.Type || req.Type == appmessages.FormType || isApproval {
 				data["kind"] = kind
 				// The verified name the banner already shows, for the screen a
 				// tap opens before the wallet has listed the message.
 				data["app_name"] = req.AppName
-				if req.Type == appmessages.FormType {
+				if req.Type == appmessages.FormType || isApproval {
 					data["app_platform_host"] = req.AppPlatformHost
 					data["app_slug"] = req.AppSlug
 				}

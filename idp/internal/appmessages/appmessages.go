@@ -134,9 +134,15 @@ type Message struct {
 	AppID        string   `json:"app_id,omitempty"`
 	AppName      string   `json:"app_name,omitempty"`
 	AppHost      string   `json:"app_host,omitempty"`
-	Sealed       string   `json:"sealed,omitempty"`
-	CreatedAt    int64    `json:"created_at"`
-	ExpiresAt    int64    `json:"expires_at"`
+	// ActDigest and Assurance are an approval's: the digest of the act the
+	// app will commit, and the assurance it asked for.
+	ActDigest string `json:"act_digest,omitempty"`
+	Assurance string `json:"assurance,omitempty"`
+	// TTL, when set, replaces the default wait (an approval's own ttl).
+	TTL       time.Duration `json:"-"`
+	Sealed    string        `json:"sealed,omitempty"`
+	CreatedAt int64         `json:"created_at"`
+	ExpiresAt int64         `json:"expires_at"`
 }
 
 // Store keeps the waiting messages.
@@ -183,6 +189,8 @@ func open(db *sql.DB, now func() time.Time) (*Store, error) {
 		"form_digest TEXT NOT NULL DEFAULT ''", "actions TEXT NOT NULL DEFAULT ''",
 		"platform_host TEXT NOT NULL DEFAULT ''", "app_sub TEXT NOT NULL DEFAULT ''",
 		"app_slug TEXT NOT NULL DEFAULT ''",
+		// For approvals.
+		"act_digest TEXT NOT NULL DEFAULT ''", "assurance TEXT NOT NULL DEFAULT ''",
 	} {
 		name := strings.Fields(col)[0]
 		if !hasColumn(db, name) {
@@ -219,23 +227,28 @@ func newID() string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-// Put records a waiting message for userID and returns its id. A form is
-// always kept: it waits on the holder's answer whatever its kind.
+// Put records a waiting message for userID and returns its id. A form or an
+// approval is always kept: it waits on the holder's answer whatever its kind.
 func (s *Store) Put(userID string, m Message) (string, error) {
 	if m.Type == "" {
 		m.Type = Type
 	}
-	if userID == "" || (m.Type != FormType && !Waits(m.Kind)) {
+	if userID == "" || (m.Type != FormType && m.Type != ApprovalType && !Waits(m.Kind)) {
 		return "", nil
 	}
 	now := s.now()
 	id := newID()
+	ttl := TTL
+	if m.TTL > 0 && m.TTL < TTL {
+		ttl = m.TTL
+	}
 	if _, err := s.db.Exec(`INSERT INTO app_messages
 		(id, user_id, app_id, app_name, app_host, kind, sealed, created_at, expires_at,
-		 type, form_id, form_digest, actions, platform_host, app_sub, app_slug)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, userID, m.AppID, m.AppName, m.AppHost, m.Kind, m.Sealed, now.Unix(), now.Add(TTL).Unix(),
-		m.Type, m.FormID, m.FormDigest, strings.Join(m.Actions, ","), m.PlatformHost, m.AppSub, m.AppSlug); err != nil {
+		 type, form_id, form_digest, actions, platform_host, app_sub, app_slug, act_digest, assurance)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, userID, m.AppID, m.AppName, m.AppHost, m.Kind, m.Sealed, now.Unix(), now.Add(ttl).Unix(),
+		m.Type, m.FormID, m.FormDigest, strings.Join(m.Actions, ","), m.PlatformHost, m.AppSub, m.AppSlug,
+		m.ActDigest, m.Assurance); err != nil {
 		return "", err
 	}
 	// Over the bound, the oldest go: the newest is the one the holder is
@@ -247,7 +260,7 @@ func (s *Store) Put(userID string, m Message) (string, error) {
 }
 
 const messageColumns = `id, type, kind, app_id, app_name, app_host, sealed, created_at, expires_at,
-	form_id, form_digest, actions, platform_host, app_sub, app_slug`
+	form_id, form_digest, actions, platform_host, app_sub, app_slug, act_digest, assurance`
 
 type scanner interface{ Scan(...any) error }
 
@@ -255,7 +268,7 @@ func scanMessage(r scanner) (Message, error) {
 	var m Message
 	var actions string
 	err := r.Scan(&m.ID, &m.Type, &m.Kind, &m.AppID, &m.AppName, &m.AppHost, &m.Sealed, &m.CreatedAt, &m.ExpiresAt,
-		&m.FormID, &m.FormDigest, &actions, &m.PlatformHost, &m.AppSub, &m.AppSlug)
+		&m.FormID, &m.FormDigest, &actions, &m.PlatformHost, &m.AppSub, &m.AppSlug, &m.ActDigest, &m.Assurance)
 	if actions != "" {
 		m.Actions = strings.Split(actions, ",")
 	}

@@ -857,3 +857,59 @@ func (iss *Issuer) IssueAppFormAnswer(c AppFormAnswerClaims) (string, error) {
 		"v":           1,
 	}, "app-form-answer+jwt")
 }
+
+// OpApprovalClaims is the holder's answer to one approval: an app's act,
+// approved or declined, at an assurance the token states.
+type OpApprovalClaims struct {
+	// Subject is the subject the app addressed, in its own terms.
+	Subject        string
+	AppID          string
+	ApprovalID     string
+	ApprovalDigest string
+	ActDigest      string
+	Decision       string
+	// ACR is the assurance reached ("device" or "gov-presence"); AMR how the
+	// holder signed (always "webauthn", plus "face" when a presence check
+	// ran).
+	ACR string
+	AMR []string
+	// Presence, for gov-presence, is the identity verifier's holder_present
+	// token, carried so the app can keep it as its own receipt.
+	Presence string
+	JTI      string
+}
+
+// OpApprovalTTL is how long an approval token is good for.
+const OpApprovalTTL = 5 * time.Minute
+
+// IssueOpApproval signs the holder's answer to an approval
+// (typ = "op-approval+jwt"). Never an access token: its audience is
+// "approval:<app id>", it carries no roles and no session, and it lives for
+// minutes. It commits to the approval as sent (its digest), the act (the
+// app's own digest of it) and the one decision.
+func (iss *Issuer) IssueOpApproval(c OpApprovalClaims) (string, error) {
+	if c.Subject == "" || c.AppID == "" || c.ApprovalID == "" || c.ApprovalDigest == "" ||
+		c.ActDigest == "" || c.Decision == "" || c.ACR == "" || len(c.AMR) == 0 || c.JTI == "" {
+		return "", fmt.Errorf("op approval: every field is required")
+	}
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"iss":             iss.issuerURL,
+		"sub":             c.Subject,
+		"aud":             "approval:" + c.AppID,
+		"iat":             now.Unix(),
+		"exp":             now.Add(OpApprovalTTL).Unix(),
+		"jti":             c.JTI,
+		"approval_id":     c.ApprovalID,
+		"approval_digest": c.ApprovalDigest,
+		"act_digest":      c.ActDigest,
+		"decision":        c.Decision,
+		"acr":             c.ACR,
+		"amr":             c.AMR,
+		"v":               1,
+	}
+	if c.Presence != "" {
+		claims["presence"] = c.Presence
+	}
+	return iss.signTyp(claims, "op-approval+jwt")
+}

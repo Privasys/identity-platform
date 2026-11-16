@@ -41,6 +41,8 @@ var alwaysDelivered = map[string]bool{
 	"share-request": true,
 	// A form is a decision the app is waiting on (internal/appmessages).
 	"app-form": true,
+	// An approval: an app waiting, now, on the holder's yes or no to one act.
+	"approval": true,
 }
 
 // appIDShape is an attested app id as the control plane forwards it: a

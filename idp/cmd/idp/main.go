@@ -546,6 +546,9 @@ func main() {
 	appForms := fido2Handler.NewAppForms(appMessages, issuer, recoveryHandler.AuthenticateBearer)
 	mux.HandleFunc("POST /wallet/app-forms/{id}/begin", appForms.HandleBegin)
 	mux.HandleFunc("POST /wallet/app-forms/{id}/answer", appForms.HandleAnswer)
+	approvals := fido2Handler.NewApprovals(appMessages, issuer, recoveryHandler.AuthenticateBearer)
+	mux.HandleFunc("POST /wallet/approvals/{id}/begin", approvals.HandleBegin)
+	mux.HandleFunc("POST /wallet/approvals/{id}/answer", approvals.HandleAnswer)
 	// The holder removing an app: its relationship row, the sessions of the
 	// client that stands for it, its spend consent and its open asks all go,
 	// and with them the app's only way back to the person (internal/apps).

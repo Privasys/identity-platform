@@ -29,12 +29,13 @@ const testForm = `{"v":1,"id":"req_1","title":"Access to a shared file",` +
 	`"actions":[{"id":"approve","kind":"approve"},{"id":"deny","kind":"deny"}],"callback":"/answer"}`
 
 type formRig struct {
-	t      *testing.T
-	forms  *AppForms
-	msgs   *appmessages.Store
-	issuer *tokens.Issuer
-	key    *ecdsa.PrivateKey
-	credID []byte
+	t         *testing.T
+	forms     *AppForms
+	approvals *Approvals
+	msgs      *appmessages.Store
+	issuer    *tokens.Issuer
+	key       *ecdsa.PrivateKey
+	credID    []byte
 }
 
 func newFormRig(t *testing.T) *formRig {
@@ -77,7 +78,7 @@ func newFormRig(t *testing.T) *formRig {
 		w.WriteHeader(http.StatusUnauthorized)
 		return ""
 	}
-	return &formRig{t: t, forms: h.NewAppForms(msgs, issuer, auth), msgs: msgs, issuer: issuer, key: key, credID: credID}
+	return &formRig{t: t, forms: h.NewAppForms(msgs, issuer, auth), approvals: h.NewApprovals(msgs, issuer, auth), msgs: msgs, issuer: issuer, key: key, credID: credID}
 }
 
 func pad32(b []byte) []byte {
@@ -115,12 +116,16 @@ func (g *formRig) call(handler http.HandlerFunc, user, id string, body any) (int
 }
 
 // sign answers a begin's options as the holder's authenticator would.
-func (g *formRig) sign(begin map[string]any) json.RawMessage {
+func (g *formRig) sign(begin map[string]any) json.RawMessage { return g.signFlags(begin, 0x05) }
+
+// signFlags signs with the given authenticator flags (0x01 user present, 0x04
+// user verified).
+func (g *formRig) signFlags(begin map[string]any, flags byte) json.RawMessage {
 	opts := begin["options"].(map[string]any)["publicKey"].(map[string]any)
 	challenge := opts["challenge"].(string)
 	clientData, _ := json.Marshal(map[string]any{"type": "webauthn.get", "challenge": challenge, "origin": "https://privasys.id"})
 	rpHash := sha256.Sum256([]byte("privasys.id"))
-	authData := append(append([]byte{}, rpHash[:]...), 0x05, 0, 0, 0, 1)
+	authData := append(append([]byte{}, rpHash[:]...), flags, 0, 0, 0, 1)
 	cdHash := sha256.Sum256(clientData)
 	digest := sha256.Sum256(append(append([]byte{}, authData...), cdHash[:]...))
 	sig, _ := ecdsa.SignASN1(rand.Reader, g.key, digest[:])

@@ -275,6 +275,9 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			// opened. The path and anything presented stay sealed.
 			if req.Type == appmessages.Type || req.Type == appmessages.FormType {
 				data["kind"] = kind
+				// The verified name the banner already shows, for the screen a
+				// tap opens before the wallet has listed the message.
+				data["app_name"] = req.AppName
 				if req.Type == appmessages.FormType {
 					data["app_platform_host"] = req.AppPlatformHost
 				}

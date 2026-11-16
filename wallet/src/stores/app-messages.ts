@@ -14,6 +14,7 @@
 import { create } from 'zustand';
 
 import { APP_FORM_TYPE, readFormPayload, type AppForm } from '@/services/app-form';
+import { APPROVAL_TYPE, readApprovalPayload, type Approval } from '@/services/approval';
 import { appMessageLink, readAppMessage, APP_MESSAGE_TYPE, type AppMessageContent } from '@/services/app-message';
 import { openSealedNotification } from '@/services/notify-seal';
 import { getCachedPlatformToken } from '@/services/platform-token';
@@ -22,7 +23,8 @@ const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
 export interface WaitingAppMessage extends AppMessageContent {
     id: string;
-    /** 'app-message', or 'app-form' for a question answered in the wallet. */
+    /** 'app-message', 'app-form' for a question answered in the wallet, or
+     *  'approval' for an act the holder approves. */
     type: string;
     appId?: string;
     appName?: string;
@@ -36,7 +38,12 @@ export interface WaitingAppMessage extends AppMessageContent {
     /** For an app-form: the form, only when it parsed and its digest is the
      *  one the IdP recorded. A form this phone cannot show has none. */
     form?: AppForm;
+    /** For an approval: the approval, only when it parsed and its digest is
+     *  the one the IdP recorded. */
+    approval?: Approval;
     createdAt: number;
+    /** When it stops waiting (seconds); an approval waits minutes. */
+    expiresAt?: number;
 }
 
 export interface ListedMessage {
@@ -57,7 +64,7 @@ export interface ListedMessage {
 /** One listed or pushed message, as the wallet shows it. */
 export async function readMessage(r: ListedMessage): Promise<WaitingAppMessage | null> {
     if (typeof r?.id !== 'string' || !r.id) return null;
-    const type = r.type === APP_FORM_TYPE ? APP_FORM_TYPE : APP_MESSAGE_TYPE;
+    const type = r.type === APP_FORM_TYPE ? APP_FORM_TYPE : r.type === APPROVAL_TYPE ? APPROVAL_TYPE : APP_MESSAGE_TYPE;
     const kindHint = typeof r.kind === 'string' ? r.kind : undefined;
     // Sealed with the type as associated data, so a message cannot be
     // replayed as a form or the other way round.
@@ -72,7 +79,14 @@ export async function readMessage(r: ListedMessage): Promise<WaitingAppMessage |
         appSlug: typeof r.app_slug === 'string' ? r.app_slug : undefined,
         platformHost: typeof r.app_platform_host === 'string' ? r.app_platform_host : undefined,
         createdAt: typeof r.created_at === 'number' ? r.created_at : 0,
+        expiresAt: typeof r.expires_at === 'number' ? r.expires_at : undefined,
     };
+    if (type === APPROVAL_TYPE) {
+        const parsed = readApprovalPayload(payload);
+        // As for a form: shown only when it is what the IdP will bind.
+        const approval = parsed && (r.form_digest === undefined || r.form_digest === parsed.digest) ? parsed : undefined;
+        return { ...base, kind: 'request', presented: [], approval };
+    }
     if (type === APP_FORM_TYPE) {
         const parsed = readFormPayload(payload);
         // What the holder sees must be what the IdP will bind their answer

@@ -455,6 +455,7 @@
     "askTitle": "{{app}} lūdz piekļuvi",
     "askHint": "Pieskarieties, lai redzētu, ko tā lūdz, un pēc tam apstipriniet vai noraidiet.",
     "formHint": "Pieskarieties, lai atbildētu šeit.",
+    "approvalTitle": "{{app}} lūdz jūsu apstiprinājumu",
     "messageRequest": "{{app}} jums nosūtīja pieprasījumu",
     "messageInvitation": "{{app}} jums nosūtīja ielūgumu",
     "messageSomeApp": "Lietotne",
@@ -1385,6 +1386,24 @@
       "unverified": "Lietotnes {{app}} serveri neizdevās pārbaudīt, tāpēc šeit uz to nevar atbildēt.",
       "not-confirmed": "{{app}} neapstiprina, ka to nosūtīja, tāpēc šeit uz to nevar atbildēt."
     }
+  },
+  "approval": {
+    "title": "Apstiprinājums",
+    "assurance": {
+      "device": "Apstiprināšanai vajag jūsu seju vai pirksta nospiedumu šajā tālrunī.",
+      "gov-presence": "Apstiprināšanai vajag jūsu sejas tiešsaistes pārbaudi pret pasi."
+    },
+    "timeLeft": "Atbildei atlicis {{time}}",
+    "expired": "Termiņš beidzies. Palūdziet {{app}} to nosūtīt vēlreiz.",
+    "prompt": {
+      "approve": "Apstiprināt: {{app}}",
+      "decline": "Noraidīt: {{app}}"
+    },
+    "done": {
+      "approve": "Apstiprināts: {{app}}",
+      "decline": "Noraidīts: {{app}}"
+    },
+    "unsupported": "Tam vajag pārbaudi, ko šī maka versija vēl neprot. Atjauniniet maku un atveriet vēlreiz."
   },
   "devices": {
     "addEntry": "Es jau izmantoju Privasys Wallet citā tālrunī",

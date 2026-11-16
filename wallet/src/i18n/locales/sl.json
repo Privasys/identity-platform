@@ -455,6 +455,7 @@
     "askTitle": "{{app}} prosi za dostop",
     "askHint": "Tapnite, da vidite, kaj želi, nato odobrite ali zavrnite.",
     "formHint": "Tapnite, da odgovorite tukaj.",
+    "approvalTitle": "{{app}} prosi za vašo odobritev",
     "messageRequest": "{{app}} vam je poslala zahtevo",
     "messageInvitation": "{{app}} vam je poslala povabilo",
     "messageSomeApp": "Aplikacija",
@@ -1409,6 +1410,24 @@
       "unverified": "Strežnika aplikacije {{app}} ni bilo mogoče preveriti, zato tukaj ni mogoče odgovoriti.",
       "not-confirmed": "Aplikacija {{app}} ne potrjuje, da je to poslala, zato tukaj ni mogoče odgovoriti."
     }
+  },
+  "approval": {
+    "title": "Odobritev",
+    "assurance": {
+      "device": "Za odobritev je potreben vaš obraz ali prstni odtis na tem telefonu.",
+      "gov-presence": "Za odobritev je potrebno preverjanje vašega obraza v živo glede na potni list."
+    },
+    "timeLeft": "Za odgovor je ostalo {{time}}",
+    "expired": "Poteklo je. Prosite {{app}}, naj to pošlje znova.",
+    "prompt": {
+      "approve": "Odobri za {{app}}",
+      "decline": "Zavrni za {{app}}"
+    },
+    "done": {
+      "approve": "Odobreno za {{app}}",
+      "decline": "Zavrnjeno za {{app}}"
+    },
+    "unsupported": "Za to je potrebno preverjanje, ki ga ta različica denarnice še ne zmore. Posodobite denarnico in odprite znova."
   },
   "devices": {
     "addEntry": "Privasys Wallet že uporabljam v drugem telefonu",

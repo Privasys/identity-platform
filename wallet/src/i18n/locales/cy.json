@@ -455,6 +455,7 @@
     "askTitle": "Mae {{app}} yn gofyn am fynediad",
     "askHint": "Tapiwch i weld beth mae'n ei ofyn, yna cymeradwywch neu gwrthodwch.",
     "formHint": "Tapiwch i ateb yma.",
+    "approvalTitle": "Mae {{app}} yn gofyn am eich cymeradwyaeth",
     "messageRequest": "Anfonodd {{app}} gais atoch",
     "messageInvitation": "Anfonodd {{app}} wahoddiad atoch",
     "messageSomeApp": "Ap",
@@ -1457,6 +1458,24 @@
       "unverified": "Nid oedd modd gwirio gweinydd {{app}}, felly ni ellir ateb hyn yma.",
       "not-confirmed": "Nid yw {{app}} yn cadarnhau iddo anfon hyn, felly ni ellir ei ateb yma."
     }
+  },
+  "approval": {
+    "title": "Cymeradwyaeth",
+    "assurance": {
+      "device": "Mae cymeradwyo'n gofyn am eich wyneb neu'ch ôl bys ar y ffôn hwn.",
+      "gov-presence": "Mae cymeradwyo'n gofyn am wiriad byw o'ch wyneb yn erbyn eich pasbort."
+    },
+    "timeLeft": "{{time}} ar ôl i ateb",
+    "expired": "Mae hwn wedi dod i ben. Gofynnwch i {{app}} ei anfon eto.",
+    "prompt": {
+      "approve": "Cymeradwyo ar gyfer {{app}}",
+      "decline": "Gwrthod ar gyfer {{app}}"
+    },
+    "done": {
+      "approve": "Cymeradwywyd ar gyfer {{app}}",
+      "decline": "Gwrthodwyd ar gyfer {{app}}"
+    },
+    "unsupported": "Mae angen gwiriad na all y fersiwn hon o'r waled ei wneud eto. Diweddarwch y waled, yna agorwch ef eto."
   },
   "devices": {
     "addEntry": "Rwy'n defnyddio Privasys Wallet ar ffôn arall yn barod",

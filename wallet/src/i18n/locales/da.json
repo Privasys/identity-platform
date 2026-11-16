@@ -422,6 +422,7 @@
     "askTitle": "{{app}} beder om adgang",
     "askHint": "Tryk for at se, hvad den vil have, og godkend eller afvis.",
     "formHint": "Tryk for at svare her.",
+    "approvalTitle": "{{app}} beder om din godkendelse",
     "messageRequest": "{{app}} har sendt dig en anmodning",
     "messageInvitation": "{{app}} har sendt dig en invitation",
     "messageSomeApp": "En app",
@@ -1350,6 +1351,24 @@
       "unverified": "{{app}}s server kunne ikke verificeres, så dette kan ikke besvares her.",
       "not-confirmed": "{{app}} bekræfter ikke at have sendt dette, så det kan ikke besvares her."
     }
+  },
+  "approval": {
+    "title": "Godkendelse",
+    "assurance": {
+      "device": "Godkendelse kræver dit ansigt eller fingeraftryk på denne telefon.",
+      "gov-presence": "Godkendelse kræver et live-tjek af dit ansigt mod dit pas."
+    },
+    "timeLeft": "{{time}} tilbage til at svare",
+    "expired": "Den er udløbet. Bed {{app}} om at sende den igen.",
+    "prompt": {
+      "approve": "Godkend for {{app}}",
+      "decline": "Afvis for {{app}}"
+    },
+    "done": {
+      "approve": "Godkendt for {{app}}",
+      "decline": "Afvist for {{app}}"
+    },
+    "unsupported": "Dette kræver et tjek, som denne version af tegnebogen endnu ikke kan udføre. Opdater tegnebogen, og åbn den igen."
   },
   "devices": {
     "addEntry": "Jeg bruger allerede Privasys Wallet på en anden telefon",

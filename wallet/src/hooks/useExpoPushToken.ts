@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
 
 import { APP_FORM_TYPE } from '../services/app-form';
+import { APPROVAL_TYPE } from '../services/approval';
 import { APP_MESSAGE_TYPE, appMessageLink, readAppMessage } from '../services/app-message';
 import { DEFAULT_RELAY_HOST, fetchDescriptor } from '../services/descriptor';
 import { pullRelay } from '../services/device-sync';
@@ -181,6 +182,28 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         if (!isRouteActive('/drive-requests')) {
             router.push({ pathname: '/drive-requests', params: { source: 'push' } });
         }
+        return;
+    }
+    if (data?.type === APPROVAL_TYPE) {
+        // An app waiting, now, on the holder's yes or no to one act. Filed
+        // first, as a form is, so its screen opens without the list.
+        const id = typeof data.message_id === 'string' ? data.message_id : '';
+        if (!id) {
+            router.navigate('/access');
+            return;
+        }
+        try {
+            const m = await readMessage({
+                id, type: APPROVAL_TYPE, kind: data.kind, app_id: data.app_id,
+                app_name: typeof data.app_name === 'string' ? data.app_name : undefined,
+                app_host: data.app_host, sealed: data.sealed,
+                app_slug: data.app_slug, app_platform_host: data.app_platform_host,
+            });
+            if (m) useAppMessagesStore.getState().remember(m);
+        } catch (e) {
+            console.warn('[notifications] could not read the approval', e);
+        }
+        router.push({ pathname: '/approval', params: { id } });
         return;
     }
     if (data?.type === APP_FORM_TYPE) {

@@ -422,6 +422,7 @@
     "askTitle": "{{app}} chiede l’accesso",
     "askHint": "Tocca per vedere cosa chiede, poi approva o rifiuta.",
     "formHint": "Tocca per rispondere qui.",
+    "approvalTitle": "{{app}} chiede la tua approvazione",
     "messageRequest": "{{app}} ti ha inviato una richiesta",
     "messageInvitation": "{{app}} ti ha inviato un invito",
     "messageSomeApp": "Un’app",
@@ -1374,6 +1375,24 @@
       "unverified": "Non è stato possibile verificare il server di {{app}}, quindi non si può rispondere qui.",
       "not-confirmed": "{{app}} non conferma di averlo inviato, quindi non si può rispondere qui."
     }
+  },
+  "approval": {
+    "title": "Approvazione",
+    "assurance": {
+      "device": "Per approvare servono il tuo volto o la tua impronta su questo telefono.",
+      "gov-presence": "Per approvare serve un controllo dal vivo del tuo volto con il passaporto."
+    },
+    "timeLeft": "Restano {{time}} per rispondere",
+    "expired": "È scaduto. Chiedi a {{app}} di inviarlo di nuovo.",
+    "prompt": {
+      "approve": "Approva per {{app}}",
+      "decline": "Rifiuta per {{app}}"
+    },
+    "done": {
+      "approve": "Approvato per {{app}}",
+      "decline": "Rifiutato per {{app}}"
+    },
+    "unsupported": "Serve un controllo che questa versione del portafoglio non sa ancora fare. Aggiorna il portafoglio, poi riaprilo."
   },
   "devices": {
     "addEntry": "Uso già Privasys Wallet su un altro telefono",

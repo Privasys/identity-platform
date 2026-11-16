@@ -455,6 +455,7 @@
     "askTitle": "{{app}} žiada o prístup",
     "askHint": "Ťuknutím zobrazíte, o čo žiada, a potom schválite alebo zamietnete.",
     "formHint": "Ťuknutím odpoviete tu.",
+    "approvalTitle": "{{app}} žiada o vaše schválenie",
     "messageRequest": "{{app}} vám poslala žiadosť",
     "messageInvitation": "{{app}} vám poslala pozvánku",
     "messageSomeApp": "Aplikácia",
@@ -1385,6 +1386,24 @@
       "unverified": "Server {{app}} sa nepodarilo overiť, preto sa na to tu nedá odpovedať.",
       "not-confirmed": "{{app}} nepotvrdzuje, že to poslala, preto sa na to tu nedá odpovedať."
     }
+  },
+  "approval": {
+    "title": "Schválenie",
+    "assurance": {
+      "device": "Schválenie vyžaduje vašu tvár alebo odtlačok prsta na tomto telefóne.",
+      "gov-presence": "Schválenie vyžaduje živú kontrolu vašej tváre voči pasu."
+    },
+    "timeLeft": "Na odpoveď zostáva {{time}}",
+    "expired": "Platnosť vypršala. Požiadajte {{app}}, aby to poslala znova.",
+    "prompt": {
+      "approve": "Schváliť pre {{app}}",
+      "decline": "Odmietnuť pre {{app}}"
+    },
+    "done": {
+      "approve": "Schválené pre {{app}}",
+      "decline": "Odmietnuté pre {{app}}"
+    },
+    "unsupported": "Vyžaduje to kontrolu, ktorú táto verzia peňaženky zatiaľ nevie. Aktualizujte peňaženku a otvorte to znova."
   },
   "devices": {
     "addEntry": "Privasys Wallet už používam na inom telefóne",

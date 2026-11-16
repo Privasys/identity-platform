@@ -422,6 +422,7 @@
     "askTitle": "{{app}} bittet um Zugriff",
     "askHint": "Tippen Sie, um zu sehen, was angefragt wird, und genehmigen oder lehnen Sie ab.",
     "formHint": "Tippen Sie, um hier zu antworten.",
+    "approvalTitle": "{{app}} bittet um Ihre Zustimmung",
     "messageRequest": "{{app}} hat Ihnen eine Anfrage gesendet",
     "messageInvitation": "{{app}} hat Ihnen eine Einladung gesendet",
     "messageSomeApp": "Eine App",
@@ -1350,6 +1351,24 @@
       "unverified": "Der Server von {{app}} konnte nicht verifiziert werden, daher kann dies hier nicht beantwortet werden.",
       "not-confirmed": "{{app}} bestätigt nicht, dies gesendet zu haben, daher kann es hier nicht beantwortet werden."
     }
+  },
+  "approval": {
+    "title": "Zustimmung",
+    "assurance": {
+      "device": "Zum Zustimmen braucht es Ihr Gesicht oder Ihren Fingerabdruck auf diesem Telefon.",
+      "gov-presence": "Zum Zustimmen braucht es eine Live-Prüfung Ihres Gesichts mit Ihrem Reisepass."
+    },
+    "timeLeft": "Noch {{time}} zum Antworten",
+    "expired": "Abgelaufen. Bitten Sie {{app}}, es erneut zu senden.",
+    "prompt": {
+      "approve": "Für {{app}} zustimmen",
+      "decline": "Für {{app}} ablehnen"
+    },
+    "done": {
+      "approve": "Für {{app}} zugestimmt",
+      "decline": "Für {{app}} abgelehnt"
+    },
+    "unsupported": "Dafür ist eine Prüfung nötig, die diese Version der Wallet noch nicht kann. Aktualisieren Sie die Wallet und öffnen Sie es erneut."
   },
   "devices": {
     "addEntry": "Ich nutze Privasys Wallet bereits auf einem anderen Telefon",

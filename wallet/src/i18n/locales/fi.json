@@ -422,6 +422,7 @@
     "askTitle": "{{app}} pyytää käyttöoikeutta",
     "askHint": "Napauta nähdäksesi, mitä se pyytää, ja hyväksy tai hylkää.",
     "formHint": "Vastaa tässä napauttamalla.",
+    "approvalTitle": "{{app}} pyytää hyväksyntääsi",
     "messageRequest": "{{app}} lähetti sinulle pyynnön",
     "messageInvitation": "{{app}} lähetti sinulle kutsun",
     "messageSomeApp": "Sovellus",
@@ -1350,6 +1351,24 @@
       "unverified": "Sovelluksen {{app}} palvelinta ei voitu varmentaa, joten tähän ei voi vastata täällä.",
       "not-confirmed": "{{app}} ei vahvista lähettäneensä tätä, joten siihen ei voi vastata täällä."
     }
+  },
+  "approval": {
+    "title": "Hyväksyntä",
+    "assurance": {
+      "device": "Hyväksyminen vaatii kasvosi tai sormenjälkesi tässä puhelimessa.",
+      "gov-presence": "Hyväksyminen vaatii kasvojesi tarkistuksen passiasi vasten."
+    },
+    "timeLeft": "Vastausaikaa jäljellä {{time}}",
+    "expired": "Tämä on vanhentunut. Pyydä sovellusta {{app}} lähettämään se uudelleen.",
+    "prompt": {
+      "approve": "Hyväksy sovellukselle {{app}}",
+      "decline": "Hylkää sovellukselle {{app}}"
+    },
+    "done": {
+      "approve": "Hyväksytty sovellukselle {{app}}",
+      "decline": "Hylätty sovellukselle {{app}}"
+    },
+    "unsupported": "Tämä vaatii tarkistuksen, jota tämä lompakon versio ei vielä osaa. Päivitä lompakko ja avaa tämä uudelleen."
   },
   "devices": {
     "addEntry": "Käytän jo Privasys Walletia toisessa puhelimessa",

@@ -422,6 +422,7 @@
     "askTitle": "{{app}} begär åtkomst",
     "askHint": "Tryck för att se vad som begärs och godkänn eller neka sedan.",
     "formHint": "Tryck för att svara här.",
+    "approvalTitle": "{{app}} ber om ditt godkännande",
     "messageRequest": "{{app}} har skickat en förfrågan till dig",
     "messageInvitation": "{{app}} har skickat en inbjudan till dig",
     "messageSomeApp": "En app",
@@ -1350,6 +1351,24 @@
       "unverified": "{{app}}s server kunde inte verifieras, så det går inte att svara på det här.",
       "not-confirmed": "{{app}} bekräftar inte att den skickade det här, så det går inte att svara på här."
     }
+  },
+  "approval": {
+    "title": "Godkännande",
+    "assurance": {
+      "device": "Att godkänna kräver ditt ansikte eller fingeravtryck på den här telefonen.",
+      "gov-presence": "Att godkänna kräver en livekontroll av ditt ansikte mot ditt pass."
+    },
+    "timeLeft": "{{time}} kvar att svara",
+    "expired": "Det har gått ut. Be {{app}} att skicka det igen.",
+    "prompt": {
+      "approve": "Godkänn för {{app}}",
+      "decline": "Avböj för {{app}}"
+    },
+    "done": {
+      "approve": "Godkänt för {{app}}",
+      "decline": "Avböjt för {{app}}"
+    },
+    "unsupported": "Det här kräver en kontroll som den här versionen av plånboken inte kan göra än. Uppdatera plånboken och öppna det igen."
   },
   "devices": {
     "addEntry": "Jag använder redan Privasys Wallet på en annan telefon",

@@ -63,7 +63,7 @@ export function hostIsApp(host: string | undefined, slug: string | undefined): b
 }
 
 /** Normalise an app id to its dashless lowercase form, for comparing. */
-function sameApp(a: string, b: string): boolean {
+export function sameApp(a: string, b: string): boolean {
     const n = (s: string) => s.toLowerCase().replace(/-/g, '');
     return !!a && !!b && n(a) === n(b);
 }
@@ -87,7 +87,28 @@ export async function confirmFormSource(args: {
     appSlug?: string;
     platformHost?: string;
 }): Promise<ConfirmedSource> {
-    const { form, appId, appSlug, platformHost } = args;
+    const { form } = args;
+    return confirmAppSource({
+        ...args,
+        confirmPath: `/.well-known/privasys/app-form?id=${encodeURIComponent(form.id)}&digest=${form.digest}`,
+        confirms: (body) => body.open === true && body.form_id === form.id && body.form_digest === form.digest,
+    });
+}
+
+/**
+ * Steps 1 to 4 for anything an app sends for an answer (a form, an
+ * approval): its own host, the app id attested there, a verified attestation
+ * in the holder's mode, and the app confirming over that channel, at
+ * `confirmPath`, that it is waiting on this exact thing.
+ */
+export async function confirmAppSource(args: {
+    appId: string;
+    appSlug?: string;
+    platformHost?: string;
+    confirmPath: string;
+    confirms: (body: Record<string, unknown>) => boolean;
+}): Promise<ConfirmedSource> {
+    const { appId, appSlug, platformHost, confirmPath, confirms } = args;
     const host = platformHost ?? '';
     // 1. The app's own host, built from its own name.
     if (!hostIsApp(host, appSlug)) throw new AnswerError('not-the-app');
@@ -107,24 +128,22 @@ export async function confirmFormSource(args: {
         attestationServerToken: await getAttestationServerToken(),
     });
     if (outcome.status !== 'verified' || !outcome.result) throw new AnswerError('unverified', outcome.message);
-    // 4. The app confirms, inside that channel, that it has this form open.
+    // 4. The app confirms, inside that channel, that it is waiting on this.
     const raFetch = makeRaTlsFetch({ enclaveHost: host, platformFetch: fetch });
     let res: Response;
     try {
-        res = await raFetch(
-            `https://${host}/.well-known/privasys/app-form?id=${encodeURIComponent(form.id)}&digest=${form.digest}`,
-        );
+        res = await raFetch(`https://${host}${confirmPath}`);
     } catch {
         throw new AnswerError('unreachable', 'the app could not be reached');
     }
-    if (!res.ok) throw new AnswerError('not-confirmed', `the app does not have this form open (${res.status})`);
-    let body: { form_id?: unknown; form_digest?: unknown; open?: unknown };
+    if (!res.ok) throw new AnswerError('not-confirmed', `the app is not waiting on this (${res.status})`);
+    let body: Record<string, unknown>;
     try {
         body = await res.json();
     } catch {
         throw new AnswerError('not-confirmed');
     }
-    if (body.open !== true || body.form_id !== form.id || body.form_digest !== form.digest) {
+    if (!body || typeof body !== 'object' || !confirms(body)) {
         throw new AnswerError('not-confirmed');
     }
     return { host, attestation: { ...inspected, ...outcome.result }, mode, challenged: outcome.challenged };

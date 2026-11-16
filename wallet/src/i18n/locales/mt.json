@@ -455,6 +455,7 @@
     "askTitle": "{{app}} qed titlob aċċess",
     "askHint": "Agħfas biex tara x'qed titlob, imbagħad approva jew iċħad.",
     "formHint": "Agħfas biex twieġeb hawn.",
+    "approvalTitle": "{{app}} titlob l-approvazzjoni tiegħek",
     "messageRequest": "{{app}} bagħtitlek talba",
     "messageInvitation": "{{app}} bagħtitlek stedina",
     "messageSomeApp": "App",
@@ -1433,6 +1434,24 @@
       "unverified": "Is-server ta’ {{app}} ma setax jiġi vverifikat, għalhekk dan ma jistax jitwieġeb hawn.",
       "not-confirmed": "{{app}} ma tikkonfermax li bagħtet dan, għalhekk ma jistax jitwieġeb hawn."
     }
+  },
+  "approval": {
+    "title": "Approvazzjoni",
+    "assurance": {
+      "device": "Biex tapprova jrid wiċċek jew il-marka tas-saba' fuq dan it-telefon.",
+      "gov-presence": "Biex tapprova jrid verifika diretta ta' wiċċek mal-passaport tiegħek."
+    },
+    "timeLeft": "{{time}} fadal biex twieġeb",
+    "expired": "Dan skada. Itlob lil {{app}} jibagħtu mill-ġdid.",
+    "prompt": {
+      "approve": "Approva għal {{app}}",
+      "decline": "Irrifjuta għal {{app}}"
+    },
+    "done": {
+      "approve": "Approvat għal {{app}}",
+      "decline": "Irrifjutat għal {{app}}"
+    },
+    "unsupported": "Dan jeħtieġ verifika li din il-verżjoni tal-kartiera għadha ma tistax tagħmel. Aġġorna l-kartiera, imbagħad iftaħ mill-ġdid."
   },
   "devices": {
     "addEntry": "Diġà nuża Privasys Wallet fuq telefown ieħor",

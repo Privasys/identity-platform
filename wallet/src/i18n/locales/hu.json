@@ -422,6 +422,7 @@
     "askTitle": "A(z) {{app}} hozzáférést kér",
     "askHint": "Koppintson, hogy lássa, mit kér, majd hagyja jóvá vagy utasítsa el.",
     "formHint": "Koppintson, hogy itt válaszoljon.",
+    "approvalTitle": "{{app}} a jóváhagyását kéri",
     "messageRequest": "A(z) {{app}} kérést küldött Önnek",
     "messageInvitation": "A(z) {{app}} meghívót küldött Önnek",
     "messageSomeApp": "Egy alkalmazás",
@@ -1350,6 +1351,24 @@
       "unverified": "A(z) {{app}} szerverét nem sikerült ellenőrizni, ezért itt nem lehet rá válaszolni.",
       "not-confirmed": "A(z) {{app}} nem erősíti meg, hogy ezt küldte, ezért itt nem lehet rá válaszolni."
     }
+  },
+  "approval": {
+    "title": "Jóváhagyás",
+    "assurance": {
+      "device": "A jóváhagyáshoz az arca vagy az ujjlenyomata kell ezen a telefonon.",
+      "gov-presence": "A jóváhagyáshoz az arca élő ellenőrzése kell az útlevele alapján."
+    },
+    "timeLeft": "Még {{time}} a válaszra",
+    "expired": "Lejárt. Kérje meg: {{app}} küldje el újra.",
+    "prompt": {
+      "approve": "Jóváhagyás: {{app}}",
+      "decline": "Elutasítás: {{app}}"
+    },
+    "done": {
+      "approve": "Jóváhagyva: {{app}}",
+      "decline": "Elutasítva: {{app}}"
+    },
+    "unsupported": "Ehhez olyan ellenőrzés kell, amelyre a tárca ezen verziója még nem képes. Frissítse a tárcát, majd nyissa meg újra."
   },
   "devices": {
     "addEntry": "Már használom a Privasys Wallet alkalmazást egy másik telefonon",

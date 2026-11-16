@@ -455,6 +455,7 @@
     "askTitle": "{{app}} palub juurdepääsu",
     "askHint": "Puudutage, et näha, mida see soovib, ning seejärel kinnitage või keelduge.",
     "formHint": "Puudutage, et siin vastata.",
+    "approvalTitle": "{{app}} palub teie kinnitust",
     "messageRequest": "{{app}} saatis teile taotluse",
     "messageInvitation": "{{app}} saatis teile kutse",
     "messageSomeApp": "Rakendus",
@@ -1361,6 +1362,24 @@
       "unverified": "Rakenduse {{app}} serverit ei õnnestunud kontrollida, seega ei saa sellele siin vastata.",
       "not-confirmed": "{{app}} ei kinnita, et saatis selle, seega ei saa sellele siin vastata."
     }
+  },
+  "approval": {
+    "title": "Kinnitus",
+    "assurance": {
+      "device": "Kinnitamiseks on vaja teie nägu või sõrmejälge selles telefonis.",
+      "gov-presence": "Kinnitamiseks on vaja teie näo otsekontrolli passi järgi."
+    },
+    "timeLeft": "Vastamiseks jäänud {{time}}",
+    "expired": "See on aegunud. Paluge {{app}} see uuesti saata.",
+    "prompt": {
+      "approve": "Kinnita rakendusele {{app}}",
+      "decline": "Keeldu rakendusele {{app}}"
+    },
+    "done": {
+      "approve": "Kinnitatud rakendusele {{app}}",
+      "decline": "Keeldutud rakendusele {{app}}"
+    },
+    "unsupported": "Selleks on vaja kontrolli, mida see rahakoti versioon veel teha ei oska. Uuendage rahakotti ja avage see uuesti."
   },
   "devices": {
     "addEntry": "Kasutan Privasys Walletit juba teises telefonis",

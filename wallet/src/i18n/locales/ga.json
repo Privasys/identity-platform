@@ -455,6 +455,7 @@
     "askTitle": "Tá {{app}} ag iarraidh rochtana",
     "askHint": "Tapáil chun a fheiceáil cad atá á iarraidh, ansin ceadaigh nó diúltaigh.",
     "formHint": "Tapáil chun freagra a thabhairt anseo.",
+    "approvalTitle": "Iarrann {{app}} do cheadú",
     "messageRequest": "Sheol {{app}} iarratas chugat",
     "messageInvitation": "Sheol {{app}} cuireadh chugat",
     "messageSomeApp": "Aip",
@@ -1433,6 +1434,24 @@
       "unverified": "Níorbh fhéidir freastalaí {{app}} a fhíorú, mar sin ní féidir é seo a fhreagairt anseo.",
       "not-confirmed": "Ní dheimhníonn {{app}} gur sheol sé é seo, mar sin ní féidir é a fhreagairt anseo."
     }
+  },
+  "approval": {
+    "title": "Ceadú",
+    "assurance": {
+      "device": "Iarrtar d’aghaidh nó do mhéarlorg ar an bhfón seo chun ceadú.",
+      "gov-presence": "Iarrtar seiceáil bheo ar d’aghaidh i gcoinne do phas chun ceadú."
+    },
+    "timeLeft": "{{time}} fágtha le freagairt",
+    "expired": "Tá sé seo imithe in éag. Iarr ar {{app}} é a sheoladh arís.",
+    "prompt": {
+      "approve": "Ceadaigh do {{app}}",
+      "decline": "Diúltaigh do {{app}}"
+    },
+    "done": {
+      "approve": "Ceadaithe do {{app}}",
+      "decline": "Diúltaithe do {{app}}"
+    },
+    "unsupported": "Tá seiceáil ag teastáil nach féidir leis an leagan seo den sparán a dhéanamh fós. Nuashonraigh an sparán, ansin oscail arís é."
   },
   "devices": {
     "addEntry": "Úsáidim Privasys Wallet cheana ar fhón eile",

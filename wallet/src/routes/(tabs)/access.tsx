@@ -274,27 +274,40 @@ export default function AccessScreen() {
                     swiped-away push still reaches the holder. The values shown
                     are what someone presented, under the wallet's own labels;
                     tapping opens the app on the host the platform verified. */}
-                {appMessages.map((m) => {
+                {/* Approvals first: an app is waiting on them now. */}
+                {[...appMessages]
+                    .sort((a, b) => Number(b.type === 'approval') - Number(a.type === 'approval'))
+                    .map((m) => {
                     const app = m.appName || m.appSlug || m.appHost || t('access.messageSomeApp');
-                    const title =
-                        m.kind === 'invitation'
-                            ? t('access.messageInvitation', { app })
-                            : t('access.messageRequest', { app });
+                    const isApproval = m.type === 'approval';
+                    const title = isApproval
+                        ? t('access.approvalTitle', { app })
+                        : m.kind === 'invitation'
+                          ? t('access.messageInvitation', { app })
+                          : t('access.messageRequest', { app });
                     const presented = m.presented.map(([k, v]) => `${attributeLabel(k)}: ${v}`).join(' · ');
                     return (
                         <Pressable
                             key={m.id}
                             style={styles.banner}
                             onPress={() =>
-                                m.type === 'app-form'
-                                    ? router.push({ pathname: '/app-form', params: { id: m.id } })
-                                    : void openAppMessage(m)
+                                isApproval
+                                    ? router.push({ pathname: '/approval', params: { id: m.id } })
+                                    : m.type === 'app-form'
+                                      ? router.push({ pathname: '/app-form', params: { id: m.id } })
+                                      : void openAppMessage(m)
                             }
                             accessibilityLabel={title}
                         >
                             <RNView style={styles.bannerIcon}>
                                 <Ionicons
-                                    name={m.kind === 'invitation' ? 'mail-open-outline' : 'chatbox-ellipses-outline'}
+                                    name={
+                                        isApproval
+                                            ? 'finger-print-outline'
+                                            : m.kind === 'invitation'
+                                              ? 'mail-open-outline'
+                                              : 'chatbox-ellipses-outline'
+                                    }
                                     size={18}
                                     color={p.infoText}
                                 />
@@ -303,7 +316,9 @@ export default function AccessScreen() {
                                 <Text style={styles.bannerTitle}>{title}</Text>
                                 {presented ? <Text style={styles.bannerMeta}>{presented}</Text> : null}
                                 <Text style={styles.bannerMeta}>
-                                    {m.type === 'app-form'
+                                    {isApproval
+                                        ? m.approval?.title ?? t('access.formHint')
+                                        : m.type === 'app-form'
                                         ? t('access.formHint')
                                         : m.link
                                           ? t('access.messageOpenHint', { app })
@@ -311,7 +326,7 @@ export default function AccessScreen() {
                                 </Text>
                             </RNView>
                             <Ionicons
-                                name={m.type === 'app-form' ? 'chevron-forward' : m.link ? 'open-outline' : 'close'}
+                                name={isApproval || m.type === 'app-form' ? 'chevron-forward' : m.link ? 'open-outline' : 'close'}
                                 size={18}
                                 color={p.infoText}
                             />

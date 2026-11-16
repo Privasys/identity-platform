@@ -455,6 +455,7 @@
     "askTitle": "{{app}} solicită acces",
     "askHint": "Atinge pentru a vedea ce solicită, apoi aprobă sau refuză.",
     "formHint": "Atinge pentru a răspunde aici.",
+    "approvalTitle": "{{app}} cere aprobarea ta",
     "messageRequest": "{{app}} ți-a trimis o solicitare",
     "messageInvitation": "{{app}} ți-a trimis o invitație",
     "messageSomeApp": "O aplicație",
@@ -1385,6 +1386,24 @@
       "unverified": "Serverul {{app}} nu a putut fi verificat, așa că nu i se poate răspunde aici.",
       "not-confirmed": "{{app}} nu confirmă că a trimis-o, așa că nu i se poate răspunde aici."
     }
+  },
+  "approval": {
+    "title": "Aprobare",
+    "assurance": {
+      "device": "Aprobarea cere fața sau amprenta ta pe acest telefon.",
+      "gov-presence": "Aprobarea cere o verificare live a feței tale cu pașaportul."
+    },
+    "timeLeft": "Mai ai {{time}} pentru răspuns",
+    "expired": "A expirat. Cere-i lui {{app}} să o trimită din nou.",
+    "prompt": {
+      "approve": "Aprobă pentru {{app}}",
+      "decline": "Refuză pentru {{app}}"
+    },
+    "done": {
+      "approve": "Aprobat pentru {{app}}",
+      "decline": "Refuzat pentru {{app}}"
+    },
+    "unsupported": "E nevoie de o verificare pe care această versiune a portofelului încă nu o poate face. Actualizează portofelul, apoi deschide din nou."
   },
   "devices": {
     "addEntry": "Folosesc deja Privasys Wallet pe alt telefon",

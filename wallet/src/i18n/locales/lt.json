@@ -455,6 +455,7 @@
     "askTitle": "{{app}} prašo prieigos",
     "askHint": "Palieskite, kad pamatytumėte, ko prašoma, tada patvirtinkite arba atmeskite.",
     "formHint": "Palieskite, kad atsakytumėte čia.",
+    "approvalTitle": "{{app}} prašo jūsų patvirtinimo",
     "messageRequest": "{{app}} atsiuntė jums prašymą",
     "messageInvitation": "{{app}} atsiuntė jums kvietimą",
     "messageSomeApp": "Programėlė",
@@ -1385,6 +1386,24 @@
       "unverified": "Nepavyko patikrinti {{app}} serverio, todėl čia atsakyti negalima.",
       "not-confirmed": "{{app}} nepatvirtina, kad tai išsiuntė, todėl čia atsakyti negalima."
     }
+  },
+  "approval": {
+    "title": "Patvirtinimas",
+    "assurance": {
+      "device": "Patvirtinimui reikia jūsų veido arba piršto atspaudo šiame telefone.",
+      "gov-presence": "Patvirtinimui reikia gyvo jūsų veido patikrinimo pagal pasą."
+    },
+    "timeLeft": "Atsakyti liko {{time}}",
+    "expired": "Baigėsi laikas. Paprašykite {{app}} išsiųsti dar kartą.",
+    "prompt": {
+      "approve": "Patvirtinti: {{app}}",
+      "decline": "Atmesti: {{app}}"
+    },
+    "done": {
+      "approve": "Patvirtinta: {{app}}",
+      "decline": "Atmesta: {{app}}"
+    },
+    "unsupported": "Tam reikia patikrinimo, kurio ši piniginės versija dar negali atlikti. Atnaujinkite piniginę ir atidarykite dar kartą."
   },
   "devices": {
     "addEntry": "Jau naudoju Privasys Wallet kitame telefone",

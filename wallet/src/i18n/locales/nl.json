@@ -422,6 +422,7 @@
     "askTitle": "{{app}} vraagt om toegang",
     "askHint": "Tik om te zien wat er wordt gevraagd en keur het goed of wijs het af.",
     "formHint": "Tik om hier te antwoorden.",
+    "approvalTitle": "{{app}} vraagt je goedkeuring",
     "messageRequest": "{{app}} heeft je een verzoek gestuurd",
     "messageInvitation": "{{app}} heeft je een uitnodiging gestuurd",
     "messageSomeApp": "Een app",
@@ -1350,6 +1351,24 @@
       "unverified": "De server van {{app}} kon niet worden geverifieerd, dus je kunt dit hier niet beantwoorden.",
       "not-confirmed": "{{app}} bevestigt niet dat het dit heeft gestuurd, dus je kunt het hier niet beantwoorden."
     }
+  },
+  "approval": {
+    "title": "Goedkeuring",
+    "assurance": {
+      "device": "Goedkeuren vraagt je gezicht of vingerafdruk op deze telefoon.",
+      "gov-presence": "Goedkeuren vraagt een live controle van je gezicht met je paspoort."
+    },
+    "timeLeft": "Nog {{time}} om te antwoorden",
+    "expired": "Verlopen. Vraag {{app}} om het opnieuw te sturen.",
+    "prompt": {
+      "approve": "Goedkeuren voor {{app}}",
+      "decline": "Weigeren voor {{app}}"
+    },
+    "done": {
+      "approve": "Goedgekeurd voor {{app}}",
+      "decline": "Geweigerd voor {{app}}"
+    },
+    "unsupported": "Hiervoor is een controle nodig die deze versie van de wallet nog niet kan. Werk de wallet bij en open het opnieuw."
   },
   "devices": {
     "addEntry": "Ik gebruik Privasys Wallet al op een andere telefoon",

@@ -422,6 +422,7 @@
     "askTitle": "{{app}} prosi o dostęp",
     "askHint": "Stuknij, aby zobaczyć, o co prosi, a potem zatwierdź lub odrzuć.",
     "formHint": "Dotknij, aby odpowiedzieć tutaj.",
+    "approvalTitle": "{{app}} prosi o Twoją zgodę",
     "messageRequest": "{{app}} wysłała Ci prośbę",
     "messageInvitation": "{{app}} wysłała Ci zaproszenie",
     "messageSomeApp": "Aplikacja",
@@ -1398,6 +1399,24 @@
       "unverified": "Nie udało się zweryfikować serwera {{app}}, więc nie można tu na to odpowiedzieć.",
       "not-confirmed": "{{app}} nie potwierdza, że to wysłała, więc nie można tu na to odpowiedzieć."
     }
+  },
+  "approval": {
+    "title": "Zgoda",
+    "assurance": {
+      "device": "Zgoda wymaga Twojej twarzy lub odcisku palca na tym telefonie.",
+      "gov-presence": "Zgoda wymaga sprawdzenia na żywo Twojej twarzy z paszportem."
+    },
+    "timeLeft": "Na odpowiedź zostało {{time}}",
+    "expired": "Czas minął. Poproś {{app}} o ponowne wysłanie.",
+    "prompt": {
+      "approve": "Zatwierdź dla {{app}}",
+      "decline": "Odrzuć dla {{app}}"
+    },
+    "done": {
+      "approve": "Zatwierdzono dla {{app}}",
+      "decline": "Odrzucono dla {{app}}"
+    },
+    "unsupported": "Wymaga to sprawdzenia, którego ta wersja portfela jeszcze nie potrafi. Zaktualizuj portfel i otwórz ponownie."
   },
   "devices": {
     "addEntry": "Używam już Privasys Wallet na innym telefonie",

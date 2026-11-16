@@ -455,6 +455,7 @@
     "askTitle": "{{app}} is asking for access",
     "askHint": "Tap to see what it wants, then approve or deny.",
     "formHint": "Tap to answer it here.",
+    "approvalTitle": "{{app}} asks for your approval",
     "messageRequest": "{{app}} sent you a request",
     "messageInvitation": "{{app}} sent you an invitation",
     "messageSomeApp": "An app",
@@ -1361,6 +1362,24 @@
       "unverified": "{{app}}’s server could not be verified, so this cannot be answered here.",
       "not-confirmed": "{{app}} does not confirm it sent this, so it cannot be answered here."
     }
+  },
+  "approval": {
+    "title": "Approval",
+    "assurance": {
+      "device": "Approving asks for your face or fingerprint on this phone.",
+      "gov-presence": "Approving asks for a live check of your face against your passport."
+    },
+    "timeLeft": "{{time}} left to answer",
+    "expired": "This has expired. Ask {{app}} to send it again.",
+    "prompt": {
+      "approve": "Approve for {{app}}",
+      "decline": "Decline for {{app}}"
+    },
+    "done": {
+      "approve": "Approved for {{app}}",
+      "decline": "Declined for {{app}}"
+    },
+    "unsupported": "This needs a check this version of the wallet cannot make yet. Update the wallet, then open it again."
   },
   "devices": {
     "addEntry": "I already use Privasys Wallet on another phone",

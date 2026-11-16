@@ -65,18 +65,18 @@ const INVISIBLE = /[‪-‮⁦-⁩‎‏؜​-‍⁠﻿­]/;
 const CONTROL = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/;
 const CONTROL_OR_NEWLINE = /[\u0000-\u001F\u007F-\u009F]/;
 
-function cleanText(v: unknown, max: number, newlines: boolean): string | null {
+export function cleanText(v: unknown, max: number, newlines: boolean): string | null {
     if (typeof v !== 'string' || v === '') return null;
     if ([...v].length > max) return null;
     if (INVISIBLE.test(v) || (newlines ? CONTROL : CONTROL_OR_NEWLINE).test(v)) return null;
     return v;
 }
 
-function isPath(p: unknown): p is string {
+export function isPath(p: unknown): p is string {
     return typeof p === 'string' && p.startsWith('/') && !p.startsWith('//') && p.length <= 512 && !/[\\\s]/.test(p);
 }
 
-function onlyKeys(o: Record<string, unknown>, allowed: string[]): boolean {
+export function onlyKeys(o: Record<string, unknown>, allowed: string[]): boolean {
     return Object.keys(o).every((k) => allowed.includes(k));
 }
 

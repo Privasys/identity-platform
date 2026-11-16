@@ -421,6 +421,7 @@
     "accountsTitle": "Comptes connectés",
     "askTitle": "{{app}} demande un accès",
     "askHint": "Touchez pour voir ce qui est demandé, puis approuvez ou refusez.",
+    "formHint": "Touchez pour répondre ici.",
     "messageRequest": "{{app}} vous a envoyé une demande",
     "messageInvitation": "{{app}} vous a envoyé une invitation",
     "messageSomeApp": "Une application",
@@ -1328,6 +1329,40 @@
     "notNow": "Pas maintenant",
     "learnMore": "En savoir plus",
     "versions": "Vous avez {{current}}. Il faut {{minimum}} ou une version plus récente."
+  },
+  "appForm": {
+    "titleRequest": "Demande",
+    "titleInvitation": "Invitation",
+    "from": "De {{app}}",
+    "presented": "Ce qui vous a été communiqué",
+    "signNote": "Votre réponse est signée avec votre clé d’accès et envoyée uniquement à {{app}}.",
+    "openInApp": "Ouvrir dans {{app}}",
+    "sent": "Votre réponse a été envoyée à {{app}}",
+    "sentAs": {
+      "approve": "Vous avez approuvé.",
+      "deny": "Vous avez refusé.",
+      "accept": "Vous avez accepté.",
+      "decline": "Vous avez décliné.",
+      "confirm": "Vous avez confirmé."
+    },
+    "action": {
+      "approve": "Approuver",
+      "deny": "Refuser",
+      "accept": "Accepter",
+      "decline": "Décliner",
+      "confirm": "Confirmer"
+    },
+    "gone": "Il a déjà été répondu à ceci, ou ce n’est plus valable.",
+    "unreadable": "Cette demande de {{app}} ne peut pas s’afficher sur ce téléphone. Ouvrez {{app}} pour y répondre.",
+    "failed": {
+      "signed-out": "Connectez-vous à Privasys sur ce téléphone, puis réessayez.",
+      "no-passkey": "Ce téléphone n’a pas de clé d’accès pour cette identité et ne peut donc pas signer la réponse.",
+      "mismatch": "La demande a été modifiée en chemin, donc rien n’a été envoyé.",
+      "gone": "Il a déjà été répondu à ceci, ou ce n’est plus valable.",
+      "not-the-app": "L’application qui a répondu n’est pas {{app}}, donc rien n’a été envoyé.",
+      "unreachable": "{{app}} est injoignable. Réessayez dans un instant.",
+      "cancelled": "Rien n’a été envoyé."
+    }
   },
   "devices": {
     "addEntry": "J'utilise déjà Privasys Wallet sur un autre téléphone",

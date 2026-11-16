@@ -421,6 +421,7 @@
     "accountsTitle": "Csatlakoztatott fiókok",
     "askTitle": "A(z) {{app}} hozzáférést kér",
     "askHint": "Koppintson, hogy lássa, mit kér, majd hagyja jóvá vagy utasítsa el.",
+    "formHint": "Koppintson, hogy itt válaszoljon.",
     "messageRequest": "A(z) {{app}} kérést küldött Önnek",
     "messageInvitation": "A(z) {{app}} meghívót küldött Önnek",
     "messageSomeApp": "Egy alkalmazás",
@@ -1304,6 +1305,40 @@
     "notNow": "Most nem",
     "learnMore": "Tudjon meg többet",
     "versions": "Önnél {{current}} van. Ehhez {{minimum}} vagy újabb kell."
+  },
+  "appForm": {
+    "titleRequest": "Kérés",
+    "titleInvitation": "Meghívó",
+    "from": "Feladó: {{app}}",
+    "presented": "Amit megosztottak Önnel",
+    "signNote": "Válaszát az azonosítókulcsával aláírjuk, és csak a(z) {{app}} kapja meg.",
+    "openInApp": "Megnyitás itt: {{app}}",
+    "sent": "Válaszát elküldtük ide: {{app}}",
+    "sentAs": {
+      "approve": "Jóváhagyta.",
+      "deny": "Elutasította.",
+      "accept": "Elfogadta.",
+      "decline": "Visszautasította.",
+      "confirm": "Megerősítette."
+    },
+    "action": {
+      "approve": "Jóváhagyás",
+      "deny": "Elutasítás",
+      "accept": "Elfogadás",
+      "decline": "Visszautasítás",
+      "confirm": "Megerősítés"
+    },
+    "gone": "Erre már válaszoltak, vagy lejárt.",
+    "unreadable": "A(z) {{app}} kérése ezen a telefonon nem jeleníthető meg. A válaszhoz nyissa meg: {{app}}.",
+    "failed": {
+      "signed-out": "Jelentkezzen be a Privasysba ezen a telefonon, majd próbálja újra.",
+      "no-passkey": "Ezen a telefonon nincs azonosítókulcs ehhez az identitáshoz, ezért nem tudja aláírni a választ.",
+      "mismatch": "A kérés útközben megváltozott, ezért semmi sem lett elküldve.",
+      "gone": "Erre már válaszoltak, vagy lejárt.",
+      "not-the-app": "A válaszoló alkalmazás nem a(z) {{app}}, ezért semmi sem lett elküldve.",
+      "unreachable": "A(z) {{app}} nem érhető el. Próbálja újra egy kicsit később.",
+      "cancelled": "Semmi sem lett elküldve."
+    }
   },
   "devices": {
     "addEntry": "Már használom a Privasys Wallet alkalmazást egy másik telefonon",

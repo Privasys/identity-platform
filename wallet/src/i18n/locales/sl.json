@@ -454,6 +454,7 @@
     "accountsTitle": "Povezani računi",
     "askTitle": "{{app}} prosi za dostop",
     "askHint": "Tapnite, da vidite, kaj želi, nato odobrite ali zavrnite.",
+    "formHint": "Tapnite, da odgovorite tukaj.",
     "messageRequest": "{{app}} vam je poslala zahtevo",
     "messageInvitation": "{{app}} vam je poslala povabilo",
     "messageSomeApp": "Aplikacija",
@@ -1363,6 +1364,40 @@
     "notNow": "Ne zdaj",
     "learnMore": "Preberite več",
     "versions": "Imate {{current}}. Potrebna je {{minimum}} ali novejša."
+  },
+  "appForm": {
+    "titleRequest": "Zahteva",
+    "titleInvitation": "Povabilo",
+    "from": "Od {{app}}",
+    "presented": "Kaj so delili z vami",
+    "signNote": "Vaš odgovor je podpisan z vašim ključem za dostop in poslan samo aplikaciji {{app}}.",
+    "openInApp": "Odpri v aplikaciji {{app}}",
+    "sent": "Vaš odgovor je bil poslan aplikaciji {{app}}",
+    "sentAs": {
+      "approve": "Odobrili ste.",
+      "deny": "Zavrnili ste.",
+      "accept": "Sprejeli ste.",
+      "decline": "Odklonili ste.",
+      "confirm": "Potrdili ste."
+    },
+    "action": {
+      "approve": "Odobri",
+      "deny": "Zavrni",
+      "accept": "Sprejmi",
+      "decline": "Odkloni",
+      "confirm": "Potrdi"
+    },
+    "gone": "Na to je že bilo odgovorjeno ali je poteklo.",
+    "unreadable": "Te zahteve aplikacije {{app}} ni mogoče prikazati na tem telefonu. Za odgovor odprite {{app}}.",
+    "failed": {
+      "signed-out": "Na tem telefonu se prijavite v Privasys in poskusite znova.",
+      "no-passkey": "Ta telefon nima ključa za dostop za to identiteto, zato ne more podpisati odgovora.",
+      "mismatch": "Zahteva se je na poti spremenila, zato ni bilo poslano nič.",
+      "gone": "Na to je že bilo odgovorjeno ali je poteklo.",
+      "not-the-app": "Aplikacija, ki je odgovorila, ni {{app}}, zato ni bilo poslano nič.",
+      "unreachable": "Aplikacija {{app}} ni dosegljiva. Poskusite znova čez trenutek.",
+      "cancelled": "Ni bilo poslano nič."
+    }
   },
   "devices": {
     "addEntry": "Privasys Wallet že uporabljam v drugem telefonu",

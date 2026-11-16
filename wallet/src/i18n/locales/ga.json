@@ -454,6 +454,7 @@
     "accountsTitle": "Cuntais nasctha",
     "askTitle": "Tá {{app}} ag iarraidh rochtana",
     "askHint": "Tapáil chun a fheiceáil cad atá á iarraidh, ansin ceadaigh nó diúltaigh.",
+    "formHint": "Tapáil chun freagra a thabhairt anseo.",
     "messageRequest": "Sheol {{app}} iarratas chugat",
     "messageInvitation": "Sheol {{app}} cuireadh chugat",
     "messageSomeApp": "Aip",
@@ -1387,6 +1388,40 @@
     "notNow": "Ní anois",
     "learnMore": "Tuilleadh eolais",
     "versions": "Tá {{current}} agat. Teastaíonn {{minimum}} nó níos déanaí."
+  },
+  "appForm": {
+    "titleRequest": "Iarratas",
+    "titleInvitation": "Cuireadh",
+    "from": "Ó {{app}}",
+    "presented": "An méid a roinneadh leat",
+    "signNote": "Sínítear do fhreagra le d’eochair rochtana agus seoltar é chuig {{app}} amháin.",
+    "openInApp": "Oscail in {{app}}",
+    "sent": "Seoladh do fhreagra chuig {{app}}",
+    "sentAs": {
+      "approve": "Cheadaigh tú.",
+      "deny": "Dhiúltaigh tú.",
+      "accept": "Ghlac tú leis.",
+      "decline": "Dhiúltaigh tú don chuireadh.",
+      "confirm": "Dheimhnigh tú."
+    },
+    "action": {
+      "approve": "Ceadaigh",
+      "deny": "Diúltaigh",
+      "accept": "Glac leis",
+      "decline": "Diúltaigh don chuireadh",
+      "confirm": "Deimhnigh"
+    },
+    "gone": "Tugadh freagra air seo cheana, nó tá sé imithe in éag.",
+    "unreadable": "Ní féidir an t-iarratas seo ó {{app}} a thaispeáint ar an bhfón seo. Oscail {{app}} chun é a fhreagairt.",
+    "failed": {
+      "signed-out": "Sínigh isteach i Privasys ar an bhfón seo, ansin bain triail eile as.",
+      "no-passkey": "Níl eochair rochtana ag an bhfón seo don aitheantas seo, mar sin ní féidir leis an freagra a shíniú.",
+      "mismatch": "Athraíodh an t-iarratas ar an mbealach, mar sin níor seoladh aon rud.",
+      "gone": "Tugadh freagra air seo cheana, nó tá sé imithe in éag.",
+      "not-the-app": "Ní hé {{app}} an aip a d’fhreagair, mar sin níor seoladh aon rud.",
+      "unreachable": "Níorbh fhéidir teacht ar {{app}}. Bain triail eile as i gceann nóiméid.",
+      "cancelled": "Níor seoladh aon rud."
+    }
   },
   "devices": {
     "addEntry": "Úsáidim Privasys Wallet cheana ar fhón eile",

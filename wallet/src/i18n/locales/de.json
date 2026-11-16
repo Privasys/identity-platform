@@ -421,6 +421,7 @@
     "accountsTitle": "Verbundene Konten",
     "askTitle": "{{app}} bittet um Zugriff",
     "askHint": "Tippen Sie, um zu sehen, was angefragt wird, und genehmigen oder lehnen Sie ab.",
+    "formHint": "Tippen Sie, um hier zu antworten.",
     "messageRequest": "{{app}} hat Ihnen eine Anfrage gesendet",
     "messageInvitation": "{{app}} hat Ihnen eine Einladung gesendet",
     "messageSomeApp": "Eine App",
@@ -1304,6 +1305,40 @@
     "notNow": "Jetzt nicht",
     "learnMore": "Mehr erfahren",
     "versions": "Sie haben {{current}}. Erforderlich ist {{minimum}} oder neuer."
+  },
+  "appForm": {
+    "titleRequest": "Anfrage",
+    "titleInvitation": "Einladung",
+    "from": "Von {{app}}",
+    "presented": "Was man mit Ihnen geteilt hat",
+    "signNote": "Ihre Antwort wird mit Ihrem Passkey signiert und nur an {{app}} gesendet.",
+    "openInApp": "In {{app}} öffnen",
+    "sent": "Ihre Antwort wurde an {{app}} gesendet",
+    "sentAs": {
+      "approve": "Sie haben genehmigt.",
+      "deny": "Sie haben abgelehnt.",
+      "accept": "Sie haben angenommen.",
+      "decline": "Sie haben die Einladung abgelehnt.",
+      "confirm": "Sie haben bestätigt."
+    },
+    "action": {
+      "approve": "Genehmigen",
+      "deny": "Ablehnen",
+      "accept": "Annehmen",
+      "decline": "Einladung ablehnen",
+      "confirm": "Bestätigen"
+    },
+    "gone": "Darauf wurde bereits geantwortet, oder es ist abgelaufen.",
+    "unreadable": "Diese Anfrage von {{app}} kann auf diesem Telefon nicht angezeigt werden. Öffnen Sie {{app}}, um zu antworten.",
+    "failed": {
+      "signed-out": "Melden Sie sich auf diesem Telefon bei Privasys an und versuchen Sie es erneut.",
+      "no-passkey": "Dieses Telefon hat keinen Passkey für diese Identität und kann die Antwort nicht signieren.",
+      "mismatch": "Die Anfrage wurde unterwegs verändert, daher wurde nichts gesendet.",
+      "gone": "Darauf wurde bereits geantwortet, oder es ist abgelaufen.",
+      "not-the-app": "Die antwortende App ist nicht {{app}}, daher wurde nichts gesendet.",
+      "unreachable": "{{app}} ist nicht erreichbar. Versuchen Sie es gleich noch einmal.",
+      "cancelled": "Es wurde nichts gesendet."
+    }
   },
   "devices": {
     "addEntry": "Ich nutze Privasys Wallet bereits auf einem anderen Telefon",

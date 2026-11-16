@@ -421,6 +421,7 @@
     "accountsTitle": "Připojené účty",
     "askTitle": "{{app}} žádá o přístup",
     "askHint": "Klepnutím zobrazíte, co žádá, a pak schválíte nebo odmítnete.",
+    "formHint": "Klepnutím odpovíte zde.",
     "messageRequest": "{{app}} vám poslala žádost",
     "messageInvitation": "{{app}} vám poslala pozvánku",
     "messageSomeApp": "Aplikace",
@@ -1328,6 +1329,40 @@
     "notNow": "Teď ne",
     "learnMore": "Více informací",
     "versions": "Máte {{current}}. Je potřeba {{minimum}} nebo novější."
+  },
+  "appForm": {
+    "titleRequest": "Žádost",
+    "titleInvitation": "Pozvánka",
+    "from": "Od {{app}}",
+    "presented": "Co s vámi sdíleli",
+    "signNote": "Vaše odpověď se podepíše vaším přístupovým klíčem a odešle se jen do {{app}}.",
+    "openInApp": "Otevřít v {{app}}",
+    "sent": "Vaše odpověď byla odeslána do {{app}}",
+    "sentAs": {
+      "approve": "Schválili jste.",
+      "deny": "Zamítli jste.",
+      "accept": "Přijali jste.",
+      "decline": "Odmítli jste.",
+      "confirm": "Potvrdili jste."
+    },
+    "action": {
+      "approve": "Schválit",
+      "deny": "Zamítnout",
+      "accept": "Přijmout",
+      "decline": "Odmítnout",
+      "confirm": "Potvrdit"
+    },
+    "gone": "Na tohle už bylo odpovězeno, nebo vypršela platnost.",
+    "unreadable": "Tuto žádost od {{app}} nelze na tomto telefonu zobrazit. Odpovězte v {{app}}.",
+    "failed": {
+      "signed-out": "Přihlaste se na tomto telefonu do Privasys a zkuste to znovu.",
+      "no-passkey": "Tento telefon nemá přístupový klíč pro tuto identitu, takže odpověď nemůže podepsat.",
+      "mismatch": "Žádost se cestou změnila, takže se nic neodeslalo.",
+      "gone": "Na tohle už bylo odpovězeno, nebo vypršela platnost.",
+      "not-the-app": "Aplikace, která odpověděla, není {{app}}, takže se nic neodeslalo.",
+      "unreachable": "{{app}} není dostupná. Zkuste to za chvíli znovu.",
+      "cancelled": "Nic se neodeslalo."
+    }
   },
   "devices": {
     "addEntry": "Privasys Wallet už používám na jiném telefonu",

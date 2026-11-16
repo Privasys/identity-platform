@@ -285,7 +285,11 @@ export default function AccessScreen() {
                         <Pressable
                             key={m.id}
                             style={styles.banner}
-                            onPress={() => void openAppMessage(m)}
+                            onPress={() =>
+                                m.type === 'app-form'
+                                    ? router.push({ pathname: '/app-form', params: { id: m.id } })
+                                    : void openAppMessage(m)
+                            }
                             accessibilityLabel={title}
                         >
                             <RNView style={styles.bannerIcon}>
@@ -299,10 +303,18 @@ export default function AccessScreen() {
                                 <Text style={styles.bannerTitle}>{title}</Text>
                                 {presented ? <Text style={styles.bannerMeta}>{presented}</Text> : null}
                                 <Text style={styles.bannerMeta}>
-                                    {m.link ? t('access.messageOpenHint', { app }) : t('access.messageNoLinkHint', { app })}
+                                    {m.type === 'app-form'
+                                        ? t('access.formHint')
+                                        : m.link
+                                          ? t('access.messageOpenHint', { app })
+                                          : t('access.messageNoLinkHint', { app })}
                                 </Text>
                             </RNView>
-                            <Ionicons name={m.link ? 'open-outline' : 'close'} size={18} color={p.infoText} />
+                            <Ionicons
+                                name={m.type === 'app-form' ? 'chevron-forward' : m.link ? 'open-outline' : 'close'}
+                                size={18}
+                                color={p.infoText}
+                            />
                         </Pressable>
                     );
                 })}

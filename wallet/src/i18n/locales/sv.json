@@ -421,6 +421,7 @@
     "accountsTitle": "Anslutna konton",
     "askTitle": "{{app}} begär åtkomst",
     "askHint": "Tryck för att se vad som begärs och godkänn eller neka sedan.",
+    "formHint": "Tryck för att svara här.",
     "messageRequest": "{{app}} har skickat en förfrågan till dig",
     "messageInvitation": "{{app}} har skickat en inbjudan till dig",
     "messageSomeApp": "En app",
@@ -1304,6 +1305,40 @@
     "notNow": "Inte nu",
     "learnMore": "Läs mer",
     "versions": "Du har {{current}}. Det krävs {{minimum}} eller senare."
+  },
+  "appForm": {
+    "titleRequest": "Förfrågan",
+    "titleInvitation": "Inbjudan",
+    "from": "Från {{app}}",
+    "presented": "Det de har delat med dig",
+    "signNote": "Ditt svar signeras med din nyckel och skickas bara till {{app}}.",
+    "openInApp": "Öppna i {{app}}",
+    "sent": "Ditt svar har skickats till {{app}}",
+    "sentAs": {
+      "approve": "Du godkände.",
+      "deny": "Du nekade.",
+      "accept": "Du tackade ja.",
+      "decline": "Du tackade nej.",
+      "confirm": "Du bekräftade."
+    },
+    "action": {
+      "approve": "Godkänn",
+      "deny": "Neka",
+      "accept": "Tacka ja",
+      "decline": "Tacka nej",
+      "confirm": "Bekräfta"
+    },
+    "gone": "Det här är redan besvarat eller har gått ut.",
+    "unreadable": "Den här förfrågan från {{app}} kan inte visas på den här telefonen. Öppna {{app}} för att svara.",
+    "failed": {
+      "signed-out": "Logga in på Privasys på den här telefonen och försök igen.",
+      "no-passkey": "Den här telefonen har ingen nyckel för den här identiteten och kan därför inte signera svaret.",
+      "mismatch": "Förfrågan ändrades på vägen, så inget skickades.",
+      "gone": "Det här är redan besvarat eller har gått ut.",
+      "not-the-app": "Appen som svarade är inte {{app}}, så inget skickades.",
+      "unreachable": "{{app}} gick inte att nå. Försök igen om en stund.",
+      "cancelled": "Inget skickades."
+    }
   },
   "devices": {
     "addEntry": "Jag använder redan Privasys Wallet på en annan telefon",

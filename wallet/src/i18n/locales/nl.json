@@ -421,6 +421,7 @@
     "accountsTitle": "Gekoppelde accounts",
     "askTitle": "{{app}} vraagt om toegang",
     "askHint": "Tik om te zien wat er wordt gevraagd en keur het goed of wijs het af.",
+    "formHint": "Tik om hier te antwoorden.",
     "messageRequest": "{{app}} heeft je een verzoek gestuurd",
     "messageInvitation": "{{app}} heeft je een uitnodiging gestuurd",
     "messageSomeApp": "Een app",
@@ -1304,6 +1305,40 @@
     "notNow": "Niet nu",
     "learnMore": "Meer lezen",
     "versions": "Je hebt {{current}}. Nodig is {{minimum}} of nieuwer."
+  },
+  "appForm": {
+    "titleRequest": "Verzoek",
+    "titleInvitation": "Uitnodiging",
+    "from": "Van {{app}}",
+    "presented": "Wat ze met je hebben gedeeld",
+    "signNote": "Je antwoord wordt ondertekend met je toegangssleutel en alleen naar {{app}} gestuurd.",
+    "openInApp": "Openen in {{app}}",
+    "sent": "Je antwoord is naar {{app}} gestuurd",
+    "sentAs": {
+      "approve": "Je hebt goedgekeurd.",
+      "deny": "Je hebt geweigerd.",
+      "accept": "Je hebt geaccepteerd.",
+      "decline": "Je hebt afgeslagen.",
+      "confirm": "Je hebt bevestigd."
+    },
+    "action": {
+      "approve": "Goedkeuren",
+      "deny": "Weigeren",
+      "accept": "Accepteren",
+      "decline": "Afslaan",
+      "confirm": "Bevestigen"
+    },
+    "gone": "Hierop is al geantwoord, of het is verlopen.",
+    "unreadable": "Dit verzoek van {{app}} kan op deze telefoon niet worden getoond. Open {{app}} om te antwoorden.",
+    "failed": {
+      "signed-out": "Meld je op deze telefoon aan bij Privasys en probeer het opnieuw.",
+      "no-passkey": "Deze telefoon heeft geen toegangssleutel voor deze identiteit en kan het antwoord dus niet ondertekenen.",
+      "mismatch": "Het verzoek is onderweg veranderd, dus er is niets verstuurd.",
+      "gone": "Hierop is al geantwoord, of het is verlopen.",
+      "not-the-app": "De app die antwoordde is niet {{app}}, dus er is niets verstuurd.",
+      "unreachable": "{{app}} is niet bereikbaar. Probeer het zo opnieuw.",
+      "cancelled": "Er is niets verstuurd."
+    }
   },
   "devices": {
     "addEntry": "Ik gebruik Privasys Wallet al op een andere telefoon",

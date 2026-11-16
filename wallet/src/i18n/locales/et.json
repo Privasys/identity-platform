@@ -454,6 +454,7 @@
     "accountsTitle": "Ühendatud kontod",
     "askTitle": "{{app}} palub juurdepääsu",
     "askHint": "Puudutage, et näha, mida see soovib, ning seejärel kinnitage või keelduge.",
+    "formHint": "Puudutage, et siin vastata.",
     "messageRequest": "{{app}} saatis teile taotluse",
     "messageInvitation": "{{app}} saatis teile kutse",
     "messageSomeApp": "Rakendus",
@@ -1315,6 +1316,40 @@
     "notNow": "Mitte praegu",
     "learnMore": "Loe rohkem",
     "versions": "Teil on {{current}}. Vaja on {{minimum}} või uuemat."
+  },
+  "appForm": {
+    "titleRequest": "Taotlus",
+    "titleInvitation": "Kutse",
+    "from": "Saatja: {{app}}",
+    "presented": "Mida nad teiega jagasid",
+    "signNote": "Teie vastus allkirjastatakse teie pääsuvõtmega ja saadetakse ainult rakendusele {{app}}.",
+    "openInApp": "Ava rakenduses {{app}}",
+    "sent": "Teie vastus saadeti rakendusele {{app}}",
+    "sentAs": {
+      "approve": "Te kiitsite heaks.",
+      "deny": "Te keeldusite.",
+      "accept": "Te võtsite vastu.",
+      "decline": "Te loobusite.",
+      "confirm": "Te kinnitasite."
+    },
+    "action": {
+      "approve": "Kiida heaks",
+      "deny": "Keeldu",
+      "accept": "Võta vastu",
+      "decline": "Loobu",
+      "confirm": "Kinnita"
+    },
+    "gone": "Sellele on juba vastatud või see on aegunud.",
+    "unreadable": "Seda rakenduse {{app}} taotlust ei saa selles telefonis kuvada. Vastamiseks avage {{app}}.",
+    "failed": {
+      "signed-out": "Logige selles telefonis Privasysesse sisse ja proovige uuesti.",
+      "no-passkey": "Selles telefonis pole selle identiteedi pääsuvõtit, seega ei saa see vastust allkirjastada.",
+      "mismatch": "Taotlus muutus teel, seega ei saadetud midagi.",
+      "gone": "Sellele on juba vastatud või see on aegunud.",
+      "not-the-app": "Vastanud rakendus ei ole {{app}}, seega ei saadetud midagi.",
+      "unreachable": "Rakendusega {{app}} ei saanud ühendust. Proovige hetke pärast uuesti.",
+      "cancelled": "Midagi ei saadetud."
+    }
   },
   "devices": {
     "addEntry": "Kasutan Privasys Walletit juba teises telefonis",

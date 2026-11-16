@@ -421,6 +421,7 @@
     "accountsTitle": "Contas ligadas",
     "askTitle": "{{app}} está a pedir acesso",
     "askHint": "Toque para ver o que pede e, depois, aprove ou recuse.",
+    "formHint": "Toque para responder aqui.",
     "messageRequest": "A {{app}} enviou-lhe um pedido",
     "messageInvitation": "A {{app}} enviou-lhe um convite",
     "messageSomeApp": "Uma app",
@@ -1328,6 +1329,40 @@
     "notNow": "Agora não",
     "learnMore": "Saber mais",
     "versions": "Tem a {{current}}. É necessária a {{minimum}} ou posterior."
+  },
+  "appForm": {
+    "titleRequest": "Pedido",
+    "titleInvitation": "Convite",
+    "from": "De {{app}}",
+    "presented": "O que partilharam consigo",
+    "signNote": "A sua resposta é assinada com a sua chave de acesso e enviada apenas para {{app}}.",
+    "openInApp": "Abrir em {{app}}",
+    "sent": "A sua resposta foi enviada para {{app}}",
+    "sentAs": {
+      "approve": "Aprovou.",
+      "deny": "Recusou.",
+      "accept": "Aceitou.",
+      "decline": "Declinou.",
+      "confirm": "Confirmou."
+    },
+    "action": {
+      "approve": "Aprovar",
+      "deny": "Recusar",
+      "accept": "Aceitar",
+      "decline": "Declinar",
+      "confirm": "Confirmar"
+    },
+    "gone": "Isto já foi respondido ou expirou.",
+    "unreadable": "Este pedido de {{app}} não pode ser mostrado neste telemóvel. Abra {{app}} para responder.",
+    "failed": {
+      "signed-out": "Inicie sessão no Privasys neste telemóvel e tente novamente.",
+      "no-passkey": "Este telemóvel não tem uma chave de acesso para esta identidade, por isso não pode assinar a resposta.",
+      "mismatch": "O pedido mudou pelo caminho, por isso nada foi enviado.",
+      "gone": "Isto já foi respondido ou expirou.",
+      "not-the-app": "A app que respondeu não é {{app}}, por isso nada foi enviado.",
+      "unreachable": "Não foi possível contactar {{app}}. Tente novamente daqui a pouco.",
+      "cancelled": "Nada foi enviado."
+    }
   },
   "devices": {
     "addEntry": "Já utilizo a Privasys Wallet noutro telemóvel",

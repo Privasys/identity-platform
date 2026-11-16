@@ -454,6 +454,7 @@
     "accountsTitle": "Cyfrifon cysylltiedig",
     "askTitle": "Mae {{app}} yn gofyn am fynediad",
     "askHint": "Tapiwch i weld beth mae'n ei ofyn, yna cymeradwywch neu gwrthodwch.",
+    "formHint": "Tapiwch i ateb yma.",
     "messageRequest": "Anfonodd {{app}} gais atoch",
     "messageInvitation": "Anfonodd {{app}} wahoddiad atoch",
     "messageSomeApp": "Ap",
@@ -1411,6 +1412,40 @@
     "notNow": "Nid nawr",
     "learnMore": "Darllen mwy",
     "versions": "Mae gennych {{current}}. Mae angen {{minimum}} neu fwy diweddar."
+  },
+  "appForm": {
+    "titleRequest": "Cais",
+    "titleInvitation": "Gwahoddiad",
+    "from": "Gan {{app}}",
+    "presented": "Yr hyn a rannwyd gyda chi",
+    "signNote": "Mae eich ateb wedi’i lofnodi â’ch allwedd mynediad a’i anfon at {{app}} yn unig.",
+    "openInApp": "Agor yn {{app}}",
+    "sent": "Anfonwyd eich ateb at {{app}}",
+    "sentAs": {
+      "approve": "Fe wnaethoch gymeradwyo.",
+      "deny": "Fe wnaethoch wrthod.",
+      "accept": "Fe wnaethoch dderbyn.",
+      "decline": "Fe wnaethoch wrthod y gwahoddiad.",
+      "confirm": "Fe wnaethoch gadarnhau."
+    },
+    "action": {
+      "approve": "Cymeradwyo",
+      "deny": "Gwrthod",
+      "accept": "Derbyn",
+      "decline": "Gwrthod y gwahoddiad",
+      "confirm": "Cadarnhau"
+    },
+    "gone": "Mae hyn eisoes wedi’i ateb, neu wedi dod i ben.",
+    "unreadable": "Ni ellir dangos y cais hwn gan {{app}} ar y ffôn hwn. Agorwch {{app}} i’w ateb.",
+    "failed": {
+      "signed-out": "Mewngofnodwch i Privasys ar y ffôn hwn, yna rhowch gynnig arall arni.",
+      "no-passkey": "Nid oes gan y ffôn hwn allwedd mynediad ar gyfer yr hunaniaeth hon, felly ni all lofnodi’r ateb.",
+      "mismatch": "Newidiodd y cais ar y ffordd, felly ni anfonwyd dim.",
+      "gone": "Mae hyn eisoes wedi’i ateb, neu wedi dod i ben.",
+      "not-the-app": "Nid {{app}} yw’r ap a atebodd, felly ni anfonwyd dim.",
+      "unreachable": "Nid oedd modd cyrraedd {{app}}. Rhowch gynnig arall arni mewn munud.",
+      "cancelled": "Ni anfonwyd dim."
+    }
   },
   "devices": {
     "addEntry": "Rwy'n defnyddio Privasys Wallet ar ffôn arall yn barod",

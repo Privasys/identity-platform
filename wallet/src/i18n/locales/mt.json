@@ -454,6 +454,7 @@
     "accountsTitle": "Kontijiet konnessi",
     "askTitle": "{{app}} qed titlob aċċess",
     "askHint": "Agħfas biex tara x'qed titlob, imbagħad approva jew iċħad.",
+    "formHint": "Agħfas biex twieġeb hawn.",
     "messageRequest": "{{app}} bagħtitlek talba",
     "messageInvitation": "{{app}} bagħtitlek stedina",
     "messageSomeApp": "App",
@@ -1387,6 +1388,40 @@
     "notNow": "Mhux issa",
     "learnMore": "Aqra aktar",
     "versions": "Għandek {{current}}. Teħtieġ {{minimum}} jew aktar reċenti."
+  },
+  "appForm": {
+    "titleRequest": "Talba",
+    "titleInvitation": "Stedina",
+    "from": "Minn {{app}}",
+    "presented": "Dak li qasmu miegħek",
+    "signNote": "It-tweġiba tiegħek tiġi ffirmata bil-passkey tiegħek u tintbagħat lil {{app}} biss.",
+    "openInApp": "Iftaħ f’{{app}}",
+    "sent": "It-tweġiba tiegħek intbagħtet lil {{app}}",
+    "sentAs": {
+      "approve": "Approvajt.",
+      "deny": "Ċħadt.",
+      "accept": "Aċċettajt.",
+      "decline": "Irrifjutajt.",
+      "confirm": "Ikkonfermajt."
+    },
+    "action": {
+      "approve": "Approva",
+      "deny": "Iċħad",
+      "accept": "Aċċetta",
+      "decline": "Irrifjuta",
+      "confirm": "Ikkonferma"
+    },
+    "gone": "Diġà ngħatat tweġiba għal dan, jew skada.",
+    "unreadable": "Din it-talba minn {{app}} ma tistax tintwera fuq dan it-telefon. Iftaħ {{app}} biex twieġeb.",
+    "failed": {
+      "signed-out": "Idħol f’Privasys fuq dan it-telefon, imbagħad erġa’ pprova.",
+      "no-passkey": "Dan it-telefon m’għandux passkey għal din l-identità, għalhekk ma jistax jiffirma t-tweġiba.",
+      "mismatch": "It-talba nbidlet fit-triq, għalhekk ma ntbagħat xejn.",
+      "gone": "Diġà ngħatat tweġiba għal dan, jew skada.",
+      "not-the-app": "L-app li wieġbet mhijiex {{app}}, għalhekk ma ntbagħat xejn.",
+      "unreachable": "{{app}} ma setgħetx tintlaħaq. Erġa’ pprova fi ftit.",
+      "cancelled": "Ma ntbagħat xejn."
+    }
   },
   "devices": {
     "addEntry": "Diġà nuża Privasys Wallet fuq telefown ieħor",

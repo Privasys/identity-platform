@@ -454,6 +454,7 @@
     "accountsTitle": "Pripojené účty",
     "askTitle": "{{app}} žiada o prístup",
     "askHint": "Ťuknutím zobrazíte, o čo žiada, a potom schválite alebo zamietnete.",
+    "formHint": "Ťuknutím odpoviete tu.",
     "messageRequest": "{{app}} vám poslala žiadosť",
     "messageInvitation": "{{app}} vám poslala pozvánku",
     "messageSomeApp": "Aplikácia",
@@ -1339,6 +1340,40 @@
     "notNow": "Teraz nie",
     "learnMore": "Zistiť viac",
     "versions": "Máte {{current}}. Potrebná je {{minimum}} alebo novšia."
+  },
+  "appForm": {
+    "titleRequest": "Žiadosť",
+    "titleInvitation": "Pozvánka",
+    "from": "Od {{app}}",
+    "presented": "Čo s vami zdieľali",
+    "signNote": "Vaša odpoveď sa podpíše vaším prístupovým kľúčom a odošle sa iba do {{app}}.",
+    "openInApp": "Otvoriť v {{app}}",
+    "sent": "Vaša odpoveď bola odoslaná do {{app}}",
+    "sentAs": {
+      "approve": "Schválili ste.",
+      "deny": "Zamietli ste.",
+      "accept": "Prijali ste.",
+      "decline": "Odmietli ste.",
+      "confirm": "Potvrdili ste."
+    },
+    "action": {
+      "approve": "Schváliť",
+      "deny": "Zamietnuť",
+      "accept": "Prijať",
+      "decline": "Odmietnuť",
+      "confirm": "Potvrdiť"
+    },
+    "gone": "Na toto už bolo odpovedané, alebo platnosť vypršala.",
+    "unreadable": "Túto žiadosť od {{app}} nemožno zobraziť na tomto telefóne. Odpovedzte v {{app}}.",
+    "failed": {
+      "signed-out": "Prihláste sa do Privasys na tomto telefóne a skúste to znova.",
+      "no-passkey": "Tento telefón nemá prístupový kľúč pre túto identitu, preto nemôže podpísať odpoveď.",
+      "mismatch": "Žiadosť sa cestou zmenila, preto sa nič neodoslalo.",
+      "gone": "Na toto už bolo odpovedané, alebo platnosť vypršala.",
+      "not-the-app": "Aplikácia, ktorá odpovedala, nie je {{app}}, preto sa nič neodoslalo.",
+      "unreachable": "{{app}} nie je dostupná. Skúste to o chvíľu znova.",
+      "cancelled": "Nič sa neodoslalo."
+    }
   },
   "devices": {
     "addEntry": "Privasys Wallet už používam na inom telefóne",

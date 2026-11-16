@@ -421,6 +421,7 @@
     "accountsTitle": "Account collegati",
     "askTitle": "{{app}} chiede l’accesso",
     "askHint": "Tocca per vedere cosa chiede, poi approva o rifiuta.",
+    "formHint": "Tocca per rispondere qui.",
     "messageRequest": "{{app}} ti ha inviato una richiesta",
     "messageInvitation": "{{app}} ti ha inviato un invito",
     "messageSomeApp": "Un’app",
@@ -1328,6 +1329,40 @@
     "notNow": "Non ora",
     "learnMore": "Scopri di più",
     "versions": "Hai {{current}}. Serve {{minimum}} o successiva."
+  },
+  "appForm": {
+    "titleRequest": "Richiesta",
+    "titleInvitation": "Invito",
+    "from": "Da {{app}}",
+    "presented": "Cosa hanno condiviso con te",
+    "signNote": "La tua risposta viene firmata con la tua passkey e inviata solo a {{app}}.",
+    "openInApp": "Apri in {{app}}",
+    "sent": "La tua risposta è stata inviata a {{app}}",
+    "sentAs": {
+      "approve": "Hai approvato.",
+      "deny": "Hai negato.",
+      "accept": "Hai accettato.",
+      "decline": "Hai rifiutato.",
+      "confirm": "Hai confermato."
+    },
+    "action": {
+      "approve": "Approva",
+      "deny": "Nega",
+      "accept": "Accetta",
+      "decline": "Rifiuta",
+      "confirm": "Conferma"
+    },
+    "gone": "Hai già risposto, oppure è scaduta.",
+    "unreadable": "Questa richiesta di {{app}} non può essere mostrata su questo telefono. Apri {{app}} per rispondere.",
+    "failed": {
+      "signed-out": "Accedi a Privasys su questo telefono, poi riprova.",
+      "no-passkey": "Questo telefono non ha una passkey per questa identità, quindi non può firmare la risposta.",
+      "mismatch": "La richiesta è cambiata lungo il percorso, quindi non è stato inviato nulla.",
+      "gone": "Hai già risposto, oppure è scaduta.",
+      "not-the-app": "L’app che ha risposto non è {{app}}, quindi non è stato inviato nulla.",
+      "unreachable": "{{app}} non è raggiungibile. Riprova tra poco.",
+      "cancelled": "Non è stato inviato nulla."
+    }
   },
   "devices": {
     "addEntry": "Uso già Privasys Wallet su un altro telefono",

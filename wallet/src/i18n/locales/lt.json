@@ -454,6 +454,7 @@
     "accountsTitle": "Prijungtos paskyros",
     "askTitle": "{{app}} prašo prieigos",
     "askHint": "Palieskite, kad pamatytumėte, ko prašoma, tada patvirtinkite arba atmeskite.",
+    "formHint": "Palieskite, kad atsakytumėte čia.",
     "messageRequest": "{{app}} atsiuntė jums prašymą",
     "messageInvitation": "{{app}} atsiuntė jums kvietimą",
     "messageSomeApp": "Programėlė",
@@ -1339,6 +1340,40 @@
     "notNow": "Ne dabar",
     "learnMore": "Sužinoti daugiau",
     "versions": "Turite {{current}}. Reikia {{minimum}} arba naujesnės."
+  },
+  "appForm": {
+    "titleRequest": "Prašymas",
+    "titleInvitation": "Kvietimas",
+    "from": "Nuo {{app}}",
+    "presented": "Ką jie su jumis pasidalijo",
+    "signNote": "Jūsų atsakymas pasirašomas jūsų prieigos raktu ir siunčiamas tik programėlei {{app}}.",
+    "openInApp": "Atidaryti programėlėje {{app}}",
+    "sent": "Jūsų atsakymas išsiųstas programėlei {{app}}",
+    "sentAs": {
+      "approve": "Patvirtinote.",
+      "deny": "Atmetėte.",
+      "accept": "Priėmėte.",
+      "decline": "Atsisakėte.",
+      "confirm": "Patvirtinote."
+    },
+    "action": {
+      "approve": "Patvirtinti",
+      "deny": "Atmesti",
+      "accept": "Priimti",
+      "decline": "Atsisakyti",
+      "confirm": "Patvirtinti"
+    },
+    "gone": "Į tai jau atsakyta arba baigėsi galiojimas.",
+    "unreadable": "Šio programėlės {{app}} prašymo negalima parodyti šiame telefone. Atsakykite atidarę {{app}}.",
+    "failed": {
+      "signed-out": "Prisijunkite prie Privasys šiame telefone ir bandykite dar kartą.",
+      "no-passkey": "Šiame telefone nėra šios tapatybės prieigos rakto, todėl jis negali pasirašyti atsakymo.",
+      "mismatch": "Prašymas pakeliui pasikeitė, todėl nieko neišsiųsta.",
+      "gone": "Į tai jau atsakyta arba baigėsi galiojimas.",
+      "not-the-app": "Atsakiusi programėlė nėra {{app}}, todėl nieko neišsiųsta.",
+      "unreachable": "Nepavyko pasiekti {{app}}. Netrukus bandykite dar kartą.",
+      "cancelled": "Nieko neišsiųsta."
+    }
   },
   "devices": {
     "addEntry": "Jau naudoju Privasys Wallet kitame telefone",

@@ -454,6 +454,7 @@
     "accountsTitle": "Povezani računi",
     "askTitle": "{{app}} traži pristup",
     "askHint": "Dodirnite da vidite što traži, zatim odobrite ili odbijte.",
+    "formHint": "Dodirnite da biste odgovorili ovdje.",
     "messageRequest": "{{app}} vam je poslala zahtjev",
     "messageInvitation": "{{app}} vam je poslala pozivnicu",
     "messageSomeApp": "Aplikacija",
@@ -1339,6 +1340,40 @@
     "notNow": "Ne sada",
     "learnMore": "Saznajte više",
     "versions": "Imate {{current}}. Potrebna je {{minimum}} ili novija."
+  },
+  "appForm": {
+    "titleRequest": "Zahtjev",
+    "titleInvitation": "Pozivnica",
+    "from": "Od {{app}}",
+    "presented": "Što su podijelili s vama",
+    "signNote": "Vaš odgovor potpisuje se vašim pristupnim ključem i šalje samo aplikaciji {{app}}.",
+    "openInApp": "Otvori u aplikaciji {{app}}",
+    "sent": "Vaš je odgovor poslan aplikaciji {{app}}",
+    "sentAs": {
+      "approve": "Odobrili ste.",
+      "deny": "Odbili ste.",
+      "accept": "Prihvatili ste.",
+      "decline": "Odbili ste pozivnicu.",
+      "confirm": "Potvrdili ste."
+    },
+    "action": {
+      "approve": "Odobri",
+      "deny": "Odbij",
+      "accept": "Prihvati",
+      "decline": "Odbij pozivnicu",
+      "confirm": "Potvrdi"
+    },
+    "gone": "Na ovo je već odgovoreno ili je isteklo.",
+    "unreadable": "Ovaj zahtjev aplikacije {{app}} ne može se prikazati na ovom telefonu. Otvorite {{app}} da biste odgovorili.",
+    "failed": {
+      "signed-out": "Prijavite se u Privasys na ovom telefonu i pokušajte ponovno.",
+      "no-passkey": "Ovaj telefon nema pristupni ključ za ovaj identitet pa ne može potpisati odgovor.",
+      "mismatch": "Zahtjev se promijenio na putu pa ništa nije poslano.",
+      "gone": "Na ovo je već odgovoreno ili je isteklo.",
+      "not-the-app": "Aplikacija koja je odgovorila nije {{app}} pa ništa nije poslano.",
+      "unreachable": "Aplikacija {{app}} nije dostupna. Pokušajte ponovno za trenutak.",
+      "cancelled": "Ništa nije poslano."
+    }
   },
   "devices": {
     "addEntry": "Već koristim Privasys Wallet na drugom telefonu",

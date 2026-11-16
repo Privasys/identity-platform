@@ -421,6 +421,7 @@
     "accountsTitle": "Forbundne konti",
     "askTitle": "{{app}} beder om adgang",
     "askHint": "Tryk for at se, hvad den vil have, og godkend eller afvis.",
+    "formHint": "Tryk for at svare her.",
     "messageRequest": "{{app}} har sendt dig en anmodning",
     "messageInvitation": "{{app}} har sendt dig en invitation",
     "messageSomeApp": "En app",
@@ -1304,6 +1305,40 @@
     "notNow": "Ikke nu",
     "learnMore": "Læs mere",
     "versions": "Du har {{current}}. Der kræves {{minimum}} eller nyere."
+  },
+  "appForm": {
+    "titleRequest": "Anmodning",
+    "titleInvitation": "Invitation",
+    "from": "Fra {{app}}",
+    "presented": "Det, de har delt med dig",
+    "signNote": "Dit svar signeres med din adgangsnøgle og sendes kun til {{app}}.",
+    "openInApp": "Åbn i {{app}}",
+    "sent": "Dit svar blev sendt til {{app}}",
+    "sentAs": {
+      "approve": "Du godkendte.",
+      "deny": "Du afviste.",
+      "accept": "Du accepterede.",
+      "decline": "Du takkede nej.",
+      "confirm": "Du bekræftede."
+    },
+    "action": {
+      "approve": "Godkend",
+      "deny": "Afvis",
+      "accept": "Accepter",
+      "decline": "Tak nej",
+      "confirm": "Bekræft"
+    },
+    "gone": "Dette er allerede besvaret eller er udløbet.",
+    "unreadable": "Denne anmodning fra {{app}} kan ikke vises på denne telefon. Åbn {{app}} for at svare.",
+    "failed": {
+      "signed-out": "Log ind på Privasys på denne telefon, og prøv igen.",
+      "no-passkey": "Denne telefon har ingen adgangsnøgle til denne identitet og kan ikke signere svaret.",
+      "mismatch": "Anmodningen blev ændret undervejs, så intet blev sendt.",
+      "gone": "Dette er allerede besvaret eller er udløbet.",
+      "not-the-app": "Den app, der svarede, er ikke {{app}}, så intet blev sendt.",
+      "unreachable": "{{app}} kunne ikke nås. Prøv igen om lidt.",
+      "cancelled": "Intet blev sendt."
+    }
   },
   "devices": {
     "addEntry": "Jeg bruger allerede Privasys Wallet på en anden telefon",

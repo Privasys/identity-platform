@@ -421,6 +421,7 @@
     "accountsTitle": "Cuentas conectadas",
     "askTitle": "{{app}} solicita acceso",
     "askHint": "Toca para ver qué pide y, después, aprueba o deniega.",
+    "formHint": "Toca para responder aquí.",
     "messageRequest": "{{app}} te ha enviado una solicitud",
     "messageInvitation": "{{app}} te ha enviado una invitación",
     "messageSomeApp": "Una app",
@@ -1328,6 +1329,40 @@
     "notNow": "Ahora no",
     "learnMore": "Leer más",
     "versions": "Tienes {{current}}. Se necesita {{minimum}} o posterior."
+  },
+  "appForm": {
+    "titleRequest": "Solicitud",
+    "titleInvitation": "Invitación",
+    "from": "De {{app}}",
+    "presented": "Lo que han compartido contigo",
+    "signNote": "Tu respuesta se firma con tu llave de acceso y se envía solo a {{app}}.",
+    "openInApp": "Abrir en {{app}}",
+    "sent": "Tu respuesta se ha enviado a {{app}}",
+    "sentAs": {
+      "approve": "Has aprobado.",
+      "deny": "Has denegado.",
+      "accept": "Has aceptado.",
+      "decline": "Has rechazado.",
+      "confirm": "Has confirmado."
+    },
+    "action": {
+      "approve": "Aprobar",
+      "deny": "Denegar",
+      "accept": "Aceptar",
+      "decline": "Rechazar",
+      "confirm": "Confirmar"
+    },
+    "gone": "Esto ya se ha respondido o ha caducado.",
+    "unreadable": "Esta solicitud de {{app}} no se puede mostrar en este teléfono. Abre {{app}} para responder.",
+    "failed": {
+      "signed-out": "Inicia sesión en Privasys en este teléfono y vuelve a intentarlo.",
+      "no-passkey": "Este teléfono no tiene una llave de acceso para esta identidad, así que no puede firmar la respuesta.",
+      "mismatch": "La solicitud cambió por el camino, así que no se ha enviado nada.",
+      "gone": "Esto ya se ha respondido o ha caducado.",
+      "not-the-app": "La app que ha respondido no es {{app}}, así que no se ha enviado nada.",
+      "unreachable": "No se ha podido contactar con {{app}}. Vuelve a intentarlo en un momento.",
+      "cancelled": "No se ha enviado nada."
+    }
   },
   "devices": {
     "addEntry": "Ya uso Privasys Wallet en otro teléfono",

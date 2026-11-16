@@ -13,6 +13,7 @@
 
 import { create } from 'zustand';
 
+import { APP_FORM_TYPE, readFormPayload, type AppForm } from '@/services/app-form';
 import { appMessageLink, readAppMessage, APP_MESSAGE_TYPE, type AppMessageContent } from '@/services/app-message';
 import { openSealedNotification } from '@/services/notify-seal';
 import { getCachedPlatformToken } from '@/services/platform-token';
@@ -21,23 +22,64 @@ const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
 export interface WaitingAppMessage extends AppMessageContent {
     id: string;
+    /** 'app-message', or 'app-form' for a question answered in the wallet. */
+    type: string;
     appId?: string;
     appName?: string;
     appHost?: string;
     /** Where opening it goes, or undefined when it carries no usable link. */
     link?: string;
+    /** For an app-form: the form, only when it parsed and its digest is the
+     *  one the IdP recorded. A form this phone cannot show has none. */
+    form?: AppForm;
     createdAt: number;
 }
 
-interface ListedMessage {
+export interface ListedMessage {
     id?: unknown;
+    type?: unknown;
     kind?: unknown;
     app_id?: unknown;
     app_name?: unknown;
     app_host?: unknown;
+    form_digest?: unknown;
     sealed?: unknown;
     created_at?: unknown;
     expires_at?: unknown;
+}
+
+/** One listed or pushed message, as the wallet shows it. */
+export async function readMessage(r: ListedMessage): Promise<WaitingAppMessage | null> {
+    if (typeof r?.id !== 'string' || !r.id) return null;
+    const type = r.type === APP_FORM_TYPE ? APP_FORM_TYPE : APP_MESSAGE_TYPE;
+    const kindHint = typeof r.kind === 'string' ? r.kind : undefined;
+    // Sealed with the type as associated data, so a message cannot be
+    // replayed as a form or the other way round.
+    const payload = typeof r.sealed === 'string' && r.sealed ? await openSealedNotification(r.sealed, type) : null;
+    const appHost = typeof r.app_host === 'string' ? r.app_host : undefined;
+    const base = {
+        id: r.id,
+        type,
+        appId: typeof r.app_id === 'string' ? r.app_id : undefined,
+        appName: typeof r.app_name === 'string' ? r.app_name : undefined,
+        appHost,
+        createdAt: typeof r.created_at === 'number' ? r.created_at : 0,
+    };
+    if (type === APP_FORM_TYPE) {
+        const parsed = readFormPayload(payload);
+        // What the holder sees must be what the IdP will bind their answer
+        // to: a form whose digest differs from the recorded one is not shown.
+        const form = parsed && (r.form_digest === undefined || r.form_digest === parsed.digest) ? parsed : undefined;
+        return {
+            ...base,
+            kind: kindHint === 'invitation' ? 'invitation' : 'request',
+            presented: [],
+            form,
+            link: form ? appMessageLink(appHost, form.link) : undefined,
+        };
+    }
+    const content = readAppMessage(payload, kindHint);
+    return { ...base, ...content, link: appMessageLink(appHost, content.path) };
 }
 
 /** Turn the IdP's list into what Access shows. Malformed and expired rows are
@@ -47,23 +89,9 @@ export async function readListed(body: unknown, nowSeconds: number): Promise<Wai
     if (!Array.isArray(rows)) return [];
     const out: WaitingAppMessage[] = [];
     for (const r of rows as ListedMessage[]) {
-        if (typeof r?.id !== 'string' || !r.id || typeof r.expires_at !== 'number' || r.expires_at <= nowSeconds) {
-            continue;
-        }
-        const kindHint = typeof r.kind === 'string' ? r.kind : undefined;
-        const payload =
-            typeof r.sealed === 'string' && r.sealed ? await openSealedNotification(r.sealed, APP_MESSAGE_TYPE) : null;
-        const content = readAppMessage(payload, kindHint);
-        const appHost = typeof r.app_host === 'string' ? r.app_host : undefined;
-        out.push({
-            ...content,
-            id: r.id,
-            appId: typeof r.app_id === 'string' ? r.app_id : undefined,
-            appName: typeof r.app_name === 'string' ? r.app_name : undefined,
-            appHost,
-            link: appMessageLink(appHost, content.path),
-            createdAt: typeof r.created_at === 'number' ? r.created_at : 0,
-        });
+        if (typeof r?.expires_at !== 'number' || r.expires_at <= nowSeconds) continue;
+        const m = await readMessage(r);
+        if (m) out.push(m);
     }
     return out;
 }
@@ -76,6 +104,12 @@ interface AppMessagesState {
     dismiss: (id: string) => Promise<void>;
     /** Follow its link, if any, then dismiss it. */
     open: (message: WaitingAppMessage) => Promise<void>;
+    /** Add one that arrived by push, so its screen can open before the list
+     *  is refreshed. Replaces a listed copy with the same id. */
+    remember: (message: WaitingAppMessage) => void;
+    /** Drop one from this phone's list only (a form once answered: the IdP
+     *  already took it). */
+    forget: (id: string) => void;
     clearAll: () => void;
 }
 
@@ -136,6 +170,10 @@ export const useAppMessagesStore = create<AppMessagesState>((set, get) => ({
         }
         await get().dismiss(message.id);
     },
+
+    remember: (message) => set({ messages: [message, ...get().messages.filter((m) => m.id !== message.id)] }),
+
+    forget: (id) => set({ messages: get().messages.filter((m) => m.id !== id) }),
 
     clearAll: () => set({ messages: [] }),
 }));

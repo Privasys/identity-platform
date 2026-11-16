@@ -421,6 +421,7 @@
     "accountsTitle": "Yhdistetyt tilit",
     "askTitle": "{{app}} pyytää käyttöoikeutta",
     "askHint": "Napauta nähdäksesi, mitä se pyytää, ja hyväksy tai hylkää.",
+    "formHint": "Vastaa tässä napauttamalla.",
     "messageRequest": "{{app}} lähetti sinulle pyynnön",
     "messageInvitation": "{{app}} lähetti sinulle kutsun",
     "messageSomeApp": "Sovellus",
@@ -1304,6 +1305,40 @@
     "notNow": "Ei nyt",
     "learnMore": "Lue lisää",
     "versions": "Sinulla on {{current}}. Tarvitaan {{minimum}} tai uudempi."
+  },
+  "appForm": {
+    "titleRequest": "Pyyntö",
+    "titleInvitation": "Kutsu",
+    "from": "Lähettäjä: {{app}}",
+    "presented": "Mitä he jakoivat kanssasi",
+    "signNote": "Vastauksesi allekirjoitetaan pääsyavaimellasi ja lähetetään vain sovellukselle {{app}}.",
+    "openInApp": "Avaa sovelluksessa {{app}}",
+    "sent": "Vastauksesi lähetettiin sovellukselle {{app}}",
+    "sentAs": {
+      "approve": "Hyväksyit.",
+      "deny": "Hylkäsit.",
+      "accept": "Otit vastaan.",
+      "decline": "Kieltäydyit.",
+      "confirm": "Vahvistit."
+    },
+    "action": {
+      "approve": "Hyväksy",
+      "deny": "Hylkää",
+      "accept": "Ota vastaan",
+      "decline": "Kieltäydy",
+      "confirm": "Vahvista"
+    },
+    "gone": "Tähän on jo vastattu, tai se on vanhentunut.",
+    "unreadable": "Tätä sovelluksen {{app}} pyyntöä ei voi näyttää tällä puhelimella. Vastaa avaamalla {{app}}.",
+    "failed": {
+      "signed-out": "Kirjaudu Privasysiin tällä puhelimella ja yritä uudelleen.",
+      "no-passkey": "Tällä puhelimella ei ole tämän identiteetin pääsyavainta, joten se ei voi allekirjoittaa vastausta.",
+      "mismatch": "Pyyntö muuttui matkalla, joten mitään ei lähetetty.",
+      "gone": "Tähän on jo vastattu, tai se on vanhentunut.",
+      "not-the-app": "Vastannut sovellus ei ole {{app}}, joten mitään ei lähetetty.",
+      "unreachable": "Sovellukseen {{app}} ei saatu yhteyttä. Yritä hetken päästä uudelleen.",
+      "cancelled": "Mitään ei lähetetty."
+    }
   },
   "devices": {
     "addEntry": "Käytän jo Privasys Walletia toisessa puhelimessa",

@@ -454,6 +454,7 @@
     "accountsTitle": "Conturi conectate",
     "askTitle": "{{app}} solicită acces",
     "askHint": "Atinge pentru a vedea ce solicită, apoi aprobă sau refuză.",
+    "formHint": "Atinge pentru a răspunde aici.",
     "messageRequest": "{{app}} ți-a trimis o solicitare",
     "messageInvitation": "{{app}} ți-a trimis o invitație",
     "messageSomeApp": "O aplicație",
@@ -1339,6 +1340,40 @@
     "notNow": "Nu acum",
     "learnMore": "Află mai multe",
     "versions": "Ai {{current}}. Este necesară {{minimum}} sau mai nouă."
+  },
+  "appForm": {
+    "titleRequest": "Solicitare",
+    "titleInvitation": "Invitație",
+    "from": "De la {{app}}",
+    "presented": "Ce ți-au comunicat",
+    "signNote": "Răspunsul tău este semnat cu cheia ta de acces și trimis doar către {{app}}.",
+    "openInApp": "Deschide în {{app}}",
+    "sent": "Răspunsul tău a fost trimis către {{app}}",
+    "sentAs": {
+      "approve": "Ai aprobat.",
+      "deny": "Ai refuzat.",
+      "accept": "Ai acceptat.",
+      "decline": "Ai declinat.",
+      "confirm": "Ai confirmat."
+    },
+    "action": {
+      "approve": "Aprobă",
+      "deny": "Refuză",
+      "accept": "Acceptă",
+      "decline": "Declină",
+      "confirm": "Confirmă"
+    },
+    "gone": "S-a răspuns deja la aceasta sau a expirat.",
+    "unreadable": "Această solicitare de la {{app}} nu poate fi afișată pe acest telefon. Deschide {{app}} pentru a răspunde.",
+    "failed": {
+      "signed-out": "Conectează-te la Privasys pe acest telefon, apoi încearcă din nou.",
+      "no-passkey": "Acest telefon nu are o cheie de acces pentru această identitate, deci nu poate semna răspunsul.",
+      "mismatch": "Solicitarea s-a schimbat pe drum, așa că nu s-a trimis nimic.",
+      "gone": "S-a răspuns deja la aceasta sau a expirat.",
+      "not-the-app": "Aplicația care a răspuns nu este {{app}}, așa că nu s-a trimis nimic.",
+      "unreachable": "{{app}} nu poate fi contactată. Încearcă din nou peste puțin timp.",
+      "cancelled": "Nu s-a trimis nimic."
+    }
   },
   "devices": {
     "addEntry": "Folosesc deja Privasys Wallet pe alt telefon",

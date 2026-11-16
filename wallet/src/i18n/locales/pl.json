@@ -421,6 +421,7 @@
     "accountsTitle": "Połączone konta",
     "askTitle": "{{app}} prosi o dostęp",
     "askHint": "Stuknij, aby zobaczyć, o co prosi, a potem zatwierdź lub odrzuć.",
+    "formHint": "Dotknij, aby odpowiedzieć tutaj.",
     "messageRequest": "{{app}} wysłała Ci prośbę",
     "messageInvitation": "{{app}} wysłała Ci zaproszenie",
     "messageSomeApp": "Aplikacja",
@@ -1352,6 +1353,40 @@
     "notNow": "Nie teraz",
     "learnMore": "Dowiedz się więcej",
     "versions": "Masz {{current}}. Potrzebna jest {{minimum}} lub nowsza."
+  },
+  "appForm": {
+    "titleRequest": "Prośba",
+    "titleInvitation": "Zaproszenie",
+    "from": "Od {{app}}",
+    "presented": "Co Ci udostępniono",
+    "signNote": "Twoja odpowiedź jest podpisywana Twoim kluczem dostępu i wysyłana tylko do {{app}}.",
+    "openInApp": "Otwórz w {{app}}",
+    "sent": "Twoja odpowiedź została wysłana do {{app}}",
+    "sentAs": {
+      "approve": "Zatwierdzono.",
+      "deny": "Odmówiono.",
+      "accept": "Zaakceptowano.",
+      "decline": "Odrzucono.",
+      "confirm": "Potwierdzono."
+    },
+    "action": {
+      "approve": "Zatwierdź",
+      "deny": "Odmów",
+      "accept": "Zaakceptuj",
+      "decline": "Odrzuć",
+      "confirm": "Potwierdź"
+    },
+    "gone": "Na to już odpowiedziano albo wygasło.",
+    "unreadable": "Tej prośby od {{app}} nie można wyświetlić na tym telefonie. Otwórz {{app}}, aby odpowiedzieć.",
+    "failed": {
+      "signed-out": "Zaloguj się do Privasys na tym telefonie i spróbuj ponownie.",
+      "no-passkey": "Ten telefon nie ma klucza dostępu dla tej tożsamości, więc nie może podpisać odpowiedzi.",
+      "mismatch": "Prośba zmieniła się po drodze, więc nic nie zostało wysłane.",
+      "gone": "Na to już odpowiedziano albo wygasło.",
+      "not-the-app": "Aplikacja, która odpowiedziała, to nie {{app}}, więc nic nie zostało wysłane.",
+      "unreachable": "Nie można połączyć się z {{app}}. Spróbuj ponownie za chwilę.",
+      "cancelled": "Nic nie zostało wysłane."
+    }
   },
   "devices": {
     "addEntry": "Używam już Privasys Wallet na innym telefonie",

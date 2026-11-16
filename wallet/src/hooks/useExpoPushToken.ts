@@ -3,6 +3,7 @@ import { useRouter, type Router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
 
+import { APP_FORM_TYPE } from '../services/app-form';
 import { APP_MESSAGE_TYPE, appMessageLink, readAppMessage } from '../services/app-message';
 import { DEFAULT_RELAY_HOST, fetchDescriptor } from '../services/descriptor';
 import { pullRelay } from '../services/device-sync';
@@ -11,7 +12,7 @@ import { ensureNotifySealKey, openSealedNotification } from '../services/notify-
 import { getPrivasysAccount } from '../services/privasys-id';
 import { fetchAttributeApproval } from '../services/attribute-approval-api';
 import { registerPushTokenWithIdp } from '../services/vault-approval-api';
-import { dismissAppMessage, useAppMessagesStore } from '../stores/app-messages';
+import { dismissAppMessage, readMessage, useAppMessagesStore } from '../stores/app-messages';
 import { useDriveNotificationsStore } from '../stores/drive-notifications';
 import { useGuardianRequestsStore } from '../stores/guardian-requests';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
@@ -180,6 +181,28 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         if (!isRouteActive('/drive-requests')) {
             router.push({ pathname: '/drive-requests', params: { source: 'push' } });
         }
+        return;
+    }
+    if (data?.type === APP_FORM_TYPE) {
+        // A question to answer in the wallet. The form travels sealed in the
+        // push; filing it first lets its screen open without waiting for the
+        // list, and the screen looks the form up by the IdP's id for it.
+        const id = typeof data.message_id === 'string' ? data.message_id : '';
+        if (!id) {
+            router.navigate('/access');
+            return;
+        }
+        try {
+            const m = await readMessage({
+                id, type: APP_FORM_TYPE, kind: data.kind, app_id: data.app_id,
+                app_name: typeof data.app_name === 'string' ? data.app_name : undefined,
+                app_host: data.app_host, sealed: data.sealed,
+            });
+            if (m) useAppMessagesStore.getState().remember(m);
+        } catch (e) {
+            console.warn('[notifications] could not read the app form', e);
+        }
+        router.push({ pathname: '/app-form', params: { id } });
         return;
     }
     if (data?.type === APP_MESSAGE_TYPE) {

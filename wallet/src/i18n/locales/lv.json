@@ -454,6 +454,7 @@
     "accountsTitle": "Savienotie konti",
     "askTitle": "{{app}} lūdz piekļuvi",
     "askHint": "Pieskarieties, lai redzētu, ko tā lūdz, un pēc tam apstipriniet vai noraidiet.",
+    "formHint": "Pieskarieties, lai atbildētu šeit.",
     "messageRequest": "{{app}} jums nosūtīja pieprasījumu",
     "messageInvitation": "{{app}} jums nosūtīja ielūgumu",
     "messageSomeApp": "Lietotne",
@@ -1339,6 +1340,40 @@
     "notNow": "Ne tagad",
     "learnMore": "Uzzināt vairāk",
     "versions": "Jums ir {{current}}. Nepieciešama {{minimum}} vai jaunāka."
+  },
+  "appForm": {
+    "titleRequest": "Pieprasījums",
+    "titleInvitation": "Ielūgums",
+    "from": "No {{app}}",
+    "presented": "Ko viņi ar jums kopīgoja",
+    "signNote": "Jūsu atbilde tiek parakstīta ar jūsu piekļuves atslēgu un nosūtīta tikai lietotnei {{app}}.",
+    "openInApp": "Atvērt lietotnē {{app}}",
+    "sent": "Jūsu atbilde tika nosūtīta lietotnei {{app}}",
+    "sentAs": {
+      "approve": "Jūs apstiprinājāt.",
+      "deny": "Jūs noraidījāt.",
+      "accept": "Jūs pieņēmāt.",
+      "decline": "Jūs atteicāties.",
+      "confirm": "Jūs apstiprinājāt."
+    },
+    "action": {
+      "approve": "Apstiprināt",
+      "deny": "Noraidīt",
+      "accept": "Pieņemt",
+      "decline": "Atteikties",
+      "confirm": "Apstiprināt"
+    },
+    "gone": "Uz šo jau ir atbildēts, vai tā derīgums ir beidzies.",
+    "unreadable": "Šo lietotnes {{app}} pieprasījumu nevar parādīt šajā tālrunī. Lai atbildētu, atveriet {{app}}.",
+    "failed": {
+      "signed-out": "Pierakstieties Privasys šajā tālrunī un mēģiniet vēlreiz.",
+      "no-passkey": "Šajā tālrunī nav šīs identitātes piekļuves atslēgas, tāpēc tas nevar parakstīt atbildi.",
+      "mismatch": "Pieprasījums ceļā mainījās, tāpēc nekas netika nosūtīts.",
+      "gone": "Uz šo jau ir atbildēts, vai tā derīgums ir beidzies.",
+      "not-the-app": "Lietotne, kas atbildēja, nav {{app}}, tāpēc nekas netika nosūtīts.",
+      "unreachable": "Lietotne {{app}} nav sasniedzama. Pēc brīža mēģiniet vēlreiz.",
+      "cancelled": "Nekas netika nosūtīts."
+    }
   },
   "devices": {
     "addEntry": "Es jau izmantoju Privasys Wallet citā tālrunī",

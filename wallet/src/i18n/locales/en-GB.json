@@ -454,6 +454,7 @@
     "accountsTitle": "Connected accounts",
     "askTitle": "{{app}} is asking for access",
     "askHint": "Tap to see what it wants, then approve or deny.",
+    "formHint": "Tap to answer it here.",
     "messageRequest": "{{app}} sent you a request",
     "messageInvitation": "{{app}} sent you an invitation",
     "messageSomeApp": "An app",
@@ -1315,6 +1316,40 @@
     "notNow": "Not now",
     "learnMore": "Read more",
     "versions": "You have {{current}}. This needs {{minimum}} or later."
+  },
+  "appForm": {
+    "titleRequest": "Request",
+    "titleInvitation": "Invitation",
+    "from": "From {{app}}",
+    "presented": "What they shared with you",
+    "signNote": "Your answer is signed with your passkey and sent only to {{app}}.",
+    "openInApp": "Open in {{app}}",
+    "sent": "Your answer was sent to {{app}}",
+    "sentAs": {
+      "approve": "You approved.",
+      "deny": "You denied.",
+      "accept": "You accepted.",
+      "decline": "You declined.",
+      "confirm": "You confirmed."
+    },
+    "action": {
+      "approve": "Approve",
+      "deny": "Deny",
+      "accept": "Accept",
+      "decline": "Decline",
+      "confirm": "Confirm"
+    },
+    "gone": "This was already answered, or has expired.",
+    "unreadable": "This request from {{app}} cannot be shown on this phone. Open {{app}} to answer it.",
+    "failed": {
+      "signed-out": "Sign in to Privasys on this phone, then try again.",
+      "no-passkey": "This phone has no passkey for this identity, so it cannot sign the answer.",
+      "mismatch": "The request changed on its way, so nothing was sent.",
+      "gone": "This was already answered, or has expired.",
+      "not-the-app": "The app that answered is not {{app}}, so nothing was sent.",
+      "unreachable": "{{app}} could not be reached. Try again in a moment.",
+      "cancelled": "Nothing was sent."
+    }
   },
   "devices": {
     "addEntry": "I already use Privasys Wallet on another phone",

@@ -391,7 +391,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     emptyText: { fontSize: 15, textAlign: 'center', color: p.textSecondary, lineHeight: 22 },
     retry: {
         marginTop: 8,
-        backgroundColor: p.blue,
+        backgroundColor: p.action,
         borderRadius: 12,
         paddingHorizontal: 20,
         paddingVertical: 10

@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { QrCode } from '@/components/QrCode';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { notify } from '@/stores/notice';
 import {
     installTransfer,
     openPairing,
@@ -82,6 +83,13 @@ export default function DeviceAddScreen() {
         try {
             const r = await installTransfer(received, setProgress);
             setProgress(r);
+            // All copied: no page to say so. Home, with the message strip. The
+            // done page stays only when some items did not copy.
+            if (r.failed === 0) {
+                notify(t('devices.doneTitle'), t('devices.doneBody'));
+                router.replace('/(tabs)');
+                return;
+            }
             setPhase('done');
         } catch (e: any) {
             setProblem(e?.message ?? String(e));
@@ -209,7 +217,7 @@ const makeStyles = (p: Palette) =>
         },
         primary: {
             marginTop: 24,
-            backgroundColor: p.blue,
+            backgroundColor: p.action,
             borderRadius: 14,
             paddingVertical: 16,
             paddingHorizontal: 20,

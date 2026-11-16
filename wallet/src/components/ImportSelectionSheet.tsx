@@ -115,7 +115,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     rowLabel: { fontSize: 15, fontWeight: '500', color: p.textPrimary },
     rowValue: { fontSize: 12, color: p.textMuted, marginTop: 1 },
     confirm: {
-        backgroundColor: p.blue, borderRadius: 12, paddingVertical: 14,
+        backgroundColor: p.action, borderRadius: 12, paddingVertical: 14,
         alignItems: 'center', marginTop: 16,
     },
     confirmDisabled: { opacity: 0.5 },

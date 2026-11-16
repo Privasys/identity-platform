@@ -378,6 +378,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         flex: 1.35, paddingVertical: 15, borderRadius: 12,
         alignItems: 'center', backgroundColor: p.green,
     },
-    approveButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+    approveButtonText: { fontSize: 16, fontWeight: '600', color: p.onGreen },
     disabledButton: { opacity: 0.5 },
 });

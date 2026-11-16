@@ -11,7 +11,6 @@
  * evidence, and leaves the address itself where it has always been: here.
  */
 
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -35,9 +34,10 @@ import {
     EmailVerifyError,
     type EmailVerifyFailure,
 } from '@/services/email-verification';
+import { notify, useNoticeStore } from '@/stores/notice';
 import { useProfileStore } from '@/stores/profile';
 
-type Phase = 'ready' | 'sending' | 'entering' | 'checking' | 'done';
+type Phase = 'ready' | 'sending' | 'entering' | 'checking';
 
 /** What to say for each way this can fail. */
 function failureKey(reason: EmailVerifyFailure): string {
@@ -136,7 +136,12 @@ export default function VerifyEmailScreen() {
             if (profile && profile.email.toLowerCase() === address.toLowerCase()) {
                 useProfileStore.getState().updateProfile({ email: result.email });
             }
-            setPhase('done');
+            // No page to say it worked: back to where the check was asked for
+            // (personal data, or a sign-in waiting on it), the address picked out
+            // there and the message strip saying so.
+            useNoticeStore.getState().markFresh([{ key: 'email', value: result.email }]);
+            notify(t('verifyEmail.doneTitle'), t('verifyEmail.doneBody', { email: result.email }));
+            router.back();
         } catch (e) {
             if (e instanceof EmailVerifyError) {
                 const left = e.attemptsLeft;
@@ -154,7 +159,7 @@ export default function VerifyEmailScreen() {
             setProblem(t('verifyEmail.errorSend'));
             setPhase('entering');
         }
-    }, [address, code, t]);
+    }, [address, code, router, t]);
 
     if (!address) {
         return (
@@ -180,18 +185,7 @@ export default function VerifyEmailScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {phase === 'done' ? (
-                        <RNView style={styles.doneWrap}>
-                            <RNView style={styles.doneIcon}>
-                                <Ionicons name="checkmark" size={34} color="#FFFFFF" />
-                            </RNView>
-                            <Text style={styles.doneTitle}>{t('verifyEmail.doneTitle')}</Text>
-                            <Text style={styles.lede}>{t('verifyEmail.doneBody', { email: address })}</Text>
-                            <Pressable style={[styles.primary, styles.doneButton]} onPress={() => router.back()}>
-                                <Text style={styles.primaryText}>{t('common.done')}</Text>
-                            </Pressable>
-                        </RNView>
-                    ) : (
+                    {(
                         <>
                             <Text style={styles.address}>{address}</Text>
                             <Text style={styles.lede}>
@@ -291,7 +285,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     problem: { marginTop: 16, fontSize: 14, lineHeight: 20, color: p.danger },
     primary: {
         marginTop: 24,
-        backgroundColor: p.blue,
+        backgroundColor: p.action,
         borderRadius: 14,
         paddingVertical: 16,
         alignItems: 'center',
@@ -302,17 +296,4 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     secondaryText: { color: p.blue, fontSize: 15, fontWeight: '600' },
     secondaryWaiting: { color: p.textMuted },
     note: { marginTop: 28, fontSize: 12.5, lineHeight: 19, color: p.textMuted },
-    doneWrap: { alignItems: 'center', paddingTop: 24 },
-    doneIcon: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: p.green,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 20,
-    },
-    // doneWrap centres its children, which would shrink the button to its label.
-    doneButton: { alignSelf: 'stretch' },
-    doneTitle: { fontSize: 22, fontWeight: '700', color: p.textPrimary, marginBottom: 8 },
 });

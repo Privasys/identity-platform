@@ -9,6 +9,7 @@ import 'react-native-get-random-values';
 import 'react-native-reanimated';
 
 import { SplashAnimation } from '@/components/SplashAnimation';
+import { Notice } from '@/components/Notice';
 import { UpdateGate } from '@/components/UpdateGate';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAppLocale } from '@/hooks/useAppLocale';
@@ -162,6 +163,7 @@ export default function RootLayout() {
     return (
         <>
             <RootLayoutNav hasProfile={hasProfile} />
+            <Notice />
             {/* Above the navigator, below the splash. A required notice has no
                 dismiss handler, and that absence IS what makes it a wall: there
                 is no flag the screen could be talked out of. */}

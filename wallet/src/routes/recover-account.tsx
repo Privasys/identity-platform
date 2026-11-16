@@ -596,6 +596,11 @@ export default function RecoverAccountScreen() {
         router.back();
     };
 
+    const handleNewPhrase = async () => {
+        await Storage.deleteItemAsync(RECOVERY_STATE_KEY);
+        router.replace('/account-recovery');
+    };
+
     const handleCancel = () => {
         Alert.alert(
             t('recover.cancelTitle'),
@@ -903,8 +908,13 @@ export default function RecoverAccountScreen() {
                         <Text style={styles.title}>{t('recover.restoredTitle')}</Text>
                         <Text style={styles.subtitle}>{t('recover.restoredBody')}</Text>
 
-                        <Pressable style={styles.primaryButton} onPress={handleDismiss}>
-                            <Text style={styles.primaryButtonText}>{t('common.done')}</Text>
+                        {/* The one thing left to do, as the button: the phrase just
+                            used works once, so a new one is made now. */}
+                        <Pressable style={styles.primaryButton} onPress={() => void handleNewPhrase()}>
+                            <Text style={styles.primaryButtonText}>{t('recover.newPhrase')}</Text>
+                        </Pressable>
+                        <Pressable style={styles.secondaryButton} onPress={() => void handleDismiss()}>
+                            <Text style={styles.secondaryButtonText}>{t('common.notNow')}</Text>
                         </Pressable>
                     </>
                 )}
@@ -1064,7 +1074,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
 
     primaryButton: {
-        backgroundColor: p.blue,
+        backgroundColor: p.action,
         borderRadius: 10,
         paddingVertical: 14,
         alignItems: 'center' as const,

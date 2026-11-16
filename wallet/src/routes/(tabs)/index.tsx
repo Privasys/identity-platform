@@ -701,7 +701,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
 
     createProfileButton: {
-        backgroundColor: p.blue,
+        backgroundColor: p.action,
         borderRadius: 12,
         paddingVertical: 14,
         paddingHorizontal: 32,

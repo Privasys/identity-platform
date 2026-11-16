@@ -103,6 +103,7 @@ import {
     type SharedAttributeTrace,
 } from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
+import { notify } from '@/stores/notice';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
@@ -898,6 +899,14 @@ function ConnectFlow() {
 
     // State
     const [step, setStep] = useState<FlowStep>('verifying');
+
+    // Signed in: no page to say so. Home, with the message strip.
+    useEffect(() => {
+        if (step !== 'done') return;
+        notify(t('connect.connected'), t('connect.connectedBody'));
+        router.replace('/(tabs)');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step]);
     const [error, setError] = useState<string | null>(null);
     const [reportOpen, setReportOpen] = useState(false);
     const [attestation, setAttestation] = useState<AttestationResult | null>(null);
@@ -1803,7 +1812,6 @@ function ConnectFlow() {
             });
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
             setStep('done');
-            setTimeout(() => router.replace('/(tabs)'), 1500);
         } catch (e: any) {
             console.error('[CONNECT] step-up approval FAILED:', e?.message, e);
             setError(`Approval failed: ${e?.message ?? e}`);
@@ -2072,10 +2080,6 @@ function ConnectFlow() {
             });
             setStep('done');
             console.log(`[CONNECT] voucher-only: issued voucher for ${payload.appHost}`);
-            // Return to Home like the other success paths — without this the
-            // "Connected" screen is a dead end and the only way out is to kill
-            // the app.
-            setTimeout(() => router.replace('/(tabs)'), 1500);
         } catch (e: any) {
             console.error('[CONNECT] voucher-only failed:', e?.message ?? e);
             setError(`Could not add ${payload.appHost}: ${e?.message ?? e}`);
@@ -2518,9 +2522,7 @@ function ConnectFlow() {
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
 
-            if (!routeTerminal(payload, attributes)) {
-                setTimeout(() => router.replace('/(tabs)'), 1500);
-            }
+            routeTerminal(payload, attributes);
         } catch (e: any) {
             console.error(`[CONNECT] registration FAILED:`, e.message, e);
             setError(`Registration failed: ${e.message}`);
@@ -2694,9 +2696,7 @@ function ConnectFlow() {
             // Start biometric grace period (skips push confirmation for subsequent auths).
             if (gracePeriodSec > 0) setUnlocked(gracePeriodSec * 1000);
 
-            if (!routeTerminal(payload, attributes)) {
-                setTimeout(() => router.replace('/(tabs)'), 1500);
-            }
+            routeTerminal(payload, attributes);
         } catch (e: any) {
             console.error(`[CONNECT] authentication FAILED:`, e.message, e);
             setError(`Authentication failed: ${e.message}`);
@@ -2920,9 +2920,7 @@ function ConnectFlow() {
             if (graceSec > 0) setUnlocked(graceSec * 1000);
 
             pendingRelay.current = null;
-            if (!routeTerminal(pending.payload, attributes)) {
-                setTimeout(() => router.replace('/(tabs)'), 1500);
-            }
+            routeTerminal(pending.payload, attributes);
         } catch (e: any) {
             console.error(`[CONNECT] relay after acquisition FAILED:`, e.message, e);
             setError(`Failed to complete sign-in: ${e.message}`);
@@ -3593,7 +3591,7 @@ function AttributeAcquisitionView({
     const handleVerifyIdentity = () => {
         // Cast: the typed-routes union regenerates at build time (the route file
         // is new); the path resolves correctly at runtime.
-        router.push('/kyc-capture' as Href);
+        router.push({ pathname: '/kyc-capture', params: { from: 'connect' } } as Href);
     };
 
     const handleLinkProvider = async (providerKey: string) => {
@@ -4302,7 +4300,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         paddingVertical: 14,
         alignItems: 'center'
     },
-    approveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+    approveButtonText: { color: p.onGreen, fontSize: 17, fontWeight: '600' },
     rejectButton: {
         flex: 1,
         backgroundColor: p.buttonNeutral,
@@ -4458,7 +4456,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         alignItems: 'center',
     },
     confirmApproveButtonText: {
-        color: '#FFFFFF',
+        color: p.onGreen,
         fontSize: 17,
         fontWeight: '600',
     },
@@ -4471,7 +4469,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         alignItems: 'center'
     },
     confirmButtonText: {
-        color: '#FFFFFF',
+        color: p.onGreen,
         fontSize: 18,
         fontWeight: '600'
     }

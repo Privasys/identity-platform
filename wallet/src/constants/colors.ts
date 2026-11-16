@@ -20,6 +20,8 @@ const brand = {
     approve: '#34C759',
     /** Destructive red. */
     danger: '#DC2626',
+    /** Text and icons on the brand green: white on it cannot be read. */
+    onGreen: '#05301C',
 };
 
 export type Palette = {
@@ -61,6 +63,7 @@ export type Palette = {
     action: string;
     approve: string;
     danger: string;
+    onGreen: string;
 };
 
 const light: Palette = {

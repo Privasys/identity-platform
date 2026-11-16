@@ -289,5 +289,5 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     buttonNeutral: { backgroundColor: p.buttonNeutral },
     buttonNeutralText: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
     buttonGo: { backgroundColor: p.approve },
-    buttonGoText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+    buttonGoText: { fontSize: 16, fontWeight: '600', color: p.onGreen },
 });

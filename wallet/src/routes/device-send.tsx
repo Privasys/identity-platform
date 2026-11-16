@@ -127,7 +127,7 @@ const makeStyles = (p: Palette) =>
         problem: { marginTop: 16, fontSize: 14, lineHeight: 20, color: p.danger },
         primary: {
             marginTop: 24,
-            backgroundColor: p.blue,
+            backgroundColor: p.action,
             borderRadius: 14,
             paddingVertical: 16,
             paddingHorizontal: 20,

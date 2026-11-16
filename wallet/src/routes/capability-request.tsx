@@ -87,6 +87,7 @@ import {
 import { useCapabilitiesStore } from '@/stores/capabilities';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useConsentStore } from '@/stores/consent';
+import { notify } from '@/stores/notice';
 import { useProfileStore } from '@/stores/profile';
 import { ATTRIBUTE_MAP, attributeLabel } from '@/services/attributes';
 import { recordChainOutcome, takeChainOutcome } from '@/utils/capability-chain';
@@ -651,9 +652,19 @@ export default function CapabilityRequestScreen() {
             // An address typed by hand that just connected is worth keeping,
             // so the next approval offers it. Asked, never assumed, and not
             // on a re-supply, where nothing new was typed.
-            if (!resupplying && setup) {
-                setOfferEmails(newEmails(setup.fields, { ...payload, ...answers }, useProfileStore.getState().profile));
+            const emails =
+                !resupplying && setup
+                    ? newEmails(setup.fields, { ...payload, ...answers }, useProfileStore.getState().profile)
+                    : [];
+            if (emails.length === 0) {
+                // Nothing to ask: no page to say it worked. Back, with the
+                // message strip.
+                notify(t('capability.doneTitle'), t('capability.doneBody', { app: requesterName || requesterAppId.slice(0, 8) }));
+                router.canGoBack() ? router.back() : router.replace('/(tabs)');
+                return;
             }
+            // The done page stays only to ask about the new addresses.
+            setOfferEmails(emails);
             setPhase('done');
         } catch (e) {
             // The provider behind the service refused the details themselves.
@@ -1105,7 +1116,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     refusalTitle: { fontSize: 13, fontWeight: '600', color: p.dangerText },
     refusalBody: { fontSize: 13, color: p.dangerText, lineHeight: 19 },
     primary: {
-        backgroundColor: p.blue,
+        backgroundColor: p.action,
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: 'center',

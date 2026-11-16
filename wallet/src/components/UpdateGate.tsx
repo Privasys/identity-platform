@@ -174,6 +174,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         alignSelf: 'stretch',
         alignItems: 'center',
     },
-    primaryButtonText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+    primaryButtonText: { fontSize: 16, fontWeight: '700', color: p.onGreen },
     dismissText: { fontSize: 15, fontWeight: '600', color: p.textSecondary },
 });

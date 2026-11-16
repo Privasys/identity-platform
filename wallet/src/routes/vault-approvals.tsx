@@ -391,7 +391,7 @@ export default function VaultApprovalsScreen() {
                                     onPress={() => approve(req)}
                                 >
                                     {busy ? (
-                                        <ActivityIndicator color="#FFFFFF" />
+                                        <ActivityIndicator color={p.onGreen} />
                                     ) : (
                                         <>
                                             <Ionicons name="finger-print" size={18} color="#FFFFFF" />
@@ -497,5 +497,5 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         marginTop: 8,
     },
     approveBtnDisabled: { opacity: 0.6 },
-    approveText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+    approveText: { color: p.onGreen, fontWeight: '700', fontSize: 15 },
 });

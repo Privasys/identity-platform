@@ -305,7 +305,7 @@ const makeStyles = (p: Palette) =>
             alignItems: 'center',
             justifyContent: 'center',
             gap: 8,
-            backgroundColor: p.blue,
+            backgroundColor: p.action,
             borderRadius: 12,
             paddingVertical: 14,
             marginTop: 12,

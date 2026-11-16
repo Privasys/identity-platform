@@ -309,11 +309,11 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 8,
     },
-    choiceOn: { backgroundColor: p.blue, borderColor: p.blue },
+    choiceOn: { backgroundColor: p.action, borderColor: p.blue },
     choiceText: { fontSize: 14, color: p.textPrimary },
     choiceTextOn: { color: '#FFFFFF', fontWeight: '600' },
     oauth: {
-        backgroundColor: p.blue,
+        backgroundColor: p.action,
         borderWidth: 1,
         borderColor: p.blue,
         borderRadius: 10,

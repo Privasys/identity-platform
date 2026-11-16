@@ -807,7 +807,7 @@ export function AttestationView({
                     </Pressable>
                     {isUnreachable ? (
                         <Pressable style={styles.continueButton} onPress={onApprove}>
-                            <Text style={styles.approveButtonText}>{t('attestation.continueAnyway')}</Text>
+                            <Text style={styles.continueButtonText}>{t('attestation.continueAnyway')}</Text>
                         </Pressable>
                     ) : !isInvalid ? (
                         <Pressable style={styles.approveButton} onPress={onApprove}>
@@ -1051,7 +1051,8 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         alignItems: 'center',
         backgroundColor: p.warnText,
     },
-    approveButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+    approveButtonText: { fontSize: 16, fontWeight: '600', color: p.onGreen },
+    continueButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
 
     advancedToggle: {
         flexDirection: 'row',

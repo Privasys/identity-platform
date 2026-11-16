@@ -586,7 +586,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: p.blue,
+        backgroundColor: p.action,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: p.blue,

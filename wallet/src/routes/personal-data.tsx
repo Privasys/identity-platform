@@ -34,6 +34,7 @@ import { useAvatarChooser } from '@/hooks/useAvatarChooser';
 import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES, isGovVerified } from '@/services/attributes';
+import { isFresh, useNoticeStore } from '@/stores/notice';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
 export default function PersonalDataScreen() {
@@ -305,6 +306,9 @@ function AttributeCard({
     const [expanded, setExpanded] = useState(false);
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(attr.value);
+    // Just added by a finished screen (an email check, an ID check): picked out
+    // for a few seconds, in place of a page that said so.
+    const fresh = useNoticeStore((st) => isFresh(st.fresh, attr.key, attr.value));
 
     const sourceLabel =
         attr.source === 'provider' && attr.sourceProvider
@@ -380,7 +384,7 @@ function AttributeCard({
     return (
         <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
             <RNView>
-                <RNView style={styles.attributeRow}>
+                <RNView style={[styles.attributeRow, fresh && styles.attributeRowFresh]}>
                     <RNView style={styles.attributeInfo}>
                         <Pressable
                             onPress={toggleExpanded}
@@ -590,6 +594,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         padding: 16,
         marginBottom: 8,
     },
+    attributeRowFresh: { backgroundColor: p.successBg, borderWidth: 1, borderColor: p.successBorder, padding: 15 },
     attributeInfo: { flex: 1 },
     attributeLabel: { fontSize: 12, fontWeight: '600', color: p.textMuted, marginBottom: 2 },
     attributeValue: { fontSize: 16, color: p.textPrimary, marginBottom: 4 },
@@ -715,7 +720,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         fontWeight: '500',
     },
     addAttrSave: {
-        backgroundColor: p.blue,
+        backgroundColor: p.action,
         borderRadius: 8,
         paddingVertical: 8,
         paddingHorizontal: 20,

@@ -35,12 +35,12 @@ import {
 } from '@/services/app-form-answer';
 import { attributeLabel } from '@/services/attributes';
 import { useAppMessagesStore } from '@/stores/app-messages';
+import { notify } from '@/stores/notice';
 
 type Phase =
     | { kind: 'checking' }
     | { kind: 'ready'; source: ConfirmedSource }
     | { kind: 'busy'; source: ConfirmedSource; action: string }
-    | { kind: 'done'; actionKind: string }
     | { kind: 'refused'; reason: AnswerFailure }
     | { kind: 'failed'; source: ConfirmedSource; reason: AnswerFailure };
 
@@ -82,22 +82,16 @@ export default function AppFormScreen() {
 
     const leave = () => (router.canGoBack() ? router.back() : router.replace('/access'));
 
-    // Once answered, return on its own, as the other success screens do; the
-    // Done button stays for a holder who does not wait.
-    useEffect(() => {
-        if (phase.kind !== 'done') return;
-        const timer = setTimeout(leave, 1500);
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [phase.kind]);
-
     const answer = async (source: ConfirmedSource, actionId: string, actionKind: string) => {
         if (!message || !form || !message.appId) return;
         setPhase({ kind: 'busy', source, action: actionId });
         try {
             await answerForm({ messageId: message.id, form, appId: message.appId, host: source.host, action: actionId });
             forget(message.id);
-            setPhase({ kind: 'done', actionKind });
+            // No page to say it worked: back to where the holder was, with
+            // the message strip saying what was sent.
+            notify(t('appForm.sent', { app }), t(`appForm.sentAs.${actionKind}`));
+            leave();
         } catch (e) {
             const reason = e instanceof AnswerError ? e.reason : 'unreachable';
             if (reason === 'gone') forget(message.id);
@@ -109,15 +103,6 @@ export default function AppFormScreen() {
     const source = phase.kind === 'ready' || phase.kind === 'busy' || phase.kind === 'failed' ? phase.source : undefined;
 
     const body = (() => {
-        if (phase.kind === 'done') {
-            return (
-                <RNView style={styles.centre}>
-                    <Ionicons name="checkmark-circle" size={48} color={p.green} />
-                    <Text style={styles.doneTitle}>{t('appForm.sent', { app })}</Text>
-                    <Text style={styles.note}>{t(`appForm.sentAs.${phase.actionKind}`)}</Text>
-                </RNView>
-            );
-        }
         if (!message) {
             return looked ? (
                 <Text style={styles.note}>{t('appForm.gone')}</Text>
@@ -188,7 +173,7 @@ export default function AppFormScreen() {
                                             accessibilityRole="button"
                                         >
                                             {busy ? (
-                                                <ActivityIndicator color={declining ? p.textPrimary : '#FFFFFF'} />
+                                                <ActivityIndicator color={declining ? p.textPrimary : p.onGreen} />
                                             ) : (
                                                 <Text style={declining ? styles.declineButtonText : styles.affirmButtonText}>
                                                     {t(`appForm.action.${a.kind}`)}
@@ -217,13 +202,13 @@ export default function AppFormScreen() {
             <SubPageHeader title={message?.kind === 'invitation' ? t('appForm.titleInvitation') : t('appForm.titleRequest')} />
             <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 32 }]}>
                 {body}
-                {phase.kind === 'done' || (!message && looked) ? (
+                {!message && looked ? (
                     <Pressable
                         style={styles.doneButton}
                         onPress={leave}
                         accessibilityRole="button"
                     >
-                        <Text style={styles.affirmButtonText}>{t('common.done')}</Text>
+                        <Text style={styles.doneButtonText}>{t('common.done')}</Text>
                     </Pressable>
                 ) : null}
             </ScrollView>
@@ -294,8 +279,6 @@ const makeStyles = (p: Palette) =>
         screen: { flex: 1, backgroundColor: p.screenBg },
         body: { padding: 20, gap: 14 },
         spinner: { marginTop: 40 },
-        centre: { alignItems: 'center', gap: 10, marginTop: 40 },
-        doneTitle: { fontSize: 18, fontWeight: '700', color: p.textPrimary, textAlign: 'center' },
         from: { gap: 4 },
         fromText: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
         hostRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
@@ -316,10 +299,11 @@ const makeStyles = (p: Palette) =>
         declineButton: { flex: 1, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.buttonNeutral },
         declineButtonText: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
         affirmButton: { flex: 1.35, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.green },
-        affirmButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+        affirmButtonText: { fontSize: 16, fontWeight: '600', color: p.onGreen },
         buttonIdle: { opacity: 0.5 },
         // The Done of the other finished screens (device-add, verify-email).
-        doneButton: { marginTop: 24, paddingVertical: 16, paddingHorizontal: 20, borderRadius: 14, alignItems: 'center', backgroundColor: p.blue },
+        doneButton: { marginTop: 24, paddingVertical: 16, paddingHorizontal: 20, borderRadius: 14, alignItems: 'center', backgroundColor: p.action },
+        doneButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
         note: { fontSize: 12.5, lineHeight: 18, color: p.textMuted, textAlign: 'center' },
         error: { fontSize: 13.5, lineHeight: 19, color: p.danger, textAlign: 'center' },
         link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 },

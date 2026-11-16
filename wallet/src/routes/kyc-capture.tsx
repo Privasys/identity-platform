@@ -14,7 +14,7 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View as NativeView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +37,7 @@ import {
     applyGovAttributes, attestVerifier, getVerifierInfo, govAttributeCandidates, portraitDataUri, readDocumentMrz,
     verifyIdentity, isRetryableCapture, type KycRecord, type VerifierAttestation,
 } from '@/services/kyc';
+import { notify, useNoticeStore } from '@/stores/notice';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
@@ -47,7 +48,7 @@ import * as Emrtd from '../../modules/native-emrtd/src/index';
 // enclave page, on request · photo · capture: the camera · read: scan the chip ·
 // review: what the chip said, before anything is sent · selfie · verifying ·
 // select · done.
-type Step = 'intro' | 'doctype' | 'chip' | 'consent' | 'attest' | 'photo' | 'capture' | 'read' | 'review' | 'selfie' | 'verifying' | 'select' | 'done';
+type Step = 'intro' | 'doctype' | 'chip' | 'consent' | 'attest' | 'photo' | 'capture' | 'read' | 'review' | 'selfie' | 'verifying' | 'select';
 type DocType = 'passport' | 'id-card';
 // positioning: looking for the lines · checking: the lines are in view ·
 // enclave: the phone could not read them, the enclave is asked · captured.
@@ -175,6 +176,7 @@ function rememberVerifier(v: VerifierAttestation) {
 export default function KycCaptureScreen() {
     const { t } = useTranslation();
     const router = useRouter();
+    const { from } = useLocalSearchParams<{ from?: string }>();
     const insets = useSafeAreaInsets();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
@@ -727,7 +729,15 @@ export default function KycCaptureScreen() {
         if (!verifiedRecord) return;
         const filled = applyGovAttributes(verifiedRecord, selected, docRead?.portraitBase64);
         console.log('[KYC] imported:', filled.join(', '));
-        setStep('done');
+        // No page to say it worked. Opened by a sign-in waiting on it: back
+        // there. Otherwise: personal data, the new details picked out.
+        notify(t('kyc.allSet'), t('kyc.allSetBody'));
+        if (from === 'connect') {
+            router.back();
+        } else {
+            useNoticeStore.getState().markFresh(filled.map((key) => ({ key })));
+            router.replace('/personal-data');
+        }
         offerAdoptIdName();
     };
 
@@ -1155,20 +1165,9 @@ export default function KycCaptureScreen() {
                         selected={selected}
                         onToggle={toggleAttr}
                         onConfirm={applySelectedAttributes}
-                        onCancel={() => setStep('done')}
+                        onCancel={close}
                     />
                 </ScrollView>
-            )}
-
-            {step === 'done' && (
-                <View style={styles.pad}>
-                    <Ionicons name="checkmark-circle" size={48} color={p.approve} />
-                    <Text style={styles.title}>{t('kyc.allSet')}</Text>
-                    <Text style={styles.body}>{t('kyc.allSetBody')}</Text>
-                    <Pressable style={styles.primary} onPress={close}>
-                        <Text style={styles.primaryText}>{t('common.done')}</Text>
-                    </Pressable>
-                </View>
             )}
 
             {/* Back and Close, drawn last so they sit above the camera preview

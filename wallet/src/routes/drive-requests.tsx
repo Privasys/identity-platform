@@ -200,7 +200,7 @@ export default function DriveRequestsScreen() {
                                     onPress={() => void decide(req, 'approve')}
                                 >
                                     {busy === req.requestId ? (
-                                        <ActivityIndicator color="#fff" size="small" />
+                                        <ActivityIndicator color={palette.onGreen} size="small" />
                                     ) : (
                                         <Text style={styles.btnApproveText}>{t('attestation.approve')}</Text>
                                     )}
@@ -333,8 +333,8 @@ function makeStyles(palette: Palette) {
             alignItems: 'center',
             justifyContent: 'center',
         },
-        btnApprove: { backgroundColor: palette.approve },
-        btnApproveText: { color: '#fff', fontWeight: '600' },
+        btnApprove: { backgroundColor: palette.green },
+        btnApproveText: { color: palette.onGreen, fontWeight: '600' },
         btnDeny: { backgroundColor: 'transparent', borderWidth: 1, borderColor: palette.border },
         btnDenyText: { color: palette.textPrimary, fontWeight: '600' },
         decisionText: { marginTop: 8, fontSize: 13, color: palette.textMuted },

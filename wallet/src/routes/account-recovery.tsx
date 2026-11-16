@@ -948,7 +948,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
 
     primaryButton: {
-        backgroundColor: p.blue,
+        backgroundColor: p.action,
         borderRadius: 10,
         paddingVertical: 12,
         alignItems: 'center' as const,

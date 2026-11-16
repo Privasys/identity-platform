@@ -141,6 +141,9 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			AppID   string          `json:"app_id"`
 			AppName string          `json:"app_name"`
 			AppHost string          `json:"app_host"`
+			// The app's platform hostname: the one the wallet can attest,
+			// where a form's answer goes. app_host may be a custom domain.
+			AppPlatformHost string `json:"app_platform_host"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Sub == "" || req.Type == "" {
 			writeError(w, http.StatusBadRequest, "sub and type are required")
@@ -158,6 +161,25 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			}
 			kind = k
 		}
+		// A form is checked the same way, against the component vocabulary
+		// the wallet draws (internal/appmessages/form.go). Its answer goes to
+		// the attested platform host, so without one there is no form.
+		var form appmessages.Form
+		if req.Type == appmessages.FormType {
+			k, f, err := appmessages.ParseFormPayload(req.Payload)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			if req.AppPlatformHost == "" {
+				writeError(w, http.StatusBadRequest, "a form needs the app's platform host")
+				return
+			}
+			kind, form = k, f
+		}
+		// The subject the app addressed, before it is resolved to an account:
+		// a form's answer names the person in the app's own terms.
+		appSub := req.Sub
 		// An app knows the holder by its own subject; everything below is
 		// keyed by account. The only way from one to the other is the
 		// relationship the holder's sign-in to this app created, and a holder
@@ -198,7 +220,8 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 		// the holder's key, before the push target is checked: a holder with no
 		// push token is exactly the one who can only find it by listing.
 		messageID := ""
-		if msgs != nil && appmessages.Waits(kind) {
+		isForm := req.Type == appmessages.FormType
+		if msgs != nil && (appmessages.Waits(kind) || isForm) {
 			sealed := ""
 			for _, t := range targets {
 				if t.EncPub == "" {
@@ -209,9 +232,14 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 				}
 				break
 			}
-			id, err := msgs.Put(req.Sub, appmessages.Message{
-				Kind: kind, AppID: req.AppID, AppName: req.AppName, AppHost: req.AppHost, Sealed: sealed,
-			})
+			m := appmessages.Message{
+				Type: req.Type, Kind: kind, AppID: req.AppID, AppName: req.AppName, AppHost: req.AppHost, Sealed: sealed,
+			}
+			if isForm {
+				m.FormID, m.FormDigest, m.Actions = form.ID, form.Digest, form.Actions
+				m.PlatformHost, m.AppSub = req.AppPlatformHost, appSub
+			}
+			id, err := msgs.Put(req.Sub, m)
 			if err != nil {
 				log.Printf("admin/notify: could not keep app message: %v", err)
 			}
@@ -227,7 +255,7 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 		// registered key (the same per-identity key on every phone of one
 		// holder, so in practice one sealing).
 		title, body := notifyTitleBody(req.Type, req.AppName)
-		if req.Type == appmessages.Type {
+		if req.Type == appmessages.Type || req.Type == appmessages.FormType {
 			body = appmessages.BannerBody(kind)
 		}
 		status := "sent-unsealed"
@@ -245,8 +273,11 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			// An app message names the host the platform verified (the wallet
 			// links only there), its kind, and the listed copy to dismiss once
 			// opened. The path and anything presented stay sealed.
-			if req.Type == appmessages.Type {
+			if req.Type == appmessages.Type || req.Type == appmessages.FormType {
 				data["kind"] = kind
+				if req.Type == appmessages.FormType {
+					data["app_platform_host"] = req.AppPlatformHost
+				}
 				if req.AppHost != "" {
 					data["app_host"] = req.AppHost
 				}

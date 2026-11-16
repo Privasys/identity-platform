@@ -540,6 +540,12 @@ func main() {
 	// App messages still waiting on this holder, and the wallet's "opened".
 	mux.HandleFunc("GET /wallet/app-messages", appmessages.HandleList(appMessages, recoveryHandler.AuthenticateBearer))
 	mux.HandleFunc("DELETE /wallet/app-messages/{id}", appmessages.HandleDismiss(appMessages, recoveryHandler.AuthenticateBearer))
+	// Answering an app form: begin binds a passkey login to one form and one
+	// action; answer verifies it, takes the form, and signs the answer token
+	// the wallet carries to the app (internal/fido2/app_form.go).
+	appForms := fido2Handler.NewAppForms(appMessages, issuer, recoveryHandler.AuthenticateBearer)
+	mux.HandleFunc("POST /wallet/app-forms/{id}/begin", appForms.HandleBegin)
+	mux.HandleFunc("POST /wallet/app-forms/{id}/answer", appForms.HandleAnswer)
 	// The holder removing an app: its relationship row, the sessions of the
 	// client that stands for it, its spend consent and its open asks all go,
 	// and with them the app's only way back to the person (internal/apps).

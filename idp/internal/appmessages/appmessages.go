@@ -117,16 +117,25 @@ func Parse(payload json.RawMessage) (kind string, err error) {
 	return p.Kind, nil
 }
 
-// Message is one waiting message, as the wallet sees it.
+// Message is one waiting message, as the wallet sees it. A form also carries
+// what answering it needs: the app's reference and digest, the actions it
+// offers, the host that can be attested, and the subject the app addressed
+// (which the answer token names, so it is never sent to the wallet).
 type Message struct {
-	ID        string `json:"id"`
-	Kind      string `json:"kind"`
-	AppID     string `json:"app_id,omitempty"`
-	AppName   string `json:"app_name,omitempty"`
-	AppHost   string `json:"app_host,omitempty"`
-	Sealed    string `json:"sealed,omitempty"`
-	CreatedAt int64  `json:"created_at"`
-	ExpiresAt int64  `json:"expires_at"`
+	ID           string   `json:"id"`
+	Type         string   `json:"type"`
+	Kind         string   `json:"kind"`
+	FormID       string   `json:"form_id,omitempty"`
+	FormDigest   string   `json:"form_digest,omitempty"`
+	Actions      []string `json:"actions,omitempty"`
+	PlatformHost string   `json:"app_platform_host,omitempty"`
+	AppSub       string   `json:"-"`
+	AppID        string   `json:"app_id,omitempty"`
+	AppName      string   `json:"app_name,omitempty"`
+	AppHost      string   `json:"app_host,omitempty"`
+	Sealed       string   `json:"sealed,omitempty"`
+	CreatedAt    int64    `json:"created_at"`
+	ExpiresAt    int64    `json:"expires_at"`
 }
 
 // Store keeps the waiting messages.
@@ -166,7 +175,40 @@ func open(db *sql.DB, now func() time.Time) (*Store, error) {
 		CREATE INDEX IF NOT EXISTS app_messages_user ON app_messages(user_id, created_at);`); err != nil {
 		return nil, err
 	}
+	// Columns added for forms. The table shipped before them (idp-v0.3.86),
+	// so each is added when missing; a row from before reads as a message.
+	for _, col := range []string{
+		"type TEXT NOT NULL DEFAULT 'app-message'", "form_id TEXT NOT NULL DEFAULT ''",
+		"form_digest TEXT NOT NULL DEFAULT ''", "actions TEXT NOT NULL DEFAULT ''",
+		"platform_host TEXT NOT NULL DEFAULT ''", "app_sub TEXT NOT NULL DEFAULT ''",
+	} {
+		name := strings.Fields(col)[0]
+		if !hasColumn(db, name) {
+			if _, err := db.Exec(`ALTER TABLE app_messages ADD COLUMN ` + col); err != nil {
+				return nil, err
+			}
+		}
+	}
 	return &Store{db: db, now: now}, nil
+}
+
+func hasColumn(db *sql.DB, name string) bool {
+	rows, err := db.Query(`PRAGMA table_info(app_messages)`)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			cid, notnull, pk int
+			cname, ctype     string
+			dflt             sql.NullString
+		)
+		if rows.Scan(&cid, &cname, &ctype, &notnull, &dflt, &pk) == nil && cname == name {
+			return true
+		}
+	}
+	return false
 }
 
 func newID() string {
@@ -175,17 +217,23 @@ func newID() string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-// Put records a waiting message for userID and returns its id.
+// Put records a waiting message for userID and returns its id. A form is
+// always kept: it waits on the holder's answer whatever its kind.
 func (s *Store) Put(userID string, m Message) (string, error) {
-	if userID == "" || !Waits(m.Kind) {
+	if m.Type == "" {
+		m.Type = Type
+	}
+	if userID == "" || (m.Type != FormType && !Waits(m.Kind)) {
 		return "", nil
 	}
 	now := s.now()
 	id := newID()
 	if _, err := s.db.Exec(`INSERT INTO app_messages
-		(id, user_id, app_id, app_name, app_host, kind, sealed, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, userID, m.AppID, m.AppName, m.AppHost, m.Kind, m.Sealed, now.Unix(), now.Add(TTL).Unix()); err != nil {
+		(id, user_id, app_id, app_name, app_host, kind, sealed, created_at, expires_at,
+		 type, form_id, form_digest, actions, platform_host, app_sub)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, userID, m.AppID, m.AppName, m.AppHost, m.Kind, m.Sealed, now.Unix(), now.Add(TTL).Unix(),
+		m.Type, m.FormID, m.FormDigest, strings.Join(m.Actions, ","), m.PlatformHost, m.AppSub); err != nil {
 		return "", err
 	}
 	// Over the bound, the oldest go: the newest is the one the holder is
@@ -196,9 +244,50 @@ func (s *Store) Put(userID string, m Message) (string, error) {
 	return id, nil
 }
 
+const messageColumns = `id, type, kind, app_id, app_name, app_host, sealed, created_at, expires_at,
+	form_id, form_digest, actions, platform_host, app_sub`
+
+type scanner interface{ Scan(...any) error }
+
+func scanMessage(r scanner) (Message, error) {
+	var m Message
+	var actions string
+	err := r.Scan(&m.ID, &m.Type, &m.Kind, &m.AppID, &m.AppName, &m.AppHost, &m.Sealed, &m.CreatedAt, &m.ExpiresAt,
+		&m.FormID, &m.FormDigest, &actions, &m.PlatformHost, &m.AppSub)
+	if actions != "" {
+		m.Actions = strings.Split(actions, ",")
+	}
+	return m, err
+}
+
+// Get returns one of userID's live messages.
+func (s *Store) Get(userID, id string) (Message, bool) {
+	m, err := scanMessage(s.db.QueryRow(`SELECT `+messageColumns+` FROM app_messages
+		WHERE user_id = ? AND id = ? AND expires_at > ?`, userID, id, s.now().Unix()))
+	return m, err == nil
+}
+
+// Take removes one of userID's live messages and returns it, or ok=false if
+// it was not there (already answered, expired, or not theirs). Exactly one
+// caller can take a given message, which is what makes an answer single use.
+func (s *Store) Take(userID, id string) (Message, bool) {
+	m, ok := s.Get(userID, id)
+	if !ok {
+		return Message{}, false
+	}
+	res, err := s.db.Exec(`DELETE FROM app_messages WHERE user_id = ? AND id = ?`, userID, id)
+	if err != nil {
+		return Message{}, false
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return Message{}, false
+	}
+	return m, true
+}
+
 // ListFor returns userID's live messages, newest first.
 func (s *Store) ListFor(userID string) []Message {
-	rows, err := s.db.Query(`SELECT id, kind, app_id, app_name, app_host, sealed, created_at, expires_at
+	rows, err := s.db.Query(`SELECT `+messageColumns+`
 		FROM app_messages WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC, id`,
 		userID, s.now().Unix())
 	if err != nil {
@@ -208,8 +297,7 @@ func (s *Store) ListFor(userID string) []Message {
 	defer rows.Close()
 	out := []Message{}
 	for rows.Next() {
-		var m Message
-		if rows.Scan(&m.ID, &m.Kind, &m.AppID, &m.AppName, &m.AppHost, &m.Sealed, &m.CreatedAt, &m.ExpiresAt) == nil {
+		if m, err := scanMessage(rows); err == nil {
 			out = append(out, m)
 		}
 	}

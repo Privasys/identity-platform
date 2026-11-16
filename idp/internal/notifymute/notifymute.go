@@ -39,6 +39,8 @@ var alwaysDelivered = map[string]bool{
 	// Someone asking for the holder's files (a Drive share link that the
 	// owner approves person by person): they wait on the holder's answer.
 	"share-request": true,
+	// A form is a decision the app is waiting on (internal/appmessages).
+	"app-form": true,
 }
 
 // appIDShape is an attested app id as the control plane forwards it: a

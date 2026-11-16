@@ -808,3 +808,42 @@ func (iss *Issuer) HandleJWKS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	json.NewEncoder(w).Encode(jwks)
 }
+
+// AppFormAnswerClaims is the holder's answer to one app form.
+type AppFormAnswerClaims struct {
+	// Subject is the subject the app addressed the form to, in its own terms.
+	Subject    string
+	AppID      string
+	FormID     string
+	FormDigest string
+	Action     string
+	JTI        string
+}
+
+// AppFormAnswerTTL is how long an answer token is good for: long enough for
+// the wallet to reach the app, too short to be worth keeping.
+const AppFormAnswerTTL = 5 * time.Minute
+
+// IssueAppFormAnswer signs the holder's answer to an app form
+// (typ = "app-form-answer+jwt"). Like a disclosure, it must never work as an
+// access token: its audience is "app-form:<app id>", it carries no roles and
+// no session, and it lives for minutes. It commits to the exact form (its
+// digest) and the one action the holder chose, so the app can check both.
+func (iss *Issuer) IssueAppFormAnswer(c AppFormAnswerClaims) (string, error) {
+	if c.Subject == "" || c.AppID == "" || c.FormID == "" || c.FormDigest == "" || c.Action == "" || c.JTI == "" {
+		return "", fmt.Errorf("app form answer: every field is required")
+	}
+	now := time.Now()
+	return iss.signTyp(jwt.MapClaims{
+		"iss":         iss.issuerURL,
+		"sub":         c.Subject,
+		"aud":         "app-form:" + c.AppID,
+		"iat":         now.Unix(),
+		"exp":         now.Add(AppFormAnswerTTL).Unix(),
+		"jti":         c.JTI,
+		"form_id":     c.FormID,
+		"form_digest": c.FormDigest,
+		"action":      c.Action,
+		"v":           1,
+	}, "app-form-answer+jwt")
+}

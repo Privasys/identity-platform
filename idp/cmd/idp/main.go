@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/Privasys/idp/internal/admin"
+	"github.com/Privasys/idp/internal/appmessages"
 	"github.com/Privasys/idp/internal/apps"
 	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/capasks"
@@ -460,7 +461,14 @@ func main() {
 	// and nothing else; the wallet's switch is registered below with the
 	// grants index. See internal/notifymute.
 	notifyMutes := notifymute.New(db, issuer.DeriveSecret("notify-mute"))
-	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken, capabilityAsks, notifyMutes, holderOfApp))
+	// App messages waiting on the holder (a request or an invitation), kept
+	// sealed for a few days so a missed push still reaches the wallet; listed
+	// beside the notify mutes below. See internal/appmessages.
+	appMessages, err := appmessages.New(db.DB)
+	if err != nil {
+		log.Fatalf("app messages: %v", err)
+	}
+	mux.HandleFunc("POST /admin/notify", admin.HandleNotify(db, cfg.AdminToken, capabilityAsks, notifyMutes, holderOfApp, appMessages))
 	mux.HandleFunc("POST /admin/subjects/for", admin.HandleSubjectsFor(issuer, cfg.AdminToken))
 	mux.HandleFunc("POST /admin/roles", admin.HandleGrantRole(db, cfg.AdminToken))
 	mux.HandleFunc("DELETE /admin/roles", admin.HandleRevokeRole(db, cfg.AdminToken))
@@ -529,11 +537,14 @@ func main() {
 	// because the front proxy already forwards that prefix.
 	mux.HandleFunc("PUT /wallet/notify-mutes/{app_id}", notifyMutes.HandleMute(recoveryHandler.AuthenticateBearer))
 	mux.HandleFunc("DELETE /wallet/notify-mutes/{app_id}", notifyMutes.HandleUnmute(recoveryHandler.AuthenticateBearer))
+	// App messages still waiting on this holder, and the wallet's "opened".
+	mux.HandleFunc("GET /wallet/app-messages", appmessages.HandleList(appMessages, recoveryHandler.AuthenticateBearer))
+	mux.HandleFunc("DELETE /wallet/app-messages/{id}", appmessages.HandleDismiss(appMessages, recoveryHandler.AuthenticateBearer))
 	// The holder removing an app: its relationship row, the sessions of the
 	// client that stands for it, its spend consent and its open asks all go,
 	// and with them the app's only way back to the person (internal/apps).
 	mux.HandleFunc("DELETE /wallet/apps/{app_id}", apps.HandleRemove(&apps.Remover{
-		Sessions: sessionsStore, Spend: spendStore, Asks: capabilityAsks, Clients: clientReg,
+		Sessions: sessionsStore, Spend: spendStore, Asks: capabilityAsks, Messages: appMessages, Clients: clientReg,
 		OnConsentRevoked: spendHandler.NotifyRevoked,
 	}, recoveryHandler.AuthenticateBearer))
 	mux.HandleFunc("GET /capability-requests/pending",

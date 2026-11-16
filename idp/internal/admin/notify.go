@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/Privasys/idp/internal/appmessages"
 	"github.com/Privasys/idp/internal/capasks"
 	"github.com/Privasys/idp/internal/notifymute"
 	"github.com/Privasys/idp/internal/push"
@@ -91,6 +92,9 @@ func notifyTitleBody(typ, appName string) (string, string) {
 		return appName, "Someone requested access to something you shared."
 	case "share-decision":
 		return appName, "There is an update on your access request."
+	case appmessages.Type:
+		// HandleNotify sets the body from the kind; this is the fallback.
+		return appName, appmessages.BannerBody("")
 	case "capability-request":
 		// The push cannot say what kind (only the wallet, inside the attested
 		// channel, learns that), so the banner stays generic.
@@ -103,7 +107,11 @@ func notifyTitleBody(typ, appName string) (string, string) {
 // HandleNotify handles POST /admin/notify (static admin token; called
 // by the management-service on behalf of an attested app).
 //
-//	Request:  {"sub","type","payload":{...},"app_id","app_name"}
+//	Request:  {"sub","type","payload":{...},"app_id","app_name","app_host"}
+//
+// app_host is the app's verified host, named by the control plane (its live
+// custom domain, or its platform hostname), never by the app.
+//
 //	Response: 200 {"status":"sent"|"sent-unsealed"} | 404 no push target
 //
 // asks, when non-nil, remembers each capability request for the holder's
@@ -119,7 +127,9 @@ func notifyTitleBody(typ, appName string) (string, string) {
 // subject, the subject IS the account and the resolver checks it exists.
 type HolderResolver func(sub, appID string) (userID string, ok bool)
 
-func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *notifymute.Service, holders HolderResolver) http.HandlerFunc {
+// msgs, when non-nil, keeps an app-message that waits on the holder (a request
+// or an invitation) for the wallet to list; see internal/appmessages.
+func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *notifymute.Service, holders HolderResolver, msgs *appmessages.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !checkAdmin(w, r, adminToken) {
 			return
@@ -130,10 +140,23 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			Payload json.RawMessage `json:"payload"`
 			AppID   string          `json:"app_id"`
 			AppName string          `json:"app_name"`
+			AppHost string          `json:"app_host"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Sub == "" || req.Type == "" {
 			writeError(w, http.StatusBadRequest, "sub and type are required")
 			return
+		}
+		// An app message must say what kind it is, and may link only to a
+		// path. Checked first, so an app learns its mistake from the status
+		// whoever it addressed.
+		kind := ""
+		if req.Type == appmessages.Type {
+			k, err := appmessages.Parse(req.Payload)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			kind = k
 		}
 		// An app knows the holder by its own subject; everything below is
 		// keyed by account. The only way from one to the other is the
@@ -170,6 +193,31 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 		}
 
 		targets := db.GetPushTargets(req.Sub)
+
+		// A request or an invitation is kept for the wallet to list, sealed to
+		// the holder's key, before the push target is checked: a holder with no
+		// push token is exactly the one who can only find it by listing.
+		messageID := ""
+		if msgs != nil && appmessages.Waits(kind) {
+			sealed := ""
+			for _, t := range targets {
+				if t.EncPub == "" {
+					continue
+				}
+				if sl, err := sealToWallet(t.EncPub, req.Type, req.Payload); err == nil {
+					sealed = sl
+				}
+				break
+			}
+			id, err := msgs.Put(req.Sub, appmessages.Message{
+				Kind: kind, AppID: req.AppID, AppName: req.AppName, AppHost: req.AppHost, Sealed: sealed,
+			})
+			if err != nil {
+				log.Printf("admin/notify: could not keep app message: %v", err)
+			}
+			messageID = id
+		}
+
 		if len(targets) == 0 {
 			writeError(w, http.StatusNotFound, "no push target for user")
 			return
@@ -179,6 +227,9 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 		// registered key (the same per-identity key on every phone of one
 		// holder, so in practice one sealing).
 		title, body := notifyTitleBody(req.Type, req.AppName)
+		if req.Type == appmessages.Type {
+			body = appmessages.BannerBody(kind)
+		}
 		status := "sent-unsealed"
 		delivered := 0
 		for _, t := range targets {
@@ -190,6 +241,18 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			if isCapReq {
 				data["nonce"] = capReq.Nonce
 				data["app_host"] = capReq.AppHost
+			}
+			// An app message names the host the platform verified (the wallet
+			// links only there), its kind, and the listed copy to dismiss once
+			// opened. The path and anything presented stay sealed.
+			if req.Type == appmessages.Type {
+				data["kind"] = kind
+				if req.AppHost != "" {
+					data["app_host"] = req.AppHost
+				}
+				if messageID != "" {
+					data["message_id"] = messageID
+				}
 			}
 			if t.EncPub != "" && len(req.Payload) > 0 {
 				sealed, err := sealToWallet(t.EncPub, req.Type, req.Payload)

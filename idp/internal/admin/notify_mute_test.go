@@ -19,11 +19,15 @@ const mutedApp = "11111111-2222-3333-4444-555555555555"
 
 func relay(t *testing.T, db *store.DB, mutes *notifymute.Service, typ string) (int, string) {
 	t.Helper()
-	body := `{"sub":"holder","type":"` + typ + `","app_id":"` + mutedApp + `","app_name":"Some App"}`
+	payload := ``
+	if typ == "app-message" {
+		payload = `,"payload":{"kind":"request"}`
+	}
+	body := `{"sub":"holder","type":"` + typ + `","app_id":"` + mutedApp + `","app_name":"Some App"` + payload + `}`
 	req := httptest.NewRequest("POST", "/admin/notify", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	// No admin token configured: the dev-mode path, not under test.
-	HandleNotify(db, "", nil, mutes, nil)(rec, req)
+	HandleNotify(db, "", nil, mutes, nil, nil)(rec, req)
 	var out struct{ Status string }
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
 	return rec.Code, out.Status

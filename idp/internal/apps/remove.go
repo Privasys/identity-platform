@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Privasys/idp/internal/appmessages"
 	"github.com/Privasys/idp/internal/capasks"
 	"github.com/Privasys/idp/internal/clients"
 	"github.com/Privasys/idp/internal/sessions"
@@ -26,6 +27,8 @@ type Remover struct {
 	Sessions *sessions.Store
 	Spend    *spend.Store
 	Asks     *capasks.Store
+	// Messages holds the app messages still waiting on the holder.
+	Messages *appmessages.Store
 	Clients  *clients.Registry
 	// OnConsentRevoked tells the platform the consent's ledger handle is dead.
 	OnConsentRevoked func(c *spend.Consent)
@@ -34,7 +37,7 @@ type Remover struct {
 // Remove ends everything for (userID, appID): the relationship row and the
 // sessions of the client that stands for the app (browsers end as
 // signed-out), the spend consent (its handle is reported dead), and the asks
-// the app had waiting. Returns the client id, or "" when no client stands
+// and messages the app had waiting. Returns the client id, or "" when no client stands
 // for the app (the consent and asks still go).
 func (rm *Remover) Remove(userID, appID string) (clientID string, sessionsEnded int, err error) {
 	appID = clients.NormaliseAppID(appID)
@@ -66,6 +69,7 @@ func (rm *Remover) Remove(userID, appID string) (clientID string, sessionsEnded 
 	if rm.Asks != nil {
 		rm.Asks.RemoveByApp(userID, appID)
 	}
+	rm.Messages.RemoveByApp(userID, appID)
 	return clientID, sessionsEnded, nil
 }
 

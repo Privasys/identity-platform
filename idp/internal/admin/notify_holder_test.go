@@ -19,7 +19,7 @@ func TestNotifyResolvesThroughTheRelationship(t *testing.T) {
 		asked = sub + "@" + appID
 		return "", false
 	}
-	h := HandleNotify(nil, "", nil, nil, holders)
+	h := HandleNotify(nil, "", nil, nil, holders, nil)
 	req := httptest.NewRequest("POST", "/admin/notify",
 		strings.NewReader(`{"sub":"sub-gone","type":"share-decision","app_id":"0123456789abcdef0123456789abcdef","payload":{}}`))
 	rec := httptest.NewRecorder()

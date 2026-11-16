@@ -144,6 +144,8 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			// The app's platform hostname: the one the wallet can attest,
 			// where a form's answer goes. app_host may be a custom domain.
 			AppPlatformHost string `json:"app_platform_host"`
+			// The app's short name, which its platform hostname is built from.
+			AppSlug string `json:"app_slug"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Sub == "" || req.Type == "" {
 			writeError(w, http.StatusBadRequest, "sub and type are required")
@@ -171,8 +173,8 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 				writeError(w, http.StatusBadRequest, err.Error())
 				return
 			}
-			if !appmessages.ValidPlatformHost(req.AppPlatformHost) {
-				writeError(w, http.StatusBadRequest, "a form needs the app's platform host (<name>.apps[.test].privasys.org)")
+			if !appmessages.HostIsApp(req.AppPlatformHost, req.AppSlug) {
+				writeError(w, http.StatusBadRequest, "a form needs the app's platform host, exactly <app name>.apps[.test].privasys.org")
 				return
 			}
 			kind, form = k, f
@@ -237,7 +239,7 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 			}
 			if isForm {
 				m.FormID, m.FormDigest, m.Actions = form.ID, form.Digest, form.Actions
-				m.PlatformHost, m.AppSub = req.AppPlatformHost, appSub
+				m.PlatformHost, m.AppSub, m.AppSlug = req.AppPlatformHost, appSub, req.AppSlug
 			}
 			id, err := msgs.Put(req.Sub, m)
 			if err != nil {
@@ -280,6 +282,7 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 				data["app_name"] = req.AppName
 				if req.Type == appmessages.FormType {
 					data["app_platform_host"] = req.AppPlatformHost
+					data["app_slug"] = req.AppSlug
 				}
 				if req.AppHost != "" {
 					data["app_host"] = req.AppHost

@@ -130,3 +130,20 @@ func TestOnlyAnAppPlatformHostReceivesAnswers(t *testing.T) {
 		}
 	}
 }
+
+func TestTheHostMustBeTheAppsOwnName(t *testing.T) {
+	if !HostIsApp("drive-demo.apps.test.privasys.org", "drive-demo") || !HostIsApp("drive.apps.privasys.org", "drive") {
+		t.Fatal("an app's own host refused")
+	}
+	for _, c := range [][2]string{
+		{"globaml.apps.privasys.org", "drive"},    // another app's host
+		{"drive.apps.privasys.org", ""},           // no name to check against
+		{"drive-demo.apps.privasys.org", "drive"}, // a name that only starts the same
+		{"x.drive.apps.privasys.org", "x.drive"},  // a name with a dot
+		{"drive.apps.privasys.org.evil", "drive"}, // not the zone
+	} {
+		if HostIsApp(c[0], c[1]) {
+			t.Errorf("%s accepted for %q", c[0], c[1])
+		}
+	}
+}

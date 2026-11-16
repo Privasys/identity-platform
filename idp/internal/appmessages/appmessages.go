@@ -129,6 +129,7 @@ type Message struct {
 	FormDigest   string   `json:"form_digest,omitempty"`
 	Actions      []string `json:"actions,omitempty"`
 	PlatformHost string   `json:"app_platform_host,omitempty"`
+	AppSlug      string   `json:"app_slug,omitempty"`
 	AppSub       string   `json:"-"`
 	AppID        string   `json:"app_id,omitempty"`
 	AppName      string   `json:"app_name,omitempty"`
@@ -181,6 +182,7 @@ func open(db *sql.DB, now func() time.Time) (*Store, error) {
 		"type TEXT NOT NULL DEFAULT 'app-message'", "form_id TEXT NOT NULL DEFAULT ''",
 		"form_digest TEXT NOT NULL DEFAULT ''", "actions TEXT NOT NULL DEFAULT ''",
 		"platform_host TEXT NOT NULL DEFAULT ''", "app_sub TEXT NOT NULL DEFAULT ''",
+		"app_slug TEXT NOT NULL DEFAULT ''",
 	} {
 		name := strings.Fields(col)[0]
 		if !hasColumn(db, name) {
@@ -230,10 +232,10 @@ func (s *Store) Put(userID string, m Message) (string, error) {
 	id := newID()
 	if _, err := s.db.Exec(`INSERT INTO app_messages
 		(id, user_id, app_id, app_name, app_host, kind, sealed, created_at, expires_at,
-		 type, form_id, form_digest, actions, platform_host, app_sub)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 type, form_id, form_digest, actions, platform_host, app_sub, app_slug)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, userID, m.AppID, m.AppName, m.AppHost, m.Kind, m.Sealed, now.Unix(), now.Add(TTL).Unix(),
-		m.Type, m.FormID, m.FormDigest, strings.Join(m.Actions, ","), m.PlatformHost, m.AppSub); err != nil {
+		m.Type, m.FormID, m.FormDigest, strings.Join(m.Actions, ","), m.PlatformHost, m.AppSub, m.AppSlug); err != nil {
 		return "", err
 	}
 	// Over the bound, the oldest go: the newest is the one the holder is
@@ -245,7 +247,7 @@ func (s *Store) Put(userID string, m Message) (string, error) {
 }
 
 const messageColumns = `id, type, kind, app_id, app_name, app_host, sealed, created_at, expires_at,
-	form_id, form_digest, actions, platform_host, app_sub`
+	form_id, form_digest, actions, platform_host, app_sub, app_slug`
 
 type scanner interface{ Scan(...any) error }
 
@@ -253,7 +255,7 @@ func scanMessage(r scanner) (Message, error) {
 	var m Message
 	var actions string
 	err := r.Scan(&m.ID, &m.Type, &m.Kind, &m.AppID, &m.AppName, &m.AppHost, &m.Sealed, &m.CreatedAt, &m.ExpiresAt,
-		&m.FormID, &m.FormDigest, &actions, &m.PlatformHost, &m.AppSub)
+		&m.FormID, &m.FormDigest, &actions, &m.PlatformHost, &m.AppSub, &m.AppSlug)
 	if actions != "" {
 		m.Actions = strings.Split(actions, ",")
 	}

@@ -263,3 +263,12 @@ var platformHostShape = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\
 
 // ValidPlatformHost reports whether host may receive a form's answer.
 func ValidPlatformHost(host string) bool { return platformHostShape.MatchString(host) }
+
+// HostIsApp reports whether host is exactly the platform hostname of the app
+// named slug: the name, then one of the enclave zones, nothing else. The
+// platform builds every app's hostname this way, so a host that is a valid
+// enclave name but another app's is refused.
+func HostIsApp(host, slug string) bool {
+	return slug != "" && ValidPlatformHost(host) &&
+		(host == slug+".apps.privasys.org" || host == slug+".apps.test.privasys.org")
+}

@@ -75,7 +75,7 @@ func relayFormTo(t *testing.T, db *store.DB, msgs *appmessages.Store, platformHo
 	payload, _ := json.Marshal(map[string]string{"kind": "invitation", "form": relayForm})
 	body, _ := json.Marshal(map[string]any{
 		"sub": "holder", "type": "app-form", "app_id": mutedApp, "app_name": "Some App",
-		"app_host": "app.example.org", "app_platform_host": platformHost, "payload": json.RawMessage(payload),
+		"app_host": "app.example.org", "app_platform_host": platformHost, "app_slug": "app", "payload": json.RawMessage(payload),
 	})
 	rec := httptest.NewRecorder()
 	HandleNotify(db, "", nil, nil, nil, msgs)(rec, httptest.NewRequest("POST", "/admin/notify", strings.NewReader(string(body))))

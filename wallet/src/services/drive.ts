@@ -44,13 +44,14 @@ const DRIVE_APP_NAME = process.env.EXPO_PUBLIC_DRIVE_APP ?? 'drive-demo';
  *  and whenever the resolve API is unreachable — the resolved hostname +
  *  attested digest win when available. Keep the digest pinned to the
  *  live test deployment's image (OID 4.2) so the fallback attests the
- *  current enclave. drive v0.1.22: chat conversations + Memory + graph.
+ *  current enclave: drive-demo version 49, as the dev store resolved it on
+ *  2026-11-16.
  *  Both overridable per build. */
 const FALLBACK_DRIVE_ORIGIN =
-    process.env.EXPO_PUBLIC_DRIVE_ORIGIN ?? 'drive-demo.apps-test.privasys.org';
+    process.env.EXPO_PUBLIC_DRIVE_ORIGIN ?? 'drive-demo.apps.test.privasys.org';
 const FALLBACK_DRIVE_IMAGE_DIGEST =
     process.env.EXPO_PUBLIC_DRIVE_DIGEST ??
-    'fcb068763a21e4e41934bd6554353026b3a96b51ba1cc9ab031f74f99b73e558';
+    'da91afbd72f1e01fbbbdd25f11c7a201ad5a0f29c880f4cc7f7dc48cb7ce6b87';
 
 interface ResolvedDrive {
     origin: string;

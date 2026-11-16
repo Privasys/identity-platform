@@ -31,6 +31,8 @@ import { listShareRequests } from '@/services/drive';
 import { rebuildFromGrantsIndex, syncGrantsIndex } from '@/services/grants-index';
 import { useAuthStore } from '@/stores/auth';
 import { useCapabilitiesStore } from '@/stores/capabilities';
+import { attributeLabel } from '@/services/attributes';
+import { useAppMessagesStore } from '@/stores/app-messages';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
 import { useConsentStore } from '@/stores/consent';
@@ -60,6 +62,9 @@ export default function AccessScreen() {
     const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
     const asks = useCapabilityAsksStore((s) => s.asks);
     const refreshAsks = useCapabilityAsksStore((s) => s.refresh);
+    const appMessages = useAppMessagesStore((s) => s.messages);
+    const refreshAppMessages = useAppMessagesStore((s) => s.refresh);
+    const openAppMessage = useAppMessagesStore((s) => s.open);
     const guardianWaiting = useGuardianRequestsStore(waitingCount);
     const refreshGuardian = useGuardianRequestsStore((s) => s.refresh);
     const hasProfile = useProfileStore((s) => !!s.profile);
@@ -98,13 +103,15 @@ export default function AccessScreen() {
         void refreshApprovals();
         void refreshAsks();
         void refreshGuardian();
+        void refreshAppMessages();
         const id = setInterval(() => {
             void refreshApprovals();
             void refreshAsks();
             void refreshGuardian();
+            void refreshAppMessages();
         }, 20_000);
         return () => clearInterval(id);
-    }, [refreshApprovals, refreshAsks, refreshGuardian]);
+    }, [refreshApprovals, refreshAsks, refreshGuardian, refreshAppMessages]);
 
     // Drive share requests, asked of the drive itself each time the tab comes
     // into view. Not on the 20-second timer above: reaching the drive means an
@@ -262,6 +269,43 @@ export default function AccessScreen() {
                         <Ionicons name="chevron-forward" size={18} color={p.infoText} />
                     </Pressable>
                 ))}
+
+                {/* Requests and invitations an app sent, listed from the IdP so a
+                    swiped-away push still reaches the holder. The values shown
+                    are what someone presented, under the wallet's own labels;
+                    tapping opens the app on the host the platform verified. */}
+                {appMessages.map((m) => {
+                    const app = m.appName || m.appHost || t('access.messageSomeApp');
+                    const title =
+                        m.kind === 'invitation'
+                            ? t('access.messageInvitation', { app })
+                            : t('access.messageRequest', { app });
+                    const presented = m.presented.map(([k, v]) => `${attributeLabel(k)}: ${v}`).join(' · ');
+                    return (
+                        <Pressable
+                            key={m.id}
+                            style={styles.banner}
+                            onPress={() => void openAppMessage(m)}
+                            accessibilityLabel={title}
+                        >
+                            <RNView style={styles.bannerIcon}>
+                                <Ionicons
+                                    name={m.kind === 'invitation' ? 'mail-open-outline' : 'chatbox-ellipses-outline'}
+                                    size={18}
+                                    color={p.infoText}
+                                />
+                            </RNView>
+                            <RNView style={styles.bannerInfo}>
+                                <Text style={styles.bannerTitle}>{title}</Text>
+                                {presented ? <Text style={styles.bannerMeta}>{presented}</Text> : null}
+                                <Text style={styles.bannerMeta}>
+                                    {m.link ? t('access.messageOpenHint', { app }) : t('access.messageNoLinkHint', { app })}
+                                </Text>
+                            </RNView>
+                            <Ionicons name={m.link ? 'open-outline' : 'close'} size={18} color={p.infoText} />
+                        </Pressable>
+                    );
+                })}
 
                 {/* Connected accounts, one entry per provider: an account of
                     the holder's somewhere we do not control, and the sign-in

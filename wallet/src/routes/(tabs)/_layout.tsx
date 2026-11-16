@@ -6,6 +6,7 @@ import { AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePalette } from '@/components/Themed';
+import { useAppMessagesStore } from '@/stores/app-messages';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
@@ -20,14 +21,18 @@ export default function TabLayout() {
     const pending = useVaultApprovalsStore((s) => s.pending.length);
     const asks = useCapabilityAsksStore((s) => s.asks.length);
     const guardian = useGuardianRequestsStore(waitingCount);
-    const waiting = pending + asks + guardian;
+    const messages = useAppMessagesStore((s) => s.messages.length);
+    const waiting = pending + asks + guardian + messages;
     // Look for open access requests whenever the wallet comes to the front,
     // not only when Access is open: the badge is how the holder learns of one
     // whose push they swiped away, from whichever tab they are on.
     useEffect(() => {
         void useCapabilityAsksStore.getState().refresh();
+        void useAppMessagesStore.getState().refresh();
         const sub = AppState.addEventListener('change', (state) => {
-            if (state === 'active') void useCapabilityAsksStore.getState().refresh();
+            if (state !== 'active') return;
+            void useCapabilityAsksStore.getState().refresh();
+            void useAppMessagesStore.getState().refresh();
         });
         return () => sub.remove();
     }, []);

@@ -1,8 +1,9 @@
 import * as Device from 'expo-device';
 import { useRouter, type Router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, Linking, Platform } from 'react-native';
 
+import { APP_MESSAGE_TYPE, appMessageLink, readAppMessage } from '../services/app-message';
 import { DEFAULT_RELAY_HOST, fetchDescriptor } from '../services/descriptor';
 import { pullRelay } from '../services/device-sync';
 import { mainAccountUserId } from '../services/devices';
@@ -10,6 +11,7 @@ import { ensureNotifySealKey, openSealedNotification } from '../services/notify-
 import { getPrivasysAccount } from '../services/privasys-id';
 import { fetchAttributeApproval } from '../services/attribute-approval-api';
 import { registerPushTokenWithIdp } from '../services/vault-approval-api';
+import { dismissAppMessage, useAppMessagesStore } from '../stores/app-messages';
 import { useDriveNotificationsStore } from '../stores/drive-notifications';
 import { useGuardianRequestsStore } from '../stores/guardian-requests';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
@@ -178,6 +180,33 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         if (!isRouteActive('/drive-requests')) {
             router.push({ pathname: '/drive-requests', params: { source: 'push' } });
         }
+        return;
+    }
+    if (data?.type === APP_MESSAGE_TYPE) {
+        // An app's message. Its link goes only to the host the platform named
+        // for the app (app_host, beside the sealed payload, never inside it),
+        // and opens straight there: the app is where the holder acts on it.
+        // Without a usable link, Access lists the ones still waiting.
+        const sealed = typeof data.sealed === 'string' ? data.sealed : '';
+        const payload = sealed ? await openSealedNotification(sealed, APP_MESSAGE_TYPE) : null;
+        const kind = typeof data.kind === 'string' ? data.kind : undefined;
+        const link = appMessageLink(
+            typeof data.app_host === 'string' ? data.app_host : undefined,
+            readAppMessage(payload, kind).path,
+        );
+        if (link) {
+            try {
+                await Linking.openURL(link);
+                if (typeof data.message_id === 'string' && data.message_id) {
+                    void dismissAppMessage(data.message_id);
+                }
+                return;
+            } catch (e) {
+                console.warn('[notifications] could not open the app message link', e);
+            }
+        }
+        void useAppMessagesStore.getState().refresh();
+        router.navigate('/access');
         return;
     }
     if (data?.type === 'capability-request') {

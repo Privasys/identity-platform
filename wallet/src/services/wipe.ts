@@ -68,6 +68,7 @@ import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
+import { useAppMessagesStore } from '@/stores/app-messages';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useGuardianRequestsStore } from '@/stores/guardian-requests';
 import { useNotifyMutesStore } from '@/stores/notify-mutes';
@@ -117,6 +118,7 @@ export async function wipeWallet(): Promise<void> {
     useDriveNotificationsStore.getState().clearAll();
     useVaultApprovalsStore.getState().clearAll();
     useCapabilityAsksStore.getState().clearAll();
+    useAppMessagesStore.getState().clearAll();
     useGuardianRequestsStore.getState().clearAll();
     // Which apps were silenced is a preference about the last identity's
     // apps; the next one starts hearing from everything.

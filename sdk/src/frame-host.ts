@@ -283,6 +283,13 @@ function sanitiseApp(raw: unknown): AuthUIConfig['app'] {
 
 const KNOWN_METHODS = ['wallet', 'passkey', 'social'] as const;
 type KnownMethod = (typeof KNOWN_METHODS)[number];
+/** The page's nonce for a link: what its server will look for in the ID token. */
+function sanitiseLinkNonce(raw: unknown): string | undefined {
+    const nonce = (raw as { nonce?: unknown } | null | undefined)?.nonce;
+    if (typeof nonce !== 'string') return undefined;
+    return /^[A-Za-z0-9._~-]{16,256}$/.test(nonce) ? nonce : undefined;
+}
+
 /** The audience of the first access token: a resource name or `app:<app id>`. */
 function sanitiseAudience(raw: unknown): string | undefined {
     if (typeof raw !== 'string') return undefined;
@@ -972,7 +979,7 @@ async function exchangeCode(
     code: string,
     clientId: string,
     codeVerifier: string,
-): Promise<{ access_token: string; refresh_token?: string; expires_in: number }> {
+): Promise<{ access_token: string; id_token?: string; refresh_token?: string; expires_in: number }> {
     const resp = await fetch(`${idpBase}/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1048,8 +1055,29 @@ window.addEventListener('message', async (e: MessageEvent) => {
             providers?: unknown;
             /** The page draws its own gate; sanitised below. */
             headless?: unknown;
+            /** Link a Privasys ID to a person signed in another way; sanitised below. */
+            link?: unknown;
         } = data.config;
         const parentOrigin = e.origin;
+        // A link is a Privasys ID sign-in whose only result is an ID token
+        // for the page's server: who the person is under this client, proven
+        // for the page's own nonce. Nothing of the page's existing session is
+        // read or replaced, and nothing but the wallet can answer it.
+        if (config.link !== undefined && !sanitiseLinkNonce(config.link)) {
+            window.parent.postMessage({ type: 'privasys:error', error: 'link needs a nonce of 16 to 256 URL-safe characters' }, parentOrigin);
+            return;
+        }
+        const linkNonce = sanitiseLinkNonce(config.link);
+        if (linkNonce) {
+            config.methods = ['wallet'];
+            config.scope = 'openid';
+            delete config.sessionRelay;
+            delete config.spend;
+            delete config.connect;
+            delete config.billingGrant;
+            delete config.attributes;
+            delete config.audience;
+        }
         // The inline frame reports its content height so the embedding page
         // can size the iframe to it (frame-size.ts); throttled to a frame.
         const onContentHeight = contentHeightReporter(parentOrigin);
@@ -1248,6 +1276,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 // result of this sign-in goes to that page, so the identity
                 // provider checks the client registered it.
                 authorizeUrl.searchParams.set('parent_origin', parentOrigin);
+                if (linkNonce) authorizeUrl.searchParams.set('nonce', linkNonce);
                 // A billing grant redirects the cost of any paid attribute
                 // disclosure from this app's owner to the user who issued the
                 // grant, so the person requiring the proof pays for it (a
@@ -1272,7 +1301,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 // so a push approval would ring the holder's phone for a flow
                 // the browser cannot use.
                 const priorSession = sessions.get(config.rpId || config.appName);
-                const stepUpEligible = !!(priorSession?.token
+                const stepUpEligible = !linkNonce && !!(priorSession?.token
                     && priorSession.clientId === clientId
                     && !isTokenExpired(priorSession.token)
                     && !config.sessionRelay?.appHost);
@@ -1638,6 +1667,23 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
                 // 5. Exchange code for JWT tokens.
                 const tokens = await exchangeCode(idpBase, code, clientId, codeVerifier);
+
+                // A link ends here. The page gets the ID token and nothing
+                // else: no session is kept, so the one the person already
+                // has for this client stands, and the access token of the
+                // linked identity never leaves this frame.
+                if (linkNonce) {
+                    if (!tokens.id_token) throw new Error('The identity provider returned no ID token');
+                    if (uiResult?.pushToken && config.brokerUrl && (uiResult.trustDevice || deviceTrusted)) {
+                        sessions.saveDeviceHint(uiResult.pushToken, config.brokerUrl,
+                            uiResult.deviceLabel ?? deviceLabels.get(uiResult.pushToken));
+                    }
+                    window.parent.postMessage(
+                        { type: 'privasys:result', result: { linked: true, idToken: tokens.id_token, method: 'wallet', sessionId: oidcSessionId } },
+                        parentOrigin,
+                    );
+                    return;
+                }
 
                 // 6. Store session with JWT access_token and refresh_token.
                 // `requestedAttributes`/`scope` record the RAW request this

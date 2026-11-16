@@ -623,6 +623,7 @@ func (h *Handler) CompleteRegistration(
 			if ok {
 				relay := buildSessionRelayClaims(r)
 				authCode := codeStore.Create(&oidc.AuthCode{
+					AMR:         []string{"webauthn"},
 					ClientID:    session.ClientID,
 					RedirectURI: session.RedirectURI,
 					UserID:      userID,
@@ -903,6 +904,7 @@ func (h *Handler) CompleteAuthentication(
 			if ok {
 				relay := buildSessionRelayClaims(r)
 				authCode := codeStore.Create(&oidc.AuthCode{
+					AMR:         []string{"webauthn"},
 					ClientID:    session.ClientID,
 					RedirectURI: session.RedirectURI,
 					UserID:      userID,

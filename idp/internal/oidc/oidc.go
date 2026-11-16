@@ -286,7 +286,7 @@ func claimsSupported() []string {
 	}
 	// email_verified rides alongside email rather than being an attribute of its
 	// own; the rest are protocol, not profile.
-	return append(out, "email_verified", "acr", "attestation_level", "auth_time",
+	return append(out, "email_verified", "acr", "amr", "attestation_level", "auth_time",
 		"iss", "aud", "exp", "iat", "roles", "wallet")
 }
 
@@ -345,6 +345,11 @@ type AuthCode struct {
 	// per-user data. Social logins, browser passkeys and forged
 	// /session/complete calls never set it — WebAuthn alone is not a wallet.
 	WalletVerified bool
+
+	// AMR is set by the handler that minted the code from a ceremony it
+	// verified itself: ["webauthn"] from the passkey handler. Left empty by
+	// the social and federation callbacks. Goes to the ID token as `amr`.
+	AMR []string
 }
 
 // CodeStore manages short-lived authorization codes.
@@ -1393,6 +1398,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 		Nonce:            ac.Nonce,
 		AuthTime:         ac.AuthTime,
 		ACR:              acrForCode(ac, client),
+		AMR:              ac.AMR,
 		SID:              sid,
 		SessionRelay:     ac.SessionRelay,
 	})

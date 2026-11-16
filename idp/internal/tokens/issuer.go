@@ -113,6 +113,13 @@ type IDTokenClaims struct {
 	Nonce            string
 	AuthTime         time.Time
 
+	// AMR is how the person authenticated, as this IdP saw it itself
+	// (AuthCode.AMR): ["webauthn"] when the code came out of a passkey
+	// ceremony here, with a Privasys ID. Emitted as the standard `amr`
+	// claim. Empty, and the claim absent, for a sign-in through another
+	// provider, whose methods this IdP cannot vouch for.
+	AMR []string
+
 	// ACR is the ACHIEVED authentication context class ("wallet",
 	// "gov-fresh"), computed by the token endpoint from what actually
 	// happened in the ceremony. Emitted as the standard `acr` claim so
@@ -165,6 +172,9 @@ func (iss *Issuer) IssueIDToken(claims IDTokenClaims) (string, error) {
 	}
 	if claims.ACR != "" {
 		c["acr"] = claims.ACR
+	}
+	if len(claims.AMR) > 0 {
+		c["amr"] = claims.AMR
 	}
 	if claims.SID != "" {
 		c["sid"] = claims.SID

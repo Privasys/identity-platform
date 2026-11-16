@@ -317,3 +317,32 @@ func TestDeriveSecret(t *testing.T) {
 		t.Fatal("two signing keys share a secret")
 	}
 }
+
+// A passkey sign-in is marked on the ID token, and nothing else is.
+func TestIDTokenAMR(t *testing.T) {
+	iss, err := NewIssuer(filepath.Join(t.TempDir(), "key.pem"), "https://privasys.id")
+	if err != nil {
+		t.Fatalf("NewIssuer: %v", err)
+	}
+	for _, passkey := range []bool{true, false} {
+		var amr []string
+		if passkey {
+			amr = []string{"webauthn"}
+		}
+		token, err := iss.IssueIDToken(IDTokenClaims{Subject: "s", Audience: "c", Nonce: "n", AuthTime: time.Now(), AMR: amr})
+		if err != nil {
+			t.Fatalf("IssueIDToken: %v", err)
+		}
+		claims, err := iss.VerifyAccessToken(token)
+		if err != nil {
+			t.Fatalf("VerifyAccessToken: %v", err)
+		}
+		got, present := claims["amr"].([]interface{})
+		if passkey && (len(got) != 1 || got[0] != "webauthn") {
+			t.Errorf("passkey sign-in: amr = %v, want [webauthn]", got)
+		}
+		if !passkey && present {
+			t.Errorf("other sign-in: amr present (%v), want absent", got)
+		}
+	}
+}

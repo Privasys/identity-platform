@@ -344,6 +344,10 @@ export interface SignInResult {
     pushToken?: string;
     /** JWT access_token from the IdP (present when clientId was set in config). */
     accessToken?: string;
+    /** Set on the result of {@link AuthFrame.linkIdentity} only. */
+    linked?: boolean;
+    /** The ID token of a link, for the page's server to verify. */
+    idToken?: string;
     /**
      * Gov-verified attribute disclosures (present when the `identity` scope
      * was requested and the user approved sharing). Each entry carries the
@@ -662,6 +666,8 @@ export class AuthFrame {
     private destroyed = false;
     // How request() reaches the app, decided by connect().
     private transport: AppTransport | null = null;
+    // The nonce of a link in progress (linkIdentity); null otherwise.
+    private linkNonce: string | null = null;
 
     constructor(config: AuthFrameConfig) {
         const { authOrigin, container, headless, ...rest } = config;
@@ -997,12 +1003,52 @@ export class AuthFrame {
      * Open the authentication modal (inside a privasys.id iframe) and
      * wait for the user to complete the ceremony.
      */
+    /**
+     * Link a Privasys ID to a person who is signed in to your app another
+     * way, for example with Microsoft or Google.
+     *
+     * The gate opens as a modal limited to the Privasys ID wallet. When the
+     * person has approved on their phone, the promise resolves with an ID
+     * token for your client. Send it to your server, which verifies the
+     * identity provider's signature, `aud` (your client id), `exp`,
+     * `nonce` (the value passed here, which your server made for this
+     * person's session) and that `amr` contains `"webauthn"`. Its `sub` is then the
+     * person's Privasys ID under your client: the subject to keep beside
+     * their account and to address approvals to.
+     *
+     * The session the page already holds is neither read nor replaced, and
+     * no session is kept for the linked identity. Call it from a click.
+     *
+     * @param nonce 16 to 256 URL-safe characters, single use, made by your server.
+     */
+    async linkIdentity(nonce: string): Promise<{ idToken: string }> {
+        if (!this.config.clientId) throw new Error('AuthFrame: linkIdentity needs a clientId');
+        if (!/^[A-Za-z0-9._~-]{16,256}$/.test(nonce)) {
+            throw new Error('AuthFrame: linkIdentity needs a nonce of 16 to 256 URL-safe characters');
+        }
+        if (this.cancelSignIn || this.linkNonce) throw new Error('AuthFrame: a sign-in is already in progress');
+        this.linkNonce = nonce;
+        try {
+            const result = await this.signIn();
+            if (!result.linked || !result.idToken) {
+                throw new Error('AuthFrame: the identity provider did not return a link');
+            }
+            return { idToken: result.idToken };
+        } finally {
+            this.linkNonce = null;
+        }
+    }
+
     signIn(): Promise<SignInResult> {
         return new Promise<SignInResult>((resolve, reject) => {
+            // A link (linkIdentity) is a modal of its own: it never uses the
+            // page's container or its sealed session.
+            const link = this.linkNonce;
+            const container = link ? null : this.container;
             const iframe = document.createElement('iframe');
             iframe.src = this.authOrigin + '/auth/';
 
-            const wantsSealed = !!this.config.sessionRelay?.appHost;
+            const wantsSealed = !link && !!this.config.sessionRelay?.appHost;
             const headless = this.headless;
 
             // Sealed mode requires the auth iframe to outlive the sign-in
@@ -1019,7 +1065,7 @@ export class AuthFrame {
             // container's bounding rect and follow it on resize/scroll
             // until sign-in completes; once auth resolves we shrink the
             // iframe to 0×0 (invisible) but leave it parented to <body>.
-            const overlayContainer = wantsSealed && !headless ? this.container : null;
+            const overlayContainer = wantsSealed && !headless ? container : null;
             const reflowOverlay = (): void => {
                 if (!overlayContainer) return;
                 const r = overlayContainer.getBoundingClientRect();
@@ -1060,13 +1106,13 @@ export class AuthFrame {
                     window.removeEventListener('scroll', reflowOverlay, true);
                     ro?.disconnect();
                 };
-            } else if (this.container) {
+            } else if (container) {
                 // Embedded mode (non-sealed): fill the container element
                 iframe.style.cssText =
                     'width:100%;height:100%;border:none;display:block;';
                 iframe.allow =
                     'publickey-credentials-get *; publickey-credentials-create *';
-                this.container.appendChild(iframe);
+                container.appendChild(iframe);
             } else {
                 // Modal mode (default): full-screen overlay
                 iframe.style.cssText =
@@ -1180,7 +1226,7 @@ export class AuthFrame {
                 switch (data.type) {
                     case 'privasys:ready': {
                         const presentation = this.config.presentation
-                            ?? (this.container ? 'inline' : 'modal');
+                            ?? (container ? 'inline' : 'modal');
                         // Methods pass through as configured; when absent the
                         // frame host filters them by attribute capability
                         // (essential attributes hide methods that cannot
@@ -1196,7 +1242,8 @@ export class AuthFrame {
                                     // Capabilities this client handles; the host
                                     // only uses features the client declared.
                                     caps: ['parent-navigate', ...(headless ? ['headless'] : [])],
-                                    ...(this.connectHint ? { connect: this.connectHint } : {}),
+                                    ...(this.connectHint && !link ? { connect: this.connectHint } : {}),
+                                    ...(link ? { link: { nonce: link }, presentation: 'modal' } : {}),
                                 },
                             },
                             this.authOrigin,
@@ -1264,7 +1311,7 @@ export class AuthFrame {
                         if (overlayContainer) {
                             overlayContainer.style.height = `${h}px`;
                             reflowOverlay();
-                        } else if (this.container) {
+                        } else if (container) {
                             iframe.style.height = `${h}px`;
                         }
                         break;

@@ -116,3 +116,17 @@ func TestTakeIsSingleUse(t *testing.T) {
 		t.Fatal("taken twice")
 	}
 }
+
+func TestOnlyAnAppPlatformHostReceivesAnswers(t *testing.T) {
+	for _, ok := range []string{"drive-demo.apps.test.privasys.org", "privasys-drive.apps.privasys.org"} {
+		if !ValidPlatformHost(ok) {
+			t.Errorf("%s refused", ok)
+		}
+	}
+	for _, bad := range []string{"", "drive.test.privasys.org", "a.b.apps.privasys.org", "drive.apps.privasys.org:8443",
+		"drive.apps.privasys.org.evil.example", "driveXappsXprivasysXorg", "evil.example", "-x.apps.privasys.org"} {
+		if ValidPlatformHost(bad) {
+			t.Errorf("%s accepted", bad)
+		}
+	}
+}

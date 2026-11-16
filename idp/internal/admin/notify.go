@@ -171,8 +171,8 @@ func HandleNotify(db *store.DB, adminToken string, asks *capasks.Store, mutes *n
 				writeError(w, http.StatusBadRequest, err.Error())
 				return
 			}
-			if req.AppPlatformHost == "" {
-				writeError(w, http.StatusBadRequest, "a form needs the app's platform host")
+			if !appmessages.ValidPlatformHost(req.AppPlatformHost) {
+				writeError(w, http.StatusBadRequest, "a form needs the app's platform host (<name>.apps[.test].privasys.org)")
 				return
 			}
 			kind, form = k, f

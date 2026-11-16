@@ -36,6 +36,16 @@ export class AnswerError extends Error {
     }
 }
 
+/**
+ * Where an answer may go: an app's own platform hostname, one label under
+ * the platform's enclave zones, and nothing else. Not a custom domain (its TLS
+ * may end at the gateway), not a deeper name, no port. The platform names the
+ * host; this pins it to the zones only an attested enclave answers on, so a
+ * compromised control plane cannot point an answer anywhere else, and the
+ * attestation below then proves which app is there.
+ */
+export const ANSWER_HOST = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.apps(\.test)?\.privasys\.org$/;
+
 /** Normalise an app id to its dashless lowercase form, for comparing. */
 function sameApp(a: string, b: string): boolean {
     const n = (s: string) => s.toLowerCase().replace(/-/g, '');
@@ -103,6 +113,7 @@ export async function answerForm(args: {
     // 4. Attest the app's own host and check it is the app that asked, then
     //    hand it the answer inside that channel.
     const host = answered.app_platform_host;
+    if (!ANSWER_HOST.test(host)) throw new AnswerError('not-the-app');
     let attestedApp: string | undefined;
     try {
         attestedApp = appIdFromOids((await inspectAttestation(host)).custom_oids) ?? undefined;

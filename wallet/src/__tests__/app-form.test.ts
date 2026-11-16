@@ -105,3 +105,25 @@ describe('answerForm', () => {
         await expect(answerForm({ messageId: 'm1', form, appId: APP, action: 'wipe' })).rejects.toBeInstanceOf(AnswerError);
     });
 });
+
+describe('ANSWER_HOST', () => {
+    it('admits only an app platform hostname', () => {
+        const { ANSWER_HOST } = jest.requireActual('../services/app-form-answer');
+        for (const ok of ['drive-demo.apps.test.privasys.org', 'privasys-drive.apps.privasys.org']) {
+            expect(ANSWER_HOST.test(ok)).toBe(true);
+        }
+        for (const bad of [
+            'drive.test.privasys.org',
+            'a.b.apps.privasys.org',
+            'drive.apps.privasys.org:8443',
+            'drive.apps.privasys.org.evil.example',
+            'driveXappsXprivasysXorg',
+            'drive.appsxprivasys.org',
+            'evil.example',
+            '-drive.apps.privasys.org',
+            'DRIVE.apps.privasys.org',
+        ]) {
+            expect(ANSWER_HOST.test(bad)).toBe(false);
+        }
+    });
+});

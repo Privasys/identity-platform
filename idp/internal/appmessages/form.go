@@ -253,3 +253,13 @@ func safePath(p string) bool {
 	return strings.HasPrefix(p, "/") && !strings.HasPrefix(p, "//") && len(p) <= maxPath &&
 		!strings.ContainsAny(p, "\\\r\n\t ")
 }
+
+// platformHostShape is where a form's answer may go: an app's own platform
+// hostname, one label under the enclave zones. The control plane names it;
+// this refuses to record a form against anything else, so neither a mistake
+// nor a compromised control plane can point an answer at another host. The
+// wallet applies the same rule before it sends.
+var platformHostShape = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.apps(\.test)?\.privasys\.org$`)
+
+// ValidPlatformHost reports whether host may receive a form's answer.
+func ValidPlatformHost(host string) bool { return platformHostShape.MatchString(host) }

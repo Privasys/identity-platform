@@ -80,6 +80,17 @@ export default function AppFormScreen() {
         };
     }, [message, form, phase.kind]);
 
+    const leave = () => (router.canGoBack() ? router.back() : router.replace('/access'));
+
+    // Once answered, return on its own, as the other success screens do; the
+    // Done button stays for a holder who does not wait.
+    useEffect(() => {
+        if (phase.kind !== 'done') return;
+        const timer = setTimeout(leave, 1500);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase.kind]);
+
     const answer = async (source: ConfirmedSource, actionId: string, actionKind: string) => {
         if (!message || !form || !message.appId) return;
         setPhase({ kind: 'busy', source, action: actionId });
@@ -209,7 +220,7 @@ export default function AppFormScreen() {
                 {phase.kind === 'done' || (!message && looked) ? (
                     <Pressable
                         style={styles.doneButton}
-                        onPress={() => (router.canGoBack() ? router.back() : router.replace('/access'))}
+                        onPress={leave}
                         accessibilityRole="button"
                     >
                         <Text style={styles.affirmButtonText}>{t('common.done')}</Text>
@@ -307,7 +318,8 @@ const makeStyles = (p: Palette) =>
         affirmButton: { flex: 1.35, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.green },
         affirmButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
         buttonIdle: { opacity: 0.5 },
-        doneButton: { marginTop: 20, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.green },
+        // The Done of the other finished screens (device-add, verify-email).
+        doneButton: { marginTop: 24, paddingVertical: 16, paddingHorizontal: 20, borderRadius: 14, alignItems: 'center', backgroundColor: p.blue },
         note: { fontSize: 12.5, lineHeight: 18, color: p.textMuted, textAlign: 'center' },
         error: { fontSize: 13.5, lineHeight: 19, color: p.danger, textAlign: 'center' },
         link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 },

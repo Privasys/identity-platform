@@ -33,7 +33,7 @@ import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 const PLATFORM_API_BASE =
     process.env.EXPO_PUBLIC_DRIVE_PLATFORM_API_URL ??
     process.env.EXPO_PUBLIC_PLATFORM_API_URL ??
-    'https://api-test.developer.privasys.org';
+    'https://api.developer.test.privasys.org';
 
 /** Store name of the Drive app to resolve. Prod build sets `privasys-drive`
  *  (eas.json); dev defaults to `drive-demo`. */

@@ -275,7 +275,7 @@ export default function AccessScreen() {
                     are what someone presented, under the wallet's own labels;
                     tapping opens the app on the host the platform verified. */}
                 {appMessages.map((m) => {
-                    const app = m.appName || m.appHost || t('access.messageSomeApp');
+                    const app = m.appName || m.appSlug || m.appHost || t('access.messageSomeApp');
                     const title =
                         m.kind === 'invitation'
                             ? t('access.messageInvitation', { app })

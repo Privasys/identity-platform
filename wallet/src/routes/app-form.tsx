@@ -65,7 +65,7 @@ export default function AppFormScreen() {
         void refresh().finally(() => setLooked(true));
     }, [message, looked, refresh]);
 
-    const app = message?.appName || t('access.messageSomeApp');
+    const app = message?.appName || message?.appSlug || t('access.messageSomeApp');
     const form = message?.form;
 
     // Establish that the app sent it before anything can be answered.
@@ -157,27 +157,35 @@ export default function AppFormScreen() {
                 {source ? (
                     <>
                         <RNView style={styles.actions}>
-                            {form.actions.map((a) => {
-                                const declining = isDeclining(a.kind);
-                                const busy = phase.kind === 'busy' && phase.action === a.id;
-                                return (
-                                    <Pressable
-                                        key={a.id}
-                                        disabled={phase.kind === 'busy'}
-                                        onPress={() => void answer(source, a.id, a.kind)}
-                                        style={[styles.button, declining ? styles.buttonDecline : styles.buttonPrimary]}
-                                        accessibilityRole="button"
-                                    >
-                                        {busy ? (
-                                            <ActivityIndicator color={declining ? p.danger : '#fff'} />
-                                        ) : (
-                                            <Text style={declining ? styles.buttonDeclineText : styles.buttonPrimaryText}>
-                                                {t(`appForm.action.${a.kind}`)}
-                                            </Text>
-                                        )}
-                                    </Pressable>
-                                );
-                            })}
+                            {/* As on the approval screen: the declining choice
+                                first and neutral, the affirming one wider and in
+                                the brand green. */}
+                            {[...form.actions]
+                                .sort((a, b) => Number(!isDeclining(a.kind)) - Number(!isDeclining(b.kind)))
+                                .map((a) => {
+                                    const declining = isDeclining(a.kind);
+                                    const busy = phase.kind === 'busy' && phase.action === a.id;
+                                    return (
+                                        <Pressable
+                                            key={a.id}
+                                            disabled={phase.kind === 'busy'}
+                                            onPress={() => void answer(source, a.id, a.kind)}
+                                            style={[
+                                                declining ? styles.declineButton : styles.affirmButton,
+                                                phase.kind === 'busy' && !busy && styles.buttonIdle,
+                                            ]}
+                                            accessibilityRole="button"
+                                        >
+                                            {busy ? (
+                                                <ActivityIndicator color={declining ? p.textPrimary : '#FFFFFF'} />
+                                            ) : (
+                                                <Text style={declining ? styles.declineButtonText : styles.affirmButtonText}>
+                                                    {t(`appForm.action.${a.kind}`)}
+                                                </Text>
+                                            )}
+                                        </Pressable>
+                                    );
+                                })}
                         </RNView>
                         <Text style={styles.note}>{t('appForm.signNote', { app })}</Text>
                     </>
@@ -186,7 +194,7 @@ export default function AppFormScreen() {
                 {message.link ? (
                     <Pressable onPress={() => void Linking.openURL(message.link!)} style={styles.link} hitSlop={8}>
                         <Text style={styles.linkText}>{t('appForm.openInApp', { app })}</Text>
-                        <Ionicons name="open-outline" size={16} color={p.action} />
+                        <Ionicons name="open-outline" size={16} color={p.blue} />
                     </Pressable>
                 ) : null}
             </>
@@ -199,8 +207,12 @@ export default function AppFormScreen() {
             <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 32 }]}>
                 {body}
                 {phase.kind === 'done' || (!message && looked) ? (
-                    <Pressable style={styles.close} onPress={() => (router.canGoBack() ? router.back() : router.replace('/access'))}>
-                        <Text style={styles.closeText}>{t('common.close')}</Text>
+                    <Pressable
+                        style={styles.doneButton}
+                        onPress={() => (router.canGoBack() ? router.back() : router.replace('/access'))}
+                        accessibilityRole="button"
+                    >
+                        <Text style={styles.affirmButtonText}>{t('common.done')}</Text>
                     </Pressable>
                 ) : null}
             </ScrollView>
@@ -288,16 +300,16 @@ const makeStyles = (p: Palette) =>
         fieldRow: { gap: 2 },
         fieldLabel: { fontSize: 12.5, color: p.textSecondary },
         fieldValue: { fontSize: 15, color: p.textPrimary },
-        actions: { gap: 10 },
-        button: { borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-        buttonPrimary: { backgroundColor: p.action },
-        buttonPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-        buttonDecline: { borderWidth: 1, borderColor: p.danger },
-        buttonDeclineText: { color: p.danger, fontSize: 16, fontWeight: '600' },
+        // The approval screen's buttons (components/AttestationView).
+        actions: { flexDirection: 'row', gap: 10 },
+        declineButton: { flex: 1, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.buttonNeutral },
+        declineButtonText: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
+        affirmButton: { flex: 1.35, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.green },
+        affirmButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+        buttonIdle: { opacity: 0.5 },
+        doneButton: { marginTop: 20, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.green },
         note: { fontSize: 12.5, lineHeight: 18, color: p.textMuted, textAlign: 'center' },
         error: { fontSize: 13.5, lineHeight: 19, color: p.danger, textAlign: 'center' },
         link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 },
-        linkText: { color: p.action, fontSize: 14.5, fontWeight: '600' },
-        close: { alignSelf: 'center', marginTop: 20, paddingVertical: 10, paddingHorizontal: 24 },
-        closeText: { color: p.action, fontSize: 15, fontWeight: '600' },
+        linkText: { color: p.blue, fontSize: 14.5, fontWeight: '600' },
     });

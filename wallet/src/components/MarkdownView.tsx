@@ -90,8 +90,8 @@ export function MarkdownView({ source }: { source: string }) {
                 );
             case 'table':
                 return (
-                    <ScrollView key={k} horizontal style={styles.tableBox}>
-                        <RNView>
+                    <ScrollView key={k} horizontal style={styles.tableBox} contentContainerStyle={styles.tableInner}>
+                        <RNView style={styles.tableInner}>
                             {[b.head, ...b.rows].map((row, r) => (
                                 <RNView key={r} style={[styles.tr, r === 0 && styles.th]}>
                                     {row.map((cell, c) => (
@@ -143,5 +143,7 @@ const makeStyles = (p: Palette) =>
         tableBox: { borderWidth: StyleSheet.hairlineWidth, borderColor: p.border, borderRadius: 8 },
         tr: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: p.border },
         th: { backgroundColor: p.cardAlt },
-        td: { minWidth: 90, maxWidth: 240, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: p.textPrimary },
+        // A table fills the width when it fits, and scrolls sideways when not.
+        tableInner: { flexGrow: 1 },
+        td: { flexGrow: 1, flexBasis: 0, minWidth: 90, maxWidth: 240, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: p.textPrimary },
     });

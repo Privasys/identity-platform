@@ -270,7 +270,11 @@ export function AttestationView({
     // The ask. Four variants rather than a base sentence with an appended
     // clause: several languages want to restructure the whole sentence, and a
     // concatenation gives them nowhere to do it.
-    const askKey = displayName
+    // Reviewing an app (from a form or an approval) is not a sign-in, so it
+    // neither says so nor asks anything.
+    const askKey = reviewOnly
+        ? displayName ? 'attestation.reviewIntro' : 'attestation.reviewIntroUnnamed'
+        : displayName
         ? hasAttributes ? 'attestation.asksSignInAndData' : 'attestation.asksSignIn'
         : hasAttributes ? 'attestation.asksSignInAndDataUnnamed' : 'attestation.asksSignInUnnamed';
 
@@ -283,7 +287,7 @@ export function AttestationView({
         <RNView style={styles.screen}>
             {/* Same green band and white type as every other screen header. */}
             <RNView style={[styles.header, { paddingTop: insets.top + 14 }]}>
-                <Text style={styles.headerTitle}>{t('attestation.requestTitle')}</Text>
+                <Text style={styles.headerTitle}>{t(reviewOnly ? 'attestation.reviewTitle' : 'attestation.requestTitle')}</Text>
             </RNView>
 
             <ScrollView

@@ -37,6 +37,7 @@ import { attestDrive, type DriveAttestation } from '@/services/drive';
 import {
     clearViewerCopies,
     DRIVE_ID,
+    fileKind,
     formatSize,
     listFolder,
     listSharedWithMe,
@@ -48,6 +49,22 @@ import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 type Section = 'mine' | 'shared';
+
+/** The icon and colour of a row: folders, then each kind the viewer knows. */
+function itemLook(it: StoredItem): { icon: React.ComponentProps<typeof Ionicons>['name']; colour: string } {
+    if (it.kind === 'folder') return { icon: 'folder', colour: '#00BCF2' };
+    switch (fileKind(it)) {
+        case 'pdf':
+            return { icon: 'document-text', colour: '#E5484D' };
+        case 'image':
+            return { icon: 'image', colour: '#12A594' };
+        case 'markdown':
+        case 'text':
+            return { icon: 'reader', colour: '#8B5CF6' };
+        default:
+            return { icon: 'document', colour: '#64748B' };
+    }
+}
 
 interface Crumb {
     tenantId: string;
@@ -363,8 +380,8 @@ export default function DriveScreen() {
                                     accessibilityRole="button"
                                     accessibilityLabel={it.name}
                                 >
-                                    <RNView style={[styles.icon, { backgroundColor: it.kind === 'folder' ? p.blue : '#8B5CF6' }]}>
-                                        <Ionicons name={it.kind === 'folder' ? 'folder' : 'document'} size={18} color="#FFFFFF" />
+                                    <RNView style={[styles.icon, { backgroundColor: itemLook(it).colour }]}>
+                                        <Ionicons name={itemLook(it).icon} size={18} color="#FFFFFF" />
                                     </RNView>
                                     <RNView style={styles.info}>
                                         <Text style={styles.name} numberOfLines={1}>

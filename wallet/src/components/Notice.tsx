@@ -7,7 +7,7 @@
  * phone gives the short success vibration.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef } from 'react';
 import { AccessibilityInfo, Animated, Pressable, StyleSheet, View as RNView } from 'react-native';

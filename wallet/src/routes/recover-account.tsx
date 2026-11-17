@@ -13,7 +13,7 @@
  * Recovery state is persisted via secure storage.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
@@ -61,6 +61,7 @@ import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 import * as Storage from '@/utils/storage';
 import * as NativeKeys from '../../modules/native-keys/src/index';
+import { MONO } from '@/constants/fonts';
 
 interface RecoveryState {
     requestId: string;
@@ -1047,7 +1048,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     accountId: {
         fontSize: 15,
-        fontFamily: 'SpaceMono',
+        fontFamily: MONO,
         color: p.textPrimary,
         marginBottom: 10,
     },

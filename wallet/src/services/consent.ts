@@ -22,7 +22,6 @@ import {
     type ConsentRecord,
     type DisclosedAttribute,
     type StandingConsent,
-    type ComputationReceipt,
 } from '@/stores/consent';
 import { useProfileStore } from '@/stores/profile';
 
@@ -213,9 +212,3 @@ export async function recordConsent(
     return record;
 }
 
-/**
- * Store a computation receipt from an enclave.
- */
-export function storeReceipt(receipt: ComputationReceipt): void {
-    useConsentStore.getState().addReceipt(receipt);
-}

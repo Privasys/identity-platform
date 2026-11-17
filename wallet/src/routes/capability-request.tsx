@@ -28,7 +28,7 @@
  * without interpreting.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -91,6 +91,7 @@ import { notify } from '@/stores/notice';
 import { useProfileStore } from '@/stores/profile';
 import { ATTRIBUTE_MAP, attributeLabel } from '@/services/attributes';
 import { recordChainOutcome, takeChainOutcome } from '@/utils/capability-chain';
+import { MONO } from '@/constants/fonts';
 
 type Phase = 'loading' | 'prerequisite' | 'ready' | 'refused' | 'working' | 'done';
 
@@ -1102,7 +1103,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     label: { fontSize: 12, color: p.textSecondary, marginBottom: 2 },
     value: { fontSize: 16, fontWeight: '600', color: p.textPrimary, lineHeight: 23 },
-    mono: { fontSize: 12, fontFamily: 'SpaceMono', color: p.textMuted },
+    mono: { fontSize: 12, fontFamily: MONO, color: p.textMuted },
     attested: { fontSize: 12, color: p.textSecondary, marginTop: 4 },
     problem: { fontSize: 13, color: p.dangerText, lineHeight: 19 },
     refusal: {

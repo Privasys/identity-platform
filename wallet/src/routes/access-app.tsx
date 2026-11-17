@@ -10,7 +10,7 @@
  * after another; accounts other apps use stay connected for them.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
@@ -23,6 +23,7 @@ import { revokeRecords } from '@/services/access-revoke';
 import { useCapabilitiesStore } from '@/stores/capabilities';
 import { isLive, type AccessRow } from '@/utils/access-rows';
 import { appTree, liveIn, whatOf } from '@/utils/access-tree';
+import { MONO } from '@/constants/fonts';
 
 export default function AccessAppScreen() {
     const params = useLocalSearchParams<{ appId?: string }>();
@@ -163,7 +164,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     content: { padding: 20 },
     centre: { alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 },
     body: { fontSize: 14, color: p.textSecondary, lineHeight: 21, textAlign: 'center' },
-    mono: { fontSize: 12, fontFamily: 'SpaceMono', color: p.textMuted, marginBottom: 16 },
+    mono: { fontSize: 12, fontFamily: MONO, color: p.textMuted, marginBottom: 16 },
     section: { marginBottom: 16 },
     sectionTitle: { fontSize: 13, fontWeight: '700', color: p.textMuted, letterSpacing: 0.4, marginBottom: 8 },
     card: { backgroundColor: p.card, borderRadius: 14, overflow: 'hidden' },

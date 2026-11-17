@@ -532,54 +532,12 @@ export function setProfileValue(
 // ── Provider claim normalisation ────────────────────────────────────────
 // Loaded from the shared JSON (single source of truth for IdP + wallet).
 
-/** Provider claim key → canonical attribute key. */
-const PROVIDER_CLAIM_MAP: Record<string, Record<string, string>> = Object.fromEntries(
-    Object.entries(canonicalDoc.providers).map(([name, prov]) => [name, prov.claimMap]),
-);
-
 /** Canonical attribute key → raw claim key that indicates verification status. */
 const PROVIDER_VERIFICATION_CLAIMS: Record<string, Record<string, string>> = Object.fromEntries(
     Object.entries(canonicalDoc.providers)
         .filter(([, prov]) => Object.keys(prov.verificationClaims).length > 0)
         .map(([name, prov]) => [name, prov.verificationClaims]),
 );
-
-/**
- * Normalise raw provider claims into canonical attribute key/value pairs.
- * Only returns attributes that are in the canonical list. When multiple
- * provider keys map to the same canonical key, the first non-empty value
- * wins (so order in the raw object matters less — we iterate the mapping
- * table, not the raw data).
- */
-export function normalizeProviderClaims(
-    provider: string,
-    raw: Record<string, unknown>,
-): Record<string, string> {
-    const mapping = PROVIDER_CLAIM_MAP[provider];
-    if (!mapping) {
-        // Unknown provider — try direct passthrough for canonical keys only.
-        const result: Record<string, string> = {};
-        for (const [k, v] of Object.entries(raw)) {
-            if (CANONICAL_KEYS.has(k) && typeof v === 'string' && v) {
-                result[k] = v;
-            }
-        }
-        return result;
-    }
-
-    const result: Record<string, string> = {};
-    for (const [providerKey, canonicalKey] of Object.entries(mapping)) {
-        // Skip if we already have a value for this canonical key or if not in our list.
-        if (result[canonicalKey]) continue;
-        if (canonicalKey !== 'sub' && !CANONICAL_KEYS.has(canonicalKey)) continue;
-
-        const val = raw[providerKey];
-        if (val != null && val !== '') {
-            result[canonicalKey] = String(val);
-        }
-    }
-    return result;
-}
 
 /**
  * Check whether a provider claims an attribute is verified.
@@ -605,57 +563,6 @@ export function isProviderVerified(
 }
 
 /**
- * Build ProfileAttribute entries from normalised claims with full provenance
- * and verification records. Filters out 'sub' (never stored as an attribute).
- *
- * For verifiable attributes (email, phone_number), the attribute is only
- * accepted as verified if the provider explicitly confirms it. Unverified
- * verifiable attributes are still stored but marked `verified: false`.
- */
-export function claimsToProfileAttributes(
-    normalised: Record<string, string>,
-    provider: string,
-    raw: Record<string, unknown>,
-): ProfileAttribute[] {
-    const now = Math.floor(Date.now() / 1000);
-    const attrs: ProfileAttribute[] = [];
-
-    for (const [key, value] of Object.entries(normalised)) {
-        if (key === 'sub' || !value) continue;
-        const def = ATTRIBUTE_MAP[key];
-        if (!def) continue;
-
-        const providerVerified = isProviderVerified(provider, key, raw);
-        const verified = def.verifiable ? providerVerified : false;
-
-        const verifications: VerificationRecord[] = [];
-        if (verified) {
-            verifications.push({
-                verifier: provider,
-                verifierDisplayName: providerDisplayName(provider),
-                method: 'oidc_claim',
-                assurance: 'provider',
-                verifiedAt: now,
-                evidence: `${provider}:${key}_verified=true`,
-            });
-        }
-
-        attrs.push({
-            key,
-            label: def.label,
-            value,
-            source: 'provider',
-            sourceProvider: provider,
-            acquiredAt: now,
-            updatedAt: now,
-            verified,
-            verifications,
-        });
-    }
-    return attrs;
-}
-
-/**
  * The name to show a human for this profile.
  *
  * The stored `displayName` is seeded with a generic placeholder at setup and is
@@ -677,17 +584,6 @@ export function profileDisplayName(profile: UserProfile, fallback: string): stri
     // One resolution, shared with getProfileValue, so the name on the Profile
     // screen is the name a relying party receives.
     return resolvedName(profile) || fallback;
-}
-
-/** Human-friendly name for a provider key. */
-function providerDisplayName(provider: string): string {
-    const names: Record<string, string> = {
-        google: 'Google',
-        microsoft: 'Microsoft',
-        github: 'GitHub',
-        linkedin: 'LinkedIn',
-    };
-    return names[provider] ?? provider;
 }
 
 /**

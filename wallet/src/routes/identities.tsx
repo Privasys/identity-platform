@@ -10,7 +10,7 @@
  * for the curious, both of whom can take one tap.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import { useMemo } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';

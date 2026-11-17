@@ -240,44 +240,6 @@ export async function signEncAuth(
 }
 
 /**
- * Upload a signed EncAuth payload to the IdP.
- *
- * `walletSessionToken` is the opaque wallet-session token issued by
- * the FIDO2 register/authenticate flow — sent as
- * `Authorization: Bearer wallet:<token>`. The IdP verifies hw_sig,
- * co-signs, and returns the full envelope.
- */
-export async function uploadEncAuth(
-    walletSessionToken: string,
-    sid: string,
-    cborPayload: Uint8Array,
-    hwSig: Uint8Array,
-): Promise<EncAuthEnvelope> {
-    const url = `${IDP_BASE_URL}/sessions/${encodeURIComponent(sid)}/encauth`;
-    const resp = await fetch(url, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer wallet:${walletSessionToken}`,
-        },
-        body: JSON.stringify({
-            payload: b64uEncode(cborPayload),
-            hw_sig: b64uEncode(hwSig),
-        }),
-    });
-    if (!resp.ok) {
-        let detail = '';
-        try {
-            detail = await resp.text();
-        } catch {
-            // ignore
-        }
-        throw new Error(`upload encauth: ${resp.status} ${detail}`);
-    }
-    return (await resp.json()) as EncAuthEnvelope;
-}
-
-/**
  * One-shot helper: ask the IdP for (or reuse) a sid for this app,
  * build + sign an EncAuth payload anchored to that sid, then upload.
  *

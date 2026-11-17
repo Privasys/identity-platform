@@ -45,7 +45,7 @@ import * as SecureStore from '@/utils/storage';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import * as NativeRaTls from '../../modules/native-ratls/src/index';
 import { walletCallHeaders } from './wallet-call';
-import { ensureWia, getValidWia, lastWiaError } from './wia';
+import { ensureWia, lastWiaError } from './wia';
 
 /** Hardware-bound holder key; the IVR binds to it and prove_* requests are
  *  signed by it. Same key the wallet uses for its DID / FIDO2 signing. */
@@ -862,14 +862,6 @@ export async function proveField(
 
 /** Salt key of the IVR's DG2 portrait commitment (mirrors the verifier). */
 export const PORTRAIT_SALT_KEY = 'picture_dg2';
-
-/** Whether the latest identity receipt can do a fresh-presence check
- *  (needs the DG2 portrait + its commitment salt — both present only on
- *  records minted by verifier >= 0.5.0 with the chip photo). */
-export async function presenceAvailable(): Promise<boolean> {
-    const record = await getLatestKycRecord();
-    return !!(record?.dg2 && record.salts[PORTRAIT_SALT_KEY]);
-}
 
 /** prove_presence: fresh selfie matched in-enclave against the document
  *  portrait this IVR committed to. Proves the DOCUMENT HOLDER is present now —

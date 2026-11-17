@@ -14,7 +14,7 @@
  * confirmation. Replaces the earlier popup-and-banner approach.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {

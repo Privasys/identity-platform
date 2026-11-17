@@ -195,12 +195,6 @@ export async function currentEpoch(): Promise<RecoveryEpoch | null> {
     return all.length ? all[all.length - 1] : null;
 }
 
-/** The epoch numbered n, null for 0 or unknown. */
-export async function epochNumbered(n: number): Promise<RecoveryEpoch | null> {
-    if (!n) return null;
-    return (await loadEpochs()).find((e) => e.n === n) ?? null;
-}
-
 // ---------------------------------------------------------------- registry
 
 export interface RegistryIdentity {

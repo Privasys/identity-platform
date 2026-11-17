@@ -103,28 +103,6 @@ export async function resolveDependencyConsent(
 }
 
 /**
- * Record the user's decision on a connecting enclave's declared dependencies,
- * keyed by (app-id, identity), with the parent app as provenance. Approving a
- * dependency here is reused for every other app that pulls in the same identity.
- */
-export function recordDependencyDecisions(
-    items: DependencyConsentItem[],
-    decision: 'approved' | 'denied',
-    parentRpId: string
-): void {
-    const store = useDependencyApprovalsStore.getState();
-    for (const item of items) {
-        store.record({
-            appId: item.dependency.appId,
-            identity: item.identity,
-            decision,
-            parentRpId,
-            appName: item.provenance.name,
-        });
-    }
-}
-
-/**
  * Record a decision on an enclave's declared dependencies straight from its
  * certificate OIDs, without the async provenance fetch — used at the moment of
  * approval where latency matters. Keyed by (app-id, identity), provenance = the

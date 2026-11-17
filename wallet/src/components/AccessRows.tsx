@@ -5,7 +5,7 @@
  * The rows the Access tab and its lists share: one provider, one app.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, View as RNView, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 

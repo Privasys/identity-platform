@@ -8,7 +8,7 @@
  * on Windows) can hand-share logs when reporting issues.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter, Stack } from 'expo-router';
@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { buildLogExport, clearLogs, formatLogs, getLogs } from '@/utils/logs';
+import { MONO } from '@/constants/fonts';
 
 export default function LogsScreen() {
     const router = useRouter();
@@ -161,7 +162,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     emptyText: { fontSize: 14, color: p.textMuted },
     logText: {
         fontSize: 11,
-        fontFamily: 'SpaceMono',
+        fontFamily: MONO,
         color: p.textPrimary,
         lineHeight: 16,
     },

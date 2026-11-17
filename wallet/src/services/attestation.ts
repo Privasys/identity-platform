@@ -205,18 +205,6 @@ export async function attestEnclave(
 }
 
 /**
- * Low-level verify against an explicit policy. Throws {@link RaTlsError} on
- * failure (carrying `.kind`). Prefer {@link attestEnclave} in flows.
- */
-export async function verifyAttestation(
-    origin: string,
-    policy: VerificationPolicy
-): Promise<AttestationResult> {
-    const { host, port } = splitOrigin(origin);
-    return NativeRaTls.verify(host, port, policy);
-}
-
-/**
  * Inspect an enclave's certificate without policy verification.
  * Used for displaying attestation details before the user decides to trust.
  */

@@ -74,7 +74,3 @@ export async function getAttributeValues(attrKey: string): Promise<ValueOption[]
     return [];
 }
 
-/** Human-readable label for a value within an attribute's set (sync, cache-only). */
-export function cachedValueLabel(attrKey: string, value: string): string {
-    return memoryCache[attrKey]?.find((v) => v.value === value)?.label ?? value;
-}

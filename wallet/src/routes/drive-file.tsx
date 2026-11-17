@@ -14,7 +14,7 @@
  * screen says so.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 
 import { MarkdownView } from '@/components/MarkdownView';
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { MONO } from '@/constants/fonts';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { copyForViewing, discardCopy, fileKind, formatSize, type FileKind } from '@/services/drive-files';
 import * as FilePreview from '../../modules/file-preview/src/index';
@@ -231,7 +232,7 @@ const makeStyles = (p: Palette) =>
             fontSize: 13,
             lineHeight: 19,
             color: p.textPrimary,
-            fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+            fontFamily: MONO,
             backgroundColor: p.card,
             padding: 14,
             borderRadius: 12,

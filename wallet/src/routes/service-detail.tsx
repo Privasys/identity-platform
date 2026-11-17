@@ -9,7 +9,7 @@
  * and the values as shared at that moment, and the datetimes.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Pressable, Alert, Linking, ScrollView, Switch, View as RNView } from 'react-native';

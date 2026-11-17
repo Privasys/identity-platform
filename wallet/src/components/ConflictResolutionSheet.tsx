@@ -10,7 +10,7 @@
  * Conflicts are presented one at a time from a queue.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo } from 'react';
 import { StyleSheet, Pressable, View as RNView } from 'react-native';
 

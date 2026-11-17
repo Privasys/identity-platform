@@ -23,6 +23,7 @@ import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { listDevices } from '@/services/devices';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { getLogs } from '@/utils/logs';
+import { MONO } from '@/constants/fonts';
 
 export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
@@ -285,7 +286,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     pushTokenText: {
         flex: 1,
         fontSize: 12,
-        fontFamily: 'SpaceMono',
+        fontFamily: MONO,
         color: p.textSecondary,
         lineHeight: 18
     },

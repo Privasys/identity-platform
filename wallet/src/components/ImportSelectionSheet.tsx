@@ -8,7 +8,7 @@
  * the avatar) before confirming.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Switch, View as RNView } from 'react-native';
 

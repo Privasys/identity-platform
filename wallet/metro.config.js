@@ -1,15 +1,12 @@
 const path = require('path');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { getDefaultConfig } = require('expo/metro-config');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-// const { withSentryConfig, } = require('@sentry/react-native/metro');
 const tsConfig = require('./tsconfig.json');
 
 // Log to ensure it’s loaded
 console.log('>>> Using custom `metro.config.js` with aliases');
 
 const projectRoot = __dirname;
-// const config = withSentryConfig(getDefaultConfig(projectRoot));
 const config = getDefaultConfig(projectRoot);
 const tsPaths = Object.entries(tsConfig.compilerOptions?.paths ?? {});
 

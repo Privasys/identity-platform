@@ -37,7 +37,6 @@ import {
     loadEpochs,
     mainAccountUserId,
     mergeRegistries,
-    myDeviceTag,
     openTransfer,
     pairingCode,
     pairingKeys,
@@ -528,12 +527,6 @@ export async function secureAfterRecovery(onProgress?: (p: InstallProgress) => v
         }
     }
     return { identities: moved.identities.length, failed: failed + claimFailed };
-}
-
-/** For the Devices screen: this phone's tag on the main account, to tell rows apart in logs. */
-export async function thisPhoneMainTag(): Promise<string | null> {
-    const account = useAuthStore.getState().privasysId;
-    return account ? myDeviceTag(mainAccountUserId(account.userId)) : null;
 }
 
 const SECURE_PENDING_KEY = 'privasys.devices.secure-pending';

@@ -8,7 +8,7 @@
  * by app. Users can review what was shared, when, and revoke standing consents.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState, useMemo, useRef } from 'react';
 import {

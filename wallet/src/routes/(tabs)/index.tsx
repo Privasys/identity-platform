@@ -8,7 +8,7 @@
  * grants, sign-in credentials, sharing history) is the Access tab's question.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';

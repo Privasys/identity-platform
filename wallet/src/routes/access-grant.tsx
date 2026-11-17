@@ -18,7 +18,7 @@
  *    there. That sentence appears before they tap, not after.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
@@ -33,6 +33,7 @@ import { isFolderBusy, listCapabilities, serviceUrlHost } from '@/services/capab
 import { syncGrantsIndex } from '@/services/grants-index';
 import { capabilityKey, useCapabilitiesStore, type CapabilityRecord } from '@/stores/capabilities';
 import { groupOf, isLive } from '@/utils/access-rows';
+import { MONO } from '@/constants/fonts';
 
 /** What the wallet has managed to learn about this grant from the service. */
 type Checked = 'checking' | 'held' | 'gone' | 'unreachable' | 'unsupported';
@@ -393,7 +394,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     label: { fontSize: 12, color: p.textSecondary, marginBottom: 2 },
     value: { fontSize: 16, fontWeight: '600', color: p.textPrimary, lineHeight: 23 },
-    mono: { fontSize: 12, fontFamily: 'SpaceMono', color: p.textMuted },
+    mono: { fontSize: 12, fontFamily: MONO, color: p.textMuted },
     muted: { fontSize: 13, color: p.textMuted, lineHeight: 19 },
     body: { fontSize: 14, color: p.textSecondary, lineHeight: 21, textAlign: 'center' },
     footnote: { fontSize: 12, color: p.textMuted, lineHeight: 18, marginTop: 12 },

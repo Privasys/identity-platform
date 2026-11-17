@@ -320,28 +320,3 @@ export async function generateCanonicalDid(pairwiseSeed: string): Promise<string
     return `did:web:privasys.id:users:${userId}`;
 }
 
-/**
- * Resolve a canonical did:web DID document (fetch from privasys.id enclave).
- *
- * The DID document includes the user's current device keys, linked providers,
- * and service endpoints. Resolution goes over RA-TLS so the document is
- * served by attested code.
- */
-export async function resolveCanonicalDidDocument(
-    did: string
-): Promise<Record<string, unknown> | null> {
-    // did:web:privasys.id:users:<userId> → https://privasys.id/users/<userId>/did.json
-    const parts = did.replace('did:web:', '').split(':');
-    if (parts.length < 3 || parts[0] !== 'privasys.id') return null;
-
-    const path = parts.slice(1).join('/');
-    const url = `https://privasys.id/${path}/did.json`;
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) return null;
-        return (await response.json()) as Record<string, unknown>;
-    } catch {
-        return null;
-    }
-}

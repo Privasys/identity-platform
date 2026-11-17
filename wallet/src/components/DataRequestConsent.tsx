@@ -29,7 +29,7 @@
  * screen's whole job in a worse form, and its only caller has been deleted.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react-native';
 import { Trans, useTranslation } from 'react-i18next';

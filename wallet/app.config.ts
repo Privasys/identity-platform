@@ -12,27 +12,12 @@ const EXPO_PROJECT_ID =
     process.env.EXPO_PUBLIC_PROJECT_ID ??
     process.env.EAS_BUILD_PROJECT_ID ??
     '482c4a6f-fdc0-44a9-9c3e-477dd2efedbc';
-// const SENTRY_DSN_URL =
-//     process.env.NX_SENTRY_DSN ??
-//     process.env.NX_SENTRY_URL ??
-//     process.env.EXPO_PUBLIC_SENTRY_DSN ??
-//     process.env.EXPO_PUBLIC_SENTRY_URL ??
-//     process.env.SENTRY_DSN ??
-//     process.env.SENTRY_URL;
 
 console.log(
     `Building Privasys Wallet version ${version}. Running app.config.ts for stage: ${STAGE}...`
 );
 
-// let sentryUrl = undefined;
-// try {
-//     sentryUrl = SENTRY_DSN_URL ? new URL(SENTRY_DSN_URL) : undefined;
-// } catch (error) {
-//     console.error('Invalid Sentry DSN URL:', error);
-// }
 
-// process.env.EXPO_PUBLIC_SENTRY_AUTH_TOKEN ??= process.env.SENTRY_AUTH_TOKEN;
-process.env.EXPO_PUBLIC_SENTRY_DSN ??= process.env.SENTRY_DSN;
 process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KEY;
 
 /**
@@ -323,16 +308,6 @@ export default (context: ConfigContext): ExpoConfig => {
             ['expo-router', { root: './src/routes' }],
             ['expo-navigation-bar', { barStyle: 'dark-content', visibility: 'visible' }],
             'expo-localization',
-            // sentryUrl
-            //     ? [
-            //         '@sentry/react-native/expo',
-            //         {
-            //             url: sentryUrl.origin,
-            //             project: 'privasys-wallet',
-            //             organization: 'privasys'
-            //         }
-            //     ]
-            //     : 'noop',
             'expo-asset',
             'expo-font',
             'expo-image',

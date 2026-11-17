@@ -8,13 +8,13 @@
  */
 
 import { useMemo } from 'react';
-import { Alert, Linking, Platform, ScrollView, StyleSheet, View as RNView } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { openableLink, parseMarkdown, type Block, type Inline } from '@/services/markdown';
 
-const MONO = Platform.select({ ios: 'Menlo', android: 'monospace' });
+import { MONO } from '@/constants/fonts';
 
 export function MarkdownView({ source }: { source: string }) {
     const p = usePalette();

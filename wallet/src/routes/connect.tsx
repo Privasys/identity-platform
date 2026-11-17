@@ -34,7 +34,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trans, useTranslation } from 'react-i18next';
 
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as WebBrowser from 'expo-web-browser';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
@@ -109,6 +109,7 @@ import { useTrustedAppsStore } from '@/stores/trusted-apps';
 
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
 import { AttestationView, type AttestationVerificationLevel, type VerificationState } from '@/components/AttestationView';
+import { MONO } from '@/constants/fonts';
 
 function appName(rpId: string): string {
     const dot = rpId.indexOf('.');
@@ -3420,7 +3421,7 @@ const makeReportStyles = (p: Palette) => StyleSheet.create({
         borderWidth: 1,
         borderColor: p.border,
     },
-    previewText: { fontSize: 11, fontFamily: 'SpaceMono', color: p.textPrimary, lineHeight: 16 },
+    previewText: { fontSize: 11, fontFamily: MONO, color: p.textPrimary, lineHeight: 16 },
     actions: {
         flexDirection: 'row',
         gap: 12,

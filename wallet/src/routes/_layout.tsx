@@ -1,4 +1,3 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -54,25 +53,6 @@ installLogCapture();
 // on the compiled-in en-GB bundle, so it cannot fail and cannot delay the
 // first frame; the user's own language is swapped in later by useAppLocale.
 initI18n();
-// import * as Sentry from '@sentry/react-native';
-
-// Sentry.init({
-//     dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-//     environment: process.env.STAGE || process.env.NODE_ENV || 'development',
-//     debug: true,
-
-//     // Adds more context data to events (IP address, cookies, user, etc.)
-//     // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-//     sendDefaultPii: true,
-
-//     // Configure Session Replay
-//     replaysSessionSampleRate: 0.1,
-//     replaysOnErrorSampleRate: 1,
-//     integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()]
-
-//     // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-//     // spotlight: __DEV__,
-// });
 
 export {
     // Catch any errors thrown by the Layout component.
@@ -96,14 +76,12 @@ SplashScreen.preventAutoHideAsync();
 // "App integrity not available on this device" on every Android launch, which
 // read like a real attestation failure while having no bearing on any (2026-08-26).
 
-// export default Sentry.wrap(function RootLayout() {
 export default function RootLayout() {
     useExpoPushToken();
     useDeviceUuid();
     useAppLocale();
     const [loaded, error] = useFonts({
         Inter: require('@/assets/fonts/InterVariable.ttf'),
-        ...FontAwesome.font
     });
 
     const hasProfile = useProfileStore((s) => s.profile != null);

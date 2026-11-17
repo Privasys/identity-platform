@@ -78,28 +78,6 @@ export async function grantSpendConsent(
     });
 }
 
-/** The holder's live consents. */
-export async function listSpendConsents(walletSessionToken: string): Promise<SpendConsent[]> {
-    const res = await idpFetch<{ consents: SpendConsent[] }>('/spend/consents', {
-        method: 'GET',
-        headers: walletAuth(walletSessionToken),
-    });
-    return res.consents ?? [];
-}
-
-/** The holder's live consent for one app, or null. */
-export async function getSpendConsent(walletSessionToken: string, appId: string): Promise<SpendConsent | null> {
-    try {
-        return await idpFetch<SpendConsent>(`/spend/consents/${encodeURIComponent(appId)}`, {
-            method: 'GET',
-            headers: walletAuth(walletSessionToken),
-        });
-    } catch (e) {
-        if (e instanceof Error && /no consent/i.test(e.message)) return null;
-        throw e;
-    }
-}
-
 /** Withdraw the consent: the app can no longer spend for the holder. */
 export async function revokeSpendConsent(walletSessionToken: string, appId: string): Promise<void> {
     await idpFetch<unknown>(`/spend/consents/${encodeURIComponent(appId)}`, {

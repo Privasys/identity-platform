@@ -21,7 +21,7 @@ import { PrivasysDrive, type DriveNode, type Tenant } from '@privasys/drive-sdk'
 import { getAttestationServerToken } from '@/services/app-attest';
 import { inspectAttestation, attestEnclave, type AttestationResult } from '@/services/attestation';
 import { apiBasesForHost, appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
-import { getDriveToken, getPlatformToken, rememberDriveHost, tokenForHost } from '@/services/platform-token';
+import { getDriveToken, getPlatformToken, rememberDriveAppId, rememberDriveHost, tokenForHost } from '@/services/platform-token';
 import { useSettingsStore, type VerificationMode } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
@@ -168,6 +168,7 @@ export async function attestDrive(forceMode?: VerificationMode): Promise<DriveAt
     // measurements and validity from the verified result.
     const attestation: AttestationResult = { ...inspected, ...outcome.result };
     lastAttest = { origin: d.origin, appId };
+    void rememberDriveAppId(appId);
     return {
         origin: d.origin,
         displayName: DRIVE_DISPLAY,

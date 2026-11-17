@@ -23,7 +23,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import type { TFunction } from 'i18next';
 
 import { ensureDrive } from '@/services/drive';
-import { getDriveToken, isDriveHost } from '@/services/platform-token';
+import { getDriveToken, isDriveAppId, isDriveHost } from '@/services/platform-token';
 import { makeRaTlsFetch, requestBytes } from '../../modules/native-ratls/src/index';
 
 /** A file or folder as the wallet lists it. */
@@ -224,8 +224,8 @@ export function formatSize(bytes: number, t: TFunction): string {
 
 /**
  * Where in the wallet a Drive link opens, or null for a link the wallet does
- * not open itself. Only a link from the Drive host the wallet resolved, with
- * a path the wallet knows. The Drive screen then checks that `from` (the app
+ * not open itself. Only a link from Drive (its attested app id, or the host
+ * the wallet resolved for it), with a path the wallet knows. The Drive screen then checks that `from` (the app
  * id the platform named) is the app id Drive's attestation carries.
  */
 export async function driveRouteFor(
@@ -234,7 +234,11 @@ export async function driveRouteFor(
     appId: string | undefined,
 ): Promise<{ pathname: '/drive'; params: Record<string, string> } | null> {
     const link = parseDriveLink(path);
-    if (!link || !appHost || !(await isDriveHost(appHost))) return null;
+    if (!link) return null;
+    // Drive is known by the app id its attestation carried (a push's host may
+    // be Drive's custom domain), or by the platform host the wallet resolved.
+    const fromDrive = (!!appId && (await isDriveAppId(appId))) || (!!appHost && (await isDriveHost(appHost)));
+    if (!fromDrive) return null;
     const params: Record<string, string> = { section: 'shared' };
     if (link.tenantId && link.nodeId) {
         params.tenant = link.tenantId;

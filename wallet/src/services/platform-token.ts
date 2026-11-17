@@ -48,6 +48,32 @@ export async function rememberDriveHost(host: string): Promise<void> {
     }
 }
 
+/** The app id Drive's attestation carried when the wallet last attested it. */
+const DRIVE_APP_KEY = 'privasys.drive.appId';
+
+const normaliseAppId = (id: string) => id.toLowerCase().replace(/-/g, '');
+
+/** Recorded by services/drive.ts from Drive's attested app id (OID 4.1). */
+export async function rememberDriveAppId(appId: string): Promise<void> {
+    try {
+        await SecureStore.setItemAsync(DRIVE_APP_KEY, normaliseAppId(appId));
+    } catch {
+        /* the next attestation records it again */
+    }
+}
+
+/** Whether `appId` is the app id Drive attested. A push names its sender's
+ *  app id (the control plane's, from the app's attested identity), while its
+ *  host may be the app's custom domain, so the id is what identifies Drive. */
+export async function isDriveAppId(appId: string): Promise<boolean> {
+    try {
+        const known = await SecureStore.getItemAsync(DRIVE_APP_KEY);
+        return !!appId && !!known && known === normaliseAppId(appId);
+    } catch {
+        return false;
+    }
+}
+
 export async function isDriveHost(host: string): Promise<boolean> {
     try {
         return !!host && (await SecureStore.getItemAsync(DRIVE_HOST_KEY)) === host;

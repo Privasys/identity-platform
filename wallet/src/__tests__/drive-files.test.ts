@@ -6,6 +6,7 @@ jest.mock('../services/drive', () => ({ ensureDrive: jest.fn() }));
 jest.mock('../services/platform-token', () => ({
     getDriveToken: jest.fn(async () => 'tok'),
     isDriveHost: jest.fn(async (h: string) => h === 'drive-demo.apps.test.privasys.org'),
+    isDriveAppId: jest.fn(async (id: string) => id === 'drive-app-id'),
 }));
 jest.mock('../../modules/native-ratls/src/index', () => ({ makeRaTlsFetch: jest.fn(), requestBytes: jest.fn() }));
 jest.mock('expo-modules-core', () => ({ requireNativeModule: () => ({}) }));
@@ -31,6 +32,12 @@ describe('driveRouteFor', () => {
         await expect(driveRouteFor('drive-demo.apps.test.privasys.org', '/#shared/t-1/n-2', 'app-1')).resolves.toEqual({
             pathname: '/drive',
             params: { section: 'shared', tenant: 't-1', node: 'n-2', from: 'app-1' },
+        });
+    });
+    it('opens it for a push from the attested Drive app id on its custom domain', async () => {
+        await expect(driveRouteFor('drive.test.privasys.org', '/#shared/t-1/n-2', 'drive-app-id')).resolves.toMatchObject({
+            pathname: '/drive',
+            params: { tenant: 't-1', node: 'n-2', from: 'drive-app-id' },
         });
     });
     it('leaves any other app to its page, even with the same path', async () => {

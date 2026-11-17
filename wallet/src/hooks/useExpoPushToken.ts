@@ -7,7 +7,7 @@ import { APP_FORM_TYPE } from '../services/app-form';
 import { APPROVAL_TYPE } from '../services/approval';
 import { APP_MESSAGE_TYPE, appMessageLink, readAppMessage } from '../services/app-message';
 import { DEFAULT_RELAY_HOST, fetchDescriptor } from '../services/descriptor';
-import { driveRouteFor } from '../services/drive-files';
+import { DRIVE_ID, driveRouteFor } from '../services/drive-files';
 import { pullRelay } from '../services/device-sync';
 import { mainAccountUserId } from '../services/devices';
 import { ensureNotifySealKey, openSealedNotification } from '../services/notify-seal';
@@ -151,6 +151,8 @@ async function fileDriveNotification(data: Record<string, unknown>): Promise<boo
             requestId: String(payload.request_id ?? ''),
             nodeName: String(payload.node_name ?? ''),
             status: payload.status === 'approved' ? 'approved' : 'denied',
+            tenantId: DRIVE_ID.test(String(payload.tenant_id ?? '')) ? String(payload.tenant_id) : undefined,
+            nodeId: DRIVE_ID.test(String(payload.node_id ?? '')) ? String(payload.node_id) : undefined,
         });
     }
     return true;
@@ -176,6 +178,23 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
             await fileDriveNotification(data);
         } catch (e) {
             console.warn('[notifications] could not file drive notification', e);
+        }
+        // An approved request opens the item in the wallet's Drive. The Drive
+        // screen follows it only from the Drive it attests.
+        if (data?.type === 'share-decision') {
+            const decision = useDriveNotificationsStore.getState().decisions.slice(-1)[0];
+            if (decision?.status === 'approved' && decision.tenantId && decision.nodeId) {
+                router.push({
+                    pathname: '/drive',
+                    params: {
+                        section: 'shared',
+                        tenant: decision.tenantId,
+                        node: decision.nodeId,
+                        ...(typeof data.app_id === 'string' ? { from: data.app_id } : {}),
+                    },
+                });
+                return;
+            }
         }
         // Already filed above, so an open list is showing it: pushing would
         // only stack a second copy of the same view. See the vault-approval

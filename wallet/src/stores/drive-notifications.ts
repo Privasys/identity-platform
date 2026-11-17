@@ -50,6 +50,10 @@ export interface ShareDecision {
     nodeName: string;
     status: 'approved' | 'denied';
     receivedAt: number;
+    /** Where the item lives (the sharer's tenant) and its id, so an approved
+     *  one opens in the wallet's Drive. Absent on decisions filed before. */
+    tenantId?: string;
+    nodeId?: string;
 }
 
 interface DriveNotificationsState {

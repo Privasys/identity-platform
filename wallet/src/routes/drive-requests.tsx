@@ -18,6 +18,7 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -70,6 +71,7 @@ export default function DriveRequestsScreen() {
     // See vault-approvals: a list screen must not be stacked by repeat pushes.
     useActiveRoute('/drive-requests');
     const { t } = useTranslation();
+    const router = useRouter();
     const palette = usePalette();
     const styles = makeStyles(palette);
     const store = useDriveNotificationsStore();
@@ -214,7 +216,18 @@ export default function DriveRequestsScreen() {
                     <>
                         <Text style={styles.sectionTitle}>{t('driveRequests.yourRequests')}</Text>
                         {decisions.map((d) => (
-                            <RNView key={`${d.requestId}-${d.status}`} style={styles.card}>
+                            <Pressable
+                                key={`${d.requestId}-${d.status}`}
+                                style={styles.card}
+                                disabled={!(d.status === 'approved' && d.tenantId && d.nodeId)}
+                                onPress={() =>
+                                    router.push({
+                                        pathname: '/drive',
+                                        params: { section: 'shared', tenant: d.tenantId!, node: d.nodeId! },
+                                    })
+                                }
+                                accessibilityRole="button"
+                            >
                                 <RNView style={styles.cardHeader}>
                                     <Ionicons
                                         name={d.status === 'approved' ? 'lock-open-outline' : 'close-circle-outline'}
@@ -231,7 +244,7 @@ export default function DriveRequestsScreen() {
                                         ? t('driveRequests.yourRequestApproved')
                                         : t('driveRequests.yourRequestDenied')}
                                 </Text>
-                            </RNView>
+                            </Pressable>
                         ))}
                     </>
                 )}

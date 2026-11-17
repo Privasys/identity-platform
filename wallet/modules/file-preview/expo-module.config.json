@@ -1,0 +1,9 @@
+{
+    "platforms": ["ios", "android"],
+    "ios": {
+        "modules": ["FilePreviewModule"]
+    },
+    "android": {
+        "modules": ["org.privasys.filepreview.FilePreviewModule"]
+    }
+}

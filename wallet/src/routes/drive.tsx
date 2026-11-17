@@ -2,20 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Drive: browse the caller's confidential personal drive. A sub view opened
- * from Profile, where the holder's own data lives; it was a tab of its own
- * until the Drive row joined Personal Data.
+ * Drive: the holder's storage, opened from Profile. Two sections, My files
+ * and Shared with me, read through the wallet's storage service
+ * (services/drive-files); a file opens in the wallet's own viewer
+ * (routes/drive-file).
  *
- * The enclave resolves like the identity verifier (store resolve API with
- * hardcoded build fallback, attestation-pinned either way); on mount the
- * screen ensures the drive session (connect + setupPersonalDrive over RA-TLS)
- * and browses the folder tree. The bell opens the share-requests screen,
- * where raw subs are decorated from the wallet's attribute referential.
+ * The Drive enclave is approved on first connect and re-approved if its
+ * attestation changes, as for the identity verifier. A Drive link (an access
+ * request approved, `/#shared/<tenant>/<node>`) arrives as `tenant` and
+ * `node`, and is followed only when it came from the Drive this screen just
+ * attested (`from` is the app id the platform named for the push).
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -26,35 +27,37 @@ import {
     View as RNView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { AttestationView } from '@/components/AttestationView';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
-import { attestDrive, ensureDrive, type DriveAttestation, type DriveNode } from '@/services/drive';
+import { attestDrive, type DriveAttestation } from '@/services/drive';
+import {
+    clearViewerCopies,
+    DRIVE_ID,
+    formatSize,
+    listFolder,
+    listSharedWithMe,
+    myTenant,
+    type SharedItem,
+    type StoredItem,
+} from '@/services/drive-files';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
-import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 
-/**
- * File size for a list row.
- *
- * The UNIT is translated (some languages abbreviate bytes differently) but the
- * NUMBER is not localised: these are small, and thousands separators here
- * would only invite the grouping-inside-a-technical-value mistake that the
- * measurement rows must never make.
- */
-function formatSize(bytes: number, t: TFunction): string {
-    if (!bytes) return '';
-    if (bytes < 1024) return t('drive.sizeBytes', { value: bytes });
-    if (bytes < 1024 * 1024) return t('drive.sizeKb', { value: (bytes / 1024).toFixed(0) });
-    return t('drive.sizeMb', { value: (bytes / (1024 * 1024)).toFixed(1) });
-}
+type Section = 'mine' | 'shared';
 
 interface Crumb {
+    tenantId: string;
     id: string;
     name: string;
+}
+
+function sameApp(a?: string, b?: string): boolean {
+    const n = (s?: string) => (s ?? '').toLowerCase().replace(/-/g, '');
+    return !!n(a) && n(a) === n(b);
 }
 
 export default function DriveScreen() {
@@ -63,24 +66,23 @@ export default function DriveScreen() {
     const styles = useMemo(() => makeStyles(p), [p]);
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const [nodes, setNodes] = useState<DriveNode[] | null>(null);
+    const params = useLocalSearchParams<{ tenant?: string; node?: string; from?: string; section?: string }>();
+    const [section, setSection] = useState<Section>(params.section === 'shared' || params.node ? 'shared' : 'mine');
+    const [items, setItems] = useState<StoredItem[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [path, setPath] = useState<Crumb[]>([]);
-    const pendingCount = useDriveNotificationsStore(
-        (s) => s.requests.filter((r) => !r.decision).length
-    );
+    const [highlight, setHighlight] = useState<string | null>(null);
+    const followed = useRef(false);
+    const pendingCount = useDriveNotificationsStore((s) => s.requests.filter((r) => !r.decision).length);
 
-    // Approval gate (mirrors the ID-check verifier): the user approves the Drive
-    // enclave on first connect and re-approves if its attestation changes.
-    //   preparing → attest + trusted-app check
-    //   approve   → show AttestationView (new enclave, or a changed one)
-    //   ready     → approved (or already trusted + unchanged) → browse
-    //   blocked   → attestation failed, or the user declined
+    // Approval gate: approve the Drive enclave on first connect, again if its
+    // attestation changes.
     type Phase = 'preparing' | 'approve' | 'ready' | 'blocked';
     const [phase, setPhase] = useState<Phase>('preparing');
     const [att, setAtt] = useState<DriveAttestation | null>(null);
+    const [driveAppId, setDriveAppId] = useState<string | null>(null);
     const [attError, setAttError] = useState<string | null>(null);
     const [isChanged, setIsChanged] = useState(false);
     const [diff, setDiff] = useState<AttestationDiff | null>(null);
@@ -89,7 +91,6 @@ export default function DriveScreen() {
 
     const folder = path.length > 0 ? path[path.length - 1] : null;
 
-    /** Record the approved Drive enclave so we don't re-prompt until it changes. */
     const rememberDrive = useCallback(
         (a: DriveAttestation) => {
             addTrustedApp({
@@ -104,29 +105,28 @@ export default function DriveScreen() {
                 configRoot: a.attestation.workload_config_merkle_root,
                 teeType: a.attestation.tee_type ?? 'tdx',
                 lastVerified: Math.floor(Date.now() / 1000),
-                credentialId: ''
+                credentialId: '',
             });
         },
-        [addTrustedApp]
+        [addTrustedApp],
     );
 
-    /** Attest the Drive enclave and decide whether the user must approve it. */
     const prepare = useCallback(async () => {
         setPhase('preparing');
         setAttError(null);
         try {
             const a = await attestDrive();
+            setDriveAppId(a.appId);
             const measurements = {
                 mrenclave: a.attestation.mrenclave,
                 mrtd: a.attestation.mrtd,
                 rtmr1: a.attestation.rtmr1,
                 rtmr2: a.attestation.rtmr2,
                 codeHash: a.attestation.workload_code_hash,
-                configRoot: a.attestation.workload_config_merkle_root
+                configRoot: a.attestation.workload_config_merkle_root,
             };
             const trusted = getApp(a.origin);
             if (trusted && isAttestationMatch(a.origin, measurements)) {
-                // Already approved on this device and unchanged: refresh + go.
                 rememberDrive(a);
                 setPhase('ready');
             } else {
@@ -139,7 +139,7 @@ export default function DriveScreen() {
             setAttError(e instanceof Error ? e.message : t('drive.verifyFailed'));
             setPhase('blocked');
         }
-    }, [getApp, isAttestationMatch, rememberDrive]);
+    }, [getApp, isAttestationMatch, rememberDrive, t]);
 
     const handleApproveDrive = useCallback(() => {
         if (!att) return;
@@ -152,72 +152,95 @@ export default function DriveScreen() {
         setAtt(null);
         setAttError(t('drive.declined'));
         setPhase('blocked');
-    }, []);
+    }, [t]);
 
-    /** "Challenge this enclave": re-attest in challenge mode with a fresh nonce. */
     const handleChallengeDrive = useCallback(async () => {
         setChallengeInFlight(true);
         try {
             setAtt(await attestDrive('challenge'));
         } catch (e) {
-            Alert.alert(
-                t('drive.challengeFailedTitle'),
-                e instanceof Error ? e.message : t('drive.challengeFailedBody')
-            );
+            Alert.alert(t('drive.challengeFailedTitle'), e instanceof Error ? e.message : t('drive.challengeFailedBody'));
         } finally {
             setChallengeInFlight(false);
         }
-    }, []);
+    }, [t]);
 
-    const load = useCallback(async (target: Crumb | null, asRefresh = false) => {
-        if (asRefresh) setRefreshing(true);
-        else setLoading(true);
-        setError(null);
-        try {
-            const s = await ensureDrive();
-            if (!s) {
-                setError(t('drive.notAvailable'));
-                setNodes(null);
+    const load = useCallback(
+        async (sec: Section, at: Crumb | null, asRefresh = false): Promise<StoredItem[] | null> => {
+            if (asRefresh) setRefreshing(true);
+            else setLoading(true);
+            setError(null);
+            try {
+                const list = at
+                    ? await listFolder(at.tenantId, at.id)
+                    : sec === 'shared'
+                      ? await listSharedWithMe()
+                      : await listFolder(await myTenant());
+                setItems(list);
+                return list;
+            } catch (e) {
+                setError(e instanceof Error ? e.message : t('drive.openFailed'));
+                setItems(null);
+                return null;
+            } finally {
+                setLoading(false);
+                setRefreshing(false);
+            }
+        },
+        [t],
+    );
+
+    const openItem = useCallback(
+        (it: StoredItem) => {
+            if (it.kind === 'folder') {
+                setPath((cur) => [...cur, { tenantId: it.tenantId, id: it.id, name: it.name }]);
                 return;
             }
-            setNodes(
-                target
-                    ? await s.drive.listFolder(s.tenant.id, target.id)
-                    : await s.drive.listRoot(s.tenant.id)
-            );
-        } catch (e) {
-            setError(e instanceof Error ? e.message : t('drive.openFailed'));
-            setNodes(null);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    }, []);
+            router.push({
+                pathname: '/drive-file',
+                params: { tenant: it.tenantId, id: it.id, name: it.name, mime: it.mime ?? '', size: String(it.sizeBytes) },
+            });
+        },
+        [router],
+    );
 
-    // Run the approval gate once on mount.
     useEffect(() => {
         void prepare();
-        // Hydrate the notifications store so the bell badge is live.
         void useDriveNotificationsStore.getState().hydrate();
+        // Copies left by a viewer that never closed cleanly.
+        clearViewerCopies();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Browse only after the enclave is approved (or already trusted).
+    // Browse once approved. The first load in Shared with me also follows a
+    // Drive link, when it came from this Drive.
     useEffect(() => {
         if (phase !== 'ready') return;
-        void load(folder);
+        void (async () => {
+            const list = await load(section, folder);
+            if (followed.current || !list || folder || section !== 'shared') return;
+            const { tenant, node, from } = params;
+            if (!tenant || !node || !DRIVE_ID.test(tenant) || !DRIVE_ID.test(node)) return;
+            followed.current = true;
+            if (from && !sameApp(from, driveAppId ?? undefined)) return;
+            const hit = (list as SharedItem[]).find((s) => s.tenantId === tenant && s.id === node);
+            if (!hit) {
+                Alert.alert(t('drive.notFound'));
+                return;
+            }
+            setHighlight(hit.id);
+            openItem(hit);
+        })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [phase, folder?.id]);
+    }, [phase, section, folder?.id]);
 
-    const openFolder = (n: DriveNode) => {
-        setPath((cur) => [...cur, { id: n.id, name: n.name }]);
-    };
-    const goBack = () => {
-        setPath((cur) => cur.slice(0, -1));
+    const switchTo = (sec: Section) => {
+        if (sec === section) return;
+        setPath([]);
+        setItems(null);
+        setSection(sec);
     };
 
-    // Approval / re-approval screen for the Drive enclave (full-screen, same
-    // shared view as sign-in and ID check).
     if (phase === 'approve' && att) {
         return (
             <AttestationView
@@ -236,6 +259,8 @@ export default function DriveScreen() {
         );
     }
 
+    const rootName = section === 'shared' ? t('drive.shared') : t('drive.mine');
+
     return (
         <RNView style={styles.screen}>
             <SubPageHeader
@@ -249,22 +274,34 @@ export default function DriveScreen() {
                         <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
                         {pendingCount > 0 && (
                             <RNView style={styles.badge}>
-                                <Text style={styles.badgeText}>
-                                    {pendingCount > 9 ? '9+' : String(pendingCount)}
-                                </Text>
+                                <Text style={styles.badgeText}>{pendingCount > 9 ? '9+' : String(pendingCount)}</Text>
                             </RNView>
                         )}
                     </Pressable>
                 }
             />
 
+            <RNView style={styles.segments} accessibilityRole="tablist">
+                {(['mine', 'shared'] as Section[]).map((s) => (
+                    <Pressable
+                        key={s}
+                        style={[styles.segment, section === s && styles.segmentOn]}
+                        onPress={() => switchTo(s)}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: section === s }}
+                    >
+                        <Text style={[styles.segmentText, section === s && styles.segmentTextOn]}>
+                            {s === 'shared' ? t('drive.shared') : t('drive.mine')}
+                        </Text>
+                    </Pressable>
+                ))}
+            </RNView>
+
             {path.length > 0 && (
                 <RNView style={styles.crumbBar}>
-                    <Pressable style={styles.crumbBack} onPress={goBack}>
+                    <Pressable style={styles.crumbBack} onPress={() => setPath((cur) => cur.slice(0, -1))}>
                         <Ionicons name="chevron-back" size={18} color={p.blue} />
-                        <Text style={styles.crumbBackText}>
-                            {path.length > 1 ? path[path.length - 2].name : t('tabs.drive')}
-                        </Text>
+                        <Text style={styles.crumbBackText}>{path.length > 1 ? path[path.length - 2].name : rootName}</Text>
                     </Pressable>
                     <Text style={styles.crumbHere} numberOfLines={1}>
                         {folder?.name}
@@ -287,62 +324,56 @@ export default function DriveScreen() {
                     <RNView style={styles.emptyState}>
                         <Ionicons name="cloud-offline-outline" size={44} color={p.textMuted} />
                         <Text style={styles.emptyText}>{error}</Text>
-                        <Pressable style={styles.retry} onPress={() => void load(folder)}>
+                        <Pressable style={styles.retry} onPress={() => void load(section, folder)}>
                             <Text style={styles.retryText}>{t('common.retry')}</Text>
                         </Pressable>
                     </RNView>
-                ) : nodes && nodes.length === 0 ? (
+                ) : items && items.length === 0 ? (
                     <RNView style={styles.emptyState}>
-                        <Ionicons name="folder-open-outline" size={44} color={p.textMuted} />
+                        <Ionicons
+                            name={section === 'shared' && !folder ? 'people-outline' : 'folder-open-outline'}
+                            size={44}
+                            color={p.textMuted}
+                        />
                         <Text style={styles.emptyText}>
-                            {folder ? t('drive.folderEmpty') : t('drive.driveEmpty')}
+                            {folder ? t('drive.folderEmpty') : section === 'shared' ? t('drive.sharedEmpty') : t('drive.driveEmpty')}
                         </Text>
                     </RNView>
                 ) : (
                     <ScrollView
                         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 32 }]}
                         showsVerticalScrollIndicator={false}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={() => void load(folder, true)}
-                            />
-                        }
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(section, folder, true)} />}
                     >
-                        {(nodes ?? []).map((n) => (
-                            <Pressable
-                                key={n.id}
-                                style={styles.card}
-                                disabled={n.kind !== 'folder'}
-                                onPress={() => openFolder(n)}
-                            >
-                                <RNView
-                                    style={[
-                                        styles.icon,
-                                        { backgroundColor: n.kind === 'folder' ? p.blue : '#8B5CF6' }
-                                    ]}
+                        {(items ?? []).map((it) => {
+                            const shared = section === 'shared' && !folder ? (it as SharedItem) : null;
+                            const meta = [
+                                it.kind === 'folder' ? t('drive.folder') : formatSize(it.sizeBytes, t) || t('drive.file'),
+                                shared ? (shared.scope === 'write' ? t('drive.sharedCanEdit') : t('drive.sharedWithYou')) : '',
+                            ]
+                                .filter(Boolean)
+                                .join(' · ');
+                            return (
+                                <Pressable
+                                    key={`${it.tenantId}/${it.id}`}
+                                    style={[styles.card, highlight === it.id && styles.cardHighlight]}
+                                    onPress={() => openItem(it)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={it.name}
                                 >
-                                    <Ionicons
-                                        name={n.kind === 'folder' ? 'folder' : 'document'}
-                                        size={18}
-                                        color="#FFFFFF"
-                                    />
-                                </RNView>
-                                <RNView style={styles.info}>
-                                    <Text style={styles.name} numberOfLines={1}>
-                                        {n.name}
-                                    </Text>
-                                    <Text style={styles.meta}>
-                                        {n.kind === 'folder'
-                                            ? t('drive.folder')
-                                            : formatSize(n.size_bytes, t) || t('drive.file')}
-                                    </Text>
-                                </RNView>
-                                {n.kind === 'folder' && (
+                                    <RNView style={[styles.icon, { backgroundColor: it.kind === 'folder' ? p.blue : '#8B5CF6' }]}>
+                                        <Ionicons name={it.kind === 'folder' ? 'folder' : 'document'} size={18} color="#FFFFFF" />
+                                    </RNView>
+                                    <RNView style={styles.info}>
+                                        <Text style={styles.name} numberOfLines={1}>
+                                            {it.name}
+                                        </Text>
+                                        <Text style={styles.meta}>{meta}</Text>
+                                    </RNView>
                                     <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
-                                )}
-                            </Pressable>
-                        ))}
+                                </Pressable>
+                            );
+                        })}
                     </ScrollView>
                 )}
             </RNView>
@@ -350,75 +381,69 @@ export default function DriveScreen() {
     );
 }
 
-const makeStyles = (p: Palette) => StyleSheet.create({
-    screen: { flex: 1, backgroundColor: p.screenBg },
-    // Same size as SubPageHeader's back button, so the title stays centred.
-    bell: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center'
-    },
-    badge: {
-        position: 'absolute',
-        top: -2,
-        right: -2,
-        minWidth: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: '#DC2626',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 4
-    },
-    badgeText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
-    crumbBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        gap: 10
-    },
-    crumbBack: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-    crumbBackText: { fontSize: 14, fontWeight: '600', color: p.blue },
-    crumbHere: { flex: 1, fontSize: 14, color: p.textSecondary, textAlign: 'right' },
-    content: { flex: 1 },
-    spinner: { marginTop: 60 },
-    list: { padding: 20, paddingTop: 16, paddingBottom: 96 },
-    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 12 },
-    emptyText: { fontSize: 15, textAlign: 'center', color: p.textSecondary, lineHeight: 22 },
-    retry: {
-        marginTop: 8,
-        backgroundColor: p.action,
-        borderRadius: 12,
-        paddingHorizontal: 20,
-        paddingVertical: 10
-    },
-    retryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
-    card: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: p.card,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 10,
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2
-    },
-    icon: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 14
-    },
-    info: { flex: 1 },
-    name: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
-    meta: { fontSize: 12, color: p.textSecondary, marginTop: 2 }
-});
+const makeStyles = (p: Palette) =>
+    StyleSheet.create({
+        screen: { flex: 1, backgroundColor: p.screenBg },
+        bell: {
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        badge: {
+            position: 'absolute',
+            top: -2,
+            right: -2,
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            backgroundColor: '#DC2626',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 4,
+        },
+        badgeText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
+        segments: {
+            flexDirection: 'row',
+            marginHorizontal: 20,
+            marginTop: 16,
+            padding: 3,
+            borderRadius: 12,
+            backgroundColor: p.buttonNeutral,
+        },
+        segment: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: 'center' },
+        segmentOn: { backgroundColor: p.card },
+        segmentText: { fontSize: 14, fontWeight: '600', color: p.textSecondary },
+        segmentTextOn: { color: p.textPrimary },
+        crumbBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, gap: 10 },
+        crumbBack: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+        crumbBackText: { fontSize: 14, fontWeight: '600', color: p.blue },
+        crumbHere: { flex: 1, fontSize: 14, color: p.textSecondary, textAlign: 'right' },
+        content: { flex: 1 },
+        spinner: { marginTop: 60 },
+        list: { padding: 20, paddingTop: 16, paddingBottom: 96 },
+        emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 12 },
+        emptyText: { fontSize: 15, textAlign: 'center', color: p.textSecondary, lineHeight: 22 },
+        retry: { marginTop: 8, backgroundColor: p.action, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
+        retryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+        card: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: p.card,
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 10,
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+            elevation: 2,
+        },
+        cardHighlight: { borderWidth: 1, borderColor: p.successBorder, backgroundColor: p.successBg, padding: 15 },
+        icon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+        info: { flex: 1 },
+        name: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
+        meta: { fontSize: 12, color: p.textSecondary, marginTop: 2 },
+    });

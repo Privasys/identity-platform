@@ -187,6 +187,40 @@ export async function request(
 }
 
 /**
+ * An RA-TLS request whose response body comes back as raw bytes, for a binary
+ * body (a PDF, an image): the string calls hand the body over inside a JSON
+ * string, which cannot carry arbitrary bytes. Same connection and checks as
+ * `request()`. Library v0.15.0 and later.
+ */
+export async function requestBytes(
+    method: string,
+    host: string,
+    port: number,
+    path: string,
+    body: string,
+    headers?: Record<string, string>,
+    caCertPath?: string,
+    options?: RequestOptions
+): Promise<{ status: number; body: Uint8Array }> {
+    if (!NativeRaTls) throw new Error('NativeRaTls is not available on web');
+    const headersJson =
+        headers && Object.keys(headers).length > 0 ? JSON.stringify(headers) : null;
+    const r: { status?: number; body?: Uint8Array; error?: string } = await NativeRaTls.requestBytes(
+        method, host, port, path, body, headersJson, caCertPath ?? null, options ? JSON.stringify(options) : null
+    );
+    if (r.error) {
+        let parsed: AttestationError;
+        try {
+            parsed = JSON.parse(r.error);
+        } catch {
+            parsed = { error: r.error } as AttestationError;
+        }
+        throw new RaTlsError(parsed);
+    }
+    return { status: r.status ?? 0, body: r.body ?? new Uint8Array(0) };
+}
+
+/**
  * A `fetch`-shaped adapter over the RA-TLS transport, suitable for
  * passing to an SDK that accepts a custom `fetch` (e.g.
  * `@privasys/drive-sdk`'s `PrivasysDrive.connect({ fetch })`).
@@ -243,3 +277,4 @@ export function makeRaTlsFetch(opts: {
 }
 
 export type { AttestationResult, AttestationError, VerificationPolicy, PostResult, VerifyErrorKind } from './NativeRaTls.types.js';
+

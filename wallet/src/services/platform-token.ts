@@ -48,7 +48,7 @@ export async function rememberDriveHost(host: string): Promise<void> {
     }
 }
 
-async function isDriveHost(host: string): Promise<boolean> {
+export async function isDriveHost(host: string): Promise<boolean> {
     try {
         return !!host && (await SecureStore.getItemAsync(DRIVE_HOST_KEY)) === host;
     } catch {

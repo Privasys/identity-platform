@@ -32,4 +32,11 @@ internal object NativeRaTlsBridge {
         method: String, host: String, port: Int, caCertPath: String?,
         path: String, body: String, headersJson: String?, optionsJson: String?
     ): String
+
+    /** [status: Int, body: ByteArray?, error: String?]: the body as raw bytes. */
+    @JvmStatic
+    external fun nativeRequestBytes(
+        method: String, host: String, port: Int, caCertPath: String?,
+        path: String, body: String, headersJson: String?, optionsJson: String?
+    ): Array<Any?>
 }

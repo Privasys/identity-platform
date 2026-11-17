@@ -182,5 +182,57 @@ public class NativeRaTlsModule: Module {
                 }
             }
         }
+
+        // `requestWith`, with the response body as bytes (a JS Uint8Array)
+        // rather than inside a JSON string, so a binary body arrives intact.
+        // Resolves {status, body} or {error} (the same error JSON as a string).
+        AsyncFunction("requestBytes") { (method: String, host: String, port: Int, path: String, body: String, headersJson: String?, caCertPath: String?, optionsJson: String?) -> [String: Any] in
+            return await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let resp = method.withCString { methodPtr in
+                        host.withCString { hostPtr in
+                            path.withCString { pathPtr in
+                                body.withCString { bodyPtr in
+                                    func call(_ caPtr: UnsafePointer<CChar>?, _ hPtr: UnsafePointer<CChar>?) -> UnsafeMutablePointer<RatlsResponse>? {
+                                        if let optionsJson {
+                                            return optionsJson.withCString { oPtr in
+                                                ratls_request_bytes(methodPtr, hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr, hPtr, oPtr)
+                                            }
+                                        }
+                                        return ratls_request_bytes(methodPtr, hostPtr, UInt16(port), caPtr, pathPtr, bodyPtr, hPtr, nil)
+                                    }
+                                    func withHeaders(_ caPtr: UnsafePointer<CChar>?) -> UnsafeMutablePointer<RatlsResponse>? {
+                                        if let headersJson {
+                                            return headersJson.withCString { hPtr in call(caPtr, hPtr) }
+                                        }
+                                        return call(caPtr, nil)
+                                    }
+                                    if let caPath = caCertPath {
+                                        return caPath.withCString { caPtr in withHeaders(caPtr) }
+                                    } else {
+                                        return withHeaders(nil)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    guard let resp else {
+                        continuation.resume(returning: ["error": "{\"error\":\"FFI returned null\"}"])
+                        return
+                    }
+                    let r = resp.pointee
+                    var out: [String: Any]
+                    if let err = r.error {
+                        out = ["error": String(cString: err)]
+                    } else {
+                        let bytes = r.body_len > 0 && r.body != nil ? Data(bytes: r.body, count: Int(r.body_len)) : Data()
+                        out = ["status": Int(r.status), "body": bytes]
+                    }
+                    ratls_free_response(resp)
+                    continuation.resume(returning: out)
+                }
+            }
+        }
     }
 }

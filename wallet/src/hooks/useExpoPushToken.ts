@@ -7,6 +7,7 @@ import { APP_FORM_TYPE } from '../services/app-form';
 import { APPROVAL_TYPE } from '../services/approval';
 import { APP_MESSAGE_TYPE, appMessageLink, readAppMessage } from '../services/app-message';
 import { DEFAULT_RELAY_HOST, fetchDescriptor } from '../services/descriptor';
+import { driveRouteFor } from '../services/drive-files';
 import { pullRelay } from '../services/device-sync';
 import { mainAccountUserId } from '../services/devices';
 import { ensureNotifySealKey, openSealedNotification } from '../services/notify-seal';
@@ -237,10 +238,17 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         const sealed = typeof data.sealed === 'string' ? data.sealed : '';
         const payload = sealed ? await openSealedNotification(sealed, APP_MESSAGE_TYPE) : null;
         const kind = typeof data.kind === 'string' ? data.kind : undefined;
-        const link = appMessageLink(
-            typeof data.app_host === 'string' ? data.app_host : undefined,
-            readAppMessage(payload, kind).path,
-        );
+        const appHost = typeof data.app_host === 'string' ? data.app_host : undefined;
+        const path = readAppMessage(payload, kind).path;
+        // Drive is the wallet's own storage: its links open the wallet's Drive
+        // screen, not the browser.
+        const driveRoute = await driveRouteFor(appHost, path, typeof data.app_id === 'string' ? data.app_id : undefined);
+        if (driveRoute) {
+            if (typeof data.message_id === 'string' && data.message_id) void dismissAppMessage(data.message_id);
+            router.push(driveRoute);
+            return;
+        }
+        const link = appMessageLink(appHost, path);
         if (link) {
             try {
                 await Linking.openURL(link);

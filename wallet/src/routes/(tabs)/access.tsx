@@ -32,7 +32,8 @@ import { rebuildFromGrantsIndex, syncGrantsIndex } from '@/services/grants-index
 import { useAuthStore } from '@/stores/auth';
 import { useCapabilitiesStore } from '@/stores/capabilities';
 import { attributeLabel } from '@/services/attributes';
-import { useAppMessagesStore } from '@/stores/app-messages';
+import { useAppMessagesStore, type WaitingAppMessage } from '@/stores/app-messages';
+import { driveRouteFor } from '@/services/drive-files';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
 import { useConsentStore } from '@/stores/consent';
@@ -65,6 +66,14 @@ export default function AccessScreen() {
     const appMessages = useAppMessagesStore((s) => s.messages);
     const refreshAppMessages = useAppMessagesStore((s) => s.refresh);
     const openAppMessage = useAppMessagesStore((s) => s.open);
+    const dismissAppMessage = useAppMessagesStore((s) => s.dismiss);
+    // A Drive link opens the wallet's Drive screen; any other app's, its page.
+    const openMessage = async (m: WaitingAppMessage) => {
+        const route = await driveRouteFor(m.appHost, m.path, m.appId);
+        if (!route) return openAppMessage(m);
+        void dismissAppMessage(m.id);
+        router.push(route);
+    };
     const guardianWaiting = useGuardianRequestsStore(waitingCount);
     const refreshGuardian = useGuardianRequestsStore((s) => s.refresh);
     const hasProfile = useProfileStore((s) => !!s.profile);
@@ -295,7 +304,7 @@ export default function AccessScreen() {
                                     ? router.push({ pathname: '/approval', params: { id: m.id } })
                                     : m.type === 'app-form'
                                       ? router.push({ pathname: '/app-form', params: { id: m.id } })
-                                      : void openAppMessage(m)
+                                      : void openMessage(m)
                             }
                             accessibilityLabel={title}
                         >

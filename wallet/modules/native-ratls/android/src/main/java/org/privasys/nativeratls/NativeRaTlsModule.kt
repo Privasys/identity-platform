@@ -45,5 +45,19 @@ class NativeRaTlsModule : Module() {
                 NativeRaTlsBridge.nativeRequestWith(method, host, port, caCertPath, path, body, headersJson, optionsJson)
             }
         }
+
+        // requestWith, with the body as bytes (a JS Uint8Array) so a binary body
+        // arrives intact. Resolves {status, body} or {error}.
+        AsyncFunction("requestBytes") { method: String, host: String, port: Int, path: String, body: String, headersJson: String?, caCertPath: String?, optionsJson: String? ->
+            runBlocking(Dispatchers.IO) {
+                val r = NativeRaTlsBridge.nativeRequestBytes(method, host, port, caCertPath, path, body, headersJson, optionsJson)
+                val error = r[2] as String?
+                if (error != null) {
+                    mapOf<String, Any?>("error" to error)
+                } else {
+                    mapOf<String, Any?>("status" to (r[0] as Int), "body" to (r[1] as ByteArray? ?: ByteArray(0)))
+                }
+            }
+        }
     }
 }

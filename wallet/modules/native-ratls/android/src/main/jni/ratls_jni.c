@@ -29,6 +29,18 @@ extern char *ratls_request_with(const char *method, const char *host, unsigned s
                                 const char *headers_json, const char *options_json);
 extern void ratls_free_string(char *ptr);
 
+/* A response with its body as raw bytes (ra-tls-clients v0.15.0). */
+typedef struct RatlsResponse {
+    unsigned short status;
+    unsigned char *body;
+    size_t body_len;
+    char *error;
+} RatlsResponse;
+extern RatlsResponse *ratls_request_bytes(const char *method, const char *host, unsigned short port,
+                                          const char *ca_cert_path, const char *path, const char *body,
+                                          const char *headers_json, const char *options_json);
+extern void ratls_free_response(RatlsResponse *resp);
+
 JNIEXPORT jstring JNICALL
 Java_org_privasys_nativeratls_NativeRaTlsBridge_nativeInspect(
     JNIEnv *env, jclass clazz, jstring host, jint port, jstring ca_cert_path) {
@@ -143,4 +155,52 @@ Java_org_privasys_nativeratls_NativeRaTlsBridge_nativeVerify(
     jstring json = (*env)->NewStringUTF(env, result ? result : "{\"error\":\"FFI returned null\"}");
     if (result) ratls_free_string(result);
     return json;
+}
+
+/* ratls_request_bytes: returns Object[]{Integer status, byte[] body, String error}.
+ * On success error is null; on failure status is 0, body is null and error is the
+ * {"error": ...} JSON the string calls return. */
+JNIEXPORT jobjectArray JNICALL
+Java_org_privasys_nativeratls_NativeRaTlsBridge_nativeRequestBytes(
+    JNIEnv *env, jclass clazz, jstring method, jstring host, jint port,
+    jstring ca_cert_path, jstring path, jstring body, jstring headers_json,
+    jstring options_json) {
+    const char *method_c = (*env)->GetStringUTFChars(env, method, NULL);
+    const char *host_c = (*env)->GetStringUTFChars(env, host, NULL);
+    const char *ca_c = ca_cert_path ? (*env)->GetStringUTFChars(env, ca_cert_path, NULL) : NULL;
+    const char *path_c = (*env)->GetStringUTFChars(env, path, NULL);
+    const char *body_c = (*env)->GetStringUTFChars(env, body, NULL);
+    const char *headers_c = headers_json ? (*env)->GetStringUTFChars(env, headers_json, NULL) : NULL;
+    const char *options_c = options_json ? (*env)->GetStringUTFChars(env, options_json, NULL) : NULL;
+
+    RatlsResponse *resp = ratls_request_bytes(method_c, host_c, (unsigned short)port, ca_c, path_c, body_c, headers_c, options_c);
+
+    (*env)->ReleaseStringUTFChars(env, method, method_c);
+    (*env)->ReleaseStringUTFChars(env, host, host_c);
+    if (ca_c) (*env)->ReleaseStringUTFChars(env, ca_cert_path, ca_c);
+    (*env)->ReleaseStringUTFChars(env, path, path_c);
+    (*env)->ReleaseStringUTFChars(env, body, body_c);
+    if (headers_c) (*env)->ReleaseStringUTFChars(env, headers_json, headers_c);
+    if (options_c) (*env)->ReleaseStringUTFChars(env, options_json, options_c);
+
+    jclass objectClass = (*env)->FindClass(env, "java/lang/Object");
+    jobjectArray out = (*env)->NewObjectArray(env, 3, objectClass, NULL);
+    if (!resp) {
+        (*env)->SetObjectArrayElement(env, out, 2, (*env)->NewStringUTF(env, "{\"error\":\"FFI returned null\"}"));
+        return out;
+    }
+    jclass integerClass = (*env)->FindClass(env, "java/lang/Integer");
+    jmethodID valueOf = (*env)->GetStaticMethodID(env, integerClass, "valueOf", "(I)Ljava/lang/Integer;");
+    (*env)->SetObjectArrayElement(env, out, 0, (*env)->CallStaticObjectMethod(env, integerClass, valueOf, (jint)resp->status));
+    if (resp->error) {
+        (*env)->SetObjectArrayElement(env, out, 2, (*env)->NewStringUTF(env, resp->error));
+    } else {
+        jbyteArray bytes = (*env)->NewByteArray(env, (jsize)resp->body_len);
+        if (resp->body_len > 0) {
+            (*env)->SetByteArrayRegion(env, bytes, 0, (jsize)resp->body_len, (const jbyte *)resp->body);
+        }
+        (*env)->SetObjectArrayElement(env, out, 1, bytes);
+    }
+    ratls_free_response(resp);
+    return out;
 }

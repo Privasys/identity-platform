@@ -1,242 +1,242 @@
 {
   "schema": 1,
-  "issuedAt": "2026-11-13T14:17:42Z",
+  "issuedAt": "2026-11-17T21:46:34Z",
   "platforms": {
     "ios": {
-      "minimum": "1.4.47",
+      "minimum": "1.4.58",
       "level": "required"
     },
     "android": {
-      "minimum": "1.4.47",
+      "minimum": "1.4.58",
       "level": "required"
     }
   },
   "notice": {
-    "id": "2026-11-13-wallet-1.4.47",
+    "id": "2026-11-17-wallet-1.4.58",
     "text": {
       "en-GB": {
         "title": "Update to keep using Privasys Wallet",
-        "body": "This version can refuse a sign-in when your last one was more than two days ago, and its ID check is harder to complete. The update keeps your identities and data.",
+        "body": "This version cannot answer the questions and approval requests apps now send, or open files shared with you. The update keeps your identities and data.",
         "changes": [
-          "The ID check is simpler: the camera reads the lines on your document by itself, and you are shown where the chip is",
-          "You see what the chip says before anything is sent",
-          "Signing in works again when your last sign-in was two or more days ago"
+          "Apps can ask you a question or ask you to approve something, and you answer here in the wallet",
+          "Files shared with you open in the wallet, and an approved request takes you to the file",
+          "A short message confirms what you just did, with clearer buttons and a lighter app"
         ]
       },
       "bg": {
         "title": "Актуализирайте, за да продължите да използвате Privasys Wallet",
-        "body": "Тази версия може да откаже влизане, ако последното ви е било преди повече от два дни, а проверката на документа с нея е по-трудна. Актуализацията запазва вашите идентичности и данни.",
+        "body": "Тази версия не може да отговаря на въпросите и заявките за одобрение, които приложенията вече изпращат, нито да отваря споделени с вас файлове. Актуализацията запазва вашите идентичности и данни.",
         "changes": [
-          "Проверката на документа е по-лесна: камерата сама разчита редовете на документа ви и ви се показва къде е чипът",
-          "Виждате какво съдържа чипът, преди да бъде изпратено каквото и да е",
-          "Влизането отново работи, когато последното ви влизане е било преди два или повече дни"
+          "Приложенията могат да ви зададат въпрос или да поискат одобрение, а вие отговаряте тук, в портфейла",
+          "Споделените с вас файлове се отварят в портфейла, а одобрената заявка ви отвежда до файла",
+          "Кратко съобщение потвърждава какво току-що направихте, с по-ясни бутони и по-леко приложение"
         ]
       },
       "cs": {
         "title": "Aktualizujte, abyste mohli dál používat Privasys Wallet",
-        "body": "Tato verze může odmítnout přihlášení, pokud to poslední proběhlo před více než dvěma dny, a kontrola dokladu je v ní obtížnější. Aktualizace zachová vaše identity i data.",
+        "body": "Tato verze neumí odpovídat na otázky a žádosti o schválení, které aplikace nyní posílají, ani otevírat soubory, které s vámi někdo sdílí. Aktualizace zachová vaše identity i data.",
         "changes": [
-          "Kontrola dokladu je jednodušší: fotoaparát sám přečte řádky na vašem dokladu a ukáže se vám, kde je čip",
-          "Než se cokoli odešle, uvidíte, co obsahuje čip",
-          "Přihlášení opět funguje, i když jste se naposledy přihlásili před dvěma a více dny"
+          "Aplikace se vás mohou na něco zeptat nebo požádat o schválení a vy odpovíte přímo v peněžence",
+          "Soubory sdílené s vámi se otevírají v peněžence a schválená žádost vás k souboru dovede",
+          "Krátká zpráva potvrdí, co jste právě udělali, tlačítka jsou přehlednější a aplikace lehčí"
         ]
       },
       "cy": {
         "title": "Diweddarwch i barhau i ddefnyddio Privasys Wallet",
-        "body": "Gall y fersiwn hon wrthod mewngofnodi os oedd eich un diwethaf fwy na deuddydd yn ôl, ac mae ei gwiriad ID yn anoddach i'w gwblhau. Mae'r diweddariad yn cadw eich hunaniaethau a'ch data.",
+        "body": "Ni all y fersiwn hon ateb y cwestiynau a'r ceisiadau am gymeradwyaeth y mae apiau'n eu hanfon nawr, nac agor ffeiliau a rannwyd gyda chi. Mae'r diweddariad yn cadw eich hunaniaethau a'ch data.",
         "changes": [
-          "Mae'r gwiriad ID yn symlach: mae'r camera'n darllen y llinellau ar eich dogfen ar ei ben ei hun, a dangosir i chi ble mae'r sglodyn",
-          "Rydych chi'n gweld beth mae'r sglodyn yn ei ddweud cyn i ddim gael ei anfon",
-          "Mae mewngofnodi'n gweithio eto pan oedd eich mewngofnodi diwethaf ddeuddydd neu fwy yn ôl"
+          "Gall apiau ofyn cwestiwn i chi neu ofyn i chi gymeradwyo rhywbeth, ac rydych chi'n ateb yma yn y waled",
+          "Mae ffeiliau a rannwyd gyda chi'n agor yn y waled, ac mae cais a gymeradwywyd yn mynd â chi i'r ffeil",
+          "Mae neges fer yn cadarnhau beth wnaethoch chi, gyda botymau cliriach ac ap ysgafnach"
         ]
       },
       "da": {
         "title": "Opdater for at blive ved med at bruge Privasys Wallet",
-        "body": "Denne version kan afvise et login, hvis dit seneste var for mere end to dage siden, og dens id-kontrol er sværere at gennemføre. Opdateringen bevarer dine identiteter og data.",
+        "body": "Denne version kan ikke besvare de spørgsmål og anmodninger om godkendelse, som apps nu sender, eller åbne filer, der er delt med dig. Opdateringen bevarer dine identiteter og data.",
         "changes": [
-          "Id-kontrollen er enklere: kameraet læser selv linjerne på dit dokument, og du får vist, hvor chippen sidder",
-          "Du ser, hvad chippen indeholder, før noget sendes",
-          "Login virker igen, når dit seneste login var for to dage siden eller mere"
+          "Apps kan stille dig et spørgsmål eller bede dig godkende noget, og du svarer her i wallet",
+          "Filer, der er delt med dig, åbnes i wallet, og en godkendt anmodning fører dig til filen",
+          "En kort besked bekræfter, hvad du lige har gjort, med tydeligere knapper og en lettere app"
         ]
       },
       "de": {
         "title": "Aktualisieren Sie, um Privasys Wallet weiter zu nutzen",
-        "body": "Diese Version kann eine Anmeldung ablehnen, wenn Ihre letzte mehr als zwei Tage zurückliegt, und ihre Ausweisprüfung ist schwerer abzuschließen. Die Aktualisierung behält Ihre Identitäten und Daten.",
+        "body": "Diese Version kann die Fragen und Freigabeanfragen, die Apps jetzt senden, nicht beantworten und keine mit Ihnen geteilten Dateien öffnen. Das Update behält Ihre Identitäten und Daten.",
         "changes": [
-          "Die Ausweisprüfung ist einfacher: Die Kamera liest die Zeilen auf Ihrem Dokument selbst, und Ihnen wird gezeigt, wo der Chip ist",
-          "Sie sehen, was der Chip enthält, bevor etwas gesendet wird",
-          "Die Anmeldung funktioniert wieder, wenn Ihre letzte zwei oder mehr Tage zurückliegt"
+          "Apps können Ihnen eine Frage stellen oder Sie um eine Freigabe bitten, und Sie antworten direkt in der Wallet",
+          "Mit Ihnen geteilte Dateien öffnen sich in der Wallet, und eine genehmigte Anfrage führt Sie zur Datei",
+          "Eine kurze Meldung bestätigt, was Sie gerade getan haben, mit klareren Schaltflächen und einer schlankeren App"
         ]
       },
       "el": {
         "title": "Ενημερώστε για να συνεχίσετε να χρησιμοποιείτε το Privasys Wallet",
-        "body": "Αυτή η έκδοση μπορεί να αρνηθεί μια σύνδεση αν η τελευταία σας έγινε πριν από περισσότερες από δύο ημέρες, και ο έλεγχος ταυτότητάς της ολοκληρώνεται πιο δύσκολα. Η ενημέρωση διατηρεί τις ταυτότητες και τα δεδομένα σας.",
+        "body": "Αυτή η έκδοση δεν μπορεί να απαντήσει στις ερωτήσεις και στα αιτήματα έγκρισης που στέλνουν πλέον οι εφαρμογές, ούτε να ανοίξει αρχεία που μοιράστηκαν μαζί σας. Η ενημέρωση διατηρεί τις ταυτότητες και τα δεδομένα σας.",
         "changes": [
-          "Ο έλεγχος ταυτότητας είναι πιο απλός: η κάμερα διαβάζει μόνη της τις γραμμές του εγγράφου σας και βλέπετε πού βρίσκεται το τσιπ",
-          "Βλέπετε τι περιέχει το τσιπ πριν σταλεί οτιδήποτε",
-          "Η σύνδεση λειτουργεί ξανά όταν η τελευταία σας σύνδεση έγινε πριν από δύο ή περισσότερες ημέρες"
+          "Οι εφαρμογές μπορούν να σας κάνουν μια ερώτηση ή να σας ζητήσουν να εγκρίνετε κάτι, και απαντάτε εδώ, στο πορτοφόλι",
+          "Τα αρχεία που μοιράστηκαν μαζί σας ανοίγουν στο πορτοφόλι, και ένα εγκεκριμένο αίτημα σας πηγαίνει στο αρχείο",
+          "Ένα σύντομο μήνυμα επιβεβαιώνει τι μόλις κάνατε, με πιο σαφή κουμπιά και ελαφρύτερη εφαρμογή"
         ]
       },
       "es": {
         "title": "Actualiza para seguir usando Privasys Wallet",
-        "body": "Esta versión puede rechazar un inicio de sesión si el último fue hace más de dos días, y su comprobación del documento es más difícil de completar. La actualización conserva tus identidades y tus datos.",
+        "body": "Esta versión no puede responder a las preguntas y solicitudes de aprobación que ahora envían las apps, ni abrir archivos compartidos contigo. La actualización conserva tus identidades y tus datos.",
         "changes": [
-          "La comprobación del documento es más sencilla: la cámara lee sola las líneas de tu documento y se te muestra dónde está el chip",
-          "Ves lo que contiene el chip antes de que se envíe nada",
-          "Iniciar sesión vuelve a funcionar cuando tu último inicio de sesión fue hace dos días o más"
+          "Las apps pueden hacerte una pregunta o pedirte que apruebes algo, y respondes aquí, en la cartera",
+          "Los archivos compartidos contigo se abren en la cartera, y una solicitud aprobada te lleva al archivo",
+          "Un mensaje breve confirma lo que acabas de hacer, con botones más claros y una app más ligera"
         ]
       },
       "et": {
-        "title": "Värskendage, et Privasys Walleti kasutamist jätkata",
-        "body": "See versioon võib sisselogimisest keelduda, kui teie eelmine oli rohkem kui kaks päeva tagasi, ja selle isikutuvastust on raskem lõpetada. Värskendus säilitab teie identiteedid ja andmed.",
+        "title": "Uuendage, et Privasys Walletit edasi kasutada",
+        "body": "See versioon ei oska vastata küsimustele ja kinnitustaotlustele, mida rakendused nüüd saadavad, ega avada teiega jagatud faile. Uuendus säilitab teie identiteedid ja andmed.",
         "changes": [
-          "Isikutuvastus on lihtsam: kaamera loeb dokumendi read ise ja teile näidatakse, kus kiip asub",
-          "Näete enne millegi saatmist, mida kiip sisaldab",
-          "Sisselogimine töötab taas, kui teie eelmine sisselogimine oli kaks või enam päeva tagasi"
+          "Rakendused saavad teilt midagi küsida või paluda midagi kinnitada ning te vastate siinsamas rahakotis",
+          "Teiega jagatud failid avanevad rahakotis ja kinnitatud taotlus viib teid failini",
+          "Lühike teade kinnitab, mida just tegite, nupud on selgemad ja rakendus kergem"
         ]
       },
       "fi": {
-        "title": "Päivitä jatkaaksesi Privasys Walletin käyttöä",
-        "body": "Tämä versio voi hylätä kirjautumisen, jos edellinen oli yli kaksi päivää sitten, ja sen henkilöllisyyden tarkistus on vaikeampi suorittaa. Päivitys säilyttää identiteettisi ja tietosi.",
+        "title": "Päivitä, jotta voit jatkaa Privasys Walletin käyttöä",
+        "body": "Tämä versio ei pysty vastaamaan kysymyksiin ja hyväksyntäpyyntöihin, joita sovellukset nyt lähettävät, eikä avaamaan kanssasi jaettuja tiedostoja. Päivitys säilyttää identiteettisi ja tietosi.",
         "changes": [
-          "Henkilöllisyyden tarkistus on yksinkertaisempi: kamera lukee asiakirjasi rivit itse, ja sinulle näytetään, missä siru on",
-          "Näet, mitä siru sisältää, ennen kuin mitään lähetetään",
-          "Kirjautuminen toimii taas, kun edellisestä kirjautumisestasi on kaksi päivää tai enemmän"
+          "Sovellukset voivat kysyä sinulta jotain tai pyytää hyväksymään jotain, ja vastaat tässä lompakossa",
+          "Kanssasi jaetut tiedostot avautuvat lompakossa, ja hyväksytty pyyntö vie sinut tiedostoon",
+          "Lyhyt viesti vahvistaa, mitä juuri teit, ja painikkeet ovat selkeämpiä ja sovellus kevyempi"
         ]
       },
       "fr": {
         "title": "Mettez à jour pour continuer à utiliser Privasys Wallet",
-        "body": "Cette version peut refuser une connexion si votre dernière date de plus de deux jours, et sa vérification d'identité est plus difficile à mener à bout. La mise à jour conserve vos identités et vos données.",
+        "body": "Cette version ne peut pas répondre aux questions et demandes d’approbation que les apps envoient désormais, ni ouvrir les fichiers partagés avec vous. La mise à jour conserve vos identités et vos données.",
         "changes": [
-          "La vérification d'identité est plus simple : l'appareil photo lit seul les lignes de votre document, et l'emplacement de la puce vous est indiqué",
-          "Vous voyez ce que contient la puce avant tout envoi",
-          "La connexion fonctionne de nouveau lorsque votre dernière connexion date de deux jours ou plus"
+          "Les apps peuvent vous poser une question ou vous demander d’approuver quelque chose, et vous répondez ici, dans le portefeuille",
+          "Les fichiers partagés avec vous s’ouvrent dans le portefeuille, et une demande approuvée vous mène au fichier",
+          "Un court message confirme ce que vous venez de faire, avec des boutons plus clairs et une app plus légère"
         ]
       },
       "ga": {
         "title": "Nuashonraigh chun leanúint ar aghaidh ag úsáid Privasys Wallet",
-        "body": "Is féidir leis an leagan seo síniú isteach a dhiúltú más mó ná dhá lá ó shínigh tú isteach go deireanach, agus is deacra a sheiceáil aitheantais a chríochnú. Coinníonn an nuashonrú d'aitheantais agus do shonraí.",
+        "body": "Ní féidir leis an leagan seo freagra a thabhairt ar na ceisteanna agus na hiarratais ar cheadú a sheolann aipeanna anois, ná comhaid a roinneadh leat a oscailt. Coinníonn an nuashonrú d’aitheantais agus do shonraí.",
         "changes": [
-          "Tá an seiceáil aitheantais níos simplí: léann an ceamara na línte ar do dhoiciméad as a stuaim féin, agus taispeántar duit cá bhfuil an sliseanna",
-          "Feiceann tú cad atá ar an sliseanna sula seoltar aon rud",
-          "Oibríonn síniú isteach arís nuair a bhí do shíniú isteach deireanach dhá lá ó shin nó níos mó"
+          "Is féidir le haipeanna ceist a chur ort nó iarraidh ort rud éigin a cheadú, agus freagraíonn tú anseo sa sparán",
+          "Osclaítear comhaid a roinneadh leat sa sparán, agus tugann iarratas ceadaithe chuig an gcomhad thú",
+          "Deimhníonn teachtaireacht ghearr an rud a rinne tú, le cnaipí níos soiléire agus aip níos éadroime"
         ]
       },
       "hr": {
         "title": "Ažurirajte kako biste nastavili koristiti Privasys Wallet",
-        "body": "Ova verzija može odbiti prijavu ako je vaša posljednja bila prije više od dva dana, a provjeru isprave u njoj teže je dovršiti. Ažuriranje zadržava vaše identitete i podatke.",
+        "body": "Ova verzija ne može odgovoriti na pitanja i zahtjeve za odobrenje koje aplikacije sada šalju niti otvoriti datoteke podijeljene s vama. Ažuriranje čuva vaše identitete i podatke.",
         "changes": [
-          "Provjera isprave je jednostavnija: kamera sama čita retke na vašoj ispravi i prikazuje vam se gdje je čip",
-          "Vidite što sadrži čip prije nego što se išta pošalje",
-          "Prijava ponovno radi kada je vaša posljednja prijava bila prije dva ili više dana"
+          "Aplikacije vam mogu postaviti pitanje ili zatražiti da nešto odobrite, a vi odgovarate ovdje, u novčaniku",
+          "Datoteke podijeljene s vama otvaraju se u novčaniku, a odobreni zahtjev vodi vas do datoteke",
+          "Kratka poruka potvrđuje što ste upravo učinili, uz jasnije gumbe i lakšu aplikaciju"
         ]
       },
       "hu": {
-        "title": "Frissítsen, hogy tovább használhassa a Privasys Walletet",
-        "body": "Ez a verzió elutasíthatja a bejelentkezést, ha az előző több mint két napja volt, és az igazolványellenőrzést nehezebb vele elvégezni. A frissítés megőrzi az identitásait és adatait.",
+        "title": "Frissítsen, hogy továbbra is használhassa a Privasys Walletet",
+        "body": "Ez a verzió nem tud válaszolni azokra a kérdésekre és jóváhagyási kérésekre, amelyeket az alkalmazások most küldenek, és nem tudja megnyitni az Önnel megosztott fájlokat. A frissítés megőrzi az identitásait és az adatait.",
         "changes": [
-          "Az igazolványellenőrzés egyszerűbb: a kamera magától olvassa be az okmány sorait, és látja, hol van a chip",
-          "Látja, mit tartalmaz a chip, mielőtt bármi elküldésre kerülne",
-          "A bejelentkezés ismét működik, ha az előző bejelentkezése két vagy több napja volt"
+          "Az alkalmazások kérdezhetnek Öntől, vagy kérhetik, hogy hagyjon jóvá valamit, és Ön itt, a tárcában válaszol",
+          "Az Önnel megosztott fájlok a tárcában nyílnak meg, és egy jóváhagyott kérés a fájlhoz vezeti",
+          "Egy rövid üzenet megerősíti, mit tett az imént, egyértelműbb gombokkal és könnyebb alkalmazással"
         ]
       },
       "it": {
         "title": "Aggiorna per continuare a usare Privasys Wallet",
-        "body": "Questa versione può rifiutare un accesso se l'ultimo risale a più di due giorni fa, e il suo controllo del documento è più difficile da completare. L'aggiornamento conserva le tue identità e i tuoi dati.",
+        "body": "Questa versione non può rispondere alle domande e alle richieste di approvazione che le app ora inviano, né aprire i file condivisi con te. L’aggiornamento conserva le tue identità e i tuoi dati.",
         "changes": [
-          "Il controllo del documento è più semplice: la fotocamera legge da sola le righe del tuo documento e ti viene mostrato dove si trova il chip",
-          "Vedi cosa contiene il chip prima che venga inviato qualcosa",
-          "L'accesso funziona di nuovo quando il tuo ultimo accesso risale a due o più giorni fa"
+          "Le app possono farti una domanda o chiederti di approvare qualcosa, e rispondi qui, nel portafoglio",
+          "I file condivisi con te si aprono nel portafoglio, e una richiesta approvata ti porta al file",
+          "Un breve messaggio conferma ciò che hai appena fatto, con pulsanti più chiari e un’app più leggera"
         ]
       },
       "lt": {
         "title": "Atnaujinkite, kad galėtumėte toliau naudoti Privasys Wallet",
-        "body": "Ši versija gali atmesti prisijungimą, jei paskutinį kartą prisijungėte daugiau nei prieš dvi dienas, o dokumento patikrinimą su ja sunkiau užbaigti. Atnaujinimas išsaugo jūsų tapatybes ir duomenis.",
+        "body": "Ši versija negali atsakyti į klausimus ir patvirtinimo prašymus, kuriuos dabar siunčia programėlės, ir atidaryti su jumis bendrinamų failų. Atnaujinimas išsaugo jūsų tapatybes ir duomenis.",
         "changes": [
-          "Dokumento patikrinimas paprastesnis: kamera pati nuskaito dokumento eilutes, o jums parodoma, kur yra lustas",
-          "Prieš ką nors išsiunčiant matote, ką turi lustas",
-          "Prisijungimas vėl veikia, kai paskutinį kartą prisijungėte prieš dvi ar daugiau dienų"
+          "Programėlės gali jums užduoti klausimą arba paprašyti ką nors patvirtinti, o jūs atsakote čia, piniginėje",
+          "Su jumis bendrinami failai atsidaro piniginėje, o patvirtintas prašymas nuveda jus prie failo",
+          "Trumpas pranešimas patvirtina, ką ką tik atlikote, mygtukai aiškesni, o programėlė lengvesnė"
         ]
       },
       "lv": {
         "title": "Atjauniniet, lai turpinātu lietot Privasys Wallet",
-        "body": "Šī versija var atteikt pierakstīšanos, ja iepriekšējā bija pirms vairāk nekā divām dienām, un dokumenta pārbaudi ar to ir grūtāk pabeigt. Atjauninājums saglabā jūsu identitātes un datus.",
+        "body": "Šī versija nevar atbildēt uz jautājumiem un apstiprinājuma pieprasījumiem, ko lietotnes tagad sūta, un nevar atvērt ar jums kopīgotus failus. Atjauninājums saglabā jūsu identitātes un datus.",
         "changes": [
-          "Dokumenta pārbaude ir vienkāršāka: kamera pati nolasa dokumenta rindas, un jums tiek parādīts, kur atrodas mikroshēma",
-          "Pirms kaut kas tiek nosūtīts, jūs redzat, ko satur mikroshēma",
-          "Pierakstīšanās atkal darbojas, ja iepriekšējā pierakstīšanās bija pirms divām vai vairāk dienām"
+          "Lietotnes var jums uzdot jautājumu vai lūgt kaut ko apstiprināt, un jūs atbildat tepat makā",
+          "Ar jums kopīgotie faili atveras makā, un apstiprināts pieprasījums jūs aizved līdz failam",
+          "Īss ziņojums apstiprina, ko tikko izdarījāt, pogas ir skaidrākas un lietotne vieglāka"
         ]
       },
       "mt": {
-        "title": "Aġġorna biex tibqa' tuża Privasys Wallet",
-        "body": "Din il-verżjoni tista' tirrifjuta dħul jekk l-aħħar wieħed tiegħek kien aktar minn jumejn ilu, u l-kontroll tal-ID tagħha huwa aktar diffiċli biex jitlesta. L-aġġornament iżomm l-identitajiet u d-dejta tiegħek.",
+        "title": "Aġġorna biex tibqa’ tuża Privasys Wallet",
+        "body": "Din il-verżjoni ma tistax twieġeb il-mistoqsijiet u t-talbiet għall-approvazzjoni li l-apps issa jibagħtu, u lanqas tiftaħ fajls maqsuma miegħek. L-aġġornament iżomm l-identitajiet u d-dejta tiegħek.",
         "changes": [
-          "Il-kontroll tal-ID huwa aktar sempliċi: il-kamera taqra l-linji fuq id-dokument tiegħek waħedha, u jintwerielek fejn hija ċ-ċippa",
-          "Tara x'fiha ċ-ċippa qabel ma jintbagħat xejn",
-          "Id-dħul jerġa' jaħdem meta l-aħħar dħul tiegħek kien jumejn ilu jew aktar"
+          "L-apps jistgħu jsaqsuk mistoqsija jew jitolbuk tapprova xi ħaġa, u twieġeb hawn fil-kartiera",
+          "Il-fajls maqsuma miegħek jinfetħu fil-kartiera, u talba approvata teħdok għall-fajl",
+          "Messaġġ qasir jikkonferma dak li għadek kif għamilt, b’buttuni aktar ċari u app eħfef"
         ]
       },
       "nl": {
         "title": "Werk bij om Privasys Wallet te blijven gebruiken",
-        "body": "Deze versie kan een aanmelding weigeren als je laatste meer dan twee dagen geleden was, en de id-controle is ermee lastiger af te ronden. De update bewaart je identiteiten en gegevens.",
+        "body": "Deze versie kan de vragen en goedkeuringsverzoeken die apps nu sturen niet beantwoorden, en geen bestanden openen die met je zijn gedeeld. De update behoudt je identiteiten en gegevens.",
         "changes": [
-          "De id-controle is eenvoudiger: de camera leest zelf de regels op je document en je ziet waar de chip zit",
-          "Je ziet wat er op de chip staat voordat er iets wordt verstuurd",
-          "Aanmelden werkt weer als je laatste aanmelding twee of meer dagen geleden was"
+          "Apps kunnen je een vraag stellen of je vragen iets goed te keuren, en je antwoordt hier in de wallet",
+          "Bestanden die met je zijn gedeeld openen in de wallet, en een goedgekeurd verzoek brengt je naar het bestand",
+          "Een kort bericht bevestigt wat je net deed, met duidelijkere knoppen en een lichtere app"
         ]
       },
       "pl": {
         "title": "Zaktualizuj, aby dalej korzystać z Privasys Wallet",
-        "body": "Ta wersja może odrzucić logowanie, jeśli ostatnie było ponad dwa dni temu, a sprawdzenie dokumentu jest w niej trudniejsze do ukończenia. Aktualizacja zachowuje Twoje tożsamości i dane.",
+        "body": "Ta wersja nie potrafi odpowiadać na pytania i prośby o zatwierdzenie, które aplikacje teraz wysyłają, ani otwierać udostępnionych Ci plików. Aktualizacja zachowuje Twoje tożsamości i dane.",
         "changes": [
-          "Sprawdzenie dokumentu jest prostsze: aparat sam odczytuje wiersze na dokumencie i widzisz, gdzie jest chip",
-          "Widzisz, co zawiera chip, zanim cokolwiek zostanie wysłane",
-          "Logowanie znów działa, gdy ostatnie logowanie było dwa lub więcej dni temu"
+          "Aplikacje mogą zadać Ci pytanie lub poprosić o zatwierdzenie czegoś, a Ty odpowiadasz tutaj, w portfelu",
+          "Udostępnione Ci pliki otwierają się w portfelu, a zatwierdzona prośba prowadzi Cię do pliku",
+          "Krótki komunikat potwierdza, co właśnie zrobiono, przyciski są czytelniejsze, a aplikacja lżejsza"
         ]
       },
       "pt": {
         "title": "Atualize para continuar a usar a Privasys Wallet",
-        "body": "Esta versão pode recusar um início de sessão se o último foi há mais de dois dias, e a verificação do documento é mais difícil de concluir. A atualização mantém as suas identidades e dados.",
+        "body": "Esta versão não consegue responder às perguntas e pedidos de aprovação que as apps agora enviam, nem abrir ficheiros partilhados consigo. A atualização mantém as suas identidades e dados.",
         "changes": [
-          "A verificação do documento é mais simples: a câmara lê sozinha as linhas do seu documento e é-lhe mostrado onde está o chip",
-          "Vê o que o chip contém antes de qualquer envio",
-          "O início de sessão volta a funcionar quando o último foi há dois dias ou mais"
+          "As apps podem fazer-lhe uma pergunta ou pedir-lhe que aprove algo, e responde aqui, na carteira",
+          "Os ficheiros partilhados consigo abrem na carteira, e um pedido aprovado leva-o ao ficheiro",
+          "Uma mensagem curta confirma o que acabou de fazer, com botões mais claros e uma app mais leve"
         ]
       },
       "ro": {
-        "title": "Actualizează ca să folosești în continuare Privasys Wallet",
-        "body": "Această versiune poate refuza o conectare dacă ultima a avut loc acum mai bine de două zile, iar verificarea actului este mai greu de dus la capăt. Actualizarea îți păstrează identitățile și datele.",
+        "title": "Actualizează pentru a folosi în continuare Privasys Wallet",
+        "body": "Această versiune nu poate răspunde la întrebările și cererile de aprobare pe care aplicațiile le trimit acum și nici nu poate deschide fișierele partajate cu tine. Actualizarea îți păstrează identitățile și datele.",
         "changes": [
-          "Verificarea actului e mai simplă: camera citește singură rândurile de pe act și ți se arată unde este cipul",
-          "Vezi ce conține cipul înainte să se trimită ceva",
-          "Conectarea funcționează din nou când ultima conectare a fost acum două zile sau mai mult"
+          "Aplicațiile îți pot pune o întrebare sau îți pot cere să aprobi ceva, iar tu răspunzi aici, în portofel",
+          "Fișierele partajate cu tine se deschid în portofel, iar o cerere aprobată te duce la fișier",
+          "Un mesaj scurt confirmă ce ai făcut, cu butoane mai clare și o aplicație mai ușoară"
         ]
       },
       "sk": {
         "title": "Aktualizujte, aby ste mohli ďalej používať Privasys Wallet",
-        "body": "Táto verzia môže odmietnuť prihlásenie, ak to posledné bolo pred viac ako dvoma dňami, a kontrola dokladu sa v nej dokončuje ťažšie. Aktualizácia zachová vaše identity aj údaje.",
+        "body": "Táto verzia nevie odpovedať na otázky a žiadosti o schválenie, ktoré aplikácie teraz posielajú, ani otvárať súbory, ktoré s vami niekto zdieľa. Aktualizácia zachová vaše identity aj údaje.",
         "changes": [
-          "Kontrola dokladu je jednoduchšia: fotoaparát sám prečíta riadky na vašom doklade a ukáže sa vám, kde je čip",
-          "Skôr než sa čokoľvek odošle, uvidíte, čo obsahuje čip",
-          "Prihlásenie opäť funguje, aj keď ste sa naposledy prihlásili pred dvoma alebo viacerými dňami"
+          "Aplikácie sa vás môžu na niečo opýtať alebo požiadať o schválenie a vy odpoviete priamo v peňaženke",
+          "Súbory zdieľané s vami sa otvárajú v peňaženke a schválená žiadosť vás dovedie k súboru",
+          "Krátka správa potvrdí, čo ste práve urobili, tlačidlá sú prehľadnejšie a aplikácia ľahšia"
         ]
       },
       "sl": {
         "title": "Posodobite, da boste lahko še naprej uporabljali Privasys Wallet",
-        "body": "Ta različica lahko zavrne prijavo, če je bila vaša zadnja pred več kot dvema dnevoma, preverjanje dokumenta pa je z njo težje dokončati. Posodobitev ohrani vaše identitete in podatke.",
+        "body": "Ta različica ne more odgovarjati na vprašanja in prošnje za odobritev, ki jih aplikacije zdaj pošiljajo, niti odpirati datotek, deljenih z vami. Posodobitev ohrani vaše identitete in podatke.",
         "changes": [
-          "Preverjanje dokumenta je preprostejše: kamera sama prebere vrstice na vašem dokumentu, prikaže pa se vam tudi, kje je čip",
-          "Preden se karkoli pošlje, vidite, kaj vsebuje čip",
-          "Prijava spet deluje, ko je bila vaša zadnja prijava pred dvema ali več dnevi"
+          "Aplikacije vam lahko zastavijo vprašanje ali vas prosijo, da nekaj odobrite, vi pa odgovorite tukaj, v denarnici",
+          "Datoteke, deljene z vami, se odprejo v denarnici, odobrena prošnja pa vas pripelje do datoteke",
+          "Kratko sporočilo potrdi, kaj ste pravkar storili, z jasnejšimi gumbi in lažjo aplikacijo"
         ]
       },
       "sv": {
         "title": "Uppdatera för att fortsätta använda Privasys Wallet",
-        "body": "Den här versionen kan neka en inloggning om din senaste var för mer än två dagar sedan, och dess id-kontroll är svårare att slutföra. Uppdateringen behåller dina identiteter och data.",
+        "body": "Den här versionen kan inte svara på de frågor och godkännandeförfrågningar som appar nu skickar, eller öppna filer som delats med dig. Uppdateringen behåller dina identiteter och data.",
         "changes": [
-          "Id-kontrollen är enklare: kameran läser själv raderna på ditt dokument och du får se var chippet sitter",
-          "Du ser vad chippet innehåller innan något skickas",
-          "Inloggning fungerar igen när din senaste inloggning var för två dagar sedan eller mer"
+          "Appar kan ställa en fråga till dig eller be dig godkänna något, och du svarar här i plånboken",
+          "Filer som delats med dig öppnas i plånboken, och en godkänd förfrågan tar dig till filen",
+          "Ett kort meddelande bekräftar vad du just gjorde, med tydligare knappar och en lättare app"
         ]
       }
     }

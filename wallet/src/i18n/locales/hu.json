@@ -537,6 +537,8 @@
     "fileTooLarge": "Ez a fájl túl nagy ahhoz, hogy a telefonon megnyíljon ({{size}}).",
     "pdfMorePages": "Az első {{shown}} oldal látható a(z) {{total}} közül.",
     "textCut": "Csak a fájl eleje látható.",
+    "linkTitle": "Megnyitja ezt a hivatkozást?",
+    "linkOpen": "Megnyitás",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

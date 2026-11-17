@@ -569,6 +569,8 @@
     "fileTooLarge": "See fail on telefonis avamiseks liiga suur ({{size}}).",
     "pdfMorePages": "Näidatakse esimest {{shown}} lehte {{total}}-st.",
     "textCut": "Näidatakse ainult faili algust.",
+    "linkTitle": "Kas avada see link?",
+    "linkOpen": "Ava",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

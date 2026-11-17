@@ -571,6 +571,8 @@
     "fileTooLarge": "Šis failas per didelis, kad būtų atidarytas telefone ({{size}}).",
     "pdfMorePages": "Rodomi pirmi {{shown}} iš {{total}} puslapių.",
     "textCut": "Rodoma tik failo pradžia.",
+    "linkTitle": "Atidaryti šią nuorodą?",
+    "linkOpen": "Atidaryti",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

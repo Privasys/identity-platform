@@ -571,6 +571,8 @@
     "fileTooLarge": "Fișierul este prea mare pentru a fi deschis pe telefon ({{size}}).",
     "pdfMorePages": "Sunt afișate primele {{shown}} din {{total}} pagini.",
     "textCut": "Este afișat doar începutul fișierului.",
+    "linkTitle": "Deschizi acest link?",
+    "linkOpen": "Deschide",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

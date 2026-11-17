@@ -575,6 +575,8 @@
     "fileTooLarge": "Tá an comhad seo rómhór le hoscailt ar an bhfón ({{size}}).",
     "pdfMorePages": "Na chéad {{shown}} leathanach as {{total}} á dtaispeáint.",
     "textCut": "Níl ach tús an chomhaid á thaispeáint.",
+    "linkTitle": "An nasc seo a oscailt?",
+    "linkOpen": "Oscail",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

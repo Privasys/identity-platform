@@ -7,7 +7,7 @@
  * lives in the wallet's cache while this screen is open and is deleted when
  * it closes.
  *
- * Images and text are drawn here. A PDF or another document opens in Apple's
+ * Images, text and Markdown (natively, without diagrams or maths) are drawn here. A PDF or another document opens in Apple's
  * Quick Look on iOS, over this screen; on Android a PDF's pages are drawn by
  * the system's renderer and shown here. Anything else can be saved or shared
  * through the OS sheet, which takes a copy out of Drive's protection, and the
@@ -24,6 +24,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, useWind
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { MarkdownView } from '@/components/MarkdownView';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { copyForViewing, discardCopy, fileKind, formatSize, type FileKind } from '@/services/drive-files';
@@ -38,7 +39,7 @@ const MAX_PDF_PAGES = 100;
 type View =
     | { kind: 'loading' }
     | { kind: 'image'; uri: string }
-    | { kind: 'text'; text: string; cut: boolean }
+    | { kind: 'text'; text: string; cut: boolean; markdown: boolean }
     | { kind: 'pdf-pages'; pages: FilePreview.RenderedPage[]; pageCount: number }
     | { kind: 'quicklook' }
     | { kind: 'other' }
@@ -89,9 +90,9 @@ export default function DriveFileScreen() {
                 const path = f.uri.replace(/^file:\/\//, '');
                 if (kind === 'image') {
                     setView({ kind: 'image', uri: f.uri });
-                } else if (kind === 'text') {
+                } else if (kind === 'text' || kind === 'markdown') {
                     const text = await f.text();
-                    setView({ kind: 'text', text: text.slice(0, MAX_TEXT), cut: text.length > MAX_TEXT });
+                    setView({ kind: 'text', text: text.slice(0, MAX_TEXT), cut: text.length > MAX_TEXT, markdown: kind === 'markdown' });
                 } else if (Platform.OS === 'ios' && (await FilePreview.canPreview(path))) {
                     setView({ kind: 'quicklook' });
                     await FilePreview.preview(path, name);
@@ -138,9 +139,13 @@ export default function DriveFileScreen() {
             case 'text':
                 return (
                     <>
-                        <Text style={styles.text} selectable>
-                            {view.text}
-                        </Text>
+                        {view.markdown ? (
+                            <MarkdownView source={view.text} />
+                        ) : (
+                            <Text style={styles.text} selectable>
+                                {view.text}
+                            </Text>
+                        )}
                         {view.cut ? <Text style={styles.note}>{t('drive.textCut')}</Text> : null}
                     </>
                 );

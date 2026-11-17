@@ -537,6 +537,8 @@
     "fileTooLarge": "Tiedosto on liian suuri avattavaksi puhelimessa ({{size}}).",
     "pdfMorePages": "Näytetään ensimmäiset {{shown}}/{{total}} sivua.",
     "textCut": "Vain tiedoston alku näytetään.",
+    "linkTitle": "Avataanko tämä linkki?",
+    "linkOpen": "Avaa",
     "sizeBytes": "{{value}} t",
     "sizeKb": "{{value}} kt",
     "sizeMb": "{{value}} Mt",

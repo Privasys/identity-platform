@@ -43,7 +43,8 @@ describe('fileKind', () => {
         [{ name: 'a.PDF' }, 'pdf'],
         [{ name: 'x', mime: 'application/pdf' }, 'pdf'],
         [{ name: 'photo.heic' }, 'image'],
-        [{ name: 'notes.md' }, 'text'],
+        [{ name: 'notes.md' }, 'markdown'],
+        [{ name: 'data.csv' }, 'text'],
         [{ name: 'report.docx' }, 'other'],
     ])('%j is %s', (item, kind) => {
         expect(fileKind(item)).toBe(kind);

@@ -537,6 +537,8 @@
     "fileTooLarge": "Filen er for stor til at åbne på telefonen ({{size}}).",
     "pdfMorePages": "Viser de første {{shown}} af {{total}} sider.",
     "textCut": "Kun begyndelsen af filen vises.",
+    "linkTitle": "Åbn dette link?",
+    "linkOpen": "Åbn",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} kB",
     "sizeMb": "{{value}} MB",

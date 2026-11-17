@@ -577,6 +577,8 @@
     "fileTooLarge": "Mae’r ffeil hon yn rhy fawr i’w hagor ar y ffôn ({{size}}).",
     "pdfMorePages": "Yn dangos y {{shown}} tudalen gyntaf o {{total}}.",
     "textCut": "Dim ond dechrau’r ffeil sy’n cael ei ddangos.",
+    "linkTitle": "Agor y ddolen hon?",
+    "linkOpen": "Agor",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

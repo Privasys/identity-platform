@@ -188,7 +188,7 @@ export function clearViewerCopies(): void {
     }
 }
 
-export type FileKind = 'image' | 'pdf' | 'text' | 'other';
+export type FileKind = 'image' | 'pdf' | 'markdown' | 'text' | 'other';
 
 /** What kind of viewer a file needs, from its MIME hint or its name. */
 export function fileKind(item: { name: string; mime?: string }): FileKind {
@@ -196,7 +196,8 @@ export function fileKind(item: { name: string; mime?: string }): FileKind {
     const ext = item.name.toLowerCase().split('.').pop() ?? '';
     if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'heic', 'heif'].includes(ext)) return 'image';
     if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
-    if (mime.startsWith('text/') || ['txt', 'md', 'markdown', 'csv', 'json', 'log'].includes(ext)) return 'text';
+    if (mime === 'text/markdown' || ['md', 'markdown'].includes(ext)) return 'markdown';
+    if (mime.startsWith('text/') || ['txt', 'csv', 'json', 'log'].includes(ext)) return 'text';
     return 'other';
 }
 

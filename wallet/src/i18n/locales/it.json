@@ -539,6 +539,8 @@
     "fileTooLarge": "Questo file è troppo grande per aprirlo sul telefono ({{size}}).",
     "pdfMorePages": "Sono mostrate le prime {{shown}} pagine su {{total}}.",
     "textCut": "È mostrato solo l’inizio del file.",
+    "linkTitle": "Aprire questo link?",
+    "linkOpen": "Apri",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

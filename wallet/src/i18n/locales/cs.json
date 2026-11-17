@@ -539,6 +539,8 @@
     "fileTooLarge": "Soubor je příliš velký na otevření v telefonu ({{size}}).",
     "pdfMorePages": "Zobrazeno prvních {{shown}} z {{total}} stránek.",
     "textCut": "Zobrazuje se jen začátek souboru.",
+    "linkTitle": "Otevřít tento odkaz?",
+    "linkOpen": "Otevřít",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} kB",
     "sizeMb": "{{value}} MB",

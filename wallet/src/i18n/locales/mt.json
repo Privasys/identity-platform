@@ -575,6 +575,8 @@
     "fileTooLarge": "Dan il-fajl huwa kbir wisq biex jinfetaħ fuq it-telefon ({{size}}).",
     "pdfMorePages": "Qed jintwerew l-ewwel {{shown}} minn {{total}} paġna.",
     "textCut": "Qed jintwera biss il-bidu tal-fajl.",
+    "linkTitle": "Tiftaħ din il-link?",
+    "linkOpen": "Iftaħ",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

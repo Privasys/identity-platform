@@ -571,6 +571,8 @@
     "fileTooLarge": "Šis fails ir pārāk liels, lai to atvērtu tālrunī ({{size}}).",
     "pdfMorePages": "Rāda pirmās {{shown}} no {{total}} lapām.",
     "textCut": "Rāda tikai faila sākumu.",
+    "linkTitle": "Vai atvērt šo saiti?",
+    "linkOpen": "Atvērt",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

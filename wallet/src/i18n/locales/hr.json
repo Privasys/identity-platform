@@ -571,6 +571,8 @@
     "fileTooLarge": "Datoteka je prevelika za otvaranje na telefonu ({{size}}).",
     "pdfMorePages": "Prikazano je prvih {{shown}} od {{total}} stranica.",
     "textCut": "Prikazan je samo početak datoteke.",
+    "linkTitle": "Otvoriti ovu poveznicu?",
+    "linkOpen": "Otvori",
     "sizeBytes": "{{value}} B",
     "sizeKb": "{{value}} KB",
     "sizeMb": "{{value}} MB",

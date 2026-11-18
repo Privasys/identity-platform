@@ -141,7 +141,9 @@ export default (context: ConfigContext): ExpoConfig => {
         scheme: config.scheme,
         ios: {
             supportsTablet: true,
-            requireFullScreen: true,
+            // iPad multitasking: the wallet lays out by the window it is
+            // given (hooks/useLargeScreen), so it can share the screen.
+            requireFullScreen: false,
             bundleIdentifier: config.bundle,
             infoPlist: {
                 ITSAppUsesNonExemptEncryption: false,

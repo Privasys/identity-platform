@@ -1316,7 +1316,8 @@
     "access": "Dostop",
     "profile": "Profil",
     "drive": "Drive",
-    "settings": "Nastavitve"
+    "settings": "Nastavitve",
+    "chooseItem": "Izberite element, da ga vidite tukaj."
   },
   "time": {
     "justNow": "pravkar",

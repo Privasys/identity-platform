@@ -1296,7 +1296,8 @@
     "access": "Pristup",
     "profile": "Profil",
     "drive": "Drive",
-    "settings": "Postavke"
+    "settings": "Postavke",
+    "chooseItem": "Odaberite stavku da biste je vidjeli ovdje."
   },
   "time": {
     "justNow": "upravo sada",

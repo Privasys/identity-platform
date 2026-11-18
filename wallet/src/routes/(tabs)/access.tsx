@@ -46,7 +46,8 @@ import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 import { AppRow, ProviderRow } from '@/components/AccessRows';
 import { appTree, providerTree, withSignIns } from '@/utils/access-tree';
 import { buildSessionRows, relativeWhen } from '@/utils/session-rows';
-import { HeaderBleed } from '@/components/HeaderBleed';
+import { usePane } from '@/components/pane';
+import { TabHeader } from '@/components/TabHeader';
 
 /** How many rows a section shows before it defers to its own screen. */
 const PREVIEW = 3;
@@ -158,12 +159,12 @@ export default function AccessScreen() {
     const providers = useMemo(() => withSignIns(providerTree(records), linked ?? []), [records, linked]);
     const grantApps = useMemo(() => appTree(records), [records]);
 
+    // A wide window has Scan in its sidebar (components/WideFrame).
+    const pane = usePane();
+
     return (
         <RNView style={styles.screen} testID="access-screen">
-            <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
-                <HeaderBleed />
-                <Text style={styles.headerTitle}>{t('tabs.access')}</Text>
-            </RNView>
+            <TabHeader title={t('tabs.access')} />
 
             <ScrollView
                 style={styles.body}
@@ -487,6 +488,7 @@ export default function AccessScreen() {
             </ScrollView>
 
             {/* Scanning is how a service gets access, so it belongs here. */}
+            {!pane && (
             <Pressable
                 style={styles.scanFab}
                 onPress={() => router.push('/scan')}
@@ -494,6 +496,7 @@ export default function AccessScreen() {
             >
                 <Ionicons name="qr-code-outline" size={26} color="#FFFFFF" />
             </Pressable>
+            )}
         </RNView>
     );
 }

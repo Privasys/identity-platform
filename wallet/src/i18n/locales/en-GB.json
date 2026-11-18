@@ -1276,7 +1276,8 @@
     "access": "Access",
     "profile": "Profile",
     "drive": "Drive",
-    "settings": "Settings"
+    "settings": "Settings",
+    "chooseItem": "Choose an item to see it here."
   },
   "time": {
     "justNow": "just now",

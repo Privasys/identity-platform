@@ -2,9 +2,15 @@
 # Licensed under the GNU Affero General Public License v3.0.
 #
 # Wallet screenshots: builds the demo wallet (EAS profile `demo`, invented
-# holder, no network; wallet/src/services/demo) for the iOS simulator and the
-# Android emulator, runs the Maestro flows in wallet/maestro, and uploads the
-# screenshots. Manual only: nothing here is shipped or submitted.
+# holder, no network; wallet/src/services/demo) once for the iOS simulator and
+# once for the Android emulator, then runs the Maestro flows in wallet/maestro
+# on every device asked for, in parallel, and uploads one set of screenshots
+# per device. Manual only: nothing here is shipped or submitted.
+#
+# The defaults cover the store listings: a large phone, a tablet and, on
+# Android, a foldable. A device the runner's Xcode does not know (the iPhone
+# Duo needs Xcode 27.1 and an iOS 27 runtime) fails its own job only, listing
+# the simulators the runner has; the other devices still deliver.
 
 name: Wallet screenshots
 
@@ -17,14 +23,14 @@ on:
         default: 'all'
         type: choice
         options: [ios, android, all]
-      ios_device:
-        description: 'iOS simulator (name as in `xcrun simctl list devicetypes`)'
+      ios_devices:
+        description: 'iOS simulators, a JSON list of device type names (`xcrun simctl list devicetypes`)'
         required: true
-        default: 'iPhone 17 Pro Max'
-      android_profile:
-        description: 'Android emulator profile (avdmanager device id)'
+        default: '["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)", "iPhone Duo"]'
+      android_profiles:
+        description: 'Android emulator profiles, a JSON list of avdmanager device ids'
         required: true
-        default: 'pixel_9_pro_xl'
+        default: '["pixel_9_pro_xl", "pixel_tablet", "pixel_fold"]'
       locale:
         description: 'Device language (BCP 47, e.g. en-GB, fr-FR)'
         required: true
@@ -41,10 +47,10 @@ env:
   MAESTRO_DRIVER_STARTUP_TIMEOUT: '240000'
 
 jobs:
-  ios:
+  ios-build:
     if: inputs.platform == 'ios' || inputs.platform == 'all'
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
 
@@ -85,22 +91,64 @@ jobs:
         working-directory: wallet
         run: |
           eas build --platform ios --profile demo --local --non-interactive --output build/demo-ios.tar.gz
-          mkdir -p build/app && tar -xzf build/demo-ios.tar.gz -C build/app
-          find build/app -maxdepth 2 -name '*.app'
+          ls -la build/demo-ios.tar.gz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: demo-ios-app
+          path: wallet/build/demo-ios.tar.gz
+          retention-days: 3
+
+  ios:
+    needs: ios-build
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(inputs.ios_devices) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: demo-ios-app
+          path: wallet/build
 
       - name: Boot the simulator
-        timeout-minutes: 10
+        timeout-minutes: 15
+        env:
+          DEVICE: ${{ matrix.device }}
+          LANG_CODE: ${{ inputs.locale }}
         run: |
           set -euo pipefail
+          mkdir -p wallet/build/app && tar -xzf wallet/build/demo-ios.tar.gz -C wallet/build/app
           UDID=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          name = '${{ inputs.ios_device }}'
+          import json, os, sys
+          name = os.environ['DEVICE']
           devs = [d for r in json.load(sys.stdin)['devices'].values() for d in r if d['name'] == name]
           print(devs[0]['udid'] if devs else '')")
           if [ -z "$UDID" ]; then
-            echo "No simulator named '${{ inputs.ios_device }}'. Available:"; xcrun simctl list devices available; exit 1
+            # No simulator of that name yet: make one, if the runner's Xcode
+            # knows the device type and has a runtime for it.
+            TYPE=$(xcrun simctl list devicetypes -j | python3 -c "
+          import json, os, sys
+          name = os.environ['DEVICE']
+          t = [d['identifier'] for d in json.load(sys.stdin)['devicetypes'] if d['name'] == name]
+          print(t[0] if t else '')")
+            RUNTIME=$(xcrun simctl list runtimes available -j | python3 -c "
+          import json, sys
+          r = [x['identifier'] for x in json.load(sys.stdin)['runtimes'] if x['platform'] == 'iOS']
+          print(r[-1] if r else '')")
+            if [ -n "$TYPE" ] && [ -n "$RUNTIME" ]; then
+              UDID=$(xcrun simctl create "$DEVICE" "$TYPE" "$RUNTIME")
+            fi
           fi
-          LANG_CODE="${{ inputs.locale }}"
+          if [ -z "$UDID" ]; then
+            echo "No simulator '$DEVICE' on this runner (Xcode $(xcodebuild -version | head -1)). Available:"
+            xcrun simctl list devicetypes | grep -E 'iPhone|iPad'
+            exit 1
+          fi
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           # The device language, so the wallet starts in it.
@@ -135,17 +183,19 @@ jobs:
           ls *.png >/dev/null 2>&1
 
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: screenshots-ios-${{ inputs.ios_device }}-${{ inputs.locale }}
+          name: screenshots-ios-${{ matrix.device }}-${{ inputs.locale }}
           path: |
             wallet/shots/*.png
             wallet/maestro-report.xml
+          if-no-files-found: ignore
           retention-days: 30
 
-  android:
+  android-build:
     if: inputs.platform == 'android' || inputs.platform == 'all'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
 
@@ -188,6 +238,28 @@ jobs:
         working-directory: wallet
         run: eas build --platform android --profile demo --local --non-interactive --output build/demo.apk
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: demo-android-apk
+          path: wallet/build/demo.apk
+          retention-days: 3
+
+  android:
+    needs: android-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: ${{ fromJSON(inputs.android_profiles) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: demo-android-apk
+          path: wallet/build
+
       - name: Install Maestro
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -205,7 +277,7 @@ jobs:
           api-level: 35
           arch: x86_64
           target: google_apis
-          profile: ${{ inputs.android_profile }}
+          profile: ${{ matrix.profile }}
           disable-animations: true
           working-directory: wallet
           script: |
@@ -222,9 +294,11 @@ jobs:
             mkdir -p shots && cd shots && (maestro test ../maestro/ --format junit --output ../maestro-report.xml || true) && ls -la
 
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: screenshots-android-${{ inputs.android_profile }}-${{ inputs.locale }}
+          name: screenshots-android-${{ matrix.profile }}-${{ inputs.locale }}
           path: |
             wallet/shots/*.png
             wallet/maestro-report.xml
+          if-no-files-found: ignore
           retention-days: 30

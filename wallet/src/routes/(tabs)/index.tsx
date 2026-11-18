@@ -44,10 +44,16 @@ import { useAvatarChooser } from '@/hooks/useAvatarChooser';
 import { useAuthStore } from '@/stores/auth';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useProfileStore } from '@/stores/profile';
-import { HeaderBleed } from '@/components/HeaderBleed';
+import { usePane } from '@/components/pane';
+import { TabHeader } from '@/components/TabHeader';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
+    // A wide window gives Profile two columns: who the holder is and their
+    // data on the left, their files, recovery and the rest on the right.
+    const pane = usePane();
+    const twoColumns = !!pane && pane.width >= PROFILE_TWO_COLUMNS;
+    const column = twoColumns ? { flex: 1, minWidth: 0 } : undefined;
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
@@ -333,16 +339,15 @@ export default function ProfileScreen() {
     return (
         <RNView style={styles.screen} testID="profile-screen">
             {/* Header */}
-            <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
-                <HeaderBleed />
-                <Text style={styles.headerTitle}>{t('tabs.profile')}</Text>
-            </RNView>
+            <TabHeader title={t('tabs.profile')} />
 
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                <RNView style={twoColumns ? styles.columns : undefined}>
+                <RNView style={column}>
                 {/* Avatar + Name */}
                 <RNView style={styles.profileCard}>
                     {/* A picture only when there is one: the avatar the holder
@@ -474,6 +479,8 @@ export default function ProfileScreen() {
                     </RNView>
                 </Pressable>
 
+                </RNView>
+                <RNView style={column}>
                 {/* Drive: the holder's files, which is their data too. It was a
                     tab; one row here is all it needs. */}
                 <Text style={styles.sectionTitle}>{t('profile.sectionDrive')}</Text>
@@ -625,10 +632,15 @@ export default function ProfileScreen() {
                         <Text style={styles.dangerButtonText}>{t('profile.clearAllData')}</Text>
                     </Pressable>
                 </RNView>
+                </RNView>
+                </RNView>
             </ScrollView>
         </RNView>
     );
 }
+
+/** The room Profile needs for two columns. */
+const PROFILE_TWO_COLUMNS = 900;
 
 const makeStyles = (p: Palette) => StyleSheet.create({
     screen: { flex: 1, backgroundColor: p.screenBg },
@@ -647,6 +659,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     scrollView: { flex: 1 },
     scrollContent: { padding: 20, paddingBottom: 40 },
+    columns: { flexDirection: 'row', alignItems: 'flex-start', gap: 32, maxWidth: 1120 },
     emptyState: {
         flex: 1,
         alignItems: 'center',

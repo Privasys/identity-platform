@@ -6,11 +6,10 @@ import { AppState, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePalette } from '@/components/Themed';
+import { useSidebarLayout, useWaitingCount } from '@/components/WideFrame';
 import { columnGutter, useLargeScreen } from '@/hooks/useLargeScreen';
 import { useAppMessagesStore } from '@/stores/app-messages';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
-import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
-import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 
 /** Bar height above whatever the system draws below it. */
 const TAB_BAR_CONTENT_HEIGHT = 60;
@@ -20,12 +19,12 @@ export default function TabLayout() {
     const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
-    const gutter = useLargeScreen() ? columnGutter(width) : 0;
-    const pending = useVaultApprovalsStore((s) => s.pending.length);
-    const asks = useCapabilityAsksStore((s) => s.asks.length);
-    const guardian = useGuardianRequestsStore(waitingCount);
-    const messages = useAppMessagesStore((s) => s.messages.length);
-    const waiting = pending + asks + guardian + messages;
+    // A wide window has the sidebar (components/WideFrame) in place of the
+    // tab bar, and lays out its own panes.
+    const wide = useSidebarLayout();
+    const large = useLargeScreen();
+    const gutter = large && !wide ? columnGutter(width) : 0;
+    const waiting = useWaitingCount();
     // Look for open access requests whenever the wallet comes to the front,
     // not only when Access is open: the badge is how the holder learns of one
     // whose push they swiped away, from whichever tab they are on.
@@ -60,6 +59,7 @@ export default function TabLayout() {
                     // On a large screen the bar runs edge to edge, its tabs
                     // kept within the centred column.
                     paddingHorizontal: gutter,
+                    ...(wide ? { display: 'none' as const } : {}),
                 },
                 // The column for each tab. Made here, not by the stack around
                 // the tabs: the navigator clips its scenes to its own bounds,

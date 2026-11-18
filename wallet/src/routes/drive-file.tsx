@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { MarkdownView } from '@/components/MarkdownView';
+import { usePane } from '@/components/pane';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { MONO } from '@/constants/fonts';
 import { Text, usePalette, type Palette } from '@/components/Themed';
@@ -47,13 +48,31 @@ type View =
     | { kind: 'too-large' }
     | { kind: 'failed'; message: string };
 
+/** What names a file to open: the route's params, or Drive's list beside it. */
+export interface DriveFileParams {
+    tenant?: string;
+    id?: string;
+    name?: string;
+    mime?: string;
+    size?: string;
+}
+
 export default function DriveFileScreen() {
+    const params = useLocalSearchParams<{ tenant?: string; id?: string; name?: string; mime?: string; size?: string }>();
+    return <DriveFileView params={params} />;
+}
+
+/** A file, opened. Drive draws it beside its list on a wide window; give it a
+ *  key per file so each file gets its own copy, deleted when it closes. */
+export function DriveFileView({ params }: { params: DriveFileParams }) {
     const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const insets = useSafeAreaInsets();
-    const { width } = useWindowDimensions();
-    const params = useLocalSearchParams<{ tenant?: string; id?: string; name?: string; mime?: string; size?: string }>();
+    const pane = usePane();
+    const win = useWindowDimensions();
+    // Images are drawn at the width they have: the pane's on a wide window.
+    const width = pane?.kind === 'detail' ? pane.width : win.width;
     const name = params.name || t('drive.file');
     const size = Number(params.size) || 0;
     const [view, setView] = useState<View>({ kind: 'loading' });

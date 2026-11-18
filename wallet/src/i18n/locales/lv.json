@@ -1296,7 +1296,8 @@
     "access": "Piekļuve",
     "profile": "Profils",
     "drive": "Drive",
-    "settings": "Iestatījumi"
+    "settings": "Iestatījumi",
+    "chooseItem": "Izvēlieties vienumu, lai to redzētu šeit."
   },
   "time": {
     "justNow": "tikko",

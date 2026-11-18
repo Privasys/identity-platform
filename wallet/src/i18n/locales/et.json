@@ -1276,7 +1276,8 @@
     "access": "Juurdepääs",
     "profile": "Profiil",
     "drive": "Drive",
-    "settings": "Sätted"
+    "settings": "Sätted",
+    "chooseItem": "Valige üksus, et seda siin näha."
   },
   "time": {
     "justNow": "just praegu",

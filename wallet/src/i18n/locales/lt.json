@@ -1296,7 +1296,8 @@
     "access": "Prieiga",
     "profile": "Profilis",
     "drive": "Drive",
-    "settings": "Nustatymai"
+    "settings": "Nustatymai",
+    "chooseItem": "Pasirinkite elementą, kad jį matytumėte čia."
   },
   "time": {
     "justNow": "ką tik",

@@ -1296,7 +1296,8 @@
     "access": "Acces",
     "profile": "Profil",
     "drive": "Drive",
-    "settings": "Setări"
+    "settings": "Setări",
+    "chooseItem": "Alege un element pentru a-l vedea aici."
   },
   "time": {
     "justNow": "chiar acum",

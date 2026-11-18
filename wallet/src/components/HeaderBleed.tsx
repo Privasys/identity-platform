@@ -14,6 +14,7 @@
 
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { usePane } from '@/components/pane';
 import { usePalette } from '@/components/Themed';
 import { columnGutter, useLargeScreen } from '@/hooks/useLargeScreen';
 
@@ -22,7 +23,9 @@ export function HeaderBleed({ colour, radius = 28 }: { colour?: string; radius?:
     const { width } = useWindowDimensions();
     const p = usePalette();
     const gutter = columnGutter(width);
-    if (!large || gutter === 0) return null;
+    // A wide window draws no band (components/WideFrame).
+    const pane = usePane();
+    if (!large || gutter === 0 || pane) return null;
     return (
         <View
             pointerEvents="none"

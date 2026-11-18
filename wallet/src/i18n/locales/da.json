@@ -1263,7 +1263,8 @@
     "access": "Adgang",
     "profile": "Profil",
     "drive": "Drive",
-    "settings": "Indstillinger"
+    "settings": "Indstillinger",
+    "chooseItem": "Vælg et element for at se det her."
   },
 
   "time": {

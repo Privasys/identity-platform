@@ -1296,7 +1296,8 @@
     "access": "Prístup",
     "profile": "Profil",
     "drive": "Drive",
-    "settings": "Nastavenia"
+    "settings": "Nastavenia",
+    "chooseItem": "Vyberte položku a zobrazí sa tu."
   },
   "time": {
     "justNow": "práve teraz",

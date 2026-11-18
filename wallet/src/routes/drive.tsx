@@ -30,7 +30,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { AttestationView } from '@/components/AttestationView';
+import { PaneContext, useHeaderTint, usePane } from '@/components/pane';
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { ChooseItem } from '@/components/WideFrame';
+import { DriveFileView, type DriveFileParams } from '@/routes/drive-file';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
 import { attestDrive, type DriveAttestation } from '@/services/drive';
@@ -92,6 +95,11 @@ export default function DriveScreen() {
     const [path, setPath] = useState<Crumb[]>([]);
     const [highlight, setHighlight] = useState<string | null>(null);
     const followed = useRef(false);
+    // On a wide enough window the open file is drawn beside the list.
+    const pane = usePane();
+    const twoPane = !!pane?.twoPane && pane.kind === 'list';
+    const tint = useHeaderTint();
+    const [open, setOpen] = useState<(DriveFileParams & { id: string }) | null>(null);
     const pendingCount = useDriveNotificationsStore((s) => s.requests.filter((r) => !r.decision).length);
 
     // Approval gate: approve the Drive enclave on first connect, again if its
@@ -213,12 +221,11 @@ export default function DriveScreen() {
                 setPath((cur) => [...cur, { tenantId: it.tenantId, id: it.id, name: it.name }]);
                 return;
             }
-            router.push({
-                pathname: '/drive-file',
-                params: { tenant: it.tenantId, id: it.id, name: it.name, mime: it.mime ?? '', size: String(it.sizeBytes) },
-            });
+            const file = { tenant: it.tenantId, id: it.id, name: it.name, mime: it.mime ?? '', size: String(it.sizeBytes) };
+            if (twoPane) setOpen(file);
+            else router.push({ pathname: '/drive-file', params: file });
         },
-        [router],
+        [router, twoPane],
     );
 
     useEffect(() => {
@@ -278,8 +285,8 @@ export default function DriveScreen() {
 
     const rootName = section === 'shared' ? t('drive.shared') : t('drive.mine');
 
-    return (
-        <RNView style={styles.screen}>
+    const list = (
+        <RNView style={[styles.screen, twoPane && styles.listPane]}>
             <SubPageHeader
                 title={t('tabs.drive')}
                 right={
@@ -288,7 +295,7 @@ export default function DriveScreen() {
                         onPress={() => router.push('/drive-requests')}
                         accessibilityLabel={t('drive.shareRequests')}
                     >
-                        <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
+                        <Ionicons name="notifications-outline" size={20} color={tint} />
                         {pendingCount > 0 && (
                             <RNView style={styles.badge}>
                                 <Text style={styles.badgeText}>{pendingCount > 9 ? '9+' : String(pendingCount)}</Text>
@@ -398,11 +405,37 @@ export default function DriveScreen() {
             </RNView>
         </RNView>
     );
+    if (!twoPane || !pane) return list;
+    return (
+        <RNView style={styles.split}>
+            {list}
+            <RNView style={styles.detailPane}>
+                {open ? (
+                    <PaneContext.Provider value={{ kind: 'detail', width: pane.width - LIST_PANE_WIDTH, twoPane: true }}>
+                        <DriveFileView key={`${open.tenant}/${open.id}`} params={open} />
+                    </PaneContext.Provider>
+                ) : (
+                    <ChooseItem />
+                )}
+            </RNView>
+        </RNView>
+    );
 }
+
+/** The list's width when the open file is drawn beside it. */
+const LIST_PANE_WIDTH = 400;
 
 const makeStyles = (p: Palette) =>
     StyleSheet.create({
         screen: { flex: 1, backgroundColor: p.screenBg },
+        split: { flex: 1, flexDirection: 'row', backgroundColor: p.screenBg },
+        listPane: {
+            flex: 0,
+            width: LIST_PANE_WIDTH,
+            borderRightWidth: StyleSheet.hairlineWidth,
+            borderRightColor: p.border,
+        },
+        detailPane: { flex: 1, minWidth: 0 },
         bell: {
             width: 36,
             height: 36,

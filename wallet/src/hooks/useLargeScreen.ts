@@ -26,3 +26,16 @@ export function useLargeScreen(): boolean {
 export function columnGutter(width: number): number {
     return Math.max(0, Math.floor((width - READABLE_WIDTH) / 2));
 }
+
+/** From this width the wallet draws a sidebar in place of the tab bar
+ *  (tablets in either orientation, unfolded phones). Narrower windows, an
+ *  iPad in Split View for one, keep the phone layout. */
+export const WIDE_MIN_WIDTH = 840;
+
+/** From this width a section shows its list and the open item side by side. */
+export const TWO_PANE_MIN_WIDTH = 1100;
+
+/** Whether the window is wide enough for the sidebar. */
+export function useWideLayout(): boolean {
+    return useWindowDimensions().width >= WIDE_MIN_WIDTH;
+}

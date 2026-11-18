@@ -1263,7 +1263,8 @@
     "access": "Käyttöoikeudet",
     "profile": "Profiili",
     "drive": "Drive",
-    "settings": "Asetukset"
+    "settings": "Asetukset",
+    "chooseItem": "Valitse kohde nähdäksesi sen tässä."
   },
 
   "time": {

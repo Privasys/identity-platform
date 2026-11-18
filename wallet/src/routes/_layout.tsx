@@ -4,7 +4,7 @@ import { useFonts } from 'expo-font';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import 'react-native-get-random-values';
 import 'react-native-reanimated';
 
@@ -48,6 +48,7 @@ import { getDeviceLocale } from '@/services/device-locale';
 import { installLogCapture } from '@/utils/logs';
 import { useWindowDimensions } from 'react-native';
 import { columnGutter, useLargeScreen } from '@/hooks/useLargeScreen';
+import { TASK_ROUTES, WideFrame, useSidebarLayout } from '@/components/WideFrame';
 import { usePalette } from '@/components/Themed';
 
 // Capture console output into an in-memory ring buffer as early as
@@ -188,6 +189,8 @@ function RootLayoutNav({ hasProfile }: { hasProfile: boolean }) {
     const colorScheme = useColorScheme();
     const router = useRouter();
     const large = useLargeScreen();
+    // The sidebar layout: a wide window, once the wallet is set up.
+    const wide = useSidebarLayout();
     const { width } = useWindowDimensions();
     const palette = usePalette();
     // The navigator's background is what shows beside the centred column on a
@@ -213,16 +216,35 @@ function RootLayoutNav({ hasProfile }: { hasProfile: boolean }) {
                     tablet, an unfolded phone) any orientation, and the content
                     in a centred column of readable width. */}
                 <Stack
-                    screenOptions={{
-                        headerShown: false,
-                        orientation: large ? 'all' : 'portrait',
-                        // The column is made with side padding, not a narrower
-                        // view, so the screen's view stays full width: Android
-                        // clips what is drawn outside it, and each header paints
-                        // its colour into the padding (components/HeaderBleed).
-                        contentStyle: large
-                            ? { paddingHorizontal: columnGutter(width), backgroundColor: palette.screenBg }
-                            : undefined,
+                    // On a wide window every screen is drawn in the wallet's
+                    // frame: the sidebar, a list beside its item, a task in a
+                    // centred sheet (components/WideFrame). On a phone the
+                    // frame draws nothing.
+                    screenLayout={({ route, children }: { route: { name: string }; children: ReactNode }) => (
+                        <WideFrame routeName={route.name}>{children}</WideFrame>
+                    )}
+                    screenOptions={({ route }: { route: { name: string } }) => {
+                        const task = wide && TASK_ROUTES.has(route.name);
+                        return {
+                            headerShown: false,
+                            orientation: large ? 'all' : 'portrait',
+                            // Between a phone and a wide window (an iPad mini
+                            // upright, say) the content is a centred column. It
+                            // is made with side padding, not a narrower view, so
+                            // the screen's view stays full width: Android clips
+                            // what is drawn outside it, and each header paints
+                            // its colour into the padding (components/HeaderBleed).
+                            contentStyle:
+                                large && !wide
+                                    ? { paddingHorizontal: columnGutter(width), backgroundColor: palette.screenBg }
+                                    : undefined,
+                            // Beside the sidebar a screen replaces the last in
+                            // place, and a task fades in over the window.
+                            ...(wide ? { animation: task ? ('fade' as const) : ('none' as const) } : {}),
+                            ...(task
+                                ? { presentation: 'transparentModal' as const, contentStyle: { backgroundColor: 'transparent' } }
+                                : {}),
+                        };
                     }}
                 >
                     {/* The tabs make their own column (routes/(tabs)/_layout):
@@ -230,7 +252,7 @@ function RootLayoutNav({ hasProfile }: { hasProfile: boolean }) {
                         here would also clip each tab's header band. */}
                     <Stack.Screen
                         name="(tabs)"
-                        options={{ contentStyle: large ? { backgroundColor: palette.screenBg } : undefined }}
+                        options={{ contentStyle: large && !wide ? { backgroundColor: palette.screenBg } : undefined }}
                     />
                 </Stack>
             </ThemeProvider>

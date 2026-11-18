@@ -1356,7 +1356,8 @@
     "access": "Mynediad",
     "profile": "Proffil",
     "drive": "Drive",
-    "settings": "Gosodiadau"
+    "settings": "Gosodiadau",
+    "chooseItem": "Dewiswch eitem i'w gweld yma."
   },
   "time": {
     "justNow": "nawr",

@@ -1276,7 +1276,8 @@
     "access": "Достъп",
     "profile": "Профил",
     "drive": "Drive",
-    "settings": "Настройки"
+    "settings": "Настройки",
+    "chooseItem": "Изберете елемент, за да го видите тук."
   },
   "time": {
     "justNow": "току-що",

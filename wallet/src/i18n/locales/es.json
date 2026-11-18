@@ -1384,6 +1384,7 @@
       "confirm": "Confirmar"
     },
     "gone": "Esto ya se ha respondido o ha caducado.",
+    "closed": "Esta solicitud ya no está esperando respuesta.",
     "unreadable": "Esta solicitud de {{app}} no se puede mostrar en este teléfono. Abre {{app}} para responder.",
     "failed": {
       "signed-out": "Inicia sesión en Privasys en este teléfono y vuelve a intentarlo.",

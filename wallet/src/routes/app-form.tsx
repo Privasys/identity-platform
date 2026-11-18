@@ -12,7 +12,12 @@
  * the platform, that the app itself sent the form: its own hostname, the app
  * id attested there, a verified attestation, and the app confirming the form
  * inside that channel (services/app-form-answer). The verified hostname is
- * shown and opens the attestation for the holder to review.
+ * shown and opens the attestation for the holder to review. Until then the
+ * form's own words are not shown at all: they are unconfirmed text.
+ *
+ * A form that fails the check says why and shows nothing of itself. If the app
+ * is not waiting on it, or the host is not the app's, it is removed at once;
+ * if the app could not be reached or verified it stays, to try again.
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -30,6 +35,7 @@ import {
     answerForm,
     AnswerError,
     confirmFormSource,
+    removedWhenRefused,
     type AnswerFailure,
     type ConfirmedSource,
 } from '@/services/app-form-answer';
@@ -41,7 +47,8 @@ type Phase =
     | { kind: 'checking' }
     | { kind: 'ready'; source: ConfirmedSource }
     | { kind: 'busy'; source: ConfirmedSource; action: string }
-    | { kind: 'refused'; reason: AnswerFailure }
+    // Carries what it shows: the message itself may already have been removed.
+    | { kind: 'refused'; reason: AnswerFailure; app: string; invitation: boolean }
     | { kind: 'failed'; source: ConfirmedSource; reason: AnswerFailure };
 
 export default function AppFormScreen() {
@@ -54,6 +61,7 @@ export default function AppFormScreen() {
     const message = useAppMessagesStore((s) => s.messages.find((m) => m.id === id));
     const refresh = useAppMessagesStore((s) => s.refresh);
     const forget = useAppMessagesStore((s) => s.forget);
+    const dismiss = useAppMessagesStore((s) => s.dismiss);
     const [looked, setLooked] = useState(false);
     const [phase, setPhase] = useState<Phase>({ kind: 'checking' });
     const [reviewing, setReviewing] = useState(false);
@@ -61,24 +69,36 @@ export default function AppFormScreen() {
     // Opened from Access the form is already listed; from a push it may not
     // be yet, so look once.
     useEffect(() => {
-        if (message || looked) return;
+        // Not once refused: a form just removed must not be listed back.
+        if (message || looked || phase.kind === 'refused') return;
         void refresh().finally(() => setLooked(true));
-    }, [message, looked, refresh]);
+    }, [message, looked, refresh, phase.kind]);
 
     const app = message?.appName || message?.appSlug || t('access.messageSomeApp');
     const form = message?.form;
 
     // Establish that the app sent it before anything can be answered.
     useEffect(() => {
-        if (!message || !form || !message.appId || phase.kind !== 'checking') return;
+        if (!message || !form || phase.kind !== 'checking') return;
+        const invitation = message.kind === 'invitation';
+        // Without an app id there is nothing to check it against.
+        if (!message.appId) {
+            setPhase({ kind: 'refused', reason: 'unverified', app, invitation });
+            return;
+        }
         let live = true;
         confirmFormSource({ form, appId: message.appId, appSlug: message.appSlug, platformHost: message.platformHost })
             .then((source) => live && setPhase({ kind: 'ready', source }))
-            .catch((e) => live && setPhase({ kind: 'refused', reason: e instanceof AnswerError ? e.reason : 'unreachable' }));
+            .catch((e) => {
+                if (!live) return;
+                const reason = e instanceof AnswerError ? e.reason : 'unreachable';
+                setPhase({ kind: 'refused', reason, app, invitation });
+                if (removedWhenRefused(reason)) void dismiss(message.id);
+            });
         return () => {
             live = false;
         };
-    }, [message, form, phase.kind]);
+    }, [message, form, phase.kind, app, dismiss]);
 
     const leave = () => (router.canGoBack() ? router.back() : router.replace('/access'));
 
@@ -103,6 +123,51 @@ export default function AppFormScreen() {
     const source = phase.kind === 'ready' || phase.kind === 'busy' || phase.kind === 'failed' ? phase.source : undefined;
 
     const body = (() => {
+        // Before the message: a refused form may already have been removed.
+        if (phase.kind === 'refused') {
+            const removed = removedWhenRefused(phase.reason);
+            const closed = phase.reason === 'not-confirmed';
+            return (
+                <>
+                    <Text style={styles.fromText}>{t('appForm.from', { app: phase.app })}</Text>
+                    <RNView style={styles.refused} testID="app-form-refused">
+                        <Ionicons
+                            name={closed ? 'checkmark-circle-outline' : 'warning-outline'}
+                            size={32}
+                            color={closed ? p.textSecondary : p.danger}
+                        />
+                        <Text style={closed ? styles.closed : styles.error}>
+                            {closed ? t('appForm.closed') : t(`appForm.refused.${phase.reason}`, { app: phase.app })}
+                        </Text>
+                    </RNView>
+                    {removed ? (
+                        <Pressable style={styles.doneButton} onPress={leave} accessibilityRole="button">
+                            <Text style={styles.doneButtonText}>{t('common.done')}</Text>
+                        </Pressable>
+                    ) : (
+                        <RNView style={styles.actions}>
+                            <Pressable
+                                style={styles.declineButton}
+                                onPress={() => {
+                                    if (message) void dismiss(message.id);
+                                    leave();
+                                }}
+                                accessibilityRole="button"
+                            >
+                                <Text style={styles.declineButtonText}>{t('common.remove')}</Text>
+                            </Pressable>
+                            <Pressable
+                                style={styles.retryButton}
+                                onPress={() => setPhase({ kind: 'checking' })}
+                                accessibilityRole="button"
+                            >
+                                <Text style={styles.doneButtonText}>{t('common.retry')}</Text>
+                            </Pressable>
+                        </RNView>
+                    )}
+                </>
+            );
+        }
         if (!message) {
             return looked ? (
                 <Text style={styles.note}>{t('appForm.gone')}</Text>
@@ -137,16 +202,15 @@ export default function AppFormScreen() {
                     ) : null}
                 </RNView>
 
-                <RNView style={[styles.card, phase.kind === 'refused' && styles.cardDimmed]}>
-                    <Text style={styles.title}>{form.title}</Text>
-                    {form.blocks.map((b, i) => (
-                        <Block key={i} block={b} styles={styles} t={t} />
-                    ))}
-                </RNView>
-
-                {phase.kind === 'refused' ? (
-                    <Text style={styles.error}>{t(`appForm.refused.${phase.reason}`, { app })}</Text>
+                {source ? (
+                    <RNView style={styles.card}>
+                        <Text style={styles.title}>{form.title}</Text>
+                        {form.blocks.map((b, i) => (
+                            <Block key={i} block={b} styles={styles} t={t} />
+                        ))}
+                    </RNView>
                 ) : null}
+
                 {phase.kind === 'failed' ? (
                     <Text style={styles.error}>{t(`appForm.failed.${phase.reason}`, { app })}</Text>
                 ) : null}
@@ -188,7 +252,7 @@ export default function AppFormScreen() {
                     </>
                 ) : null}
 
-                {message.link ? (
+                {source && message.link ? (
                     <Pressable onPress={() => void Linking.openURL(message.link!)} style={styles.link} hitSlop={8}>
                         <Text style={styles.linkText}>{t('appForm.openInApp', { app })}</Text>
                         <Ionicons name="open-outline" size={16} color={p.blue} />
@@ -200,10 +264,16 @@ export default function AppFormScreen() {
 
     return (
         <RNView style={styles.screen}>
-            <SubPageHeader title={message?.kind === 'invitation' ? t('appForm.titleInvitation') : t('appForm.titleRequest')} />
+            <SubPageHeader
+                title={
+                    (phase.kind === 'refused' ? phase.invitation : message?.kind === 'invitation')
+                        ? t('appForm.titleInvitation')
+                        : t('appForm.titleRequest')
+                }
+            />
             <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 32 }]}>
                 {body}
-                {!message && looked ? (
+                {!message && looked && phase.kind !== 'refused' ? (
                     <Pressable
                         style={styles.doneButton}
                         onPress={leave}
@@ -286,7 +356,9 @@ const makeStyles = (p: Palette) =>
         hostChecking: { fontSize: 13, color: p.textSecondary },
         hostVerified: { fontSize: 13, color: p.textSecondary, flexShrink: 1 },
         card: { backgroundColor: p.card, borderRadius: 14, padding: 18, gap: 12, borderWidth: 1, borderColor: p.border },
-        cardDimmed: { opacity: 0.55 },
+        refused: { alignItems: 'center', gap: 12, paddingVertical: 24, paddingHorizontal: 8 },
+        closed: { fontSize: 15, lineHeight: 21, color: p.textSecondary, textAlign: 'center' },
+        retryButton: { flex: 1.35, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.action },
         title: { fontSize: 18, fontWeight: '700', color: p.textPrimary },
         text: { fontSize: 14.5, lineHeight: 21, color: p.textPrimary },
         divider: { height: StyleSheet.hairlineWidth, backgroundColor: p.border },

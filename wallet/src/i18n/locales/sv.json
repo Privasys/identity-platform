@@ -1360,6 +1360,7 @@
       "confirm": "Bekräfta"
     },
     "gone": "Det här är redan besvarat eller har gått ut.",
+    "closed": "Den här förfrågan väntar inte längre på svar.",
     "unreadable": "Den här förfrågan från {{app}} kan inte visas på den här telefonen. Öppna {{app}} för att svara.",
     "failed": {
       "signed-out": "Logga in på Privasys på den här telefonen och försök igen.",

@@ -1395,6 +1395,7 @@
       "confirm": "Apstiprināt"
     },
     "gone": "Uz šo jau ir atbildēts, vai tā derīgums ir beidzies.",
+    "closed": "Šis pieprasījums vairs negaida atbildi.",
     "unreadable": "Šo lietotnes {{app}} pieprasījumu nevar parādīt šajā tālrunī. Lai atbildētu, atveriet {{app}}.",
     "failed": {
       "signed-out": "Pierakstieties Privasys šajā tālrunī un mēģiniet vēlreiz.",

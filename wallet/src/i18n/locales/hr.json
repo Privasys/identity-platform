@@ -1395,6 +1395,7 @@
       "confirm": "Potvrdi"
     },
     "gone": "Na ovo je već odgovoreno ili je isteklo.",
+    "closed": "Ovaj zahtjev više ne čeka odgovor.",
     "unreadable": "Ovaj zahtjev aplikacije {{app}} ne može se prikazati na ovom telefonu. Otvorite {{app}} da biste odgovorili.",
     "failed": {
       "signed-out": "Prijavite se u Privasys na ovom telefonu i pokušajte ponovno.",

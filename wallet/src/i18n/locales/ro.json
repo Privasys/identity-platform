@@ -1395,6 +1395,7 @@
       "confirm": "Confirmă"
     },
     "gone": "S-a răspuns deja la aceasta sau a expirat.",
+    "closed": "Această cerere nu mai așteaptă un răspuns.",
     "unreadable": "Această solicitare de la {{app}} nu poate fi afișată pe acest telefon. Deschide {{app}} pentru a răspunde.",
     "failed": {
       "signed-out": "Conectează-te la Privasys pe acest telefon, apoi încearcă din nou.",

@@ -1443,6 +1443,7 @@
       "confirm": "Ikkonferma"
     },
     "gone": "Diġà ngħatat tweġiba għal dan, jew skada.",
+    "closed": "Din it-talba m'għadhiex tistenna tweġiba.",
     "unreadable": "Din it-talba minn {{app}} ma tistax tintwera fuq dan it-telefon. Iftaħ {{app}} biex twieġeb.",
     "failed": {
       "signed-out": "Idħol f’Privasys fuq dan it-telefon, imbagħad erġa’ pprova.",

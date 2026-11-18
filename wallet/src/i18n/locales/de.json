@@ -1360,6 +1360,7 @@
       "confirm": "Bestätigen"
     },
     "gone": "Darauf wurde bereits geantwortet, oder es ist abgelaufen.",
+    "closed": "Diese Anfrage wartet nicht mehr auf eine Antwort.",
     "unreadable": "Diese Anfrage von {{app}} kann auf diesem Telefon nicht angezeigt werden. Öffnen Sie {{app}}, um zu antworten.",
     "failed": {
       "signed-out": "Melden Sie sich auf diesem Telefon bei Privasys an und versuchen Sie es erneut.",

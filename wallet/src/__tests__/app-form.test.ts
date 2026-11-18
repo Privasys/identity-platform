@@ -22,7 +22,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
 import { formDigest, parseForm } from '../services/app-form';
-import { answerForm, AnswerError, confirmFormSource, hostIsApp } from '../services/app-form-answer';
+import { answerForm, AnswerError, confirmFormSource, hostIsApp, removedWhenRefused } from '../services/app-form-answer';
 import { attestEnclave, inspectAttestation } from '../services/attestation';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 import { signVaultAssertion } from '../services/fido2';
@@ -185,5 +185,21 @@ describe('confirmFormSource', () => {
     ])('refuses when the app %s', async (_n, status, body) => {
         confirmWith(status as number, body);
         await expect(confirmFormSource({ form, appId: APP, appSlug: 'drive', platformHost: HOST })).rejects.toMatchObject({ reason: 'not-confirmed' });
+    });
+
+    // A refused form is removed for good when the app is not waiting on it,
+    // so an app that is only restarting must not read as that.
+    it.each([500, 502, 503, 408, 429])('takes a %i as unreachable, not as not waiting', async (status) => {
+        confirmWith(status, {});
+        await expect(confirmFormSource({ form, appId: APP, appSlug: 'drive', platformHost: HOST })).rejects.toMatchObject({ reason: 'unreachable' });
+    });
+});
+
+describe('removedWhenRefused', () => {
+    it.each(['not-confirmed', 'not-the-app'] as const)('removes a form refused as %s', (reason) => {
+        expect(removedWhenRefused(reason)).toBe(true);
+    });
+    it.each(['unverified', 'unreachable'] as const)('keeps a form refused as %s, to try again', (reason) => {
+        expect(removedWhenRefused(reason)).toBe(false);
     });
 });

@@ -1395,6 +1395,7 @@
       "confirm": "Patvirtinti"
     },
     "gone": "Į tai jau atsakyta arba baigėsi galiojimas.",
+    "closed": "Šis prašymas nebelaukia atsakymo.",
     "unreadable": "Šio programėlės {{app}} prašymo negalima parodyti šiame telefone. Atsakykite atidarę {{app}}.",
     "failed": {
       "signed-out": "Prisijunkite prie Privasys šiame telefone ir bandykite dar kartą.",

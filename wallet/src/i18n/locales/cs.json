@@ -1384,6 +1384,7 @@
       "confirm": "Potvrdit"
     },
     "gone": "Na tohle už bylo odpovězeno, nebo vypršela platnost.",
+    "closed": "Tato žádost už nečeká na odpověď.",
     "unreadable": "Tuto žádost od {{app}} nelze na tomto telefonu zobrazit. Odpovězte v {{app}}.",
     "failed": {
       "signed-out": "Přihlaste se na tomto telefonu do Privasys a zkuste to znovu.",

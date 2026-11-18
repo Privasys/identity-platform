@@ -1443,6 +1443,7 @@
       "confirm": "Deimhnigh"
     },
     "gone": "Tugadh freagra air seo cheana, nó tá sé imithe in éag.",
+    "closed": "Níl an t-iarratas seo ag fanacht le freagra a thuilleadh.",
     "unreadable": "Ní féidir an t-iarratas seo ó {{app}} a thaispeáint ar an bhfón seo. Oscail {{app}} chun é a fhreagairt.",
     "failed": {
       "signed-out": "Sínigh isteach i Privasys ar an bhfón seo, ansin bain triail eile as.",

@@ -69,6 +69,16 @@ export function sameApp(a: string, b: string): boolean {
     return !!a && !!b && n(a) === n(b);
 }
 
+/**
+ * Whether a form that failed its source check is removed at once. The app
+ * saying it is not waiting (someone else answered, or it was withdrawn) and a
+ * host that is not the app's are final. An app that could not be reached or
+ * verified may be restarting, so that form stays for the holder to try again.
+ */
+export function removedWhenRefused(reason: AnswerFailure): boolean {
+    return reason === 'not-confirmed' || reason === 'not-the-app';
+}
+
 /** What the screen shows once a form is confirmed, and links to. */
 export interface ConfirmedSource {
     host: string;
@@ -137,6 +147,12 @@ export async function confirmAppSource(args: {
         res = await raFetch(`https://${host}${confirmPath}`);
     } catch {
         throw new AnswerError('unreachable', 'the app could not be reached');
+    }
+    // An app that is restarting or overloaded has said nothing about this
+    // form. Only a clear answer counts as "not waiting": a form refused that
+    // way is removed for good (removedWhenRefused).
+    if (res.status >= 500 || res.status === 408 || res.status === 429) {
+        throw new AnswerError('unreachable', `the app could not answer (${res.status})`);
     }
     if (!res.ok) throw new AnswerError('not-confirmed', `the app is not waiting on this (${res.status})`);
     let body: Record<string, unknown>;

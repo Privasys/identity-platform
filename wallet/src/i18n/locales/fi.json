@@ -1360,6 +1360,7 @@
       "confirm": "Vahvista"
     },
     "gone": "Tähän on jo vastattu, tai se on vanhentunut.",
+    "closed": "Tämä pyyntö ei enää odota vastausta.",
     "unreadable": "Tätä sovelluksen {{app}} pyyntöä ei voi näyttää tällä puhelimella. Vastaa avaamalla {{app}}.",
     "failed": {
       "signed-out": "Kirjaudu Privasysiin tällä puhelimella ja yritä uudelleen.",

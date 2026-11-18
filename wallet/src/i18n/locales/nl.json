@@ -1360,6 +1360,7 @@
       "confirm": "Bevestigen"
     },
     "gone": "Hierop is al geantwoord, of het is verlopen.",
+    "closed": "Dit verzoek wacht niet meer op een antwoord.",
     "unreadable": "Dit verzoek van {{app}} kan op deze telefoon niet worden getoond. Open {{app}} om te antwoorden.",
     "failed": {
       "signed-out": "Meld je op deze telefoon aan bij Privasys en probeer het opnieuw.",

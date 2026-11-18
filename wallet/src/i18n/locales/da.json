@@ -1360,6 +1360,7 @@
       "confirm": "Bekræft"
     },
     "gone": "Dette er allerede besvaret eller er udløbet.",
+    "closed": "Denne anmodning venter ikke længere på svar.",
     "unreadable": "Denne anmodning fra {{app}} kan ikke vises på denne telefon. Åbn {{app}} for at svare.",
     "failed": {
       "signed-out": "Log ind på Privasys på denne telefon, og prøv igen.",

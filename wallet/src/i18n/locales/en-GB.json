@@ -1371,6 +1371,7 @@
       "confirm": "Confirm"
     },
     "gone": "This was already answered, or has expired.",
+    "closed": "This request is no longer waiting for an answer.",
     "unreadable": "This request from {{app}} cannot be shown on this phone. Open {{app}} to answer it.",
     "failed": {
       "signed-out": "Sign in to Privasys on this phone, then try again.",

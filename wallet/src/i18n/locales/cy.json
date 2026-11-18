@@ -1467,6 +1467,7 @@
       "confirm": "Cadarnhau"
     },
     "gone": "Mae hyn eisoes wedi’i ateb, neu wedi dod i ben.",
+    "closed": "Nid yw'r cais hwn yn aros am ateb mwyach.",
     "unreadable": "Ni ellir dangos y cais hwn gan {{app}} ar y ffôn hwn. Agorwch {{app}} i’w ateb.",
     "failed": {
       "signed-out": "Mewngofnodwch i Privasys ar y ffôn hwn, yna rhowch gynnig arall arni.",

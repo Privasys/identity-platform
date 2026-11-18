@@ -1371,6 +1371,7 @@
       "confirm": "Kinnita"
     },
     "gone": "Sellele on juba vastatud või see on aegunud.",
+    "closed": "See taotlus ei oota enam vastust.",
     "unreadable": "Seda rakenduse {{app}} taotlust ei saa selles telefonis kuvada. Vastamiseks avage {{app}}.",
     "failed": {
       "signed-out": "Logige selles telefonis Privasysesse sisse ja proovige uuesti.",

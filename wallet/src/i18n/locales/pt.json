@@ -1384,6 +1384,7 @@
       "confirm": "Confirmar"
     },
     "gone": "Isto já foi respondido ou expirou.",
+    "closed": "Este pedido já não está à espera de resposta.",
     "unreadable": "Este pedido de {{app}} não pode ser mostrado neste telemóvel. Abra {{app}} para responder.",
     "failed": {
       "signed-out": "Inicie sessão no Privasys neste telemóvel e tente novamente.",

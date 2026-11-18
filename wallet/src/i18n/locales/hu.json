@@ -1360,6 +1360,7 @@
       "confirm": "Megerősítés"
     },
     "gone": "Erre már válaszoltak, vagy lejárt.",
+    "closed": "Ez a kérés már nem vár válaszra.",
     "unreadable": "A(z) {{app}} kérése ezen a telefonon nem jeleníthető meg. A válaszhoz nyissa meg: {{app}}.",
     "failed": {
       "signed-out": "Jelentkezzen be a Privasysba ezen a telefonon, majd próbálja újra.",

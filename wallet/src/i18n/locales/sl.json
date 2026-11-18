@@ -1419,6 +1419,7 @@
       "confirm": "Potrdi"
     },
     "gone": "Na to je že bilo odgovorjeno ali je poteklo.",
+    "closed": "Ta zahteva ne čaka več na odgovor.",
     "unreadable": "Te zahteve aplikacije {{app}} ni mogoče prikazati na tem telefonu. Za odgovor odprite {{app}}.",
     "failed": {
       "signed-out": "Na tem telefonu se prijavite v Privasys in poskusite znova.",

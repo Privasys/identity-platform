@@ -369,6 +369,7 @@ export default (context: ConfigContext): ExpoConfig => {
             './plugins/swift-concurrency-fix',
             './plugins/disable-lint-vital',
             './plugins/android-fold-continuity',
+            './plugins/android-optional-portrait',
             './plugins/android-backup-rules'
         ].filter((p) => p !== 'noop') as ExpoConfig['plugins'],
         experiments: { typedRoutes: true, reactCompiler: true, buildCacheProvider: 'eas' }

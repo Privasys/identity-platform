@@ -7,12 +7,16 @@
 # on every device asked for, in parallel, and uploads one set of screenshots
 # per device. Manual only: nothing here is shipped or submitted.
 #
-# The defaults cover the store listings: a large phone, a tablet and, on
-# Android, a foldable. A device the runner's Xcode does not know fails its own
-# job only, listing the simulators the runner has; the other devices still
-# deliver. The iPhone Duo is left out until the runners carry Xcode 27.1 (the
-# macos-26 image had Xcode 26.6 on 2026-11-18) and the wallet is on an Expo SDK
-# that supports it; pass it in ios_devices to try.
+# The defaults cover the store listings: a large phone, a tablet and a
+# foldable on each platform. A device the runner's Xcode does not know fails
+# its own job only, listing the simulators the runner has; the other devices
+# still deliver.
+#
+# The iPhone Duo's simulator needs Xcode 27.1, which only the `xcode-27` image
+# has (a public preview, actions/runner-images#14404; macos-26 had Xcode 26.6
+# on 2026-11-18), so its job runs there. The app it installs is still the one
+# built with Xcode 26 on macos-26: until the wallet is on an Expo SDK built
+# with Xcode 27, the Duo shows it as an app built for an older iOS.
 
 name: Wallet screenshots
 
@@ -28,7 +32,7 @@ on:
       ios_devices:
         description: 'iOS simulators, a JSON list of device type names (`xcrun simctl list devicetypes`)'
         required: true
-        default: '["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)"]'
+        default: '["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)", "iPhone Duo"]'
       android_profiles:
         description: 'Android emulator profiles, a JSON list of avdmanager device ids'
         required: true
@@ -149,7 +153,8 @@ jobs:
 
   ios:
     needs: ios-build
-    runs-on: macos-26
+    # Devices that need Xcode 27 run on its image; the rest on macos-26.
+    runs-on: ${{ matrix.device == 'iPhone Duo' && 'xcode-27' || 'macos-26' }}
     timeout-minutes: 60
     strategy:
       fail-fast: false

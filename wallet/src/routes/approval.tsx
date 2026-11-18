@@ -10,7 +10,12 @@
  * Nothing can be answered until the wallet has established, without trusting
  * the platform, that the app itself sent it (services/approval-answer, the
  * same check as forms). Answering asks for a fresh biometric, then the
- * passkey; the token goes to the app over RA-TLS.
+ * passkey; the token goes to the app over RA-TLS. Until the check passes the
+ * approval's own words are not shown at all: they are unconfirmed text.
+ *
+ * An approval that fails the check says why and shows nothing of itself. If
+ * the app is not waiting on it, or the host is not the app's, it is removed at
+ * once; if the app could not be reached or verified it stays, to try again.
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -23,7 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { AttestationView } from '@/components/AttestationView';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { AnswerError, type AnswerFailure, type ConfirmedSource } from '@/services/app-form-answer';
+import { AnswerError, removedWhenRefused, type AnswerFailure, type ConfirmedSource } from '@/services/app-form-answer';
 import type { Decision } from '@/services/approval';
 import { answerApproval, confirmApprovalSource } from '@/services/approval-answer';
 import { useAppMessagesStore } from '@/stores/app-messages';
@@ -33,7 +38,8 @@ type Phase =
     | { kind: 'checking' }
     | { kind: 'ready'; source: ConfirmedSource }
     | { kind: 'busy'; source: ConfirmedSource; decision: Decision }
-    | { kind: 'refused'; reason: AnswerFailure }
+    // Carries the app's name: the message itself may already have been removed.
+    | { kind: 'refused'; reason: AnswerFailure; app: string }
     | { kind: 'failed'; source: ConfirmedSource; reason: AnswerFailure };
 
 function useSecondsLeft(expiresAt?: number): number | undefined {
@@ -56,14 +62,16 @@ export default function ApprovalScreen() {
     const message = useAppMessagesStore((s) => s.messages.find((m) => m.id === id));
     const refresh = useAppMessagesStore((s) => s.refresh);
     const forget = useAppMessagesStore((s) => s.forget);
+    const dismiss = useAppMessagesStore((s) => s.dismiss);
     const [looked, setLooked] = useState(false);
     const [phase, setPhase] = useState<Phase>({ kind: 'checking' });
     const [reviewing, setReviewing] = useState(false);
 
     useEffect(() => {
-        if (message || looked) return;
+        // Not once refused: an approval just removed must not be listed back.
+        if (message || looked || phase.kind === 'refused') return;
         void refresh().finally(() => setLooked(true));
-    }, [message, looked, refresh]);
+    }, [message, looked, refresh, phase.kind]);
 
     const app = message?.appName || message?.appSlug || t('access.messageSomeApp');
     const approval = message?.approval;
@@ -71,15 +79,25 @@ export default function ApprovalScreen() {
     const expired = left === 0;
 
     useEffect(() => {
-        if (!message || !approval || !message.appId || phase.kind !== 'checking') return;
+        if (!message || !approval || phase.kind !== 'checking') return;
+        // Without an app id there is nothing to check it against.
+        if (!message.appId) {
+            setPhase({ kind: 'refused', reason: 'unverified', app });
+            return;
+        }
         let live = true;
         confirmApprovalSource({ approval, appId: message.appId, appSlug: message.appSlug, platformHost: message.platformHost })
             .then((source) => live && setPhase({ kind: 'ready', source }))
-            .catch((e) => live && setPhase({ kind: 'refused', reason: e instanceof AnswerError ? e.reason : 'unreachable' }));
+            .catch((e) => {
+                if (!live) return;
+                const reason = e instanceof AnswerError ? e.reason : 'unreachable';
+                setPhase({ kind: 'refused', reason, app });
+                if (removedWhenRefused(reason)) void dismiss(message.id);
+            });
         return () => {
             live = false;
         };
-    }, [message, approval, phase.kind]);
+    }, [message, approval, phase.kind, app, dismiss]);
 
     const leave = () => (router.canGoBack() ? router.back() : router.replace('/access'));
 
@@ -110,6 +128,51 @@ export default function ApprovalScreen() {
     const supported = approval?.assurance === 'device';
 
     const body = (() => {
+        // Before the message: a refused approval may already have been removed.
+        if (phase.kind === 'refused') {
+            const removed = removedWhenRefused(phase.reason);
+            const closed = phase.reason === 'not-confirmed';
+            return (
+                <>
+                    <Text style={styles.fromText}>{t('appForm.from', { app: phase.app })}</Text>
+                    <RNView style={styles.refused} testID="approval-refused">
+                        <Ionicons
+                            name={closed ? 'checkmark-circle-outline' : 'warning-outline'}
+                            size={32}
+                            color={closed ? p.textSecondary : p.danger}
+                        />
+                        <Text style={closed ? styles.closed : styles.error}>
+                            {closed ? t('appForm.closed') : t(`appForm.refused.${phase.reason}`, { app: phase.app })}
+                        </Text>
+                    </RNView>
+                    {removed ? (
+                        <Pressable style={styles.doneButton} onPress={leave} accessibilityRole="button">
+                            <Text style={styles.doneButtonText}>{t('common.done')}</Text>
+                        </Pressable>
+                    ) : (
+                        <RNView style={styles.actions}>
+                            <Pressable
+                                style={styles.declineButton}
+                                onPress={() => {
+                                    if (message) void dismiss(message.id);
+                                    leave();
+                                }}
+                                accessibilityRole="button"
+                            >
+                                <Text style={styles.declineButtonText}>{t('common.remove')}</Text>
+                            </Pressable>
+                            <Pressable
+                                style={styles.retryButton}
+                                onPress={() => setPhase({ kind: 'checking' })}
+                                accessibilityRole="button"
+                            >
+                                <Text style={styles.doneButtonText}>{t('common.retry')}</Text>
+                            </Pressable>
+                        </RNView>
+                    )}
+                </>
+            );
+        }
         if (!message) {
             return looked ? (
                 <Text style={styles.note}>{t('appForm.gone')}</Text>
@@ -144,48 +207,47 @@ export default function ApprovalScreen() {
                     ) : null}
                 </RNView>
 
-                <RNView style={[styles.card, (phase.kind === 'refused' || expired) && styles.cardDimmed]}>
-                    <Text style={styles.title}>{approval.title}</Text>
-                    {approval.lines.length > 0 ? (
-                        <RNView style={styles.lines}>
-                            {approval.lines.map((l, i) => (
-                                <RNView key={i} style={styles.line}>
-                                    <Text style={styles.lineLabel}>{l.label}</Text>
-                                    <Text style={styles.lineValue}>{l.value}</Text>
-                                </RNView>
-                            ))}
-                        </RNView>
-                    ) : null}
-                    <RNView style={styles.divider} />
-                    <RNView style={styles.metaRow}>
-                        <Ionicons
-                            name={approval.assurance === 'gov-presence' ? 'scan-outline' : 'finger-print-outline'}
-                            size={16}
-                            color={p.textSecondary}
-                        />
-                        <Text style={styles.meta}>{t(`approval.assurance.${approval.assurance}`)}</Text>
-                    </RNView>
-                    {left !== undefined ? (
+                {source ? (
+                    <RNView style={[styles.card, expired && styles.cardDimmed]}>
+                        <Text style={styles.title}>{approval.title}</Text>
+                        {approval.lines.length > 0 ? (
+                            <RNView style={styles.lines}>
+                                {approval.lines.map((l, i) => (
+                                    <RNView key={i} style={styles.line}>
+                                        <Text style={styles.lineLabel}>{l.label}</Text>
+                                        <Text style={styles.lineValue}>{l.value}</Text>
+                                    </RNView>
+                                ))}
+                            </RNView>
+                        ) : null}
+                        <RNView style={styles.divider} />
                         <RNView style={styles.metaRow}>
-                            <Ionicons name="time-outline" size={16} color={expired ? p.danger : p.textSecondary} />
-                            <Text style={[styles.meta, expired && { color: p.danger }]}>
-                                {expired
-                                    ? t('approval.expired', { app })
-                                    : t('approval.timeLeft', {
-                                          time: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`,
-                                      })}
-                            </Text>
+                            <Ionicons
+                                name={approval.assurance === 'gov-presence' ? 'scan-outline' : 'finger-print-outline'}
+                                size={16}
+                                color={p.textSecondary}
+                            />
+                            <Text style={styles.meta}>{t(`approval.assurance.${approval.assurance}`)}</Text>
                         </RNView>
-                    ) : null}
-                </RNView>
-
-                {phase.kind === 'refused' ? (
-                    <Text style={styles.error}>{t(`appForm.refused.${phase.reason}`, { app })}</Text>
+                        {left !== undefined ? (
+                            <RNView style={styles.metaRow}>
+                                <Ionicons name="time-outline" size={16} color={expired ? p.danger : p.textSecondary} />
+                                <Text style={[styles.meta, expired && { color: p.danger }]}>
+                                    {expired
+                                        ? t('approval.expired', { app })
+                                        : t('approval.timeLeft', {
+                                              time: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`,
+                                          })}
+                                </Text>
+                            </RNView>
+                        ) : null}
+                    </RNView>
                 ) : null}
+
                 {phase.kind === 'failed' ? (
                     <Text style={styles.error}>{t(`appForm.failed.${phase.reason}`, { app })}</Text>
                 ) : null}
-                {!supported ? <Text style={styles.error}>{t('approval.unsupported')}</Text> : null}
+                {source && !supported ? <Text style={styles.error}>{t('approval.unsupported')}</Text> : null}
 
                 {source && supported && !expired ? (
                     <>
@@ -227,7 +289,7 @@ export default function ApprovalScreen() {
             <SubPageHeader title={t('approval.title')} />
             <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 32 }]}>
                 {body}
-                {(!message && looked) || expired ? (
+                {phase.kind !== 'refused' && ((!message && looked) || expired) ? (
                     <Pressable style={styles.doneButton} onPress={leave} accessibilityRole="button">
                         <Text style={styles.doneButtonText}>{t('common.done')}</Text>
                     </Pressable>
@@ -264,6 +326,9 @@ const makeStyles = (p: Palette) =>
         hostMuted: { fontSize: 13, color: p.textSecondary, flexShrink: 1 },
         card: { backgroundColor: p.card, borderRadius: 14, padding: 18, gap: 12, borderWidth: 1, borderColor: p.border },
         cardDimmed: { opacity: 0.55 },
+        refused: { alignItems: 'center', gap: 12, paddingVertical: 24, paddingHorizontal: 8 },
+        closed: { fontSize: 15, lineHeight: 21, color: p.textSecondary, textAlign: 'center' },
+        retryButton: { flex: 1.35, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.action },
         title: { fontSize: 18, fontWeight: '700', color: p.textPrimary },
         lines: { gap: 8 },
         line: { gap: 2 },

@@ -1,0 +1,12 @@
+appId: org.privasys.wallet.demo
+name: Personal data
+---
+- runFlow: subflows/launch.yaml
+- tapOn:
+    id: "profile-personal-data"
+- extendedWaitUntil:
+    visible:
+      id: "personal-data-screen"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 09-personal-data

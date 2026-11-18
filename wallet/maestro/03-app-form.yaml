@@ -1,0 +1,14 @@
+appId: org.privasys.wallet.demo
+name: An app form, its sender checked
+---
+- runFlow: subflows/launch.yaml
+- tapOn:
+    id: "tab-access"
+- tapOn:
+    id: "access-app-form"
+- extendedWaitUntil:
+    visible:
+      id: "app-form-verified-host"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 03-app-form

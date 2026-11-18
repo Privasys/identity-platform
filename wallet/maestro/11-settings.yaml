@@ -1,0 +1,12 @@
+appId: org.privasys.wallet.demo
+name: Settings
+---
+- runFlow: subflows/launch.yaml
+- tapOn:
+    id: "tab-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 11-settings

@@ -1,4 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Stack, useRouter } from 'expo-router';
@@ -42,6 +43,8 @@ import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { checkDeviceSecurity } from '@/services/security';
+import { assertDemoAllowed, demo, isDemo } from '@/services/demo/gate';
+import { getDeviceLocale } from '@/services/device-locale';
 import { installLogCapture } from '@/utils/logs';
 
 // Capture console output into an in-memory ring buffer as early as
@@ -53,6 +56,13 @@ installLogCapture();
 // on the compiled-in en-GB bundle, so it cannot fail and cannot delay the
 // first frame; the user's own language is swapped in later by useAppLocale.
 initI18n();
+
+// A demo build (EXPO_PUBLIC_DEMO=1, the `demo` profile) refuses to start on a
+// production stage, then fills the stores with its invented holder before the
+// first render, in place of the hydrate below. In any other build both lines
+// are no-ops and the demo code is not in the bundle (services/demo/gate.ts).
+assertDemoAllowed(Constants.expoConfig?.extra?.STAGE);
+if (isDemo()) demo().seedDemo(Date.now(), getDeviceLocale());
 
 export {
     // Catch any errors thrown by the Layout component.
@@ -88,12 +98,15 @@ export default function RootLayout() {
     // Is this build still supported? Null until an answer arrives, so a slow or
     // absent network never delays the app.
     const { notice: updateNotice, dismiss: dismissUpdate } = useUpdateGate();
-    const [storesReady, setStoresReady] = useState(false);
+    const [storesReady, setStoresReady] = useState(isDemo());
     const [showSplashAnim, setShowSplashAnim] = useState(true);
 
     // Hydrate persisted stores on app launch, once the secrets written before
     // they stayed on this phone have been moved (utils/storage.ts).
     useEffect(() => {
+        // The demo was seeded at load, and has no storage to read and no
+        // other phones to sync with.
+        if (isDemo()) return;
         migrateToThisDeviceOnly(DEVICE_ONLY_KEYS).then(() => Promise.all([
             useAuthStore.getState().hydrate(),
             useProfileStore.getState().hydrate(),
@@ -116,8 +129,10 @@ export default function RootLayout() {
                 .then(() => requestSync())
                 .catch((e: any) => console.warn('[device-sync] start-up sync failed:', e?.message ?? e));
         }));
+    }, []);
 
-        // Run security checks in the background
+    // Run security checks in the background
+    useEffect(() => {
         checkDeviceSecurity().then((status) => {
             if (status.warnings.length > 0) {
                 console.warn('Security warnings:', status.warnings);

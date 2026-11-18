@@ -1,0 +1,13 @@
+# A fresh launch of the demo wallet, waited on until Profile is drawn and the
+# splash animation has gone.
+appId: org.privasys.wallet.demo
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "profile-screen"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000

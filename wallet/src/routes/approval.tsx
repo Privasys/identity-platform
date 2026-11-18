@@ -132,6 +132,7 @@ export default function ApprovalScreen() {
                     ) : source ? (
                         <Pressable
                             style={styles.hostRow}
+                            testID="approval-verified-host"
                             onPress={() => setReviewing(true)}
                             accessibilityRole="button"
                             accessibilityLabel={t('appForm.reviewAttestation', { host: source.host })}

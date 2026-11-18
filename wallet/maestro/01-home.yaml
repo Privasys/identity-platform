@@ -1,0 +1,5 @@
+appId: org.privasys.wallet.demo
+name: Home (Profile)
+---
+- runFlow: subflows/launch.yaml
+- takeScreenshot: 01-home

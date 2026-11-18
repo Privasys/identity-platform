@@ -1,0 +1,18 @@
+appId: org.privasys.wallet.demo
+name: ID check, first screen
+# Only the overview: every step after it needs a camera or an NFC chip.
+---
+- runFlow: subflows/launch.yaml
+- scrollUntilVisible:
+    element:
+      id: "profile-id-check"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "profile-id-check"
+- extendedWaitUntil:
+    visible:
+      id: "kyc-intro"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 10-id-check

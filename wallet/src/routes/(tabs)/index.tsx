@@ -330,7 +330,7 @@ export default function ProfileScreen() {
 
 
     return (
-        <RNView style={styles.screen}>
+        <RNView style={styles.screen} testID="profile-screen">
             {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
                 <Text style={styles.headerTitle}>{t('tabs.profile')}</Text>
@@ -400,6 +400,7 @@ export default function ProfileScreen() {
 
                 <Pressable
                     style={styles.sharingCard}
+                    testID="profile-personal-data"
                     onPress={() => router.push('/personal-data' as never)}
                 >
                     <RNView style={styles.sharingRow}>
@@ -421,6 +422,7 @@ export default function ProfileScreen() {
                 {/* Government-verified ID scan (highest assurance) */}
                 <Pressable
                     style={styles.sharingCard}
+                    testID="profile-id-check"
                     onPress={() => router.push('/kyc-capture' as never)}
                 >
                     <RNView style={styles.sharingRow}>
@@ -475,6 +477,7 @@ export default function ProfileScreen() {
                 <Text style={styles.sectionTitle}>{t('profile.sectionDrive')}</Text>
                 <Pressable
                     style={styles.sharingCard}
+                    testID="profile-drive"
                     onPress={() => router.push('/drive')}
                 >
                     <RNView style={styles.sharingRow}>

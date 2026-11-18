@@ -1,0 +1,14 @@
+appId: org.privasys.wallet.demo
+name: An approval, its sender checked
+---
+- runFlow: subflows/launch.yaml
+- tapOn:
+    id: "tab-access"
+- tapOn:
+    id: "access-approval"
+- extendedWaitUntil:
+    visible:
+      id: "approval-verified-host"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 05-approval

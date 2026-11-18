@@ -46,7 +46,7 @@ export default function SettingsScreen() {
     );
 
     return (
-        <RNView style={styles.screen}>
+        <RNView style={styles.screen} testID="settings-screen">
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
                 <Text style={styles.headerTitle}>{t('settings.title')}</Text>
             </RNView>
@@ -137,7 +137,7 @@ export default function SettingsScreen() {
                     <>
                         <Text style={styles.sectionTitle}>{t('devices.settingsTitle')}</Text>
                         <Text style={styles.sectionDescription}>{t('devices.settingsDescription')}</Text>
-                        <Pressable style={styles.logsButton} onPress={() => router.push('/devices' as never)}>
+                        <Pressable style={styles.logsButton} testID="settings-devices" onPress={() => router.push('/devices' as never)}>
                             <Ionicons name="phone-portrait-outline" size={18} color={p.textPrimary} />
                             <Text style={styles.logsButtonText}>{t('devices.settingsRow', { count: phones })}</Text>
                             <Ionicons name="chevron-forward" size={18} color={p.textMuted} />

@@ -1,0 +1,227 @@
+# Copyright (c) Privasys. All rights reserved.
+# Licensed under the GNU Affero General Public License v3.0.
+#
+# Wallet screenshots: builds the demo wallet (EAS profile `demo`, invented
+# holder, no network; wallet/src/services/demo) for the iOS simulator and the
+# Android emulator, runs the Maestro flows in wallet/maestro, and uploads the
+# screenshots. Manual only: nothing here is shipped or submitted.
+
+name: Wallet screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform'
+        required: true
+        default: 'all'
+        type: choice
+        options: [ios, android, all]
+      ios_device:
+        description: 'iOS simulator (name as in `xcrun simctl list devicetypes`)'
+        required: true
+        default: 'iPhone 17 Pro Max'
+      android_profile:
+        description: 'Android emulator profile (avdmanager device id)'
+        required: true
+        default: 'pixel_9_pro_xl'
+      locale:
+        description: 'Device language (BCP 47, e.g. en-GB, fr-FR)'
+        required: true
+        default: 'en-GB'
+
+env:
+  BUN_VERSION: '1.3.11'
+  # Auth for the @privasys scoped registry (wallet/.npmrc), as in build-wallet.
+  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  RATLS_VERSION: v0.15.1
+  MAESTRO_VERSION: '1.39.13'
+  # The iOS driver (an XCTest runner) can take minutes to start on a cold
+  # simulator; its default wait gave up on the iPad.
+  MAESTRO_DRIVER_STARTUP_TIMEOUT: '240000'
+
+jobs:
+  ios:
+    if: inputs.platform == 'ios' || inputs.platform == 'all'
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: RA-TLS libraries (device and simulator)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p wallet/modules/native-ratls/ios/lib
+          cd wallet/modules/native-ratls/ios/lib
+          gh release download "$RATLS_VERSION" --repo Privasys/ra-tls-clients \
+            --pattern 'ratls-mobile-ios.tar.gz' --output ratls-mobile-ios.tar.gz
+          tar -xzf ratls-mobile-ios.tar.gz && rm ratls-mobile-ios.tar.gz
+          test -f libratls_mobile-simulator.a
+
+      - name: Stage artefacts for the EAS tarball
+        run: |
+          git add -f wallet/modules/native-ratls/ios/lib/
+          git -c user.name='CI' -c user.email='ci@privasys.org' commit -m 'ci: add Rust iOS artifacts [skip ci]'
+
+      - name: Install dependencies
+        working-directory: wallet
+        run: bun install --frozen-lockfile
+
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install CocoaPods
+        run: sudo gem install cocoapods
+
+      - name: Build the demo app for the simulator
+        working-directory: wallet
+        run: |
+          eas build --platform ios --profile demo --local --non-interactive --output build/demo-ios.tar.gz
+          mkdir -p build/app && tar -xzf build/demo-ios.tar.gz -C build/app
+          find build/app -maxdepth 2 -name '*.app'
+
+      - name: Boot the simulator
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          name = '${{ inputs.ios_device }}'
+          devs = [d for r in json.load(sys.stdin)['devices'].values() for d in r if d['name'] == name]
+          print(devs[0]['udid'] if devs else '')")
+          if [ -z "$UDID" ]; then
+            echo "No simulator named '${{ inputs.ios_device }}'. Available:"; xcrun simctl list devices available; exit 1
+          fi
+          LANG_CODE="${{ inputs.locale }}"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          # The device language, so the wallet starts in it.
+          xcrun simctl spawn "$UDID" defaults write -g AppleLanguages -array "${LANG_CODE%%-*}"
+          xcrun simctl spawn "$UDID" defaults write -g AppleLocale -string "${LANG_CODE/-/_}"
+          xcrun simctl shutdown "$UDID" && xcrun simctl boot "$UDID" && xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 \
+            --cellularBars 4 --wifiBars 3
+          APP=$(find wallet/build/app -maxdepth 2 -name '*.app' | head -1)
+          xcrun simctl install "$UDID" "$APP"
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Take the screenshots
+        timeout-minutes: 30
+        working-directory: wallet
+        run: |
+          mkdir -p shots && cd shots
+          # A flow that fails still leaves the others' screenshots; a run that
+          # produced none (the driver never started) is tried once more, and
+          # fails the job if it still has none.
+          for attempt in 1 2; do
+            maestro --device "$UDID" test ../maestro/ --format junit --output ../maestro-report.xml || true
+            ls *.png >/dev/null 2>&1 && break
+            echo "No screenshots on attempt $attempt"
+          done
+          ls -la
+          ls *.png >/dev/null 2>&1
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: screenshots-ios-${{ inputs.ios_device }}-${{ inputs.locale }}
+          path: |
+            wallet/shots/*.png
+            wallet/maestro-report.xml
+          retention-days: 30
+
+  android:
+    if: inputs.platform == 'android' || inputs.platform == 'all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: RA-TLS libraries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p wallet/modules/native-ratls/android/src/main/jniLibs
+          cd wallet/modules/native-ratls/android/src/main/jniLibs
+          gh release download "$RATLS_VERSION" --repo Privasys/ra-tls-clients \
+            --pattern 'ratls-mobile-android.tar.gz' --output ratls-mobile-android.tar.gz
+          tar -xzf ratls-mobile-android.tar.gz && rm ratls-mobile-android.tar.gz
+          test -f x86_64/libratls_mobile.so
+
+      - name: Stage artefacts for the EAS tarball
+        run: |
+          git add -f wallet/modules/native-ratls/android/src/main/jniLibs/
+          git -c user.name='CI' -c user.email='ci@privasys.org' commit -m 'ci: add Rust Android artifacts [skip ci]'
+
+      - name: Install dependencies
+        working-directory: wallet
+        run: bun install --frozen-lockfile
+
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build the demo APK
+        working-directory: wallet
+        run: eas build --platform android --profile demo --local --non-interactive --output build/demo.apk
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+
+      - name: Take the screenshots
+        timeout-minutes: 40
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: ${{ inputs.android_profile }}
+          disable-animations: true
+          working-directory: wallet
+          script: |
+            adb install -r build/demo.apk
+            adb shell settings put global sysui_demo_allowed 1
+            adb shell am broadcast -a com.android.systemui.demo -e command enter
+            adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941
+            adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false
+            adb shell "setprop persist.sys.locale ${{ inputs.locale }}; setprop ctl.restart zygote" || true
+            sleep 20
+            mkdir -p shots && cd shots && (maestro test ../maestro/ --format junit --output ../maestro-report.xml || true) && ls -la
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: screenshots-android-${{ inputs.android_profile }}-${{ inputs.locale }}
+          path: |
+            wallet/shots/*.png
+            wallet/maestro-report.xml
+          retention-days: 30

@@ -14,6 +14,14 @@
             "ios": { "simulator": false }
         },
         "staging": { "extends": "production", "distribution": "internal" },
+        "demo": {
+            "extends": "preview",
+            "distribution": "internal",
+            "autoIncrement": false,
+            "ios": { "simulator": true },
+            "android": { "buildType": "apk", "withoutCredentials": true },
+            "env": { "NODE_ENV": "development", "STAGE": "demo", "EXPO_PUBLIC_DEMO": "1" }
+        },
         "preview": {
             "extends": "base",
             "distribution": "store",

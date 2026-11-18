@@ -23,6 +23,7 @@ import type {
     VerifyErrorKind,
 } from '../../modules/native-ratls/src/NativeRaTls.types';
 import type { VerificationMode } from '@/stores/settings';
+import { demo, isDemo } from '@/services/demo/gate';
 
 export type { AttestationResult, VerificationPolicy };
 export type { VerificationMode };
@@ -154,6 +155,7 @@ export async function attestEnclave(
     origin: string,
     opts: AttestOptions
 ): Promise<AttestationOutcome> {
+    if (isDemo()) return demo().attestEnclave(origin, opts);
     const challenged = opts.mode === 'challenge';
     // No bearer → we cannot get the attestation service's verdict. Report it as
     // unavailable so the connect flow shows the "continue anyway" recovery UX
@@ -209,6 +211,7 @@ export async function attestEnclave(
  * Used for displaying attestation details before the user decides to trust.
  */
 export async function inspectAttestation(origin: string): Promise<AttestationResult> {
+    if (isDemo()) return demo().inspectAttestation(origin);
     const { host, port } = splitOrigin(origin);
     return NativeRaTls.inspect(host, port);
 }

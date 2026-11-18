@@ -1,0 +1,19 @@
+appId: org.privasys.wallet.demo
+name: Sharing history
+---
+- runFlow: subflows/launch.yaml
+- tapOn:
+    id: "tab-access"
+- scrollUntilVisible:
+    element:
+      id: "access-sharing-history"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "access-sharing-history"
+- extendedWaitUntil:
+    visible:
+      id: "consent-history-screen"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 13-consent-history

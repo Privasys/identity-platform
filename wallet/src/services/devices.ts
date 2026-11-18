@@ -36,6 +36,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import * as Crypto from 'expo-crypto';
 import * as Device from 'expo-device';
 
+import { demo, isDemo } from '@/services/demo/gate';
 import { ensureDataRoot } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
@@ -341,6 +342,7 @@ async function fetchRemote(session: string): Promise<{ reg: Registry | null; ver
  * registry, or the local one when nothing could be reached.
  */
 export async function syncRegistry(session: string | null = mainSession()): Promise<Registry> {
+    if (isDemo()) return demo().syncRegistry();
     let local = await localRegistry();
     if (useProfileStore.getState().profile) local = upsertDevice(local, await ensureDevice());
     if (!session) return local;
@@ -388,6 +390,7 @@ export async function storeRegistry(session: string, reg: Registry): Promise<voi
 
 /** The holder's phones, this one first. */
 export async function listDevices(): Promise<{ device: RegistryDevice; isThis: boolean }[]> {
+    if (isDemo()) return demo().listDevices();
     const me = await ensureDevice();
     const reg = await localRegistry();
     const all = upsertDevice(reg, me).devices;

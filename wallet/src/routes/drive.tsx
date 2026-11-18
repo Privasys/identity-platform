@@ -285,6 +285,7 @@ export default function DriveScreen() {
                 {(['mine', 'shared'] as Section[]).map((s) => (
                     <Pressable
                         key={s}
+                        testID={`drive-section-${s}`}
                         style={[styles.segment, section === s && styles.segmentOn]}
                         onPress={() => switchTo(s)}
                         accessibilityRole="tab"
@@ -356,6 +357,7 @@ export default function DriveScreen() {
                             return (
                                 <Pressable
                                     key={`${it.tenantId}/${it.id}`}
+                                    testID={`drive-item-${it.id}`}
                                     style={[styles.card, highlight === it.id && styles.cardHighlight]}
                                     onPress={() => openItem(it)}
                                     accessibilityRole="button"

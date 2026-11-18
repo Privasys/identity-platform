@@ -134,7 +134,7 @@ export default function ConsentHistoryScreen() {
     };
 
     return (
-        <RNView style={styles.screen}>
+        <RNView style={styles.screen} testID="consent-history-screen">
             {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
                 <Pressable onPress={() => router.back()} style={styles.backButton}>

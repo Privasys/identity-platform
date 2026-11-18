@@ -1,0 +1,23 @@
+appId: org.privasys.wallet.demo
+name: Drive, Shared with me
+---
+- runFlow: subflows/launch.yaml
+- scrollUntilVisible:
+    element:
+      id: "profile-drive"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "profile-drive"
+- extendedWaitUntil:
+    visible:
+      id: "drive-section-shared"
+    timeout: 10000
+- tapOn:
+    id: "drive-section-shared"
+- extendedWaitUntil:
+    visible:
+      id: "drive-item-s-weekend"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 07-drive-shared

@@ -117,7 +117,7 @@ export default function DevicesScreen() {
         ]);
 
     return (
-        <RNView style={styles.screen}>
+        <RNView style={styles.screen} testID="devices-screen">
             <SubPageHeader title={t('devices.title')} />
             <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 32 }]}>
                 <Text style={styles.lede}>{t('devices.lede')}</Text>

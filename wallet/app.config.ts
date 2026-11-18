@@ -21,6 +21,20 @@ console.log(
 process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KEY;
 
 /**
+ * The demo build: invented data, no network, for screenshots on a simulator
+ * (src/services/demo). It has its own name, scheme and bundle id so it can
+ * never replace or read a real install, and it must never be a production
+ * build: the app refuses to start that way too (services/demo/gate.ts).
+ */
+const DEMO = process.env.EXPO_PUBLIC_DEMO === '1';
+if (DEMO && STAGE === 'production') {
+    throw new Error('EXPO_PUBLIC_DEMO=1 on the production stage. Build the demo with the `demo` profile.');
+}
+if (STAGE === 'demo' && !DEMO) {
+    throw new Error('The demo stage needs EXPO_PUBLIC_DEMO=1.');
+}
+
+/**
  * Keychain access groups, named here rather than inferred.
  *
  * Keychain items are addressed by `<prefix>.<group>`, where the prefix is the
@@ -44,8 +58,12 @@ process.env.EXPO_PUBLIC_CHALLENGE_SECRET_KEY ??= process.env.CHALLENGE_SECRET_KE
  * what the app and its extensions share is stated rather than assumed.
  */
 
-/** Groups shared between the app and its extensions. */
-const SHARED_KEYCHAIN_GROUPS = ['$(AppIdentifierPrefix)org.privasys.shared'];
+/**
+ * Groups shared between the app and its extensions. The demo shares none:
+ * the shared group is common to every Privasys Wallet install signed by the
+ * team, and a demo must never be able to reach a real wallet's keychain.
+ */
+const SHARED_KEYCHAIN_GROUPS = DEMO ? [] : ['$(AppIdentifierPrefix)org.privasys.shared'];
 
 /** Every use of the camera, in one sentence (see the camera plugins below). */
 const CAMERA_USAGE =
@@ -63,6 +81,13 @@ const envConfig = {
         name: 'Privasys Wallet Preview',
         scheme: 'privasys-wallet-preview',
         bundle: 'org.privasys.wallet',
+        icon: './assets/icon.preview.png',
+        adaptiveIconBackgroundColor: '#F0FFF4'
+    },
+    demo: {
+        name: 'Privasys Wallet Demo',
+        scheme: 'privasys-wallet-demo',
+        bundle: 'org.privasys.wallet.demo',
         icon: './assets/icon.preview.png',
         adaptiveIconBackgroundColor: '#F0FFF4'
     },
@@ -155,7 +180,8 @@ export default (context: ConfigContext): ExpoConfig => {
                 ]
             },
             config: { usesNonExemptEncryption: false },
-            associatedDomains: ['applinks:privasys.id', 'webcredentials:privasys.id'],
+            // The demo answers no privasys.id link and offers no passkeys.
+            associatedDomains: DEMO ? [] : ['applinks:privasys.id', 'webcredentials:privasys.id'],
             // NFC tag reading for the eMRTD (passport/ID chip) KYC flow. Requires
             // the matching capability enabled on the org.privasys.wallet App ID.
             entitlements: {
@@ -164,7 +190,7 @@ export default (context: ConfigContext): ExpoConfig => {
                 // default group `<prefix>.<bundle id>`. The first entry is the
                 // default for new writes, so the app's own group leads.
                 'keychain-access-groups': [
-                    '$(AppIdentifierPrefix)org.privasys.wallet',
+                    `$(AppIdentifierPrefix)${config.bundle}`,
                     ...SHARED_KEYCHAIN_GROUPS,
                 ]
             }
@@ -177,8 +203,10 @@ export default (context: ConfigContext): ExpoConfig => {
                 backgroundColor: config.adaptiveIconBackgroundColor
             },
             // predictiveBackGestureEnabled: true
-            googleServicesFile: './fixtures/org.privasys.wallet.google-services.json',
-            intentFilters: [
+            // Firebase knows the real package only, and the demo receives no
+            // pushes; nor does it claim privasys.id links.
+            googleServicesFile: DEMO ? undefined : './fixtures/org.privasys.wallet.google-services.json',
+            intentFilters: DEMO ? [] : [
                 {
                     action: 'VIEW',
                     autoVerify: true,
@@ -202,7 +230,9 @@ export default (context: ConfigContext): ExpoConfig => {
                 build: {
                     experimental: {
                         ios: {
-                            appExtensions: [
+                            // No extensions in the demo: both share the
+                            // keychain group a demo must not hold.
+                            appExtensions: DEMO ? [] : [
                                 {
                                     targetName: 'NotificationServiceExtension',
                                     bundleIdentifier: `${config.bundle}.NotificationService`,
@@ -313,8 +343,10 @@ export default (context: ConfigContext): ExpoConfig => {
             'expo-image',
             'expo-web-browser',
             ['expo-notifications', { icon: './assets/notification-icon.png', color: '#B21D36' }],
-            './modules/passkey-provider/app.plugin',
-            './modules/notification-service/app.plugin',
+            // These two add the passkey and notification extensions, with the
+            // shared keychain group; the demo carries neither.
+            DEMO ? 'noop' : './modules/passkey-provider/app.plugin',
+            DEMO ? 'noop' : './modules/notification-service/app.plugin',
             './modules/app-attest/app.plugin',
             './plugins/swift-concurrency-fix',
             './plugins/disable-lint-vital',

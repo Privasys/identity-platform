@@ -19,6 +19,7 @@
 import { PrivasysDrive, type DriveNode, type Tenant } from '@privasys/drive-sdk';
 
 import { getAttestationServerToken } from '@/services/app-attest';
+import { demo, isDemo } from '@/services/demo/gate';
 import { inspectAttestation, attestEnclave, type AttestationResult } from '@/services/attestation';
 import { apiBasesForHost, appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
 import { getDriveToken, getPlatformToken, rememberDriveAppId, rememberDriveHost, tokenForHost } from '@/services/platform-token';
@@ -131,6 +132,7 @@ let lastAttest: { origin: string; appId: string } | null = null;
  * on a missing/mismatched digest or a failed verification.
  */
 export async function attestDrive(forceMode?: VerificationMode): Promise<DriveAttestation> {
+    if (isDemo()) return demo().attestDrive(forceMode);
     let d = await resolveDrive();
     const inspected = await inspectAttestation(d.origin);
     const appId = appIdFromOids(inspected.custom_oids);
@@ -196,6 +198,9 @@ let inflight: Promise<DriveSession | null> | null = null;
  * call it from a user-initiated flow. Returns null when Drive is unavailable.
  */
 export async function ensureDrive(): Promise<DriveSession | null> {
+    // The demo has no Drive to connect to; every Drive call a screen makes is
+    // answered by its own switch point instead.
+    if (isDemo()) return null;
     if (session) return session;
     if (inflight) return inflight;
     inflight = setup().finally(() => {
@@ -265,6 +270,7 @@ export interface RemoteShareRequest {
  * referential knows the sub.
  */
 export async function listShareRequests(): Promise<{ tenantId: string; requests: RemoteShareRequest[] }> {
+    if (isDemo()) return demo().listShareRequests();
     const s = await ensureDrive();
     if (!s) throw new Error('Drive is unavailable');
     const token = await getDriveToken();

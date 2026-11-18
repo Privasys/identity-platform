@@ -22,6 +22,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import type { TFunction } from 'i18next';
 
+import { demo, isDemo } from '@/services/demo/gate';
 import { ensureDrive } from '@/services/drive';
 import { getDriveToken, isDriveAppId, isDriveHost } from '@/services/platform-token';
 import { makeRaTlsFetch, requestBytes } from '../../modules/native-ratls/src/index';
@@ -92,6 +93,7 @@ export function sortItems<T extends StoredItem>(items: T[]): T[] {
 
 /** The holder's own drive: its tenant id, for listing from the top. */
 export async function myTenant(): Promise<string> {
+    if (isDemo()) return demo().myTenant();
     const s = await ensureDrive();
     if (!s) throw new Error('Drive is unavailable');
     return s.tenant.id;
@@ -100,6 +102,7 @@ export async function myTenant(): Promise<string> {
 /** A folder's contents, in the holder's drive or in a share; the top of a
  *  drive when `folderId` is undefined. */
 export async function listFolder(tenantId: string, folderId?: string): Promise<StoredItem[]> {
+    if (isDemo()) return demo().listFolder(tenantId, folderId);
     const t = encodeURIComponent(tenantId);
     const path = folderId ? `/v1/tenants/${t}/folders/${encodeURIComponent(folderId)}` : `/v1/tenants/${t}/root`;
     const body = await json<NodeJSON[] | { nodes?: NodeJSON[] }>(await driveFetch(path), 'list');
@@ -109,6 +112,7 @@ export async function listFolder(tenantId: string, folderId?: string): Promise<S
 
 /** What others shared with the holder, across every drive. */
 export async function listSharedWithMe(): Promise<SharedItem[]> {
+    if (isDemo()) return demo().listSharedWithMe();
     const body = await json<{ shared?: Record<string, unknown>[] }>(await driveFetch('/v1/shared'), 'shared');
     const out: SharedItem[] = [];
     for (const r of body.shared ?? []) {
@@ -129,6 +133,7 @@ export async function listSharedWithMe(): Promise<SharedItem[]> {
 /** A file's plaintext, from the enclave over the attested channel, as bytes
  *  (the text calls cannot carry a binary body). */
 export async function readFile(tenantId: string, fileId: string): Promise<Uint8Array> {
+    if (isDemo()) return demo().readFile(tenantId, fileId);
     const s = await ensureDrive();
     if (!s) throw new Error('Drive is unavailable');
     const token = await getDriveToken();

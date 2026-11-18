@@ -16,6 +16,7 @@ import { create } from 'zustand';
 import { APP_FORM_TYPE, readFormPayload, type AppForm } from '@/services/app-form';
 import { APPROVAL_TYPE, readApprovalPayload, type Approval } from '@/services/approval';
 import { appMessageLink, readAppMessage, APP_MESSAGE_TYPE, type AppMessageContent } from '@/services/app-message';
+import { isDemo } from '@/services/demo/gate';
 import { openSealedNotification } from '@/services/notify-seal';
 import { getCachedPlatformToken } from '@/services/platform-token';
 
@@ -154,6 +155,8 @@ export const useAppMessagesStore = create<AppMessagesState>((set, get) => ({
     messages: [],
 
     refresh: () => {
+        // The demo's waiting items are seeded; there is no IdP to ask.
+        if (isDemo()) return Promise.resolve();
         if (inflight) return inflight;
         inflight = (async () => {
             try {

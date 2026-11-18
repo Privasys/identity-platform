@@ -1,0 +1,17 @@
+appId: org.privasys.wallet.demo
+name: Drive, My files
+---
+- runFlow: subflows/launch.yaml
+- scrollUntilVisible:
+    element:
+      id: "profile-drive"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "profile-drive"
+- extendedWaitUntil:
+    visible:
+      id: "drive-item-f-documents"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 06-drive-my-files

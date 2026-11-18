@@ -17,6 +17,7 @@
 import * as SecureStore from '@/utils/storage';
 import { authenticate as fido2Authenticate } from './fido2';
 import { ensurePrivasysSession } from './privasys-id';
+import { isDemo } from '@/services/demo/gate';
 import { useAuthStore } from '@/stores/auth';
 
 const IDP_BASE_URL = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
@@ -146,6 +147,9 @@ function activePlatformCredentialId(): string {
  * biometric — so call this from a user-initiated flow, not cold start).
  */
 export async function getPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: string): Promise<string> {
+    // The demo holds no account and must never start a sign-in: every caller
+    // already copes with a token it cannot get.
+    if (isDemo()) throw new Error('no platform token in the demo');
     const cached = await readCached(audience, clientId);
     if (cached) return cached;
     const key = storeKeyFor(clientId);
@@ -164,6 +168,7 @@ export async function getPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: 
  * sheet in front of someone who did not ask for anything.
  */
 export async function getCachedPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: string): Promise<string | null> {
+    if (isDemo()) return null;
     return readCached(audience, clientId);
 }
 

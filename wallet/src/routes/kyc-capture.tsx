@@ -776,6 +776,7 @@ export default function KycCaptureScreen() {
                 are steps ticked off and not each a new explanation. */}
             {step === 'intro' && (
                 <ScrollView
+                    testID="kyc-intro"
                     style={styles.flex}
                     contentContainerStyle={styles.padContent}
                     showsVerticalScrollIndicator={false}

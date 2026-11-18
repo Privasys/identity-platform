@@ -68,6 +68,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="index"
                 options={{
+                    tabBarButtonTestID: 'tab-profile',
                     title: t('tabs.profile'),
                     tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                         <Ionicons name="person-circle" size={size} color={color} />
@@ -79,6 +80,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="access"
                 options={{
+                    tabBarButtonTestID: 'tab-access',
                     title: t('tabs.access'),
                     tabBarBadge: waiting > 0 ? waiting : undefined,
                     tabBarBadgeStyle: { backgroundColor: p.danger },
@@ -92,6 +94,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="settings"
                 options={{
+                    tabBarButtonTestID: 'tab-settings',
                     title: t('tabs.settings'),
                     tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                         <Ionicons name="settings" size={size} color={color} />

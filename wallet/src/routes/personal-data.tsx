@@ -158,7 +158,7 @@ export default function PersonalDataScreen() {
     const sortedAttributes = [...profile.attributes].sort((a, b) => orderOf(a.key) - orderOf(b.key));
 
     return (
-        <RNView style={styles.screen}>
+        <RNView style={styles.screen} testID="personal-data-screen">
             <SubPageHeader title={t('personalData.title')} />
 
             {/* The editor and the add-attribute field sit at the BOTTOM of a

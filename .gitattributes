@@ -14,3 +14,9 @@
 # Pinning eol=lf makes the working tree, the object store and CI agree.
 wallet/src/i18n/locales/*.json text eol=lf
 wallet/src/i18n/manifest.ts    text eol=lf
+
+# Binary files are stored and checked out byte for byte.
+*.pdf binary
+*.jpg binary
+*.jpeg binary
+*.png binary

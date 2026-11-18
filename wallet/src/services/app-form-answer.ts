@@ -24,6 +24,7 @@ import { resolveStepUpCredential, type StepUpAssertionOptions } from '@/services
 import { getAttestationServerToken } from '@/services/app-attest';
 import { signVaultAssertion } from '@/services/fido2';
 import { getCachedPlatformToken } from '@/services/platform-token';
+import { demo, isDemo } from '@/services/demo/gate';
 import { appIdFromOids } from '@/services/release-provenance';
 import { useSettingsStore } from '@/stores/settings';
 import type { AppForm } from '@/services/app-form';
@@ -87,6 +88,7 @@ export async function confirmFormSource(args: {
     appSlug?: string;
     platformHost?: string;
 }): Promise<ConfirmedSource> {
+    if (isDemo()) return demo().confirmSource(args);
     const { form } = args;
     return confirmAppSource({
         ...args,

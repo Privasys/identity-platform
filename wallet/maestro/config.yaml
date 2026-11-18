@@ -1,0 +1,7 @@
+# Maestro workspace for the demo build (src/services/demo). Each top-level
+# flow opens one screen group and takes one named screenshot; together they
+# also click through every main screen. Shared steps live in subflows/.
+flows:
+  - "*.yaml"
+executionOrder:
+  continueOnFailure: true

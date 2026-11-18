@@ -158,7 +158,7 @@ export default function AccessScreen() {
     const grantApps = useMemo(() => appTree(records), [records]);
 
     return (
-        <RNView style={styles.screen}>
+        <RNView style={styles.screen} testID="access-screen">
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
                 <Text style={styles.headerTitle}>{t('tabs.access')}</Text>
             </RNView>
@@ -298,6 +298,7 @@ export default function AccessScreen() {
                     return (
                         <Pressable
                             key={m.id}
+                            testID={`access-${m.type}`}
                             style={styles.banner}
                             onPress={() =>
                                 isApproval
@@ -469,7 +470,7 @@ export default function AccessScreen() {
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </Pressable>
-                    <Pressable style={styles.row} onPress={() => router.push('/consent-history')}>
+                    <Pressable style={styles.row} testID="access-sharing-history" onPress={() => router.push('/consent-history')}>
                         <RNView style={styles.rowInfo}>
                             <Text style={styles.rowTitle}>{t('access.sharingHistory')}</Text>
                             <Text style={styles.rowMeta}>

@@ -141,7 +141,9 @@ export default function DriveFileScreen() {
                 return (
                     <>
                         {view.markdown ? (
-                            <MarkdownView source={view.text} />
+                            <RNView testID="drive-file-markdown">
+                                <MarkdownView source={view.text} />
+                            </RNView>
                         ) : (
                             <Text style={styles.text} selectable>
                                 {view.text}

@@ -1,0 +1,12 @@
+appId: org.privasys.wallet.demo
+name: Access, with the waiting items
+---
+- runFlow: subflows/launch.yaml
+- tapOn:
+    id: "tab-access"
+- extendedWaitUntil:
+    visible:
+      id: "access-approval"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 02-access

@@ -60,4 +60,10 @@ config.resolver.resolveRequest = (ctx, moduleName, platform) => {
     return originalResolveRequest(ctx, moduleName, platform);
 };
 
+// Babel inlines EXPO_PUBLIC_DEMO into each file it transforms, and Metro's
+// transform cache is not keyed on it: an export after a demo build reused the
+// demo's transforms and shipped the invented wallet (seen 2026-11-17). Keying
+// the cache on the flag keeps a demo build's output out of every other build.
+config.cacheVersion = `${config.cacheVersion ?? ''}|demo=${process.env.EXPO_PUBLIC_DEMO === '1' ? 1 : 0}`;
+
 module.exports = config;

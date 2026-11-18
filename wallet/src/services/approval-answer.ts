@@ -33,6 +33,7 @@ import {
 } from '@/services/app-form-answer';
 import { resolveStepUpCredential, type StepUpAssertionOptions } from '@/services/attribute-approval-api';
 import { inspectAttestation } from '@/services/attestation';
+import { demo, isDemo } from '@/services/demo/gate';
 import { signVaultAssertion } from '@/services/fido2';
 import { getCachedPlatformToken } from '@/services/platform-token';
 import { appIdFromOids } from '@/services/release-provenance';
@@ -50,6 +51,7 @@ export function confirmApprovalSource(args: {
     appSlug?: string;
     platformHost?: string;
 }): Promise<ConfirmedSource> {
+    if (isDemo()) return demo().confirmSource(args);
     const { approval } = args;
     return confirmAppSource({
         ...args,

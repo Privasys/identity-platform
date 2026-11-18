@@ -1,0 +1,29 @@
+appId: org.privasys.wallet.demo
+name: A shared Markdown file in the wallet's viewer
+---
+- runFlow: subflows/launch.yaml
+- scrollUntilVisible:
+    element:
+      id: "profile-drive"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "profile-drive"
+- extendedWaitUntil:
+    visible:
+      id: "drive-section-shared"
+    timeout: 10000
+- tapOn:
+    id: "drive-section-shared"
+- extendedWaitUntil:
+    visible:
+      id: "drive-item-s-weekend"
+    timeout: 10000
+- tapOn:
+    id: "drive-item-s-weekend"
+- extendedWaitUntil:
+    visible:
+      id: "drive-file-markdown"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 08-drive-file

@@ -1,0 +1,19 @@
+appId: org.privasys.wallet.demo
+name: The holder's phones
+---
+- runFlow: subflows/launch.yaml
+- tapOn:
+    id: "tab-settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-devices"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "settings-devices"
+- extendedWaitUntil:
+    visible:
+      id: "devices-screen"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: 12-devices

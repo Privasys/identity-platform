@@ -1,0 +1,19 @@
+appId: org.privasys.wallet.demo
+name: The attestation of the app that sent a form
+# The sign-in approval itself starts from a QR code or a push, which the demo
+# cannot raise; the same attestation screen is one tap from a form.
+---
+- runFlow: subflows/launch.yaml
+- tapOn:
+    id: "tab-access"
+- tapOn:
+    id: "access-app-form"
+- extendedWaitUntil:
+    visible:
+      id: "app-form-verified-host"
+    timeout: 10000
+- tapOn:
+    id: "app-form-verified-host"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 04-attestation

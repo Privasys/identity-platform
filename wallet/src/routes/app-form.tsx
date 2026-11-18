@@ -125,6 +125,7 @@ export default function AppFormScreen() {
                     ) : source ? (
                         <Pressable
                             style={styles.hostRow}
+                            testID="app-form-verified-host"
                             onPress={() => setReviewing(true)}
                             accessibilityRole="button"
                             accessibilityLabel={t('appForm.reviewAttestation', { host: source.host })}

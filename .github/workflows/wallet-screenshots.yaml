@@ -7,16 +7,20 @@
 # on every device asked for, in parallel, and uploads one set of screenshots
 # per device. Manual only: nothing here is shipped or submitted.
 #
-# The defaults cover the store listings: a large phone, a tablet and a
-# foldable on each platform. A device the runner's Xcode does not know fails
-# its own job only, listing the simulators the runner has; the other devices
-# still deliver.
+# The defaults cover the store listings: a large phone and a tablet on each
+# platform, and an Android foldable. A device the runner's Xcode does not know
+# fails its own job only, listing the simulators the runner has; the other
+# devices still deliver.
 #
-# The iPhone Duo's simulator needs Xcode 27.1, which only the `xcode-27` image
-# has (a public preview, actions/runner-images#14404; macos-26 had Xcode 26.6
-# on 2026-11-18), so its job runs there. The app it installs is still the one
-# built with Xcode 26 on macos-26: until the wallet is on an Expo SDK built
-# with Xcode 27, the Duo shows it as an app built for an older iOS.
+# The iPhone Duo is not a default. Its simulator needs Xcode 27.1, which only
+# the `xcode-27` image has (a public preview, actions/runner-images#14404), so
+# its job runs there, unfolded by .github/tools/duo-hinge. But Maestro, like
+# XCUIScreen.main, sees only the cover display: unfolded, the cover goes black
+# and the app is on the inner display, so the flows find nothing (2026-11-18,
+# run 44329163720; mobile-dev-inc/maestro#3617). And the app is still built
+# with Xcode 26, which the Duo shows as an app for an older iOS. Pass it in
+# ios_devices once Maestro drives the inner display and the wallet is built
+# with Xcode 27.
 
 name: Wallet screenshots
 
@@ -32,7 +36,7 @@ on:
       ios_devices:
         description: 'iOS simulators, a JSON list of device type names (`xcrun simctl list devicetypes`)'
         required: true
-        default: '["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)", "iPhone Duo"]'
+        default: '["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)"]'
       android_profiles:
         description: 'Android emulator profiles, a JSON list of avdmanager device ids'
         required: true

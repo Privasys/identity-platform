@@ -260,6 +260,35 @@ jobs:
           git add -f wallet/modules/native-ratls/ios/lib/
           git -c user.name='CI' -c user.email='ci@privasys.org' commit -m 'ci: add Rust iOS artifacts [skip ci]'
 
+      # Build caches: compiled C++ (ccache, on through ios.ccacheEnabled in
+      # app.config.ts, with React Native's recommended settings for Xcode), the
+      # pods and the packages. EAS builds in a fixed folder, so paths, and so
+      # cache entries, match from one build to the next.
+      - name: Set up ccache
+        run: |
+          brew install ccache
+          {
+            echo "EAS_LOCAL_BUILD_WORKINGDIR=$RUNNER_TEMP/eas-build"
+            echo "CCACHE_DIR=$HOME/.ccache"
+            echo "CCACHE_BASEDIR=$RUNNER_TEMP/eas-build"
+            echo "CCACHE_MAXSIZE=2G"
+            echo "CCACHE_SLOPPINESS=clang_index_store,file_stat_matches,include_file_ctime,include_file_mtime,ivfsoverlay,pch_defines,modules,system_headers,time_macros"
+            echo "CCACHE_FILECLONE=true"
+            echo "CCACHE_DEPEND=true"
+            echo "CCACHE_INODECACHE=true"
+          } >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.ccache
+            ~/Library/Caches/CocoaPods
+            ~/.bun/install/cache
+          key: wallet-ios-device-${{ hashFiles('wallet/bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            wallet-ios-device-${{ hashFiles('wallet/bun.lock') }}-
+            wallet-ios-device-
+
       - name: Install dependencies
         working-directory: wallet
         run: bun install --frozen-lockfile
@@ -286,6 +315,7 @@ jobs:
             --local \
             --non-interactive \
             --output build/wallet-ios.ipa
+          ccache -s
 
       - name: Upload IPA
         uses: actions/upload-artifact@v7
@@ -339,6 +369,32 @@ jobs:
           git add -f wallet/modules/native-ratls/android/src/main/jniLibs/
           git -c user.name='CI' -c user.email='ci@privasys.org' commit -m 'ci: add Rust Android artifacts [skip ci]'
 
+      # Build caches: Gradle's downloads and build cache, compiled C++ (React
+      # Native's CMake uses ccache when it is installed) and the packages. EAS
+      # builds in a fixed folder, so paths, and so cache entries, match.
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Set up ccache and Gradle's build cache
+        run: |
+          sudo apt-get install -y -qq ccache
+          mkdir -p ~/.gradle && echo 'org.gradle.caching=true' >> ~/.gradle/gradle.properties
+          {
+            echo "EAS_LOCAL_BUILD_WORKINGDIR=$RUNNER_TEMP/eas-build"
+            echo "CCACHE_DIR=$HOME/.ccache"
+            echo "CCACHE_BASEDIR=$RUNNER_TEMP/eas-build"
+            echo "CCACHE_MAXSIZE=2G"
+          } >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.ccache
+            ~/.bun/install/cache
+          key: wallet-android-release-${{ hashFiles('wallet/bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            wallet-android-release-${{ hashFiles('wallet/bun.lock') }}-
+            wallet-android-release-
+
       - name: Install dependencies
         working-directory: wallet
         run: bun install --frozen-lockfile
@@ -362,6 +418,7 @@ jobs:
             --local \
             --non-interactive \
             --output build/wallet-android.aab
+          ccache -s
 
       - name: Upload AAB
         uses: actions/upload-artifact@v7

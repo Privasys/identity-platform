@@ -314,9 +314,22 @@ export default (context: ConfigContext): ExpoConfig => {
                             '-dontwarn net.sf.scuba.**',
                             '-dontwarn org.bouncycastle.**',
                             '-dontwarn javax.naming.**'
-                        ].join('\n')
+                        ].join('\n'),
+                        // The processor types the native code is built for: those
+                        // the RA-TLS library ships (arm64-v8a for phones, x86_64
+                        // for emulators and Chromebooks). A 32-bit phone could
+                        // install the others but never attest, and each type is a
+                        // full native build. The screenshot workflow builds the
+                        // emulator's alone (WALLET_ANDROID_ABIS).
+                        buildArchs: (process.env.WALLET_ANDROID_ABIS || 'arm64-v8a,x86_64').split(','),
                     },
-                    ios: { deploymentTarget: '16.0' }
+                    ios: {
+                        deploymentTarget: '16.0',
+                        // Compiled C++ is reused between CI builds (the workflows
+                        // keep ccache's directory); without ccache installed
+                        // nothing changes.
+                        ccacheEnabled: true,
+                    }
                 }
             ],
             // Both plugins write NSCameraUsageDescription, so they carry the

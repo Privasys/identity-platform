@@ -327,8 +327,11 @@ export default (context: ConfigContext): ExpoConfig => {
                         deploymentTarget: '16.0',
                         // Compiled C++ is reused between CI builds (the workflows
                         // keep ccache's directory); without ccache installed
-                        // nothing changes.
-                        ccacheEnabled: true,
+                        // nothing changes. The demo only: React Native points
+                        // every target's compiler at $(REACT_NATIVE_PATH), which
+                        // the app's extensions do not define, so the store
+                        // build's archive fails with it (1.4.60).
+                        ccacheEnabled: DEMO,
                     }
                 }
             ],

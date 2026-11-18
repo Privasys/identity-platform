@@ -12,6 +12,10 @@ apply plugin: 'kotlin-android'
 android {
     namespace "org.privasys.nativeratls"
     compileSdk safeExtGet("compileSdkVersion", 36)
+    // The app's NDK. Without it the Android plugin's default (27.0) is fetched
+    // next to the app's 27.1: a second download, which once came back corrupt
+    // and failed the build.
+    ndkVersion safeExtGet("ndkVersion", "27.1.12297006")
 
     defaultConfig {
         minSdk safeExtGet("minSdkVersion", 26)

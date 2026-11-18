@@ -8,9 +8,11 @@
 # per device. Manual only: nothing here is shipped or submitted.
 #
 # The defaults cover the store listings: a large phone, a tablet and, on
-# Android, a foldable. A device the runner's Xcode does not know (the iPhone
-# Duo needs Xcode 27.1 and an iOS 27 runtime) fails its own job only, listing
-# the simulators the runner has; the other devices still deliver.
+# Android, a foldable. A device the runner's Xcode does not know fails its own
+# job only, listing the simulators the runner has; the other devices still
+# deliver. The iPhone Duo is left out until the runners carry Xcode 27.1 (the
+# macos-26 image had Xcode 26.6 on 2026-11-18) and the wallet is on an Expo SDK
+# that supports it; pass it in ios_devices to try.
 
 name: Wallet screenshots
 
@@ -26,7 +28,7 @@ on:
       ios_devices:
         description: 'iOS simulators, a JSON list of device type names (`xcrun simctl list devicetypes`)'
         required: true
-        default: '["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)", "iPhone Duo"]'
+        default: '["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)"]'
       android_profiles:
         description: 'Android emulator profiles, a JSON list of avdmanager device ids'
         required: true
@@ -297,7 +299,12 @@ jobs:
         if: steps.built.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install -y -qq ccache
-          mkdir -p ~/.gradle && echo 'org.gradle.caching=true' >> ~/.gradle/gradle.properties
+          # The user-level file wins over the project's, whose 2 GB heap ran
+          # out packaging the APK on Ubuntu 26.04 runners (OutOfMemoryError in
+          # :app:packageRelease). The runner has 16 GB.
+          mkdir -p ~/.gradle
+          echo 'org.gradle.caching=true' >> ~/.gradle/gradle.properties
+          echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
           {
             echo "EAS_LOCAL_BUILD_WORKINGDIR=$RUNNER_TEMP/eas-build"
             echo "CCACHE_DIR=$HOME/.ccache"

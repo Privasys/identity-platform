@@ -212,6 +212,15 @@ jobs:
             --cellularBars 4 --wifiBars 3
           APP=$(find wallet/build/app -maxdepth 2 -name '*.app' | head -1)
           xcrun simctl install "$UDID" "$APP"
+          # A foldable is shot unfolded, on its inner screen. simctl has no
+          # command for the fold, so .github/tools/duo-hinge (vendored, MIT)
+          # sends the hinge event the Device Hub app sends.
+          case "$DEVICE" in *Duo*)
+            clang -fobjc-arc -framework Foundation -o "$RUNNER_TEMP/duo-hinge" .github/tools/duo-hinge/duo-hinge.m
+            "$RUNNER_TEMP/duo-hinge" -d "$UDID" flat
+            sleep 5
+            ;;
+          esac
           echo "UDID=$UDID" >> "$GITHUB_ENV"
 
       - name: Install Maestro

@@ -41,6 +41,12 @@ on:
         description: 'Android emulator profiles, a JSON list of avdmanager device ids'
         required: true
         default: '["pixel_9_pro_xl", "pixel_tablet", "pixel_fold"]'
+      android_fold:
+        description: 'Foldable emulators: shoot the inner screen (unfolded) or the outer screen (folded)'
+        required: true
+        default: 'unfolded'
+        type: choice
+        options: [unfolded, folded]
       locale:
         description: 'Device language (BCP 47, e.g. en-GB, fr-FR)'
         required: true
@@ -412,12 +418,13 @@ jobs:
             adb shell am broadcast -a com.android.systemui.demo -e command status -e location hide -e alarm hide -e sync hide -e bluetooth hide
             adb shell "setprop persist.sys.locale ${{ inputs.locale }}; setprop ctl.restart zygote" || true
             sleep 20
+            if [ "${{ inputs.android_fold }}" = "folded" ]; then adb emu fold; sleep 10; adb shell wm size; fi
             mkdir -p shots && cd shots && (maestro test ../maestro/ --format junit --output ../maestro-report.xml || true) && ls -la
 
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: screenshots-android-${{ matrix.profile }}-${{ inputs.locale }}
+          name: screenshots-android-${{ matrix.profile }}-${{ inputs.android_fold }}-${{ inputs.locale }}
           path: |
             wallet/shots/*.png
             wallet/maestro-report.xml

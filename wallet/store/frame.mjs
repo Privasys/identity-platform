@@ -17,6 +17,9 @@
  *   duo          2007 x 2853  App Store, iPhone Duo inner display
  *   play-phone   1080 x 1920  Google Play, phone (9:16)
  *   play-tablet  2560 x 1600  Google Play, 7" and 10" tablets (landscape)
+ *   fold-1x1     2160 x 2160  Google Play, foldable, unfolded screen in 1:1
+ *   fold-4x3     2880 x 2160  Google Play, foldable, unfolded screen in 4:3
+ *   fold-outer   1350 x 2160  Google Play, foldable, outer screen in 10:16
  *
  * The output is a PNG per headline, in the headline file's order (01-..., 02-...).
  * Browsers write PNGs with an alpha channel, which App Store Connect refuses:
@@ -38,6 +41,9 @@ const TARGETS = {
     duo: { w: 2007, h: 2853, layout: 'portrait' },
     'play-phone': { w: 1080, h: 1920, layout: 'portrait' },
     'play-tablet': { w: 2560, h: 1600, layout: 'landscape' },
+    'fold-1x1': { w: 2160, h: 2160, layout: 'landscape' },
+    'fold-4x3': { w: 2880, h: 2160, layout: 'landscape' },
+    'fold-outer': { w: 1350, h: 2160, layout: 'portrait' },
     feature: { w: 1024, h: 500, layout: 'landscape' },
 };
 

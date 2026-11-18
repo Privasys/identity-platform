@@ -250,3 +250,86 @@ test('a refused rebind is not retried by later requests', async () => {
     assert.equal(bootstraps, 1, 'one refused bootstrap, then no more');
     assert.equal(states.at(-1)?.status, 'reapproval-required');
 });
+
+/** A session whose enclave forgot it, with `bootstrap` answering each attempt
+ *  and no real delay between retries. */
+async function restartedHost(bootstrap: (attempt: number, enc: Uint8Array) => Response) {
+    const enclave = await encKey();
+    const sdk = (await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits'])) as CryptoKeyPair;
+    const counts = { bootstraps: 0, vouchers: 0 };
+    const fetchImpl: typeof fetch = async (input) => {
+        if (String(input).endsWith('/__privasys/session-bootstrap')) {
+            return bootstrap(++counts.bootstraps, enclave.pubRaw);
+        }
+        return new Response('unknown or expired session', { status: 401, headers: { 'Content-Type': 'text/plain' } });
+    };
+    const session = await PrivasysSession.fromHandshake({
+        host: 'app.example.test',
+        sessionId: b64u(crypto.getRandomValues(new Uint8Array(16))),
+        sdkPrivateKey: sdk.privateKey,
+        encPub: b64u(enclave.pubRaw),
+        fetchImpl,
+        getEncAuth: async () => {
+            counts.vouchers++;
+            return voucherFor(enclave.pubRaw);
+        },
+    });
+    (session as unknown as { rebindUnavailableWaitsMs: number[] }).rebindUnavailableWaitsMs = [1, 1, 1];
+    const states: SealedSessionState[] = [];
+    session.onStateChange = (s) => states.push(s);
+    return { session, states, counts };
+}
+
+const accepted = (enc: Uint8Array) => new Response(
+    JSON.stringify({ session_id: b64u(crypto.getRandomValues(new Uint8Array(16))), enc_pub: b64u(enc), sub: 'holder' }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+);
+
+for (const status of [404, 502, 503]) {
+    test(`a bootstrap answered ${status} while the app loads recovers with no approval`, async () => {
+        const { session, states, counts } = await restartedHost((attempt, enc) =>
+            attempt < 3 ? new Response('not ready', { status }) : accepted(enc));
+        const before = session.sessionId;
+        await session.request('GET', '/api/one');
+        assert.equal(counts.bootstraps, 3, 'retried until the app answered');
+        assert.equal(counts.vouchers, 3, 'each retry carried a current voucher');
+        assert.notEqual(session.sessionId, before, 'the session adopted the rebound id');
+        assert.deepEqual(states, [
+            { status: 'recovering' },
+            { status: 'recovering', reason: 'unavailable' },
+            { status: 'ok' },
+        ]);
+    });
+}
+
+test('an enclave that changed still asks for approval once it answers', async () => {
+    const { states, session, counts } = await restartedHost((attempt, enc) => attempt < 2
+        ? new Response('unknown host', { status: 404 })
+        : new Response(JSON.stringify({ session_id: 'x', enc_pub: b64u(enc), encauth_reject: 'enc-changed' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        }));
+    await session.request('GET', '/api/one');
+    await session.request('GET', '/api/two');
+    assert.equal(counts.bootstraps, 2, 'a refusal is final: no later request tries again');
+    assert.deepEqual(states.at(-1), { status: 'reapproval-required', reason: 'enc-changed' });
+});
+
+test('an app still loading after the waits is retried by the next request', async () => {
+    let loaded = false;
+    const { session, states, counts } = await restartedHost((_attempt, enc) =>
+        loaded ? accepted(enc) : new Response('unknown host', { status: 404 }));
+    await session.request('GET', '/api/one');
+    assert.equal(counts.bootstraps, 4, 'one attempt and three bounded retries');
+    assert.deepEqual(states.at(-1), { status: 'recovering', reason: 'unavailable' });
+    loaded = true;
+    await session.request('GET', '/api/two');
+    assert.deepEqual(states.at(-1), { status: 'ok' });
+});
+
+test('a bootstrap the enclave forbids is still a refusal', async () => {
+    const { session, states, counts } = await restartedHost(() => new Response('forbidden', { status: 403 }));
+    await session.request('GET', '/api/one');
+    assert.equal(counts.bootstraps, 1);
+    assert.deepEqual(states.at(-1), { status: 'reapproval-required', reason: 'rejected' });
+});

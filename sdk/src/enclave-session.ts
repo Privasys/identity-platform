@@ -179,6 +179,20 @@ export interface SealedSessionState {
  *  in the next window instead of failing a request the user is waiting on. */
 const REBIND_RATE_LIMIT_WAITS_MS = [15_000, 45_000];
 
+/** Waits applied while the app cannot answer a bootstrap: a host that has just
+ *  restarted loads its apps one after another, which takes a minute or two.
+ *  Past the last wait the session stays `recovering` and the next request
+ *  tries again. */
+const REBIND_UNAVAILABLE_WAITS_MS = [5_000, 10_000, 15_000, 30_000, 30_000];
+
+/** True for a bootstrap answer that says nothing about the voucher: the app is
+ *  not loaded yet (404), or the host or the gateway in front of it is not
+ *  ready. The enclave has not judged the voucher, so the holder has nothing to
+ *  approve yet; an enclave that did change refuses the voucher once it answers. */
+function isBootstrapUnavailable(status: number): boolean {
+    return status === 404 || status === 408 || status === 425 || status >= 500;
+}
+
 interface DerivedKeys {
     aead: CryptoKey;
     c2sPrefix: Uint8Array;
@@ -207,6 +221,7 @@ export class PrivasysSession {
      *  enclave's rebind budget and end in rate-limited bootstraps, leaving
      *  the page with nothing to show. */
     private rebindRefused = false;
+    private rebindUnavailableWaitsMs = REBIND_UNAVAILABLE_WAITS_MS;
     private lastState: SealedSessionState = { status: 'ok' };
     /** Liveness listener (see {@link SealedSessionState}); the frame host
      *  forwards it to the adopter page. */
@@ -535,10 +550,23 @@ export class PrivasysSession {
         }
 
         let handshake = await bootstrapWithEncAuth(this.host, env, this.fetchImpl);
-        for (const wait of REBIND_RATE_LIMIT_WAITS_MS) {
-            if (handshake.ok || handshake.error !== 'rate-limited') break;
-            this.setState({ status: 'recovering', reason: 'rate-limited' });
+        const rateLimitWaits = [...REBIND_RATE_LIMIT_WAITS_MS];
+        const unavailableWaits = [...this.rebindUnavailableWaitsMs];
+        while (!handshake.ok) {
+            const wait = handshake.error === 'rate-limited' ? rateLimitWaits.shift()
+                : handshake.error === 'unavailable' ? unavailableWaits.shift()
+                : undefined;
+            if (wait === undefined) break;
+            this.setState({ status: 'recovering', reason: handshake.error });
             await new Promise((r) => setTimeout(r, wait));
+            if (handshake.error === 'unavailable') {
+                // The wait can outlast the voucher: ask for a current one.
+                try {
+                    env = (await this.getEncAuth()) ?? env;
+                } catch {
+                    /* keep the one we hold; the enclave judges it */
+                }
+            }
             handshake = await bootstrapWithEncAuth(this.host, env, this.fetchImpl);
         }
         if (!handshake.ok) {
@@ -1182,7 +1210,9 @@ class SealedWebSocketImpl implements SealedWebSocket {
  * browser JS), `reason` carries the stable token so the UI can explain
  * the wake: `workload-changed` (the app was updated), `enc-changed`
  * (the hosting platform changed), `voucher-expired`, `voucher-invalid`.
- * `unavailable` is a transport/parse failure worth retrying.
+ * `unavailable` is a transport/parse failure, or an answer from a host that
+ * is not ready to judge the voucher (see isBootstrapUnavailable): worth
+ * retrying, with nothing for the holder to approve yet.
  */
 async function bootstrapWithEncAuth(
     host: string,
@@ -1210,6 +1240,7 @@ async function bootstrapWithEncAuth(
         // The enclave budgets voucher-backed bootstraps per session (a fixed
         // one-minute window); a 429 is "try again shortly", not a refusal.
         if (resp.status === 429) return { ok: false, error: 'rate-limited' };
+        if (isBootstrapUnavailable(resp.status)) return { ok: false, error: 'unavailable' };
         if (!resp.ok) return { ok: false, error: 'rejected' };
 
         const data = (await resp.json()) as {

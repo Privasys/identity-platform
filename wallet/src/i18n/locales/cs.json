@@ -1400,7 +1400,7 @@
   "approval": {
     "title": "Schválení",
     "assurance": {
-      "device": "Schválení vyžaduje váš obličej nebo otisk prstu na tomto telefonu.",
+      "device": "Schválení vyžaduje váš obličej nebo otisk prstu na tomto zařízení.",
       "gov-presence": "Schválení vyžaduje živou kontrolu vašeho obličeje vůči pasu."
     },
     "timeLeft": "Na odpověď zbývá {{time}}",

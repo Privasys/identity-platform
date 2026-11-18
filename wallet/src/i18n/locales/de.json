@@ -1376,7 +1376,7 @@
   "approval": {
     "title": "Zustimmung",
     "assurance": {
-      "device": "Zum Zustimmen braucht es Ihr Gesicht oder Ihren Fingerabdruck auf diesem Telefon.",
+      "device": "Zum Zustimmen braucht es Ihr Gesicht oder Ihren Fingerabdruck auf diesem Gerät.",
       "gov-presence": "Zum Zustimmen braucht es eine Live-Prüfung Ihres Gesichts mit Ihrem Reisepass."
     },
     "timeLeft": "Noch {{time}} zum Antworten",

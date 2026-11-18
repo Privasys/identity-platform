@@ -1400,7 +1400,7 @@
   "approval": {
     "title": "Approbation",
     "assurance": {
-      "device": "Approuver demande votre visage ou votre empreinte sur ce téléphone.",
+      "device": "Approuver demande votre visage ou votre empreinte sur cet appareil.",
       "gov-presence": "Approuver demande une vérification en direct de votre visage avec votre passeport."
     },
     "timeLeft": "Encore {{time}} pour répondre",

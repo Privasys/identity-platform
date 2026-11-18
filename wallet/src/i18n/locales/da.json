@@ -1376,7 +1376,7 @@
   "approval": {
     "title": "Godkendelse",
     "assurance": {
-      "device": "Godkendelse kræver dit ansigt eller fingeraftryk på denne telefon.",
+      "device": "Godkendelse kræver dit ansigt eller fingeraftryk på denne enhed.",
       "gov-presence": "Godkendelse kræver et live-tjek af dit ansigt mod dit pas."
     },
     "timeLeft": "{{time}} tilbage til at svare",

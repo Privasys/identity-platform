@@ -1376,7 +1376,7 @@
   "approval": {
     "title": "Hyväksyntä",
     "assurance": {
-      "device": "Hyväksyminen vaatii kasvosi tai sormenjälkesi tässä puhelimessa.",
+      "device": "Hyväksyminen vaatii kasvosi tai sormenjälkesi tässä laitteessa.",
       "gov-presence": "Hyväksyminen vaatii kasvojesi tarkistuksen passiasi vasten."
     },
     "timeLeft": "Vastausaikaa jäljellä {{time}}",

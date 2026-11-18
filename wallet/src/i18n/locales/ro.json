@@ -1411,7 +1411,7 @@
   "approval": {
     "title": "Aprobare",
     "assurance": {
-      "device": "Aprobarea cere fața sau amprenta ta pe acest telefon.",
+      "device": "Aprobarea cere fața sau amprenta ta pe acest dispozitiv.",
       "gov-presence": "Aprobarea cere o verificare live a feței tale cu pașaportul."
     },
     "timeLeft": "Mai ai {{time}} pentru răspuns",

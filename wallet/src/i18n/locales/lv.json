@@ -1411,7 +1411,7 @@
   "approval": {
     "title": "Apstiprinājums",
     "assurance": {
-      "device": "Apstiprināšanai vajag jūsu seju vai pirksta nospiedumu šajā tālrunī.",
+      "device": "Apstiprināšanai vajag jūsu seju vai pirksta nospiedumu šajā ierīcē.",
       "gov-presence": "Apstiprināšanai vajag jūsu sejas tiešsaistes pārbaudi pret pasi."
     },
     "timeLeft": "Atbildei atlicis {{time}}",

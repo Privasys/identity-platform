@@ -28,6 +28,7 @@ import AccessScreen from '@/routes/(tabs)/access';
 import SettingsScreen from '@/routes/(tabs)/settings';
 import { useAppMessagesStore } from '@/stores/app-messages';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
+import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
 import { useProfileStore } from '@/stores/profile';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
@@ -77,6 +78,7 @@ const SIDEBAR_WIDTH = 260;
 const SIDEBAR_WIDTH_NARROW = 220;
 const LIST_WIDTH = 400;
 const SHEET_WIDTH = 600;
+const SHEET_MAX_HEIGHT = 820;
 
 const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
 
@@ -189,6 +191,8 @@ function Sidebar({ active, width, styles }: { active: Section; width: number; st
     const insets = useSafeAreaInsets();
     const profile = useProfileStore((s) => s.profile);
     const waiting = useWaitingCount();
+    // Requests for the holder's files, as Profile's Drive row counts them.
+    const driveRequests = useDriveNotificationsStore((s) => s.requests.filter((q) => !q.decision).length);
 
     const go = (s: Section) => {
         // The section open at its top already, or Drive (which opens its files
@@ -202,7 +206,7 @@ function Sidebar({ active, width, styles }: { active: Section; width: number; st
 
     const items: { key: Section; icon: keyof typeof Ionicons.glyphMap; label: string; badge?: number }[] = [
         { key: 'profile', icon: 'person-circle', label: t('tabs.profile') },
-        { key: 'drive', icon: 'folder', label: t('tabs.drive') },
+        { key: 'drive', icon: 'folder', label: t('tabs.drive'), badge: driveRequests },
         { key: 'access', icon: 'key', label: t('tabs.access'), badge: waiting },
         { key: 'settings', icon: 'settings', label: t('tabs.settings') },
     ];
@@ -285,9 +289,12 @@ function TaskSheet({ children, styles }: { children: ReactNode; styles: Styles }
     const insets = useSafeAreaInsets();
     const sheetWidth = Math.min(SHEET_WIDTH, width - 64);
     const margin = Math.max(insets.top, 24) + 24;
+    // As tall as most tasks need, not the whole window: a short request does
+    // not sit in a sheet of empty space, and a longer task scrolls in it.
+    const sheetHeight = Math.min(height - margin * 2, SHEET_MAX_HEIGHT);
     return (
         <View style={styles.backdrop}>
-            <View style={[styles.sheet, { width: sheetWidth, height: height - margin * 2 }]}>
+            <View style={[styles.sheet, { width: sheetWidth, height: sheetHeight }]}>
                 {/* The sheet sits clear of the status bar and the home
                     indicator, so the screen inside needs no room for them. */}
                 <SafeAreaInsetsContext.Provider value={NO_INSETS}>

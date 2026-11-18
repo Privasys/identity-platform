@@ -1411,7 +1411,7 @@
   "approval": {
     "title": "Schválenie",
     "assurance": {
-      "device": "Schválenie vyžaduje vašu tvár alebo odtlačok prsta na tomto telefóne.",
+      "device": "Schválenie vyžaduje vašu tvár alebo odtlačok prsta na tomto zariadení.",
       "gov-presence": "Schválenie vyžaduje živú kontrolu vašej tváre voči pasu."
     },
     "timeLeft": "Na odpoveď zostáva {{time}}",

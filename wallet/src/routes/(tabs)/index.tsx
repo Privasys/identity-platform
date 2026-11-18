@@ -483,6 +483,8 @@ export default function ProfileScreen() {
                 <RNView style={column}>
                 {/* Drive: the holder's files, which is their data too. It was a
                     tab; one row here is all it needs. */}
+                {/* A wide window has Drive in its sidebar. */}
+                {!pane && (<>
                 <Text style={styles.sectionTitle}>{t('profile.sectionDrive')}</Text>
                 <Pressable
                     style={styles.sharingCard}
@@ -510,6 +512,7 @@ export default function ProfileScreen() {
                         <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                     </RNView>
                 </Pressable>
+                </>)}
 
                 {/* Sharing history and registered credentials used to sit here.
                     They answer "who can act on me", which is the Access tab's

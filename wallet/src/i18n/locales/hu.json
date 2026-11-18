@@ -1376,7 +1376,7 @@
   "approval": {
     "title": "Jóváhagyás",
     "assurance": {
-      "device": "A jóváhagyáshoz az arca vagy az ujjlenyomata kell ezen a telefonon.",
+      "device": "A jóváhagyáshoz az arca vagy az ujjlenyomata kell ezen az eszközön.",
       "gov-presence": "A jóváhagyáshoz az arca élő ellenőrzése kell az útlevele alapján."
     },
     "timeLeft": "Még {{time}} a válaszra",

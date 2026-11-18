@@ -1483,7 +1483,7 @@
   "approval": {
     "title": "Cymeradwyaeth",
     "assurance": {
-      "device": "Mae cymeradwyo'n gofyn am eich wyneb neu'ch ôl bys ar y ffôn hwn.",
+      "device": "Mae cymeradwyo'n gofyn am eich wyneb neu'ch ôl bys ar y ddyfais hon.",
       "gov-presence": "Mae cymeradwyo'n gofyn am wiriad byw o'ch wyneb yn erbyn eich pasbort."
     },
     "timeLeft": "{{time}} ar ôl i ateb",

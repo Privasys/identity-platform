@@ -1400,7 +1400,7 @@
   "approval": {
     "title": "Approvazione",
     "assurance": {
-      "device": "Per approvare servono il tuo volto o la tua impronta su questo telefono.",
+      "device": "Per approvare servono il tuo volto o la tua impronta su questo dispositivo.",
       "gov-presence": "Per approvare serve un controllo dal vivo del tuo volto con il passaporto."
     },
     "timeLeft": "Restano {{time}} per rispondere",

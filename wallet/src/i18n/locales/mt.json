@@ -1459,7 +1459,7 @@
   "approval": {
     "title": "Approvazzjoni",
     "assurance": {
-      "device": "Biex tapprova jrid wiċċek jew il-marka tas-saba' fuq dan it-telefon.",
+      "device": "Biex tapprova jrid wiċċek jew il-marka tas-saba' fuq dan l-apparat.",
       "gov-presence": "Biex tapprova jrid verifika diretta ta' wiċċek mal-passaport tiegħek."
     },
     "timeLeft": "{{time}} fadal biex twieġeb",

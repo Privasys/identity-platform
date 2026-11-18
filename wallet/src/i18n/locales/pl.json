@@ -1424,7 +1424,7 @@
   "approval": {
     "title": "Zgoda",
     "assurance": {
-      "device": "Zgoda wymaga Twojej twarzy lub odcisku palca na tym telefonie.",
+      "device": "Zgoda wymaga Twojej twarzy lub odcisku palca na tym urządzeniu.",
       "gov-presence": "Zgoda wymaga sprawdzenia na żywo Twojej twarzy z paszportem."
     },
     "timeLeft": "Na odpowiedź zostało {{time}}",

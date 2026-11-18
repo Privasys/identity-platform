@@ -1376,7 +1376,7 @@
   "approval": {
     "title": "Goedkeuring",
     "assurance": {
-      "device": "Goedkeuren vraagt je gezicht of vingerafdruk op deze telefoon.",
+      "device": "Goedkeuren vraagt je gezicht of vingerafdruk op dit apparaat.",
       "gov-presence": "Goedkeuren vraagt een live controle van je gezicht met je paspoort."
     },
     "timeLeft": "Nog {{time}} om te antwoorden",

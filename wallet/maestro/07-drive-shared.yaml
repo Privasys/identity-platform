@@ -2,13 +2,26 @@ appId: org.privasys.wallet.demo
 name: Drive, Shared with me
 ---
 - runFlow: subflows/launch.yaml
-- scrollUntilVisible:
-    element:
-      id: "profile-drive"
-    direction: DOWN
-    timeout: 30000
-- tapOn:
-    id: "profile-drive"
+# A wide window has Drive in its sidebar; a phone opens it from Profile.
+- runFlow:
+    when:
+      visible:
+        id: "tab-drive"
+    commands:
+      - tapOn:
+          id: "tab-drive"
+- runFlow:
+    when:
+      notVisible:
+        id: "tab-drive"
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "profile-drive"
+          direction: DOWN
+          timeout: 30000
+      - tapOn:
+          id: "profile-drive"
 - extendedWaitUntil:
     visible:
       id: "drive-section-shared"

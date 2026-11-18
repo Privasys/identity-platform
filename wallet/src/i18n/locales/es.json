@@ -1400,7 +1400,7 @@
   "approval": {
     "title": "Aprobación",
     "assurance": {
-      "device": "Aprobar pide tu cara o tu huella en este teléfono.",
+      "device": "Aprobar pide tu cara o tu huella en este dispositivo.",
       "gov-presence": "Aprobar pide una comprobación en directo de tu cara con tu pasaporte."
     },
     "timeLeft": "Quedan {{time}} para responder",

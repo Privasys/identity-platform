@@ -1411,7 +1411,7 @@
   "approval": {
     "title": "Odobrenje",
     "assurance": {
-      "device": "Za odobrenje je potrebno vaše lice ili otisak prsta na ovom telefonu.",
+      "device": "Za odobrenje je potrebno vaše lice ili otisak prsta na ovom uređaju.",
       "gov-presence": "Za odobrenje je potrebna provjera vašeg lica uživo prema putovnici."
     },
     "timeLeft": "Za odgovor je ostalo {{time}}",

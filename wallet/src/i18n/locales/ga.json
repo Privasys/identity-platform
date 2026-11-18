@@ -1459,7 +1459,7 @@
   "approval": {
     "title": "Ceadú",
     "assurance": {
-      "device": "Iarrtar d’aghaidh nó do mhéarlorg ar an bhfón seo chun ceadú.",
+      "device": "Iarrtar d’aghaidh nó do mhéarlorg ar an ngléas seo chun ceadú.",
       "gov-presence": "Iarrtar seiceáil bheo ar d’aghaidh i gcoinne do phas chun ceadú."
     },
     "timeLeft": "{{time}} fágtha le freagairt",

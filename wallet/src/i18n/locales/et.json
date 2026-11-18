@@ -1387,7 +1387,7 @@
   "approval": {
     "title": "Kinnitus",
     "assurance": {
-      "device": "Kinnitamiseks on vaja teie nägu või sõrmejälge selles telefonis.",
+      "device": "Kinnitamiseks on vaja teie nägu või sõrmejälge selles seadmes.",
       "gov-presence": "Kinnitamiseks on vaja teie näo otsekontrolli passi järgi."
     },
     "timeLeft": "Vastamiseks jäänud {{time}}",

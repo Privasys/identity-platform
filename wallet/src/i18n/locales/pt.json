@@ -1400,7 +1400,7 @@
   "approval": {
     "title": "Aprovação",
     "assurance": {
-      "device": "Aprovar pede o seu rosto ou a sua impressão digital neste telefone.",
+      "device": "Aprovar pede o seu rosto ou a sua impressão digital neste dispositivo.",
       "gov-presence": "Aprovar pede uma verificação ao vivo do seu rosto com o seu passaporte."
     },
     "timeLeft": "Faltam {{time}} para responder",

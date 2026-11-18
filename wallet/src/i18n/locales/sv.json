@@ -1376,7 +1376,7 @@
   "approval": {
     "title": "Godkännande",
     "assurance": {
-      "device": "Att godkänna kräver ditt ansikte eller fingeravtryck på den här telefonen.",
+      "device": "Att godkänna kräver ditt ansikte eller fingeravtryck på den här enheten.",
       "gov-presence": "Att godkänna kräver en livekontroll av ditt ansikte mot ditt pass."
     },
     "timeLeft": "{{time}} kvar att svara",

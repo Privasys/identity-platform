@@ -1411,7 +1411,7 @@
   "approval": {
     "title": "Patvirtinimas",
     "assurance": {
-      "device": "Patvirtinimui reikia jūsų veido arba piršto atspaudo šiame telefone.",
+      "device": "Patvirtinimui reikia jūsų veido arba piršto atspaudo šiame įrenginyje.",
       "gov-presence": "Patvirtinimui reikia gyvo jūsų veido patikrinimo pagal pasą."
     },
     "timeLeft": "Atsakyti liko {{time}}",

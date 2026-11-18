@@ -1387,7 +1387,7 @@
   "approval": {
     "title": "Approval",
     "assurance": {
-      "device": "Approving asks for your face or fingerprint on this phone.",
+      "device": "Approving asks for your face or fingerprint on this device.",
       "gov-presence": "Approving asks for a live check of your face against your passport."
     },
     "timeLeft": "{{time}} left to answer",

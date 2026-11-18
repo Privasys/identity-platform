@@ -5,6 +5,10 @@
     "title": "Privasys Wallet",
     "line": "Your verified identity, and apps you can check before you trust them."
   },
+  "creative": {
+    "header": { "first": "Prove who you are.", "second": "Check who you’re talking to." },
+    "search": { "title": "A digital identity wallet", "lines": ["Verified from your passport.", "No passwords."] }
+  },
   "shots": [
     { "shot": "10-id-check", "headline": "Your identity, verified from your passport" },
     { "shot": "03-app-form", "headline": "Apps ask. You answer, in your wallet" },

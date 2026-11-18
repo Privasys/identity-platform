@@ -60,6 +60,7 @@ import { RecoveryPhraseCard } from '@/components/RecoveryPhraseCard';
 import { profileName } from '@/services/attributes';
 import { shortAccountId } from '@/utils/account-id';
 import { useProfileStore } from '@/stores/profile';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 type InviteMethod = 'email' | 'qr';
 
@@ -485,6 +486,7 @@ export default function AccountRecoveryScreen() {
         <RNView style={styles.screen}>
             {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                <HeaderBleed colour="#0F172A" radius={0} />
                 <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </Pressable>

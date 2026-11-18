@@ -44,6 +44,7 @@ import { useAvatarChooser } from '@/hooks/useAvatarChooser';
 import { useAuthStore } from '@/stores/auth';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useProfileStore } from '@/stores/profile';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
@@ -333,6 +334,7 @@ export default function ProfileScreen() {
         <RNView style={styles.screen} testID="profile-screen">
             {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
+                <HeaderBleed />
                 <Text style={styles.headerTitle}>{t('tabs.profile')}</Text>
             </RNView>
 

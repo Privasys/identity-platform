@@ -36,6 +36,7 @@ import { establishPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
 import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 export default function SecureWalletScreen() {
     const insets = useSafeAreaInsets();
@@ -110,6 +111,7 @@ export default function SecureWalletScreen() {
     return (
         <RNView style={styles.screen}>
             <RNView style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                <HeaderBleed colour="#0F172A" radius={0} />
                 <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </Pressable>

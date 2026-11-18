@@ -46,6 +46,7 @@ import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 import { AppRow, ProviderRow } from '@/components/AccessRows';
 import { appTree, providerTree, withSignIns } from '@/utils/access-tree';
 import { buildSessionRows, relativeWhen } from '@/utils/session-rows';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 /** How many rows a section shows before it defers to its own screen. */
 const PREVIEW = 3;
@@ -160,6 +161,7 @@ export default function AccessScreen() {
     return (
         <RNView style={styles.screen} testID="access-screen">
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
+                <HeaderBleed />
                 <Text style={styles.headerTitle}>{t('tabs.access')}</Text>
             </RNView>
 

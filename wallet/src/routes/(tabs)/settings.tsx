@@ -24,6 +24,7 @@ import { listDevices } from '@/services/devices';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { getLogs } from '@/utils/logs';
 import { MONO } from '@/constants/fonts';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
@@ -48,6 +49,7 @@ export default function SettingsScreen() {
     return (
         <RNView style={styles.screen} testID="settings-screen">
             <RNView style={[styles.header, { paddingTop: insets.top + 16 }]}>
+                <HeaderBleed />
                 <Text style={styles.headerTitle}>{t('settings.title')}</Text>
             </RNView>
 

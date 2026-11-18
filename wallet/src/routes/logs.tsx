@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { buildLogExport, clearLogs, formatLogs, getLogs } from '@/utils/logs';
 import { MONO } from '@/constants/fonts';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 export default function LogsScreen() {
     const router = useRouter();
@@ -74,6 +75,7 @@ export default function LogsScreen() {
         <RNView style={styles.screen}>
             <Stack.Screen options={{ headerShown: false }} />
             <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                <HeaderBleed />
                 <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </Pressable>

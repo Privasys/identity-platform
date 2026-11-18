@@ -35,6 +35,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react
 import { Trans, useTranslation } from 'react-i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 export interface ConsentDataItem {
     key: string;
@@ -126,6 +127,7 @@ export function DataRequestConsent({
         <RNView style={styles.flex}>
             {title ? (
                 <RNView style={[styles.header, { paddingTop: contentTopInset + 14 }]}>
+                    <HeaderBleed />
                     <Text style={styles.headerTitle}>{title}</Text>
                 </RNView>
             ) : null}

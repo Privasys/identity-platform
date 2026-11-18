@@ -2,10 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppState } from 'react-native';
+import { AppState, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePalette } from '@/components/Themed';
+import { columnGutter, useLargeScreen } from '@/hooks/useLargeScreen';
 import { useAppMessagesStore } from '@/stores/app-messages';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
@@ -18,6 +19,8 @@ export default function TabLayout() {
     const p = usePalette();
     const { t } = useTranslation();
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const gutter = useLargeScreen() ? columnGutter(width) : 0;
     const pending = useVaultApprovalsStore((s) => s.pending.length);
     const asks = useCapabilityAsksStore((s) => s.asks.length);
     const guardian = useGuardianRequestsStore(waitingCount);
@@ -53,8 +56,16 @@ export default function TabLayout() {
                     borderTopWidth: 0.5,
                     paddingTop: 4,
                     paddingBottom: insets.bottom,
-                    height: TAB_BAR_CONTENT_HEIGHT + insets.bottom
+                    height: TAB_BAR_CONTENT_HEIGHT + insets.bottom,
+                    // On a large screen the bar runs edge to edge, its tabs
+                    // kept within the centred column.
+                    paddingHorizontal: gutter,
                 },
+                // The column for each tab. Made here, not by the stack around
+                // the tabs: the navigator clips its scenes to its own bounds,
+                // so each header band (components/HeaderBleed) can reach the
+                // screen edges only if those bounds are the whole screen.
+                sceneStyle: gutter ? { paddingHorizontal: gutter, backgroundColor: p.screenBg } : undefined,
                 tabBarLabelStyle: {
                     fontSize: 11,
                     fontWeight: '600'

@@ -40,6 +40,7 @@ import { applyLocale } from '@/i18n';
 import { SUPPORTED_LOCALES, localeMeta } from '@/i18n/locales';
 import { isPackAvailable } from '@/i18n/packs';
 import { useSettingsStore } from '@/stores/settings';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 /** Tags usable without a download. Recomputed only when one is added. */
 function availableTags(): Set<string> {
@@ -101,6 +102,7 @@ export default function LanguageScreen() {
         <RNView style={styles.screen}>
             <Stack.Screen options={{ headerShown: false }} />
             <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                <HeaderBleed />
                 <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </Pressable>

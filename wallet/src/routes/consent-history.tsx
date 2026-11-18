@@ -27,6 +27,7 @@ import type { TFunction } from 'i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { attributeLabel } from '@/services/attributes';
 import { useConsentStore, type ConsentRecord, type StandingConsent, type ComputationReceipt } from '@/stores/consent';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 /** Above this many records the history tab shows a search box. */
 const SEARCH_THRESHOLD = 10;
@@ -137,6 +138,7 @@ export default function ConsentHistoryScreen() {
         <RNView style={styles.screen} testID="consent-history-screen">
             {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                <HeaderBleed colour={p.textPrimary} radius={0} />
                 <Pressable onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color={p.card} />
                 </Pressable>

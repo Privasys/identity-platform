@@ -46,6 +46,9 @@ import { checkDeviceSecurity } from '@/services/security';
 import { assertDemoAllowed, demo, isDemo } from '@/services/demo/gate';
 import { getDeviceLocale } from '@/services/device-locale';
 import { installLogCapture } from '@/utils/logs';
+import { useWindowDimensions } from 'react-native';
+import { columnGutter, useLargeScreen } from '@/hooks/useLargeScreen';
+import { usePalette } from '@/components/Themed';
 
 // Capture console output into an in-memory ring buffer as early as
 // possible so the Settings → Logs screen and the Connect → Report Error
@@ -184,6 +187,13 @@ function KeepAwake() {
 function RootLayoutNav({ hasProfile }: { hasProfile: boolean }) {
     const colorScheme = useColorScheme();
     const router = useRouter();
+    const large = useLargeScreen();
+    const { width } = useWindowDimensions();
+    const palette = usePalette();
+    // The navigator's background is what shows beside the centred column on a
+    // large screen: the wallet's own, not the library's grey.
+    const baseTheme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
+    const navTheme = { ...baseTheme, colors: { ...baseTheme.colors, background: palette.screenBg } };
 
     // No identity yet (fresh install, or after Settings → Clear All Data) →
     // send the user to the Profile tab, whose empty state runs the first-run
@@ -198,8 +208,31 @@ function RootLayoutNav({ hasProfile }: { hasProfile: boolean }) {
     return (
         <>
             {__DEV__ && <KeepAwake />}
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <Stack screenOptions={{ headerShown: false, orientation: 'portrait' }} />
+            <ThemeProvider value={navTheme}>
+                {/* On a phone, portrait and full width. On a large screen (a
+                    tablet, an unfolded phone) any orientation, and the content
+                    in a centred column of readable width. */}
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                        orientation: large ? 'all' : 'portrait',
+                        // The column is made with side padding, not a narrower
+                        // view, so the screen's view stays full width: Android
+                        // clips what is drawn outside it, and each header paints
+                        // its colour into the padding (components/HeaderBleed).
+                        contentStyle: large
+                            ? { paddingHorizontal: columnGutter(width), backgroundColor: palette.screenBg }
+                            : undefined,
+                    }}
+                >
+                    {/* The tabs make their own column (routes/(tabs)/_layout):
+                        the tab navigator clips its scenes, so a column made
+                        here would also clip each tab's header band. */}
+                    <Stack.Screen
+                        name="(tabs)"
+                        options={{ contentStyle: large ? { backgroundColor: palette.screenBg } : undefined }}
+                    />
+                </Stack>
             </ThemeProvider>
         </>
     );

@@ -45,6 +45,7 @@ import type { AttestationDiff } from '@/services/attestation-diff';
 import type { OsRelease, WorkloadRelease } from '@/services/release-provenance';
 import { sourceRow, type StoreListing } from '@/services/store-listing';
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 /**
  * The outcome of the enclave verification the screen is showing, so the view
@@ -287,6 +288,7 @@ export function AttestationView({
         <RNView style={styles.screen}>
             {/* Same green band and white type as every other screen header. */}
             <RNView style={[styles.header, { paddingTop: insets.top + 14 }]}>
+                <HeaderBleed />
                 <Text style={styles.headerTitle}>{t(reviewOnly ? 'attestation.reviewTitle' : 'attestation.requestTitle')}</Text>
             </RNView>
 

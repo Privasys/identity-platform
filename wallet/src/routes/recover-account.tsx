@@ -62,6 +62,7 @@ import { useProfileStore } from '@/stores/profile';
 import * as Storage from '@/utils/storage';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import { MONO } from '@/constants/fonts';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 interface RecoveryState {
     requestId: string;
@@ -625,6 +626,7 @@ export default function RecoverAccountScreen() {
         <RNView style={styles.screen}>
             {/* Header */}
             <RNView style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                <HeaderBleed colour="#0F172A" radius={0} />
                 <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </Pressable>

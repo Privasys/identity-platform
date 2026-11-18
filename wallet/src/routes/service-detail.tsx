@@ -48,6 +48,7 @@ import { useSessionsStore } from '@/stores/sessions';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 function appName(rpId: string): string {
     const dot = rpId.indexOf('.');
@@ -458,6 +459,7 @@ export default function ServiceDetailScreen() {
             <RNView style={styles.screen}>
                 {/* Header */}
                 <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                    <HeaderBleed />
                     <Pressable onPress={() => router.back()} style={styles.backArrow}>
                         <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                     </Pressable>

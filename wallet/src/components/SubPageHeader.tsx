@@ -15,6 +15,7 @@ import { Pressable, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { HeaderBleed } from '@/components/HeaderBleed';
 
 export function SubPageHeader({ title, right }: { title: string; right?: ReactNode }) {
     const p = usePalette();
@@ -27,6 +28,7 @@ export function SubPageHeader({ title, right }: { title: string; right?: ReactNo
     };
     return (
         <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
+            <HeaderBleed />
             <Pressable onPress={goBack} style={styles.back} hitSlop={10} accessibilityLabel="Back">
                 <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
             </Pressable>

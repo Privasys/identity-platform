@@ -32,7 +32,9 @@ import (
 const AppRoleAdminRole = "privasys-platform:idp-app-roles"
 
 // appRoleRegex pins the exact role shape this endpoint may manage:
-// <audience>:app:<app-id-hex>:owner|admin|approver, where app-id-hex is the
+// <audience>:app:<app-id-hex>:<tier>, where <tier> is a team tier (owner,
+// admin), the vault approver, or a support tier (support-admin,
+// support-member, support-viewer, which the monitor reads), and app-id-hex is the
 // raw apps.id (32 lowercase hex chars, no dashes) — the same encoding the
 // platform pins at OID 3.6 and already uses for the per-app approver role.
 // The audience prefix is what filterRolesByAudience keys on: config roles are
@@ -41,7 +43,7 @@ const AppRoleAdminRole = "privasys-platform:idp-app-roles"
 // plus the fixed tier suffix means the caller can never manage a bare
 // platform role (privasys-platform:admin etc.) through this endpoint.
 var appRoleRegex = regexp.MustCompile(
-	`^[a-z0-9][a-z0-9-]*:app:[0-9a-f]{32}:(owner|admin|approver)$`)
+	`^[a-z0-9][a-z0-9-]*:app:[0-9a-f]{32}:(owner|admin|approver|support-admin|support-member|support-viewer)$`)
 
 // HandleGrantAppRole handles POST /admin/app-roles — grant an app-scoped role.
 //
@@ -105,7 +107,7 @@ func readAppRoleBody(w http.ResponseWriter, r *http.Request) (userID, role strin
 	}
 	if !appRoleRegex.MatchString(req.Role) {
 		writeError(w, http.StatusBadRequest,
-			"role must match <audience>:app:<app-id-hex>:owner|admin|approver")
+			"role must match <audience>:app:<app-id-hex>:owner|admin|approver|support-admin|support-member|support-viewer")
 		return "", "", false
 	}
 	return req.UserID, req.Role, true

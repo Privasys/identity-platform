@@ -6,7 +6,7 @@ package admin
 import "testing"
 
 // TestAppRoleRegex pins the exact role shape /admin/app-roles may manage:
-// <audience>:app:<32-hex app id>:owner|admin|approver. In particular it must
+// <audience>:app:<32-hex app id>:<tier>. In particular it must
 // reject bare platform roles — the endpoint is scoped so the management
 // service can sync app teams without being able to grant itself platform
 // power.
@@ -14,9 +14,13 @@ func TestAppRoleRegex(t *testing.T) {
 	// apps.id as raw hex (no dashes) — the OID 3.6 encoding.
 	const id = "f555f319bfa94fc0bcae2c8c714fb31a"
 	cases := map[string]bool{
-		"privasys-platform:app:" + id + ":owner":     true,
-		"privasys-platform:app:" + id + ":admin":     true,
-		"attestation-server:app:" + id + ":approver": true,
+		"privasys-platform:app:" + id + ":owner":          true,
+		"privasys-platform:app:" + id + ":admin":          true,
+		"attestation-server:app:" + id + ":approver":      true,
+		"privasys-platform:app:" + id + ":support-admin":  true,
+		"privasys-platform:app:" + id + ":support-member": true,
+		"privasys-platform:app:" + id + ":support-viewer": true,
+		"privasys-platform:app:" + id + ":support-owner":  false,
 		// Wrong tier.
 		"privasys-platform:app:" + id + ":viewer": false,
 		// Bare platform roles must never be manageable here.

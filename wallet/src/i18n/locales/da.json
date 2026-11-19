@@ -1342,7 +1342,12 @@
     "batchDoneBody": "Handlingerne kan nu fortsætte.",
     "batchWaitingTitle": "En liste over handlinger venter",
     "batchWaitingHint": "Gennemgå listen, før den udløber",
-    "batchDetail": "Godkendte handlinger: {{count}}. {{label}}"
+    "batchDetail": "Godkendte handlinger: {{count}}. {{label}}",
+    "batchAppCount_one": "Berører {{count}} app",
+    "batchAppCount_other": "Berører {{count}} apps",
+    "batchWhatChanges": "Hvad ændres",
+    "batchWhatChangesBody": "Hver nøgle frigives til den viste nye måling, så dens app kan læse den efter ændringen. Hver politik træder i kraft som vist.",
+    "batchNameUnconfirmed": "Navnet er ikke bekræftet"
   },
   "update": {
     "requiredTitle": "Opdatering påkrævet",

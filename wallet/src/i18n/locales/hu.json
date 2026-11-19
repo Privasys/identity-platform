@@ -1342,7 +1342,12 @@
     "batchDoneBody": "A műveletek most már folytatódhatnak.",
     "batchWaitingTitle": "Egy műveletlista várakozik",
     "batchWaitingHint": "Nézze át a listát, mielőtt lejár",
-    "batchDetail": "Jóváhagyott műveletek: {{count}}. {{label}}"
+    "batchDetail": "Jóváhagyott műveletek: {{count}}. {{label}}",
+    "batchAppCount_one": "{{count}} alkalmazást érint",
+    "batchAppCount_other": "{{count}} alkalmazást érint",
+    "batchWhatChanges": "Mi változik",
+    "batchWhatChangesBody": "Minden kulcs a megjelenített új mérés számára válik elérhetővé, hogy az alkalmazása a változás után olvashassa. Minden szabályzat a megjelenített módon lép életbe.",
+    "batchNameUnconfirmed": "A név nincs megerősítve"
   },
   "update": {
     "requiredTitle": "Frissítés szükséges",

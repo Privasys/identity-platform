@@ -1378,7 +1378,14 @@
     "batchDoneBody": "Operácie teraz môžu pokračovať.",
     "batchWaitingTitle": "Čaká zoznam operácií",
     "batchWaitingHint": "Skontrolujte zoznam, kým nevyprší",
-    "batchDetail": "Schválené operácie: {{count}}. {{label}}"
+    "batchDetail": "Schválené operácie: {{count}}. {{label}}",
+    "batchAppCount_one": "Týka sa {{count}} aplikácie",
+    "batchAppCount_few": "Týka sa {{count}} aplikácií",
+    "batchAppCount_many": "Týka sa {{count}} aplikácie",
+    "batchAppCount_other": "Týka sa {{count}} aplikácií",
+    "batchWhatChanges": "Čo sa zmení",
+    "batchWhatChangesBody": "Každý kľúč sa uvoľní pre zobrazené nové meranie, aby ho jeho aplikácia mohla po zmene čítať. Každá politika nadobudne účinnosť tak, ako je zobrazené.",
+    "batchNameUnconfirmed": "Názov nie je potvrdený"
   },
   "update": {
     "requiredTitle": "Vyžaduje sa aktualizácia",

@@ -9,6 +9,7 @@ import {
     computeVaultOp,
     dashedAppId,
     describeVaultHandle,
+    groupVaultBatch,
     reachedEndOfList,
     VaultBatchRefused,
     verifyVaultBatch,
@@ -229,6 +230,42 @@ describe('describeVaultHandle', () => {
 
     it('writes an app id the way the control plane does', () => {
         expect(dashedAppId('0123456789abcdef0123456789abcdef')).toBe('01234567-89ab-cdef-0123-456789abcdef');
+    });
+});
+
+describe('groupVaultBatch', () => {
+    const a = 'aa'.repeat(16);
+    const b = 'bb'.repeat(16);
+    const host = 'cc'.repeat(16);
+    const entry = (handle: string) => ({
+        operation: 'promote' as const,
+        handle,
+        measurementDigest: 'd'.repeat(64),
+        policyVersion: 1,
+        vaultOp: handle,
+    });
+
+    it('puts every entry in one group per app, the host first, unknown shapes last', () => {
+        const list = [
+            entry(`app:${b}:policy`),
+            entry(`apps.privasys.org/${a}/storage-kek/v1`),
+            entry('example.org/thing'),
+            entry(`apps.privasys.org/${b}/registry-cred/default`),
+            entry(`apps.privasys.org/${host}/manager/data/v1`),
+            entry(`apps.privasys.org/${b}/storage-kek/v1`),
+        ];
+        const groups = groupVaultBatch(list);
+        expect(groups.map((g) => [g.subject, g.id, g.entries.map((e) => e.handle)])).toEqual([
+            ['host', host, [`apps.privasys.org/${host}/manager/data/v1`]],
+            ['app', b, [`app:${b}:policy`, `apps.privasys.org/${b}/registry-cred/default`, `apps.privasys.org/${b}/storage-kek/v1`]],
+            ['app', a, [`apps.privasys.org/${a}/storage-kek/v1`]],
+            ['other', undefined, ['example.org/thing']],
+        ]);
+        expect(groups.flatMap((g) => g.entries)).toHaveLength(list.length);
+    });
+
+    it('keeps two unknown handles apart', () => {
+        expect(groupVaultBatch([entry('x/1'), entry('x/2')])).toHaveLength(2);
     });
 });
 

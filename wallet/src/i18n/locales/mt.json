@@ -1428,7 +1428,15 @@
     "batchDoneBody": "L-operazzjonijiet issa jistgħu jkomplu.",
     "batchWaitingTitle": "Lista ta' operazzjonijiet qed tistenna",
     "batchWaitingHint": "Irrevedi l-lista qabel ma tiskadi",
-    "batchDetail": "Operazzjonijiet approvati: {{count}}. {{label}}"
+    "batchDetail": "Operazzjonijiet approvati: {{count}}. {{label}}",
+    "batchAppCount_one": "Jaffettwa {{count}} app",
+    "batchAppCount_two": "Jaffettwa {{count}} apps",
+    "batchAppCount_few": "Jaffettwa {{count}} apps",
+    "batchAppCount_many": "Jaffettwa {{count}} app",
+    "batchAppCount_other": "Jaffettwa {{count}} app",
+    "batchWhatChanges": "X'jinbidel",
+    "batchWhatChangesBody": "Kull ċavetta tinħareġ għall-kejl il-ġdid muri, biex l-app tagħha tkun tista' taqraha wara l-bidla. Kull politika tidħol fis-seħħ kif muri.",
+    "batchNameUnconfirmed": "L-isem mhux ikkonfermat"
   },
   "update": {
     "requiredTitle": "Aġġornament meħtieġ",

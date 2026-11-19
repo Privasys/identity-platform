@@ -1378,7 +1378,13 @@
     "batchDoneBody": "Darbības tagad var turpināties.",
     "batchWaitingTitle": "Gaida darbību saraksts",
     "batchWaitingHint": "Pārskatiet sarakstu, pirms tas beidzas",
-    "batchDetail": "Apstiprinātās darbības: {{count}}. {{label}}"
+    "batchDetail": "Apstiprinātās darbības: {{count}}. {{label}}",
+    "batchAppCount_zero": "Ietekmē {{count}} lietotņu",
+    "batchAppCount_one": "Ietekmē {{count}} lietotni",
+    "batchAppCount_other": "Ietekmē {{count}} lietotnes",
+    "batchWhatChanges": "Kas mainās",
+    "batchWhatChangesBody": "Katra atslēga tiek atbrīvota parādītajam jaunajam mērījumam, lai tās lietotne to varētu nolasīt pēc izmaiņām. Katra politika stājas spēkā, kā parādīts.",
+    "batchNameUnconfirmed": "Nosaukums nav apstiprināts"
   },
   "update": {
     "requiredTitle": "Nepieciešams atjauninājums",

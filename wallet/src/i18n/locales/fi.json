@@ -1342,7 +1342,12 @@
     "batchDoneBody": "Toiminnot voivat nyt jatkua.",
     "batchWaitingTitle": "Toimintoluettelo odottaa",
     "batchWaitingHint": "Tarkista luettelo ennen sen vanhenemista",
-    "batchDetail": "Hyväksytyt toiminnot: {{count}}. {{label}}"
+    "batchDetail": "Hyväksytyt toiminnot: {{count}}. {{label}}",
+    "batchAppCount_one": "Koskee {{count}} sovellusta",
+    "batchAppCount_other": "Koskee {{count}} sovellusta",
+    "batchWhatChanges": "Mitä muuttuu",
+    "batchWhatChangesBody": "Jokainen avain vapautetaan näytetylle uudelle mittaukselle, jotta sen sovellus voi lukea sen muutoksen jälkeen. Jokainen käytäntö tulee voimaan näytetyllä tavalla.",
+    "batchNameUnconfirmed": "Nimeä ei ole vahvistettu"
   },
   "update": {
     "requiredTitle": "Päivitys vaaditaan",

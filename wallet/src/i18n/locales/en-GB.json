@@ -1353,7 +1353,12 @@
     "batchDoneBody": "The operations can now go ahead.",
     "batchWaitingTitle": "A list of operations is waiting",
     "batchWaitingHint": "Review the list before it expires",
-    "batchDetail": "Operations approved: {{count}}. {{label}}"
+    "batchDetail": "Operations approved: {{count}}. {{label}}",
+    "batchAppCount_one": "Affects {{count}} app",
+    "batchAppCount_other": "Affects {{count}} apps",
+    "batchWhatChanges": "What changes",
+    "batchWhatChangesBody": "Each key is released to the new measurement shown, so its app can read it after the change. Each policy takes effect as shown.",
+    "batchNameUnconfirmed": "Name not confirmed"
   },
   "update": {
     "requiredTitle": "Update required",

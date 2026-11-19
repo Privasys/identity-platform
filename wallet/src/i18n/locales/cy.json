@@ -1453,7 +1453,16 @@
     "batchDoneBody": "Gall y gweithrediadau fynd rhagddynt nawr.",
     "batchWaitingTitle": "Mae rhestr o weithrediadau'n aros",
     "batchWaitingHint": "Adolygwch y rhestr cyn iddi ddod i ben",
-    "batchDetail": "Gweithrediadau a gymeradwywyd: {{count}}. {{label}}"
+    "batchDetail": "Gweithrediadau a gymeradwywyd: {{count}}. {{label}}",
+    "batchAppCount_zero": "Yn effeithio ar {{count}} ap",
+    "batchAppCount_one": "Yn effeithio ar {{count}} ap",
+    "batchAppCount_two": "Yn effeithio ar {{count}} ap",
+    "batchAppCount_few": "Yn effeithio ar {{count}} ap",
+    "batchAppCount_many": "Yn effeithio ar {{count}} ap",
+    "batchAppCount_other": "Yn effeithio ar {{count}} ap",
+    "batchWhatChanges": "Beth sy'n newid",
+    "batchWhatChangesBody": "Mae pob allwedd yn cael ei rhyddhau i'r mesuriad newydd a ddangosir, fel y gall ei ap ei darllen ar ôl y newid. Mae pob polisi yn dod i rym fel y dangosir.",
+    "batchNameUnconfirmed": "Enw heb ei gadarnhau"
   },
   "update": {
     "requiredTitle": "Rhaid diweddaru",

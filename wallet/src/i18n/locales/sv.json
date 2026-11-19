@@ -1342,7 +1342,12 @@
     "batchDoneBody": "Åtgärderna kan nu fortsätta.",
     "batchWaitingTitle": "En lista med åtgärder väntar",
     "batchWaitingHint": "Granska listan innan den går ut",
-    "batchDetail": "Godkända åtgärder: {{count}}. {{label}}"
+    "batchDetail": "Godkända åtgärder: {{count}}. {{label}}",
+    "batchAppCount_one": "Påverkar {{count}} app",
+    "batchAppCount_other": "Påverkar {{count}} appar",
+    "batchWhatChanges": "Vad som ändras",
+    "batchWhatChangesBody": "Varje nyckel släpps till den visade nya mätningen, så att dess app kan läsa den efter ändringen. Varje policy träder i kraft som visas.",
+    "batchNameUnconfirmed": "Namnet är inte bekräftat"
   },
   "update": {
     "requiredTitle": "Uppdatering krävs",

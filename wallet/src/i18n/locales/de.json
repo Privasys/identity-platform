@@ -1342,7 +1342,12 @@
     "batchDoneBody": "Die Vorgänge können jetzt fortgesetzt werden.",
     "batchWaitingTitle": "Eine Liste von Vorgängen wartet",
     "batchWaitingHint": "Prüfen Sie die Liste, bevor sie abläuft",
-    "batchDetail": "Genehmigte Vorgänge: {{count}}. {{label}}"
+    "batchDetail": "Genehmigte Vorgänge: {{count}}. {{label}}",
+    "batchAppCount_one": "Betrifft {{count}} App",
+    "batchAppCount_other": "Betrifft {{count}} Apps",
+    "batchWhatChanges": "Was sich ändert",
+    "batchWhatChangesBody": "Jeder Schlüssel wird für die angezeigte neue Messung freigegeben, damit seine App ihn nach der Änderung lesen kann. Jede Richtlinie tritt wie angezeigt in Kraft.",
+    "batchNameUnconfirmed": "Name nicht bestätigt"
   },
   "update": {
     "requiredTitle": "Update erforderlich",

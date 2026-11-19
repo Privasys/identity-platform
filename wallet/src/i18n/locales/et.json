@@ -1353,7 +1353,12 @@
     "batchDoneBody": "Toimingud võivad nüüd jätkuda.",
     "batchWaitingTitle": "Toimingute loend ootab",
     "batchWaitingHint": "Vaadake loend enne aegumist üle",
-    "batchDetail": "Kinnitatud toimingud: {{count}}. {{label}}"
+    "batchDetail": "Kinnitatud toimingud: {{count}}. {{label}}",
+    "batchAppCount_one": "Mõjutab {{count}} rakendust",
+    "batchAppCount_other": "Mõjutab {{count}} rakendust",
+    "batchWhatChanges": "Mis muutub",
+    "batchWhatChangesBody": "Iga võti vabastatakse näidatud uuele mõõtmisele, et selle rakendus saaks seda pärast muudatust lugeda. Iga poliitika jõustub nii, nagu näidatud.",
+    "batchNameUnconfirmed": "Nimi pole kinnitatud"
   },
   "update": {
     "requiredTitle": "Vajalik on uuendus",

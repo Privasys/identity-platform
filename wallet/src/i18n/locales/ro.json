@@ -1378,7 +1378,13 @@
     "batchDoneBody": "Operațiunile pot continua acum.",
     "batchWaitingTitle": "O listă de operațiuni este în așteptare",
     "batchWaitingHint": "Verificați lista înainte să expire",
-    "batchDetail": "Operațiuni aprobate: {{count}}. {{label}}"
+    "batchDetail": "Operațiuni aprobate: {{count}}. {{label}}",
+    "batchAppCount_one": "Afectează {{count}} aplicație",
+    "batchAppCount_few": "Afectează {{count}} aplicații",
+    "batchAppCount_other": "Afectează {{count}} de aplicații",
+    "batchWhatChanges": "Ce se schimbă",
+    "batchWhatChangesBody": "Fiecare cheie este eliberată pentru noua măsurătoare afișată, astfel încât aplicația ei să o poată citi după schimbare. Fiecare politică intră în vigoare așa cum este afișat.",
+    "batchNameUnconfirmed": "Nume neconfirmat"
   },
   "update": {
     "requiredTitle": "Actualizare necesară",

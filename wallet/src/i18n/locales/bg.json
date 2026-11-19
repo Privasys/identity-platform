@@ -1353,7 +1353,12 @@
     "batchDoneBody": "Операциите вече могат да продължат.",
     "batchWaitingTitle": "Чака списък с операции",
     "batchWaitingHint": "Прегледайте списъка, преди да изтече",
-    "batchDetail": "Одобрени операции: {{count}}. {{label}}"
+    "batchDetail": "Одобрени операции: {{count}}. {{label}}",
+    "batchAppCount_one": "Засяга {{count}} приложение",
+    "batchAppCount_other": "Засяга {{count}} приложения",
+    "batchWhatChanges": "Какво се променя",
+    "batchWhatChangesBody": "Всеки ключ се предоставя на показаното ново измерване, за да може приложението му да го чете след промяната. Всяка политика влиза в сила, както е показано.",
+    "batchNameUnconfirmed": "Името не е потвърдено"
   },
   "update": {
     "requiredTitle": "Необходима е актуализация",

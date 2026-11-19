@@ -1403,7 +1403,14 @@
     "batchDoneBody": "Operacije se lahko zdaj nadaljujejo.",
     "batchWaitingTitle": "Seznam operacij čaka",
     "batchWaitingHint": "Preglejte seznam, preden poteče",
-    "batchDetail": "Odobrene operacije: {{count}}. {{label}}"
+    "batchDetail": "Odobrene operacije: {{count}}. {{label}}",
+    "batchAppCount_one": "Vpliva na {{count}} aplikacijo",
+    "batchAppCount_two": "Vpliva na {{count}} aplikaciji",
+    "batchAppCount_few": "Vpliva na {{count}} aplikacije",
+    "batchAppCount_other": "Vpliva na {{count}} aplikacij",
+    "batchWhatChanges": "Kaj se spremeni",
+    "batchWhatChangesBody": "Vsak ključ se sprosti za prikazano novo meritev, da ga lahko njegova aplikacija po spremembi bere. Vsak pravilnik začne veljati, kot je prikazano.",
+    "batchNameUnconfirmed": "Ime ni potrjeno"
   },
   "update": {
     "requiredTitle": "Potrebna je posodobitev",

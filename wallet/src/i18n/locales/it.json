@@ -1367,7 +1367,13 @@
     "batchDoneBody": "Ora le operazioni possono proseguire.",
     "batchWaitingTitle": "Un elenco di operazioni è in attesa",
     "batchWaitingHint": "Controlla l'elenco prima che scada",
-    "batchDetail": "Operazioni approvate: {{count}}. {{label}}"
+    "batchDetail": "Operazioni approvate: {{count}}. {{label}}",
+    "batchAppCount_one": "Riguarda {{count}} app",
+    "batchAppCount_many": "Riguarda {{count}} app",
+    "batchAppCount_other": "Riguarda {{count}} app",
+    "batchWhatChanges": "Cosa cambia",
+    "batchWhatChangesBody": "Ogni chiave viene rilasciata alla nuova misurazione indicata, così la sua app può leggerla dopo la modifica. Ogni policy entra in vigore come indicato.",
+    "batchNameUnconfirmed": "Nome non confermato"
   },
   "update": {
     "requiredTitle": "Aggiornamento necessario",

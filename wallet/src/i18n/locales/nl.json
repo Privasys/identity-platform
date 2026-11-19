@@ -1342,7 +1342,12 @@
     "batchDoneBody": "De bewerkingen kunnen nu doorgaan.",
     "batchWaitingTitle": "Er wacht een lijst met bewerkingen",
     "batchWaitingHint": "Bekijk de lijst voordat deze verloopt",
-    "batchDetail": "Goedgekeurde bewerkingen: {{count}}. {{label}}"
+    "batchDetail": "Goedgekeurde bewerkingen: {{count}}. {{label}}",
+    "batchAppCount_one": "Betreft {{count}} app",
+    "batchAppCount_other": "Betreft {{count}} apps",
+    "batchWhatChanges": "Wat er verandert",
+    "batchWhatChangesBody": "Elke sleutel wordt vrijgegeven voor de getoonde nieuwe meting, zodat de app hem na de wijziging kan lezen. Elk beleid gaat in zoals getoond.",
+    "batchNameUnconfirmed": "Naam niet bevestigd"
   },
   "update": {
     "requiredTitle": "Update vereist",

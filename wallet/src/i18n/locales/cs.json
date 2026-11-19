@@ -1367,7 +1367,14 @@
     "batchDoneBody": "Operace teď mohou pokračovat.",
     "batchWaitingTitle": "Čeká seznam operací",
     "batchWaitingHint": "Zkontrolujte seznam, než vyprší",
-    "batchDetail": "Schválené operace: {{count}}. {{label}}"
+    "batchDetail": "Schválené operace: {{count}}. {{label}}",
+    "batchAppCount_one": "Týká se {{count}} aplikace",
+    "batchAppCount_few": "Týká se {{count}} aplikací",
+    "batchAppCount_many": "Týká se {{count}} aplikace",
+    "batchAppCount_other": "Týká se {{count}} aplikací",
+    "batchWhatChanges": "Co se změní",
+    "batchWhatChangesBody": "Každý klíč se uvolní pro zobrazené nové měření, aby jej jeho aplikace mohla po změně číst. Každá zásada začne platit, jak je uvedeno.",
+    "batchNameUnconfirmed": "Název není potvrzen"
   },
   "update": {
     "requiredTitle": "Vyžadována aktualizace",

@@ -1378,7 +1378,14 @@
     "batchDoneBody": "Dabar operacijos gali būti tęsiamos.",
     "batchWaitingTitle": "Laukia operacijų sąrašas",
     "batchWaitingHint": "Peržiūrėkite sąrašą, kol jis nepasibaigė",
-    "batchDetail": "Patvirtintos operacijos: {{count}}. {{label}}"
+    "batchDetail": "Patvirtintos operacijos: {{count}}. {{label}}",
+    "batchAppCount_one": "Paveikia {{count}} programėlę",
+    "batchAppCount_few": "Paveikia {{count}} programėles",
+    "batchAppCount_many": "Paveikia {{count}} programėlės",
+    "batchAppCount_other": "Paveikia {{count}} programėlių",
+    "batchWhatChanges": "Kas keičiasi",
+    "batchWhatChangesBody": "Kiekvienas raktas atleidžiamas parodytam naujam matavimui, kad jo programėlė galėtų jį skaityti po pakeitimo. Kiekviena politika įsigalioja, kaip parodyta.",
+    "batchNameUnconfirmed": "Pavadinimas nepatvirtintas"
   },
   "update": {
     "requiredTitle": "Būtinas naujinimas",

@@ -28,6 +28,7 @@ import {
     Alert,
     Pressable,
     ScrollView,
+    StyleSheet,
     View as RNView,
     type NativeScrollEvent,
     type NativeSyntheticEvent,
@@ -47,11 +48,12 @@ import {
 } from '@/services/vault-approval-api';
 import {
     describeVaultHandle,
+    groupVaultBatch,
     reachedEndOfList,
     vaultBatchRouteName,
+    type VaultBatchGroup,
     type VaultBatchKeyKind,
     type VerifiedVaultBatch,
-    type VerifiedVaultBatchEntry,
 } from '@/services/vault-approval-batch';
 import { notify } from '@/stores/notice';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
@@ -87,7 +89,9 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
     const forgetBatch = useVaultApprovalsStore((s) => s.forgetBatch);
 
     const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
-    const [names, setNames] = useState<Record<string, string>>({});
+    // An app's name by its id: a string once the control plane confirms it,
+    // null when it could not, absent while asking.
+    const [names, setNames] = useState<Record<string, string | null>>({});
     const [readToEnd, setReadToEnd] = useState(false);
     const [busy, setBusy] = useState(false);
     const [now, setNow] = useState(() => Date.now());
@@ -121,9 +125,11 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
         let cancelled = false;
         const ids = new Set(batch.entries.map((e) => describeVaultHandle(e.handle).appId).filter(Boolean));
         for (const id of ids as Set<string>) {
-            void lookupVaultBatchAppName(id).then((name) => {
-                if (!cancelled && name) setNames((prev) => ({ ...prev, [id]: name }));
-            });
+            void lookupVaultBatchAppName(id)
+                .catch(() => null)
+                .then((name) => {
+                    if (!cancelled) setNames((prev) => ({ ...prev, [id]: name || null }));
+                });
         }
         return () => {
             cancelled = true;
@@ -242,22 +248,34 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
         }
 
         const { label, entries, exp } = phase.batch;
+        const groups = groupVaultBatch(entries);
+        const apps = groups.filter((g) => g.subject === 'app').length;
         const left = Math.max(0, Math.round(exp - now / 1000));
         const expired = left === 0;
-        const canApprove = readToEnd && !expired && !busy;
+        // Not while a name is still being looked up: what is approved is shown
+        // in full first. A name that could not be confirmed is flagged instead.
+        const named = groups.every((g) => g.subject !== 'app' || !g.id || g.id in names);
+        const canApprove = readToEnd && named && !expired && !busy;
         return (
             <>
-                <Text style={styles.fromText}>{t('vaultApprovals.batchTitle', { count: entries.length })}</Text>
+                <RNView style={styles.from}>
+                    <Text style={styles.fromText}>{t('vaultApprovals.batchTitle', { count: entries.length })}</Text>
+                    {apps > 0 ? <Text style={styles.meta}>{t('vaultApprovals.batchAppCount', { count: apps })}</Text> : null}
+                </RNView>
 
                 <RNView style={[styles.card, expired && styles.cardDimmed]} testID="vault-batch-card">
                     <RNView style={styles.line}>
                         <Text style={styles.lineLabel}>{t('vaultApprovals.batchLabelCaption')}</Text>
                         <Text style={styles.lineValue}>{label}</Text>
                     </RNView>
+                    <RNView style={styles.line}>
+                        <Text style={styles.lineLabel}>{t('vaultApprovals.batchWhatChanges')}</Text>
+                        <Text style={styles.meta}>{t('vaultApprovals.batchWhatChangesBody')}</Text>
+                    </RNView>
                     <RNView style={styles.divider} />
-                    <RNView style={styles.lines}>
-                        {entries.map((entry) => (
-                            <EntryLine key={`${entry.operation} ${entry.handle}`} entry={entry} names={names} styles={styles} />
+                    <RNView style={extra.groups}>
+                        {groups.map((group) => (
+                            <GroupBlock key={group.key} group={group} names={names} styles={styles} />
                         ))}
                     </RNView>
                     <RNView style={styles.divider} />
@@ -331,33 +349,59 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
     );
 }
 
-/** One entry: the kind of key over the app (or host) it belongs to, and the
- *  id and digest the signature binds, so the name never stands alone. */
-function EntryLine({
-    entry,
+/**
+ * One app (or the host) and what the approval changes for it. The name is the
+ * control plane's, found by the id inside the signed handle; the id stays
+ * beside it, and a name that could not be confirmed says so rather than
+ * standing in for one. Each line keeps the digest the signature binds.
+ */
+function GroupBlock({
+    group,
     names,
     styles,
 }: {
-    entry: VerifiedVaultBatchEntry;
-    names: Record<string, string>;
+    group: VaultBatchGroup;
+    names: Record<string, string | null>;
     styles: ReturnType<typeof taskStyles>;
 }) {
     const { t } = useTranslation();
-    const subject = describeVaultHandle(entry.handle);
-    const id = subject.appId ?? subject.enclaveId;
+    const p = usePalette();
+    const looked = group.subject === 'app' && group.id ? names[group.id] : undefined;
+    const unconfirmed = group.subject === 'app' && looked === null;
     const name =
-        subject.kind === 'host'
+        group.subject === 'host'
             ? t('vaultApprovals.batchHostSubject')
-            : subject.appId
-              ? (names[subject.appId] ?? t('vaultApprovals.batchUnknownApp'))
-              : entry.handle;
-    const digestLabel = subject.kind === 'policy' ? t('vaultApprovals.policyDocument') : t('vaultApprovals.newMeasurement');
+            : group.subject === 'other'
+              ? group.entries[0].handle
+              : unconfirmed
+                ? t('vaultApprovals.batchNameUnconfirmed')
+                : (looked ?? '…');
     return (
-        <RNView style={styles.line} testID="vault-batch-entry">
-            <Text style={styles.lineLabel}>{t(KIND_KEY[subject.kind])}</Text>
-            <Text style={styles.lineValue}>{name}</Text>
-            {id ? <Text style={styles.meta}>{shortId(id)}</Text> : null}
-            <Text style={styles.meta}>{`${digestLabel} ${shortDigest(entry.measurementDigest)}`}</Text>
+        <RNView style={styles.line} testID="vault-batch-group">
+            <RNView style={extra.groupHead}>
+                {unconfirmed ? <Ionicons name="warning-outline" size={15} color={p.warnText} /> : null}
+                <Text style={[styles.lineValue, extra.groupName, unconfirmed && { color: p.warnText }]}>{name}</Text>
+                {group.id ? <Text style={styles.meta}>{shortId(group.id)}</Text> : null}
+            </RNView>
+            {group.entries.map((entry) => {
+                const kind = describeVaultHandle(entry.handle).kind;
+                const digestLabel =
+                    kind === 'policy' ? t('vaultApprovals.policyDocument') : t('vaultApprovals.newMeasurement');
+                return (
+                    <RNView key={`${entry.operation} ${entry.handle}`} style={extra.op} testID="vault-batch-entry">
+                        <Text style={styles.lineLabel}>{t(KIND_KEY[kind])}</Text>
+                        <Text style={styles.lineLabel}>{`${digestLabel} ${shortDigest(entry.measurementDigest)}`}</Text>
+                    </RNView>
+                );
+            })}
         </RNView>
     );
 }
+
+/** What this card has that the task styles do not: the app groups. */
+const extra = StyleSheet.create({
+    groups: { gap: 14 },
+    groupHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    groupName: { flex: 1, fontWeight: '600' },
+    op: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12 },
+});

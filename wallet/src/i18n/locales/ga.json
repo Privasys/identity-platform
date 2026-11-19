@@ -1428,7 +1428,15 @@
     "batchDoneBody": "Is féidir leis na hoibríochtaí leanúint ar aghaidh anois.",
     "batchWaitingTitle": "Tá liosta oibríochtaí ag feitheamh",
     "batchWaitingHint": "Athbhreithnigh an liosta sula rachaidh sé in éag",
-    "batchDetail": "Oibríochtaí faofa: {{count}}. {{label}}"
+    "batchDetail": "Oibríochtaí faofa: {{count}}. {{label}}",
+    "batchAppCount_one": "Bíonn tionchar aige ar {{count}} aip",
+    "batchAppCount_two": "Bíonn tionchar aige ar {{count}} aip",
+    "batchAppCount_few": "Bíonn tionchar aige ar {{count}} aip",
+    "batchAppCount_many": "Bíonn tionchar aige ar {{count}} n-aip",
+    "batchAppCount_other": "Bíonn tionchar aige ar {{count}} aip",
+    "batchWhatChanges": "Cad a athraíonn",
+    "batchWhatChangesBody": "Scaoiltear gach eochair chuig an tomhas nua a thaispeántar, ionas gur féidir lena aip í a léamh tar éis an athraithe. Tagann gach beartas i bhfeidhm mar a thaispeántar.",
+    "batchNameUnconfirmed": "Ainm gan deimhniú"
   },
   "update": {
     "requiredTitle": "Nuashonrú riachtanach",

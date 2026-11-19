@@ -1392,7 +1392,14 @@
     "batchDoneBody": "Operacje mogą teraz być kontynuowane.",
     "batchWaitingTitle": "Lista operacji oczekuje",
     "batchWaitingHint": "Przejrzyj listę, zanim wygaśnie",
-    "batchDetail": "Zatwierdzone operacje: {{count}}. {{label}}"
+    "batchDetail": "Zatwierdzone operacje: {{count}}. {{label}}",
+    "batchAppCount_one": "Dotyczy {{count}} aplikacji",
+    "batchAppCount_few": "Dotyczy {{count}} aplikacji",
+    "batchAppCount_many": "Dotyczy {{count}} aplikacji",
+    "batchAppCount_other": "Dotyczy {{count}} aplikacji",
+    "batchWhatChanges": "Co się zmienia",
+    "batchWhatChangesBody": "Każdy klucz zostaje udostępniony dla pokazanego nowego pomiaru, aby jego aplikacja mogła go odczytać po zmianie. Każda zasada wchodzi w życie tak, jak pokazano.",
+    "batchNameUnconfirmed": "Nazwa niepotwierdzona"
   },
   "update": {
     "requiredTitle": "Wymagana aktualizacja",

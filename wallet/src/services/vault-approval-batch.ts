@@ -285,6 +285,44 @@ export function describeVaultHandle(handle: string): VaultBatchSubject {
     return { kind: 'other' };
 }
 
+/** What one subject of a batch is: a host, an app, or a handle of a shape the
+ *  wallet does not know (shown in full, alone). */
+export interface VaultBatchGroup {
+    key: string;
+    subject: 'host' | 'app' | 'other';
+    /** The app id (hex) or, for a host, the enclave id. Absent for 'other'. */
+    id?: string;
+    entries: VerifiedVaultBatchEntry[];
+}
+
+/**
+ * The batch as the card shows it: one group per app it touches, so the holder
+ * sees which apps an approval affects and what changes for each. A host's own
+ * key comes first, since everything on it depends on that; then apps in the
+ * order the signed list first names them; then any handle the wallet cannot
+ * place. Every entry lands in exactly one group, in its signed order.
+ */
+export function groupVaultBatch(entries: readonly VerifiedVaultBatchEntry[]): VaultBatchGroup[] {
+    const groups = new Map<string, VaultBatchGroup>();
+    for (const entry of entries) {
+        const s = describeVaultHandle(entry.handle);
+        const [key, group]: [string, Omit<VaultBatchGroup, 'entries'>] =
+            s.kind === 'host' && s.enclaveId
+                ? [`host:${s.enclaveId}`, { key: `host:${s.enclaveId}`, subject: 'host', id: s.enclaveId }]
+                : s.appId
+                  ? [`app:${s.appId}`, { key: `app:${s.appId}`, subject: 'app', id: s.appId }]
+                  : [`other:${entry.handle}`, { key: `other:${entry.handle}`, subject: 'other' }];
+        const found = groups.get(key);
+        if (found) found.entries.push(entry);
+        else groups.set(key, { ...group, entries: [entry] });
+    }
+    const rank = { host: 0, app: 1, other: 2 } as const;
+    return [...groups.values()]
+        .map((g, i) => ({ g, i }))
+        .sort((a, b) => rank[a.g.subject] - rank[b.g.subject] || a.i - b.i)
+        .map(({ g }) => g);
+}
+
 /** The dashed form of an app id, as the control plane reports it. */
 export function dashedAppId(hex: string): string {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;

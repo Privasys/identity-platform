@@ -41,7 +41,8 @@ const TARGETS = {
     duo: { w: 2007, h: 2853, layout: 'portrait' },
     'play-phone': { w: 1080, h: 1920, layout: 'portrait' },
     'play-tablet': { w: 2560, h: 1600, layout: 'landscape' },
-    'fold-1x1': { w: 2160, h: 2160, layout: 'landscape' },
+    // Wide enough for the 6:5 unfolded screen to reach the bottom edge.
+    'fold-1x1': { w: 2160, h: 2160, layout: 'landscape', shot: 0.92 },
     'fold-4x3': { w: 2880, h: 2160, layout: 'landscape' },
     'fold-outer': { w: 1350, h: 2160, layout: 'portrait' },
     feature: { w: 1024, h: 500, layout: 'landscape' },
@@ -63,14 +64,14 @@ const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>'
  *  screenshot below it with rounded top corners, running off the bottom edge
  *  (portrait) or standing beside the headline (landscape). The focal point
  *  stays in the centre of the canvas. */
-function page({ w, h, layout }, shotUrl, headline, fontUrl) {
+function page({ w, h, layout, shot }, shotUrl, headline, fontUrl) {
     // Landscape canvases use the same headline-over-screenshot layout: a
     // headline in a side column wrapped into four short lines.
     const portrait = true;
     const wide = layout === 'landscape';
     const pad = Math.round(w * (wide ? 0.04 : 0.07));
     const titleSize = Math.round(wide ? h * 0.068 : w * 0.074);
-    const shotWidth = Math.round(w * (wide ? 0.78 : 0.8));
+    const shotWidth = Math.round(w * (shot ?? (wide ? 0.78 : 0.8)));
     const radius = Math.round(shotWidth * 0.055);
     return `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face { font-family: Inter; src: url("${fontUrl}") format("truetype"); font-weight: 100 900; }
@@ -93,7 +94,9 @@ h1 {
   overflow: hidden;
   ${portrait ? '' : `align-self: center; margin-right: ${pad}px; max-height: ${h - pad * 2}px;`}
 }
-.shot img { display: block; width: 100%; ${portrait ? 'height: 100%; object-fit: cover; object-position: top;' : 'height: auto;'} }
+.shot { background: #F8FAFB; }
+/* Full width always: a screenshot may run off the bottom, never off a side. */
+.shot img { display: block; width: 100%; height: auto; }
 </style></head><body><h1>${esc(headline)}</h1><div class="shot"><img src="${shotUrl}"></div></body></html>`;
 }
 

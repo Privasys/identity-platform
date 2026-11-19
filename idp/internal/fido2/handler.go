@@ -90,6 +90,7 @@ type Handler struct {
 	walletSessions *walletSessionStore
 	vaultResults   *vaultResultStore
 	vaultPending   *vaultPendingStore
+	vaultBatches   *vaultBatchStore
 	attrPending    *attrPendingStore
 	// subjectFor names the subject a client sees for an account, so the
 	// wallet can put it in the voucher the enclave asserts.
@@ -232,6 +233,7 @@ func NewHandler(cfg Config) (*Handler, error) {
 		walletSessions: newWalletSessionStore(),
 		vaultResults:   newVaultResultStore(),
 		vaultPending:   newVaultPendingStore(),
+		vaultBatches:   newVaultBatchStore(),
 		attrPending:    newAttrPendingStore(),
 	}, nil
 }
@@ -269,6 +271,9 @@ type challengeEntry struct {
 	// (the vault promote-step-up design). On /complete the handler issues an operation-bound
 	// access token from these values instead of a session token.
 	vaultApproval *vaultApprovalMeta
+	// vaultBatch is set when this challenge is a batch of vault operations
+	// (vault_approval_batch.go). Only the batch /complete accepts it.
+	vaultBatch *vaultBatchMeta
 }
 
 // vaultApprovalMeta carries the operation-binding values fixed at begin time so
@@ -519,7 +524,7 @@ func (h *Handler) CompleteRegistration(
 		}
 
 		entry, ok := h.challenges.pop(challenge)
-		if !ok {
+		if !ok || entry.vaultBatch != nil {
 			errorJSON(w, http.StatusBadRequest, "challenge expired or not found")
 			return
 		}
@@ -813,7 +818,7 @@ func (h *Handler) CompleteAuthentication(
 		}
 
 		entry, ok := h.challenges.pop(challenge)
-		if !ok {
+		if !ok || entry.vaultBatch != nil {
 			errorJSON(w, http.StatusBadRequest, "challenge expired or not found")
 			return
 		}

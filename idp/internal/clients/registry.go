@@ -61,6 +61,10 @@ type Client struct {
 	// beside the origins of its redirect URIs. A sign-in in the frame has no
 	// redirect, so the page it was embedded in is what ties it to the client.
 	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+	// AppOrigins is the page origins of the attested apps this client stands
+	// for, as the control plane hosting each app reports them. They follow
+	// the app: a new hostname or custom domain needs no change to the client.
+	AppOrigins []string `json:"app_origins,omitempty"`
 }
 
 // NormaliseOrigin reduces a URL to its origin, lowercase. It returns "" for
@@ -90,7 +94,7 @@ func (c *Client) AcceptsOrigin(origin string) bool {
 	if want == "" {
 		return false
 	}
-	for _, list := range [][]string{c.AllowedOrigins, c.RedirectURIs} {
+	for _, list := range [][]string{c.AllowedOrigins, c.AppOrigins, c.RedirectURIs} {
 		for _, u := range list {
 			if NormaliseOrigin(u) == want {
 				return true
@@ -122,12 +126,12 @@ func NewRegistry(db *store.DB) *Registry {
 
 // Get retrieves a client by ID.
 func (reg *Registry) Get(clientID string) (*Client, error) {
-	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID, sector, socialJSON, originsJSON string
+	var name, secretHash, redirectURIsJSON, requiredAttrsJSON, billingAccountID, rpID, sector, socialJSON, originsJSON, appIDs string
 	var billableRP, platform int
 	err := reg.db.QueryRow(
-		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id, sector, platform, social_providers, allowed_origins FROM clients WHERE client_id = ?",
+		"SELECT client_name, client_secret, redirect_uris, required_attributes, billable_rp, billing_account_id, rp_id, sector, platform, social_providers, allowed_origins, app_ids FROM clients WHERE client_id = ?",
 		clientID,
-	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID, &sector, &platform, &socialJSON, &originsJSON)
+	).Scan(&name, &secretHash, &redirectURIsJSON, &requiredAttrsJSON, &billableRP, &billingAccountID, &rpID, &sector, &platform, &socialJSON, &originsJSON, &appIDs)
 	if err != nil {
 		return nil, fmt.Errorf("client not found: %w", err)
 	}
@@ -144,6 +148,11 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 	var origins []string
 	json.Unmarshal([]byte(originsJSON), &origins)
 
+	var appOrigins []string
+	for _, id := range strings.Split(appIDs, ",") {
+		appOrigins = append(appOrigins, reg.AppOriginsOf(id)...)
+	}
+
 	return &Client{
 		ClientID:           clientID,
 		ClientName:         name,
@@ -157,6 +166,7 @@ func (reg *Registry) Get(clientID string) (*Client, error) {
 		Platform:           platform != 0,
 		SocialProviders:    social,
 		AllowedOrigins:     origins,
+		AppOrigins:         appOrigins,
 	}, nil
 }
 
@@ -416,6 +426,95 @@ func (reg *Registry) SetAllowedOrigins(clientID string, origins []string) error 
 		return fmt.Errorf("unknown client %q", clientID)
 	}
 	return nil
+}
+
+// maxAppOrigins bounds what one app may be served on: its platform name and
+// a handful of custom domains.
+const maxAppOrigins = 32
+
+// AppOriginsOf returns the page origins an attested app is served on, as its
+// control plane last reported them.
+func (reg *Registry) AppOriginsOf(appID string) []string {
+	id := NormaliseAppID(appID)
+	if id == "" {
+		return nil
+	}
+	var raw string
+	_ = reg.db.QueryRow("SELECT origins FROM app_origins WHERE app_id = ?", id).Scan(&raw)
+	var out []string
+	_ = json.Unmarshal([]byte(raw), &out)
+	return out
+}
+
+// SetAppOrigins replaces the page origins an attested app is served on. An
+// empty list forgets the app.
+func (reg *Registry) SetAppOrigins(appID string, origins []string) ([]string, error) {
+	id := NormaliseAppID(appID)
+	if id == "" {
+		return nil, fmt.Errorf("app id %q is not 32 hex characters", appID)
+	}
+	if len(origins) > maxAppOrigins {
+		return nil, fmt.Errorf("an app has at most %d origins", maxAppOrigins)
+	}
+	clean := []string{}
+	seen := map[string]bool{}
+	for _, o := range origins {
+		n := NormaliseOrigin(o)
+		if n == "" {
+			return nil, fmt.Errorf("origin %q must be an https origin", o)
+		}
+		if !seen[n] {
+			seen[n] = true
+			clean = append(clean, n)
+		}
+	}
+	if len(clean) == 0 {
+		_, err := reg.db.Exec("DELETE FROM app_origins WHERE app_id = ?", id)
+		return clean, err
+	}
+	raw, err := json.Marshal(clean)
+	if err != nil {
+		return nil, err
+	}
+	_, err = reg.db.Exec(
+		`INSERT INTO app_origins (app_id, origins, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+		 ON CONFLICT(app_id) DO UPDATE SET origins = excluded.origins, updated_at = CURRENT_TIMESTAMP`,
+		id, string(raw))
+	return clean, err
+}
+
+// HandleSetAppOrigins records where an attested app is served. The control
+// plane that hosts the app calls it when the app's hostnames change, so the
+// client standing for the app accepts sign-ins from them with no list kept
+// by hand.
+//
+//	POST /apps/{app_id}/origins  {"origins": ["https://app.example"]}   (admin token)
+func HandleSetAppOrigins(reg *Registry, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminToken == "" || r.Header.Get("Authorization") != "Bearer "+adminToken {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		var req struct {
+			Origins []string `json:"origins"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 64*1024)).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
+			return
+		}
+		appID := r.PathValue("app_id")
+		origins, err := reg.SetAppOrigins(appID, req.Origins)
+		if err != nil {
+			http.Error(w, `{"error":"`+strings.ReplaceAll(err.Error(), `"`, "'")+`"}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"app_id":    NormaliseAppID(appID),
+			"origins":   origins,
+			"client_id": reg.ClientOfApp(appID),
+		})
+	}
 }
 
 // HandleSetAllowedOrigins sets the extra page origins of a client.

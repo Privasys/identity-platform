@@ -217,6 +217,83 @@ func TestSocialProviders_SetAndRead(t *testing.T) {
 	}
 }
 
+// A client accepts the pages of the apps it stands for, and of no other app.
+func TestAppOrigins(t *testing.T) {
+	reg := newTestRegistry(t)
+	c, err := reg.Register("app", []string{"https://rp.example/cb"}, "", []string{"email"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := reg.Register("other", []string{"https://other.example/cb"}, "", []string{"email"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const app = "590ebdc3-1b63-401f-bbb8-22d5f3886c5e"
+	const stranger = "11111111-2222-3333-4444-555555555555"
+	accepts := func(clientID, origin string) bool {
+		t.Helper()
+		got, err := reg.Get(clientID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got.AcceptsOrigin(origin)
+	}
+
+	// Reported before the client names the app: nothing follows yet.
+	if _, err := reg.SetAppOrigins(app, []string{"https://App.apps.example/", "https://custom.example", "https://custom.example"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := reg.AppOriginsOf(app); len(got) != 2 || got[0] != "https://app.apps.example" || got[1] != "https://custom.example" {
+		t.Fatalf("origins are normalised and listed once, got %v", got)
+	}
+	if accepts(c.ClientID, "https://custom.example") {
+		t.Fatal("an app's origin was accepted by a client that does not stand for it")
+	}
+	if _, err := reg.SetAppOrigins(stranger, []string{"https://stranger.example"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := reg.SetAppIDs(c.ClientID, []string{app}); err != nil {
+		t.Fatal(err)
+	}
+	for origin, want := range map[string]bool{
+		"https://app.apps.example": true,
+		"https://custom.example":   true,
+		"https://rp.example":       true,
+		"https://stranger.example": false,
+	} {
+		if got := accepts(c.ClientID, origin); got != want {
+			t.Errorf("%q: %v, want %v", origin, got, want)
+		}
+	}
+	if accepts(other.ClientID, "https://custom.example") {
+		t.Fatal("another client accepted the app's origin")
+	}
+
+	// The list is replaced, so a removed domain stops being accepted.
+	if _, err := reg.SetAppOrigins(app, []string{"https://app.apps.example"}); err != nil {
+		t.Fatal(err)
+	}
+	if accepts(c.ClientID, "https://custom.example") {
+		t.Fatal("a removed origin is still accepted")
+	}
+	if _, err := reg.SetAppOrigins(app, nil); err != nil {
+		t.Fatal(err)
+	}
+	if accepts(c.ClientID, "https://app.apps.example") || reg.AppOriginsOf(app) != nil {
+		t.Fatal("an empty list must forget the app")
+	}
+
+	for _, bad := range [][]string{{"http://plain.example"}, {"not a url"}, make([]string, maxAppOrigins+1)} {
+		if _, err := reg.SetAppOrigins(app, bad); err == nil {
+			t.Errorf("%v: accepted", bad)
+		}
+	}
+	if _, err := reg.SetAppOrigins("not-an-app", []string{"https://a.example"}); err == nil {
+		t.Fatal("a malformed app id was accepted")
+	}
+}
+
 func TestAcceptsOrigin(t *testing.T) {
 	c := &Client{
 		RedirectURIs:   []string{"https://App.example/callback", "http://localhost:4200/cb", "http://evil.example/cb"},

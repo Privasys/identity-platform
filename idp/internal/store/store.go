@@ -54,6 +54,15 @@ func migrate(db *sql.DB) error {
 			created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
+		-- The page origins an attested app is served on (JSON list), as the
+		-- control plane that hosts the app reports them. A client accepts a
+		-- sign-in from the origins of the apps it stands for.
+		CREATE TABLE IF NOT EXISTS app_origins (
+			app_id     TEXT PRIMARY KEY,  -- 32 lowercase hex
+			origins    TEXT NOT NULL DEFAULT '[]',
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
 		-- FIDO2 users.
 		CREATE TABLE IF NOT EXISTS users (
 			user_id    TEXT PRIMARY KEY,  -- opaque ID (UUID)

@@ -98,6 +98,15 @@ type vaultBatchMeta struct {
 	entries []vaultBatchEntry
 }
 
+// vaultBatchHiddenRune reports a character that changes how text reads without
+// being seen: controls, format and bidirectional marks, and line separators.
+// The wallet refuses the same set on its card; refusing it here tells the
+// initiator why, instead of leaving the owner with a card that will not open.
+func vaultBatchHiddenRune(r rune) bool {
+	return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) ||
+		r == 0x180e || r == 0x2028 || r == 0x2029 || (r >= 0x2060 && r <= 0x206f)
+}
+
 // validateVaultBatch checks a requested batch and returns its entries in
 // canonical order. Only promotes and app policies may be batched: an export, a
 // key-policy update or a recovery releases or changes control of a key, and
@@ -110,8 +119,8 @@ func validateVaultBatch(label string, entries []vaultBatchEntry) ([]vaultBatchEn
 		return nil, fmt.Errorf("label must be valid text of at most %d characters", vaultBatchMaxLabelRunes)
 	}
 	for _, r := range label {
-		if unicode.IsControl(r) {
-			return nil, errors.New("label must not contain control characters")
+		if vaultBatchHiddenRune(r) {
+			return nil, errors.New("label must not contain control, format or bidirectional characters")
 		}
 	}
 	if len(entries) == 0 || len(entries) > vaultBatchMaxEntries {
@@ -125,9 +134,12 @@ func validateVaultBatch(label string, entries []vaultBatchEntry) ([]vaultBatchEn
 		if e.Handle == "" || len(e.Handle) > vaultBatchMaxHandleBytes {
 			return nil, fmt.Errorf("entry %d: handle required, at most %d bytes", i, vaultBatchMaxHandleBytes)
 		}
+		if !utf8.ValidString(e.Handle) {
+			return nil, fmt.Errorf("entry %d: handle must be valid text", i)
+		}
 		for _, r := range e.Handle {
-			if r <= ' ' || r == 0x7f {
-				return nil, fmt.Errorf("entry %d: handle must not contain spaces or control characters", i)
+			if unicode.IsSpace(r) || vaultBatchHiddenRune(r) {
+				return nil, fmt.Errorf("entry %d: handle must not contain spaces, control, format or bidirectional characters", i)
 			}
 		}
 		switch e.Operation {

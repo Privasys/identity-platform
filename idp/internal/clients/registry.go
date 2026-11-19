@@ -488,7 +488,7 @@ func (reg *Registry) SetAppOrigins(appID string, origins []string) ([]string, er
 // client standing for the app accepts sign-ins from them with no list kept
 // by hand.
 //
-//	POST /apps/{app_id}/origins  {"origins": ["https://app.example"]}   (admin token)
+//	POST /admin/apps/{app_id}/origins  {"origins": ["https://app.example"]}   (admin token)
 func HandleSetAppOrigins(reg *Registry, adminToken string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if adminToken == "" || r.Header.Get("Authorization") != "Bearer "+adminToken {

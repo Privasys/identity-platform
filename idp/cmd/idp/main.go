@@ -315,7 +315,7 @@ func main() {
 	mux.HandleFunc("POST /clients/{id}/origins", clients.HandleSetAllowedOrigins(clientReg, cfg.AdminToken))
 	// Where an attested app is served, reported by its control plane: the
 	// client standing for the app accepts sign-ins from those pages.
-	mux.HandleFunc("POST /apps/{app_id}/origins", clients.HandleSetAppOrigins(clientReg, cfg.AdminToken))
+	mux.HandleFunc("POST /admin/apps/{app_id}/origins", clients.HandleSetAppOrigins(clientReg, cfg.AdminToken))
 
 	// Wallet Instance Attestation: the wallet-provider JWKS (verifiers fetch it /
 	// have it provisioned), a fresh challenge, and enrolment → a holder-bound WIA.

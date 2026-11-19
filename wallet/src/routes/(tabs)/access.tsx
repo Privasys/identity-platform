@@ -62,6 +62,8 @@ export default function AccessScreen() {
     const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
     const consentRecordCount = useConsentStore((s) => s.records.length);
     const pendingApprovals = useVaultApprovalsStore((s) => s.pending);
+    const pendingBatches = useVaultApprovalsStore((s) => s.batchIds.length);
+    const approvalsWaiting = pendingApprovals.length + pendingBatches;
     const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
     const asks = useCapabilityAsksStore((s) => s.asks);
     const refreshAsks = useCapabilityAsksStore((s) => s.refresh);
@@ -208,12 +210,12 @@ export default function AccessScreen() {
                     </Pressable>
                 )}
 
-                {pendingApprovals.length > 0 && (
+                {approvalsWaiting > 0 && (
                     <Pressable
                         style={styles.banner}
                         onPress={() => router.push('/vault-approvals')}
                         accessibilityLabel={t('home.pendingVaultApprovals', {
-                            count: pendingApprovals.length,
+                            count: approvalsWaiting,
                         })}
                     >
                         <RNView style={styles.bannerIcon}>
@@ -221,7 +223,7 @@ export default function AccessScreen() {
                         </RNView>
                         <RNView style={styles.bannerInfo}>
                             <Text style={styles.bannerTitle}>
-                                {t('home.pendingApprovals', { count: pendingApprovals.length })}
+                                {t('home.pendingApprovals', { count: approvalsWaiting })}
                             </Text>
                             <Text style={styles.bannerMeta}>{t('home.pendingApprovalsHint')}</Text>
                         </RNView>

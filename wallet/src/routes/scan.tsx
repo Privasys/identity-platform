@@ -127,6 +127,17 @@ export default function TabScanScreen() {
             // 1. Try raw JSON payload (backward-compatible)
             if (routePayload(result.data)) return;
 
+            // 2. One approval for a list of vault operations.
+            const vaultBatch =
+                /^privasys-wallet(?:-dev|-preview)?:\/\/vault-approvals\?(?:[^#]*&)?batch_id=([A-Za-z0-9_-]{43})(?:[&#]|$)/.exec(
+                    result.data,
+                );
+            if (vaultBatch) {
+                navigating.current = true;
+                router.push({ pathname: '/vault-approvals', params: { batch_id: vaultBatch[1], source: 'qr' } });
+                return;
+            }
+
             // 2. Vault approval: the QR the CLI and the IdP approval page show,
             //    privasys-wallet[-dev|-preview]://vault-approvals?vault_op=<cap>.
             //    Matched as text: "vault-approvals" is the URL host here, not

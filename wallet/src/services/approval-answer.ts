@@ -62,7 +62,7 @@ export function confirmApprovalSource(args: {
 
 /** A fresh biometric (or the phone's passcode where it has none), as vault
  *  approvals ask: the act is approved now, not by an unlock a minute ago. */
-async function freshBiometric(prompt: string, cancel: string): Promise<boolean> {
+export async function freshBiometric(prompt: string, cancel: string): Promise<boolean> {
     if (Platform.OS === 'ios') return NativeKeys.authenticateForSigning(prompt);
     const r = await LocalAuthentication.authenticateAsync({
         promptMessage: prompt,

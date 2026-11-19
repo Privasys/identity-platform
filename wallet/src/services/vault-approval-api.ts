@@ -19,8 +19,17 @@
  *  - POST /complete is authenticated by the assertion itself.
  */
 
+import { resolveApp } from './app-resolve';
 import { myDeviceTag } from './devices';
 import { signVaultAssertion } from './fido2';
+import {
+    dashedAppId,
+    isVaultBatchId,
+    verifyVaultBatch,
+    VaultBatchRefused,
+    type VaultBatchRefusal,
+    type VerifiedVaultBatch,
+} from './vault-approval-batch';
 import { useAuthStore, type Credential } from '../stores/auth';
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
@@ -110,7 +119,7 @@ export async function listVaultApprovals(
  * matching the request's allowCredentials against the on-device credential
  * store. Returns undefined when this device does not hold the owner credential.
  */
-export function resolveApprovalCredential(req: VaultApprovalRequest): Credential | undefined {
+export function resolveApprovalCredential(req: Pick<VaultApprovalRequest, 'options'>): Credential | undefined {
     const allowed = req.options.publicKey.allowCredentials ?? [];
     const { getCredentialById } = useAuthStore.getState();
     for (const c of allowed) {
@@ -130,7 +139,7 @@ export function resolveApprovalCredential(req: VaultApprovalRequest): Credential
  * was empty. Short prefixes only: credential ids are public identifiers, but
  * there is no reason to fill the screen.
  */
-export function describeApprovalMismatch(req: VaultApprovalRequest): string {
+export function describeApprovalMismatch(req: Pick<VaultApprovalRequest, 'options'>): string {
     const short = (s: string) => (s && s.length > 12 ? `${s.slice(0, 10)}…` : s || '(empty)');
     const requested = (req.options.publicKey.allowCredentials ?? []).map((c) => short(c.id));
     const { credentials, privasysId } = useAuthStore.getState();
@@ -170,6 +179,64 @@ export async function approveVaultApproval(req: VaultApprovalRequest, credential
     if (!res.ok) {
         throw new Error(`approve failed (${res.status}): ${await res.text()}`);
     }
+}
+
+export type VaultBatchFetch =
+    | { kind: 'ok'; batch: VerifiedVaultBatch }
+    /** Approved, replaced by a newer batch, or expired. */
+    | { kind: 'gone' }
+    /** The list does not hash to what the passkey would sign. */
+    | { kind: 'refused'; reason: VaultBatchRefusal };
+
+/**
+ * Fetch a batch by its capability and verify it. Only a list that hashes to the
+ * batch id comes back as `ok`. Throws when the identity provider cannot be reached.
+ */
+export async function fetchVaultBatch(batchId: string): Promise<VaultBatchFetch> {
+    if (!isVaultBatchId(batchId)) return { kind: 'refused', reason: 'binding' };
+    const res = await fetch(
+        `${IDP_BASE}/fido2/vault-approval/batch/pending?challenge=${encodeURIComponent(batchId)}`,
+    );
+    if (res.status === 404) return { kind: 'gone' };
+    if (!res.ok) throw new Error(`fetch vault batch failed (${res.status})`);
+    try {
+        return { kind: 'ok', batch: verifyVaultBatch(batchId, await res.json()) };
+    } catch (e) {
+        if (e instanceof VaultBatchRefused) return { kind: 'refused', reason: e.reason };
+        return { kind: 'refused', reason: 'malformed' };
+    }
+}
+
+/**
+ * Approve a verified batch: one assertion over the list's own hash. The answer
+ * carries no tokens: they go to the owner who began the batch.
+ */
+export async function approveVaultBatch(batch: VerifiedVaultBatch, credential: Credential): Promise<void> {
+    const { publicKey } = batch.options;
+    const assertion = await signVaultAssertion(IDP_ORIGIN, credential.keyAlias, credential.credentialId, {
+        ...publicKey,
+        rpId: publicKey.rpId || credential.serverRpId,
+    });
+    const res = await fetch(
+        `${IDP_BASE}/fido2/vault-approval/batch/complete?challenge=${encodeURIComponent(batch.batchId)}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(assertion) },
+    );
+    if (!res.ok) throw new Error(`approve failed (${res.status}): ${await res.text()}`);
+    const done = (await res.json()) as { status?: string; count?: number };
+    if (done.status !== 'approved' || done.count !== batch.entries.length) {
+        throw new Error('approve failed: the answer does not cover the whole list');
+    }
+}
+
+/**
+ * An app's name, looked up by the id in its signed handle. Null when the control
+ * plane does not know the app, or answers for a different one.
+ */
+export async function lookupVaultBatchAppName(appIdHex: string): Promise<string | null> {
+    const id = dashedAppId(appIdHex);
+    const app = await resolveApp(id).catch(() => null);
+    if (!app || app.app_id?.toLowerCase() !== id) return null;
+    return app.display_name || app.name || null;
 }
 
 /**

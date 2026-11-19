@@ -92,7 +92,7 @@ export function useSidebarLayout(): boolean {
 
 /** Everything waiting on a decision: the Access badge, on the tab bar and here. */
 export function useWaitingCount(): number {
-    const pending = useVaultApprovalsStore((s) => s.pending.length);
+    const pending = useVaultApprovalsStore((s) => s.pending.length + s.batchIds.length);
     const asks = useCapabilityAsksStore((s) => s.asks.length);
     const guardian = useGuardianRequestsStore(waitingCount);
     const messages = useAppMessagesStore((s) => s.messages.length);

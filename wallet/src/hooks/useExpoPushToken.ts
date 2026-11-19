@@ -18,6 +18,7 @@ import { dismissAppMessage, readMessage, useAppMessagesStore } from '../stores/a
 import { useDriveNotificationsStore } from '../stores/drive-notifications';
 import { useGuardianRequestsStore } from '../stores/guardian-requests';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
+import { vaultBatchRouteName } from '../services/vault-approval-batch';
 import { isRouteActive } from '../utils/active-route';
 
 let _notificationsSetup = false;
@@ -40,6 +41,7 @@ async function getNotifications() {
                     data?.type === 'auth-request' ||
                     data?.type === 'voucher-request' ||
                     data?.type === 'vault-approval' ||
+                    data?.type === 'vault-approval-batch' ||
                     data?.type === 'attribute-approval' ||
                     data?.type === 'capability-request' ||
                     data?.type === 'recovery-request';
@@ -306,6 +308,17 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         }
         return;
     }
+    if (data?.type === 'vault-approval-batch') {
+        // One approval for a list. The card fetches the list and verifies it
+        // against this id before showing a row.
+        const batchId = String(data.batch_id ?? '');
+        if (!batchId) return;
+        useVaultApprovalsStore.getState().rememberBatch(batchId);
+        if (!isRouteActive(vaultBatchRouteName(batchId))) {
+            router.push({ pathname: '/vault-approvals', params: { batch_id: batchId, source: 'push' } });
+        }
+        return;
+    }
     if (data?.type === 'vault-approval') {
         const vaultOp = String(data.vault_op ?? '');
         // Remember the capability so the Home banner + the screen list it even
@@ -405,6 +418,9 @@ async function sweepPresentedApprovals(): Promise<void> {
             const data = n.request.content.data as Record<string, unknown> | undefined;
             if (data?.type === 'vault-approval' && data.vault_op) {
                 store.remember(String(data.vault_op));
+            }
+            if (data?.type === 'vault-approval-batch' && data.batch_id) {
+                store.rememberBatch(String(data.batch_id));
             }
             // A guardian's recovery request: Access shows it as waiting even
             // when the wallet was opened from its icon rather than the push.

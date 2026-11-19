@@ -36,6 +36,7 @@ import { create } from 'zustand';
 
 import {
     fetchVaultApproval,
+    fetchVaultBatch,
     listVaultApprovals,
     type VaultApprovalRequest,
 } from '@/services/vault-approval-api';
@@ -61,12 +62,45 @@ interface VaultApprovalsState {
      * arrived; `refresh()` alone can only ever re-check ops we already saw.
      */
     discover: () => Promise<void>;
+    /** Batches still open on the identity provider. Each card verifies its own
+     *  list when it opens; these ids only say that one is waiting. */
+    batchIds: string[];
+    rememberBatch: (batchId: string) => void;
+    forgetBatch: (batchId: string) => void;
+    /** Drop the batches the identity provider no longer holds. */
+    refreshBatches: () => Promise<void>;
 }
 
 export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => ({
     knownOps: [],
     pending: [],
     loading: false,
+    batchIds: [],
+
+    rememberBatch: (batchId) => {
+        if (!batchId || get().batchIds.includes(batchId)) return;
+        set((s) => ({ batchIds: [...s.batchIds, batchId] }));
+        // A notification left in the tray can name a batch that has closed.
+        void get().refreshBatches();
+    },
+
+    forgetBatch: (batchId) => {
+        set((s) => ({ batchIds: s.batchIds.filter((b) => b !== batchId) }));
+    },
+
+    refreshBatches: async () => {
+        const dead: string[] = [];
+        await Promise.all(
+            get().batchIds.map(async (id) => {
+                try {
+                    if ((await fetchVaultBatch(id)).kind === 'gone') dead.push(id);
+                } catch (e) {
+                    console.warn('[vault-approvals] batch fetch failed', e);
+                }
+            }),
+        );
+        if (dead.length) set((s) => ({ batchIds: s.batchIds.filter((b) => !dead.includes(b)) }));
+    },
 
     remember: (vaultOp) => {
         if (!vaultOp || get().knownOps.includes(vaultOp)) return;
@@ -82,10 +116,11 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
     },
 
     clearAll: () => {
-        set({ knownOps: [], pending: [], loading: false });
+        set({ knownOps: [], pending: [], loading: false, batchIds: [] });
     },
 
     refresh: async () => {
+        void get().refreshBatches();
         const ops = get().knownOps;
         if (ops.length === 0) {
             set({ pending: [], loading: false });

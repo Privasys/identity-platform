@@ -15,7 +15,7 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     StyleSheet,
@@ -32,6 +32,7 @@ import {
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { VaultBatchCard } from '@/components/VaultBatchCard';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
@@ -95,7 +96,13 @@ function formatRemaining(expiresAtSec: number, nowMs: number, t: TFunction): str
         : t('vaultApprovals.expiresInSeconds', { count: s });
 }
 
-export default function VaultApprovalsScreen() {
+/** One route, as the deep link names it: a batch id opens that list's card. */
+export default function VaultApprovalsRoute() {
+    const { batch_id: batchId } = useLocalSearchParams<{ batch_id?: string }>();
+    return batchId ? <VaultBatchCard key={String(batchId)} batchId={String(batchId)} /> : <VaultApprovalsScreen />;
+}
+
+function VaultApprovalsScreen() {
     // A list screen: while it is up, a fresh push has nothing to add beyond the
     // store update that precedes it, so the dispatcher skips the route push
     // rather than stacking another copy of this same view.
@@ -110,6 +117,7 @@ export default function VaultApprovalsScreen() {
     const discover = useVaultApprovalsStore((s) => s.discover);
     const remember = useVaultApprovalsStore((s) => s.remember);
     const forget = useVaultApprovalsStore((s) => s.forget);
+    const batchIds = useVaultApprovalsStore((s) => s.batchIds);
 
     const [refreshing, setRefreshing] = useState(false);
     const [approvingOp, setApprovingOp] = useState<string | null>(null);
@@ -242,9 +250,26 @@ export default function VaultApprovalsScreen() {
             >
                 <Text style={styles.subtitle}>{t('vaultApprovals.subtitle')}</Text>
 
+                {batchIds.map((batchId) => (
+                    <Pressable
+                        key={batchId}
+                        style={[styles.card, styles.batchRow]}
+                        onPress={() => router.push({ pathname: '/vault-approvals', params: { batch_id: batchId } })}
+                    >
+                        <RNView style={styles.cardIcon}>
+                            <Ionicons name="list" size={16} color={p.infoText} />
+                        </RNView>
+                        <RNView style={styles.batchRowText}>
+                            <Text style={styles.cardTitle}>{t('vaultApprovals.batchWaitingTitle')}</Text>
+                            <Text style={styles.label}>{t('vaultApprovals.batchWaitingHint')}</Text>
+                        </RNView>
+                        <Ionicons name="chevron-forward" size={18} color={p.infoText} />
+                    </Pressable>
+                ))}
+
                 {loading && pending.length === 0 ? (
                     <ActivityIndicator style={styles.spinner} color={p.green} />
-                ) : pending.length === 0 ? (
+                ) : pending.length === 0 && batchIds.length > 0 ? null : pending.length === 0 ? (
                     <RNView style={styles.emptyCard}>
                         <RNView style={styles.emptyIcon}>
                             <Ionicons name="checkmark-circle" size={30} color={p.green} />
@@ -447,6 +472,8 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         elevation: 2,
     },
     cardHighlighted: { borderWidth: 1, borderColor: p.green },
+    batchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    batchRowText: { flex: 1, gap: 2 },
     subject: { fontSize: 17, fontWeight: '700', color: p.textPrimary, marginBottom: 4 },
     plain: { fontSize: 13, lineHeight: 19, color: p.textSecondary, marginBottom: 12 },
     linkValueWrap: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },

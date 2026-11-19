@@ -412,6 +412,13 @@ func (h *Handler) VaultApprovalBatchBegin(iss *tokens.Issuer) http.HandlerFunc {
 	}
 }
 
+func vaultBatchPushBody(count int) string {
+	if count == 1 {
+		return "1 operation needs your approval"
+	}
+	return fmt.Sprintf("%d operations need your approval", count)
+}
+
 // pushVaultBatch nudges the owner's wallets. Only the routing type and the
 // capability travel through the push service.
 func (h *Handler) pushVaultBatch(sub, batchID string, count int) bool {
@@ -421,7 +428,7 @@ func (h *Handler) pushVaultBatch(sub, batchID string, count int) bool {
 			if err := push.Notify(context.Background(), h.db, sub, push.Message{
 				Token: token,
 				Title: "Vault approval",
-				Body:  fmt.Sprintf("%d operations need your approval", count),
+				Body:  vaultBatchPushBody(count),
 				Data:  map[string]string{"type": "vault-approval-batch", "batch_id": batchID},
 			}); err != nil {
 				log.Printf("fido2/vault-approval/batch: push send: %v", err)

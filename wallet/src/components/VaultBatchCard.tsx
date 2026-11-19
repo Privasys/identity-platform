@@ -163,6 +163,15 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
         else router.replace('/access');
     }, []);
 
+    // Declining hides the batch for good, tells the identity provider, and
+    // leaves: closing alone left it waiting on the Access screen.
+    const declineBatch = useVaultApprovalsStore((s) => s.declineBatch);
+    const decline = useCallback(() => {
+        declineBatch(batchId);
+        notify(t('appForm.sentAs.decline'));
+        leave();
+    }, [batchId, declineBatch, leave, t]);
+
     const approve = useCallback(async () => {
         if (!batch || busy) return;
         const credential = resolveApprovalCredential(batch);
@@ -305,10 +314,11 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
                             <Pressable
                                 style={[styles.declineButton, busy && styles.buttonIdle]}
                                 disabled={busy}
-                                onPress={leave}
+                                onPress={decline}
                                 accessibilityRole="button"
+                                testID="vault-batch-decline"
                             >
-                                <Text style={styles.declineButtonText}>{t('common.cancel')}</Text>
+                                <Text style={styles.declineButtonText}>{t('appForm.action.decline')}</Text>
                             </Pressable>
                             <Pressable
                                 style={[styles.affirmButton, !canApprove && !busy && styles.buttonIdle]}

@@ -32,6 +32,7 @@ import {
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { taskStyles } from '@/components/task-styles';
 import { VaultBatchCard } from '@/components/VaultBatchCard';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -43,6 +44,7 @@ import {
     resolveApprovalCredential,
     type VaultApprovalRequest,
 } from '@/services/vault-approval-api';
+import { notify } from '@/stores/notice';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 import { useActiveRoute } from '@/utils/active-route';
@@ -111,8 +113,10 @@ function VaultApprovalsScreen() {
     const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
+    const task = useMemo(() => taskStyles(p), [p]);
 
     const pending = useVaultApprovalsStore((s) => s.pending);
+    const decline = useVaultApprovalsStore((s) => s.decline);
     const loading = useVaultApprovalsStore((s) => s.loading);
     const discover = useVaultApprovalsStore((s) => s.discover);
     const remember = useVaultApprovalsStore((s) => s.remember);
@@ -410,20 +414,35 @@ function VaultApprovalsScreen() {
                                         <Text style={styles.mono}>{shortHex(s.measurement, t)}</Text>
                                     </RNView>
                                 ) : null}
-                                <Pressable
-                                    style={[styles.approveBtn, busy && styles.approveBtnDisabled]}
-                                    disabled={busy}
-                                    onPress={() => approve(req)}
-                                >
-                                    {busy ? (
-                                        <ActivityIndicator color={p.onGreen} />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="finger-print" size={18} color="#FFFFFF" />
-                                            <Text style={styles.approveText}>{t('attestation.approve')}</Text>
-                                        </>
-                                    )}
-                                </Pressable>
+                                <RNView style={[task.actions, styles.cardActions]}>
+                                    <Pressable
+                                        style={[task.declineButton, busy && task.buttonIdle]}
+                                        disabled={busy}
+                                        onPress={() => {
+                                            decline(req.vault_op);
+                                            notify(t('appForm.sentAs.decline'));
+                                        }}
+                                        accessibilityRole="button"
+                                        testID="vault-approval-decline"
+                                    >
+                                        <Text style={task.declineButtonText}>{t('appForm.action.decline')}</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={[task.affirmButton, styles.affirmRow, busy && task.buttonIdle]}
+                                        disabled={busy}
+                                        onPress={() => approve(req)}
+                                        accessibilityRole="button"
+                                    >
+                                        {busy ? (
+                                            <ActivityIndicator color={p.onGreen} />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="finger-print" size={18} color={p.onGreen} />
+                                                <Text style={task.affirmButtonText}>{t('attestation.approve')}</Text>
+                                            </>
+                                        )}
+                                    </Pressable>
+                                </RNView>
                             </RNView>
                         );
                     })
@@ -513,16 +532,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     summaryBox: { backgroundColor: p.infoBg, borderRadius: 10, padding: 12, marginBottom: 12, gap: 4 },
     summaryLabel: { fontSize: 12, fontWeight: '600', color: p.infoText },
     summaryText: { fontSize: 14, color: p.textPrimary, lineHeight: 20 },
-    approveBtn: {
-        flexDirection: 'row',
-        gap: 8,
-        backgroundColor: p.green,
-        borderRadius: 12,
-        paddingVertical: 13,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 8,
-    },
-    approveBtnDisabled: { opacity: 0.6 },
-    approveText: { color: p.onGreen, fontWeight: '700', fontSize: 15 },
+    cardActions: { marginTop: 8 },
+    affirmRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
 });

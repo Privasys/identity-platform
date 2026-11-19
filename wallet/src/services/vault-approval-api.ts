@@ -229,6 +229,25 @@ export async function approveVaultBatch(batch: VerifiedVaultBatch, credential: C
 }
 
 /**
+ * Tell the identity provider the holder declines, so the initiator learns at
+ * once rather than at the expiry. Best-effort: the capability is the authority,
+ * as for reading it, and an identity provider without the route (404) or out of
+ * reach changes nothing here, since the wallet has already hidden the request
+ * and the request expires on its own.
+ */
+async function declineVault(path: string, challenge: string): Promise<void> {
+    try {
+        const res = await fetch(`${IDP_BASE}${path}?challenge=${encodeURIComponent(challenge)}`, { method: 'POST' });
+        if (!res.ok && res.status !== 404) console.warn(`[vault-approvals] decline answered ${res.status}`);
+    } catch (e) {
+        console.warn('[vault-approvals] decline failed', e);
+    }
+}
+
+export const declineVaultApproval = (vaultOp: string) => declineVault('/fido2/vault-approval/decline', vaultOp);
+export const declineVaultBatch = (batchId: string) => declineVault('/fido2/vault-approval/batch/decline', batchId);
+
+/**
  * An app's name, looked up by the id in its signed handle. Null when the control
  * plane does not know the app, or answers for a different one.
  */

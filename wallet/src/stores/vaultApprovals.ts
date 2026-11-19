@@ -35,6 +35,8 @@
 import { create } from 'zustand';
 
 import {
+    declineVaultApproval,
+    declineVaultBatch,
     fetchVaultApproval,
     fetchVaultBatch,
     listVaultApprovals,
@@ -69,6 +71,15 @@ interface VaultApprovalsState {
     forgetBatch: (batchId: string) => void;
     /** Drop the batches the identity provider no longer holds. */
     refreshBatches: () => Promise<void>;
+    /** Capabilities and batch ids the holder declined this session. Discovery,
+     *  the tray sweep and a late push never bring them back, so a declined
+     *  request stays gone even from an identity provider that cannot drop it
+     *  and only lets it expire. */
+    declined: string[];
+    /** Decline one request: hide it, then tell the identity provider. */
+    decline: (vaultOp: string) => void;
+    /** Decline a batch: hide it, then tell the identity provider. */
+    declineBatch: (batchId: string) => void;
 }
 
 export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => ({
@@ -76,9 +87,29 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
     pending: [],
     loading: false,
     batchIds: [],
+    declined: [],
+
+    decline: (vaultOp) => {
+        if (!vaultOp) return;
+        set((s) => ({
+            declined: s.declined.includes(vaultOp) ? s.declined : [...s.declined, vaultOp],
+            knownOps: s.knownOps.filter((o) => o !== vaultOp),
+            pending: s.pending.filter((r) => r.vault_op !== vaultOp),
+        }));
+        void declineVaultApproval(vaultOp);
+    },
+
+    declineBatch: (batchId) => {
+        if (!batchId) return;
+        set((s) => ({
+            declined: s.declined.includes(batchId) ? s.declined : [...s.declined, batchId],
+            batchIds: s.batchIds.filter((b) => b !== batchId),
+        }));
+        void declineVaultBatch(batchId);
+    },
 
     rememberBatch: (batchId) => {
-        if (!batchId || get().batchIds.includes(batchId)) return;
+        if (!batchId || get().batchIds.includes(batchId) || get().declined.includes(batchId)) return;
         set((s) => ({ batchIds: [...s.batchIds, batchId] }));
         // A notification left in the tray can name a batch that has closed.
         void get().refreshBatches();
@@ -103,7 +134,7 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
     },
 
     remember: (vaultOp) => {
-        if (!vaultOp || get().knownOps.includes(vaultOp)) return;
+        if (!vaultOp || get().knownOps.includes(vaultOp) || get().declined.includes(vaultOp)) return;
         set((s) => ({ knownOps: [...s.knownOps, vaultOp] }));
         void get().refresh();
     },
@@ -116,7 +147,7 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
     },
 
     clearAll: () => {
-        set({ knownOps: [], pending: [], loading: false, batchIds: [] });
+        set({ knownOps: [], pending: [], loading: false, batchIds: [], declined: [] });
     },
 
     refresh: async () => {
@@ -142,7 +173,8 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
         );
         found.sort((a, b) => b.expires_at - a.expires_at);
         set((s) => ({
-            pending: found,
+            // Less any declined while the fetch was in flight.
+            pending: found.filter((r) => !s.declined.includes(r.vault_op)),
             knownOps: s.knownOps.filter((o) => !dead.includes(o)),
             loading: false,
         }));
@@ -158,7 +190,10 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
             if (live.length > 0) {
                 set((s) => ({
                     knownOps: Array.from(
-                        new Set([...s.knownOps, ...live.map((r) => r.vault_op)]),
+                        new Set([
+                            ...s.knownOps,
+                            ...live.map((r) => r.vault_op).filter((o) => !s.declined.includes(o)),
+                        ]),
                     ),
                 }));
             }

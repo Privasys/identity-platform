@@ -7,11 +7,16 @@
  * One tap here carries the weight of many, so the card is built to make it as
  * deliberate: nothing shows until the list has been verified against what the
  * passkey will sign (services/vault-approval-batch), every entry has its own
- * row, and Approve stays off until the holder has reached the end of the list.
+ * line in the card, and Approve stays off until the holder has reached the end.
  *
- * What a row says comes from the signed handle, and the app's name from the
- * control plane by the id in that handle. The label is the one thing written by
- * whoever began the batch, so it is presented as their description.
+ * It is a task like the app's approval and form screens and wears their look
+ * (components/task-styles): the card holds what is being decided, and the
+ * answers follow it in the same scroll, so they can never show without it. A
+ * list with nothing to show is refused, never offered.
+ *
+ * What a line says comes from the signed handle, and the app's name from the
+ * control plane by the id in that handle. The label is the one thing written
+ * by whoever began the batch, so it is presented as their description.
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -23,14 +28,15 @@ import {
     Alert,
     Pressable,
     ScrollView,
-    StyleSheet,
     View as RNView,
     type NativeScrollEvent,
     type NativeSyntheticEvent,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
-import { Text, usePalette, type Palette } from '@/components/Themed';
+import { taskStyles } from '@/components/task-styles';
+import { Text, usePalette } from '@/components/Themed';
 import { freshBiometric } from '@/services/approval-answer';
 import {
     approveVaultBatch,
@@ -47,6 +53,7 @@ import {
     type VerifiedVaultBatch,
     type VerifiedVaultBatchEntry,
 } from '@/services/vault-approval-batch';
+import { notify } from '@/stores/notice';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 import { useActiveRoute } from '@/utils/active-route';
@@ -56,8 +63,7 @@ type Phase =
     | { kind: 'failed' }
     | { kind: 'gone' }
     | { kind: 'refused' }
-    | { kind: 'ready'; batch: VerifiedVaultBatch }
-    | { kind: 'done'; count: number };
+    | { kind: 'ready'; batch: VerifiedVaultBatch };
 
 const KIND_KEY: Record<VaultBatchKeyKind, string> = {
     storage: 'vaultApprovals.batchKindStorage',
@@ -70,12 +76,14 @@ const KIND_KEY: Record<VaultBatchKeyKind, string> = {
 };
 
 const shortId = (id: string) => `${id.slice(0, 8)}…${id.slice(-4)}`;
+const shortDigest = (d: string) => `${d.slice(0, 10)}…${d.slice(-6)}`;
 
 export function VaultBatchCard({ batchId }: { batchId: string }) {
     useActiveRoute(vaultBatchRouteName(batchId));
     const { t } = useTranslation();
     const p = usePalette();
-    const styles = useMemo(() => makeStyles(p), [p]);
+    const styles = useMemo(() => taskStyles(p), [p]);
+    const insets = useSafeAreaInsets();
     const forgetBatch = useVaultApprovalsStore((s) => s.forgetBatch);
 
     const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
@@ -90,7 +98,9 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
         try {
             const found = await fetchVaultBatch(batchId);
             if (found.kind === 'ok') {
-                setPhase({ kind: 'ready', batch: found.batch });
+                // Verified, but a list with nothing in it has nothing to show,
+                // and an approval with nothing shown is not offered.
+                setPhase(found.batch.entries.length > 0 ? { kind: 'ready', batch: found.batch } : { kind: 'refused' });
                 return;
             }
             if (found.kind === 'gone') forgetBatch(batchId);
@@ -142,9 +152,9 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
         [measure],
     );
 
-    const close = useCallback(() => {
+    const leave = useCallback(() => {
         if (router.canGoBack()) router.back();
-        else router.replace('/');
+        else router.replace('/access');
     }, []);
 
     const approve = useCallback(async () => {
@@ -174,237 +184,180 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
                 detail: t('vaultApprovals.batchDetail', { count: batch.entries.length, label: batch.label }),
             });
             forgetBatch(batch.batchId);
-            setPhase({ kind: 'done', count: batch.entries.length });
+            // As the app's approval does: the strip says so, and the screen goes.
+            notify(t('vaultApprovals.batchDoneTitle'), t('vaultApprovals.batchDoneBody'));
+            leave();
         } catch (e: any) {
             Alert.alert(t('vaultApprovals.approvalFailedTitle'), e?.message ?? t('vaultApprovals.approvalFailedBody'));
         } finally {
             setBusy(false);
         }
-    }, [batch, busy, forgetBatch, t]);
+    }, [batch, busy, forgetBatch, leave, t]);
 
-    if (phase.kind !== 'ready') {
+    const body = (() => {
+        if (phase.kind === 'loading') {
+            return <ActivityIndicator style={styles.spinner} color={p.textSecondary} />;
+        }
+        if (phase.kind === 'refused' || phase.kind === 'gone') {
+            const refused = phase.kind === 'refused';
+            return (
+                <>
+                    <RNView style={styles.refused} testID={`vault-batch-${phase.kind}`}>
+                        <Ionicons
+                            name={refused ? 'warning-outline' : 'checkmark-circle-outline'}
+                            size={32}
+                            color={refused ? p.danger : p.textSecondary}
+                        />
+                        <Text style={styles.fromText}>
+                            {t(refused ? 'vaultApprovals.batchRefusedTitle' : 'vaultApprovals.batchGoneTitle')}
+                        </Text>
+                        <Text style={refused ? styles.error : styles.closed}>
+                            {t(refused ? 'vaultApprovals.batchRefusedBody' : 'vaultApprovals.batchGoneBody')}
+                        </Text>
+                    </RNView>
+                    <Pressable style={styles.doneButton} onPress={leave} accessibilityRole="button">
+                        <Text style={styles.doneButtonText}>{t('common.done')}</Text>
+                    </Pressable>
+                </>
+            );
+        }
+        if (phase.kind === 'failed') {
+            return (
+                <>
+                    <RNView style={styles.refused} testID="vault-batch-failed">
+                        <Ionicons name="cloud-offline-outline" size={32} color={p.textSecondary} />
+                        <Text style={styles.fromText}>{t('vaultApprovals.batchFailedTitle')}</Text>
+                        <Text style={styles.closed}>{t('vaultApprovals.batchFailedBody')}</Text>
+                    </RNView>
+                    <RNView style={styles.actions}>
+                        <Pressable style={styles.declineButton} onPress={leave} accessibilityRole="button">
+                            <Text style={styles.declineButtonText}>{t('common.close')}</Text>
+                        </Pressable>
+                        <Pressable style={styles.retryButton} onPress={() => void load()} accessibilityRole="button">
+                            <Text style={styles.doneButtonText}>{t('common.retry')}</Text>
+                        </Pressable>
+                    </RNView>
+                </>
+            );
+        }
+
+        const { label, entries, exp } = phase.batch;
+        const left = Math.max(0, Math.round(exp - now / 1000));
+        const expired = left === 0;
+        const canApprove = readToEnd && !expired && !busy;
         return (
-            <RNView style={styles.screen}>
-                <SubPageHeader title={t('vaultApprovals.title')} />
-                {phase.kind === 'loading' ? (
-                    <ActivityIndicator style={styles.spinner} color={p.green} />
-                ) : (
-                    <Outcome phase={phase} styles={styles} p={p} onClose={close} onRetry={load} />
-                )}
-            </RNView>
-        );
-    }
+            <>
+                <Text style={styles.fromText}>{t('vaultApprovals.batchTitle', { count: entries.length })}</Text>
 
-    const { label, entries, exp } = phase.batch;
-    const secondsLeft = Math.max(0, Math.round(exp - now / 1000));
-    const expired = secondsLeft <= 0;
-    const canApprove = readToEnd && !expired && !busy;
-    const remaining = expired
-        ? t('vaultApprovals.expired')
-        : secondsLeft >= 60
-          ? t('vaultApprovals.expiresInMinutes', { minutes: Math.floor(secondsLeft / 60), seconds: secondsLeft % 60 })
-          : t('vaultApprovals.expiresInSeconds', { count: secondsLeft });
+                <RNView style={[styles.card, expired && styles.cardDimmed]} testID="vault-batch-card">
+                    <RNView style={styles.line}>
+                        <Text style={styles.lineLabel}>{t('vaultApprovals.batchLabelCaption')}</Text>
+                        <Text style={styles.lineValue}>{label}</Text>
+                    </RNView>
+                    <RNView style={styles.divider} />
+                    <RNView style={styles.lines}>
+                        {entries.map((entry) => (
+                            <EntryLine key={`${entry.operation} ${entry.handle}`} entry={entry} names={names} styles={styles} />
+                        ))}
+                    </RNView>
+                    <RNView style={styles.divider} />
+                    <RNView style={styles.metaRow}>
+                        <Ionicons name="finger-print-outline" size={16} color={p.textSecondary} />
+                        <Text style={styles.meta}>{t('approval.assurance.device')}</Text>
+                    </RNView>
+                    <RNView style={styles.metaRow}>
+                        <Ionicons name="time-outline" size={16} color={expired ? p.danger : p.textSecondary} />
+                        <Text style={[styles.meta, expired && { color: p.danger }]}>
+                            {expired
+                                ? t('vaultApprovals.expired')
+                                : t('approval.timeLeft', {
+                                      time: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`,
+                                  })}
+                        </Text>
+                    </RNView>
+                </RNView>
+
+                {expired ? (
+                    <Pressable style={styles.doneButton} onPress={leave} accessibilityRole="button">
+                        <Text style={styles.doneButtonText}>{t('common.done')}</Text>
+                    </Pressable>
+                ) : (
+                    <>
+                        <RNView style={styles.actions}>
+                            <Pressable
+                                style={[styles.declineButton, busy && styles.buttonIdle]}
+                                disabled={busy}
+                                onPress={leave}
+                                accessibilityRole="button"
+                            >
+                                <Text style={styles.declineButtonText}>{t('common.cancel')}</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[styles.affirmButton, !canApprove && !busy && styles.buttonIdle]}
+                                disabled={!canApprove}
+                                onPress={() => void approve()}
+                                accessibilityRole="button"
+                                accessibilityState={{ disabled: !canApprove, busy }}
+                                testID="vault-batch-approve"
+                            >
+                                {busy ? (
+                                    <ActivityIndicator color={p.onGreen} />
+                                ) : (
+                                    <Text style={styles.affirmButtonText}>{t('appForm.action.approve')}</Text>
+                                )}
+                            </Pressable>
+                        </RNView>
+                        {!readToEnd ? <Text style={styles.note}>{t('vaultApprovals.batchScrollHint')}</Text> : null}
+                    </>
+                )}
+            </>
+        );
+    })();
 
     return (
         <RNView style={styles.screen}>
             <SubPageHeader title={t('vaultApprovals.title')} />
             <ScrollView
-                contentContainerStyle={styles.content}
+                contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 32 }]}
                 scrollEventThrottle={32}
                 onScroll={onScroll}
                 onLayout={(e) => measure({ viewportHeight: e.nativeEvent.layout.height })}
                 onContentSizeChange={(_, height) => measure({ contentHeight: height })}
                 testID="vault-batch-list"
             >
-                <RNView style={styles.titleRow}>
-                    <Text style={styles.title}>{t('vaultApprovals.batchTitle', { count: entries.length })}</Text>
-                    <RNView style={[styles.ttlPill, secondsLeft < 60 && styles.ttlPillUrgent]}>
-                        <Ionicons name="time-outline" size={12} color={secondsLeft < 60 ? p.warnText : p.infoText} />
-                        <Text style={[styles.ttlText, secondsLeft < 60 && styles.ttlTextUrgent]}>{remaining}</Text>
-                    </RNView>
-                </RNView>
-
-                <RNView style={styles.labelBox}>
-                    <Text style={styles.labelCaption}>{t('vaultApprovals.batchLabelCaption')}</Text>
-                    <Text style={styles.labelText}>{label}</Text>
-                </RNView>
-
-                <RNView style={styles.list}>
-                    {entries.map((entry, i) => (
-                        <BatchRow
-                            key={`${entry.operation} ${entry.handle}`}
-                            entry={entry}
-                            names={names}
-                            last={i === entries.length - 1}
-                            styles={styles}
-                            p={p}
-                        />
-                    ))}
-                </RNView>
+                {body}
             </ScrollView>
-
-            <RNView style={styles.footer}>
-                {!readToEnd ? <Text style={styles.hint}>{t('vaultApprovals.batchScrollHint')}</Text> : null}
-                <Pressable
-                    style={[styles.approveBtn, !canApprove && styles.approveBtnDisabled]}
-                    disabled={!canApprove}
-                    onPress={() => void approve()}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: !canApprove, busy }}
-                    testID="vault-batch-approve"
-                >
-                    {busy ? (
-                        <ActivityIndicator color={p.onGreen} />
-                    ) : (
-                        <>
-                            <Ionicons name="finger-print" size={18} color={p.onGreen} />
-                            <Text style={styles.approveText}>{t('attestation.approve')}</Text>
-                        </>
-                    )}
-                </Pressable>
-            </RNView>
         </RNView>
     );
 }
 
-function BatchRow({
+/** One entry: the kind of key over the app (or host) it belongs to, and the
+ *  id and digest the signature binds, so the name never stands alone. */
+function EntryLine({
     entry,
     names,
-    last,
     styles,
-    p,
 }: {
     entry: VerifiedVaultBatchEntry;
     names: Record<string, string>;
-    last: boolean;
-    styles: ReturnType<typeof makeStyles>;
-    p: Palette;
+    styles: ReturnType<typeof taskStyles>;
 }) {
     const { t } = useTranslation();
     const subject = describeVaultHandle(entry.handle);
     const id = subject.appId ?? subject.enclaveId;
-    const title =
+    const name =
         subject.kind === 'host'
             ? t('vaultApprovals.batchHostSubject')
             : subject.appId
               ? (names[subject.appId] ?? t('vaultApprovals.batchUnknownApp'))
-              : t(KIND_KEY.other);
-    const digest = entry.measurementDigest;
+              : entry.handle;
+    const digestLabel = subject.kind === 'policy' ? t('vaultApprovals.policyDocument') : t('vaultApprovals.newMeasurement');
     return (
-        <RNView style={[styles.row, !last && styles.rowDivider]}>
-            <RNView style={styles.rowIcon}>
-                <Ionicons name={subject.kind === 'policy' ? 'document-text' : 'key'} size={15} color={p.infoText} />
-            </RNView>
-            <RNView style={styles.rowText}>
-                <Text style={styles.rowTitle}>{title}</Text>
-                <Text style={styles.rowKind}>{t(KIND_KEY[subject.kind])}</Text>
-                {/* The id is what the signature binds: it stays beside the name. */}
-                <Text style={styles.mono}>{id ? shortId(id) : entry.handle}</Text>
-                <Text style={styles.mono}>
-                    {subject.kind === 'policy' ? t('vaultApprovals.policyDocument') : t('vaultApprovals.newMeasurement')}
-                    {` ${digest.slice(0, 10)}…${digest.slice(-6)}`}
-                </Text>
-            </RNView>
+        <RNView style={styles.line} testID="vault-batch-entry">
+            <Text style={styles.lineLabel}>{t(KIND_KEY[subject.kind])}</Text>
+            <Text style={styles.lineValue}>{name}</Text>
+            {id ? <Text style={styles.meta}>{shortId(id)}</Text> : null}
+            <Text style={styles.meta}>{`${digestLabel} ${shortDigest(entry.measurementDigest)}`}</Text>
         </RNView>
     );
 }
-
-function Outcome({
-    phase,
-    styles,
-    p,
-    onClose,
-    onRetry,
-}: {
-    phase: Exclude<Phase, { kind: 'loading' } | { kind: 'ready' }>;
-    styles: ReturnType<typeof makeStyles>;
-    p: Palette;
-    onClose: () => void;
-    onRetry: () => void;
-}) {
-    const { t } = useTranslation();
-    const refused = phase.kind === 'refused';
-    const copy = {
-        refused: ['vaultApprovals.batchRefusedTitle', 'vaultApprovals.batchRefusedBody'],
-        gone: ['vaultApprovals.batchGoneTitle', 'vaultApprovals.batchGoneBody'],
-        failed: ['vaultApprovals.batchFailedTitle', 'vaultApprovals.batchFailedBody'],
-        done: ['vaultApprovals.batchDoneTitle', 'vaultApprovals.batchDoneBody'],
-    }[phase.kind];
-    return (
-        <RNView style={styles.outcome} testID={`vault-batch-${phase.kind}`}>
-            <Ionicons
-                name={refused ? 'shield-outline' : phase.kind === 'done' ? 'checkmark-circle' : 'time-outline'}
-                size={40}
-                color={refused ? p.dangerText : p.infoText}
-            />
-            <Text style={styles.outcomeTitle}>{t(copy[0])}</Text>
-            <Text style={styles.outcomeBody}>{t(copy[1])}</Text>
-            {phase.kind === 'failed' ? (
-                <Pressable style={styles.approveBtn} onPress={onRetry} accessibilityRole="button">
-                    <Text style={styles.approveText}>{t('common.retry')}</Text>
-                </Pressable>
-            ) : null}
-            <Pressable style={styles.closeBtn} onPress={onClose} accessibilityRole="button">
-                <Text style={styles.closeText}>{t('common.close')}</Text>
-            </Pressable>
-        </RNView>
-    );
-}
-
-const makeStyles = (p: Palette) =>
-    StyleSheet.create({
-        screen: { flex: 1, backgroundColor: p.screenBg },
-        spinner: { marginTop: 40 },
-        content: { padding: 16, paddingBottom: 24, gap: 14 },
-        titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-        title: { flex: 1, fontSize: 20, fontWeight: '700', color: p.textPrimary },
-        ttlPill: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4,
-            backgroundColor: p.infoBg,
-            paddingHorizontal: 8,
-            paddingVertical: 3,
-            borderRadius: 10,
-        },
-        ttlPillUrgent: { backgroundColor: p.warnBg },
-        ttlText: { fontSize: 12, fontWeight: '600', color: p.infoText },
-        ttlTextUrgent: { color: p.warnText },
-        labelBox: { backgroundColor: p.infoBg, borderRadius: 10, padding: 12, gap: 4 },
-        labelCaption: { fontSize: 12, fontWeight: '600', color: p.infoText },
-        labelText: { fontSize: 14, lineHeight: 20, color: p.textPrimary },
-        list: { backgroundColor: p.card, borderRadius: 16, paddingHorizontal: 14 },
-        row: { flexDirection: 'row', gap: 10, paddingVertical: 12 },
-        rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: p.textSecondary },
-        rowIcon: {
-            width: 28,
-            height: 28,
-            borderRadius: 8,
-            backgroundColor: p.infoBg,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        rowText: { flex: 1, gap: 2 },
-        rowTitle: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
-        rowKind: { fontSize: 13, color: p.textSecondary },
-        mono: { fontSize: 12, color: p.textSecondary, fontFamily: 'monospace' },
-        footer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, gap: 8, backgroundColor: p.screenBg },
-        hint: { fontSize: 13, color: p.textSecondary, textAlign: 'center' },
-        approveBtn: {
-            flexDirection: 'row',
-            gap: 8,
-            alignSelf: 'stretch',
-            backgroundColor: p.green,
-            borderRadius: 12,
-            paddingVertical: 13,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        approveBtnDisabled: { opacity: 0.45 },
-        approveText: { color: p.onGreen, fontWeight: '700', fontSize: 15 },
-        outcome: { padding: 24, paddingTop: 48, alignItems: 'center', gap: 12 },
-        outcomeTitle: { fontSize: 18, fontWeight: '700', color: p.textPrimary, textAlign: 'center' },
-        outcomeBody: { fontSize: 14, lineHeight: 20, color: p.textSecondary, textAlign: 'center', marginBottom: 8 },
-        closeBtn: { alignSelf: 'stretch', paddingVertical: 13, alignItems: 'center' },
-        closeText: { color: p.infoText, fontWeight: '600', fontSize: 15 },
-    });

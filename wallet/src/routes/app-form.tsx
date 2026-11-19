@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AttestationView } from '@/components/AttestationView';
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { taskStyles } from '@/components/task-styles';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { isDeclining, type FormBlock } from '@/services/app-form';
 import {
@@ -345,40 +346,18 @@ function Block({
     }
 }
 
-const makeStyles = (p: Palette) =>
-    StyleSheet.create({
-        screen: { flex: 1, backgroundColor: p.screenBg },
-        body: { padding: 20, gap: 14 },
-        spinner: { marginTop: 40 },
-        from: { gap: 4 },
-        fromText: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
-        hostRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+const makeStyles = (p: Palette) => ({
+    ...taskStyles(p),
+    ...StyleSheet.create({
         hostChecking: { fontSize: 13, color: p.textSecondary },
         hostVerified: { fontSize: 13, color: p.textSecondary, flexShrink: 1 },
-        card: { backgroundColor: p.card, borderRadius: 14, padding: 18, gap: 12, borderWidth: 1, borderColor: p.border },
-        refused: { alignItems: 'center', gap: 12, paddingVertical: 24, paddingHorizontal: 8 },
-        closed: { fontSize: 15, lineHeight: 21, color: p.textSecondary, textAlign: 'center' },
-        retryButton: { flex: 1.35, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.action },
-        title: { fontSize: 18, fontWeight: '700', color: p.textPrimary },
         text: { fontSize: 14.5, lineHeight: 21, color: p.textPrimary },
-        divider: { height: StyleSheet.hairlineWidth, backgroundColor: p.border },
         fields: { gap: 8 },
         sectionLabel: { fontSize: 12, fontWeight: '600', color: p.textMuted, letterSpacing: 0.3 },
         fieldRow: { gap: 2 },
         fieldLabel: { fontSize: 12.5, color: p.textSecondary },
         fieldValue: { fontSize: 15, color: p.textPrimary },
-        // The approval screen's buttons (components/AttestationView).
-        actions: { flexDirection: 'row', gap: 10 },
-        declineButton: { flex: 1, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.buttonNeutral },
-        declineButtonText: { fontSize: 16, fontWeight: '600', color: p.textPrimary },
-        affirmButton: { flex: 1.35, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: p.green },
-        affirmButtonText: { fontSize: 16, fontWeight: '600', color: p.onGreen },
-        buttonIdle: { opacity: 0.5 },
-        // The Done of the other finished screens (device-add, verify-email).
-        doneButton: { marginTop: 24, paddingVertical: 16, paddingHorizontal: 20, borderRadius: 14, alignItems: 'center', backgroundColor: p.action },
-        doneButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
-        note: { fontSize: 12.5, lineHeight: 18, color: p.textMuted, textAlign: 'center' },
-        error: { fontSize: 13.5, lineHeight: 19, color: p.danger, textAlign: 'center' },
         link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 },
         linkText: { color: p.blue, fontSize: 14.5, fontWeight: '600' },
-    });
+    }),
+});

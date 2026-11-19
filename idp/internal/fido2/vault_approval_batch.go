@@ -236,6 +236,7 @@ type vaultBatchPending struct {
 type vaultBatchResult struct {
 	sub       string
 	tokens    []vaultBatchToken
+	declined  bool // the owner declined on the phone: no tokens will come
 	expiresAt time.Time
 }
 
@@ -298,16 +299,32 @@ func (s *vaultBatchStore) finish(batchID, sub string, tokens []vaultBatchToken, 
 	s.results[batchID] = vaultBatchResult{sub: sub, tokens: tokens, expiresAt: time.Unix(exp, 0)}
 }
 
-// take returns a batch's tokens to their owner, once.
-func (s *vaultBatchStore) take(batchID, sub string) ([]vaultBatchToken, bool) {
+// decline closes an open batch the owner refused, so the initiator's poll ends.
+func (s *vaultBatchStore) decline(batchID string) (sub string, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, ok := s.pending[batchID]
+	if !ok || time.Now().After(p.expiresAt) {
+		return "", false
+	}
+	delete(s.pending, batchID)
+	if s.open[p.sub] == batchID {
+		delete(s.open, p.sub)
+	}
+	s.results[batchID] = vaultBatchResult{sub: p.sub, declined: true, expiresAt: p.expiresAt}
+	return p.sub, true
+}
+
+// take returns a batch's result to its owner, once: the tokens, or a refusal.
+func (s *vaultBatchStore) take(batchID, sub string) (vaultBatchResult, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	r, ok := s.results[batchID]
 	if !ok || r.sub != sub || time.Now().After(r.expiresAt) {
-		return nil, false
+		return vaultBatchResult{}, false
 	}
 	delete(s.results, batchID)
-	return r.tokens, true
+	return r, true
 }
 
 func (s *vaultBatchStore) cleanup(now time.Time) {
@@ -511,13 +528,63 @@ func (h *Handler) VaultApprovalBatchToken(iss *tokens.Issuer) http.HandlerFunc {
 			errorJSON(w, http.StatusBadRequest, "challenge required")
 			return
 		}
-		issued, ok := h.vaultBatches.take(batchID, sub)
+		res, ok := h.vaultBatches.take(batchID, sub)
 		if !ok {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusAccepted)
 			_, _ = w.Write([]byte(`{"status":"pending"}`))
 			return
 		}
-		writeJSON(w, map[string]interface{}{"tokens": issued})
+		if res.declined {
+			writeDeclined(w)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"tokens": res.tokens})
+	}
+}
+
+// writeDeclined is the initiator's terminal answer once the owner declined.
+func writeDeclined(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusGone)
+	_, _ = w.Write([]byte(`{"status":"declined"}`))
+}
+
+// VaultApprovalDecline handles POST /fido2/vault-approval/decline?challenge=<vault_op>.
+//
+// The capability is the authority, as for GET pending: a decline can only end a
+// request, never approve one. The challenge is consumed first, so a decline and
+// an approval cannot both succeed. 204 when the request was dropped, 404 when it
+// is unknown, already answered or expired.
+func (h *Handler) VaultApprovalDecline() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vaultOp := r.URL.Query().Get("challenge")
+		entry, ok := h.challenges.popIf(vaultOp, func(e *challengeEntry) bool { return e.vaultApproval != nil })
+		if vaultOp == "" || !ok {
+			errorJSON(w, http.StatusNotFound, "no pending approval for this challenge")
+			return
+		}
+		m := entry.vaultApproval
+		h.vaultPending.remove(vaultOp)
+		h.vaultResults.decline(vaultOp, m.sub, time.Unix(m.exp, 0))
+		log.Printf("fido2: vault-approval DECLINED by the owner's wallet (sub %s, vault_op %s…)", m.sub, vaultOp[:min(12, len(vaultOp))])
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// VaultApprovalBatchDecline handles POST
+// /fido2/vault-approval/batch/decline?challenge=<batch_id>, on the same terms
+// as VaultApprovalDecline.
+func (h *Handler) VaultApprovalBatchDecline() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		batchID := r.URL.Query().Get("challenge")
+		_, ok := h.challenges.popIf(batchID, func(e *challengeEntry) bool { return e.vaultBatch != nil })
+		if batchID == "" || !ok {
+			errorJSON(w, http.StatusNotFound, "no pending batch for this challenge")
+			return
+		}
+		sub, _ := h.vaultBatches.decline(batchID)
+		log.Printf("fido2: vault-approval batch DECLINED by the owner's wallet (sub %s, batch %s…)", sub, batchID[:min(12, len(batchID))])
+		w.WriteHeader(http.StatusNoContent)
 	}
 }

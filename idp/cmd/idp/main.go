@@ -352,6 +352,8 @@ func main() {
 	mux.HandleFunc("GET /fido2/vault-approval/batch/pending", fido2Handler.VaultApprovalBatchPending())
 	mux.HandleFunc("POST /fido2/vault-approval/batch/complete", fido2Handler.VaultApprovalBatchComplete(issuer, "privasys-platform"))
 	mux.HandleFunc("GET /fido2/vault-approval/batch/token", fido2Handler.VaultApprovalBatchToken(issuer))
+	mux.HandleFunc("POST /fido2/vault-approval/decline", fido2Handler.VaultApprovalDecline())
+	mux.HandleFunc("POST /fido2/vault-approval/batch/decline", fido2Handler.VaultApprovalBatchDecline())
 	// Attribute step-up (push arm): the wallet fetches the pending delta by
 	// capability and posts the signed assertion plus the attribute values;
 	// completion finishes the OIDC authorize session the browser is polling.

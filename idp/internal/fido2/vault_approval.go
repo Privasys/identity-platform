@@ -67,6 +67,7 @@ type vaultResultStore struct {
 type vaultResultEntry struct {
 	sub       string
 	token     string
+	declined  bool // the owner declined on the phone: no token will come
 	expiresAt time.Time
 }
 
@@ -87,18 +88,25 @@ func (s *vaultResultStore) put(vaultOp, sub, token string, exp int64) {
 	s.mu.Unlock()
 }
 
-// take returns the stashed token for vaultOp iff it exists, has not expired, and
-// belongs to sub. It is single-use: a hit is deleted. The bool reports whether a
-// (live, sub-matching) entry was found.
-func (s *vaultResultStore) take(vaultOp, sub string) (string, bool) {
+// decline records that the owner refused vaultOp, so the initiator's poll ends.
+func (s *vaultResultStore) decline(vaultOp, sub string, expiresAt time.Time) {
+	s.mu.Lock()
+	s.results[vaultOp] = vaultResultEntry{sub: sub, declined: true, expiresAt: expiresAt}
+	s.mu.Unlock()
+}
+
+// take returns the stashed result for vaultOp iff it exists, has not expired,
+// and belongs to sub: a token, or a refusal. It is single-use: a hit is
+// deleted. The bool reports whether a (live, sub-matching) entry was found.
+func (s *vaultResultStore) take(vaultOp, sub string) (vaultResultEntry, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	e, ok := s.results[vaultOp]
 	if !ok || time.Now().After(e.expiresAt) || e.sub != sub {
-		return "", false
+		return vaultResultEntry{}, false
 	}
 	delete(s.results, vaultOp)
-	return e.token, true
+	return e, true
 }
 
 func (s *vaultResultStore) cleanup() {
@@ -129,7 +137,7 @@ func (h *Handler) VaultApprovalToken(iss *tokens.Issuer) http.HandlerFunc {
 			errorJSON(w, http.StatusBadRequest, "challenge required")
 			return
 		}
-		tok, ok := h.vaultResults.take(vaultOp, sub)
+		res, ok := h.vaultResults.take(vaultOp, sub)
 		if !ok {
 			// Not yet completed (or expired / not this owner's): tell the CLI to
 			// keep polling.
@@ -137,7 +145,11 @@ func (h *Handler) VaultApprovalToken(iss *tokens.Issuer) http.HandlerFunc {
 			writeJSON(w, map[string]string{"status": "pending"})
 			return
 		}
-		writeJSON(w, map[string]string{"access_token": tok})
+		if res.declined {
+			writeDeclined(w)
+			return
+		}
+		writeJSON(w, map[string]string{"access_token": res.token})
 	}
 }
 

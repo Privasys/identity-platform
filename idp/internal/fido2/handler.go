@@ -322,6 +322,19 @@ func (cs *challengeStore) pop(key string) (*challengeEntry, bool) {
 	return e, true
 }
 
+// popIf removes and returns the live entry under key only when match accepts
+// it, so a caller can never consume a challenge of another kind.
+func (cs *challengeStore) popIf(key string, match func(*challengeEntry) bool) (*challengeEntry, bool) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	e, ok := cs.challenges[key]
+	if !ok || time.Now().After(e.expiresAt) || !match(e) {
+		return nil, false
+	}
+	delete(cs.challenges, key)
+	return e, true
+}
+
 func (cs *challengeStore) cleanup() {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()

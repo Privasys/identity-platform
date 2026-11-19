@@ -7,6 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -166,11 +169,87 @@ func TestBatchStoreKeepsOneOpenBatchAndHandsTokensOutOnce(t *testing.T) {
 	if _, ok := s.take("two", "someone-else"); ok {
 		t.Fatal("another subject collected the tokens")
 	}
-	if got, ok := s.take("two", "owner"); !ok || len(got) != 1 {
+	if got, ok := s.take("two", "owner"); !ok || got.declined || len(got.tokens) != 1 {
 		t.Fatal("the owner could not collect the tokens")
 	}
 	if _, ok := s.take("two", "owner"); ok {
 		t.Fatal("the tokens were collected twice")
+	}
+}
+
+func newDeclineTestHandler() *Handler {
+	return &Handler{
+		challenges:   &challengeStore{challenges: map[string]*challengeEntry{}},
+		vaultBatches: &vaultBatchStore{pending: map[string]*vaultBatchPending{}, open: map[string]string{}, results: map[string]vaultBatchResult{}},
+		vaultPending: &vaultPendingStore{pending: map[string]*vaultPendingEntry{}},
+		vaultResults: &vaultResultStore{results: map[string]vaultResultEntry{}},
+	}
+}
+
+func declineStatus(t *testing.T, hf http.HandlerFunc, path, challenge string) int {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	hf(rec, httptest.NewRequest(http.MethodPost, path+"?challenge="+url.QueryEscape(challenge), nil))
+	return rec.Code
+}
+
+// A declined batch leaves the phone's list, cannot be approved afterwards, and
+// ends the initiator's poll with a refusal rather than a timeout.
+func TestBatchDecline(t *testing.T) {
+	h := newDeclineTestHandler()
+	exp := time.Now().Add(time.Minute)
+	h.challenges.put("batch-1", &challengeEntry{expiresAt: exp, vaultBatch: &vaultBatchMeta{sub: "owner", batchID: "batch-1"}})
+	h.vaultBatches.put("batch-1", &vaultBatchPending{sub: "owner", expiresAt: exp})
+	// A challenge of another kind under the same key is never consumed.
+	h.challenges.put("other", &challengeEntry{expiresAt: exp})
+
+	if got := declineStatus(t, h.VaultApprovalBatchDecline(), "/fido2/vault-approval/batch/decline", "other"); got != http.StatusNotFound {
+		t.Fatalf("declining another kind of challenge: %d", got)
+	}
+	if _, ok := h.challenges.pop("other"); !ok {
+		t.Fatal("the other challenge was consumed")
+	}
+	if got := declineStatus(t, h.VaultApprovalBatchDecline(), "/fido2/vault-approval/batch/decline", "batch-1"); got != http.StatusNoContent {
+		t.Fatalf("decline: %d", got)
+	}
+	if _, ok := h.vaultBatches.get("batch-1"); ok {
+		t.Fatal("the declined batch is still pending")
+	}
+	if _, ok := h.challenges.pop("batch-1"); ok {
+		t.Fatal("the declined batch can still be approved")
+	}
+	if got := declineStatus(t, h.VaultApprovalBatchDecline(), "/fido2/vault-approval/batch/decline", "batch-1"); got != http.StatusNotFound {
+		t.Fatalf("second decline: %d", got)
+	}
+	if _, ok := h.vaultBatches.take("batch-1", "someone-else"); ok {
+		t.Fatal("another subject read the refusal")
+	}
+	if r, ok := h.vaultBatches.take("batch-1", "owner"); !ok || !r.declined || len(r.tokens) != 0 {
+		t.Fatalf("the owner did not get the refusal: %+v %v", r, ok)
+	}
+}
+
+func TestSingleDecline(t *testing.T) {
+	h := newDeclineTestHandler()
+	exp := time.Now().Add(time.Minute)
+	op := "vault-op-1"
+	h.challenges.put(op, &challengeEntry{expiresAt: exp, vaultApproval: &vaultApprovalMeta{sub: "owner", vaultOp: op, exp: exp.Unix()}})
+	h.vaultPending.put(op, &vaultPendingEntry{sub: "owner", expiresAt: exp})
+
+	if got := declineStatus(t, h.VaultApprovalDecline(), "/fido2/vault-approval/decline", op); got != http.StatusNoContent {
+		t.Fatalf("decline: %d", got)
+	}
+	if _, ok := h.vaultPending.get(op); ok {
+		t.Fatal("the declined approval is still pending")
+	}
+	if _, ok := h.challenges.pop(op); ok {
+		t.Fatal("the declined approval can still be completed")
+	}
+	if got := declineStatus(t, h.VaultApprovalDecline(), "/fido2/vault-approval/decline", op); got != http.StatusNotFound {
+		t.Fatalf("second decline: %d", got)
+	}
+	if r, ok := h.vaultResults.take(op, "owner"); !ok || !r.declined || r.token != "" {
+		t.Fatalf("the owner did not get the refusal: %+v %v", r, ok)
 	}
 }
 

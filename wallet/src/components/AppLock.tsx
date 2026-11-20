@@ -54,6 +54,8 @@ const LOGO_INK = '#0F172A';
 /** The white gap between the halves. */
 const GAP = 20;
 const OPEN_MS = 450;
+/** The longest the lock waits for a tapped push to open its screen. */
+const PUSH_WAIT_MS = 4000;
 
 /** Ask for Face ID to open the wallet. True once the holder is verified. */
 export async function unlockWallet(prompt: string, cancel: string): Promise<boolean> {
@@ -75,6 +77,8 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
     const hasProfile = useProfileStore((s) => s.profile != null);
     const lockSec = useSettingsStore((s) => s.appLockSec);
     const locked = useAppLockStore((s) => s.locked);
+    const exemptPushAt = useAppLockStore((s) => s.exemptPushAt);
+    const launchPushChecked = useAppLockStore((s) => s.launchPushChecked);
     const on = !isDemo() && hasProfile && lockSec != null;
 
     const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
@@ -157,6 +161,29 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
         if (!showLock) setFailed(false);
     }, [showLock]);
 
+    // A tapped approval push is on its way to its screen: the lock waits for
+    // it rather than asking for Face ID, then lets it open. If the screen
+    // never comes, the lock asks after all.
+    const exempt = lockExempt(pathname);
+    useEffect(() => {
+        if (exemptPushAt == null) return;
+        const { clearExemptPush } = useAppLockStore.getState();
+        if (exempt) {
+            clearExemptPush();
+            return;
+        }
+        const timer = setTimeout(clearExemptPush, Math.max(0, exemptPushAt + PUSH_WAIT_MS - Date.now()));
+        return () => clearTimeout(timer);
+    }, [exemptPushAt, exempt]);
+    // At start, the push that launched the wallet is looked for first. Should
+    // that never answer, the lock asks anyway.
+    const [launchWaitOver, setLaunchWaitOver] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setLaunchWaitOver(true), PUSH_WAIT_MS);
+        return () => clearTimeout(timer);
+    }, []);
+    const pushWaiting = exemptPushAt != null || !(launchPushChecked || launchWaitOver);
+
     const unlock = useCallback(async () => {
         if (busy) return;
         setBusy(true);
@@ -176,13 +203,13 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
             asked.current = false;
             return;
         }
-        if (asked.current || appState !== 'active') return;
+        if (asked.current || appState !== 'active' || pushWaiting) return;
         const timer = setTimeout(() => {
             asked.current = true;
             void unlock();
         }, 350);
         return () => clearTimeout(timer);
-    }, [showLock, appState, unlock]);
+    }, [showLock, appState, pushWaiting, unlock]);
 
     // Two squares turned 45°, much larger than the screen, each with an edge
     // GAP/2 from the diagonal through the centre.

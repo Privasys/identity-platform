@@ -17,6 +17,7 @@ import { registerPushTokenWithIdp } from '../services/vault-approval-api';
 import { dismissAppMessage, readMessage, useAppMessagesStore } from '../stores/app-messages';
 import { useDriveNotificationsStore } from '../stores/drive-notifications';
 import { useGuardianRequestsStore } from '../stores/guardian-requests';
+import { useAppLockStore } from '../stores/app-lock';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 import { vaultBatchRouteName } from '../services/vault-approval-batch';
 import { isRouteActive } from '../utils/active-route';
@@ -214,6 +215,8 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
             router.navigate('/access');
             return;
         }
+        // Before the read: the lock must not ask for Face ID meanwhile.
+        useAppLockStore.getState().expectExemptPush();
         try {
             const m = await readMessage({
                 id, type: APPROVAL_TYPE, kind: data.kind, app_id: data.app_id,
@@ -313,6 +316,7 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         // against this id before showing a row.
         const batchId = String(data.batch_id ?? '');
         if (!batchId) return;
+        useAppLockStore.getState().expectExemptPush();
         useVaultApprovalsStore.getState().rememberBatch(batchId);
         if (!isRouteActive(vaultBatchRouteName(batchId))) {
             router.push({ pathname: '/vault-approvals', params: { batch_id: batchId, source: 'push' } });
@@ -325,6 +329,7 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         // when the user reaches the screen another way (missed banner,
         // foreground arrival).
         useVaultApprovalsStore.getState().remember(vaultOp);
+        useAppLockStore.getState().expectExemptPush();
         // Do NOT push when that screen is already up. It lists everything
         // pending, and remember() has just added this one, so a push adds no
         // information and one screen per notification.
@@ -576,6 +581,9 @@ async function setupListeners(router: Router): Promise<void> {
         } catch (e) {
             console.warn('[notifications] getLastNotificationResponseAsync failed', e);
         }
+        // After the dispatch above has had its tick, so a push that marks an
+        // exempt screen does so before the lock asks for Face ID.
+        setTimeout(() => useAppLockStore.getState().setLaunchPushChecked(), 0);
     }
 
     // Foreground notification handler — when an auth-request arrives while

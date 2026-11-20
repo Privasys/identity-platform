@@ -17,6 +17,18 @@ interface AppLockState {
     unlock: () => void;
     /** Record when the wallet went to the background; null once it is back. */
     wentToBackground: (at: number | null) => void;
+    /**
+     * A tapped push is on its way to a screen that opens without the unlock
+     * (services/app-lock lockExempt): when it was tapped, or null. Until the
+     * screen is up, the lock waits instead of asking for Face ID, or the
+     * holder would look once to unlock and again to approve.
+     */
+    exemptPushAt: number | null;
+    expectExemptPush: () => void;
+    clearExemptPush: () => void;
+    /** The push that launched the wallet, if any, has been looked for. */
+    launchPushChecked: boolean;
+    setLaunchPushChecked: () => void;
 }
 
 export const useAppLockStore = create<AppLockState>((set) => ({
@@ -25,4 +37,9 @@ export const useAppLockStore = create<AppLockState>((set) => ({
     lock: () => set({ locked: true }),
     unlock: () => set({ locked: false }),
     wentToBackground: (at) => set({ backgroundAt: at }),
+    exemptPushAt: null,
+    expectExemptPush: () => set({ exemptPushAt: Date.now() }),
+    clearExemptPush: () => set({ exemptPushAt: null }),
+    launchPushChecked: false,
+    setLaunchPushChecked: () => set({ launchPushChecked: true }),
 }));

@@ -10,8 +10,8 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -20,12 +20,14 @@ import {
     Alert,
     ActivityIndicator,
     Platform,
+    StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, usePalette, type Palette } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
 import {
     biometricLabelKey,
     holderVerificationAvailable,
@@ -57,6 +59,19 @@ export default function ProfileScreen() {
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
+    // The other tabs' green bands keep Android's status bar icons white. On a
+    // phone Profile has no band, so its icons follow the page: dark on light.
+    const scheme = useColorScheme();
+    const inPane = !!pane;
+    useFocusEffect(
+        useCallback(() => {
+            if (Platform.OS !== 'android' || inPane) return;
+            const entry = StatusBar.pushStackEntry({
+                barStyle: scheme === 'dark' ? 'light-content' : 'dark-content',
+            });
+            return () => StatusBar.popStackEntry(entry);
+        }, [inPane, scheme]),
+    );
     const profile = useProfileStore((s) => s.profile);
     const recoveryPhraseSaved = useAuthStore((s) => s.recoveryPhraseSaved);
     const chooseAvatar = useAvatarChooser();

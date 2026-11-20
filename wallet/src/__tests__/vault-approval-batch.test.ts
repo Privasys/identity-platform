@@ -196,6 +196,24 @@ describe('what reaches the card', () => {
         expect(JSON.stringify(batch)).not.toContain('Nothing to see');
     });
 
+    it('keeps a promote version id, and only as a version id', () => {
+        const a = answer();
+        const promote = a.entries.findIndex((e: VectorEntry) => e.operation === 'promote');
+        const policy = a.entries.findIndex((e: VectorEntry) => e.operation === 'app-policy');
+        const vid = '5C464728-4EC7-4FF7-8EF8-816602D3CAEC';
+        a.entries[promote].context = { version_id: vid, version: 'v9.9.9 (trust me)' };
+        a.entries[policy].context = { version_id: vid };
+        const batch = verifyVaultBatch(vector.batch_id, a);
+        const byHandle = (h: string) => batch.entries.find((e) => e.handle === h)!;
+        expect(byHandle(a.entries[promote].handle).versionIdHint).toBe(vid.toLowerCase());
+        expect(byHandle(a.entries[policy].handle).versionIdHint).toBeUndefined();
+        expect(JSON.stringify(batch)).not.toContain('trust me');
+
+        const b = answer();
+        b.entries[promote].context = { version_id: 'v1.2.3; drop table' };
+        expect(verifyVaultBatch(vector.batch_id, b).entries.every((e) => e.versionIdHint === undefined)).toBe(true);
+    });
+
     it('sorts by UTF-8 bytes, as the identity provider does', () => {
         // U+1F600 comes first in UTF-16 units, but after U+FF5E in UTF-8 bytes.
         const base = vector.entries[1];
@@ -262,6 +280,23 @@ describe('groupVaultBatch', () => {
             ['other', undefined, ['example.org/thing']],
         ]);
         expect(groups.flatMap((g) => g.entries)).toHaveLength(list.length);
+    });
+
+    it('gives an app its version only when all its promotes name the same one', () => {
+        const v1 = '11111111-1111-4111-8111-111111111111';
+        const v2 = '22222222-2222-4222-8222-222222222222';
+        const hinted = (handle: string, versionIdHint?: string) => ({ ...entry(handle), versionIdHint });
+        const groups = groupVaultBatch([
+            hinted(`apps.privasys.org/${a}/storage-kek/v1`, v1),
+            hinted(`apps.privasys.org/${a}/registry-cred/default`, v1),
+            hinted(`apps.privasys.org/${b}/storage-kek/v1`, v1),
+            hinted(`apps.privasys.org/${b}/registry-cred/default`, v2),
+            hinted(`apps.privasys.org/${host}/manager/data/v1`, v1),
+        ]);
+        const of = (id: string) => groups.find((g) => g.id === id)!;
+        expect(of(a).versionIdHint).toBe(v1);
+        expect(of(b).versionIdHint).toBeUndefined();
+        expect(of(host).versionIdHint).toBeUndefined();
     });
 
     it('keeps two unknown handles apart', () => {

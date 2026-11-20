@@ -22,6 +22,7 @@
 import { resolveApp } from './app-resolve';
 import { myDeviceTag } from './devices';
 import { signVaultAssertion } from './fido2';
+import { fetchReleaseProvenance, publicApiGet, type ReleaseProvenance } from './release-provenance';
 import {
     dashedAppId,
     isVaultBatchId,
@@ -256,6 +257,44 @@ export async function lookupVaultBatchAppName(appIdHex: string): Promise<string 
     const app = await resolveApp(id).catch(() => null);
     if (!app || app.app_id?.toLowerCase() !== id) return null;
     return app.display_name || app.name || null;
+}
+
+/** A host as the control plane names it to anyone holding its id. */
+export interface VaultBatchHost {
+    /** Absent for a host a customer owns: its name is theirs, not published. */
+    name?: string;
+    region?: string;
+    country?: string;
+    /** The runtime release the host runs now (not the one being approved). */
+    release?: string;
+}
+
+/**
+ * Name the host whose /data key a batch moves, by the enclave id inside the
+ * signed handle. Null when the control plane does not know that id.
+ */
+export async function lookupVaultBatchHost(enclaveIdHex: string): Promise<VaultBatchHost | null> {
+    if (!/^[0-9a-f]{32}$/.test(enclaveIdHex)) return null;
+    const enclaveId = dashedAppId(enclaveIdHex);
+    const got = await publicApiGet<{
+        id?: string;
+        name?: string;
+        region?: string;
+        country?: string;
+        os_release_tag?: string;
+    }>(`/api/v1/enclaves/${enclaveId}/public`);
+    if (!got || got.id?.toLowerCase() !== enclaveId) return null;
+    const text = (v: unknown) => (typeof v === 'string' && v.length > 0 && v.length <= 80 ? v : undefined);
+    return { name: text(got.name), region: text(got.region), country: text(got.country), release: text(got.os_release_tag) };
+}
+
+/**
+ * The published release of the version an app's promotes name. Asked of the
+ * control plane with the app id from the signed handle, so a version of any
+ * other app is refused there. Null when it cannot say.
+ */
+export async function lookupVaultBatchVersion(appIdHex: string, versionId: string): Promise<ReleaseProvenance | null> {
+    return fetchReleaseProvenance(dashedAppId(appIdHex), versionId).catch(() => null);
 }
 
 /**

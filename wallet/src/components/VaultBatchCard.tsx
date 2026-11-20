@@ -44,7 +44,10 @@ import {
     describeApprovalMismatch,
     fetchVaultBatch,
     lookupVaultBatchAppName,
+    lookupVaultBatchHost,
+    lookupVaultBatchVersion,
     resolveApprovalCredential,
+    type VaultBatchHost,
 } from '@/services/vault-approval-api';
 import {
     describeVaultHandle,
@@ -92,6 +95,10 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
     // An app's name by its id: a string once the control plane confirms it,
     // null when it could not, absent while asking.
     const [names, setNames] = useState<Record<string, string | null>>({});
+    // A host by its enclave id, and an app's version label by its app id: the
+    // control plane's answers, shown when they come and never waited for.
+    const [hosts, setHosts] = useState<Record<string, VaultBatchHost | null>>({});
+    const [versions, setVersions] = useState<Record<string, string | null>>({});
     const [readToEnd, setReadToEnd] = useState(false);
     const [busy, setBusy] = useState(false);
     const [now, setNow] = useState(() => Date.now());
@@ -130,6 +137,22 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
                 .then((name) => {
                     if (!cancelled) setNames((prev) => ({ ...prev, [id]: name || null }));
                 });
+        }
+        for (const group of groupVaultBatch(batch.entries)) {
+            const id = group.id;
+            if (!id) continue;
+            if (group.subject === 'host') {
+                void lookupVaultBatchHost(id)
+                    .catch(() => null)
+                    .then((host) => {
+                        if (!cancelled) setHosts((prev) => ({ ...prev, [id]: host }));
+                    });
+            } else if (group.subject === 'app' && group.versionIdHint) {
+                void lookupVaultBatchVersion(id, group.versionIdHint).then((prov) => {
+                    const label = prov?.workload_release?.label || prov?.version?.label || null;
+                    if (!cancelled) setVersions((prev) => ({ ...prev, [id]: label }));
+                });
+            }
         }
         return () => {
             cancelled = true;
@@ -284,7 +307,14 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
                     <RNView style={styles.divider} />
                     <RNView style={extra.groups}>
                         {groups.map((group) => (
-                            <GroupBlock key={group.key} group={group} names={names} styles={styles} />
+                            <GroupBlock
+                                key={group.key}
+                                group={group}
+                                names={names}
+                                host={group.id ? hosts[group.id] : undefined}
+                                version={group.id ? versions[group.id] : undefined}
+                                styles={styles}
+                            />
                         ))}
                     </RNView>
                     <RNView style={styles.divider} />
@@ -368,19 +398,32 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
 function GroupBlock({
     group,
     names,
+    host,
+    version,
     styles,
 }: {
     group: VaultBatchGroup;
     names: Record<string, string | null>;
+    /** The control plane's answer for a host group; absent while asking. */
+    host?: VaultBatchHost | null;
+    /** The published version label for an app group; absent while asking. */
+    version?: string | null;
     styles: ReturnType<typeof taskStyles>;
 }) {
     const { t } = useTranslation();
     const p = usePalette();
     const looked = group.subject === 'app' && group.id ? names[group.id] : undefined;
     const unconfirmed = group.subject === 'app' && looked === null;
+    // Where the host is and what it runs now; an app's published version.
+    const detail =
+        group.subject === 'host'
+            ? [host?.region, host?.release].filter(Boolean).join(' · ')
+            : group.subject === 'app'
+              ? (version ?? '')
+              : '';
     const name =
         group.subject === 'host'
-            ? t('vaultApprovals.batchHostSubject')
+            ? (host?.name ?? t('vaultApprovals.batchHostSubject'))
             : group.subject === 'other'
               ? group.entries[0].handle
               : unconfirmed
@@ -393,6 +436,11 @@ function GroupBlock({
                 <Text style={[styles.lineValue, extra.groupName, unconfirmed && { color: p.warnText }]}>{name}</Text>
                 {group.id ? <Text style={styles.meta}>{shortId(group.id)}</Text> : null}
             </RNView>
+            {detail ? (
+                <Text style={styles.meta} testID="vault-batch-group-detail">
+                    {detail}
+                </Text>
+            ) : null}
             {group.entries.map((entry) => {
                 const kind = describeVaultHandle(entry.handle).kind;
                 const digestLabel =

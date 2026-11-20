@@ -20,6 +20,8 @@
  *
  * Each entry's `context` is written by whoever began the batch and is bound by
  * nothing, so it is dropped here: a verified batch cannot carry it to the screen.
+ * One field survives, as a question rather than an answer: a promote's
+ * version id, which the card asks the control plane about (versionIdHint).
  * This module has no native imports, so all of it runs under test.
  */
 
@@ -29,6 +31,8 @@ const BATCH_DOMAIN = 'privasys-vault-approval-batch-v1';
 const SINGLE_DOMAIN = 'privasys-vault-approval/v1';
 
 export const VAULT_BATCH_MAX_ENTRIES = 32;
+/** A control-plane version id: the only form of entry context the card keeps. */
+const VERSION_ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const MAX_LABEL_CHARS = 120;
 const MAX_HANDLE_BYTES = 512;
 
@@ -75,6 +79,13 @@ export interface VerifiedVaultBatchEntry {
     measurementDigest: string;
     policyVersion: number;
     vaultOp: string;
+    /**
+     * The app version the initiator says this promote is for. Bound by
+     * nothing, so it is never shown: it is only the question the card asks the
+     * control plane, which answers for the app named in the signed handle and
+     * refuses a version of any other app.
+     */
+    versionIdHint?: string;
 }
 
 export interface VerifiedVaultBatch {
@@ -215,12 +226,16 @@ export function verifyVaultBatch(requestedBatchId: string, answer: unknown): Ver
         if (computeVaultOp(handle, digest, version as number, nonce, exp as number) !== vaultOp) {
             throw new VaultBatchRefused('entry');
         }
+        const hint = ((e.context ?? {}) as Record<string, unknown>).version_id;
         verified.push({
             operation: e.operation as VerifiedVaultBatchEntry['operation'],
             handle,
             measurementDigest: digest,
             policyVersion: version as number,
             vaultOp,
+            ...(e.operation === 'promote' && typeof hint === 'string' && VERSION_ID.test(hint)
+                ? { versionIdHint: hint.toLowerCase() }
+                : {}),
         });
     }
 
@@ -293,6 +308,8 @@ export interface VaultBatchGroup {
     /** The app id (hex) or, for a host, the enclave id. Absent for 'other'. */
     id?: string;
     entries: VerifiedVaultBatchEntry[];
+    /** For an app: the version its promotes name, when they all name the same one. */
+    versionIdHint?: string;
 }
 
 /**
@@ -315,6 +332,11 @@ export function groupVaultBatch(entries: readonly VerifiedVaultBatchEntry[]): Va
         const found = groups.get(key);
         if (found) found.entries.push(entry);
         else groups.set(key, { ...group, entries: [entry] });
+    }
+    for (const g of groups.values()) {
+        const hints = new Set(g.entries.map((e) => e.versionIdHint));
+        const only = hints.size === 1 ? [...hints][0] : undefined;
+        if (g.subject === 'app' && only) g.versionIdHint = only;
     }
     const rank = { host: 0, app: 1, other: 2 } as const;
     return [...groups.values()]

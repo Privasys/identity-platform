@@ -11,7 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-native';
+import { StyleSheet, Pressable, Alert, ScrollView, Switch, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -21,7 +21,7 @@ import { LanguagePicker } from '@/components/LanguagePicker';
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
-import { APP_LOCK_OPTIONS, type AppLockSeconds } from '@/services/app-lock';
+import { APP_LOCK_DEFAULT, APP_LOCK_OPTIONS, type AppLockSeconds } from '@/services/app-lock';
 import { isDemo } from '@/services/demo/gate';
 import { listDevices } from '@/services/devices';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
@@ -73,27 +73,39 @@ export default function SettingsScreen() {
                 {isDemo() ? null : (
                     <>
                         <Text style={styles.sectionTitle}>{t('appLock.title')}</Text>
-                        <Text style={styles.sectionDescription}>{t('appLock.settingsDescription')}</Text>
-                        <View style={styles.optionsRow}>
-                            {([null, ...APP_LOCK_OPTIONS] as const).map((sec) => (
-                                <Pressable
-                                    key={String(sec)}
-                                    style={[styles.optionButton, appLockSec === sec && styles.optionButtonActive]}
-                                    onPress={() => void chooseAppLock(sec)}
-                                    accessibilityRole="button"
-                                    accessibilityState={{ selected: appLockSec === sec }}
-                                    testID={`settings-app-lock-${sec ?? 'off'}`}
-                                >
-                                    <Text style={[styles.optionText, appLockSec === sec && styles.optionTextActive]}>
-                                        {sec === null
-                                            ? t('appLock.off')
-                                            : sec === 0
-                                              ? t('settings.gracePeriodAlways')
-                                              : t('appLock.minutes', { count: sec / 60 })}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </View>
+                        <RNView style={styles.toggleRow}>
+                            <RNView style={styles.toggleText}>
+                                <Text style={styles.toggleLabel}>{t('appLock.offerHeading')}</Text>
+                                <Text style={styles.toggleHint}>{t('appLock.settingsDescription')}</Text>
+                            </RNView>
+                            <Switch
+                                value={appLockSec != null}
+                                onValueChange={(on) => void chooseAppLock(on ? APP_LOCK_DEFAULT : null)}
+                                trackColor={{ false: p.border, true: p.green }}
+                                thumbColor="#FFFFFF"
+                                accessibilityLabel={t('appLock.offerHeading')}
+                                testID="settings-app-lock"
+                            />
+                        </RNView>
+                        {/* When it locks again, once it is on. */}
+                        {appLockSec == null ? null : (
+                            <View style={styles.optionsRow}>
+                                {APP_LOCK_OPTIONS.map((sec) => (
+                                    <Pressable
+                                        key={String(sec)}
+                                        style={[styles.optionButton, appLockSec === sec && styles.optionButtonActive]}
+                                        onPress={() => void chooseAppLock(sec)}
+                                        accessibilityRole="button"
+                                        accessibilityState={{ selected: appLockSec === sec }}
+                                        testID={`settings-app-lock-${sec}`}
+                                    >
+                                        <Text style={[styles.optionText, appLockSec === sec && styles.optionTextActive]}>
+                                            {sec === 0 ? t('settings.gracePeriodAlways') : t('appLock.minutes', { count: sec / 60 })}
+                                        </Text>
+                                    </Pressable>
+                                ))}
+                            </View>
+                        )}
                     </>
                 )}
 
@@ -157,25 +169,6 @@ export default function SettingsScreen() {
                     mints a NEW identity; the old one needs recovery), which is
                     account surgery, not a setting. */}
 
-                {/* Push Token */}
-                {pushToken ? (
-                    <>
-                        <Text style={styles.sectionTitle}>{t('settings.pushTokenTitle')}</Text>
-                        <Pressable
-                            style={styles.pushTokenCard}
-                            onPress={() => {
-                                Clipboard.setStringAsync(pushToken);
-                                Alert.alert(t('common.copied'), t('settings.pushTokenCopied'));
-                            }}
-                        >
-                            <Text style={styles.pushTokenText} numberOfLines={2}>
-                                {pushToken}
-                            </Text>
-                            <Ionicons name="copy-outline" size={18} color={p.textSecondary} />
-                        </Pressable>
-                    </>
-                ) : null}
-
                 {phones > 0 ? (
                     <>
                         <Text style={styles.sectionTitle}>{t('devices.settingsTitle')}</Text>
@@ -230,6 +223,25 @@ export default function SettingsScreen() {
                         </ExternalLink>
                     </View>
                 </View>
+
+                {/* Push Token: for support, so last. */}
+                {pushToken ? (
+                    <>
+                        <Text style={styles.sectionTitle}>{t('settings.pushTokenTitle')}</Text>
+                        <Pressable
+                            style={styles.pushTokenCard}
+                            onPress={() => {
+                                Clipboard.setStringAsync(pushToken);
+                                Alert.alert(t('common.copied'), t('settings.pushTokenCopied'));
+                            }}
+                        >
+                            <Text style={styles.pushTokenText} numberOfLines={2}>
+                                {pushToken}
+                            </Text>
+                            <Ionicons name="copy-outline" size={18} color={p.textSecondary} />
+                        </Pressable>
+                    </>
+                ) : null}
             </ScrollView>
         </RNView>
     );
@@ -370,6 +382,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         paddingVertical: 12,
         marginBottom: 8,
     },
+    toggleText: { flex: 1, backgroundColor: 'transparent' },
     toggleLabel: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
     toggleHint: { fontSize: 12, color: p.textSecondary, marginTop: 2 },
 });

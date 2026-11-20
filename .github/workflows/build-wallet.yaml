@@ -419,6 +419,22 @@ jobs:
         working-directory: wallet
         run: bun install --frozen-lockfile
 
+      # The runner image has neither NDK the build asks for, and Gradle
+      # downloads them mid-build with no retry: one truncated download of
+      # 27.0 ("Archive is not a ZIP archive") failed 1.4.67's Android build.
+      # Installed here, a bad download is retried before the build starts.
+      - name: Install the NDKs
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          for ndk in 27.1.12297006 27.0.12077973; do
+            for attempt in 1 2 3; do
+              if [ -f "$ANDROID_HOME/ndk/$ndk/source.properties" ]; then break; fi
+              rm -rf "$ANDROID_HOME/ndk/$ndk"
+              yes | "$SDKM" --install "ndk;$ndk" > /dev/null || echo "NDK $ndk: attempt $attempt failed"
+            done
+            test -f "$ANDROID_HOME/ndk/$ndk/source.properties" || { echo "::error::NDK $ndk did not install"; exit 1; }
+          done
+
       - name: Setup EAS
         uses: expo/expo-github-action@v9
         with:

@@ -54,6 +54,7 @@ const LOGO_INK = '#0F172A';
 /** The white gap between the halves. */
 const GAP = 20;
 const OPEN_MS = 450;
+const CLOSE_MS = 300;
 /** The longest the lock waits for a tapped push to open its screen. */
 const PUSH_WAIT_MS = 4000;
 
@@ -64,7 +65,7 @@ export async function unlockWallet(prompt: string, cancel: string): Promise<bool
     return r.success;
 }
 
-type Mode = 'shut' | 'opening' | 'gone';
+type Mode = 'shut' | 'closing' | 'opening' | 'gone';
 
 export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?: () => void }) {
     const { t } = useTranslation();
@@ -121,9 +122,10 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
     const cover = on && away;
     const shut = launching || showLock || cover;
 
-    // Closing is instant: it happens at start, or while the wallet is out of
-    // sight. Opening slides, after a start or an unlock; a cover over an
-    // unlocked wallet just goes.
+    // Opening slides, after a start or an unlock; a cover over an unlocked
+    // wallet just goes. Closing slides too when the holder is watching (leaving
+    // an approval screen without approving), and is instant at start or while
+    // the wallet is out of sight.
     const progress = useSharedValue(0);
     const [mode, setMode] = useState<Mode>('shut');
     const slideNext = useRef(true);
@@ -139,12 +141,20 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
     useEffect(() => {
         if (shut) {
             cancelAnimation(progress);
-            progress.value = 0;
             if (launching || showLock) slideNext.current = true;
+            if (!launching && !cover && appState === 'active' && mode !== 'shut') {
+                setMode('closing');
+                progress.value = withTiming(0, { duration: CLOSE_MS, easing: Easing.out(Easing.cubic) }, (done) => {
+                    if (done) runOnJS(setMode)('shut');
+                });
+                return;
+            }
+            progress.value = 0;
             setMode('shut');
             return;
         }
-        if (mode !== 'shut') return;
+        if (mode !== 'shut' && mode !== 'closing') return;
+        cancelAnimation(progress);
         if (!slideNext.current) {
             setMode('gone');
             return;
@@ -228,7 +238,7 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
     return (
         <RNView
             style={[StyleSheet.absoluteFill, styles.screen, closed && styles.ground]}
-            pointerEvents={closed ? 'auto' : 'none'}
+            pointerEvents={mode === 'opening' ? 'none' : 'auto'}
             accessibilityViewIsModal={closed}
             testID="app-lock"
             onLayout={() => {

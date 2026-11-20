@@ -2,22 +2,40 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * The app lock's screen (services/app-lock), drawn above everything.
+ * The logo is the lock (services/app-lock). The wallet opens on the logo's two
+ * halves, closed, the green over the blue with a white gap between them. They
+ * slide apart onto the wallet:
  *
- * - Locked: the wallet asks for Face ID by itself, then offers Unlock if the
- *   holder cancelled. The phone's passcode is accepted where Face ID fails.
- * - Away (in the app switcher, under Control Centre): a plain cover, so the
- *   switcher's preview does not show the screen that was open.
+ * - at start, straight away when the lock is off, or once Face ID succeeds;
+ * - on coming back after the chosen time, once Face ID succeeds again.
  *
- * Both only while the lock is on. A request screen that needs its own Face ID
- * (services/app-lock lockExempt) opens without the unlock.
+ * Face ID is asked for by itself, over the closed halves. If the holder
+ * cancels it, Unlock waits at the bottom, clear of where iOS draws Face ID.
+ *
+ * While the wallet is away (in the app switcher, under Control Centre) the
+ * halves close as a cover, so the switcher's preview shows the logo rather
+ * than the screen that was open. They go without a slide when the wallet comes
+ * back unlocked.
+ *
+ * A request screen that needs its own Face ID (services/app-lock lockExempt)
+ * opens without the unlock.
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { usePathname } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Platform, Pressable, StyleSheet, View as RNView, type AppStateStatus } from 'react-native';
+import {
+    AppState,
+    Platform,
+    Pressable,
+    StyleSheet,
+    View as RNView,
+    useWindowDimensions,
+    type AppStateStatus,
+} from 'react-native';
+import Animated, { Easing, cancelAnimation, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { taskStyles } from '@/components/task-styles';
@@ -28,6 +46,15 @@ import { useAppLockStore } from '@/stores/app-lock';
 import { useProfileStore } from '@/stores/profile';
 import { useSettingsStore } from '@/stores/settings';
 
+/** The app icon's colours, which the halves are. */
+const LOGO_GREEN = '#34C17B';
+const LOGO_BLUE = '#00AAEE';
+const LOGO_GROUND = '#FFFFFF';
+const LOGO_INK = '#0F172A';
+/** The white gap between the halves. */
+const GAP = 20;
+const OPEN_MS = 450;
+
 /** Ask for Face ID to open the wallet. True once the holder is verified. */
 export async function unlockWallet(prompt: string, cancel: string): Promise<boolean> {
     const r = await withPrompt(() => LocalAuthentication.authenticateAsync({ promptMessage: prompt, cancelLabel: cancel }));
@@ -35,11 +62,15 @@ export async function unlockWallet(prompt: string, cancel: string): Promise<bool
     return r.success;
 }
 
-export function AppLock({ ready }: { ready: boolean }) {
+type Mode = 'shut' | 'opening' | 'gone';
+
+export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?: () => void }) {
     const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const pathname = usePathname();
+    const insets = useSafeAreaInsets();
+    const { width: W, height: H } = useWindowDimensions();
 
     const hasProfile = useProfileStore((s) => s.profile != null);
     const lockSec = useSettingsStore((s) => s.appLockSec);
@@ -48,14 +79,17 @@ export function AppLock({ ready }: { ready: boolean }) {
 
     const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
     const [busy, setBusy] = useState(false);
+    // Face ID was cancelled or failed: Unlock shows.
+    const [failed, setFailed] = useState(false);
 
-    // A start with the lock on begins locked.
-    const started = useRef(false);
+    // The halves start closed. With the lock on, the start is a lock.
+    const [launching, setLaunching] = useState(true);
     useEffect(() => {
-        if (started.current || !ready) return;
-        started.current = true;
         if (on) useAppLockStore.getState().lock();
-    }, [on, ready]);
+        setLaunching(false);
+        // Once, at start.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Away and back: locked again once the chosen time has passed.
     useEffect(() => {
@@ -72,14 +106,63 @@ export function AppLock({ ready }: { ready: boolean }) {
         return () => sub.remove();
     }, [on]);
 
-    const exempt = lockExempt(pathname);
-    const showLock = on && ready && locked && !exempt;
+    const showLock = on && locked && !lockExempt(pathname);
+    // iOS draws the switcher's preview just after the app goes inactive;
+    // Android once it is in the background. Not while a Face ID prompt of the
+    // wallet's own makes it inactive.
+    const away =
+        Platform.OS === 'ios'
+            ? (appState === 'inactive' || appState === 'background') && !promptOpen()
+            : appState === 'background';
+    const cover = on && away;
+    const shut = launching || showLock || cover;
+
+    // Closing is instant: it happens at start, or while the wallet is out of
+    // sight. Opening slides, after a start or an unlock; a cover over an
+    // unlocked wallet just goes.
+    const progress = useSharedValue(0);
+    const [mode, setMode] = useState<Mode>('shut');
+    const slideNext = useRef(true);
+    const opened = useRef(false);
+    const finishOpen = useCallback(() => {
+        setMode('gone');
+        slideNext.current = false;
+        if (!opened.current) {
+            opened.current = true;
+            onOpened?.();
+        }
+    }, [onOpened]);
+    useEffect(() => {
+        if (shut) {
+            cancelAnimation(progress);
+            progress.value = 0;
+            if (launching || showLock) slideNext.current = true;
+            setMode('shut');
+            return;
+        }
+        if (mode !== 'shut') return;
+        if (!slideNext.current) {
+            setMode('gone');
+            return;
+        }
+        setMode('opening');
+        progress.value = withTiming(1, { duration: OPEN_MS, easing: Easing.in(Easing.cubic) }, (done) => {
+            if (done) runOnJS(finishOpen)();
+        });
+        // `mode` is read, not followed: the effect answers `shut` changing.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shut, launching, showLock]);
+
+    useEffect(() => {
+        if (!showLock) setFailed(false);
+    }, [showLock]);
 
     const unlock = useCallback(async () => {
         if (busy) return;
         setBusy(true);
         try {
-            await unlockWallet(t('appLock.prompt'), t('common.cancel'));
+            const ok = await unlockWallet(t('appLock.prompt'), t('common.cancel'));
+            setFailed(!ok);
         } finally {
             setBusy(false);
         }
@@ -101,24 +184,54 @@ export function AppLock({ ready }: { ready: boolean }) {
         return () => clearTimeout(timer);
     }, [showLock, appState, unlock]);
 
-    // iOS draws the switcher's preview just after the app goes inactive; Android
-    // once it is in the background.
-    const away =
-        Platform.OS === 'ios'
-            ? (appState === 'inactive' || appState === 'background') && !promptOpen()
-            : appState === 'background';
-    const showCover = on && away;
+    // Two squares turned 45°, much larger than the screen, each with an edge
+    // GAP/2 from the diagonal through the centre.
+    const size = Math.max(W, H) * 1.5;
+    const offset = ((size + GAP) * Math.SQRT2) / 4;
+    const greenStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: -progress.value * H }, { rotate: '-45deg' }],
+    }));
+    const blueStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: progress.value * H }, { rotate: '-45deg' }],
+    }));
 
-    if (!showLock && !showCover) return null;
+    const shown = useRef(false);
+    if (mode === 'gone') return null;
+    const closed = mode === 'shut';
     return (
-        <RNView style={[StyleSheet.absoluteFill, styles.screen]} testID="app-lock">
-            <RNView style={styles.centre}>
-                <RNView style={styles.badge}>
-                    <Ionicons name="lock-closed" size={30} color={p.green} />
+        <RNView
+            style={[StyleSheet.absoluteFill, styles.screen, closed && styles.ground]}
+            pointerEvents={closed ? 'auto' : 'none'}
+            accessibilityViewIsModal={closed}
+            testID="app-lock"
+            onLayout={() => {
+                if (shown.current) return;
+                shown.current = true;
+                onShown?.();
+            }}
+        >
+            <Animated.View
+                style={[
+                    styles.half,
+                    { width: size, height: size, top: H / 2 - offset - size / 2, left: W / 2 - offset - size / 2, backgroundColor: LOGO_GREEN },
+                    greenStyle,
+                ]}
+            />
+            <Animated.View
+                style={[
+                    styles.half,
+                    { width: size, height: size, top: H / 2 + offset - size / 2, left: W / 2 + offset - size / 2, backgroundColor: LOGO_BLUE },
+                    blueStyle,
+                ]}
+            />
+            {/* The lock sits in the gap while the wallet is locked. */}
+            {closed && on && (locked || cover) ? (
+                <RNView style={[styles.gapLock, { top: H / 2 - GAP_LOCK / 2, left: W / 2 - GAP_LOCK / 2 }]} pointerEvents="none">
+                    <Ionicons name="lock-closed" size={18} color={LOGO_INK} />
                 </RNView>
-                {/* The cover says nothing: it may only be the app switcher. */}
-                {showLock && !showCover ? <Text style={styles.lockTitle}>{t('appLock.lockedTitle')}</Text> : null}
-                {showLock && !showCover ? (
+            ) : null}
+            {closed && showLock && failed && !cover ? (
+                <RNView style={[styles.bottom, { paddingBottom: insets.bottom + 24 }]}>
                     <Pressable
                         style={[styles.affirmButton, styles.unlock, busy && styles.buttonIdle]}
                         disabled={busy}
@@ -126,28 +239,33 @@ export function AppLock({ ready }: { ready: boolean }) {
                         accessibilityRole="button"
                         testID="app-lock-unlock"
                     >
-                        <Text style={styles.affirmButtonText}>{t('appLock.unlock')}</Text>
+                        <Text style={[styles.affirmButtonText, styles.unlockText]}>{t('appLock.unlock')}</Text>
                     </Pressable>
-                ) : null}
-            </RNView>
+                </RNView>
+            ) : null}
         </RNView>
     );
 }
 
+const GAP_LOCK = 44;
+
 const makeStyles = (p: Palette) => ({
     ...taskStyles(p),
     ...StyleSheet.create({
-        screen: { backgroundColor: p.screenBg, zIndex: 1000, elevation: 1000 },
-        centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 },
-        badge: {
-            width: 64,
-            height: 64,
-            borderRadius: 32,
-            backgroundColor: p.card,
+        screen: { zIndex: 1000, elevation: 1000, overflow: 'hidden' },
+        ground: { backgroundColor: LOGO_GROUND },
+        half: { position: 'absolute' },
+        gapLock: {
+            position: 'absolute',
+            width: GAP_LOCK,
+            height: GAP_LOCK,
+            borderRadius: GAP_LOCK / 2,
+            backgroundColor: LOGO_GROUND,
             alignItems: 'center',
             justifyContent: 'center',
         },
-        lockTitle: { fontSize: 17, fontWeight: '600', color: p.textPrimary, textAlign: 'center' },
-        unlock: { flex: 0, alignSelf: 'stretch', marginTop: 8 },
+        bottom: { position: 'absolute', left: 24, right: 24, bottom: 0 },
+        unlock: { flex: 0, alignSelf: 'stretch', backgroundColor: LOGO_GROUND },
+        unlockText: { color: LOGO_INK },
     }),
 });

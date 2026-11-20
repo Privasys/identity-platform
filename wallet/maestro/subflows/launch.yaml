@@ -1,5 +1,5 @@
 # A fresh launch of the demo wallet, waited on until Profile is drawn and the
-# splash animation has gone.
+# logo has opened onto it (components/AppLock).
 appId: org.privasys.wallet.demo
 ---
 - launchApp:

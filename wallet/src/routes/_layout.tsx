@@ -9,7 +9,6 @@ import 'react-native-get-random-values';
 import 'react-native-reanimated';
 
 import { AppLock } from '@/components/AppLock';
-import { SplashAnimation } from '@/components/SplashAnimation';
 import { Notice } from '@/components/Notice';
 import { UpdateGate } from '@/components/UpdateGate';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -106,7 +105,8 @@ export default function RootLayout() {
     // absent network never delays the app.
     const { notice: updateNotice, dismiss: dismissUpdate } = useUpdateGate();
     const [storesReady, setStoresReady] = useState(isDemo());
-    const [showSplashAnim, setShowSplashAnim] = useState(true);
+    // The logo has opened onto the wallet (components/AppLock).
+    const [opened, setOpened] = useState(false);
 
     // Hydrate persisted stores on app launch, once the secrets written before
     // they stayed on this phone have been moved (utils/storage.ts).
@@ -152,8 +152,8 @@ export default function RootLayout() {
         if (error) throw error;
     }, [error]);
 
-    const onSplashComplete = useCallback(() => {
-        setShowSplashAnim(false);
+    const onOpened = useCallback(() => {
+        setOpened(true);
     }, []);
 
     if (!loaded || !storesReady) {
@@ -162,9 +162,9 @@ export default function RootLayout() {
 
     return (
         <>
-            <RootLayoutNav hasProfile={hasProfile} ready={!showSplashAnim} />
+            <RootLayoutNav hasProfile={hasProfile} ready={opened} />
             <Notice />
-            {/* Above the navigator, below the splash. A required notice has no
+            {/* Above the navigator, below the logo. A required notice has no
                 dismiss handler, and that absence IS what makes it a wall: there
                 is no flag the screen could be talked out of. */}
             {updateNotice && (
@@ -173,14 +173,9 @@ export default function RootLayout() {
                     onDismiss={updateNotice.level === 'required' ? undefined : dismissUpdate}
                 />
             )}
-            {/* Above every screen and notice, below the splash. */}
-            <AppLock ready={!showSplashAnim} />
-            {showSplashAnim && (
-                <SplashAnimation
-                    onComplete={onSplashComplete}
-                    onReady={() => SplashScreen.hideAsync()}
-                />
-            )}
+            {/* The logo, above everything: it opens onto the wallet at start and
+                closes over it as the lock (components/AppLock). */}
+            <AppLock onShown={() => SplashScreen.hideAsync()} onOpened={onOpened} />
         </>
     );
 }

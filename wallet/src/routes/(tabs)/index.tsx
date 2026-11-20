@@ -19,7 +19,6 @@ import {
     View as RNView,
     Alert,
     ActivityIndicator,
-    Image,
     Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -45,6 +44,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useProfileStore } from '@/stores/profile';
 import { usePane } from '@/components/pane';
+import { IdentityCard } from '@/components/IdentityCard';
 import { TabHeader } from '@/components/TabHeader';
 
 export default function ProfileScreen() {
@@ -117,6 +117,9 @@ export default function ProfileScreen() {
         profile?.avatarUri ||
         profile?.attributes.find((a) => a.key === 'picture_id' && a.value)?.value ||
         '';
+    // The card says the ID was checked once the identity enclave has
+    // certified an attribute from a passport or ID card.
+    const idChecked = !!profile?.attributes.some((a) => a.verifications?.some((v) => v.assurance === 'gov'));
     useEffect(() => {
         let alive = true;
         void biometricLabelKey().then((l) => {
@@ -338,48 +341,25 @@ export default function ProfileScreen() {
 
     return (
         <RNView style={styles.screen} testID="profile-screen">
-            {/* Header */}
-            <TabHeader title={t('tabs.profile')} />
+            {/* On a phone the identity card is the header, with no band above it;
+                a wide window heads the column with the tab name, as every tab does
+                there (components/TabHeader). */}
+            {pane ? <TabHeader title={t('tabs.profile')} /> : null}
 
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, pane ? null : { paddingTop: insets.top + 12 }]}
                 showsVerticalScrollIndicator={false}
             >
                 <RNView style={twoColumns ? styles.columns : undefined}>
                 <RNView style={column}>
-                {/* Avatar + Name */}
-                <RNView style={styles.profileCard}>
-                    {/* A picture only when there is one: the avatar the holder
-                        set, or failing that the photo from their ID. No initial
-                        in a circle and no placeholder silhouette. Tapping it
-                        sets the avatar; with no picture, a line of text does. */}
-                    {avatarSource ? (
-                        <Pressable
-                            style={styles.avatarContainer}
-                            onPress={chooseAvatar}
-                            accessibilityRole="button"
-                            accessibilityLabel={t('profile.photoTitle')}
-                        >
-                            <Image
-                                source={{ uri: avatarSource }}
-                                style={styles.avatarImage}
-                                onError={(e) =>
-                                    console.warn('[avatar] failed to load', e.nativeEvent?.error)
-                                }
-                            />
-                        </Pressable>
-                    ) : null}
-                    <Text style={styles.profileName}>{shownName}</Text>
-                    {profile.email ? (
-                        <Text style={styles.profileEmail}>{profile.email}</Text>
-                    ) : null}
-                    {avatarSource ? null : (
-                        <Pressable onPress={chooseAvatar} hitSlop={8} style={styles.addPhoto}>
-                            <Text style={styles.addPhotoText}>{t('profile.addPhoto')}</Text>
-                        </Pressable>
-                    )}
-                </RNView>
+                <IdentityCard
+                    name={shownName}
+                    email={profile.email}
+                    avatar={avatarSource}
+                    idChecked={idChecked}
+                    onChooseAvatar={chooseAvatar}
+                />
 
                 {/* DID */}
                 {/* The three identifiers live one tap away. Three long strings
@@ -748,23 +728,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         fontWeight: '500',
     },
 
-    profileCard: {
-        alignItems: 'center',
-        backgroundColor: p.card,
-        borderRadius: 16,
-        padding: 24,
-        marginBottom: 24
-    },
-    avatarContainer: { marginBottom: 16 },
-    avatarImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-    },
-    profileName: { fontSize: 22, fontWeight: '700', color: p.textPrimary, marginBottom: 4 },
-    profileEmail: { fontSize: 15, color: p.textSecondary },
-    addPhoto: { marginTop: 10 },
-    addPhotoText: { fontSize: 15, fontWeight: '600', color: p.blue },
     countBadge: {
         minWidth: 20,
         height: 20,

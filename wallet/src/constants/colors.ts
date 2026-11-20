@@ -57,6 +57,12 @@ export type Palette = {
     infoText: string;
     /** Neutral button background (Reject/Cancel). */
     buttonNeutral: string;
+    /** The identity card on Profile: dark in both schemes. */
+    idCard: string;
+    /** Text on the identity card. */
+    onIdCard: string;
+    /** Secondary text on the identity card. */
+    onIdCardMuted: string;
     /** Brand accents (scheme-invariant). */
     green: string;
     blue: string;
@@ -87,6 +93,9 @@ const light: Palette = {
     infoBorder: '#5EEAD4',
     infoText: '#0F766E',
     buttonNeutral: 'rgba(128,128,128,0.2)',
+    idCard: '#0F172A',
+    onIdCard: '#FFFFFF',
+    onIdCardMuted: '#A9B6C4',
     ...brand,
 };
 
@@ -111,6 +120,9 @@ const dark: Palette = {
     infoBorder: '#0F766E',
     infoText: '#5EEAD4',
     buttonNeutral: 'rgba(148,163,184,0.25)',
+    idCard: '#1E293B',
+    onIdCard: '#F1F5F9',
+    onIdCardMuted: '#94A3B8',
     ...brand,
 };
 

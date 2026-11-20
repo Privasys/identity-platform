@@ -17,6 +17,11 @@
  * than the screen that was open. They go without a slide when the wallet comes
  * back unlocked.
  *
+ * JavaScript draws a frame or two late for the snapshot iOS takes as the app
+ * goes to the background, so a native cover (modules/privacy-cover) is added
+ * in that moment, the same closed halves, and lifted once this screen has
+ * caught up on return.
+ *
  * A request screen that needs its own Face ID (services/app-lock lockExempt)
  * opens without the unlock.
  */
@@ -38,6 +43,7 @@ import Animated, { Easing, cancelAnimation, runOnJS, useAnimatedStyle, useShared
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import * as PrivacyCover from '../../modules/privacy-cover/src/index';
 import { taskStyles } from '@/components/task-styles';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { locksOnReturn, lockExempt, promptOpen, withPrompt } from '@/services/app-lock';
@@ -110,6 +116,20 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
         });
         return () => sub.remove();
     }, [on]);
+
+    // The native cover follows the lock, and is lifted once this screen has
+    // drawn what the return calls for: the lock, or the wallet.
+    useEffect(() => {
+        PrivacyCover.setEnabled(on);
+    }, [on]);
+    useEffect(() => {
+        if (appState !== 'active') return;
+        // Two frames: the one that draws it, and the one that shows it.
+        let frame = requestAnimationFrame(() => {
+            frame = requestAnimationFrame(() => PrivacyCover.release());
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [appState]);
 
     const showLock = on && locked && !lockExempt(pathname);
     // iOS draws the switcher's preview just after the app goes inactive;

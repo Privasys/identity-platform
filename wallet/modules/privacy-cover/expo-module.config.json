@@ -1,0 +1,9 @@
+{
+    "platforms": ["ios", "android"],
+    "ios": {
+        "modules": ["PrivacyCoverModule"]
+    },
+    "android": {
+        "modules": ["org.privasys.privacycover.PrivacyCoverModule"]
+    }
+}

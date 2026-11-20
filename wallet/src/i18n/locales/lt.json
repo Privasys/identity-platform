@@ -1509,5 +1509,18 @@
     "removeThisConfirm": "Pašalinti ir ištrinti",
     "addHint": "Norėdami pridėti telefoną, įdiekite jame Privasys Wallet, pasirinkite „Jau naudoju Privasys Wallet kitame telefone“ ir šiuo telefonu nuskaitykite jame rodomą kodą.",
     "limitNote": "Didžiausias leidžiamas telefonų skaičius: {{max}}."
+  },
+  "appLock": {
+    "title": "Programėlės užraktas",
+    "offerHeading": "Užrakinti piniginę",
+    "offerBody": "Prašyti {{biometric}} kaskart atidarant piniginę, kad niekas, laikantis jūsų atrakintą telefoną, negalėtų matyti, kas joje yra.",
+    "offerNote": "Tai galite bet kada pakeisti skiltyje Nustatymai.",
+    "turnOn": "Įjungti",
+    "prompt": "Atrakinti piniginę",
+    "lockedTitle": "Piniginė užrakinta",
+    "unlock": "Atrakinti",
+    "settingsDescription": "Prašyti patvirtinti, kad tai jūs, kaskart atidarant piniginę ir grįžus prie jos po pasirinkto laiko.",
+    "off": "Išj.",
+    "minutes": "{{count}} min."
   }
 }

@@ -18,6 +18,7 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { withPrompt } from '@/services/app-lock';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -113,11 +114,13 @@ export default function DriveRequestsScreen() {
 
     const decide = useCallback(
         async (req: ShareRequest, decision: 'approve' | 'deny') => {
-            const auth = await LocalAuthentication.authenticateAsync({
-                promptMessage: decision === 'approve'
-                    ? t('driveRequests.promptApprove', { item: req.nodeName })
-                    : t('driveRequests.promptDeny', { item: req.nodeName }),
-            });
+            const auth = await withPrompt(() =>
+                LocalAuthentication.authenticateAsync({
+                    promptMessage: decision === 'approve'
+                        ? t('driveRequests.promptApprove', { item: req.nodeName })
+                        : t('driveRequests.promptDeny', { item: req.nodeName }),
+                }),
+            );
             if (!auth.success) return;
             setBusy(req.requestId);
             try {

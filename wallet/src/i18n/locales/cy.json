@@ -1586,5 +1586,18 @@
     "removeThisConfirm": "Tynnu a chlirio",
     "addHint": "I ychwanegu ffôn, gosodwch Privasys Wallet arno, dewiswch „Rwy'n defnyddio Privasys Wallet ar ffôn arall yn barod”, a sganiwch y cod y mae'n ei ddangos gyda'r ffôn hwn.",
     "limitNote": "Gallwch gael hyd at {{max}} ffôn."
+  },
+  "appLock": {
+    "title": "Clo Ap",
+    "offerHeading": "Cloi'r waled",
+    "offerBody": "Gofyn am {{biometric}} bob tro y byddwch yn agor y waled, fel na all neb sy'n dal eich ffôn heb ei gloi weld beth sydd ynddi.",
+    "offerNote": "Gallwch newid hyn unrhyw bryd yn y Gosodiadau.",
+    "turnOn": "Troi ymlaen",
+    "prompt": "Datgloi'r waled",
+    "lockedTitle": "Mae'r waled wedi'i chloi",
+    "unlock": "Datgloi",
+    "settingsDescription": "Gofyn i gadarnhau mai chi sydd yno bob tro y byddwch yn agor y waled, a phan fyddwch yn dod yn ôl ati ar ôl yr amser a ddewiswyd.",
+    "off": "I ffwrdd",
+    "minutes": "{{count}} mun"
   }
 }

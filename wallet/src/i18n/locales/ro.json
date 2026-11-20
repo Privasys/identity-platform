@@ -1508,5 +1508,18 @@
     "removeThisConfirm": "Elimină și șterge",
     "addHint": "Pentru a adăuga un telefon, instalează pe el Privasys Wallet, alege „Folosesc deja Privasys Wallet pe alt telefon” și scanează cu acest telefon codul pe care îl afișează.",
     "limitNote": "Numărul maxim de telefoane: {{max}}."
+  },
+  "appLock": {
+    "title": "Blocare aplicație",
+    "offerHeading": "Blochează portofelul",
+    "offerBody": "Cere {{biometric}} de fiecare dată când deschizi portofelul, ca nimeni care îți ține telefonul deblocat să nu poată vedea ce conține.",
+    "offerNote": "Poți schimba asta oricând în Setări.",
+    "turnOn": "Activează",
+    "prompt": "Deblochează portofelul",
+    "lockedTitle": "Portofelul este blocat",
+    "unlock": "Deblochează",
+    "settingsDescription": "Cere să confirmi că ești tu de fiecare dată când deschizi portofelul și când revii la el după timpul ales.",
+    "off": "Nu",
+    "minutes": "{{count}} min"
   }
 }

@@ -1471,5 +1471,18 @@
     "removeThisConfirm": "Poista ja tyhjennä",
     "addHint": "Lisää puhelin asentamalla siihen Privasys Wallet, valitsemalla ”Käytän jo Privasys Walletia toisessa puhelimessa” ja skannaamalla sen näyttämä koodi tällä puhelimella.",
     "limitNote": "Sinulla voi olla enintään {{max}} puhelinta."
+  },
+  "appLock": {
+    "title": "Sovelluslukitus",
+    "offerHeading": "Lukitse lompakko",
+    "offerBody": "Kysy {{biometric}} aina, kun avaat lompakon, jotta kukaan lukitsematonta puhelintasi pitelevä ei näe sen sisältöä.",
+    "offerNote": "Voit muuttaa tätä milloin tahansa Asetuksissa.",
+    "turnOn": "Ota käyttöön",
+    "prompt": "Avaa lompakon lukitus",
+    "lockedTitle": "Lompakko on lukittu",
+    "unlock": "Avaa",
+    "settingsDescription": "Pyydä vahvistamaan henkilöllisyytesi aina, kun avaat lompakon, ja kun palaat siihen valitun ajan jälkeen.",
+    "off": "Pois",
+    "minutes": "{{count}} min"
   }
 }

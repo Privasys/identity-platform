@@ -1560,5 +1560,18 @@
     "removeThisConfirm": "Neħħi u ħassar",
     "addHint": "Biex iżżid telefown, installa Privasys Wallet fuqu, agħżel „Diġà nuża Privasys Wallet fuq telefown ieħor” u skennja l-kodiċi li juri b'dan it-telefown.",
     "limitNote": "L-għadd massimu ta' telefowns: {{max}}."
+  },
+  "appLock": {
+    "title": "Lokk tal-App",
+    "offerHeading": "Sakkar il-kartiera",
+    "offerBody": "Itlob {{biometric}} kull darba li tiftaħ il-kartiera, biex ħadd li jkollu t-telefon miftuħ tiegħek f'idejh ma jkun jista' jara x'fiha.",
+    "offerNote": "Tista' tibdel dan meta trid fl-Issettjar.",
+    "turnOn": "Ixgħel",
+    "prompt": "Iftaħ il-kartiera",
+    "lockedTitle": "Il-kartiera msakkra",
+    "unlock": "Iftaħ",
+    "settingsDescription": "Itlob konferma li int kull darba li tiftaħ il-kartiera, u meta terġa' lura għaliha wara l-ħin magħżul.",
+    "off": "Mitfi",
+    "minutes": "{{count}} min"
   }
 }

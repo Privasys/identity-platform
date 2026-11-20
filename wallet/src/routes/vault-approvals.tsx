@@ -14,7 +14,6 @@
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -25,11 +24,9 @@ import {
     Alert,
     ActivityIndicator,
     Linking,
-    Platform,
     RefreshControl,
 } from 'react-native';
 
-import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { taskStyles } from '@/components/task-styles';
@@ -45,6 +42,7 @@ import {
     type VaultApprovalRequest,
 } from '@/services/vault-approval-api';
 import { notify } from '@/stores/notice';
+import { freshBiometric } from '@/services/approval-answer';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 import { useActiveRoute } from '@/utils/active-route';
@@ -194,18 +192,9 @@ function VaultApprovalsScreen() {
             // context instead lets that signature ride this same Face ID. On
             // Android the hardware signature doesn't prompt again, so the OS
             // biometric shown here is already the only one.
-            const approved =
-                Platform.OS === 'ios'
-                    ? await NativeKeys.authenticateForSigning(t('vaultApprovals.biometricPrompt'))
-                    : (
-                          await LocalAuthentication.authenticateAsync({
-                              promptMessage: t('vaultApprovals.biometricPrompt'),
-                              // Strong: must satisfy the time-bound AUTH_BIOMETRIC_STRONG
-                              // signing key so the ensuing signature is authorised.
-                              biometricsSecurityLevel: 'strong',
-                              cancelLabel: t('common.cancel'),
-                          })
-                      ).success;
+            // Strong on Android: the time-bound AUTH_BIOMETRIC_STRONG signing
+            // key needs it for the signature that follows (freshBiometric).
+            const approved = await freshBiometric(t('vaultApprovals.biometricPrompt'), t('common.cancel'));
             if (!approved) return;
 
             setApprovingOp(req.vault_op);

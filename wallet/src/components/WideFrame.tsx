@@ -43,6 +43,7 @@ export const TASK_ROUTES = new Set([
     'capability-request',
     'access-grant',
     'vault-approvals',
+    'app-lock',
     'kyc-capture',
     'verify-email',
     'account-recovery',

@@ -1508,5 +1508,18 @@
     "removeThisConfirm": "Noņemt un notīrīt",
     "addHint": "Lai pievienotu tālruni, instalējiet tajā Privasys Wallet, izvēlieties „Es jau izmantoju Privasys Wallet citā tālrunī” un ar šo tālruni noskenējiet tajā redzamo kodu.",
     "limitNote": "Maksimālais tālruņu skaits: {{max}}."
+  },
+  "appLock": {
+    "title": "Lietotnes bloķēšana",
+    "offerHeading": "Bloķēt maku",
+    "offerBody": "Prasīt {{biometric}} katru reizi, kad atverat maku, lai neviens, kas tur jūsu atbloķēto tālruni, nevarētu redzēt tā saturu.",
+    "offerNote": "To varat jebkurā laikā mainīt sadaļā Iestatījumi.",
+    "turnOn": "Ieslēgt",
+    "prompt": "Atbloķēt maku",
+    "lockedTitle": "Maks ir bloķēts",
+    "unlock": "Atbloķēt",
+    "settingsDescription": "Prasīt apstiprināt, ka tas esat jūs, katru reizi, kad atverat maku, un kad atgriežaties pēc izvēlētā laika.",
+    "off": "Izsl.",
+    "minutes": "{{count}} min"
   }
 }

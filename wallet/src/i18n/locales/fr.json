@@ -1497,5 +1497,18 @@
     "removeThisConfirm": "Retirer et effacer",
     "addHint": "Pour ajouter un téléphone, installez-y Privasys Wallet, choisissez « J'utilise déjà Privasys Wallet sur un autre téléphone » et scannez avec ce téléphone le code qu'il affiche.",
     "limitNote": "Vous pouvez avoir jusqu'à {{max}} téléphones."
+  },
+  "appLock": {
+    "title": "Verrouillage",
+    "offerHeading": "Verrouiller le portefeuille",
+    "offerBody": "Demander {{biometric}} à chaque ouverture du portefeuille, pour que personne ayant votre téléphone déverrouillé en main ne puisse voir son contenu.",
+    "offerNote": "Vous pouvez modifier ce choix à tout moment dans Réglages.",
+    "turnOn": "Activer",
+    "prompt": "Déverrouiller le portefeuille",
+    "lockedTitle": "Le portefeuille est verrouillé",
+    "unlock": "Déverrouiller",
+    "settingsDescription": "Demander de confirmer que c’est bien vous à chaque ouverture du portefeuille, et à votre retour après le délai choisi.",
+    "off": "Non",
+    "minutes": "{{count}} min"
   }
 }

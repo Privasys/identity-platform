@@ -1471,5 +1471,18 @@
     "removeThisConfirm": "Verwijderen en wissen",
     "addHint": "Om een telefoon toe te voegen, installeer je Privasys Wallet erop, kies je “Ik gebruik Privasys Wallet al op een andere telefoon” en scan je met deze telefoon de code die hij toont.",
     "limitNote": "Je kunt maximaal {{max}} telefoons hebben."
+  },
+  "appLock": {
+    "title": "App-vergrendeling",
+    "offerHeading": "Vergrendel de wallet",
+    "offerBody": "Vraag om {{biometric}} telkens als je de wallet opent, zodat niemand die je ontgrendelde telefoon vasthoudt kan zien wat erin staat.",
+    "offerNote": "Je kunt dit altijd wijzigen in Instellingen.",
+    "turnOn": "Inschakelen",
+    "prompt": "Ontgrendel de wallet",
+    "lockedTitle": "De wallet is vergrendeld",
+    "unlock": "Ontgrendel",
+    "settingsDescription": "Vraag om te bevestigen dat jij het bent telkens als je de wallet opent, en als je terugkomt na de gekozen tijd.",
+    "off": "Uit",
+    "minutes": "{{count}} min"
   }
 }

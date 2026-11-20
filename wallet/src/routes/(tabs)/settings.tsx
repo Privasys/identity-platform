@@ -15,11 +15,14 @@ import { StyleSheet, Pressable, Alert, ScrollView, View as RNView } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { unlockWallet } from '@/components/AppLock';
 import { ExternalLink } from '@/components/ExternalLink';
 import { LanguagePicker } from '@/components/LanguagePicker';
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
+import { APP_LOCK_OPTIONS, type AppLockSeconds } from '@/services/app-lock';
+import { isDemo } from '@/services/demo/gate';
 import { listDevices } from '@/services/devices';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { getLogs } from '@/utils/logs';
@@ -35,6 +38,19 @@ export default function SettingsScreen() {
     const { gracePeriodSec, setGracePeriod } = useSettingsStore();
     const verificationMode = useSettingsStore((s) => s.verificationMode);
     const setVerificationMode = useSettingsStore((s) => s.setVerificationMode);
+    const appLockSec = useSettingsStore((s) => s.appLockSec);
+    // Any change to the lock checks Face ID first: turning it on proves it will
+    // open, and nobody else holding the phone can turn it off or loosen it.
+    const chooseAppLock = useCallback(
+        async (choice: AppLockSeconds | null) => {
+            const settings = useSettingsStore.getState();
+            if (choice === settings.appLockSec) return;
+            if (!(await unlockWallet(t('appLock.prompt'), t('common.cancel')))) return;
+            settings.setAppLock(choice);
+            settings.setAppLockAsked();
+        },
+        [t],
+    );
     const pushToken = useExpoPushToken();
     // Devices shows from the first phone: it is where the phone is named.
     const [phones, setPhones] = useState(0);
@@ -52,6 +68,34 @@ export default function SettingsScreen() {
 
             <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
                 <LanguagePicker />
+
+                {/* App lock (services/app-lock). Not in the demo build. */}
+                {isDemo() ? null : (
+                    <>
+                        <Text style={styles.sectionTitle}>{t('appLock.title')}</Text>
+                        <Text style={styles.sectionDescription}>{t('appLock.settingsDescription')}</Text>
+                        <View style={styles.optionsRow}>
+                            {([null, ...APP_LOCK_OPTIONS] as const).map((sec) => (
+                                <Pressable
+                                    key={String(sec)}
+                                    style={[styles.optionButton, appLockSec === sec && styles.optionButtonActive]}
+                                    onPress={() => void chooseAppLock(sec)}
+                                    accessibilityRole="button"
+                                    accessibilityState={{ selected: appLockSec === sec }}
+                                    testID={`settings-app-lock-${sec ?? 'off'}`}
+                                >
+                                    <Text style={[styles.optionText, appLockSec === sec && styles.optionTextActive]}>
+                                        {sec === null
+                                            ? t('appLock.off')
+                                            : sec === 0
+                                              ? t('settings.gracePeriodAlways')
+                                              : t('appLock.minutes', { count: sec / 60 })}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </>
+                )}
 
                 {/* Grace Period */}
                 <Text style={styles.sectionTitle}>{t('settings.gracePeriodTitle')}</Text>

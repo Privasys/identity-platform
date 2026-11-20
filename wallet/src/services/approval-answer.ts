@@ -31,6 +31,7 @@ import {
     sameApp,
     type ConfirmedSource,
 } from '@/services/app-form-answer';
+import { withPrompt } from '@/services/app-lock';
 import { resolveStepUpCredential, type StepUpAssertionOptions } from '@/services/attribute-approval-api';
 import { inspectAttestation } from '@/services/attestation';
 import { demo, isDemo } from '@/services/demo/gate';
@@ -38,6 +39,7 @@ import { signVaultAssertion } from '@/services/fido2';
 import { getCachedPlatformToken } from '@/services/platform-token';
 import { appIdFromOids } from '@/services/release-provenance';
 import type { Approval, Decision } from '@/services/approval';
+import { useAppLockStore } from '@/stores/app-lock';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
@@ -63,13 +65,18 @@ export function confirmApprovalSource(args: {
 /** A fresh biometric (or the phone's passcode where it has none), as vault
  *  approvals ask: the act is approved now, not by an unlock a minute ago. */
 export async function freshBiometric(prompt: string, cancel: string): Promise<boolean> {
-    if (Platform.OS === 'ios') return NativeKeys.authenticateForSigning(prompt);
-    const r = await LocalAuthentication.authenticateAsync({
-        promptMessage: prompt,
-        biometricsSecurityLevel: 'strong',
-        cancelLabel: cancel,
+    const ok = await withPrompt(async () => {
+        if (Platform.OS === 'ios') return NativeKeys.authenticateForSigning(prompt);
+        const r = await LocalAuthentication.authenticateAsync({
+            promptMessage: prompt,
+            biometricsSecurityLevel: 'strong',
+            cancelLabel: cancel,
+        });
+        return r.success;
     });
-    return r.success;
+    // The holder was just verified: the app lock need not ask again.
+    if (ok) useAppLockStore.getState().unlock();
+    return ok;
 }
 
 /**

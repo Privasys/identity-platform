@@ -1471,5 +1471,18 @@
     "removeThisConfirm": "Fjern og slet",
     "addHint": "For at tilføje en telefon skal du installere Privasys Wallet på den, vælge “Jeg bruger allerede Privasys Wallet på en anden telefon” og scanne den kode, den viser, med denne telefon.",
     "limitNote": "Du kan have op til {{max}} telefoner."
+  },
+  "appLock": {
+    "title": "Applås",
+    "offerHeading": "Lås tegnebogen",
+    "offerBody": "Bed om {{biometric}}, hver gang du åbner tegnebogen, så ingen, der holder din ulåste telefon, kan se, hvad den indeholder.",
+    "offerNote": "Du kan ændre det når som helst under Indstillinger.",
+    "turnOn": "Slå til",
+    "prompt": "Lås tegnebogen op",
+    "lockedTitle": "Tegnebogen er låst",
+    "unlock": "Lås op",
+    "settingsDescription": "Bed om at bekræfte, at det er dig, hver gang du åbner tegnebogen, og når du vender tilbage efter den valgte tid.",
+    "off": "Fra",
+    "minutes": "{{count}} min"
   }
 }

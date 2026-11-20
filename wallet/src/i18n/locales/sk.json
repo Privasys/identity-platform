@@ -1509,5 +1509,18 @@
     "removeThisConfirm": "Odstrániť a vymazať",
     "addHint": "Ak chcete pridať telefón, nainštalujte doň Privasys Wallet, zvoľte „Privasys Wallet už používam na inom telefóne“ a týmto telefónom naskenujte kód, ktorý zobrazí.",
     "limitNote": "Maximálny počet telefónov: {{max}}."
+  },
+  "appLock": {
+    "title": "Zámok aplikácie",
+    "offerHeading": "Zamknúť peňaženku",
+    "offerBody": "Vyžadovať {{biometric}} pri každom otvorení peňaženky, aby nikto, kto drží váš odomknutý telefón, nevidel, čo obsahuje.",
+    "offerNote": "Kedykoľvek to môžete zmeniť v Nastaveniach.",
+    "turnOn": "Zapnúť",
+    "prompt": "Odomknúť peňaženku",
+    "lockedTitle": "Peňaženka je zamknutá",
+    "unlock": "Odomknúť",
+    "settingsDescription": "Overiť, že ste to vy, pri každom otvorení peňaženky a pri návrate do nej po zvolenom čase.",
+    "off": "Vyp.",
+    "minutes": "{{count}} min"
   }
 }

@@ -1471,5 +1471,18 @@
     "removeThisConfirm": "Eltávolítás és törlés",
     "addHint": "Telefon hozzáadásához telepítse rá a Privasys Wallet alkalmazást, válassza a „Már használom a Privasys Wallet alkalmazást egy másik telefonon” lehetőséget, majd ezzel a telefonnal olvassa be a rajta megjelenő kódot.",
     "limitNote": "Legfeljebb {{max}} telefonja lehet."
+  },
+  "appLock": {
+    "title": "Alkalmazászár",
+    "offerHeading": "A tárca zárolása",
+    "offerBody": "A tárca minden megnyitásakor {{biometric}} kérése, hogy aki a feloldott telefonját tartja, ne lássa, mit tartalmaz.",
+    "offerNote": "Ezt bármikor módosíthatja a Beállításokban.",
+    "turnOn": "Bekapcsolás",
+    "prompt": "A tárca feloldása",
+    "lockedTitle": "A tárca zárolva van",
+    "unlock": "Feloldás",
+    "settingsDescription": "Annak megerősítése, hogy Ön az, a tárca minden megnyitásakor, és amikor a választott idő után visszatér hozzá.",
+    "off": "Ki",
+    "minutes": "{{count}} perc"
   }
 }

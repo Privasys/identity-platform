@@ -1560,5 +1560,18 @@
     "removeThisConfirm": "Bain agus glan",
     "addHint": "Chun fón a chur leis, suiteáil Privasys Wallet air, roghnaigh „Úsáidim Privasys Wallet cheana ar fhón eile”, agus scan an cód a thaispeánann sé leis an bhfón seo.",
     "limitNote": "An líon uasta fón: {{max}}."
+  },
+  "appLock": {
+    "title": "Glas Aipe",
+    "offerHeading": "Cuir glas ar an sparán",
+    "offerBody": "Iarr {{biometric}} gach uair a osclaíonn tú an sparán, ionas nach féidir le duine ar bith a bhfuil do ghuthán díghlasáilte aige a bhfuil ann a fheiceáil.",
+    "offerNote": "Is féidir leat é seo a athrú am ar bith i Socruithe.",
+    "turnOn": "Cas air",
+    "prompt": "Díghlasáil an sparán",
+    "lockedTitle": "Tá glas ar an sparán",
+    "unlock": "Díghlasáil",
+    "settingsDescription": "Iarr deimhniú gur tusa atá ann gach uair a osclaíonn tú an sparán, agus nuair a fhilleann tú air tar éis an ama a roghnaíodh.",
+    "off": "As",
+    "minutes": "{{count}} nóim"
   }
 }

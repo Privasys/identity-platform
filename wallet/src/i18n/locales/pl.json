@@ -1523,5 +1523,18 @@
     "removeThisConfirm": "Usuń i wyczyść",
     "addHint": "Aby dodać telefon, zainstaluj na nim Privasys Wallet, wybierz „Używam już Privasys Wallet na innym telefonie” i zeskanuj tym telefonem wyświetlony na nim kod.",
     "limitNote": "Maksymalna liczba telefonów: {{max}}."
+  },
+  "appLock": {
+    "title": "Blokada aplikacji",
+    "offerHeading": "Zablokuj portfel",
+    "offerBody": "Pytaj o {{biometric}} przy każdym otwarciu portfela, aby nikt, kto trzyma Twój odblokowany telefon, nie mógł zobaczyć, co zawiera.",
+    "offerNote": "Możesz to zmienić w dowolnej chwili w Ustawieniach.",
+    "turnOn": "Włącz",
+    "prompt": "Odblokuj portfel",
+    "lockedTitle": "Portfel jest zablokowany",
+    "unlock": "Odblokuj",
+    "settingsDescription": "Pytaj o potwierdzenie, że to Ty, przy każdym otwarciu portfela i po powrocie do niego po wybranym czasie.",
+    "off": "Wył.",
+    "minutes": "{{count}} min"
   }
 }

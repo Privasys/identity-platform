@@ -1,6 +1,7 @@
 // Copyright (c) Privasys. All rights reserved.
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { isAppLockSeconds, type AppLockSeconds } from '@/services/app-lock';
 import * as SecureStore from '@/utils/storage';
 import { create } from 'zustand';
 
@@ -35,11 +36,18 @@ export interface SettingsState {
      * is true.
      */
     seenFirstConnect: boolean;
+    /** The app lock (services/app-lock): seconds away before it locks, or
+     *  null when it is off. Off until the holder turns it on. */
+    appLockSec: AppLockSeconds | null;
+    /** Whether the holder has answered the one-time question about the lock. */
+    appLockAsked: boolean;
 
     setGracePeriod: (seconds: number) => void;
     setVerificationMode: (mode: VerificationMode) => void;
     setLanguage: (tag: string | null) => void;
     setSeenFirstConnect: (seen: boolean) => void;
+    setAppLock: (seconds: AppLockSeconds | null) => void;
+    setAppLockAsked: () => void;
     /**
      * Reset to first-run defaults, EXCEPT the explicit app-language override.
      * Everything else here is state the wallet inferred or the user set while
@@ -66,6 +74,8 @@ function persist(get: () => SettingsState) {
             verificationMode: s.verificationMode,
             language: s.language,
             seenFirstConnect: s.seenFirstConnect,
+            appLockSec: s.appLockSec,
+            appLockAsked: s.appLockAsked,
         })
     ).catch(console.error);
 }
@@ -75,6 +85,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     verificationMode: 'deterministic',
     language: null,
     seenFirstConnect: false,
+    appLockSec: null,
+    appLockAsked: false,
 
     setGracePeriod: (seconds) => {
         set({ gracePeriodSec: seconds });
@@ -96,8 +108,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         persist(get);
     },
 
+    setAppLock: (seconds) => {
+        set({ appLockSec: seconds });
+        persist(get);
+    },
+
+    setAppLockAsked: () => {
+        set({ appLockAsked: true });
+        persist(get);
+    },
+
     clearAll: () => {
-        set({ gracePeriodSec: 30, verificationMode: 'deterministic', seenFirstConnect: false });
+        // A wiped wallet asks again once it is set up anew.
+        set({ gracePeriodSec: 30, verificationMode: 'deterministic', seenFirstConnect: false, appLockSec: null, appLockAsked: false });
         persist(get);
     },
 
@@ -117,6 +140,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             }
             if (typeof data.seenFirstConnect === 'boolean') {
                 set({ seenFirstConnect: data.seenFirstConnect });
+            }
+            if (data.appLockSec === null || isAppLockSeconds(data.appLockSec)) {
+                set({ appLockSec: data.appLockSec });
+            }
+            if (typeof data.appLockAsked === 'boolean') {
+                set({ appLockAsked: data.appLockAsked });
             }
         } catch {
             // Corrupted — use defaults

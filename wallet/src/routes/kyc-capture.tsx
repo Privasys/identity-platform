@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { AttestationView } from '@/components/AttestationView';
+import { withPrompt } from '@/services/app-lock';
 import { fetchStoreListing, type StoreListing } from '@/services/store-listing';
 import { FirstConnectExplainer } from '@/components/FirstConnectExplainer';
 import { useSettingsStore } from '@/stores/settings';
@@ -410,7 +411,8 @@ export default function KycCaptureScreen() {
             `[KYC] reading ${docType} chip — doc=${key.documentNumber.length}c dob=${key.dateOfBirth.length}c exp=${key.dateOfExpiry.length}c`,
         );
         try {
-            const read = await Emrtd.readDocument(key);
+            // The chip reader's sheet makes iOS inactive: keep the screen visible behind it.
+            const read = await withPrompt(() => Emrtd.readDocument(key));
             setDocRead(read);
             setPortraitFailed(false);
             setStep('review');

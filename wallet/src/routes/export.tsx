@@ -15,6 +15,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { withPrompt } from '@/services/app-lock';
 import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react-native';
@@ -169,9 +170,11 @@ export default function BackupAndExportScreen() {
                 text: t('common.continue'),
                 onPress: async () => {
                     try {
-                        const auth = await LocalAuthentication.authenticateAsync({
-                            promptMessage: t('backup.readableConfirm'),
-                        });
+                        const auth = await withPrompt(() =>
+                            LocalAuthentication.authenticateAsync({
+                                promptMessage: t('backup.readableConfirm'),
+                            }),
+                        );
                         if (!auth.success) return;
                         const data = exportAttributesForAudit(profile);
                         data.attributes = data.attributes.filter((a) => keys.has(a.key));

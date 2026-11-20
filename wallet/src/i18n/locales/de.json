@@ -1471,5 +1471,18 @@
     "removeThisConfirm": "Entfernen und löschen",
     "addHint": "Um ein Telefon hinzuzufügen, installieren Sie darauf Privasys Wallet, wählen Sie „Ich nutze Privasys Wallet bereits auf einem anderen Telefon“ und scannen Sie den angezeigten Code mit diesem Telefon.",
     "limitNote": "Sie können bis zu {{max}} Telefone haben."
+  },
+  "appLock": {
+    "title": "App-Sperre",
+    "offerHeading": "Wallet sperren",
+    "offerBody": "Bei jedem Öffnen der Wallet nach {{biometric}} fragen, damit niemand, der Ihr entsperrtes Telefon in der Hand hat, ihren Inhalt sehen kann.",
+    "offerNote": "Sie können dies jederzeit in den Einstellungen ändern.",
+    "turnOn": "Einschalten",
+    "prompt": "Wallet entsperren",
+    "lockedTitle": "Die Wallet ist gesperrt",
+    "unlock": "Entsperren",
+    "settingsDescription": "Bei jedem Öffnen der Wallet bestätigen, dass Sie es sind, und bei der Rückkehr nach der gewählten Zeit.",
+    "off": "Aus",
+    "minutes": "{{count}} Min."
   }
 }

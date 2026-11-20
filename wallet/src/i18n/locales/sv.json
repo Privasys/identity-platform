@@ -1471,5 +1471,18 @@
     "removeThisConfirm": "Ta bort och rensa",
     "addHint": "Om du vill lägga till en telefon installerar du Privasys Wallet på den, väljer ”Jag använder redan Privasys Wallet på en annan telefon” och skannar koden den visar med den här telefonen.",
     "limitNote": "Du kan ha upp till {{max}} telefoner."
+  },
+  "appLock": {
+    "title": "Applås",
+    "offerHeading": "Lås plånboken",
+    "offerBody": "Be om {{biometric}} varje gång du öppnar plånboken, så att ingen som håller i din upplåsta telefon kan se vad den innehåller.",
+    "offerNote": "Du kan ändra detta när som helst i Inställningar.",
+    "turnOn": "Slå på",
+    "prompt": "Lås upp plånboken",
+    "lockedTitle": "Plånboken är låst",
+    "unlock": "Lås upp",
+    "settingsDescription": "Be dig bekräfta att det är du varje gång du öppnar plånboken, och när du kommer tillbaka efter den valda tiden.",
+    "off": "Av",
+    "minutes": "{{count}} min"
   }
 }

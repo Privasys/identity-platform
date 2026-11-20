@@ -39,11 +39,11 @@ import * as WebBrowser from 'expo-web-browser';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import * as Crypto from 'expo-crypto';
-import * as LocalAuthentication from 'expo-local-authentication';
 import * as NativeKeys from '../../modules/native-keys/src/index';
 
 import { base64urlToBytes } from '@/utils/encoding';
 import { buildErrorReport } from '@/utils/logs';
+import { freshBiometric } from '@/services/approval-answer';
 import { sendErrorReport, ReportSendError, REPORT_INBOX, type ReportFailure } from '@/services/error-report';
 
 import { DataRequestConsent } from '@/components/DataRequestConsent';
@@ -1781,16 +1781,7 @@ function ConnectFlow() {
             // vault-approval screen: on iOS the signature itself is Face
             // ID-gated, so authenticate the signing context here; on Android
             // the strong-biometric prompt authorises the signing key.
-            const approvedBio =
-                Platform.OS === 'ios'
-                    ? await NativeKeys.authenticateForSigning(t('connect.approveMoreData'))
-                    : (
-                          await LocalAuthentication.authenticateAsync({
-                              promptMessage: t('connect.approveMoreData'),
-                              biometricsSecurityLevel: 'strong',
-                              cancelLabel: t('common.cancel'),
-                          })
-                      ).success;
+            const approvedBio = await freshBiometric(t('connect.approveMoreData'), t('common.cancel'));
             if (!approvedBio) {
                 router.replace('/(tabs)');
                 return;

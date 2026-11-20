@@ -1497,5 +1497,18 @@
     "removeThisConfirm": "Remover e apagar",
     "addHint": "Para adicionar um telemóvel, instale nele a Privasys Wallet, escolha «Já utilizo a Privasys Wallet noutro telemóvel» e leia com este telemóvel o código que ele mostrar.",
     "limitNote": "Pode ter até {{max}} telemóveis."
+  },
+  "appLock": {
+    "title": "Bloqueio da app",
+    "offerHeading": "Bloquear a carteira",
+    "offerBody": "Pedir {{biometric}} sempre que abrir a carteira, para que ninguém que tenha o seu telemóvel desbloqueado na mão possa ver o que ela contém.",
+    "offerNote": "Pode alterar isto a qualquer momento em Definições.",
+    "turnOn": "Ativar",
+    "prompt": "Desbloquear a carteira",
+    "lockedTitle": "A carteira está bloqueada",
+    "unlock": "Desbloquear",
+    "settingsDescription": "Pedir para confirmar que é você sempre que abrir a carteira e quando voltar a ela após o tempo escolhido.",
+    "off": "Não",
+    "minutes": "{{count}} min"
   }
 }

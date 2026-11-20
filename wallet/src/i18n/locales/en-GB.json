@@ -1482,5 +1482,18 @@
     "removeThisConfirm": "Remove and clear",
     "addHint": "To add a phone, install Privasys Wallet on it, choose “I already use Privasys Wallet on another phone”, and scan the code it shows with this phone.",
     "limitNote": "You can have up to {{max}} phones."
+  },
+  "appLock": {
+    "title": "App Lock",
+    "offerHeading": "Lock the wallet",
+    "offerBody": "Ask for {{biometric}} each time you open the wallet, so nobody holding your unlocked phone can see what it holds.",
+    "offerNote": "You can change this at any time in Settings.",
+    "turnOn": "Turn on",
+    "prompt": "Unlock the wallet",
+    "lockedTitle": "The wallet is locked",
+    "unlock": "Unlock",
+    "settingsDescription": "Ask to confirm it is you each time you open the wallet, and when you come back to it after the time chosen.",
+    "off": "Off",
+    "minutes": "{{count}} min"
   }
 }

@@ -2,12 +2,13 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
 import { useKeepAwake } from 'expo-keep-awake';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import 'react-native-get-random-values';
 import 'react-native-reanimated';
 
+import { AppLock } from '@/components/AppLock';
 import { SplashAnimation } from '@/components/SplashAnimation';
 import { Notice } from '@/components/Notice';
 import { UpdateGate } from '@/components/UpdateGate';
@@ -42,6 +43,8 @@ import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
+import { isTabPath } from '@/services/app-lock';
+import { holderVerificationAvailable } from '@/services/biometrics';
 import { checkDeviceSecurity } from '@/services/security';
 import { assertDemoAllowed, demo, isDemo } from '@/services/demo/gate';
 import { getDeviceLocale } from '@/services/device-locale';
@@ -159,7 +162,7 @@ export default function RootLayout() {
 
     return (
         <>
-            <RootLayoutNav hasProfile={hasProfile} />
+            <RootLayoutNav hasProfile={hasProfile} ready={!showSplashAnim} />
             <Notice />
             {/* Above the navigator, below the splash. A required notice has no
                 dismiss handler, and that absence IS what makes it a wall: there
@@ -170,6 +173,8 @@ export default function RootLayout() {
                     onDismiss={updateNotice.level === 'required' ? undefined : dismissUpdate}
                 />
             )}
+            {/* Above every screen and notice, below the splash. */}
+            <AppLock ready={!showSplashAnim} />
             {showSplashAnim && (
                 <SplashAnimation
                     onComplete={onSplashComplete}
@@ -185,9 +190,11 @@ function KeepAwake() {
     return null;
 }
 
-function RootLayoutNav({ hasProfile }: { hasProfile: boolean }) {
+function RootLayoutNav({ hasProfile, ready }: { hasProfile: boolean; ready: boolean }) {
     const colorScheme = useColorScheme();
     const router = useRouter();
+    const pathname = usePathname();
+    const appLockAsked = useSettingsStore((s) => s.appLockAsked);
     const large = useLargeScreen();
     // The sidebar layout: a wide window, once the wallet is set up.
     const wide = useSidebarLayout();
@@ -207,6 +214,20 @@ function RootLayoutNav({ hasProfile }: { hasProfile: boolean }) {
             router.replace('/(tabs)');
         }
     }, [hasProfile]);
+
+    // The app lock is asked about once, on a tab and never over a task: after
+    // setup, or on the first start of a version that has it. A phone with no
+    // Face ID and no passcode has nothing to lock with, so it is not asked.
+    useEffect(() => {
+        if (isDemo() || !ready || !hasProfile || appLockAsked || !isTabPath(pathname)) return;
+        let cancelled = false;
+        void holderVerificationAvailable().then((can) => {
+            if (!cancelled && can) router.push('/app-lock');
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [ready, hasProfile, appLockAsked, pathname]);
 
     return (
         <>

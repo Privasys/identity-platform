@@ -1497,5 +1497,18 @@
     "removeThisConfirm": "Quitar y borrar",
     "addHint": "Para añadir un teléfono, instala Privasys Wallet en él, elige «Ya uso Privasys Wallet en otro teléfono» y escanea con este teléfono el código que muestre.",
     "limitNote": "Puedes tener hasta {{max}} teléfonos."
+  },
+  "appLock": {
+    "title": "Bloqueo de la app",
+    "offerHeading": "Bloquear la cartera",
+    "offerBody": "Pedir {{biometric}} cada vez que abras la cartera, para que nadie que tenga tu teléfono desbloqueado pueda ver lo que contiene.",
+    "offerNote": "Puedes cambiarlo cuando quieras en Ajustes.",
+    "turnOn": "Activar",
+    "prompt": "Desbloquear la cartera",
+    "lockedTitle": "La cartera está bloqueada",
+    "unlock": "Desbloquear",
+    "settingsDescription": "Pedir que confirmes que eres tú cada vez que abras la cartera y al volver a ella tras el tiempo elegido.",
+    "off": "No",
+    "minutes": "{{count}} min"
   }
 }

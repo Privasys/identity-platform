@@ -1482,5 +1482,18 @@
     "removeThisConfirm": "Eemalda ja kustuta",
     "addHint": "Telefoni lisamiseks installige sellesse Privasys Wallet, valige „Kasutan Privasys Walletit juba teises telefonis” ja skannige selle telefoniga kood, mida see näitab.",
     "limitNote": "Teil võib olla kuni {{max}} telefoni."
+  },
+  "appLock": {
+    "title": "Rakenduse lukk",
+    "offerHeading": "Lukusta rahakott",
+    "offerBody": "Küsi {{biometric}} iga kord, kui avate rahakoti, et keegi, kellel on teie lukustamata telefon, ei näeks selle sisu.",
+    "offerNote": "Saate seda igal ajal muuta jaotises Sätted.",
+    "turnOn": "Lülita sisse",
+    "prompt": "Ava rahakott",
+    "lockedTitle": "Rahakott on lukus",
+    "unlock": "Ava",
+    "settingsDescription": "Küsi kinnitust, et see olete teie, iga kord, kui avate rahakoti, ja kui naasete selle juurde pärast valitud aega.",
+    "off": "Väljas",
+    "minutes": "{{count}} min"
   }
 }

@@ -1534,5 +1534,18 @@
     "removeThisConfirm": "Odstrani in izbriši",
     "addHint": "Če želite dodati telefon, vanj namestite Privasys Wallet, izberite »Privasys Wallet že uporabljam v drugem telefonu« in s tem telefonom skenirajte kodo, ki jo prikaže.",
     "limitNote": "Največje število telefonov: {{max}}."
+  },
+  "appLock": {
+    "title": "Zaklep aplikacije",
+    "offerHeading": "Zakleni denarnico",
+    "offerBody": "Zahtevaj {{biometric}} ob vsakem odprtju denarnice, da nihče, ki drži vaš odklenjen telefon, ne more videti, kaj vsebuje.",
+    "offerNote": "To lahko kadar koli spremenite v Nastavitvah.",
+    "turnOn": "Vklopi",
+    "prompt": "Odkleni denarnico",
+    "lockedTitle": "Denarnica je zaklenjena",
+    "unlock": "Odkleni",
+    "settingsDescription": "Zahtevaj potrditev, da ste to vi, ob vsakem odprtju denarnice in ko se vrnete po izbranem času.",
+    "off": "Izkl.",
+    "minutes": "{{count}} min"
   }
 }

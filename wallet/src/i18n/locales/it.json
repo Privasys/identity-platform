@@ -1497,5 +1497,18 @@
     "removeThisConfirm": "Rimuovi e cancella",
     "addHint": "Per aggiungere un telefono, installa Privasys Wallet su quel telefono, scegli «Uso già Privasys Wallet su un altro telefono» e scansiona con questo telefono il codice che mostra.",
     "limitNote": "Puoi avere fino a {{max}} telefoni."
+  },
+  "appLock": {
+    "title": "Blocco app",
+    "offerHeading": "Blocca il portafoglio",
+    "offerBody": "Chiedi {{biometric}} ogni volta che apri il portafoglio, così nessuno che tenga in mano il tuo telefono sbloccato può vedere cosa contiene.",
+    "offerNote": "Puoi cambiarlo in qualsiasi momento in Impostazioni.",
+    "turnOn": "Attiva",
+    "prompt": "Sblocca il portafoglio",
+    "lockedTitle": "Il portafoglio è bloccato",
+    "unlock": "Sblocca",
+    "settingsDescription": "Chiedi di confermare che sei tu ogni volta che apri il portafoglio e quando ci torni dopo il tempo scelto.",
+    "off": "No",
+    "minutes": "{{count}} min"
   }
 }

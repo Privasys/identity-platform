@@ -1508,5 +1508,18 @@
     "removeThisConfirm": "Ukloni i izbriši",
     "addHint": "Da biste dodali telefon, instalirajte na njega Privasys Wallet, odaberite „Već koristim Privasys Wallet na drugom telefonu” i ovim telefonom skenirajte kod koji prikaže.",
     "limitNote": "Najveći dopušteni broj telefona: {{max}}."
+  },
+  "appLock": {
+    "title": "Zaključavanje",
+    "offerHeading": "Zaključajte novčanik",
+    "offerBody": "Tražite {{biometric}} pri svakom otvaranju novčanika kako nitko tko drži vaš otključani telefon ne bi mogao vidjeti što sadrži.",
+    "offerNote": "To možete promijeniti u bilo kojem trenutku u Postavkama.",
+    "turnOn": "Uključi",
+    "prompt": "Otključajte novčanik",
+    "lockedTitle": "Novčanik je zaključan",
+    "unlock": "Otključaj",
+    "settingsDescription": "Tražite potvrdu da ste to vi pri svakom otvaranju novčanika i pri povratku nakon odabranog vremena.",
+    "off": "Isklj.",
+    "minutes": "{{count}} min"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "privasys-wallet",
-  "version": "1.4.75",
+  "version": "1.4.76",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {

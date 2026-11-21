@@ -268,8 +268,7 @@ private func verifyEnclave(host: String, port: Int) -> [String: Any]? {
 /// 3. Show compact attestation summary with approve/cancel
 /// 4. On registration, ask where the passkey is kept: on this device only (a
 ///    Secure Enclave key) or backed up to the holder's devices (a key derived
-///    from the passkey root). A site that asks for a hardware attestation
-///    gets a local one, without the question.
+///    from the passkey root).
 /// 5. Biometric gate: the Secure Enclave key's access control for a local
 ///    passkey, an LAContext check made here for a synced one
 /// 6. Sign the challenge and return the credential to the OS
@@ -335,14 +334,6 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
                 }
             }
         }
-    }
-
-    /// A site that asks for a direct or enterprise attestation wants to know
-    /// the key is bound to hardware. A synced key is not, so such a site only
-    /// ever gets a local one. The attestation format itself stays "none".
-    private func siteRequiresHardwareKey(_ request: ASPasskeyCredentialRequest) -> Bool {
-        let preference = request.attestationPreference
-        return preference == .direct || preference == .enterprise
     }
 
     // MARK: - Passkey Assertion
@@ -606,11 +597,10 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
             subtitle: "It stays on this \(device) and is lost with it."
         )
 
-        if siteRequiresHardwareKey(request) {
-            statusLabel.text = "This website asks for a passkey kept on this \(device)"
-            detailLabel.text = rpId
-            syncedButton.isHidden = true
-        } else if loadPasskeyRoot() == nil {
+        // iOS does not hand a provider the site's attestation preference (only
+        // the site's own request carries it), so on iOS the holder's choice
+        // stands for every site. The attestation format is "none" either way.
+        if loadPasskeyRoot() == nil {
             statusLabel.text = "Save a passkey on this \(device)"
             detailLabel.text = "\(rpId)\nTo back up new passkeys to your devices, open Privasys Wallet first."
             syncedButton.isHidden = true

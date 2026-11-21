@@ -175,6 +175,33 @@ describe('profile store', () => {
             expect(a[0].verified).toBe(true);
         });
 
+        it("keeps the verifier's proof when the same source re-imports the same value", () => {
+            useProfileStore.getState().createProfile(baseProfile());
+            const bare = { verifier: 'google', verifierDisplayName: 'Google', method: 'oidc_claim' as const, assurance: 'provider' as const, verifiedAt: 100 };
+            useProfileStore.getState().mergeAttribute(
+                incoming({ key: 'email', value: 'a@example.com', source: 'provider', sourceProvider: 'google', verified: true, verifications: [bare] }), false,
+            );
+            // A re-import: the same (verifier, method), now with a proof.
+            const proved = { ...bare, verifiedAt: 200, proof: 'jws-1', proofDevice: 'dev', proofSalt: 'salt' };
+            useProfileStore.getState().mergeAttribute(
+                incoming({ key: 'email', value: 'a@example.com', source: 'provider', sourceProvider: 'google', verified: true, verifications: [proved] }), false,
+            );
+            let v = useProfileStore.getState().profile!.attributes[0].verifications!;
+            expect(v).toHaveLength(1);
+            expect(v[0].proof).toBe('jws-1');
+
+            // A later bare claim never removes the proof; a newer proof replaces it.
+            useProfileStore.getState().mergeAttribute(
+                incoming({ key: 'email', value: 'a@example.com', source: 'provider', sourceProvider: 'google', verifications: [{ ...bare, verifiedAt: 300 }] }), false,
+            );
+            useProfileStore.getState().mergeAttribute(
+                incoming({ key: 'email', value: 'a@example.com', source: 'provider', sourceProvider: 'google', verifications: [{ ...proved, verifiedAt: 400, proof: 'jws-2' }] }), false,
+            );
+            v = useProfileStore.getState().profile!.attributes[0].verifications!;
+            expect(v).toHaveLength(1);
+            expect(v[0].proof).toBe('jws-2');
+        });
+
         it('raises a conflict for a differing single-valued attribute', () => {
             useProfileStore.getState().createProfile(baseProfile());
             useProfileStore.getState().mergeAttribute(incoming({ value: 'bob' }), false);

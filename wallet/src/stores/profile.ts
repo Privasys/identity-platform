@@ -489,8 +489,15 @@ function strengthen(existing: ProfileAttribute, incoming: ProfileAttribute): Pro
 
     const verifications = [...(existing.verifications ?? [])];
     for (const v of incoming.verifications ?? []) {
-        if (!verifications.some((x) => x.verifier === v.verifier && x.method === v.method)) {
+        const i = verifications.findIndex((x) => x.verifier === v.verifier && x.method === v.method);
+        if (i < 0) {
             verifications.push(v);
+        } else if (v.proof && (!verifications[i].proof || v.verifiedAt >= verifications[i].verifiedAt)) {
+            // A record carrying the Attribute Verifier's proof replaces the same
+            // source's bare claim, and a newer proof an older one. Skipping it as
+            // a duplicate dropped the proof on a re-import, and the value then
+            // reached apps unverified (2026-11-21).
+            verifications[i] = v;
         }
     }
 

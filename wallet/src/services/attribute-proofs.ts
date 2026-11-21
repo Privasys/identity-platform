@@ -145,7 +145,12 @@ async function proofForThisDevice(key: string, value: string, record: Verificati
  */
 export async function disclosureFor(key: string, value: string, clientId: string, sub: string, nonce: string): Promise<string | undefined> {
     const record = proofRecordFor(key, value);
-    if (!record?.proof) return undefined;
+    if (!record?.proof) {
+        // Said out loud: the value then reaches the app unverified, and a
+        // silent miss here is what hid a dropped proof (2026-11-21).
+        console.warn(`[attribute-proofs] no proof for ${key}: disclosed without one`);
+        return undefined;
+    }
     try {
         const proof = await proofForThisDevice(key, value, record);
         return await disclose(proof, clientId, sub, nonce);

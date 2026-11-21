@@ -3606,7 +3606,10 @@ function AttributeAcquisitionView({
             store.linkProvider(result.provider);
 
             for (const attr of result.seedAttributes) {
-                // Only seed if the profile doesn't already have this value.
+                // Seed a value the profile doesn't have. The same value it
+                // already has is strengthened instead: its new verifications
+                // (the Attribute Verifier's proof among them) are merged in,
+                // or a re-link would leave it as unverified as before.
                 const existing = profile ? getProfileValue(profile, attr.key) : undefined;
                 if (!existing) {
                     setProfileValue(store, attr.key, attr.value, 'provider', {
@@ -3614,6 +3617,8 @@ function AttributeAcquisitionView({
                         verified: attr.verified,
                         verifications: attr.verifications,
                     });
+                } else if (existing.trim().toLowerCase() === attr.value.trim().toLowerCase()) {
+                    store.mergeAttribute(attr, false);
                 }
             }
         } catch (e: any) {

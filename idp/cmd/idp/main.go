@@ -355,6 +355,7 @@ func main() {
 	mux.HandleFunc("GET /fido2/vault-approval/token", fido2Handler.VaultApprovalToken(issuer))
 	// The wallet lists its owner's pending approvals here (push arm of the flow).
 	mux.HandleFunc("GET /fido2/vault-approval/pending", fido2Handler.VaultApprovalPending(issuer))
+	mux.HandleFunc("GET /fido2/vault-approval/status", fido2Handler.VaultApprovalStatus())
 	// One approval for a list of promotes and app policies (a host roll).
 	mux.HandleFunc("POST /fido2/vault-approval/batch/begin", fido2Handler.VaultApprovalBatchBegin(issuer))
 	mux.HandleFunc("GET /fido2/vault-approval/batch/pending", fido2Handler.VaultApprovalBatchPending())

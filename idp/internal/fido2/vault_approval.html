@@ -31,10 +31,16 @@
   .wallet p { margin: 10px 0 0; }
   .or { display: flex; align-items: center; gap: 10px; color: #6b7180; font-size: 12px; margin: 18px 0 4px; }
   .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid #262a36; }
+  /* The shared sign-in gate fills the page; "decline" stays reachable over it. */
+  #gate { position: fixed; inset: 0; background: #fff; z-index: 10; }
+  #gateDecline { position: fixed; left: 24px; bottom: 18px; z-index: 20; width: auto; margin: 0;
+                 padding: 6px 10px; background: #fff; color: #b91c1c; font-size: 14px; border-radius: 8px; }
 </style>
 </head>
 <body>
-  <div class="card">
+  <div id="gate" hidden></div>
+  <button id="gateDecline" hidden>Not me, decline</button>
+  <div class="card" id="card">
     <h1>Approve vault operation</h1>
     <p>Your terminal requested a hardware-backed approval. Review the operation, then
        approve it. This authorises this one operation and nothing else.</p>
@@ -50,6 +56,7 @@
     <p class="muted" id="hint">You can close this tab after approving; return to your terminal.</p>
   </div>
 
+<script src="/auth/privasys-auth-client.iife.js"></script>
 <script>
 "use strict";
 
@@ -80,6 +87,9 @@ function fail(msg) { statusEl.textContent = msg; statusEl.className = "status er
 // through textContent, never innerHTML, and the QR and its link are used only
 // when they have exactly the shape the CLI produces.
 let payload;
+// What the gate shows: the operation's details, and the wallet link.
+const bullets = [];
+let walletLink = null;
 try {
   const frag = location.hash.replace(/^#/, "");
   if (!frag) throw new Error("no request payload in URL");
@@ -106,6 +116,9 @@ if (payload) {
     b.textContent = label;
     op.appendChild(b);
     op.appendChild(document.createTextNode(": " + value));
+    // A digest is shown whole on the card; the gate's line keeps its start
+    // and end, which is what a person compares.
+    bullets.push(label + ": " + (value.length > 40 ? value.slice(0, 16) + "…" + value.slice(-16) : value));
   }
   row("Operation", opLabels[s.operation] || s.operation || "?");
   row("Key", s.handle || "?");
@@ -117,6 +130,9 @@ if (payload) {
   // this page is itself on the phone.
   const deeplinkRe = /^privasys-wallet(-dev|-preview)?:\/\/vault-approvals\?vault_op=[A-Za-z0-9_%-]+$/;
   const qrRe = /^data:image\/png;base64,[A-Za-z0-9+/]+=*$/;
+  if (typeof payload.deeplink === "string" && deeplinkRe.test(payload.deeplink)) {
+    walletLink = payload.deeplink;
+  }
   if (typeof payload.deeplink === "string" && deeplinkRe.test(payload.deeplink) &&
       typeof payload.qr === "string" && qrRe.test(payload.qr)) {
     document.getElementById("wallet-qr").src = payload.qr;
@@ -180,6 +196,100 @@ async function approve() {
 }
 
 btn.addEventListener("click", approve);
+
+function showApproved() {
+  statusEl.className = "status ok";
+  statusEl.textContent = "Approved. Return to your terminal; you can close this tab.";
+  btn.style.display = "none";
+  document.getElementById("wallet").hidden = true;
+  document.getElementById("or").hidden = true;
+  document.getElementById("hint").textContent = "The terminal will continue automatically.";
+}
+
+// The shared sign-in gate, run on this approval: the same view every app
+// signs in with. The wallet was notified when the terminal asked; the gate
+// says so, shows the QR code that opens the approval in the wallet when the
+// notification is late, offers a passkey on this computer, and shows the
+// outcome however the approval was given. The card above stays as the
+// fallback when the gate cannot open.
+const gateEl = document.getElementById("gate");
+const declineEl = document.getElementById("gateDecline");
+const cardEl = document.getElementById("card");
+let gate = null;
+
+function showCard() {
+  gateEl.hidden = true;
+  declineEl.hidden = true;
+  cardEl.hidden = false;
+  const g = gate;
+  gate = null;
+  if (g) { try { g.cancel(); } catch (e) { /* already closed */ } }
+}
+
+function vaultOpOf(p) {
+  const v = p && p.options && p.options.publicKey && p.options.publicKey.challenge;
+  return typeof v === "string" && /^[A-Za-z0-9_-]{16,256}$/.test(v) ? v : null;
+}
+
+function openGate() {
+  const vaultOp = vaultOpOf(payload);
+  if (!vaultOp || !walletLink || !window.Privasys || !Privasys.AuthFrame) return false;
+  try {
+    gate = new Privasys.AuthFrame({
+      apiBase: "https://api.developer.privasys.org",
+      appName: "Privasys CLI",
+      rpId: "privasys.id",
+      presentation: "page",
+      container: gateEl,
+      pitch: {
+        title: "Approve vault operation",
+        description: "Your terminal asked for a hardware-backed approval. It authorises this one operation and nothing else.",
+        bullets: bullets.slice(0, 5)
+      },
+      operationApproval: {
+        challenge: vaultOp,
+        walletLink: walletLink,
+        // The passkey runs on this page, which holds the request's options.
+        onPasskey: function () { showCard(); approve(); }
+      }
+    });
+  } catch (e) { gate = null; return false; }
+  cardEl.hidden = true;
+  gateEl.hidden = false;
+  declineEl.hidden = false;
+  const mine = gate;
+  mine.signIn().then(function (res) {
+    if (gate !== mine) return;
+    showCard();
+    if (res && res.approved) showApproved();
+  }).catch(function (e) {
+    if (gate !== mine) return;
+    showCard();
+    const msg = e && e.message;
+    if (msg && msg !== "Authentication cancelled") fail(msg);
+  });
+  return true;
+}
+
+declineEl.addEventListener("click", async function () {
+  const vaultOp = vaultOpOf(payload);
+  showCard();
+  if (!vaultOp) return;
+  try {
+    const r = await fetch("/fido2/vault-approval/decline?challenge=" + encodeURIComponent(vaultOp), { method: "POST" });
+    if (r.status !== 204) throw new Error("this approval is no longer open");
+    btn.style.display = "none";
+    document.getElementById("wallet").hidden = true;
+    document.getElementById("or").hidden = true;
+    statusEl.className = "status err";
+    statusEl.textContent = "Declined. Your terminal stops waiting; you can close this tab.";
+    document.getElementById("hint").textContent = "";
+  } catch (e) {
+    fail("Could not decline: " + (e && e.message ? e.message : e));
+  }
+});
+
+if (payload) openGate();
 </script>
 </body>
 </html>

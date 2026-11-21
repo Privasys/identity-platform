@@ -62,6 +62,15 @@ func (h *Handler) VaultApprovalPage() http.HandlerFunc {
 type vaultResultStore struct {
 	mu      sync.Mutex
 	results map[string]vaultResultEntry
+	// outcomes remembers how each approval ended, for the approval page,
+	// after the initiator has collected the token (a take is single-use).
+	// It holds no token: only approved or declined.
+	outcomes map[string]vaultOutcome
+}
+
+type vaultOutcome struct {
+	declined  bool
+	expiresAt time.Time
 }
 
 type vaultResultEntry struct {
@@ -85,13 +94,38 @@ func newVaultResultStore() *vaultResultStore {
 func (s *vaultResultStore) put(vaultOp, sub, token string, exp int64) {
 	s.mu.Lock()
 	s.results[vaultOp] = vaultResultEntry{sub: sub, token: token, expiresAt: time.Unix(exp, 0)}
+	s.recordOutcome(vaultOp, false, time.Unix(exp, 0))
 	s.mu.Unlock()
+}
+
+// recordOutcome notes how vaultOp ended. Callers hold s.mu.
+func (s *vaultResultStore) recordOutcome(vaultOp string, declined bool, expiresAt time.Time) {
+	if s.outcomes == nil {
+		s.outcomes = make(map[string]vaultOutcome)
+	}
+	s.outcomes[vaultOp] = vaultOutcome{declined: declined, expiresAt: expiresAt}
+}
+
+// outcome reports how vaultOp ended: "approved", "declined", or "" when it
+// has not ended or is no longer known.
+func (s *vaultResultStore) outcome(vaultOp string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	o, ok := s.outcomes[vaultOp]
+	if !ok || time.Now().After(o.expiresAt) {
+		return ""
+	}
+	if o.declined {
+		return "declined"
+	}
+	return "approved"
 }
 
 // decline records that the owner refused vaultOp, so the initiator's poll ends.
 func (s *vaultResultStore) decline(vaultOp, sub string, expiresAt time.Time) {
 	s.mu.Lock()
 	s.results[vaultOp] = vaultResultEntry{sub: sub, declined: true, expiresAt: expiresAt}
+	s.recordOutcome(vaultOp, true, expiresAt)
 	s.mu.Unlock()
 }
 
@@ -116,6 +150,11 @@ func (s *vaultResultStore) cleanup() {
 	for k, v := range s.results {
 		if now.After(v.expiresAt) {
 			delete(s.results, k)
+		}
+	}
+	for k, v := range s.outcomes {
+		if now.After(v.expiresAt) {
+			delete(s.outcomes, k)
 		}
 	}
 }
@@ -150,6 +189,31 @@ func (h *Handler) VaultApprovalToken(iss *tokens.Issuer) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, map[string]string{"access_token": res.token})
+	}
+}
+
+// VaultApprovalStatus handles GET /fido2/vault-approval/status?challenge=<vault_op>.
+//
+// Where one approval stands, for the approval page: "pending" while it waits,
+// "approved" or "declined" once answered (whether in the wallet or with a
+// passkey on the page), "gone" when it expired or was never known. As for GET
+// pending, the challenge is the capability; this tells its holder only the
+// outcome, never a token.
+func (h *Handler) VaultApprovalStatus() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vaultOp := r.URL.Query().Get("challenge")
+		if vaultOp == "" {
+			errorJSON(w, http.StatusBadRequest, "challenge required")
+			return
+		}
+		status := "gone"
+		if _, ok := h.vaultPending.get(vaultOp); ok {
+			status = "pending"
+		} else if o := h.vaultResults.outcome(vaultOp); o != "" {
+			status = o
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, map[string]string{"status": status})
 	}
 }
 

@@ -290,6 +290,69 @@ function sanitiseLinkNonce(raw: unknown): string | undefined {
     return /^[A-Za-z0-9._~-]{16,256}$/.test(nonce) ? nonce : undefined;
 }
 
+/** The user code of a device request: eight letters or digits, however typed. */
+function sanitiseDeviceUserCode(raw: unknown): string | undefined {
+    const code = (raw as { userCode?: unknown } | null | undefined)?.userCode;
+    if (typeof code !== 'string') return undefined;
+    const c = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return c.length === 8 ? c : undefined;
+}
+
+/** A sign-in another device started and waits on (RFC 8628). */
+interface DeviceRequest {
+    sessionId: string;
+    clientId: string;
+    appName: string;
+    rpId: string;
+    brokerUrl?: string;
+    /** The wallet link of the request, as the identity provider made it. */
+    qrPayload: string;
+    requestedAttributes?: string[];
+}
+
+/**
+ * Reads a pending device request from the identity provider. Everything the
+ * ceremony needs is in the wallet link the request was created with: the
+ * request's own session, the app that asked and what it asked for.
+ */
+async function lookupDeviceRequest(idpBase: string, userCode: string): Promise<DeviceRequest> {
+    const resp = await fetch(`${idpBase}/device/lookup?user_code=${encodeURIComponent(userCode)}`, { cache: 'no-store' });
+    if (!resp.ok) throw new Error('This code is invalid or has expired');
+    const data = await resp.json();
+    if (data.status !== 'pending') throw new Error('This request has already been answered');
+    const p = new URL(String(data.qr_payload)).searchParams.get('p') ?? '';
+    const b64 = p.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(atob(b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64));
+    const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+    const sessionId = text(decoded.sessionId);
+    const clientId = text(decoded.clientId);
+    if (!sessionId || !clientId) throw new Error('This request cannot be approved here');
+    return {
+        sessionId,
+        clientId,
+        appName: text(decoded.appName) || text(data.client_name) || clientId,
+        rpId: text(decoded.rpId) || globalThis.location.hostname,
+        ...(text(decoded.brokerUrl) ? { brokerUrl: text(decoded.brokerUrl) } : {}),
+        qrPayload: String(data.qr_payload),
+        ...(Array.isArray(decoded.requestedAttributes)
+            ? { requestedAttributes: decoded.requestedAttributes.map(String) }
+            : {}),
+    };
+}
+
+/** Waits until the identity provider says a session is authenticated. */
+async function waitAuthenticated(pollUrl: string, timeoutMs = 120_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const resp = await fetch(pollUrl, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`poll failed: ${resp.status}`);
+        const data = await resp.json().catch(() => null);
+        if (data?.authenticated) return;
+        await new Promise((r) => setTimeout(r, 1500));
+    }
+    throw new Error('The request timed out');
+}
+
 /** The audience of the first access token: a resource name or `app:<app id>`. */
 function sanitiseAudience(raw: unknown): string | undefined {
     if (typeof raw !== 'string') return undefined;
@@ -1057,6 +1120,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
             headless?: unknown;
             /** Link a Privasys ID to a person signed in another way; sanitised below. */
             link?: unknown;
+            /** Approve a sign-in another device started; sanitised below. */
+            deviceRequest?: unknown;
         } = data.config;
         const parentOrigin = e.origin;
         // A link is a Privasys ID sign-in whose only result is an ID token
@@ -1080,6 +1145,37 @@ window.addEventListener('message', async (e: MessageEvent) => {
         }
         // The inline frame reports its content height so the embedding page
         // can size the iframe to it (frame-size.ts); throttled to a frame.
+        // A device request: the ceremony runs on the request the other device
+        // created, for the app that asked, so the holder sees that app's
+        // consent and the device gets what it asked for. Only the identity
+        // provider's own pages may ask for this: the code is the capability,
+        // and a foreign page must not be able to walk a visitor through
+        // approving someone else's device.
+        let device: DeviceRequest | null = null;
+        if (config.deviceRequest !== undefined) {
+            const userCode = sanitiseDeviceUserCode(config.deviceRequest);
+            if (!userCode || linkNonce || parentOrigin !== globalThis.location.origin) {
+                window.parent.postMessage({ type: 'privasys:error', error: 'a device request cannot be approved from this page' }, parentOrigin);
+                return;
+            }
+            try {
+                device = await lookupDeviceRequest(globalThis.location.origin, userCode);
+            } catch (err) {
+                window.parent.postMessage({ type: 'privasys:error', error: err instanceof Error ? err.message : 'This code is invalid or has expired' }, parentOrigin);
+                return;
+            }
+            config.methods = ['wallet'];
+            config.clientId = device.clientId;
+            config.appName = device.appName;
+            config.rpId = device.rpId;
+            if (device.brokerUrl) config.brokerUrl = device.brokerUrl;
+            delete config.sessionRelay;
+            delete config.spend;
+            delete config.connect;
+            delete config.billingGrant;
+            delete config.attributes;
+            delete config.audience;
+        }
         const onContentHeight = contentHeightReporter(parentOrigin);
 
         // Wallet handoff via the parent page (mobile): only when the frame
@@ -1301,25 +1397,38 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 // so a push approval would ring the holder's phone for a flow
                 // the browser cannot use.
                 const priorSession = sessions.get(config.rpId || config.appName);
-                const stepUpEligible = !linkNonce && !!(priorSession?.token
+                const stepUpEligible = !linkNonce && !device && !!(priorSession?.token
                     && priorSession.clientId === clientId
                     && !isTokenExpired(priorSession.token)
                     && !config.sessionRelay?.appHost);
                 if (stepUpEligible) {
                     authorizeUrl.searchParams.set('session_hint', priorSession!.token);
                 }
-                const authResp = await fetch(authorizeUrl.toString(), {
-                    headers: { Accept: 'application/json' },
-                });
-                if (!authResp.ok) {
-                    const body = await authResp.json().catch(() => ({ error: authResp.statusText }));
-                    const err = new Error(body.error_description || body.error || `Authorize failed: ${authResp.status}`);
-                    // Preserve the OAuth error code (e.g. `insufficient_credits`
-                    // on 402) so the parent can raise a typed error.
-                    (err as Error & { code?: string }).code = body.error;
-                    throw err;
-                }
-                const authData = await authResp.json();
+                const authorize = async () => {
+                    const authResp = await fetch(authorizeUrl.toString(), {
+                        headers: { Accept: 'application/json' },
+                    });
+                    if (!authResp.ok) {
+                        const body = await authResp.json().catch(() => ({ error: authResp.statusText }));
+                        const err = new Error(body.error_description || body.error || `Authorize failed: ${authResp.status}`);
+                        // Preserve the OAuth error code (e.g. `insufficient_credits`
+                        // on 402) so the parent can raise a typed error.
+                        (err as Error & { code?: string }).code = body.error;
+                        throw err;
+                    }
+                    return authResp.json();
+                };
+                // A device request already has its session at the identity
+                // provider: the ceremony runs on that one, and no new request
+                // is made.
+                const authData = device
+                    ? {
+                        session_id: device.sessionId,
+                        poll_url: `${idpBase}/session/status?session_id=${encodeURIComponent(device.sessionId)}`,
+                        qr_payload: device.qrPayload,
+                        requested_attributes: device.requestedAttributes,
+                    }
+                    : await authorize();
                 // The IdP keeps from the wallet any attribute the client's
                 // registration does not allow. Signing in anyway would hand
                 // the page a token without what it asked for, and the holder
@@ -1642,7 +1751,17 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 //    - Wallet (relay): call /session/complete to bridge.
                 //    - Social: the popup callback already marked it complete, so
                 //      call /session/complete to get the code (it's idempotent).
-                if (uiResult.method === 'passkey') {
+                if (device) {
+                    // The wallet answered over the relay: hand what it shared
+                    // to the identity provider, which completes the request.
+                    // A wallet that answered the identity provider directly
+                    // has completed it already.
+                    if (!uiResult.completedViaPoll) {
+                        await completeSession(idpBase, oidcSessionId, uiResult.attributes);
+                    }
+                    await waitAuthenticated(pollUrl);
+                    code = '';
+                } else if (uiResult.method === 'passkey') {
                     // A client that asked for the name or email had the gate
                     // confirm them with a provider after the passkey
                     // (profileAfterPasskey); the provider's callback added
@@ -1666,6 +1785,19 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 } // end full ceremony (skipped when the step-up push completed)
 
                 // 5. Exchange code for JWT tokens.
+                // A device request is approved now. Its tokens go to the device
+                // that asked, which redeems them itself: this page gets none.
+                if (device) {
+                    if (uiResult?.pushToken && config.brokerUrl && (uiResult.trustDevice || deviceTrusted)) {
+                        sessions.saveDeviceHint(uiResult.pushToken, config.brokerUrl,
+                            uiResult.deviceLabel ?? deviceLabels.get(uiResult.pushToken));
+                    }
+                    window.parent.postMessage(
+                        { type: 'privasys:result', result: { approved: true, sessionToken: '', method: 'wallet', sessionId: oidcSessionId } },
+                        parentOrigin,
+                    );
+                    return;
+                }
                 const tokens = await exchangeCode(idpBase, code, clientId, codeVerifier);
 
                 // A link ends here. The page gets the ID token and nothing

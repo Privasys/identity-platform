@@ -178,6 +178,18 @@ export interface AuthFrameConfig {
      * the right default for a business relying party.
      */
     billingGrant?: string;
+    /**
+     * Approve a sign-in that another device started (an RFC 8628 device
+     * request), named by the user code that device shows. The gate runs on
+     * that request: it shows the app that asked, the holder approves it in
+     * their wallet, and the tokens go to the device, never to this page.
+     * `signIn()` then resolves with `approved: true` and no token.
+     *
+     * For the identity provider's own verification page only: the gate
+     * refuses it from any other origin. `clientId`, `scope` and `attributes`
+     * are taken from the request, and the wallet is the only method.
+     */
+    deviceRequest?: { userCode: string };
     /** Management service API base URL. */
     apiBase: string;
     /** App name or UUID as registered on the platform. */
@@ -344,6 +356,9 @@ export interface SignInResult {
     pushToken?: string;
     /** JWT access_token from the IdP (present when clientId was set in config). */
     accessToken?: string;
+    /** Set on the result of a {@link AuthFrameConfig.deviceRequest} only:
+     *  the request is approved, and this page gets no token. */
+    approved?: boolean;
     /** Set on the result of {@link AuthFrame.linkIdentity} only. */
     linked?: boolean;
     /** The ID token of a link, for the page's server to verify. */

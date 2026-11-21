@@ -1504,7 +1504,11 @@
     "removeThisPasskeys": "Las claves de acceso que este dispositivo creó para otros sitios web solo están en él y se perderán. Primero añade en cada uno de esos sitios una clave de acceso desde otro dispositivo.",
     "removeOfflineTitle": "No se puede conectar con privasys.id",
     "removeOfflineBody": "Sin conexión, este dispositivo no puede quitarse de tu cuenta por sí mismo. Puedes borrarlo de todos modos: seguirá apareciendo en tus otros dispositivos hasta que lo quites allí, en Ajustes › Dispositivos.",
-    "removeOfflineConfirm": "Borrar de todos modos"
+    "removeOfflineConfirm": "Borrar de todos modos",
+    "removeThisPasskeysCount_one": "{{count}} clave de acceso que este dispositivo creó para otro sitio web solo está en él y se perderá. Primero añade en ese sitio una clave de acceso desde otro dispositivo.",
+    "removeThisPasskeysCount_many": "{{count}} de claves de acceso que este dispositivo creó para otros sitios web solo están en él y se perderán. Primero añade en cada uno de esos sitios una clave de acceso desde otro dispositivo.",
+    "removeThisPasskeysCount_other": "{{count}} claves de acceso que este dispositivo creó para otros sitios web solo están en él y se perderán. Primero añade en cada uno de esos sitios una clave de acceso desde otro dispositivo.",
+    "revokeOtherPasskeys": "Las claves de acceso que ese dispositivo guardaba solo en él para otros sitios web se pierden con él. Sus claves de acceso con copia de seguridad en tus dispositivos siguen funcionando aquí."
   },
   "appLock": {
     "title": "Bloqueo de la app",

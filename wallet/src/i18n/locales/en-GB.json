@@ -1489,7 +1489,10 @@
     "removeThisPasskeys": "Passkeys this device made for other websites stay on it only and will be lost. Add a passkey from another device on each of those sites first.",
     "removeOfflineTitle": "privasys.id can't be reached",
     "removeOfflineBody": "This device can't take itself off your account without a connection. You can clear it anyway: it will still appear on your other devices until you remove it there, under Settings › Devices.",
-    "removeOfflineConfirm": "Clear anyway"
+    "removeOfflineConfirm": "Clear anyway",
+    "removeThisPasskeysCount_one": "{{count}} passkey this device made for another website is kept on it only and will be lost. Add a passkey from another device on that site first.",
+    "removeThisPasskeysCount_other": "{{count}} passkeys this device made for other websites are kept on it only and will be lost. Add a passkey from another device on each of those sites first.",
+    "revokeOtherPasskeys": "Passkeys that device kept for other websites on it only are lost with it. Its passkeys backed up to your devices keep working here."
   },
   "appLock": {
     "title": "App Lock",

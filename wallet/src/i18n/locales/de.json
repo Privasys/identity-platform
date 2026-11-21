@@ -1478,7 +1478,10 @@
     "removeThisPasskeys": "Passkeys, die dieses Gerät für andere Websites erstellt hat, gibt es nur hier, und sie gehen verloren. Fügen Sie zuerst auf jeder dieser Websites einen Passkey von einem anderen Gerät hinzu.",
     "removeOfflineTitle": "privasys.id ist nicht erreichbar",
     "removeOfflineBody": "Ohne Verbindung kann sich dieses Gerät nicht selbst aus Ihrem Konto entfernen. Sie können es trotzdem löschen: Auf Ihren anderen Geräten wird es weiter angezeigt, bis Sie es dort unter Einstellungen › Geräte entfernen.",
-    "removeOfflineConfirm": "Trotzdem löschen"
+    "removeOfflineConfirm": "Trotzdem löschen",
+    "removeThisPasskeysCount_one": "{{count}} Passkey, den dieses Gerät für eine andere Website erstellt hat, gibt es nur hier, und er geht verloren. Fügen Sie zuerst auf dieser Website einen Passkey von einem anderen Gerät hinzu.",
+    "removeThisPasskeysCount_other": "{{count}} Passkeys, die dieses Gerät für andere Websites erstellt hat, gibt es nur hier, und sie gehen verloren. Fügen Sie zuerst auf jeder dieser Websites einen Passkey von einem anderen Gerät hinzu.",
+    "revokeOtherPasskeys": "Passkeys, die jenes Gerät für andere Websites nur bei sich gespeichert hat, gehen mit ihm verloren. Seine Passkeys mit Sicherung auf Ihren Geräten funktionieren hier weiter."
   },
   "appLock": {
     "title": "App-Sperre",

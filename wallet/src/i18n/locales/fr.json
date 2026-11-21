@@ -1504,7 +1504,11 @@
     "removeThisPasskeys": "Les clés d'accès que cet appareil a créées pour d'autres sites web ne se trouvent que sur lui et seront perdues. Ajoutez d'abord une clé d'accès depuis un autre appareil sur chacun de ces sites.",
     "removeOfflineTitle": "privasys.id est injoignable",
     "removeOfflineBody": "Sans connexion, cet appareil ne peut pas se retirer lui-même de votre compte. Vous pouvez quand même l'effacer : il apparaîtra encore sur vos autres appareils jusqu'à ce que vous l'y retiriez, dans Réglages › Appareils.",
-    "removeOfflineConfirm": "Effacer quand même"
+    "removeOfflineConfirm": "Effacer quand même",
+    "removeThisPasskeysCount_one": "{{count}} clé d'accès que cet appareil a créée pour un autre site web ne se trouve que sur lui et sera perdue. Ajoutez d'abord une clé d'accès depuis un autre appareil sur ce site.",
+    "removeThisPasskeysCount_many": "{{count}} de clés d'accès que cet appareil a créées pour d'autres sites web ne se trouvent que sur lui et seront perdues. Ajoutez d'abord une clé d'accès depuis un autre appareil sur chacun de ces sites.",
+    "removeThisPasskeysCount_other": "{{count}} clés d'accès que cet appareil a créées pour d'autres sites web ne se trouvent que sur lui et seront perdues. Ajoutez d'abord une clé d'accès depuis un autre appareil sur chacun de ces sites.",
+    "revokeOtherPasskeys": "Les clés d'accès que cet appareil-là conservait uniquement sur lui pour d'autres sites web sont perdues avec lui. Ses clés d'accès sauvegardées sur vos appareils continuent de fonctionner ici."
   },
   "appLock": {
     "title": "Verrouillage",

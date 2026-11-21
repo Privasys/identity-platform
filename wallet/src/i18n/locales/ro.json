@@ -1515,7 +1515,11 @@
     "removeThisPasskeys": "Cheile de acces create de acest dispozitiv pentru alte site-uri sunt doar pe el și se vor pierde. Mai întâi adaugă pe fiecare dintre acele site-uri o cheie de acces de pe alt dispozitiv.",
     "removeOfflineTitle": "privasys.id nu poate fi accesat",
     "removeOfflineBody": "Fără conexiune, acest dispozitiv nu se poate elimina singur din contul tău. Poți șterge oricum totul de pe el: va apărea în continuare pe celelalte dispozitive până când îl elimini de acolo, din Setări › Dispozitive.",
-    "removeOfflineConfirm": "Șterge oricum"
+    "removeOfflineConfirm": "Șterge oricum",
+    "removeThisPasskeysCount_one": "{{count}} cheie de acces creată de acest dispozitiv pentru alt site este doar pe el și se va pierde. Mai întâi adaugă pe acel site o cheie de acces de pe alt dispozitiv.",
+    "removeThisPasskeysCount_few": "{{count}} chei de acces create de acest dispozitiv pentru alte site-uri sunt doar pe el și se vor pierde. Mai întâi adaugă pe fiecare dintre acele site-uri o cheie de acces de pe alt dispozitiv.",
+    "removeThisPasskeysCount_other": "{{count}} de chei de acces create de acest dispozitiv pentru alte site-uri sunt doar pe el și se vor pierde. Mai întâi adaugă pe fiecare dintre acele site-uri o cheie de acces de pe alt dispozitiv.",
+    "revokeOtherPasskeys": "Cheile de acces pe care acel dispozitiv le păstra doar pe el pentru alte site-uri se pierd odată cu el. Cheile sale de acces cu copie de siguranță pe dispozitivele tale continuă să funcționeze aici."
   },
   "appLock": {
     "title": "Blocare aplicație",

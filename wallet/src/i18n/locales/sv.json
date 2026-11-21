@@ -1478,7 +1478,10 @@
     "removeThisPasskeys": "Passkeys som den här enheten skapat för andra webbplatser finns bara på den och går förlorade. Lägg först till en passkey från en annan enhet på var och en av de webbplatserna.",
     "removeOfflineTitle": "privasys.id går inte att nå",
     "removeOfflineBody": "Utan anslutning kan den här enheten inte ta bort sig själv från ditt konto. Du kan rensa den ändå: den visas fortfarande på dina andra enheter tills du tar bort den där, under Inställningar › Enheter.",
-    "removeOfflineConfirm": "Rensa ändå"
+    "removeOfflineConfirm": "Rensa ändå",
+    "removeThisPasskeysCount_one": "{{count}} passkey som den här enheten skapat för en annan webbplats finns bara på den och går förlorad. Lägg först till en passkey från en annan enhet på den webbplatsen.",
+    "removeThisPasskeysCount_other": "{{count}} passkeys som den här enheten skapat för andra webbplatser finns bara på den och går förlorade. Lägg först till en passkey från en annan enhet på var och en av de webbplatserna.",
+    "revokeOtherPasskeys": "Passkeys som den enheten bara förvarade på sig själv för andra webbplatser går förlorade med den. Dess passkeys med säkerhetskopia på dina enheter fortsätter att fungera här."
   },
   "appLock": {
     "title": "Applås",

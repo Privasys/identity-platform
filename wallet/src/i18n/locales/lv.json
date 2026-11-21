@@ -1515,7 +1515,11 @@
     "removeThisPasskeys": "Piekļuves atslēgas, ko šī ierīce izveidoja citām vietnēm, ir tikai tajā un tiks zaudētas. Vispirms katrā no šīm vietnēm pievienojiet piekļuves atslēgu no citas ierīces.",
     "removeOfflineTitle": "privasys.id nav sasniedzams",
     "removeOfflineBody": "Bez savienojuma šī ierīce nevar pati sevi noņemt no jūsu konta. Tomēr varat to notīrīt: tā joprojām būs redzama jūsu citās ierīcēs, līdz to tur noņemsiet sadaļā Iestatījumi › Ierīces.",
-    "removeOfflineConfirm": "Tomēr notīrīt"
+    "removeOfflineConfirm": "Tomēr notīrīt",
+    "removeThisPasskeysCount_zero": "{{count}} piekļuves atslēgas, ko šī ierīce izveidoja citām vietnēm, ir tikai tajā un tiks zaudētas. Vispirms katrā no šīm vietnēm pievienojiet piekļuves atslēgu no citas ierīces.",
+    "removeThisPasskeysCount_one": "{{count}} piekļuves atslēga, ko šī ierīce izveidoja citai vietnei, ir tikai tajā un tiks zaudēta. Vispirms šajā vietnē pievienojiet piekļuves atslēgu no citas ierīces.",
+    "removeThisPasskeysCount_other": "{{count}} piekļuves atslēgas, ko šī ierīce izveidoja citām vietnēm, ir tikai tajā un tiks zaudētas. Vispirms katrā no šīm vietnēm pievienojiet piekļuves atslēgu no citas ierīces.",
+    "revokeOtherPasskeys": "Piekļuves atslēgas, ko tā ierīce citām vietnēm glabāja tikai sevī, tiek zaudētas kopā ar to. Tās piekļuves atslēgas, kurām ir rezerves kopija jūsu ierīcēs, šeit turpina darboties."
   },
   "appLock": {
     "title": "Lietotnes bloķēšana",

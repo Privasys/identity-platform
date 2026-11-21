@@ -1478,7 +1478,10 @@
     "removeThisPasskeys": "Adgangsnøgler, som denne enhed har oprettet til andre websites, findes kun på den og går tabt. Tilføj først en adgangsnøgle fra en anden enhed på hvert af de websites.",
     "removeOfflineTitle": "privasys.id kan ikke nås",
     "removeOfflineBody": "Uden forbindelse kan denne enhed ikke fjerne sig selv fra din konto. Du kan slette alt på den alligevel: den vises stadig på dine andre enheder, indtil du fjerner den der under Indstillinger › Enheder.",
-    "removeOfflineConfirm": "Slet alligevel"
+    "removeOfflineConfirm": "Slet alligevel",
+    "removeThisPasskeysCount_one": "{{count}} adgangsnøgle, som denne enhed har oprettet til et andet website, findes kun på den og går tabt. Tilføj først en adgangsnøgle fra en anden enhed på det website.",
+    "removeThisPasskeysCount_other": "{{count}} adgangsnøgler, som denne enhed har oprettet til andre websites, findes kun på den og går tabt. Tilføj først en adgangsnøgle fra en anden enhed på hvert af de websites.",
+    "revokeOtherPasskeys": "Adgangsnøgler, som den enhed kun opbevarede på sig selv til andre websites, går tabt sammen med den. Dens adgangsnøgler med sikkerhedskopi på dine enheder virker fortsat her."
   },
   "appLock": {
     "title": "Applås",

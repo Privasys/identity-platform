@@ -1478,7 +1478,10 @@
     "removeThisPasskeys": "Azok a hozzáférési kulcsok, amelyeket ez az eszköz más webhelyekhez hozott létre, csak ezen vannak meg, és elvesznek. Előbb adjon hozzá mindegyik webhelyen egy hozzáférési kulcsot egy másik eszközről.",
     "removeOfflineTitle": "A privasys.id nem érhető el",
     "removeOfflineBody": "Kapcsolat nélkül ez az eszköz nem tudja eltávolítani magát a fiókjából. Ettől még törölheti róla az adatokat: a többi eszközén továbbra is megjelenik, amíg ott el nem távolítja a Beállítások › Eszközök részben.",
-    "removeOfflineConfirm": "Törlés mégis"
+    "removeOfflineConfirm": "Törlés mégis",
+    "removeThisPasskeysCount_one": "{{count}} hozzáférési kulcs, amelyet ez az eszköz egy másik webhelyhez hozott létre, csak ezen van meg, és elvész. Előbb adjon hozzá azon a webhelyen egy hozzáférési kulcsot egy másik eszközről.",
+    "removeThisPasskeysCount_other": "{{count}} hozzáférési kulcs, amelyet ez az eszköz más webhelyekhez hozott létre, csak ezen van meg, és elvész. Előbb adjon hozzá mindegyik ilyen webhelyen egy hozzáférési kulcsot egy másik eszközről.",
+    "revokeOtherPasskeys": "Azok a hozzáférési kulcsok, amelyeket az az eszköz más webhelyekhez csak magán tárolt, vele együtt elvesznek. Az eszközein biztonsági mentéssel rendelkező hozzáférési kulcsai itt továbbra is működnek."
   },
   "appLock": {
     "title": "Alkalmazászár",

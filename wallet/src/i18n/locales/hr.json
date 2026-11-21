@@ -1515,7 +1515,11 @@
     "removeThisPasskeys": "Pristupni ključevi koje je ovaj uređaj izradio za druga web-mjesta nalaze se samo na njemu i bit će izgubljeni. Najprije na svakom od tih web-mjesta dodajte pristupni ključ s drugog uređaja.",
     "removeOfflineTitle": "privasys.id nije dostupan",
     "removeOfflineBody": "Bez veze ovaj se uređaj ne može sam ukloniti s vašeg računa. Svejedno možete izbrisati sve na njemu: i dalje će se prikazivati na vašim ostalim uređajima dok ga ondje ne uklonite, u Postavke › Uređaji.",
-    "removeOfflineConfirm": "Svejedno izbriši"
+    "removeOfflineConfirm": "Svejedno izbriši",
+    "removeThisPasskeysCount_one": "{{count}} pristupni ključ koji je ovaj uređaj izradio za drugo web-mjesto nalazi se samo na njemu i bit će izgubljen. Najprije na tom web-mjestu dodajte pristupni ključ s drugog uređaja.",
+    "removeThisPasskeysCount_few": "{{count}} pristupna ključa koja je ovaj uređaj izradio za druga web-mjesta nalaze se samo na njemu i bit će izgubljena. Najprije na svakom od tih web-mjesta dodajte pristupni ključ s drugog uređaja.",
+    "removeThisPasskeysCount_other": "{{count}} pristupnih ključeva koje je ovaj uređaj izradio za druga web-mjesta nalazi se samo na njemu i bit će izgubljeno. Najprije na svakom od tih web-mjesta dodajte pristupni ključ s drugog uređaja.",
+    "revokeOtherPasskeys": "Pristupni ključevi koje je taj uređaj za druga web-mjesta čuvao samo na sebi gube se zajedno s njim. Njegovi pristupni ključevi sa sigurnosnom kopijom na vašim uređajima ovdje i dalje rade."
   },
   "appLock": {
     "title": "Zaključavanje",

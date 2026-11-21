@@ -1593,7 +1593,14 @@
     "removeThisPasskeys": "Mae allweddi mynediad a wnaeth y ddyfais hon ar gyfer gwefannau eraill yn aros arni hi yn unig a byddant yn cael eu colli. Ychwanegwch allwedd fynediad o ddyfais arall ar bob un o'r gwefannau hynny yn gyntaf.",
     "removeOfflineTitle": "Does dim modd cyrraedd privasys.id",
     "removeOfflineBody": "Ni all y ddyfais hon dynnu ei hun oddi ar eich cyfrif heb gysylltiad. Gallwch ei chlirio beth bynnag: bydd yn dal i ymddangos ar eich dyfeisiau eraill nes i chi ei thynnu yno, o dan Gosodiadau › Dyfeisiau.",
-    "removeOfflineConfirm": "Clirio beth bynnag"
+    "removeOfflineConfirm": "Clirio beth bynnag",
+    "removeThisPasskeysCount_zero": "Mae {{count}} o allweddi mynediad a wnaeth y ddyfais hon ar gyfer gwefannau eraill yn aros arni hi yn unig a byddant yn cael eu colli. Ychwanegwch allwedd fynediad o ddyfais arall ar bob un o'r gwefannau hynny yn gyntaf.",
+    "removeThisPasskeysCount_one": "Mae {{count}} allwedd fynediad a wnaeth y ddyfais hon ar gyfer gwefan arall yn aros arni hi yn unig a bydd yn cael ei cholli. Ychwanegwch allwedd fynediad o ddyfais arall ar y wefan honno yn gyntaf.",
+    "removeThisPasskeysCount_two": "Mae {{count}} o allweddi mynediad a wnaeth y ddyfais hon ar gyfer gwefannau eraill yn aros arni hi yn unig a byddant yn cael eu colli. Ychwanegwch allwedd fynediad o ddyfais arall ar bob un o'r gwefannau hynny yn gyntaf.",
+    "removeThisPasskeysCount_few": "Mae {{count}} o allweddi mynediad a wnaeth y ddyfais hon ar gyfer gwefannau eraill yn aros arni hi yn unig a byddant yn cael eu colli. Ychwanegwch allwedd fynediad o ddyfais arall ar bob un o'r gwefannau hynny yn gyntaf.",
+    "removeThisPasskeysCount_many": "Mae {{count}} o allweddi mynediad a wnaeth y ddyfais hon ar gyfer gwefannau eraill yn aros arni hi yn unig a byddant yn cael eu colli. Ychwanegwch allwedd fynediad o ddyfais arall ar bob un o'r gwefannau hynny yn gyntaf.",
+    "removeThisPasskeysCount_other": "Mae {{count}} o allweddi mynediad a wnaeth y ddyfais hon ar gyfer gwefannau eraill yn aros arni hi yn unig a byddant yn cael eu colli. Ychwanegwch allwedd fynediad o ddyfais arall ar bob un o'r gwefannau hynny yn gyntaf.",
+    "revokeOtherPasskeys": "Mae allweddi mynediad a gadwodd y ddyfais honno ar gyfer gwefannau eraill arni hi yn unig yn cael eu colli gyda hi. Mae ei hallweddi mynediad sydd â chopi wrth gefn ar eich dyfeisiau yn parhau i weithio yma."
   },
   "appLock": {
     "title": "Clo Ap",

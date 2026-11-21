@@ -1567,7 +1567,13 @@
     "removeThisPasskeys": "Fanann na heochracha rochtana a rinne an gléas seo do shuíomhanna gréasáin eile air amháin agus caillfear iad. Cuir eochair rochtana ó ghléas eile le gach ceann de na suíomhanna sin ar dtús.",
     "removeOfflineTitle": "Ní féidir teacht ar privasys.id",
     "removeOfflineBody": "Ní féidir leis an ngléas seo é féin a bhaint de do chuntas gan cheangal. Is féidir leat é a ghlanadh mar sin féin: beidh sé le feiceáil ar do ghléasanna eile go dtí go mbainfidh tú ann é, faoi Socruithe › Gléasanna.",
-    "removeOfflineConfirm": "Glan mar sin féin"
+    "removeOfflineConfirm": "Glan mar sin féin",
+    "removeThisPasskeysCount_one": "Fanann {{count}} eochair rochtana a rinne an gléas seo do shuíomh gréasáin eile air amháin agus caillfear í. Cuir eochair rochtana ó ghléas eile leis an suíomh sin ar dtús.",
+    "removeThisPasskeysCount_two": "Fanann {{count}} eochair rochtana a rinne an gléas seo do shuíomhanna gréasáin eile air amháin agus caillfear iad. Cuir eochair rochtana ó ghléas eile le gach ceann de na suíomhanna sin ar dtús.",
+    "removeThisPasskeysCount_few": "Fanann {{count}} eochair rochtana a rinne an gléas seo do shuíomhanna gréasáin eile air amháin agus caillfear iad. Cuir eochair rochtana ó ghléas eile le gach ceann de na suíomhanna sin ar dtús.",
+    "removeThisPasskeysCount_many": "Fanann {{count}} eochair rochtana a rinne an gléas seo do shuíomhanna gréasáin eile air amháin agus caillfear iad. Cuir eochair rochtana ó ghléas eile le gach ceann de na suíomhanna sin ar dtús.",
+    "removeThisPasskeysCount_other": "Fanann {{count}} eochair rochtana a rinne an gléas seo do shuíomhanna gréasáin eile air amháin agus caillfear iad. Cuir eochair rochtana ó ghléas eile le gach ceann de na suíomhanna sin ar dtús.",
+    "revokeOtherPasskeys": "Caillfear in éineacht leis an ngléas sin na heochracha rochtana a choinnigh sé air féin amháin do shuíomhanna gréasáin eile. Leanann a eochracha rochtana a bhfuil cúltaca acu ar do ghléasanna ag obair anseo."
   },
   "appLock": {
     "title": "Glas Aipe",

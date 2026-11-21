@@ -1516,7 +1516,12 @@
     "removeThisPasskeys": "Prístupové kľúče, ktoré toto zariadenie vytvorilo pre iné weby, sú len v ňom a stratia sa. Najprv na každom z týchto webov pridajte prístupový kľúč z iného zariadenia.",
     "removeOfflineTitle": "privasys.id nie je dostupný",
     "removeOfflineBody": "Bez pripojenia sa toto zariadenie nemôže samo odstrániť z vášho účtu. Napriek tomu ho môžete vymazať: na vašich ostatných zariadeniach sa bude zobrazovať, kým ho tam neodstránite v časti Nastavenia › Zariadenia.",
-    "removeOfflineConfirm": "Napriek tomu vymazať"
+    "removeOfflineConfirm": "Napriek tomu vymazať",
+    "removeThisPasskeysCount_one": "{{count}} prístupový kľúč, ktorý toto zariadenie vytvorilo pre iný web, je len v ňom a stratí sa. Najprv na tomto webe pridajte prístupový kľúč z iného zariadenia.",
+    "removeThisPasskeysCount_few": "{{count}} prístupové kľúče, ktoré toto zariadenie vytvorilo pre iné weby, sú len v ňom a stratia sa. Najprv na každom z týchto webov pridajte prístupový kľúč z iného zariadenia.",
+    "removeThisPasskeysCount_many": "{{count}} prístupového kľúča, ktoré toto zariadenie vytvorilo pre iné weby, je len v ňom a stratí sa. Najprv na každom z týchto webov pridajte prístupový kľúč z iného zariadenia.",
+    "removeThisPasskeysCount_other": "{{count}} prístupových kľúčov, ktoré toto zariadenie vytvorilo pre iné weby, je len v ňom a stratí sa. Najprv na každom z týchto webov pridajte prístupový kľúč z iného zariadenia.",
+    "revokeOtherPasskeys": "Prístupové kľúče, ktoré ono zariadenie uchovávalo pre iné weby len u seba, sa s ním stratia. Jeho prístupové kľúče zálohované do vašich zariadení tu budú fungovať ďalej."
   },
   "appLock": {
     "title": "Zámok aplikácie",

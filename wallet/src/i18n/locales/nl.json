@@ -1478,7 +1478,10 @@
     "removeThisPasskeys": "Passkeys die dit apparaat voor andere websites heeft gemaakt, staan alleen hierop en gaan verloren. Voeg eerst op elk van die sites een passkey toe vanaf een ander apparaat.",
     "removeOfflineTitle": "privasys.id is niet bereikbaar",
     "removeOfflineBody": "Zonder verbinding kan dit apparaat zichzelf niet uit je account halen. Je kunt het toch wissen: het blijft op je andere apparaten staan totdat je het daar verwijdert, onder Instellingen › Apparaten.",
-    "removeOfflineConfirm": "Toch wissen"
+    "removeOfflineConfirm": "Toch wissen",
+    "removeThisPasskeysCount_one": "{{count}} passkey die dit apparaat voor een andere website heeft gemaakt, staat alleen hierop en gaat verloren. Voeg eerst op die site een passkey toe vanaf een ander apparaat.",
+    "removeThisPasskeysCount_other": "{{count}} passkeys die dit apparaat voor andere websites heeft gemaakt, staan alleen hierop en gaan verloren. Voeg eerst op elk van die sites een passkey toe vanaf een ander apparaat.",
+    "revokeOtherPasskeys": "Passkeys die dat apparaat voor andere websites alleen op zichzelf bewaarde, gaan ermee verloren. De passkeys ervan met een back-up op je apparaten blijven hier werken."
   },
   "appLock": {
     "title": "App-vergrendeling",

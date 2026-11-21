@@ -1541,7 +1541,12 @@
     "removeThisPasskeys": "Gesla za dostop, ki jih je ta naprava ustvarila za druga spletna mesta, so samo v njej in bodo izgubljena. Najprej na vsakem od teh spletnih mest dodajte geslo za dostop iz druge naprave.",
     "removeOfflineTitle": "privasys.id ni dosegljiv",
     "removeOfflineBody": "Brez povezave se ta naprava ne more sama odstraniti iz vašega računa. Vseeno lahko izbrišete vse v njej: v vaših drugih napravah bo še prikazana, dokler je tam ne odstranite v razdelku Nastavitve › Naprave.",
-    "removeOfflineConfirm": "Vseeno izbriši"
+    "removeOfflineConfirm": "Vseeno izbriši",
+    "removeThisPasskeysCount_one": "{{count}} geslo za dostop, ki ga je ta naprava ustvarila za drugo spletno mesto, je samo v njej in bo izgubljeno. Najprej na tem spletnem mestu dodajte geslo za dostop iz druge naprave.",
+    "removeThisPasskeysCount_two": "{{count}} gesli za dostop, ki ju je ta naprava ustvarila za druga spletna mesta, sta samo v njej in bosta izgubljeni. Najprej na vsakem od teh spletnih mest dodajte geslo za dostop iz druge naprave.",
+    "removeThisPasskeysCount_few": "{{count}} gesla za dostop, ki jih je ta naprava ustvarila za druga spletna mesta, so samo v njej in bodo izgubljena. Najprej na vsakem od teh spletnih mest dodajte geslo za dostop iz druge naprave.",
+    "removeThisPasskeysCount_other": "{{count}} gesel za dostop, ki jih je ta naprava ustvarila za druga spletna mesta, je samo v njej in bo izgubljenih. Najprej na vsakem od teh spletnih mest dodajte geslo za dostop iz druge naprave.",
+    "revokeOtherPasskeys": "Gesla za dostop, ki jih je tista naprava za druga spletna mesta hranila samo pri sebi, se izgubijo skupaj z njo. Njena gesla za dostop z varnostno kopijo v vaših napravah tukaj še naprej delujejo."
   },
   "appLock": {
     "title": "Zaklep aplikacije",

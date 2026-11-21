@@ -1530,7 +1530,12 @@
     "removeThisPasskeys": "Klucze dostępu, które to urządzenie utworzyło dla innych witryn, są tylko na nim i zostaną utracone. Najpierw dodaj w każdej z tych witryn klucz dostępu z innego urządzenia.",
     "removeOfflineTitle": "Nie można połączyć się z privasys.id",
     "removeOfflineBody": "Bez połączenia to urządzenie nie może samo usunąć się z Twojego konta. Mimo to możesz je wyczyścić: będzie nadal widoczne na Twoich pozostałych urządzeniach, dopóki go tam nie usuniesz w sekcji Ustawienia › Urządzenia.",
-    "removeOfflineConfirm": "Wyczyść mimo to"
+    "removeOfflineConfirm": "Wyczyść mimo to",
+    "removeThisPasskeysCount_one": "{{count}} klucz dostępu, który to urządzenie utworzyło dla innej witryny, jest tylko na nim i zostanie utracony. Najpierw dodaj w tej witrynie klucz dostępu z innego urządzenia.",
+    "removeThisPasskeysCount_few": "{{count}} klucze dostępu, które to urządzenie utworzyło dla innych witryn, są tylko na nim i zostaną utracone. Najpierw dodaj w każdej z tych witryn klucz dostępu z innego urządzenia.",
+    "removeThisPasskeysCount_many": "{{count}} kluczy dostępu, które to urządzenie utworzyło dla innych witryn, jest tylko na nim i zostanie utraconych. Najpierw dodaj w każdej z tych witryn klucz dostępu z innego urządzenia.",
+    "removeThisPasskeysCount_other": "{{count}} klucza dostępu, które to urządzenie utworzyło dla innych witryn, jest tylko na nim i zostanie utracone. Najpierw dodaj w każdej z tych witryn klucz dostępu z innego urządzenia.",
+    "revokeOtherPasskeys": "Klucze dostępu, które tamto urządzenie przechowywało tylko u siebie dla innych witryn, przepadają razem z nim. Jego klucze dostępu z kopią zapasową na Twoich urządzeniach nadal tu działają."
   },
   "appLock": {
     "title": "Blokada aplikacji",

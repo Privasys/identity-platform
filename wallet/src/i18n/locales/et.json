@@ -1489,7 +1489,10 @@
     "removeThisPasskeys": "Pääsuvõtmed, mille see seade on teiste veebisaitide jaoks loonud, on ainult selles seadmes ja lähevad kaotsi. Lisage enne igale neist saitidest pääsuvõti mõnest teisest seadmest.",
     "removeOfflineTitle": "privasys.id ei ole kättesaadav",
     "removeOfflineBody": "Ilma ühenduseta ei saa see seade end teie kontolt eemaldada. Saate selle sisu siiski kustutada: seade on teie teistes seadmetes näha seni, kuni eemaldate selle seal jaotises Sätted › Seadmed.",
-    "removeOfflineConfirm": "Kustuta siiski"
+    "removeOfflineConfirm": "Kustuta siiski",
+    "removeThisPasskeysCount_one": "{{count}} pääsuvõti, mille see seade on teise veebisaidi jaoks loonud, on ainult selles seadmes ja läheb kaotsi. Lisage enne sellele saidile pääsuvõti mõnest teisest seadmest.",
+    "removeThisPasskeysCount_other": "{{count}} pääsuvõtit, mille see seade on teiste veebisaitide jaoks loonud, on ainult selles seadmes ja läheb kaotsi. Lisage enne igale neist saitidest pääsuvõti mõnest teisest seadmest.",
+    "revokeOtherPasskeys": "Pääsuvõtmed, mida see seade hoidis teiste veebisaitide jaoks ainult enda peal, lähevad koos sellega kaotsi. Selle pääsuvõtmed, millest on teie seadmetes varukoopia, töötavad siin edasi."
   },
   "appLock": {
     "title": "Rakenduse lukk",

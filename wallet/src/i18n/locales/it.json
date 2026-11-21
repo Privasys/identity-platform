@@ -1504,7 +1504,11 @@
     "removeThisPasskeys": "Le passkey che questo dispositivo ha creato per altri siti web si trovano solo qui e andranno perse. Prima aggiungi su ciascuno di quei siti una passkey da un altro dispositivo.",
     "removeOfflineTitle": "privasys.id non è raggiungibile",
     "removeOfflineBody": "Senza connessione questo dispositivo non può rimuoversi da solo dal tuo account. Puoi cancellarlo comunque: continuerà a comparire sugli altri dispositivi finché non lo rimuovi da lì, in Impostazioni › Dispositivi.",
-    "removeOfflineConfirm": "Cancella comunque"
+    "removeOfflineConfirm": "Cancella comunque",
+    "removeThisPasskeysCount_one": "{{count}} passkey che questo dispositivo ha creato per un altro sito web si trova solo qui e andrà persa. Prima aggiungi su quel sito una passkey da un altro dispositivo.",
+    "removeThisPasskeysCount_many": "{{count}} di passkey che questo dispositivo ha creato per altri siti web si trovano solo qui e andranno perse. Prima aggiungi su ciascuno di quei siti una passkey da un altro dispositivo.",
+    "removeThisPasskeysCount_other": "{{count}} passkey che questo dispositivo ha creato per altri siti web si trovano solo qui e andranno perse. Prima aggiungi su ciascuno di quei siti una passkey da un altro dispositivo.",
+    "revokeOtherPasskeys": "Le passkey che quel dispositivo conservava solo su di sé per altri siti web vanno perse con esso. Le sue passkey con backup sui tuoi dispositivi continuano a funzionare qui."
   },
   "appLock": {
     "title": "Blocco app",

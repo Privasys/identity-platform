@@ -1478,7 +1478,10 @@
     "removeThisPasskeys": "Pääsyavaimet, jotka tämä laite on luonut muille verkkosivustoille, ovat vain tässä laitteessa ja menetetään. Lisää ensin jokaiselle näistä sivustoista pääsyavain toiselta laitteelta.",
     "removeOfflineTitle": "privasys.id ei ole tavoitettavissa",
     "removeOfflineBody": "Ilman yhteyttä tämä laite ei voi poistaa itseään tililtäsi. Voit silti tyhjentää sen: se näkyy edelleen muilla laitteillasi, kunnes poistat sen niistä kohdassa Asetukset › Laitteet.",
-    "removeOfflineConfirm": "Tyhjennä silti"
+    "removeOfflineConfirm": "Tyhjennä silti",
+    "removeThisPasskeysCount_one": "{{count}} pääsyavain, jonka tämä laite on luonut toiselle verkkosivustolle, on vain tässä laitteessa ja menetetään. Lisää ensin sille sivustolle pääsyavain toiselta laitteelta.",
+    "removeThisPasskeysCount_other": "{{count}} pääsyavainta, jotka tämä laite on luonut muille verkkosivustoille, on vain tässä laitteessa ja menetetään. Lisää ensin jokaiselle näistä sivustoista pääsyavain toiselta laitteelta.",
+    "revokeOtherPasskeys": "Pääsyavaimet, joita se laite säilytti muita verkkosivustoja varten vain itsellään, menetetään sen mukana. Sen pääsyavaimet, joista on varmuuskopio laitteillasi, toimivat täällä edelleen."
   },
   "appLock": {
     "title": "Sovelluslukitus",

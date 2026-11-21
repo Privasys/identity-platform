@@ -1516,7 +1516,12 @@
     "removeThisPasskeys": "Prieigos raktai, kuriuos šis įrenginys sukūrė kitoms svetainėms, yra tik jame ir bus prarasti. Pirmiausia kiekvienoje iš tų svetainių pridėkite prieigos raktą iš kito įrenginio.",
     "removeOfflineTitle": "Nepavyksta pasiekti privasys.id",
     "removeOfflineBody": "Be ryšio šis įrenginys negali pats savęs pašalinti iš jūsų paskyros. Vis tiek galite jį išvalyti: jis toliau bus rodomas kituose jūsų įrenginiuose, kol ten jo nepašalinsite skiltyje Nustatymai › Įrenginiai.",
-    "removeOfflineConfirm": "Vis tiek išvalyti"
+    "removeOfflineConfirm": "Vis tiek išvalyti",
+    "removeThisPasskeysCount_one": "{{count}} prieigos raktas, kurį šis įrenginys sukūrė kitai svetainei, yra tik jame ir bus prarastas. Pirmiausia toje svetainėje pridėkite prieigos raktą iš kito įrenginio.",
+    "removeThisPasskeysCount_few": "{{count}} prieigos raktai, kuriuos šis įrenginys sukūrė kitoms svetainėms, yra tik jame ir bus prarasti. Pirmiausia kiekvienoje iš tų svetainių pridėkite prieigos raktą iš kito įrenginio.",
+    "removeThisPasskeysCount_many": "{{count}} prieigos rakto, kurį šis įrenginys sukūrė kitoms svetainėms, yra tik jame ir bus prarasta. Pirmiausia kiekvienoje iš tų svetainių pridėkite prieigos raktą iš kito įrenginio.",
+    "removeThisPasskeysCount_other": "{{count}} prieigos raktų, kuriuos šis įrenginys sukūrė kitoms svetainėms, yra tik jame ir bus prarasta. Pirmiausia kiekvienoje iš tų svetainių pridėkite prieigos raktą iš kito įrenginio.",
+    "revokeOtherPasskeys": "Prieigos raktai, kuriuos tas įrenginys kitoms svetainėms laikė tik savyje, prarandami kartu su juo. Jo prieigos raktai, turintys atsarginę kopiją jūsų įrenginiuose, čia toliau veikia."
   },
   "appLock": {
     "title": "Programėlės užraktas",

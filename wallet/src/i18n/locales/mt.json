@@ -1567,7 +1567,13 @@
     "removeThisPasskeys": "Il-passkeys li dan l-apparat għamel għal websajts oħra jibqgħu fuqu biss u se jintilfu. L-ewwel żid passkey minn apparat ieħor fuq kull wieħed minn dawk is-siti.",
     "removeOfflineTitle": "privasys.id ma jistax jintlaħaq",
     "removeOfflineBody": "Mingħajr konnessjoni, dan l-apparat ma jistax ineħħi lilu nnifsu mill-kont tiegħek. Tista' tħassar kollox fuqu xorta waħda: se jibqa' jidher fuq l-apparati l-oħra tiegħek sakemm tneħħih minn hemm, taħt Issettjar › Apparati.",
-    "removeOfflineConfirm": "Ħassar xorta"
+    "removeOfflineConfirm": "Ħassar xorta",
+    "removeThisPasskeysCount_one": "{{count}} passkey li dan l-apparat għamel għal websajt oħra jibqa' fuqu biss u se jintilef. L-ewwel żid passkey minn apparat ieħor fuq dak is-sit.",
+    "removeThisPasskeysCount_two": "{{count}} passkeys li dan l-apparat għamel għal websajts oħra jibqgħu fuqu biss u se jintilfu. L-ewwel żid passkey minn apparat ieħor fuq kull wieħed minn dawk is-siti.",
+    "removeThisPasskeysCount_few": "{{count}} passkeys li dan l-apparat għamel għal websajts oħra jibqgħu fuqu biss u se jintilfu. L-ewwel żid passkey minn apparat ieħor fuq kull wieħed minn dawk is-siti.",
+    "removeThisPasskeysCount_many": "{{count}}-il passkey li dan l-apparat għamel għal websajts oħra jibqgħu fuqu biss u se jintilfu. L-ewwel żid passkey minn apparat ieħor fuq kull wieħed minn dawk is-siti.",
+    "removeThisPasskeysCount_other": "{{count}}-il passkey li dan l-apparat għamel għal websajts oħra jibqgħu fuqu biss u se jintilfu. L-ewwel żid passkey minn apparat ieħor fuq kull wieħed minn dawk is-siti.",
+    "revokeOtherPasskeys": "Il-passkeys li dak l-apparat żamm fuqu biss għal websajts oħra jintilfu miegħu. Il-passkeys tiegħu b'backup fuq l-apparati tiegħek jibqgħu jaħdmu hawn."
   },
   "appLock": {
     "title": "Lokk tal-App",

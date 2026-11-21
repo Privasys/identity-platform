@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`website passkeys derives the root and a synced passkey per site 1`] = `
+{
+  "pubExampleCom": "04685fddec15bcd5babcb8be6b181a43964279b8f9cc63a7620f9f5b9fdcd0094a3c2506a8b0a00426b39c47475b61423a3074a0f9092735b9b868c26571c48556",
+  "root": "dbf48f5caf769655c82494e38ee824617874a623539f5b33640abe1cdb9dedf5",
+  "scalarExampleCom": "9c69d00194d9cd3bee2b12c2ab4be00f72f6e23b7ca186c39d0d3f52cb3caf54",
+}
+`;

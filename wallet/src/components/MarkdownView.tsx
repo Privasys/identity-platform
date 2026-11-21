@@ -12,7 +12,7 @@ import { Alert, Linking, ScrollView, StyleSheet, View as RNView } from 'react-na
 import { useTranslation } from 'react-i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { openableLink, parseMarkdown, type Block, type Inline } from '@/services/markdown';
+import { columnWidths, openableLink, parseMarkdown, type Block, type Inline } from '@/services/markdown';
 
 import { MONO } from '@/constants/fonts';
 
@@ -88,22 +88,26 @@ export function MarkdownView({ source }: { source: string }) {
                         ))}
                     </RNView>
                 );
-            case 'table':
+            case 'table': {
+                // One width per column, the same in every row, or each row
+                // lays out its cells on its own and the columns drift apart.
+                const widths = columnWidths(b.head, b.rows);
                 return (
                     <ScrollView key={k} horizontal style={styles.tableBox} contentContainerStyle={styles.tableInner}>
                         <RNView style={styles.tableInner}>
                             {[b.head, ...b.rows].map((row, r) => (
                                 <RNView key={r} style={[styles.tr, r === 0 && styles.th]}>
-                                    {row.map((cell, c) => (
+                                    {widths.map((w, c) => (
                                         <Text
                                             key={c}
                                             style={[
                                                 styles.td,
+                                                { flexBasis: w, flexGrow: w },
                                                 r === 0 && styles.strong,
                                                 { textAlign: b.align[c] ?? 'left' },
                                             ]}
                                         >
-                                            {inline(cell, `${k}.${r}.${c}`)}
+                                            {row[c] ? inline(row[c], `${k}.${r}.${c}`) : null}
                                         </Text>
                                     ))}
                                 </RNView>
@@ -111,6 +115,7 @@ export function MarkdownView({ source }: { source: string }) {
                         </RNView>
                     </ScrollView>
                 );
+            }
         }
     };
 
@@ -145,5 +150,7 @@ const makeStyles = (p: Palette) =>
         th: { backgroundColor: p.cardAlt },
         // A table fills the width when it fits, and scrolls sideways when not.
         tableInner: { flexGrow: 1 },
-        td: { flexGrow: 1, flexBasis: 0, minWidth: 90, maxWidth: 240, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: p.textPrimary },
+        // Widths come from columnWidths: flexBasis and flexGrow, equal in every row.
+        td: { flexShrink: 0, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: p.textPrimary },
     });
+

@@ -278,3 +278,21 @@ export function parseInline(src: string, depth = 0): Inline[] {
 export function openableLink(href: string): boolean {
     return /^(https?:\/\/|mailto:)/i.test(href);
 }
+
+/** A cell's text, for sizing its column. */
+function plain(c: Inline[]): string {
+    return c.map((n) => ('v' in n ? n.v : plain(n.c))).join('');
+}
+
+/**
+ * Each column's width, from its longest cell: about 7.5 points a character at
+ * 14 pt, between 90 and 280 so a long cell wraps rather than stretching the
+ * table. The table scrolls sideways when the columns add up to more than the
+ * screen, and shares out any room left in proportion when they do not.
+ */
+export function columnWidths(head: Inline[][], rows: Inline[][][]): number[] {
+    return head.map((_, c) => {
+        const longest = Math.max(0, ...[head, ...rows].map((row) => (row[c] ? plain(row[c]).length : 0)));
+        return Math.min(280, Math.max(90, Math.round(longest * 7.5) + 20));
+    });
+}

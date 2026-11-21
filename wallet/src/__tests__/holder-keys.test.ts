@@ -34,7 +34,10 @@ describe('holder keys', () => {
             identityScalar: hex(i.secretKey),
             identityPub: hex(i.publicKey),
             commitment: holderCommitment(a.publicKey, SALT),
+            identityCommitment: holderCommitment(i.publicKey, SALT),
         }).toMatchSnapshot();
+        // Recomputed in Go by the Verifiers (crypto/hkdf, crypto/ecdh).
+        expect(holderCommitment(i.publicKey, SALT)).toBe('g607rOJG9LvYq7X_ZSPh4MKGazeMIAvXvWW09Bm36hg');
     });
 
     it('opens its own commitment and no other', () => {

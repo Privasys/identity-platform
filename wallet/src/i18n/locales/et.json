@@ -1543,12 +1543,12 @@
   "cardCheck": {
     "entry": "Lisage panga kinnitatud aadress",
     "explainTitle": "Kinnitage oma aadress panga kaudu",
-    "explainBody": "privasys.id avab teie kaardi £0 kontrolli: raha ei võeta. Sisestate oma arveldusaadressi, teie pank kinnitab esimese rea ja postiindeksi ning teie rahakotti lisatakse ainult see, mille pank kinnitab. Privasys ei säilita kaardiandmeid.",
+    "explainBody": "Avaneb teie kaardi £0 kontroll: midagi ei võeta. Sisestate arveldusaadressi ja see lisatakse rahakotti ainult siis, kui teie pank kinnitab nii esimese rea kui ka postiindeksi. Privasys ei hoia kaardiandmeid.",
     "doneTitle": "Aadress kinnitatud",
     "doneBody": "Teie pank kinnitas selle ja see on nüüd teie rahakotis kontrollitud andmena.",
-    "nothingConfirmed": "Teie pank ei kinnitanud seda aadressi. Midagi ei lisatud.",
+    "nothingConfirmed": "Teie pank ei kinnitanud kogu aadressi, seega midagi ei lisatud. Apple Pay või automaatne täitmine võis sisestada vana aadressi: kontrollige seda ja proovige uuesti.",
     "failed": "Kontrolli ei õnnestunud lõpule viia: {{reason}}",
-    "confirmedByCard": "Kinnitanud teie kaardi pank ({{card}})",
-    "confirmedByBank": "Kinnitanud teie kaardi pank"
+    "confirmedByCard": "Arveldusaadressi kinnitas teie kaardi pank ({{card}})",
+    "confirmedByBank": "Arveldusaadressi kinnitas teie kaardi pank"
   }
 }

@@ -1601,12 +1601,12 @@
   "cardCheck": {
     "entry": "Dodajte naslov, ki ga potrdi banka",
     "explainTitle": "Potrdite naslov pri svoji banki",
-    "explainBody": "privasys.id odpre preverjanje vaše kartice v znesku £0: nič ne bo bremenjeno. Vnesete naslov za izstavitev računa, vaša banka potrdi prvo vrstico in poštno številko, v denarnico pa se doda samo to, kar banka potrdi. Privasys ne hrani podatkov o kartici.",
+    "explainBody": "Odpre se preverjanje vaše kartice za £0: nič se ne bremeni. Vpišete naslov za račun, ki se v denarnico doda le, če vaša banka potrdi tako prvo vrstico kot poštno številko. Privasys ne hrani podatkov o karticah.",
     "doneTitle": "Naslov potrjen",
     "doneBody": "Vaša banka ga je potrdila in je zdaj preverjen podatek v vaši denarnici.",
-    "nothingConfirmed": "Vaša banka tega naslova ni potrdila. Nič ni bilo dodano.",
+    "nothingConfirmed": "Vaša banka ni potrdila celotnega naslova, zato ni bilo nič dodano. Apple Pay ali samodejno izpolnjevanje je morda vneslo star naslov: preverite ga in poskusite znova.",
     "failed": "Preverjanja ni bilo mogoče dokončati: {{reason}}",
-    "confirmedByCard": "Potrdila banka vaše kartice ({{card}})",
-    "confirmedByBank": "Potrdila banka vaše kartice"
+    "confirmedByCard": "Naslov za račun je potrdila banka vaše kartice ({{card}})",
+    "confirmedByBank": "Naslov za račun je potrdila banka vaše kartice"
   }
 }

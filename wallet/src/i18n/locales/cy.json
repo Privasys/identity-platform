@@ -1659,12 +1659,12 @@
   "cardCheck": {
     "entry": "Ychwanegu cyfeiriad wedi'i gadarnhau gan eich banc",
     "explainTitle": "Cadarnhewch eich cyfeiriad gyda'ch banc",
-    "explainBody": "Mae privasys.id yn agor gwiriad £0 o'ch cerdyn: ni chodir dim. Rydych chi'n teipio eich cyfeiriad bilio, mae eich banc yn cadarnhau'r llinell gyntaf a'r cod post, a dim ond yr hyn y mae'n ei gadarnhau sy'n cael ei ychwanegu at eich waled. Nid yw Privasys yn cadw unrhyw fanylion cerdyn.",
+    "explainBody": "Mae gwiriad £0 o'ch cerdyn yn agor: does dim yn cael ei godi. Rydych chi'n teipio'ch cyfeiriad bilio, a dim ond os yw'ch banc yn cadarnhau'r llinell gyntaf a'r cod post y caiff ei ychwanegu at eich waled. Nid yw Privasys yn cadw unrhyw fanylion cerdyn.",
     "doneTitle": "Cyfeiriad wedi'i gadarnhau",
     "doneBody": "Cadarnhaodd eich banc ef, ac mae bellach yn fanylyn wedi'i wirio yn eich waled.",
-    "nothingConfirmed": "Ni chadarnhaodd eich banc y cyfeiriad hwn. Ni ychwanegwyd dim.",
+    "nothingConfirmed": "Wnaeth eich banc ddim cadarnhau'r cyfeiriad llawn hwn, felly does dim wedi'i ychwanegu. Efallai fod Apple Pay neu awtolenwi wedi rhoi hen gyfeiriad: gwiriwch ef a rhowch gynnig arall arni.",
     "failed": "Ni fu modd cwblhau'r gwiriad: {{reason}}",
-    "confirmedByCard": "Wedi'i gadarnhau gan fanc eich cerdyn ({{card}})",
-    "confirmedByBank": "Wedi'i gadarnhau gan fanc eich cerdyn"
+    "confirmedByCard": "Cyfeiriad bilio wedi'i gadarnhau gan fanc eich cerdyn ({{card}})",
+    "confirmedByBank": "Cyfeiriad bilio wedi'i gadarnhau gan fanc eich cerdyn"
   }
 }

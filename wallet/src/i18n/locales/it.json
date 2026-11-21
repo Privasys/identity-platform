@@ -1561,12 +1561,12 @@
   "cardCheck": {
     "entry": "Aggiungi un indirizzo confermato dalla tua banca",
     "explainTitle": "Conferma il tuo indirizzo con la tua banca",
-    "explainBody": "privasys.id apre una verifica da £0 della tua carta: non viene addebitato nulla. Inserisci il tuo indirizzo di fatturazione, la tua banca conferma la prima riga e il codice postale, e solo ciò che conferma viene aggiunto al tuo portafoglio. Privasys non conserva alcun dato della carta.",
+    "explainBody": "Si apre una verifica da £0 della tua carta: non viene addebitato nulla. Inserisci il tuo indirizzo di fatturazione, che viene aggiunto al tuo wallet solo se la tua banca conferma sia la prima riga sia il CAP. Privasys non conserva dati delle carte.",
     "doneTitle": "Indirizzo confermato",
     "doneBody": "La tua banca l'ha confermato e ora è un dato verificato nel tuo portafoglio.",
-    "nothingConfirmed": "La tua banca non ha confermato questo indirizzo. Non è stato aggiunto nulla.",
+    "nothingConfirmed": "La tua banca non ha confermato l'indirizzo completo, quindi non è stato aggiunto nulla. Apple Pay o la compilazione automatica potrebbero aver inserito un vecchio indirizzo: controllalo e riprova.",
     "failed": "Non è stato possibile completare la verifica: {{reason}}",
-    "confirmedByCard": "Confermato dalla banca della tua carta ({{card}})",
-    "confirmedByBank": "Confermato dalla banca della tua carta"
+    "confirmedByCard": "Indirizzo di fatturazione confermato dalla banca della tua carta ({{card}})",
+    "confirmedByBank": "Indirizzo di fatturazione confermato dalla banca della tua carta"
   }
 }

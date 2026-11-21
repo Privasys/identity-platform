@@ -1572,12 +1572,12 @@
   "cardCheck": {
     "entry": "Pievienot bankas apstiprinātu adresi",
     "explainTitle": "Apstipriniet adresi ar savas bankas palīdzību",
-    "explainBody": "privasys.id atver jūsu kartes £0 pārbaudi: nekas netiek iekasēts. Jūs ievadāt savu norēķinu adresi, jūsu banka apstiprina pirmo rindu un pasta indeksu, un jūsu makam tiek pievienots tikai tas, ko tā apstiprina. Privasys neglabā kartes datus.",
+    "explainBody": "Atveras jūsu kartes £0 pārbaude: nekas netiek iekasēts. Jūs ievadāt norēķinu adresi, un tā tiek pievienota makam tikai tad, ja jūsu banka apstiprina gan pirmo rindu, gan pasta indeksu. Privasys neglabā karšu datus.",
     "doneTitle": "Adrese apstiprināta",
     "doneBody": "Jūsu banka to apstiprināja, un tagad tā ir jūsu makā kā pārbaudīti dati.",
-    "nothingConfirmed": "Jūsu banka neapstiprināja šo adresi. Nekas netika pievienots.",
+    "nothingConfirmed": "Jūsu banka neapstiprināja visu adresi, tāpēc nekas netika pievienots. Apple Pay vai automātiskā aizpilde, iespējams, ievadīja vecu adresi: pārbaudiet to un mēģiniet vēlreiz.",
     "failed": "Pārbaudi nevarēja pabeigt: {{reason}}",
-    "confirmedByCard": "Apstiprinājusi jūsu kartes banka ({{card}})",
-    "confirmedByBank": "Apstiprinājusi jūsu kartes banka"
+    "confirmedByCard": "Norēķinu adresi apstiprinājusi jūsu kartes banka ({{card}})",
+    "confirmedByBank": "Norēķinu adresi apstiprinājusi jūsu kartes banka"
   }
 }

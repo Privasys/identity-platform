@@ -407,8 +407,12 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
             // same certified value twice and lets a relying party receive a
             // document reading under a key the referential publishes as
             // self-asserted — free, and never metered.
-            const migrated = migrateDualTierAssurance(data);
-            if (migrated.moved.length > 0 || migrated.dropped.length > 0) {
+            // Migration: early card checks signed an address on the postcode
+            // alone, which can match an old address the bank still holds.
+            // Those proofs are no longer trusted.
+            const partial = dropPartialCardChecks(data.attributes ?? []);
+            const migrated = migrateDualTierAssurance({ ...data, attributes: partial.attributes });
+            if (partial.changed || migrated.moved.length > 0 || migrated.dropped.length > 0) {
                 data.attributes = migrated.attributes;
                 set({ profile: data });
                 persist(data);
@@ -420,6 +424,42 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         }
     }
 }));
+
+/**
+ * Take back what an early card check confirmed on the postcode alone: an
+ * address with a postcode and no street line, carrying a card-check proof.
+ * The proof goes; an address the card check alone put there goes with it
+ * (its value is only that postcode, which may be an old one).
+ */
+export function dropPartialCardChecks(attributes: ProfileAttribute[]): {
+    changed: boolean;
+    attributes: ProfileAttribute[];
+} {
+    let changed = false;
+    const out: ProfileAttribute[] = [];
+    for (const attr of attributes) {
+        const isCard = (v: VerificationRecord) => v.method === 'card_check' || v.proofMaterial?.kind === 'card_check';
+        if (attr.key !== 'address' || !(attr.verifications ?? []).some(isCard) || !postcodeOnly(attr.value)) {
+            out.push(attr);
+            continue;
+        }
+        changed = true;
+        const rest = (attr.verifications ?? []).filter((v) => !isCard(v));
+        if (attr.sourceProvider === 'card_bank' && rest.length === 0) continue;
+        out.push({ ...attr, verifications: rest, verified: attr.verified && rest.length > 0 });
+    }
+    return { changed, attributes: out };
+}
+
+/** An address value with a postcode and no street line. */
+function postcodeOnly(value: string): boolean {
+    try {
+        const a = JSON.parse(value) as Record<string, unknown>;
+        return !!a.postal_code && !a.street_address && !a.formatted;
+    } catch {
+        return false;
+    }
+}
 
 function persist(profile: UserProfile) {
     SecureStore.setItemAsync(STORE_KEY, JSON.stringify(profile)).catch(console.error);

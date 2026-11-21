@@ -1561,12 +1561,12 @@
   "cardCheck": {
     "entry": "Añadir una dirección confirmada por tu banco",
     "explainTitle": "Confirma tu dirección con tu banco",
-    "explainBody": "privasys.id abre una comprobación de £0 de tu tarjeta: no se cobra nada. Escribes tu dirección de facturación, tu banco confirma la primera línea y el código postal, y solo lo que confirma se añade a tu monedero. Privasys no guarda ningún dato de la tarjeta.",
+    "explainBody": "Se abre una comprobación de £0 de tu tarjeta: no se cobra nada. Escribes tu dirección de facturación y solo se añade a tu cartera si tu banco confirma tanto la primera línea como el código postal. Privasys no guarda datos de tarjetas.",
     "doneTitle": "Dirección confirmada",
     "doneBody": "Tu banco la ha confirmado y ahora es un dato verificado en tu monedero.",
-    "nothingConfirmed": "Tu banco no ha confirmado esta dirección. No se ha añadido nada.",
+    "nothingConfirmed": "Tu banco no confirmó esta dirección completa, así que no se añadió nada. Puede que Apple Pay o el autocompletado hayan puesto una dirección antigua: revísala e inténtalo de nuevo.",
     "failed": "No se ha podido completar la comprobación: {{reason}}",
-    "confirmedByCard": "Confirmada por el banco de tu tarjeta ({{card}})",
-    "confirmedByBank": "Confirmada por el banco de tu tarjeta"
+    "confirmedByCard": "Dirección de facturación confirmada por el banco de tu tarjeta ({{card}})",
+    "confirmedByBank": "Dirección de facturación confirmada por el banco de tu tarjeta"
   }
 }

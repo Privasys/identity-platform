@@ -1574,12 +1574,12 @@
   "cardCheck": {
     "entry": "Pridať adresu potvrdenú bankou",
     "explainTitle": "Potvrďte adresu cez svoju banku",
-    "explainBody": "privasys.id otvorí overenie vašej karty na £0: nič sa nestrhne. Zadáte fakturačnú adresu, vaša banka potvrdí prvý riadok a PSČ a do peňaženky sa pridá len to, čo potvrdí. Privasys neuchováva žiadne údaje o karte.",
+    "explainBody": "Otvorí sa kontrola vašej karty na £0: nič sa nestrhne. Zadáte fakturačnú adresu a do peňaženky sa pridá, len ak vaša banka potvrdí prvý riadok aj PSČ. Privasys neuchováva žiadne údaje o karte.",
     "doneTitle": "Adresa potvrdená",
     "doneBody": "Vaša banka ju potvrdila a teraz je vo vašej peňaženke ako overený údaj.",
-    "nothingConfirmed": "Vaša banka túto adresu nepotvrdila. Nič nebolo pridané.",
+    "nothingConfirmed": "Vaša banka nepotvrdila celú adresu, takže sa nič nepridalo. Apple Pay alebo automatické vypĺňanie mohli zadať starú adresu: skontrolujte ju a skúste to znova.",
     "failed": "Overenie sa nepodarilo dokončiť: {{reason}}",
-    "confirmedByCard": "Potvrdené bankou vašej karty ({{card}})",
-    "confirmedByBank": "Potvrdené bankou vašej karty"
+    "confirmedByCard": "Fakturačná adresa potvrdená bankou vašej karty ({{card}})",
+    "confirmedByBank": "Fakturačná adresa potvrdená bankou vašej karty"
   }
 }

@@ -1574,12 +1574,12 @@
   "cardCheck": {
     "entry": "Pridėti banko patvirtintą adresą",
     "explainTitle": "Patvirtinkite adresą per savo banką",
-    "explainBody": "privasys.id atidaro jūsų kortelės £0 patikrą: nieko nenuskaičiuojama. Įvedate savo atsiskaitymo adresą, jūsų bankas patvirtina pirmąją eilutę ir pašto kodą, ir į jūsų piniginę pridedama tik tai, ką jis patvirtina. Privasys nesaugo jokių kortelės duomenų.",
+    "explainBody": "Atsidaro jūsų kortelės £0 patikra: nieko nenuskaičiuojama. Įvedate atsiskaitymo adresą, ir jis įtraukiamas į piniginę tik tada, kai jūsų bankas patvirtina ir pirmą eilutę, ir pašto kodą. Privasys nesaugo kortelių duomenų.",
     "doneTitle": "Adresas patvirtintas",
     "doneBody": "Jūsų bankas jį patvirtino, ir dabar jūsų piniginėje jis saugomas kaip patikrinti duomenys.",
-    "nothingConfirmed": "Jūsų bankas nepatvirtino šio adreso. Niekas nebuvo pridėta.",
+    "nothingConfirmed": "Jūsų bankas nepatvirtino viso adreso, todėl niekas nepridėta. Apple Pay ar automatinis pildymas galėjo įrašyti seną adresą: patikrinkite jį ir bandykite dar kartą.",
     "failed": "Patikros nepavyko užbaigti: {{reason}}",
-    "confirmedByCard": "Patvirtino jūsų kortelės bankas ({{card}})",
-    "confirmedByBank": "Patvirtino jūsų kortelės bankas"
+    "confirmedByCard": "Atsiskaitymo adresą patvirtino jūsų kortelės bankas ({{card}})",
+    "confirmedByBank": "Atsiskaitymo adresą patvirtino jūsų kortelės bankas"
   }
 }

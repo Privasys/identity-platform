@@ -1590,12 +1590,12 @@
   "cardCheck": {
     "entry": "Dodaj adres potwierdzony przez bank",
     "explainTitle": "Potwierdź adres w swoim banku",
-    "explainBody": "privasys.id otwiera weryfikację Twojej karty na £0: nic nie zostanie pobrane. Wpisujesz adres rozliczeniowy, Twój bank potwierdza pierwszą linię i kod pocztowy, a do portfela trafia tylko to, co bank potwierdzi. Privasys nie przechowuje danych karty.",
+    "explainBody": "Otwiera się weryfikacja Twojej karty na £0: nic nie jest pobierane. Wpisujesz adres rozliczeniowy, a trafia on do portfela tylko wtedy, gdy Twój bank potwierdzi zarówno pierwszy wiersz, jak i kod pocztowy. Privasys nie przechowuje danych kart.",
     "doneTitle": "Adres potwierdzony",
     "doneBody": "Twój bank go potwierdził i jest teraz zweryfikowaną informacją w Twoim portfelu.",
-    "nothingConfirmed": "Twój bank nie potwierdził tego adresu. Nic nie zostało dodane.",
+    "nothingConfirmed": "Twój bank nie potwierdził pełnego adresu, więc nic nie zostało dodane. Apple Pay lub autouzupełnianie mogły wpisać stary adres: sprawdź go i spróbuj ponownie.",
     "failed": "Nie udało się ukończyć weryfikacji: {{reason}}",
-    "confirmedByCard": "Potwierdzone przez bank Twojej karty ({{card}})",
-    "confirmedByBank": "Potwierdzone przez bank Twojej karty"
+    "confirmedByCard": "Adres rozliczeniowy potwierdzony przez bank Twojej karty ({{card}})",
+    "confirmedByBank": "Adres rozliczeniowy potwierdzony przez bank Twojej karty"
   }
 }

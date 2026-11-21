@@ -1561,12 +1561,12 @@
   "cardCheck": {
     "entry": "Ajouter une adresse confirmée par votre banque",
     "explainTitle": "Confirmez votre adresse auprès de votre banque",
-    "explainBody": "privasys.id ouvre une vérification à £0 de votre carte : rien n'est débité. Vous saisissez votre adresse de facturation, votre banque confirme la première ligne et le code postal, et seul ce qu'elle confirme est ajouté à votre portefeuille. Privasys ne conserve aucune donnée de carte.",
+    "explainBody": "Une vérification à £0 de votre carte s'ouvre : rien n'est débité. Vous saisissez votre adresse de facturation, et elle n'est ajoutée à votre portefeuille que si votre banque confirme à la fois la première ligne et le code postal. Privasys ne conserve aucune donnée de carte.",
     "doneTitle": "Adresse confirmée",
     "doneBody": "Votre banque l'a confirmée, et c'est désormais une information vérifiée dans votre portefeuille.",
-    "nothingConfirmed": "Votre banque n'a pas confirmé cette adresse. Rien n'a été ajouté.",
+    "nothingConfirmed": "Votre banque n'a pas confirmé cette adresse complète, donc rien n'a été ajouté. Apple Pay ou le remplissage automatique a peut-être saisi une ancienne adresse : vérifiez-la et réessayez.",
     "failed": "La vérification n'a pas pu aboutir : {{reason}}",
-    "confirmedByCard": "Confirmée par la banque de votre carte ({{card}})",
-    "confirmedByBank": "Confirmée par la banque de votre carte"
+    "confirmedByCard": "Adresse de facturation confirmée par la banque de votre carte ({{card}})",
+    "confirmedByBank": "Adresse de facturation confirmée par la banque de votre carte"
   }
 }

@@ -1630,12 +1630,12 @@
   "cardCheck": {
     "entry": "Cuir seoladh leis a dheimhnigh do bhanc",
     "explainTitle": "Deimhnigh do sheoladh le do bhanc",
-    "explainBody": "Osclaíonn privasys.id seiceáil £0 ar do chárta: ní ghearrtar aon rud. Clóscríobhann tú do sheoladh billeála, deimhníonn do bhanc an chéad líne agus an cód poist, agus ní chuirtear le do sparán ach an méid a dheimhníonn sé. Ní choinníonn Privasys aon sonraí cárta.",
+    "explainBody": "Osclaítear seiceáil £0 ar do chárta: ní ghearrtar aon rud. Clóscríobhann tú do sheoladh billeála, agus ní chuirtear le do sparán é ach amháin má dheimhníonn do bhanc an chéad líne agus an t-éirchód araon. Ní choinníonn Privasys aon sonraí cárta.",
     "doneTitle": "Seoladh deimhnithe",
     "doneBody": "Dheimhnigh do bhanc é, agus is mionsonra fíoraithe i do sparán é anois.",
-    "nothingConfirmed": "Níor dheimhnigh do bhanc an seoladh seo. Níor cuireadh aon rud leis.",
+    "nothingConfirmed": "Níor dheimhnigh do bhanc an seoladh iomlán seo, mar sin níor cuireadh aon rud leis. B'fhéidir gur líon Apple Pay nó uathlíonadh seanseoladh: seiceáil é agus bain triail eile as.",
     "failed": "Níorbh fhéidir an tseiceáil a chríochnú: {{reason}}",
-    "confirmedByCard": "Deimhnithe ag banc do chárta ({{card}})",
-    "confirmedByBank": "Deimhnithe ag banc do chárta"
+    "confirmedByCard": "Seoladh billeála deimhnithe ag banc do chárta ({{card}})",
+    "confirmedByBank": "Seoladh billeála deimhnithe ag banc do chárta"
   }
 }

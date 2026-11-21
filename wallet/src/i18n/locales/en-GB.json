@@ -1543,12 +1543,12 @@
   "cardCheck": {
     "entry": "Add an address confirmed by your bank",
     "explainTitle": "Confirm your address with your bank",
-    "explainBody": "privasys.id opens a £0 check of your card: nothing is charged. You type your billing address, your bank confirms the first line and the postcode, and only what it confirms is added to your wallet. Privasys keeps no card details.",
+    "explainBody": "A £0 check of your card opens: nothing is charged. You type your billing address, and it is added to your wallet only if your bank confirms both the first line and the postcode. Privasys keeps no card details.",
     "doneTitle": "Address confirmed",
     "doneBody": "Your bank confirmed it, and it is now a verified detail in your wallet.",
-    "nothingConfirmed": "Your bank didn't confirm this address. Nothing was added.",
+    "nothingConfirmed": "Your bank didn't confirm this full address, so nothing was added. Apple Pay or autofill may have filled in an old address: check it and try again.",
     "failed": "The check could not be completed: {{reason}}",
-    "confirmedByCard": "Confirmed by your card's bank ({{card}})",
-    "confirmedByBank": "Confirmed by your card's bank"
+    "confirmedByCard": "Billing address confirmed by your card's bank ({{card}})",
+    "confirmedByBank": "Billing address confirmed by your card's bank"
   }
 }

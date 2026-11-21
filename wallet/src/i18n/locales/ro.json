@@ -1572,12 +1572,12 @@
   "cardCheck": {
     "entry": "Adaugă o adresă confirmată de banca ta",
     "explainTitle": "Confirmă-ți adresa prin banca ta",
-    "explainBody": "privasys.id deschide o verificare de £0 a cardului tău: nu se încasează nimic. Introduci adresa de facturare, banca ta confirmă primul rând și codul poștal, iar în portofelul tău se adaugă doar ce confirmă ea. Privasys nu păstrează niciun detaliu al cardului.",
+    "explainBody": "Se deschide o verificare de £0 a cardului tău: nu se percepe nimic. Introduci adresa de facturare, iar ea se adaugă în portofel doar dacă banca ta confirmă atât primul rând, cât și codul poștal. Privasys nu păstrează date de card.",
     "doneTitle": "Adresă confirmată",
     "doneBody": "Banca ta a confirmat-o, iar acum este un detaliu verificat în portofelul tău.",
-    "nothingConfirmed": "Banca ta nu a confirmat această adresă. Nu s-a adăugat nimic.",
+    "nothingConfirmed": "Banca ta nu a confirmat adresa completă, așa că nu s-a adăugat nimic. Apple Pay sau completarea automată poate a introdus o adresă veche: verific-o și încearcă din nou.",
     "failed": "Verificarea nu a putut fi finalizată: {{reason}}",
-    "confirmedByCard": "Confirmată de banca cardului tău ({{card}})",
-    "confirmedByBank": "Confirmată de banca cardului tău"
+    "confirmedByCard": "Adresă de facturare confirmată de banca cardului tău ({{card}})",
+    "confirmedByBank": "Adresă de facturare confirmată de banca cardului tău"
   }
 }

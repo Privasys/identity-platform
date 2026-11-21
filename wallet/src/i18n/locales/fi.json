@@ -1532,12 +1532,12 @@
   "cardCheck": {
     "entry": "Lisää pankkisi vahvistama osoite",
     "explainTitle": "Vahvista osoitteesi pankkisi kautta",
-    "explainBody": "privasys.id avaa korttisi tarkistuksen summalla £0: mitään ei veloiteta. Kirjoitat laskutusosoitteesi, pankkisi vahvistaa ensimmäisen rivin ja postinumeron, ja vain sen vahvistamat tiedot lisätään lompakkoosi. Privasys ei säilytä korttitietoja.",
+    "explainBody": "Korttisi £0:n tarkistus avautuu: mitään ei veloiteta. Kirjoitat laskutusosoitteesi, ja se lisätään lompakkoosi vain, jos pankkisi vahvistaa sekä ensimmäisen rivin että postinumeron. Privasys ei säilytä korttitietoja.",
     "doneTitle": "Osoite vahvistettu",
     "doneBody": "Pankkisi vahvisti sen, ja se on nyt vahvistettu tieto lompakossasi.",
-    "nothingConfirmed": "Pankkisi ei vahvistanut tätä osoitetta. Mitään ei lisätty.",
+    "nothingConfirmed": "Pankkisi ei vahvistanut koko osoitetta, joten mitään ei lisätty. Apple Pay tai automaattinen täyttö on ehkä syöttänyt vanhan osoitteen: tarkista se ja yritä uudelleen.",
     "failed": "Tarkistusta ei voitu suorittaa loppuun: {{reason}}",
-    "confirmedByCard": "Vahvistanut korttisi pankki ({{card}})",
-    "confirmedByBank": "Vahvistanut korttisi pankki"
+    "confirmedByCard": "Laskutusosoitteen vahvisti korttisi pankki ({{card}})",
+    "confirmedByBank": "Laskutusosoitteen vahvisti korttisi pankki"
   }
 }

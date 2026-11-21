@@ -1532,12 +1532,12 @@
   "cardCheck": {
     "entry": "Von Ihrer Bank bestätigte Adresse hinzufügen",
     "explainTitle": "Adresse über Ihre Bank bestätigen",
-    "explainBody": "privasys.id startet eine Prüfung Ihrer Karte über £0: Es wird nichts abgebucht. Sie geben Ihre Rechnungsadresse ein, Ihre Bank bestätigt die erste Adresszeile und die Postleitzahl, und nur was sie bestätigt, wird Ihrem Wallet hinzugefügt. Privasys speichert keine Kartendaten.",
+    "explainBody": "Eine Prüfung Ihrer Karte über £0 öffnet sich: Es wird nichts abgebucht. Sie geben Ihre Rechnungsadresse ein, und sie wird Ihrem Wallet nur hinzugefügt, wenn Ihre Bank sowohl die erste Adresszeile als auch die Postleitzahl bestätigt. Privasys speichert keine Kartendaten.",
     "doneTitle": "Adresse bestätigt",
     "doneBody": "Ihre Bank hat sie bestätigt, und sie ist jetzt eine geprüfte Angabe in Ihrem Wallet.",
-    "nothingConfirmed": "Ihre Bank hat diese Adresse nicht bestätigt. Es wurde nichts hinzugefügt.",
+    "nothingConfirmed": "Ihre Bank hat diese Adresse nicht vollständig bestätigt, daher wurde nichts hinzugefügt. Apple Pay oder das automatische Ausfüllen hat möglicherweise eine alte Adresse eingetragen: Prüfen Sie sie und versuchen Sie es erneut.",
     "failed": "Die Prüfung konnte nicht abgeschlossen werden: {{reason}}",
-    "confirmedByCard": "Bestätigt von der Bank Ihrer Karte ({{card}})",
-    "confirmedByBank": "Bestätigt von der Bank Ihrer Karte"
+    "confirmedByCard": "Rechnungsadresse bestätigt von der Bank Ihrer Karte ({{card}})",
+    "confirmedByBank": "Rechnungsadresse bestätigt von der Bank Ihrer Karte"
   }
 }

@@ -1561,12 +1561,12 @@
   "cardCheck": {
     "entry": "Adicionar uma morada confirmada pelo seu banco",
     "explainTitle": "Confirme a sua morada com o seu banco",
-    "explainBody": "privasys.id abre uma verificação de £0 do seu cartão: nada é cobrado. Escreve a sua morada de faturação, o seu banco confirma a primeira linha e o código postal, e só o que ele confirma é adicionado à sua carteira. A Privasys não guarda nenhum dado do cartão.",
+    "explainBody": "Abre-se uma verificação de £0 do seu cartão: nada é cobrado. Escreve o seu endereço de faturação, e ele só é adicionado à sua carteira se o seu banco confirmar tanto a primeira linha como o código postal. A Privasys não guarda dados de cartões.",
     "doneTitle": "Morada confirmada",
     "doneBody": "O seu banco confirmou-a e é agora um dado verificado na sua carteira.",
-    "nothingConfirmed": "O seu banco não confirmou esta morada. Nada foi adicionado.",
+    "nothingConfirmed": "O seu banco não confirmou este endereço completo, por isso nada foi adicionado. O Apple Pay ou o preenchimento automático podem ter colocado um endereço antigo: verifique-o e tente novamente.",
     "failed": "Não foi possível concluir a verificação: {{reason}}",
-    "confirmedByCard": "Confirmada pelo banco do seu cartão ({{card}})",
-    "confirmedByBank": "Confirmada pelo banco do seu cartão"
+    "confirmedByCard": "Endereço de faturação confirmado pelo banco do seu cartão ({{card}})",
+    "confirmedByBank": "Endereço de faturação confirmado pelo banco do seu cartão"
   }
 }

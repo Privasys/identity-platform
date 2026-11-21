@@ -1532,12 +1532,12 @@
   "cardCheck": {
     "entry": "Lägg till en adress som din bank bekräftar",
     "explainTitle": "Bekräfta din adress med din bank",
-    "explainBody": "privasys.id öppnar en kontroll av ditt kort på £0: ingenting dras. Du skriver din faktureringsadress, din bank bekräftar första raden och postnumret, och bara det som banken bekräftar läggs till i din plånbok. Privasys sparar inga kortuppgifter.",
+    "explainBody": "En kontroll av ditt kort på £0 öppnas: inget debiteras. Du skriver din faktureringsadress, och den läggs till i din plånbok bara om din bank bekräftar både första raden och postnumret. Privasys sparar inga kortuppgifter.",
     "doneTitle": "Adressen är bekräftad",
     "doneBody": "Din bank har bekräftat den, och den är nu en verifierad uppgift i din plånbok.",
-    "nothingConfirmed": "Din bank bekräftade inte den här adressen. Ingenting lades till.",
+    "nothingConfirmed": "Din bank bekräftade inte hela adressen, så inget lades till. Apple Pay eller autofyll kan ha fyllt i en gammal adress: kontrollera den och försök igen.",
     "failed": "Kontrollen kunde inte slutföras: {{reason}}",
-    "confirmedByCard": "Bekräftad av ditt korts bank ({{card}})",
-    "confirmedByBank": "Bekräftad av ditt korts bank"
+    "confirmedByCard": "Faktureringsadress bekräftad av ditt korts bank ({{card}})",
+    "confirmedByBank": "Faktureringsadress bekräftad av ditt korts bank"
   }
 }

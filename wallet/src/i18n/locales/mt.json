@@ -1630,12 +1630,12 @@
   "cardCheck": {
     "entry": "Żid indirizz ikkonfermat mill-bank tiegħek",
     "explainTitle": "Ikkonferma l-indirizz tiegħek mal-bank tiegħek",
-    "explainBody": "privasys.id jiftaħ verifika ta' £0 tal-kard tiegħek: ma jiġi ddebitat xejn. Tikteb l-indirizz tal-fatturazzjoni tiegħek, il-bank tiegħek jikkonferma l-ewwel linja u l-kodiċi postali, u jiżdied mal-kartiera tiegħek biss dak li jikkonferma. Privasys ma jżomm l-ebda dettalji tal-kard.",
+    "explainBody": "Jinfetaħ verifika ta' £0 tal-kard tiegħek: ma jitħallas xejn. Tikteb l-indirizz tal-kontijiet tiegħek, u jiżdied mal-wallet tiegħek biss jekk il-bank tiegħek jikkonferma kemm l-ewwel linja kif ukoll il-kodiċi postali. Privasys ma żżomm l-ebda dettall tal-kard.",
     "doneTitle": "Indirizz ikkonfermat",
     "doneBody": "Il-bank tiegħek ikkonfermah, u issa huwa dettall ivverifikat fil-kartiera tiegħek.",
-    "nothingConfirmed": "Il-bank tiegħek ma kkonfermax dan l-indirizz. Ma żdied xejn.",
+    "nothingConfirmed": "Il-bank tiegħek ma kkonfermax dan l-indirizz kollu, għalhekk ma żdied xejn. Forsi Apple Pay jew il-mili awtomatiku daħħlu indirizz qadim: iċċekkjah u erġa' pprova.",
     "failed": "Il-verifika ma setgħetx titlesta: {{reason}}",
-    "confirmedByCard": "Ikkonfermat mill-bank tal-kard tiegħek ({{card}})",
-    "confirmedByBank": "Ikkonfermat mill-bank tal-kard tiegħek"
+    "confirmedByCard": "Indirizz tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek ({{card}})",
+    "confirmedByBank": "Indirizz tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek"
   }
 }

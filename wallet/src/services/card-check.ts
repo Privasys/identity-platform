@@ -6,9 +6,10 @@
  *
  * A £0 card check on the payment provider's hosted card page (the card form
  * belongs in a browser, never in the wallet): the bank confirms, or not, the
- * first line and the postcode the holder typed. The wallet then has the
- * Privasys Attribute Verifier sign the fields that passed, and keeps the proof
- * with the check's result.
+ * first line and the postcode the holder typed. Only when it confirms both
+ * does the wallet have the Privasys Attribute Verifier sign the address, and
+ * keep the proof with the check's result: a postcode alone can match an old
+ * address the bank still holds.
  *
  *  1. Start the check on the control plane with the holder commitment (a
  *     fresh salt: no two checks can be linked), a PKCE challenge and the
@@ -17,9 +18,10 @@
  *  2. The control plane hands back a one-time code; the wallet claims the
  *     result with the PKCE verifier, so no other app that caught the redirect
  *     can.
- *  3. The verifier asks the back office about the check and signs the passed
- *     fields as the canonical "address" (street_address, postal_code). The
- *     card's brand and country are display data in its label.
+ *  3. The verifier asks the back office about the check and, on a full
+ *     match, signs the canonical "address" (street_address, postal_code), a
+ *     billing address. The card's brand and country are display data in its
+ *     label.
  *
  * The result's check_id proves the check is the holder's: it is kept only on
  * the attribute (encrypted in the device sync and the profile copy), never
@@ -30,7 +32,7 @@ import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 
-import { attest, newCommitment, type AttributeProof } from '@/services/attribute-verifier';
+import { attest, AttributeVerifierError, newCommitment, type AttributeProof } from '@/services/attribute-verifier';
 import { thisDeviceBinding } from '@/services/attribute-proofs';
 import { getPlatformToken } from '@/services/platform-token';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
@@ -124,8 +126,10 @@ async function runCheck(commitment: string): Promise<CheckResult> {
 export async function checkAddressWithCard(): Promise<AttributeProof> {
     const { salt, commitment } = newCommitment();
     const result = await runCheck(commitment);
-    if (result.checks.line1 !== 'pass' && result.checks.postal_code !== 'pass') {
-        throw new CardCheckError('nothing-confirmed', 'the bank confirmed neither the address nor the postcode');
+    // An address is confirmed whole or not at all: a postcode alone can match
+    // an old address the bank still holds (autofill offers old ones too).
+    if (result.checks.line1 !== 'pass' || result.checks.postal_code !== 'pass') {
+        throw new CardCheckError('nothing-confirmed', 'the bank did not confirm the full address');
     }
     const material = {
         check_id: result.check_id,
@@ -137,6 +141,10 @@ export async function checkAddressWithCard(): Promise<AttributeProof> {
     try {
         proofs = await attest('card_check', material, salt);
     } catch (e: any) {
+        // 422: the verifier's own reading of the check is not a full match.
+        if (e instanceof AttributeVerifierError && e.status === 422) {
+            throw new CardCheckError('nothing-confirmed', 'the bank did not confirm the full address');
+        }
         throw new CardCheckError('unverified', e?.message ?? 'the verifier could not sign the address');
     }
     const proof = proofs.find((p) => p.attr === 'address');

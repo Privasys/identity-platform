@@ -20,7 +20,7 @@ jest.mock('@/utils/storage', () => {
     };
 });
 
-import { useProfileStore, type UserProfile, type LinkedProvider, type ProfileAttribute } from '@/stores/profile';
+import { dropPartialCardChecks, useProfileStore, type UserProfile, type LinkedProvider, type ProfileAttribute } from '@/stores/profile';
 
 // Reset store between tests
 beforeEach(() => {
@@ -254,5 +254,47 @@ describe('profile store', () => {
 
         useProfileStore.getState().clearProfile();
         expect(useProfileStore.getState().profile).toBeNull();
+    });
+});
+
+describe('dropPartialCardChecks', () => {
+    const card = (value: Record<string, string>, over: Partial<ProfileAttribute> = {}): ProfileAttribute => ({
+        key: 'address',
+        label: 'Address',
+        value: JSON.stringify(value),
+        source: 'provider',
+        sourceProvider: 'card_bank',
+        verified: true,
+        verifications: [
+            {
+                verifier: 'privasys-attribute-verifier',
+                verifierDisplayName: 'card_bank',
+                method: 'card_check',
+                assurance: 'provider',
+                verifiedAt: 1,
+                evidence: 'verifier:x:proven',
+            },
+        ],
+        ...over,
+    });
+
+    it('drops an address a card check confirmed on the postcode alone', () => {
+        const r = dropPartialCardChecks([card({ postal_code: 'N1 0JA' })]);
+        expect(r.changed).toBe(true);
+        expect(r.attributes).toEqual([]);
+    });
+
+    it('keeps a full address the bank confirmed', () => {
+        const a = card({ street_address: '1 High Street', postal_code: 'N1 0JA' });
+        const r = dropPartialCardChecks([a]);
+        expect(r.changed).toBe(false);
+        expect(r.attributes).toEqual([a]);
+    });
+
+    it('keeps an address from elsewhere, without the card proof and unverified', () => {
+        const r = dropPartialCardChecks([card({ postal_code: 'N1 0JA' }, { source: 'manual', sourceProvider: undefined })]);
+        expect(r.attributes).toHaveLength(1);
+        expect(r.attributes[0].verifications).toEqual([]);
+        expect(r.attributes[0].verified).toBe(false);
     });
 });

@@ -1572,12 +1572,12 @@
   "cardCheck": {
     "entry": "Dodajte adresu koju potvrđuje banka",
     "explainTitle": "Potvrdite adresu putem svoje banke",
-    "explainBody": "privasys.id otvara provjeru vaše kartice od £0: ništa se ne naplaćuje. Upisujete adresu za naplatu, vaša banka potvrđuje prvi redak i poštanski broj, a u novčanik se dodaje samo ono što banka potvrdi. Privasys ne čuva podatke o kartici.",
+    "explainBody": "Otvara se provjera vaše kartice od £0: ništa se ne naplaćuje. Upisujete adresu za naplatu, a ona se dodaje u novčanik samo ako vaša banka potvrdi i prvi redak i poštanski broj. Privasys ne čuva podatke o karticama.",
     "doneTitle": "Adresa potvrđena",
     "doneBody": "Vaša banka ju je potvrdila i sada je provjereni podatak u vašem novčaniku.",
-    "nothingConfirmed": "Vaša banka nije potvrdila ovu adresu. Ništa nije dodano.",
+    "nothingConfirmed": "Vaša banka nije potvrdila cijelu adresu pa ništa nije dodano. Apple Pay ili automatsko popunjavanje možda su unijeli staru adresu: provjerite je i pokušajte ponovno.",
     "failed": "Provjera nije mogla biti dovršena: {{reason}}",
-    "confirmedByCard": "Potvrdila banka vaše kartice ({{card}})",
-    "confirmedByBank": "Potvrdila banka vaše kartice"
+    "confirmedByCard": "Adresu za naplatu potvrdila je banka vaše kartice ({{card}})",
+    "confirmedByBank": "Adresu za naplatu potvrdila je banka vaše kartice"
   }
 }

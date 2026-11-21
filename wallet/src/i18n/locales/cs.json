@@ -1563,12 +1563,12 @@
   "cardCheck": {
     "entry": "Přidat adresu potvrzenou bankou",
     "explainTitle": "Potvrďte adresu u své banky",
-    "explainBody": "privasys.id otevře ověření vaší karty na £0: nic se nestrhne. Zadáte fakturační adresu, vaše banka potvrdí první řádek a PSČ a do peněženky se přidá jen to, co potvrdí. Privasys neuchovává žádné údaje o kartě.",
+    "explainBody": "Otevře se kontrola vaší karty na £0: nic se neúčtuje. Zadáte fakturační adresu a ta se do peněženky přidá, jen pokud vaše banka potvrdí první řádek i PSČ. Privasys neuchovává žádné údaje o kartě.",
     "doneTitle": "Adresa potvrzena",
     "doneBody": "Vaše banka ji potvrdila a nyní je ve vaší peněžence jako ověřený údaj.",
-    "nothingConfirmed": "Vaše banka tuto adresu nepotvrdila. Nic nebylo přidáno.",
+    "nothingConfirmed": "Vaše banka nepotvrdila celou adresu, takže nic nebylo přidáno. Apple Pay nebo automatické vyplňování mohly zadat starou adresu: zkontrolujte ji a zkuste to znovu.",
     "failed": "Ověření se nepodařilo dokončit: {{reason}}",
-    "confirmedByCard": "Potvrzeno bankou vaší karty ({{card}})",
-    "confirmedByBank": "Potvrzeno bankou vaší karty"
+    "confirmedByCard": "Fakturační adresa potvrzena bankou vaší karty ({{card}})",
+    "confirmedByBank": "Fakturační adresa potvrzena bankou vaší karty"
   }
 }

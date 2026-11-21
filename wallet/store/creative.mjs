@@ -54,8 +54,8 @@ body { position: relative; font-family: Inter, sans-serif; color: #FFFFFF; }
 function header(shot, copy, font, guides) {
     const safe = { x: 1097, y: 493, w: 1646, h: 661 };
     const body = `
-${phone(shot('05-approval'), -150, -420, 560, 0.6)}
-${phone(shot('04-attestation'), 480, 240, 560)}
+${phone(shot('04-attestation'), -150, -420, 560, 0.6)}
+${phone(shot('01-home'), 480, 240, 560)}
 ${phone(shot('08-drive-file'), 2800, -620, 560)}
 ${phone(shot('02-access'), 3430, 130, 560, 0.6)}
 <div style="position:absolute;left:${safe.x}px;top:${safe.y}px;width:${safe.w}px;height:${safe.h}px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:28px;font-weight:750;font-size:112px;line-height:1.1;letter-spacing:-0.02em">
@@ -77,7 +77,7 @@ function search(shot, copy, font, guides) {
   <div style="font-size:142px;line-height:1.06;font-weight:750;letter-spacing:-0.02em">${esc(copy.title)}</div>
   <div style="font-size:66px;line-height:1.25;font-weight:500;color:${GREEN}">${copy.lines.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
 </div>
-${phone(shot('05-approval'), safe.x + safe.w - pw * 2 - gap, safe.y, pw)}
+${phone(shot('01-home'), safe.x + safe.w - pw * 2 - gap, safe.y, pw)}
 ${phone(shot('04-attestation'), safe.x + safe.w - pw, safe.y, pw)}`;
     return shell(3840, 2560, font, body, guides ? safe : null);
 }

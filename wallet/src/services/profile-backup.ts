@@ -46,6 +46,7 @@ import { File, Paths } from 'expo-file-system';
 
 import { currentDrive, ensureDrive, type DriveSession } from '@/services/drive';
 import { loadKycRecords, saveKycRecord, type KycRecord } from '@/services/kyc';
+import { importSyncedWebsitePasskeys, syncedWebsitePasskeys, type WebsitePasskey } from '@/services/website-passkeys';
 import { ensureDataRoot, peekDataRoot } from '@/services/sovereign';
 import { useProfileStore, type UserProfile } from '@/stores/profile';
 import { base64urlToBytes, bytesToBase64url } from '@/utils/encoding';
@@ -70,6 +71,8 @@ const utf8 = (s: string) => new TextEncoder().encode(s);
 export interface BackupContents {
     profile: Omit<UserProfile, 'pairwiseSeed' | 'did'> | null;
     kycRecords: KycRecord[];
+    /** Website passkeys backed up to the holder's devices: their records (the keys are re-derived). */
+    websitePasskeys?: WebsitePasskey[];
 }
 
 interface BackupFile {
@@ -101,7 +104,7 @@ export async function collectContents(): Promise<BackupContents> {
         const { pairwiseSeed: _seed, did: _did, ...rest } = profile;
         kept = rest;
     }
-    return { profile: kept, kycRecords: await loadKycRecords() };
+    return { profile: kept, kycRecords: await loadKycRecords(), websitePasskeys: await syncedWebsitePasskeys() };
 }
 
 /** Encrypt contents under the data root's backup key. Exported for tests. */
@@ -155,6 +158,9 @@ export async function restoreContents(contents: BackupContents): Promise<{ attri
     const store = useProfileStore.getState();
     if (!store.profile) throw new BackupError('no-profile', 'finish setting up the wallet before restoring a backup');
     let attributes = 0;
+    // Backed-up website passkeys: their keys come from the seed this wallet
+    // has recovered, so their records are all a new device needs.
+    await importSyncedWebsitePasskeys(contents.websitePasskeys);
     const incoming = contents.profile;
     if (incoming) {
         const { displayName, email, avatarUri } = store.profile;

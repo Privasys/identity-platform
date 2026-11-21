@@ -12,6 +12,7 @@ jest.mock('expo-crypto', () => ({
     getRandomBytes: (n: number) => new Uint8Array(n).map((_, i) => (i * 11 + 5) & 0xff),
 }));
 jest.mock('expo-file-system', () => ({ File: jest.fn(), Paths: { document: 'doc', cache: 'cache' } }));
+jest.mock('@/services/website-passkeys', () => ({ syncedWebsitePasskeys: async () => [], importSyncedWebsitePasskeys: async () => 0 }));
 jest.mock('@/utils/storage', () => {
     const mockStore: Record<string, string> = {};
     return {

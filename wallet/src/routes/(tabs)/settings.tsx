@@ -208,12 +208,57 @@ export default function SettingsScreen() {
                     <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                 </Pressable>
 
-                {/* This device and your account. Remove this device only when the
+                {/* About — one tile: everything as key/value rows. */}
+                <Text style={styles.sectionTitle}>{t('settings.aboutTitle')}</Text>
+                <View style={styles.buildInfoCard}>
+                    <BuildInfoRow label={t('settings.aboutVersion')} value={Constants.expoConfig?.extra?.CODE_VERSION} />
+                    <BuildInfoRow label={t('settings.aboutBuildNumber')} value={Constants.expoConfig?.extra?.BUILD_NUMBER} />
+                    <BuildInfoRow label={t('settings.aboutBuildId')} value={Constants.expoConfig?.extra?.BUILD_ID?.slice(0, 7)} />
+                    <BuildInfoRow label={t('settings.aboutBuildType')} value={Constants.expoConfig?.extra?.STAGE} />
+                    <BuildInfoRow label={t('settings.aboutCommitId')} value={Constants.expoConfig?.extra?.COMMIT_HASH?.slice(0, 7)} />
+                    {/* Legal identity. A company name and its registration read
+                        the same in every language and are never translated. */}
+                    <BuildInfoRow label={t('settings.aboutDeveloper')} value="Privasys Ltd" />
+                    <BuildInfoRow label={t('settings.aboutRegistered')} value="England & Wales" />
+                    <BuildInfoRow label={t('settings.aboutCompanyNo')} value="16866500" />
+                    <View style={styles.buildInfoRow}>
+                        <Text style={styles.buildInfoLabel}>{t('settings.aboutWebsite')}</Text>
+                        <ExternalLink href="https://privasys.org">
+                            <Text style={styles.buildInfoLink}>privasys.org</Text>
+                        </ExternalLink>
+                    </View>
+                </View>
+
+                {/* Push Token: for support, so near the end, above the actions that remove things. */}
+                {pushToken ? (
+                    <>
+                        <Text style={styles.sectionTitle}>{t('settings.pushTokenTitle')}</Text>
+                        <Pressable
+                            style={styles.pushTokenCard}
+                            onPress={() => {
+                                Clipboard.setStringAsync(pushToken);
+                                Alert.alert(t('common.copied'), t('settings.pushTokenCopied'));
+                            }}
+                        >
+                            {/* One line, shortened in the middle: wrapped, the closing
+                                bracket was left alone on a line of its own. Copy
+                                takes the whole token. */}
+                            <Text style={styles.pushTokenText} numberOfLines={1} ellipsizeMode="middle">
+                                {pushToken}
+                            </Text>
+                            <Ionicons name="copy-outline" size={18} color={p.textSecondary} />
+                        </Pressable>
+                    </>
+                ) : null}
+
+                {/* This device and your account, last, after a divider: the actions that
+                    remove things sit apart from the settings above.  Remove this device only when the
                     holder has another: on the only one there is nothing to
                     move to, and a phone is moved by adding the new one first.
                     Deleting the account is a page at privasys.id. */}
                 {isDemo() ? null : (
                     <>
+                        <View style={styles.dangerDivider} />
                         <Text style={styles.sectionTitle}>{t('accountDeletion.sectionTitle')}</Text>
                         {phones > 1 ? (
                             <>
@@ -244,49 +289,6 @@ export default function SettingsScreen() {
                         </Pressable>
                     </>
                 )}
-
-                {/* About — one tile: everything as key/value rows. */}
-                <Text style={styles.sectionTitle}>{t('settings.aboutTitle')}</Text>
-                <View style={styles.buildInfoCard}>
-                    <BuildInfoRow label={t('settings.aboutVersion')} value={Constants.expoConfig?.extra?.CODE_VERSION} />
-                    <BuildInfoRow label={t('settings.aboutBuildNumber')} value={Constants.expoConfig?.extra?.BUILD_NUMBER} />
-                    <BuildInfoRow label={t('settings.aboutBuildId')} value={Constants.expoConfig?.extra?.BUILD_ID?.slice(0, 7)} />
-                    <BuildInfoRow label={t('settings.aboutBuildType')} value={Constants.expoConfig?.extra?.STAGE} />
-                    <BuildInfoRow label={t('settings.aboutCommitId')} value={Constants.expoConfig?.extra?.COMMIT_HASH?.slice(0, 7)} />
-                    {/* Legal identity. A company name and its registration read
-                        the same in every language and are never translated. */}
-                    <BuildInfoRow label={t('settings.aboutDeveloper')} value="Privasys Ltd" />
-                    <BuildInfoRow label={t('settings.aboutRegistered')} value="England & Wales" />
-                    <BuildInfoRow label={t('settings.aboutCompanyNo')} value="16866500" />
-                    <View style={styles.buildInfoRow}>
-                        <Text style={styles.buildInfoLabel}>{t('settings.aboutWebsite')}</Text>
-                        <ExternalLink href="https://privasys.org">
-                            <Text style={styles.buildInfoLink}>privasys.org</Text>
-                        </ExternalLink>
-                    </View>
-                </View>
-
-                {/* Push Token: for support, so last. */}
-                {pushToken ? (
-                    <>
-                        <Text style={styles.sectionTitle}>{t('settings.pushTokenTitle')}</Text>
-                        <Pressable
-                            style={styles.pushTokenCard}
-                            onPress={() => {
-                                Clipboard.setStringAsync(pushToken);
-                                Alert.alert(t('common.copied'), t('settings.pushTokenCopied'));
-                            }}
-                        >
-                            {/* One line, shortened in the middle: wrapped, the closing
-                                bracket was left alone on a line of its own. Copy
-                                takes the whole token. */}
-                            <Text style={styles.pushTokenText} numberOfLines={1} ellipsizeMode="middle">
-                                {pushToken}
-                            </Text>
-                            <Ionicons name="copy-outline" size={18} color={p.textSecondary} />
-                        </Pressable>
-                    </>
-                ) : null}
             </ScrollView>
         </RNView>
     );
@@ -416,6 +418,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         paddingVertical: 14,
         marginBottom: 8,
     },
+    dangerDivider: { height: StyleSheet.hairlineWidth, backgroundColor: p.border, marginTop: 32, marginBottom: 8 },
     logsButtonText: { flex: 1, fontSize: 15, fontWeight: '500', color: p.textPrimary },
     toggleRow: {
         flexDirection: 'row',

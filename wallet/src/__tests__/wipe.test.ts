@@ -65,6 +65,12 @@ const mockClearDeviceFlows = jest.fn(async () => undefined);
 jest.mock('@/services/device-flows', () => ({
     clearDeviceFlowsLocalState: () => mockClearDeviceFlows(),
 }));
+// A pending account deletion and its marks still to send are this wallet's;
+// the module pulls in the sign-in stack, so it is mocked like device-flows.
+const mockClearAccountDeletion = jest.fn(async () => undefined);
+jest.mock('@/services/account-deletion', () => ({
+    clearAccountDeletionLocalState: () => mockClearAccountDeletion(),
+}));
 
 // Hardware keys live outside SecureStore, so they get their own ledger.
 const mockHardwareKeys = new Set<string>();
@@ -289,6 +295,13 @@ describe('wipe coverage', () => {
 
         expect(unaccounted).toEqual([]);
     });
+});
+
+it('forgets a pending account deletion', async () => {
+    const { wipeWallet } = require('@/services/wipe');
+    mockClearAccountDeletion.mockClear();
+    await wipeWallet();
+    expect(mockClearAccountDeletion).toHaveBeenCalledTimes(1);
 });
 
 it('deletes the automatic profile backup', async () => {

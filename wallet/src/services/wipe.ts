@@ -43,6 +43,7 @@
  *   - The attribute value-set cache, which holds no personal data.
  */
 
+import { clearAccountDeletionLocalState } from '@/services/account-deletion';
 import { deleteDeviceKey } from '@/services/did';
 import { clearKycRecords } from '@/services/kyc';
 import { clearGrantsIndexLocalState } from '@/services/grants-index';
@@ -132,6 +133,7 @@ export async function wipeWallet(): Promise<void> {
         settle('devices', clearDevicesLocalState()),
         settle('device sync', clearDeviceSyncLocalState()),
         settle('device flows', clearDeviceFlowsLocalState()),
+        settle('account deletion', clearAccountDeletionLocalState()),
         // The automatic copy of the profile goes too: the phone's own backup
         // must not carry the last identity's details to the next one.
         settle('profile backup', clearProfileBackupLocalState()),

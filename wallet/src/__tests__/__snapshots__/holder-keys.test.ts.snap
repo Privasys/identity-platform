@@ -1,0 +1,11 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`holder keys matches the agreed vectors 1`] = `
+{
+  "attributePub": "04ee4284b840373e9615410eef21189d6fb076eb3e010cbcf1dcbfc53ebb992634d69812914d2ca2317d194d4c981c18163204ccc71996733a111f5bdb5af31e9b",
+  "attributeScalar": "21467fe9179b82d245e228cbf51f218b6c63e9723f66d49f0ebc9fb45de20a25",
+  "commitment": "KEy5C9YSQSuJ1abFbMRpCGfVBud2RoTA8VrqtLJnad4",
+  "identityPub": "04ecc1745af4530da0b4ecc7eac030803b77cacfd117e60b30b6f663940ba6fc86a4a448b712878d98965de765f5765fe6c6ccaec1299756110f53fc95fef3b703",
+  "identityScalar": "a8159621747befbe378ec9162bbbde947af05d99dc2baf617d0c17c235664191",
+}
+`;

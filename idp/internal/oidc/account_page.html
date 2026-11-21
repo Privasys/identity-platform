@@ -1138,7 +1138,7 @@
       ? "Open Privasys Wallet to confirm. This link works for 10 minutes."
       : "Scan this code with Privasys Wallet, or with your phone's camera, to confirm. It works for 10 minutes.";
     if (!isPhone() && window.PrivasysQR) {
-      $("delQR").innerHTML = PrivasysQR.svg(req.confirm_url, { ecc: "M", border: 4, logo: true });
+      $("delQR").innerHTML = PrivasysQR.svg(req.confirm_url, { ecc: "H", border: 4, logo: true });
     }
     if (pollTimer) clearInterval(pollTimer);
     var until = Date.now() + 10 * 60 * 1000;

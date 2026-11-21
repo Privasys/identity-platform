@@ -235,7 +235,10 @@ export default function SettingsScreen() {
                                 Alert.alert(t('common.copied'), t('settings.pushTokenCopied'));
                             }}
                         >
-                            <Text style={styles.pushTokenText} numberOfLines={2}>
+                            {/* One line, shortened in the middle: wrapped, the closing
+                                bracket was left alone on a line of its own. Copy
+                                takes the whole token. */}
+                            <Text style={styles.pushTokenText} numberOfLines={1} ellipsizeMode="middle">
                                 {pushToken}
                             </Text>
                             <Ionicons name="copy-outline" size={18} color={p.textSecondary} />

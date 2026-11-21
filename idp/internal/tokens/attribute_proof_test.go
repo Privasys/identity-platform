@@ -69,3 +69,12 @@ func TestAttributeDisclosureProves(t *testing.T) {
 		t.Fatal("accepted with no pinned keys")
 	}
 }
+
+func TestAddressClaimIsAnObject(t *testing.T) {
+	if v, ok := claimValue("address", `{"postal_code":"SW1A 1AA"}`).(map[string]interface{}); !ok || v["postal_code"] != "SW1A 1AA" {
+		t.Fatalf("address claim: %#v", claimValue("address", `{"postal_code":"SW1A 1AA"}`))
+	}
+	if claimValue("address", "1 High St") != "1 High St" || claimValue("name", `{"x":1}`) != `{"x":1}` {
+		t.Fatal("non-object values must stay strings")
+	}
+}

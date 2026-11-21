@@ -232,7 +232,7 @@ func (iss *Issuer) IssueAccessTokenWithTTL(subject, audience, sid string, roles 
 	}
 	for k, v := range attributes {
 		if v != "" {
-			c[k] = v
+			c[k] = claimValue(k, v)
 		}
 	}
 	return iss.sign(c)
@@ -912,4 +912,19 @@ func (iss *Issuer) IssueOpApproval(c OpApprovalClaims) (string, error) {
 		claims["presence"] = c.Presence
 	}
 	return iss.signTyp(claims, "op-approval+jwt")
+}
+
+// claimValue is how an attribute appears in a token. Attributes travel as
+// strings; an object-valued one (the OIDC address claim) is carried as its
+// JSON and emitted as the object OIDC Core 5.1.1 defines. Anything that is
+// not a JSON object stays the string it arrived as.
+func claimValue(key, v string) interface{} {
+	if key != "address" || !strings.HasPrefix(strings.TrimSpace(v), "{") {
+		return v
+	}
+	var obj map[string]interface{}
+	if err := json.Unmarshal([]byte(v), &obj); err != nil {
+		return v
+	}
+	return obj
 }

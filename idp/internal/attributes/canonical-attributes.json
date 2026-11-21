@@ -12,6 +12,7 @@
     { "key": "picture",      "label": "Avatar",        "scope": "profile",  "profileField": "avatarUri",   "verifiable": false, "govKey": "picture_id" },
     { "key": "locale",       "label": "Language",      "scope": "profile",  "profileField": "locale",      "verifiable": false, "valuesUrl": "/referential/locale.json", "deviceSourced": true },
     { "key": "phone_number", "label": "Phone Number",  "scope": "phone",    "profileField": null,          "verifiable": true,  "multiValued": true },
+    { "key": "address",      "label": "Address",       "scope": "address",  "profileField": null,          "verifiable": true,  "valueType": "object", "valueFields": ["formatted", "street_address", "locality", "region", "postal_code", "country"] },
     { "key": "birthdate",    "label": "Date of Birth", "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true, "assurance": "self_asserted", "govKey": "birthdate_id" },
     { "key": "nationality",  "label": "Nationality",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true, "assurance": "self_asserted", "govKey": "nationality_id", "valuesUrl": "/referential/nationality.json" },
     { "key": "age_over_18",  "label": "18 or older",   "scope": "identity", "profileField": null,          "verifiable": false, "identityVerifiable": true, "assurance": "gov_verified", "marketplace": { "key": "privasys:age_over_18", "billable": true } },

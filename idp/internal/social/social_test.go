@@ -512,3 +512,27 @@ func TestAccountPicker(t *testing.T) {
 		}
 	}
 }
+
+// The wallet's holder commitment becomes the provider's OIDC nonce, so the
+// ID token names the wallet that started the sign-in.
+func TestWalletLink_HolderCommitmentIsTheProviderNonce(t *testing.T) {
+	_, prov := fakeProvider(t)
+	h := newWalletTestHandler(t, prov)
+	const commitment = "KEy5C9YSQSuJ1abFbMRpCGfVBud2RoTA8VrqtLJnad4"
+	base := "/wallet/link?provider=google&redirect_uri=" + url.QueryEscape("privasys-wallet://link/callback") +
+		"&nonce=n&code_challenge=" + s256("v") + "&code_challenge_method=S256"
+	rec := httptest.NewRecorder()
+	h.HandleWalletLink(rec, httptest.NewRequest("GET", base+"&holder_commitment="+commitment, nil))
+	if rec.Code != http.StatusFound {
+		t.Fatalf("got %d, want 302", rec.Code)
+	}
+	loc, _ := url.Parse(rec.Header().Get("Location"))
+	if loc.Query().Get("nonce") != commitment {
+		t.Fatalf("provider nonce = %q, want the holder commitment", loc.Query().Get("nonce"))
+	}
+	rec = httptest.NewRecorder()
+	h.HandleWalletLink(rec, httptest.NewRequest("GET", base+"&holder_commitment=not-a-commitment", nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for a malformed commitment", rec.Code)
+	}
+}

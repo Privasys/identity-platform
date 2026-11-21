@@ -211,6 +211,12 @@ type linkResult struct {
 	verified  map[string]bool
 	challenge string // wallet PKCE S256 challenge; verifier checked at retrieval
 	expiresAt time.Time
+	// The provider's raw material, handed to the wallet unchanged so the
+	// Privasys Attribute Verifier can check it. This server does not judge
+	// it: an ID token from OIDC providers, and for GitHub, which issues
+	// none, the access token the verifier reads the account with.
+	idToken     string
+	accessToken string
 }
 
 type resultStore struct {
@@ -534,6 +540,10 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 			attrs:     attrs,
 			verified:  providerVerified(entry.provider, raw),
 			challenge: entry.challenge,
+			idToken:   exchanged.IDToken,
+		}
+		if entry.provider == "github" {
+			res.accessToken = accessToken
 		}
 		resultCode := h.results.create(res)
 		sep := "?"
@@ -698,6 +708,20 @@ func (h *Handler) HandleWalletLink(w http.ResponseWriter, r *http.Request) {
 	uq.Set("redirect_uri", h.issuerURL+"/auth/social/callback")
 	uq.Set("response_type", "code")
 	uq.Set("scope", strings.Join(prov.Scopes, " "))
+	// The wallet's holder commitment becomes the provider's OIDC nonce, so
+	// the ID token the provider signs names the wallet that started this
+	// sign-in. The Attribute Verifier refuses a token whose nonce does not
+	// open to the importing wallet's key: a token copied from anywhere,
+	// this server included, cannot be imported into another wallet. It is
+	// a salted hash, fresh per import, so the provider learns nothing it
+	// could link.
+	if hc := q.Get("holder_commitment"); hc != "" {
+		if !commitmentShape(hc) {
+			http.Error(w, "holder_commitment must be 43 base64url characters", http.StatusBadRequest)
+			return
+		}
+		uq.Set("nonce", hc)
+	}
 
 	// Upstream PKCE only when the provider supports it (see HandleRedirect).
 	var verifier string
@@ -751,12 +775,32 @@ func (h *Handler) HandleWalletLinkResult(w http.ResponseWriter, r *http.Request)
 		attrs = append(attrs, walletLinkAttr{Key: k, Value: v, Verified: res.verified[k]})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	out := map[string]interface{}{
 		"provider":   res.provider,
 		"sub":        res.userID,
 		"attributes": attrs,
-	})
+	}
+	if res.idToken != "" {
+		out["id_token"] = res.idToken
+	}
+	if res.accessToken != "" {
+		out["access_token"] = res.accessToken
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
+// commitmentShape accepts an unpadded base64url SHA-256: 43 characters.
+func commitmentShape(s string) bool {
+	if len(s) != 43 {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // microsoftProvedEmail reads Entra's xms_edov claim: the address in this ID

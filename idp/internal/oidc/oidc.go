@@ -70,6 +70,11 @@ const presenceAttribute = "holder_present"
 // `email_verified` and is never disclosed to anyone.
 const emailReceiptAttribute = "email_receipt"
 
+// emailProofAttribute carries an Attribute Verifier disclosure of the
+// address, addressed to the relying party. Reserved like email_receipt: not
+// canonical, so it decides `email_verified` and is never disclosed itself.
+const emailProofAttribute = "email_proof"
+
 // presenceMarketplaceKey is how the registry spells the ceremony (seeded by
 // management-service migration 056). It is hard-coded here, and only here,
 // because presenceAttribute is deliberately absent from the referential that
@@ -1382,9 +1387,18 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	// a reserved key that is not a canonical attribute, so it is dropped by
 	// filterAttributesRequested above and never reaches a relying party as a
 	// value of its own.
+	//
+	// Or the Attribute Verifier proved it: from the provider's own signed ID
+	// token at import (Google, Microsoft under the same xms_edov rule as a
+	// direct sign-in, any OIDC provider), or by a code it mailed itself. The
+	// wallet hands over a fresh disclosure addressed to this client, under
+	// another reserved key; this server checks only the verifier's
+	// signature, never the evidence behind it.
 	emailVerified := false
 	if addr := filteredAttrs["email"]; addr != "" {
-		emailVerified = ac.EmailVerified || issuer.EmailReceiptProves(attrs[emailReceiptAttribute], ac.UserID, addr)
+		emailVerified = ac.EmailVerified ||
+			tokens.AttributeDisclosureProves(attrs[emailProofAttribute], ac.ClientID, "email", addr) ||
+			issuer.EmailReceiptProves(attrs[emailReceiptAttribute], ac.UserID, addr)
 	}
 
 	idToken, err := issuer.IssueIDToken(tokens.IDTokenClaims{

@@ -56,6 +56,11 @@ type Config struct {
 	AndroidAttestRoot  string // Google hardware-attestation root (PEM or path); required for strict android
 	AndroidAllowTEE    bool   // when false, require StrongBox (reject plain TEE)
 
+	// AttributeVerifierJWKS pins the Privasys Attribute Verifier's signing
+	// keys (a JWKS document): its disclosures decide email_verified on the
+	// wallet path. Empty: no disclosure proves anything.
+	AttributeVerifierJWKS string
+
 	// Attribute marketplace: the IdP mints disclosure vouchers by calling the
 	// management-service, which resolves the attribute registry and reserves
 	// the RP's credits on the ledger (keeping ledger access solely in mgmt).
@@ -130,6 +135,8 @@ func Load() *Config {
 		AndroidPackage:     envStr("IDP_ANDROID_PACKAGE", ""),
 		AndroidAttestRoot:  envPEM("IDP_ANDROID_ATTEST_ROOT"),
 		AndroidAllowTEE:    envStr("IDP_WIA_ANDROID_ALLOW_TEE", "true") == "true",
+
+		AttributeVerifierJWKS: envStr("IDP_ATTRIBUTE_VERIFIER_JWKS", ""),
 
 		MgmtURL:      envStr("IDP_MGMT_URL", ""),
 		IdpMgmtToken: envStr("IDP_MGMT_TOKEN", ""),

@@ -81,6 +81,12 @@ func main() {
 	// subject for each person (internal/tokens/subject.go). One-way: the IdP
 	// keeps no map back; a token's account comes from the session it names.
 
+	// The Attribute Verifier's pinned keys: its disclosures decide
+	// email_verified on the wallet path.
+	if err := tokens.SetAttributeVerifierJWKS(cfg.AttributeVerifierJWKS); err != nil {
+		log.Fatalf("attribute verifier keys: %v", err)
+	}
+
 	// Wallet-provider signing key — a DISTINCT key that signs Wallet Instance
 	// Attestations, verified via /wallet-provider/jwks (provisioned into the
 	// verifier enclave like the CSCA anchors). Kept separate from the OIDC key so

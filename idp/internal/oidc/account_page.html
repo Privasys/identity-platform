@@ -493,6 +493,25 @@
     </div>
   </div>
 
+  <!-- Card address check: /account/card-check, opened by the wallet. -->
+  <div id="cc" class="hidden">
+    <header class="acct-head">
+      <h1>Confirm your address.</h1>
+      <p class="who">Your card's bank confirms your billing address. There is no charge.</p>
+    </header>
+    <section class="section">
+      <div class="apps">
+        <div class="app"><div><div class="app-name">No charge</div><div class="hint">Your card is checked with your bank and nothing is taken. We do not keep your card.</div></div></div>
+        <div class="app"><div><div class="app-name">Only what your bank confirms</div><div class="hint">Your bank says whether the first line and postcode of the address match the card. Your name is not checked.</div></div></div>
+        <div class="app"><div><div class="app-name">Kept in your wallet</div><div class="hint">The result goes back to Privasys Wallet. We keep only the bank's yes or no and the date, not your address.</div></div></div>
+      </div>
+      <div class="row" style="margin-top:1.2rem"><button class="btn" id="ccStart" type="button">Continue to the card check</button></div>
+      <p class="hint" id="ccStatus" style="margin-top:.8rem"></p>
+      <div class="row hidden" id="ccBackRow" style="margin-top:.8rem"><a class="btn btn-outline" id="ccBack" href="#">Back to Privasys Wallet</a></div>
+      <div class="err" id="ccErr"></div>
+    </section>
+  </div>
+
   <!-- /account/delete/confirm opened in a browser: the wallet was not there to take the link. -->
   <section id="delConfirmInfo" class="connect hidden">
     <h1>Open this on your phone.</h1>
@@ -1131,6 +1150,81 @@
       } catch (e) { /* keep waiting */ }
     }, 2500);
   });
+
+  // --- Card address check (/account/card-check) ---
+  //
+  // Opened by the wallet with hb (holder binding), code_challenge and return
+  // (the wallet's own scheme). The page sends the holder to the payment
+  // provider's page for a card check with no charge, then, back here,
+  // completes it and hands the wallet a one-time code at its return address.
+  // The wallet collects the result itself, with its PKCE verifier.
+  var onCardCheck = location.pathname.indexOf("/account/card-check") === 0;
+  var ccKey = "privasys.cardcheck";
+  function ccParams() {
+    var q = new URLSearchParams(location.search);
+    if (q.get("hb") && q.get("code_challenge") && q.get("return")) {
+      var p = { hb: q.get("hb"), cc: q.get("code_challenge"), ret: q.get("return"), api: q.get("api") === "test" ? "test" : "" };
+      try { sessionStorage.setItem(ccKey, JSON.stringify(p)); } catch (e) { /* private mode: one go only */ }
+      return p;
+    }
+    try { return JSON.parse(sessionStorage.getItem(ccKey) || "null"); } catch (e) { return null; }
+  }
+  var ccQuery = new URLSearchParams(location.search);
+  var ccSaved = onCardCheck ? ccParams() : null;
+  // The dev control plane, for testing from the dev wallet only.
+  var ccApi = function (p, o) {
+    var base = ccSaved && ccSaved.api === "test" ? "https://api.developer.test.privasys.org" : API;
+    return call(base, "/api/v1" + p, o);
+  };
+  function ccBackTo(err) {
+    if (!ccSaved || !ccSaved.ret) return;
+    var u = ccSaved.ret + (ccSaved.ret.indexOf("?") < 0 ? "?" : "&") + "error=" + encodeURIComponent(err);
+    $("ccBack").href = u;
+    $("ccBackRow").classList.remove("hidden");
+  }
+
+  async function loadCardCheck() {
+    $("connect").classList.add("hidden");
+    $("navConnect").classList.add("hidden");
+    $("navUser").classList.remove("hidden");
+    $("main").classList.add("hidden");
+    $("cc").classList.remove("hidden");
+    if (!ccSaved) {
+      $("ccStart").disabled = true;
+      $("ccErr").textContent = "Open the card check from Privasys Wallet.";
+      return;
+    }
+    if (ccQuery.get("done")) {
+      $("ccStart").classList.add("hidden");
+      $("ccStatus").textContent = "Finishing…";
+      try {
+        var r = await ccApi("/billing/address-checks/complete", { method: "POST", body: { session: ccQuery.get("done") } });
+        try { sessionStorage.removeItem(ccKey); } catch (e) { /* ignore */ }
+        $("ccStatus").textContent = "Done. Returning to Privasys Wallet.";
+        location.replace(r["return"]);
+      } catch (e) { $("ccStatus").textContent = ""; $("ccErr").textContent = e.message; ccBackTo("failed"); }
+      return;
+    }
+    if (ccQuery.get("cancelled")) {
+      $("ccStatus").textContent = "The card check was cancelled.";
+      ccBackTo("cancelled");
+    }
+  }
+
+  $("ccStart").addEventListener("click", async function () {
+    $("ccErr").textContent = "";
+    this.disabled = true;
+    try {
+      var r = await ccApi("/billing/address-checks/start", { method: "POST", body: { holder_binding: ccSaved.hb, code_challenge: ccSaved.cc, "return": ccSaved.ret } });
+      location.assign(r.url);
+    } catch (e) { $("ccErr").textContent = e.message; this.disabled = false; }
+  });
+
+  if (onCardCheck) {
+    load = async function () {
+      try { await loadCardCheck(); } catch (e) { $("ccErr").textContent = e.message; }
+    };
+  }
 
   if (onConfirmPage) {
     // The wallet takes this link when installed; a browser that got it shows

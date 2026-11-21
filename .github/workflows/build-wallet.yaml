@@ -50,6 +50,17 @@ on:
         required: true
         default: true
         type: boolean
+      ios_runner:
+        description: 'macOS image for the iOS build: macos-26 (Xcode 26) or xcode-27 (public preview), to try a newer SDK'
+        required: false
+        default: 'macos-26'
+        type: choice
+        options: [macos-26, xcode-27]
+      submit:
+        description: 'Submit to TestFlight and Play internal (off for a trial build)'
+        required: false
+        default: true
+        type: boolean
 
 env:
   RUST_TOOLCHAIN: stable
@@ -242,7 +253,9 @@ jobs:
        !inputs.use_eas_cloud &&
        (inputs.platform == 'ios' || inputs.platform == 'all'))
     needs: [check]
-    runs-on: macos-26  # Xcode 26 — ships iOS 26 SDK
+    # Xcode 26 (iOS 26 SDK) for releases. A manual run can try the xcode-27
+    # preview image: Apple wants the iOS 27 SDK from April 2027 (ITMS-90725).
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && inputs.ios_runner || 'macos-26' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -470,6 +483,7 @@ jobs:
     if: >
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/wallet-v')) ||
       (github.event_name == 'workflow_dispatch' &&
+       inputs.submit &&
        !inputs.use_eas_cloud &&
        (inputs.platform == 'ios' || inputs.platform == 'all'))
     needs: [build-local-ios]
@@ -518,6 +532,7 @@ jobs:
     if: >
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/wallet-v')) ||
       (github.event_name == 'workflow_dispatch' &&
+       inputs.submit &&
        !inputs.use_eas_cloud &&
        (inputs.platform == 'android' || inputs.platform == 'all') &&
        inputs.profile == 'production')

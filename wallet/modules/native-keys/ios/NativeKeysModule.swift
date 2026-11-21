@@ -337,7 +337,7 @@ public class NativeKeysModule: Module {
                     credentialID: credentialId,
                     userHandle: userHandle
                 )
-                ASCredentialIdentityStore.shared.removeCredentialIdentityEntries([identity]) { _, error in
+                ASCredentialIdentityStore.shared.removeCredentialIdentities([identity]) { _, error in
                     if let error {
                         NSLog("NativeKeys: identity-store removal failed: %@", error.localizedDescription)
                     }

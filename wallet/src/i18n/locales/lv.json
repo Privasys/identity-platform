@@ -1561,5 +1561,16 @@
     "onlyDeviceHint": "Pārejat uz jaunu tālruni? Vispirms pievienojiet to, pēc tam noņemiet šo.",
     "deleteAccountHint": "Pēc 7 dienām dzēš jūsu Privasys kontu un visu tajā, izmantojot privasys.id. Līdz tam varat atcelt.",
     "deleteAccount": "Dzēst manu kontu"
+  },
+  "cardCheck": {
+    "entry": "Pievienot bankas apstiprinātu adresi",
+    "explainTitle": "Apstipriniet adresi ar savas bankas palīdzību",
+    "explainBody": "privasys.id atver jūsu kartes £0 pārbaudi: nekas netiek iekasēts. Jūs ievadāt savu norēķinu adresi, jūsu banka apstiprina pirmo rindu un pasta indeksu, un jūsu makam tiek pievienots tikai tas, ko tā apstiprina. Privasys neglabā kartes datus.",
+    "doneTitle": "Adrese apstiprināta",
+    "doneBody": "Jūsu banka to apstiprināja, un tagad tā ir jūsu makā kā pārbaudīti dati.",
+    "nothingConfirmed": "Jūsu banka neapstiprināja šo adresi. Nekas netika pievienots.",
+    "failed": "Pārbaudi nevarēja pabeigt: {{reason}}",
+    "confirmedByCard": "Apstiprinājusi jūsu kartes banka ({{card}})",
+    "confirmedByBank": "Apstiprinājusi jūsu kartes banka"
   }
 }

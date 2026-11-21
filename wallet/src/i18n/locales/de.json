@@ -1522,5 +1522,16 @@
     "onlyDeviceHint": "Sie wechseln zu einem neuen Telefon? Fügen Sie es zuerst hinzu und entfernen Sie dann dieses.",
     "deleteAccountHint": "Löscht Ihr Privasys-Konto und alles darin nach 7 Tagen, über privasys.id. Bis dahin können Sie die Löschung abbrechen.",
     "deleteAccount": "Mein Konto löschen"
+  },
+  "cardCheck": {
+    "entry": "Von Ihrer Bank bestätigte Adresse hinzufügen",
+    "explainTitle": "Adresse über Ihre Bank bestätigen",
+    "explainBody": "privasys.id startet eine Prüfung Ihrer Karte über £0: Es wird nichts abgebucht. Sie geben Ihre Rechnungsadresse ein, Ihre Bank bestätigt die erste Adresszeile und die Postleitzahl, und nur was sie bestätigt, wird Ihrem Wallet hinzugefügt. Privasys speichert keine Kartendaten.",
+    "doneTitle": "Adresse bestätigt",
+    "doneBody": "Ihre Bank hat sie bestätigt, und sie ist jetzt eine geprüfte Angabe in Ihrem Wallet.",
+    "nothingConfirmed": "Ihre Bank hat diese Adresse nicht bestätigt. Es wurde nichts hinzugefügt.",
+    "failed": "Die Prüfung konnte nicht abgeschlossen werden: {{reason}}",
+    "confirmedByCard": "Bestätigt von der Bank Ihrer Karte ({{card}})",
+    "confirmedByBank": "Bestätigt von der Bank Ihrer Karte"
   }
 }

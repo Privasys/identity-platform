@@ -1550,5 +1550,16 @@
     "onlyDeviceHint": "Vai mudar para um telemóvel novo? Adicione-o primeiro e depois remova este.",
     "deleteAccountHint": "Elimina a sua conta Privasys e tudo o que contém ao fim de 7 dias, a partir de privasys.id. Pode cancelar até lá.",
     "deleteAccount": "Eliminar a minha conta"
+  },
+  "cardCheck": {
+    "entry": "Adicionar uma morada confirmada pelo seu banco",
+    "explainTitle": "Confirme a sua morada com o seu banco",
+    "explainBody": "privasys.id abre uma verificação de £0 do seu cartão: nada é cobrado. Escreve a sua morada de faturação, o seu banco confirma a primeira linha e o código postal, e só o que ele confirma é adicionado à sua carteira. A Privasys não guarda nenhum dado do cartão.",
+    "doneTitle": "Morada confirmada",
+    "doneBody": "O seu banco confirmou-a e é agora um dado verificado na sua carteira.",
+    "nothingConfirmed": "O seu banco não confirmou esta morada. Nada foi adicionado.",
+    "failed": "Não foi possível concluir a verificação: {{reason}}",
+    "confirmedByCard": "Confirmada pelo banco do seu cartão ({{card}})",
+    "confirmedByBank": "Confirmada pelo banco do seu cartão"
   }
 }

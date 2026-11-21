@@ -1522,5 +1522,16 @@
     "onlyDeviceHint": "Új telefonra vált? Előbb adja hozzá azt, majd távolítsa el ezt.",
     "deleteAccountHint": "7 nap elteltével törli Privasys-fiókját és mindent, ami benne van, a privasys.id oldalon keresztül. Addig visszavonhatja.",
     "deleteAccount": "Fiókom törlése"
+  },
+  "cardCheck": {
+    "entry": "Bankja által megerősített cím hozzáadása",
+    "explainTitle": "Erősítse meg címét a bankjával",
+    "explainBody": "A privasys.id egy £0 összegű ellenőrzést indít a kártyáján: nem történik terhelés. Ön megadja a számlázási címét, a bankja megerősíti az első sort és az irányítószámot, és csak az kerül a tárcájába, amit megerősít. A Privasys nem tárol kártyaadatokat.",
+    "doneTitle": "Cím megerősítve",
+    "doneBody": "A bankja megerősítette, és most már ellenőrzött adatként szerepel a tárcájában.",
+    "nothingConfirmed": "A bankja nem erősítette meg ezt a címet. Semmi sem került a tárcájába.",
+    "failed": "Az ellenőrzést nem sikerült befejezni: {{reason}}",
+    "confirmedByCard": "Kártyája bankja erősítette meg ({{card}})",
+    "confirmedByBank": "Kártyája bankja erősítette meg"
   }
 }

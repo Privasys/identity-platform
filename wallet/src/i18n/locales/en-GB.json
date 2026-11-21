@@ -1533,5 +1533,16 @@
     "onlyDeviceHint": "Moving to a new phone? Add it first, then remove this one.",
     "deleteAccountHint": "Deletes your Privasys account and everything in it after 7 days, from privasys.id. You can cancel until then.",
     "deleteAccount": "Delete my account"
+  },
+  "cardCheck": {
+    "entry": "Add an address confirmed by your bank",
+    "explainTitle": "Confirm your address with your bank",
+    "explainBody": "privasys.id opens a £0 check of your card: nothing is charged. You type your billing address, your bank confirms the first line and the postcode, and only what it confirms is added to your wallet. Privasys keeps no card details.",
+    "doneTitle": "Address confirmed",
+    "doneBody": "Your bank confirmed it, and it is now a verified detail in your wallet.",
+    "nothingConfirmed": "Your bank didn't confirm this address. Nothing was added.",
+    "failed": "The check could not be completed: {{reason}}",
+    "confirmedByCard": "Confirmed by your card's bank ({{card}})",
+    "confirmedByBank": "Confirmed by your card's bank"
   }
 }

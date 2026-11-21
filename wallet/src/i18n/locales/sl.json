@@ -1589,5 +1589,16 @@
     "onlyDeviceHint": "Prehajate na nov telefon? Najprej ga dodajte, nato odstranite tega.",
     "deleteAccountHint": "Po 7 dneh izbriše vaš račun Privasys in vse v njem, prek privasys.id. Do takrat lahko izbris prekličete.",
     "deleteAccount": "Izbriši moj račun"
+  },
+  "cardCheck": {
+    "entry": "Dodajte naslov, ki ga potrdi banka",
+    "explainTitle": "Potrdite naslov pri svoji banki",
+    "explainBody": "privasys.id odpre preverjanje vaše kartice v znesku £0: nič ne bo bremenjeno. Vnesete naslov za izstavitev računa, vaša banka potrdi prvo vrstico in poštno številko, v denarnico pa se doda samo to, kar banka potrdi. Privasys ne hrani podatkov o kartici.",
+    "doneTitle": "Naslov potrjen",
+    "doneBody": "Vaša banka ga je potrdila in je zdaj preverjen podatek v vaši denarnici.",
+    "nothingConfirmed": "Vaša banka tega naslova ni potrdila. Nič ni bilo dodano.",
+    "failed": "Preverjanja ni bilo mogoče dokončati: {{reason}}",
+    "confirmedByCard": "Potrdila banka vaše kartice ({{card}})",
+    "confirmedByBank": "Potrdila banka vaše kartice"
   }
 }

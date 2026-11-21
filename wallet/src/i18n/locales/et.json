@@ -1533,5 +1533,16 @@
     "onlyDeviceHint": "Kas võtate kasutusele uue telefoni? Lisage see kõigepealt ja eemaldage siis see seade.",
     "deleteAccountHint": "Kustutab teie Privasyse konto ja kõik selles oleva 7 päeva pärast, saidi privasys.id kaudu. Seni saate kustutamise tühistada.",
     "deleteAccount": "Kustuta minu konto"
+  },
+  "cardCheck": {
+    "entry": "Lisage panga kinnitatud aadress",
+    "explainTitle": "Kinnitage oma aadress panga kaudu",
+    "explainBody": "privasys.id avab teie kaardi £0 kontrolli: raha ei võeta. Sisestate oma arveldusaadressi, teie pank kinnitab esimese rea ja postiindeksi ning teie rahakotti lisatakse ainult see, mille pank kinnitab. Privasys ei säilita kaardiandmeid.",
+    "doneTitle": "Aadress kinnitatud",
+    "doneBody": "Teie pank kinnitas selle ja see on nüüd teie rahakotis kontrollitud andmena.",
+    "nothingConfirmed": "Teie pank ei kinnitanud seda aadressi. Midagi ei lisatud.",
+    "failed": "Kontrolli ei õnnestunud lõpule viia: {{reason}}",
+    "confirmedByCard": "Kinnitanud teie kaardi pank ({{card}})",
+    "confirmedByBank": "Kinnitanud teie kaardi pank"
   }
 }

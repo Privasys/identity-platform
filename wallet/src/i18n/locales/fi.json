@@ -1522,5 +1522,16 @@
     "onlyDeviceHint": "Siirrytkö uuteen puhelimeen? Lisää se ensin ja poista sitten tämä.",
     "deleteAccountHint": "Poistaa Privasys-tilisi ja kaiken sen sisällön 7 päivän kuluttua osoitteesta privasys.id. Voit peruuttaa siihen asti.",
     "deleteAccount": "Poista tilini"
+  },
+  "cardCheck": {
+    "entry": "Lisää pankkisi vahvistama osoite",
+    "explainTitle": "Vahvista osoitteesi pankkisi kautta",
+    "explainBody": "privasys.id avaa korttisi tarkistuksen summalla £0: mitään ei veloiteta. Kirjoitat laskutusosoitteesi, pankkisi vahvistaa ensimmäisen rivin ja postinumeron, ja vain sen vahvistamat tiedot lisätään lompakkoosi. Privasys ei säilytä korttitietoja.",
+    "doneTitle": "Osoite vahvistettu",
+    "doneBody": "Pankkisi vahvisti sen, ja se on nyt vahvistettu tieto lompakossasi.",
+    "nothingConfirmed": "Pankkisi ei vahvistanut tätä osoitetta. Mitään ei lisätty.",
+    "failed": "Tarkistusta ei voitu suorittaa loppuun: {{reason}}",
+    "confirmedByCard": "Vahvistanut korttisi pankki ({{card}})",
+    "confirmedByBank": "Vahvistanut korttisi pankki"
   }
 }

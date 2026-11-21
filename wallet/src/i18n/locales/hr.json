@@ -1561,5 +1561,16 @@
     "onlyDeviceHint": "Prelazite na novi telefon? Najprije ga dodajte, a zatim uklonite ovaj.",
     "deleteAccountHint": "Nakon 7 dana briše vaš Privasys račun i sve u njemu, putem privasys.id. Do tada možete otkazati.",
     "deleteAccount": "Izbriši moj račun"
+  },
+  "cardCheck": {
+    "entry": "Dodajte adresu koju potvrđuje banka",
+    "explainTitle": "Potvrdite adresu putem svoje banke",
+    "explainBody": "privasys.id otvara provjeru vaše kartice od £0: ništa se ne naplaćuje. Upisujete adresu za naplatu, vaša banka potvrđuje prvi redak i poštanski broj, a u novčanik se dodaje samo ono što banka potvrdi. Privasys ne čuva podatke o kartici.",
+    "doneTitle": "Adresa potvrđena",
+    "doneBody": "Vaša banka ju je potvrdila i sada je provjereni podatak u vašem novčaniku.",
+    "nothingConfirmed": "Vaša banka nije potvrdila ovu adresu. Ništa nije dodano.",
+    "failed": "Provjera nije mogla biti dovršena: {{reason}}",
+    "confirmedByCard": "Potvrdila banka vaše kartice ({{card}})",
+    "confirmedByBank": "Potvrdila banka vaše kartice"
   }
 }

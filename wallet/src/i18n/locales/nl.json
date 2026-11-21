@@ -1522,5 +1522,16 @@
     "onlyDeviceHint": "Stap je over op een nieuwe telefoon? Voeg die eerst toe en verwijder daarna deze.",
     "deleteAccountHint": "Verwijdert je Privasys-account en alles erin na 7 dagen, via privasys.id. Tot dan kun je annuleren.",
     "deleteAccount": "Mijn account verwijderen"
+  },
+  "cardCheck": {
+    "entry": "Adres toevoegen dat je bank bevestigt",
+    "explainTitle": "Bevestig je adres via je bank",
+    "explainBody": "privasys.id opent een controle van £0 op je kaart: er wordt niets afgeschreven. Je typt je factuuradres, je bank bevestigt de eerste regel en de postcode, en alleen wat de bank bevestigt wordt aan je wallet toegevoegd. Privasys bewaart geen kaartgegevens.",
+    "doneTitle": "Adres bevestigd",
+    "doneBody": "Je bank heeft het bevestigd en het is nu een geverifieerd gegeven in je wallet.",
+    "nothingConfirmed": "Je bank heeft dit adres niet bevestigd. Er is niets toegevoegd.",
+    "failed": "De controle kon niet worden voltooid: {{reason}}",
+    "confirmedByCard": "Bevestigd door de bank van je kaart ({{card}})",
+    "confirmedByBank": "Bevestigd door de bank van je kaart"
   }
 }

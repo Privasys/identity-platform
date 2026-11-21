@@ -1550,5 +1550,16 @@
     "onlyDeviceHint": "Vous passez à un nouveau téléphone ? Ajoutez-le d'abord, puis retirez celui-ci.",
     "deleteAccountHint": "Supprime votre compte Privasys et tout son contenu au bout de 7 jours, depuis privasys.id. Vous pouvez annuler d'ici là.",
     "deleteAccount": "Supprimer mon compte"
+  },
+  "cardCheck": {
+    "entry": "Ajouter une adresse confirmée par votre banque",
+    "explainTitle": "Confirmez votre adresse auprès de votre banque",
+    "explainBody": "privasys.id ouvre une vérification à £0 de votre carte : rien n'est débité. Vous saisissez votre adresse de facturation, votre banque confirme la première ligne et le code postal, et seul ce qu'elle confirme est ajouté à votre portefeuille. Privasys ne conserve aucune donnée de carte.",
+    "doneTitle": "Adresse confirmée",
+    "doneBody": "Votre banque l'a confirmée, et c'est désormais une information vérifiée dans votre portefeuille.",
+    "nothingConfirmed": "Votre banque n'a pas confirmé cette adresse. Rien n'a été ajouté.",
+    "failed": "La vérification n'a pas pu aboutir : {{reason}}",
+    "confirmedByCard": "Confirmée par la banque de votre carte ({{card}})",
+    "confirmedByBank": "Confirmée par la banque de votre carte"
   }
 }

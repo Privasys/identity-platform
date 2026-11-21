@@ -1551,5 +1551,16 @@
     "onlyDeviceHint": "Přecházíte na nový telefon? Nejprve ho přidejte, potom odeberte tento.",
     "deleteAccountHint": "Po 7 dnech smaže váš účet Privasys a vše v něm, přes privasys.id. Do té doby to můžete zrušit.",
     "deleteAccount": "Smazat můj účet"
+  },
+  "cardCheck": {
+    "entry": "Přidat adresu potvrzenou bankou",
+    "explainTitle": "Potvrďte adresu u své banky",
+    "explainBody": "privasys.id otevře ověření vaší karty na £0: nic se nestrhne. Zadáte fakturační adresu, vaše banka potvrdí první řádek a PSČ a do peněženky se přidá jen to, co potvrdí. Privasys neuchovává žádné údaje o kartě.",
+    "doneTitle": "Adresa potvrzena",
+    "doneBody": "Vaše banka ji potvrdila a nyní je ve vaší peněžence jako ověřený údaj.",
+    "nothingConfirmed": "Vaše banka tuto adresu nepotvrdila. Nic nebylo přidáno.",
+    "failed": "Ověření se nepodařilo dokončit: {{reason}}",
+    "confirmedByCard": "Potvrzeno bankou vaší karty ({{card}})",
+    "confirmedByBank": "Potvrzeno bankou vaší karty"
   }
 }

@@ -1522,5 +1522,16 @@
     "onlyDeviceHint": "Skifter du til en ny telefon? Tilføj den først, og fjern så denne.",
     "deleteAccountHint": "Sletter din Privasys-konto og alt i den efter 7 dage, fra privasys.id. Du kan annullere indtil da.",
     "deleteAccount": "Slet min konto"
+  },
+  "cardCheck": {
+    "entry": "Tilføj en adresse bekræftet af din bank",
+    "explainTitle": "Bekræft din adresse via din bank",
+    "explainBody": "privasys.id åbner et tjek af dit kort på £0: der trækkes intet. Du indtaster din faktureringsadresse, din bank bekræfter første linje og postnummeret, og kun det, banken bekræfter, føjes til din wallet. Privasys gemmer ingen kortoplysninger.",
+    "doneTitle": "Adresse bekræftet",
+    "doneBody": "Din bank har bekræftet den, og den er nu en verificeret oplysning i din wallet.",
+    "nothingConfirmed": "Din bank bekræftede ikke denne adresse. Intet blev tilføjet.",
+    "failed": "Tjekket kunne ikke gennemføres: {{reason}}",
+    "confirmedByCard": "Bekræftet af dit korts bank ({{card}})",
+    "confirmedByBank": "Bekræftet af dit korts bank"
   }
 }

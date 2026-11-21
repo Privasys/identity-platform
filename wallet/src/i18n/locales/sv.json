@@ -1522,5 +1522,16 @@
     "onlyDeviceHint": "Byter du till en ny telefon? Lägg till den först och ta sedan bort den här.",
     "deleteAccountHint": "Raderar ditt Privasys-konto och allt i det efter 7 dagar, från privasys.id. Du kan avbryta fram till dess.",
     "deleteAccount": "Radera mitt konto"
+  },
+  "cardCheck": {
+    "entry": "Lägg till en adress som din bank bekräftar",
+    "explainTitle": "Bekräfta din adress med din bank",
+    "explainBody": "privasys.id öppnar en kontroll av ditt kort på £0: ingenting dras. Du skriver din faktureringsadress, din bank bekräftar första raden och postnumret, och bara det som banken bekräftar läggs till i din plånbok. Privasys sparar inga kortuppgifter.",
+    "doneTitle": "Adressen är bekräftad",
+    "doneBody": "Din bank har bekräftat den, och den är nu en verifierad uppgift i din plånbok.",
+    "nothingConfirmed": "Din bank bekräftade inte den här adressen. Ingenting lades till.",
+    "failed": "Kontrollen kunde inte slutföras: {{reason}}",
+    "confirmedByCard": "Bekräftad av ditt korts bank ({{card}})",
+    "confirmedByBank": "Bekräftad av ditt korts bank"
   }
 }

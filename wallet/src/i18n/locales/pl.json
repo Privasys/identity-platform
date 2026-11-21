@@ -1578,5 +1578,16 @@
     "onlyDeviceHint": "Przenosisz się na nowy telefon? Najpierw go dodaj, a potem usuń ten.",
     "deleteAccountHint": "Usuwa Twoje konto Privasys i wszystko, co się w nim znajduje, po 7 dniach, przez privasys.id. Do tego czasu możesz to anulować.",
     "deleteAccount": "Usuń moje konto"
+  },
+  "cardCheck": {
+    "entry": "Dodaj adres potwierdzony przez bank",
+    "explainTitle": "Potwierdź adres w swoim banku",
+    "explainBody": "privasys.id otwiera weryfikację Twojej karty na £0: nic nie zostanie pobrane. Wpisujesz adres rozliczeniowy, Twój bank potwierdza pierwszą linię i kod pocztowy, a do portfela trafia tylko to, co bank potwierdzi. Privasys nie przechowuje danych karty.",
+    "doneTitle": "Adres potwierdzony",
+    "doneBody": "Twój bank go potwierdził i jest teraz zweryfikowaną informacją w Twoim portfelu.",
+    "nothingConfirmed": "Twój bank nie potwierdził tego adresu. Nic nie zostało dodane.",
+    "failed": "Nie udało się ukończyć weryfikacji: {{reason}}",
+    "confirmedByCard": "Potwierdzone przez bank Twojej karty ({{card}})",
+    "confirmedByBank": "Potwierdzone przez bank Twojej karty"
   }
 }

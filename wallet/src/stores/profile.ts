@@ -47,6 +47,22 @@ export interface VerificationRecord {
      * Stored for audit trail, never shown to other apps.
      */
     evidence?: string;
+    /**
+     * The Privasys Attribute Verifier's signed proof of this value (a JWS),
+     * bound to one device of the holder (services/attribute-proofs). Syncs to
+     * the holder's other devices, each of which has it rebound to itself the
+     * first time it discloses it.
+     */
+    proof?: string;
+    /** The device the proof is bound to: base64url(SHA-256(SEC1 device key)). */
+    proofDevice?: string;
+    /** The salt of the holder commitment the proof was made under (base64url). */
+    proofSalt?: string;
+    /**
+     * The raw evidence the proof was made from (a provider's ID token, a card
+     * check), kept so the verifier can re-attest it. Never shown or shared.
+     */
+    proofMaterial?: { kind: string; data: Record<string, unknown> };
 }
 
 /**

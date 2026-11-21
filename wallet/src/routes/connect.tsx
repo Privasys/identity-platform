@@ -83,6 +83,7 @@ import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { issueEncAuthForSignIn } from '@/services/encauth';
 import { CREDITS_PER_GBP, formatCap, grantSpendConsent } from '@/services/spend-api';
 import { bindSpendConsent } from '@/services/spend-binding';
+import { disclosureFor } from '@/services/attribute-proofs';
 import { ensureWia } from '@/services/wia';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
@@ -358,6 +359,8 @@ function presenceOutcome(
 async function patchSessionAttributes(
     payload: QRPayload,
     attributes: Record<string, string> | undefined,
+    /** The subject the app knows the holder by, for the email's disclosure. */
+    sub?: string,
 ): Promise<void> {
     if (!payload.clientId || !attributes || Object.keys(attributes).length === 0) return;
     if (!payload.origin?.includes('privasys.id')) return;
@@ -372,6 +375,13 @@ async function patchSessionAttributes(
     if (attributes.email) {
         const receipt = emailReceiptFor(useProfileStore.getState().profile, attributes.email);
         if (receipt) body = { ...attributes, email_receipt: receipt };
+        // The Attribute Verifier's proof, disclosed afresh to this app only:
+        // what makes a provider-verified address verified for it. Inside the
+        // sign-in's biometric grace, so no extra prompt; best effort.
+        if (sub) {
+            const proof = await disclosureFor('email', attributes.email, payload.clientId, sub, payload.sessionId);
+            if (proof) body = { ...body, email_proof: proof };
+        }
     }
     try {
         await fetch(`https://${payload.origin}/session/complete`, {
@@ -2433,7 +2443,7 @@ function ConnectFlow() {
             // (including paid gov proofs the RP was already charged for) never
             // reach the issued tokens. The IdP's patch branch is idempotent,
             // so double delivery via the SDK path is harmless.
-            await patchSessionAttributes(payload, attributes);
+            await patchSessionAttributes(payload, attributes, result.subject || result.userHandle);
             warmWalletAttestation();
 
             // Relay succeeded — now persist locally.
@@ -2607,7 +2617,7 @@ function ConnectFlow() {
             );
 
             // Device-flow attribute delivery (see patchSessionAttributes).
-            await patchSessionAttributes(payload, attributes);
+            await patchSessionAttributes(payload, attributes, result.subject);
             warmWalletAttestation();
 
             // Keep the IdP's push target fresh for this pairwise identity
@@ -2847,7 +2857,7 @@ function ConnectFlow() {
             );
 
             // Device-flow attribute delivery (see patchSessionAttributes).
-            await patchSessionAttributes(pending.payload, attributes);
+            await patchSessionAttributes(pending.payload, attributes, pending.credential?.userHandle);
             warmWalletAttestation();
 
             // For registration, persist the credential now

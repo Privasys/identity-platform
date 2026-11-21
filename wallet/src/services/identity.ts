@@ -24,6 +24,8 @@
 
 import { bytesToBase64url as base64urlEncode } from '@/utils/encoding';
 import Constants from 'expo-constants';
+import { attachLinkProofs, linkMaterial } from '@/services/attribute-proofs';
+import { newCommitment } from '@/services/attribute-verifier';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -63,6 +65,10 @@ interface WalletLinkResult {
     provider: string;
     sub: string;
     attributes: { key: string; value: string; verified: boolean }[];
+    /** The provider's own signed ID token (OIDC providers), bound to the holder commitment. */
+    id_token?: string;
+    /** GitHub's access token, for the verifier to read the provider's API once. */
+    access_token?: string;
 }
 
 /** Generate a cryptographically random nonce for CSRF correlation. */
@@ -128,6 +134,17 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
         code_challenge: challenge,
         code_challenge_method: 'S256',
     });
+    // The holder commitment becomes the provider's nonce, so the token it
+    // signs is tied to this holder and the Attribute Verifier can prove it
+    // (services/attribute-proofs). A fresh salt each time: no two imports can
+    // be linked by what the provider or privasys.id sees.
+    let holder: { salt: string; commitment: string } | null = null;
+    try {
+        holder = newCommitment();
+        params.set('holder_commitment', holder.commitment);
+    } catch {
+        holder = null; // not set up yet: imported without a proof
+    }
     const result = await WebBrowser.openAuthSessionAsync(
         `${IDP_BASE}/wallet/link?${params.toString()}`,
         redirectUri,
@@ -210,6 +227,12 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
             verifications,
         });
     }
+
+    // 4. The Attribute Verifier checks the provider's own evidence and signs a
+    //    proof for each value it can vouch for. Best effort: without it the
+    //    attributes are kept as before, and can be checked again later.
+    const material = linkMaterial(providerKey, data.id_token, data.access_token);
+    if (material && holder) await attachLinkProofs(seedAttributes, material, holder.salt, displayName);
 
     const provider: LinkedProvider = {
         provider: providerKey,

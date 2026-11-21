@@ -31,7 +31,7 @@ export interface VerificationRecord {
     /** Human-readable verifier name for UI display. */
     verifierDisplayName: string;
     /** Verification method (e.g. 'oidc_claim', 'email_code', 'nfc_pace', 'kyc_enclave'). */
-    method: 'oidc_claim' | 'email_code' | 'sms_code' | 'nfc_bac' | 'nfc_pace' | 'kyc_enclave' | 'manual';
+    method: 'oidc_claim' | 'email_code' | 'sms_code' | 'nfc_bac' | 'nfc_pace' | 'kyc_enclave' | 'card_check' | 'manual';
     /**
      * Assurance level reached by this verification:
      *   'provider' — asserted by a linked IdP (an OIDC claim like email_verified)

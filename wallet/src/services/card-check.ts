@@ -157,7 +157,7 @@ export async function checkAddressWithCard(): Promise<AttributeProof> {
             {
                 verifier: proof.source,
                 verifierDisplayName: 'card_bank',
-                method: 'manual',
+                method: 'card_check',
                 assurance: proof.method === 'proven' ? 'provider' : 'none',
                 verifiedAt: now,
                 evidence: `verifier:${proof.source}:${proof.method}`,
@@ -198,14 +198,15 @@ const BRANDS: Record<string, string> = {
     cartes_bancaires: 'Cartes Bancaires',
 };
 
-/** A country's name in the holder's language, or its code where the engine has no names. */
-function countryName(code: string, locale: string): string {
-    try {
-        const names = new (Intl as any).DisplayNames([locale], { type: 'region' });
-        return names.of(code.toUpperCase()) ?? code.toUpperCase();
-    } catch {
-        return code.toUpperCase();
-    }
+/**
+ * A country as its flag: the same in every language, where a name would need
+ * translating and the phone's JavaScript engine has no country names (it
+ * showed "GB"). Anything not a two-letter code is shown as it is.
+ */
+function countryFlag(code: string): string {
+    const c = code.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(c)) return c;
+    return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
 }
 
 /**
@@ -222,8 +223,8 @@ export function cardBankSource(
         | { brand?: string | null; country?: string | null }
         | undefined;
     const brand = label?.brand ? BRANDS[label.brand.toLowerCase()] ?? label.brand : null;
-    const country = label?.country ? countryName(label.country, locale) : null;
-    if (brand && country) return t('cardCheck.confirmedByCard', { card: `${brand}, ${country}` });
+    const country = label?.country ? countryFlag(label.country) : null;
+    if (brand && country) return t('cardCheck.confirmedByCard', { card: `${brand} ${country}` });
     if (brand || country) return t('cardCheck.confirmedByCard', { card: brand ?? country });
     return t('cardCheck.confirmedByBank');
 }

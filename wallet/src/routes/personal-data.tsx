@@ -564,7 +564,9 @@ function AttributeCard({
                                         </Text>
                                         {sources.map((s, i) => (
                                             <RNView key={i} style={styles.provenanceRow}>
-                                                <Text style={styles.provenanceValue}>{s.displayName}</Text>
+                                                <Text style={styles.provenanceValue}>
+                                                    {s.displayName === 'card_bank' ? cardBankSource(attr, t, currentLocale()) : s.displayName}
+                                                </Text>
                                                 <Text style={styles.provenanceValue}>
                                                     {t('time.onDate', { when: new Date(s.addedAt * 1000) })}
                                                 </Text>
@@ -582,13 +584,13 @@ function AttributeCard({
                                                 <RNView style={styles.provenanceRow}>
                                                     <Text style={styles.provenanceLabel}>{t('personalData.verifier')}</Text>
                                                     <Text style={styles.provenanceValue}>
-                                                        {v.verifierDisplayName}
+                                                        {v.verifier === 'card_bank' ? cardBankSource(attr, t, currentLocale()) : v.verifierDisplayName}
                                                     </Text>
                                                 </RNView>
                                                 <RNView style={styles.provenanceRow}>
                                                     <Text style={styles.provenanceLabel}>{t('personalData.method')}</Text>
                                                     <Text style={styles.provenanceValue}>
-                                                        {v.method.replace(/_/g, ' ')}
+                                                        {(v.verifier === 'card_bank' ? 'card_check' : v.method).replace(/_/g, ' ')}
                                                     </Text>
                                                 </RNView>
                                                 <RNView style={styles.provenanceRow}>

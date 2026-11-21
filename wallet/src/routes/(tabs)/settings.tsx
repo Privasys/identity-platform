@@ -23,7 +23,7 @@ import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { APP_LOCK_DEFAULT, APP_LOCK_OPTIONS, type AppLockSeconds } from '@/services/app-lock';
 import { isDemo } from '@/services/demo/gate';
-import { listDevices } from '@/services/devices';
+import { deviceIcon, listDevices } from '@/services/devices';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { getLogs } from '@/utils/logs';
 import { MONO } from '@/constants/fonts';
@@ -174,7 +174,7 @@ export default function SettingsScreen() {
                         <Text style={styles.sectionTitle}>{t('devices.settingsTitle')}</Text>
                         <Text style={styles.sectionDescription}>{t('devices.settingsDescription')}</Text>
                         <Pressable style={styles.logsButton} testID="settings-devices" onPress={() => router.push('/devices' as never)}>
-                            <Ionicons name="phone-portrait-outline" size={18} color={p.textPrimary} />
+                            <Ionicons name={deviceIcon('', true)} size={18} color={p.textPrimary} />
                             <Text style={styles.logsButtonText}>{t('devices.settingsRow', { count: phones })}</Text>
                             <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                         </Pressable>

@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { removeThisPhone, revokeDevice, type InstallProgress } from '@/services/device-flows';
-import { MAX_DEVICES, listDevices, renameDevice, syncRegistry, type RegistryDevice } from '@/services/devices';
+import { MAX_DEVICES, deviceIcon, listDevices, renameDevice, syncRegistry, type RegistryDevice } from '@/services/devices';
 import { wipeWallet } from '@/services/wipe';
 
 type Row = { device: RegistryDevice; isThis: boolean };
@@ -123,7 +123,7 @@ export default function DevicesScreen() {
                 <Text style={styles.lede}>{t('devices.lede')}</Text>
                 {rows.map(({ device, isThis }) => (
                     <RNView key={device.id} style={styles.card}>
-                        <Ionicons name="phone-portrait-outline" size={22} color={p.textSecondary} />
+                        <Ionicons name={deviceIcon(device.name, isThis)} size={22} color={p.textSecondary} />
                         <RNView style={styles.cardText}>
                             <Text style={styles.name}>{device.name}</Text>
                             <Text style={styles.meta}>{isThis ? t('devices.thisPhone') : added(device)}</Text>

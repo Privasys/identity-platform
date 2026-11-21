@@ -102,6 +102,15 @@ function osDeviceName(): string {
     return Device.modelName || 'Phone';
 }
 
+/**
+ * The icon for a device in the list: this one by what it is, another by its
+ * name (the registry keeps no type), a phone when the name does not say.
+ */
+export function deviceIcon(name: string, isThis: boolean): 'tablet-portrait-outline' | 'phone-portrait-outline' {
+    const tablet = isThis ? Device.deviceType === Device.DeviceType.TABLET : /(ipad|tablet|tab)/i.test(name);
+    return tablet ? 'tablet-portrait-outline' : 'phone-portrait-outline';
+}
+
 let cachedDevice: LocalDevice | null = null;
 
 /** This phone, made on first use. */

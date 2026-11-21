@@ -272,9 +272,13 @@ export async function startMailCode(
 ): Promise<{ mailToken: string; expiresAt: number; codeLength: number; maxAttempts: number; resendAfter: number }> {
     const ch = await challenge();
     const msg = mailStartMessage(email, ch);
+    // Signed by the holder key only: sending a code binds nothing to this
+    // device, so it raises no biometric prompt. The device key signs once, at
+    // redemption (attest mail_code), where the proof is bound. The verifier
+    // reads the device for its rate limits from the WIA (verifier >= 0.1.3).
     const r = await post<{ mail_token: string; expires_at: number; code_length: number; max_attempts: number; resend_after: number }>(
         '/mail/start',
-        { email, holder: holderBlock(msg, salt), device: await deviceBlock(msg), wia: await wia(), challenge: ch },
+        { email, holder: holderBlock(msg, salt), wia: await wia(), challenge: ch },
     );
     return {
         mailToken: r.mail_token,

@@ -17,6 +17,13 @@ const PODFILE_SNIPPET = `
     target.build_configurations.each do |bc|
       bc.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
       bc.build_settings['SWIFT_VERSION'] = '5'
+      # Xcode 27 refuses a deployment target below iOS 15 (SDWebImage says
+      # 9.0, ReachabilitySwift 12.0). No pod can run below the app's own
+      # 16.0 anyway, so raise any lower one to it.
+      dt = bc.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+      if dt.nil? || dt.to_f < 16.0
+        bc.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
+      end
       # Disable signing for resource bundle targets (Xcode 14+)
       if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.bundle'
         bc.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'

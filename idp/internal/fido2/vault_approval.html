@@ -260,8 +260,9 @@ function openGate() {
   const mine = gate;
   mine.signIn().then(function (res) {
     if (gate !== mine) return;
+    // The gate shows the outcome itself and stays.
+    if (res && res.approved) { declineEl.hidden = true; return; }
     showCard();
-    if (res && res.approved) showApproved();
   }).catch(function (e) {
     if (gate !== mine) return;
     showCard();
@@ -273,11 +274,13 @@ function openGate() {
 
 declineEl.addEventListener("click", async function () {
   const vaultOp = vaultOpOf(payload);
-  showCard();
-  if (!vaultOp) return;
+  declineEl.hidden = true;
+  if (!vaultOp) { showCard(); return; }
   try {
     const r = await fetch("/fido2/vault-approval/decline?challenge=" + encodeURIComponent(vaultOp), { method: "POST" });
     if (r.status !== 204) throw new Error("this approval is no longer open");
+    // The gate watches this approval and shows the decline itself.
+    if (gate) return;
     btn.style.display = "none";
     document.getElementById("wallet").hidden = true;
     document.getElementById("or").hidden = true;
@@ -285,6 +288,7 @@ declineEl.addEventListener("click", async function () {
     statusEl.textContent = "Declined. Your terminal stops waiting; you can close this tab.";
     document.getElementById("hint").textContent = "";
   } catch (e) {
+    showCard();
     fail("Could not decline: " + (e && e.message ? e.message : e));
   }
 });

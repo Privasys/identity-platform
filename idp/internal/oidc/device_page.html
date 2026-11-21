@@ -581,7 +581,10 @@ var PrivasysQR = (function () {
     mine.signIn().then(function (res) {
       if (gate !== mine || done) return;
       if (res && res.approved) {
-        finish(true, "Approved ✓", "You can return to your device. This page can be closed.");
+        // The gate shows the outcome itself and stays.
+        done = true;
+        if (pollTimer) clearInterval(pollTimer);
+        $("gateDeny").classList.add("hidden");
       } else {
         closeGate();
         renderConsent(d);

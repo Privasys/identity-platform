@@ -200,15 +200,28 @@ async function resolve(): Promise<Resolved> {
  * service must verify the enclave. Refuses otherwise.
  */
 async function channel(): Promise<Resolved> {
-    const v = await resolve();
-    if (Date.now() - attestedAt < ATTEST_TTL_MS) return v;
-    const origin = v.port === 443 ? v.host : `${v.host}:${v.port}`;
-    const inspected = await inspectAttestation(origin);
-    const oid = inspected.custom_oids?.find((o) => o.oid === IMAGE_OID);
-    if (!oid || oid.value_hex.toLowerCase() !== v.imageDigest) {
-        throw new AttributeVerifierError(0, 'the attribute verifier is not the published build; nothing was sent');
+    if (resolved && Date.now() - attestedAt < ATTEST_TTL_MS) return resolved;
+    // What the platform publishes is read afresh with each attestation: the
+    // verifier is upgraded under a running wallet, and the build it publishes
+    // then is the one to hold the enclave to.
+    resolved = null;
+    let v = await resolve();
+    const origin = (r: Resolved) => (r.port === 443 ? r.host : `${r.host}:${r.port}`);
+    let inspected = await inspectAttestation(origin(v));
+    let digest = inspected.custom_oids?.find((o) => o.oid === IMAGE_OID)?.value_hex.toLowerCase();
+    if (digest !== v.imageDigest) {
+        // An upgrade can land between the two reads: read once more, and
+        // refuse only if the enclave still is not the published build.
+        resolved = null;
+        v = await resolve();
+        inspected = await inspectAttestation(origin(v));
+        digest = inspected.custom_oids?.find((o) => o.oid === IMAGE_OID)?.value_hex.toLowerCase();
+        if (digest !== v.imageDigest) {
+            resolved = null;
+            throw new AttributeVerifierError(0, 'the attribute verifier is not the published build; nothing was sent');
+        }
     }
-    const outcome = await attestEnclave(origin, {
+    const outcome = await attestEnclave(origin(v), {
         tee: inspected.tee_type ?? 'tdx',
         mode: useSettingsStore.getState().verificationMode,
         attestationServer: ATTESTATION_SERVER,

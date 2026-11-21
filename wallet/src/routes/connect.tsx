@@ -1567,6 +1567,7 @@ function ConnectFlow() {
                 plan.every((i) => decided.has(i.key))
             ) {
                 approvedAttrsRef.current = new Set(standing.attributes);
+                console.log(`[CONNECT] consent: remembered decision for ${key} covers ${plan.map((i) => i.key).join(',')}`);
                 // A remembered decision can skip the consent SCREEN, never the
                 // live presence check.
                 await runWithPresence(approvedAttrsRef.current, cont);

@@ -56,6 +56,11 @@ on:
         default: 'macos-26'
         type: choice
         options: [macos-26, xcode-27]
+      xcode:
+        description: 'Xcode on that image: default (the image''s own), latest (its newest release, betas skipped), or a version such as 27.2'
+        required: false
+        default: 'default'
+        type: string
       submit:
         description: 'Submit to TestFlight and Play internal (off for a trial build)'
         required: false
@@ -258,6 +263,33 @@ jobs:
     runs-on: ${{ github.event_name == 'workflow_dispatch' && inputs.ios_runner || 'macos-26' }}
     steps:
       - uses: actions/checkout@v6
+
+      # Releases and main builds keep the image's default Xcode; a manual run
+      # can pick another one the image carries.
+      - name: Select Xcode
+        env:
+          XCODE: ${{ github.event_name == 'workflow_dispatch' && inputs.xcode || 'default' }}
+        run: |
+          set -euo pipefail
+          app=""
+          case "$XCODE" in
+            default|"") ;;
+            latest)
+              app=$(ls -d /Applications/Xcode_*.app | grep -E '/Xcode_[0-9]+(\.[0-9]+)*\.app$' | sort -V | tail -1) ;;
+            *)
+              app="/Applications/Xcode_$XCODE.app"
+              if [ ! -d "$app" ]; then
+                echo "::error::Xcode $XCODE is not on this image. It has:"
+                ls -d /Applications/Xcode_*.app
+                exit 1
+              fi ;;
+          esac
+          if [ -n "$app" ]; then
+            sudo xcode-select -s "$app/Contents/Developer"
+            echo "DEVELOPER_DIR=$app/Contents/Developer" >> "$GITHUB_ENV"
+          fi
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
 
       - uses: oven-sh/setup-bun@v2
         with:

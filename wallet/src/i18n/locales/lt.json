@@ -983,7 +983,10 @@
     "sources": "Šaltiniai",
     "verificationRecords": "Patikros įrašai",
     "verifier": "Tikrintuvas",
-    "method": "Metodas"
+    "method": "Metodas",
+    "verifiedByMail": "Patikrinta el. pašto kodu",
+    "verifiedByProvider": "Patikrino {{provider}}",
+    "fromProviderAccount": "Iš jūsų {{provider}} paskyros"
   },
 
   "verifyEmail": {

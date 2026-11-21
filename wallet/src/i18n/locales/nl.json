@@ -949,7 +949,10 @@
     "sources": "Bronnen",
     "verificationRecords": "Verificatiegegevens",
     "verifier": "Verificateur",
-    "method": "Methode"
+    "method": "Methode",
+    "verifiedByMail": "Geverifieerd met e-mailcode",
+    "verifiedByProvider": "Geverifieerd door {{provider}}",
+    "fromProviderAccount": "Uit je {{provider}}-account"
   },
 
   "verifyEmail": {

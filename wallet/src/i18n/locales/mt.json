@@ -1007,7 +1007,10 @@
     "sources": "Sorsi",
     "verificationRecords": "Rekords ta' verifika",
     "verifier": "Verifikatur",
-    "method": "Metodu"
+    "method": "Metodu",
+    "verifiedByMail": "Ivverifikat b'kodiċi bl-email",
+    "verifiedByProvider": "Ivverifikat minn {{provider}}",
+    "fromProviderAccount": "Mill-kont {{provider}} tiegħek"
   },
 
   "verifyEmail": {

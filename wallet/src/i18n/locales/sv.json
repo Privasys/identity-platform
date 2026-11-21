@@ -949,7 +949,10 @@
     "sources": "Källor",
     "verificationRecords": "Verifieringsuppgifter",
     "verifier": "Verifierare",
-    "method": "Metod"
+    "method": "Metod",
+    "verifiedByMail": "Verifierat med e-postkod",
+    "verifiedByProvider": "Verifierat av {{provider}}",
+    "fromProviderAccount": "Från ditt {{provider}}-konto"
   },
 
   "verifyEmail": {

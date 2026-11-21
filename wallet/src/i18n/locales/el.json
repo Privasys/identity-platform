@@ -949,7 +949,10 @@
     "sources": "Πηγές",
     "verificationRecords": "Αρχεία επαλήθευσης",
     "verifier": "Επαληθευτής",
-    "method": "Μέθοδος"
+    "method": "Μέθοδος",
+    "verifiedByMail": "Επαληθευμένο με κωδικό email",
+    "verifiedByProvider": "Επαληθευμένο από {{provider}}",
+    "fromProviderAccount": "Από τον λογαριασμό σας {{provider}}"
   },
 
   "verifyEmail": {

@@ -983,7 +983,10 @@
     "sources": "Avoti",
     "verificationRecords": "Pārbaudes ieraksti",
     "verifier": "Pārbaudītājs",
-    "method": "Metode"
+    "method": "Metode",
+    "verifiedByMail": "Pārbaudīts ar e-pasta kodu",
+    "verifiedByProvider": "Pārbaudījis {{provider}}",
+    "fromProviderAccount": "No jūsu {{provider}} konta"
   },
 
   "verifyEmail": {

@@ -949,7 +949,10 @@
     "sources": "Quellen",
     "verificationRecords": "Prüfnachweise",
     "verifier": "Prüfer",
-    "method": "Methode"
+    "method": "Methode",
+    "verifiedByMail": "Geprüft per E-Mail-Code",
+    "verifiedByProvider": "Geprüft durch {{provider}}",
+    "fromProviderAccount": "Aus Ihrem {{provider}}-Konto"
   },
 
   "verifyEmail": {

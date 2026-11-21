@@ -983,7 +983,10 @@
     "sources": "Zdroje",
     "verificationRecords": "Záznamy o overení",
     "verifier": "Overovateľ",
-    "method": "Metóda"
+    "method": "Metóda",
+    "verifiedByMail": "Overené kódom z e-mailu",
+    "verifiedByProvider": "Overené službou {{provider}}",
+    "fromProviderAccount": "Z vášho účtu {{provider}}"
   },
 
   "verifyEmail": {

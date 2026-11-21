@@ -1019,7 +1019,10 @@
     "sources": "Ffynonellau",
     "verificationRecords": "Cofnodion gwirio",
     "verifier": "Gwiriwr",
-    "method": "Dull"
+    "method": "Dull",
+    "verifiedByMail": "Wedi'i wirio â chod e-bost",
+    "verifiedByProvider": "Wedi'i wirio gan {{provider}}",
+    "fromProviderAccount": "O'ch cyfrif {{provider}}"
   },
 
   "verifyEmail": {

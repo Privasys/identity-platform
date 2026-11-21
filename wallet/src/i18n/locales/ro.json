@@ -983,7 +983,10 @@
     "sources": "Surse",
     "verificationRecords": "Înregistrări de verificare",
     "verifier": "Verificator",
-    "method": "Metodă"
+    "method": "Metodă",
+    "verifiedByMail": "Verificat prin cod pe e-mail",
+    "verifiedByProvider": "Verificat de {{provider}}",
+    "fromProviderAccount": "Din contul tău {{provider}}"
   },
 
   "verifyEmail": {

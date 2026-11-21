@@ -949,7 +949,10 @@
     "sources": "Kilder",
     "verificationRecords": "Verificeringsoplysninger",
     "verifier": "Verifikator",
-    "method": "Metode"
+    "method": "Metode",
+    "verifiedByMail": "Verificeret med e-mailkode",
+    "verifiedByProvider": "Verificeret af {{provider}}",
+    "fromProviderAccount": "Fra din {{provider}}-konto"
   },
 
   "verifyEmail": {

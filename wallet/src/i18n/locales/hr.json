@@ -983,7 +983,10 @@
     "sources": "Izvori",
     "verificationRecords": "Zapisi o provjeri",
     "verifier": "Provjeritelj",
-    "method": "Metoda"
+    "method": "Metoda",
+    "verifiedByMail": "Provjereno kodom iz e-pošte",
+    "verifiedByProvider": "Provjereno uslugom {{provider}}",
+    "fromProviderAccount": "Iz vašeg računa {{provider}}"
   },
 
   "verifyEmail": {

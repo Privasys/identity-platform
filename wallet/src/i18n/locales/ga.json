@@ -1007,7 +1007,10 @@
     "sources": "Foinsí",
     "verificationRecords": "Taifid fhíoraithe",
     "verifier": "Fíoraitheoir",
-    "method": "Modh"
+    "method": "Modh",
+    "verifiedByMail": "Fíoraithe le cód ríomhphoist",
+    "verifiedByProvider": "Fíoraithe ag {{provider}}",
+    "fromProviderAccount": "Ó do chuntas {{provider}}"
   },
 
   "verifyEmail": {

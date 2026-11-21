@@ -973,7 +973,10 @@
     "sources": "Źródła",
     "verificationRecords": "Zapisy weryfikacji",
     "verifier": "Weryfikator",
-    "method": "Metoda"
+    "method": "Metoda",
+    "verifiedByMail": "Zweryfikowane kodem z e-maila",
+    "verifiedByProvider": "Zweryfikowane przez {{provider}}",
+    "fromProviderAccount": "Z Twojego konta {{provider}}"
   },
 
   "verifyEmail": {

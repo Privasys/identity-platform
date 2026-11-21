@@ -971,7 +971,10 @@
     "sources": "Allikad",
     "verificationRecords": "Kontrollikirjed",
     "verifier": "Kontrollija",
-    "method": "Meetod"
+    "method": "Meetod",
+    "verifiedByMail": "Kontrollitud e-posti koodiga",
+    "verifiedByProvider": "Kontrollitud teenuse {{provider}} poolt",
+    "fromProviderAccount": "Teie {{provider}} kontolt"
   },
 
   "verifyEmail": {

@@ -971,7 +971,10 @@
     "sources": "Sources",
     "verificationRecords": "Verification Records",
     "verifier": "Verifier",
-    "method": "Method"
+    "method": "Method",
+    "verifiedByMail": "Verified by email code",
+    "verifiedByProvider": "Verified by {{provider}}",
+    "fromProviderAccount": "From your {{provider}} account"
   },
 
   "verifyEmail": {

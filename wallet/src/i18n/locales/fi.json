@@ -949,7 +949,10 @@
     "sources": "Lähteet",
     "verificationRecords": "Vahvistustietueet",
     "verifier": "Vahvistaja",
-    "method": "Menetelmä"
+    "method": "Menetelmä",
+    "verifiedByMail": "Vahvistettu sähköpostikoodilla",
+    "verifiedByProvider": "Vahvistanut {{provider}}",
+    "fromProviderAccount": "{{provider}}-tililtäsi"
   },
 
   "verifyEmail": {

@@ -971,7 +971,10 @@
     "sources": "Източници",
     "verificationRecords": "Записи от проверки",
     "verifier": "Проверяващ",
-    "method": "Метод"
+    "method": "Метод",
+    "verifiedByMail": "Проверено с код по имейл",
+    "verifiedByProvider": "Проверено от {{provider}}",
+    "fromProviderAccount": "От профила ви в {{provider}}"
   },
 
   "verifyEmail": {

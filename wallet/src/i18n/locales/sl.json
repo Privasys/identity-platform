@@ -995,7 +995,10 @@
     "sources": "Viri",
     "verificationRecords": "Zapisi o preverjanju",
     "verifier": "Preverjevalnik",
-    "method": "Metoda"
+    "method": "Metoda",
+    "verifiedByMail": "Preverjeno s kodo po e-pošti",
+    "verifiedByProvider": "Preverjeno s storitvijo {{provider}}",
+    "fromProviderAccount": "Iz vašega računa {{provider}}"
   },
 
   "verifyEmail": {

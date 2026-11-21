@@ -949,7 +949,10 @@
     "sources": "Források",
     "verificationRecords": "Ellenőrzési nyilvántartások",
     "verifier": "Ellenőrző",
-    "method": "Módszer"
+    "method": "Módszer",
+    "verifiedByMail": "E-mailes kóddal ellenőrzött",
+    "verifiedByProvider": "Ellenőrizte: {{provider}}",
+    "fromProviderAccount": "{{provider}}-fiókjából"
   },
 
   "verifyEmail": {

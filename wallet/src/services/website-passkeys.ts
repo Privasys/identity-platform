@@ -75,8 +75,20 @@ export async function installPasskeyRoot(seedHex: string | undefined): Promise<v
     }
 }
 
-/** Part of Clear All Data. */
+/**
+ * Part of the wipe: every website passkey on this device goes (both kinds,
+ * their records and, for the device-only ones, their keys), then the root.
+ * Left behind, the passkey provider would go on signing in to websites as the
+ * holder on a wallet that has been cleared.
+ */
 export async function clearPasskeyRoot(): Promise<void> {
+    for (const p of await listWebsitePasskeys()) {
+        try {
+            await NativeKeys.deleteWebsitePasskey(p.rpId, p.credentialId);
+        } catch {
+            /* best effort: the next wipe tries again */
+        }
+    }
     try {
         await NativeKeys.clearPasskeyRoot();
     } catch {

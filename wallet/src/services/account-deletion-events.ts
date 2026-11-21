@@ -26,6 +26,8 @@ export const DELETION_PUSH_TYPES = new Set([
     'account-deletion-reminder',
     'account-deletion-cancelled',
     'account-deleted',
+    // This device was removed from the holder's wallet by another one.
+    'device-removed',
 ]);
 
 /** Handle one of DELETION_PUSH_TYPES. Never clears the wallet on the push alone. */
@@ -41,6 +43,8 @@ export async function handleDeletionPush(type: string): Promise<void> {
             await cancelIdentityMarks();
             return;
         case 'account-deleted':
+        case 'device-removed':
+            // Only privasys.id's own answer (the tombstone) clears anything.
             await clearIfGone();
             return;
     }

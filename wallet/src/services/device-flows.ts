@@ -65,6 +65,7 @@ import {
 } from '@/services/identities';
 import { identitySealPub } from '@/services/notify-seal';
 import { ensurePrivasysSession } from '@/services/privasys-id';
+import { cancelIdentityMarks } from '@/services/account-deletion';
 import { collectContents, restoreContents, type BackupContents } from '@/services/profile-backup';
 import { ensureDataRoot, installDataRoot } from '@/services/sovereign';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
@@ -526,6 +527,11 @@ export async function secureAfterRecovery(onProgress?: (p: InstallProgress) => v
             claimFailed++;
         }
     }
+    // A phrase recovery cancels a pending account deletion: privasys.id
+    // unmarks the main account, and only this wallet can unmark the identities
+    // (privasys.id cannot link them). A cancel of an unmarked identity is
+    // harmless, and any left over are retried at each start.
+    void cancelIdentityMarks().catch((e: any) => console.warn('[devices] deletion marks not cancelled yet:', e?.message ?? e));
     return { identities: moved.identities.length, failed: failed + claimFailed };
 }
 

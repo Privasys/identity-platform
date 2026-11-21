@@ -37,6 +37,7 @@ const DEVICE_ONLY_KEYS = [
     'privasys.identities.protected',
     'privasys.identities.legacy',
 ];
+import { deletionStartup } from '@/services/account-deletion-events';
 import { restoreFromAutoBackupIfEmpty, watchProfileForBackup } from '@/services/profile-backup';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
@@ -135,6 +136,9 @@ export default function RootLayout() {
                 .then(() => pullRelay())
                 .then(() => requestSync())
                 .catch((e: any) => console.warn('[device-sync] start-up sync failed:', e?.message ?? e));
+            // A deletion: marks still to send, the banner, and whether this
+            // wallet's account (or this device) is gone.
+            void deletionStartup();
         }));
     }, []);
 

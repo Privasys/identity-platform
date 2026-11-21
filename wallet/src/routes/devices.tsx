@@ -18,9 +18,9 @@ import { useTranslation } from 'react-i18next';
 
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { removeThisPhone, revokeDevice, type InstallProgress } from '@/services/device-flows';
+import { useRemoveThisDevice } from '@/hooks/useRemoveThisDevice';
+import { revokeDevice, type InstallProgress } from '@/services/device-flows';
 import { MAX_DEVICES, deviceIcon, listDevices, renameDevice, syncRegistry, type RegistryDevice } from '@/services/devices';
-import { wipeWallet } from '@/services/wipe';
 
 type Row = { device: RegistryDevice; isThis: boolean };
 
@@ -95,26 +95,8 @@ export default function DevicesScreen() {
         }
     };
 
-    const confirmRemoveThis = () =>
-        Alert.alert(t('devices.removeThisTitle'), t('devices.removeThisBody'), [
-            { text: t('common.cancel'), style: 'cancel' },
-            {
-                text: t('devices.removeThisConfirm'),
-                style: 'destructive',
-                onPress: async () => {
-                    setBusy('this');
-                    try {
-                        await removeThisPhone();
-                        await wipeWallet();
-                        router.replace('/(tabs)');
-                    } catch (e: any) {
-                        Alert.alert(t('devices.revokeFailed', { reason: e?.message ?? String(e) }));
-                    } finally {
-                        setBusy(null);
-                    }
-                },
-            },
-        ]);
+    // The same as Settings' Remove this device, offline fallback included.
+    const removeThis = useRemoveThisDevice();
 
     return (
         <RNView style={styles.screen} testID="devices-screen">
@@ -156,8 +138,8 @@ export default function DevicesScreen() {
                 <Text style={styles.note}>{t('devices.limitNote', { max: MAX_DEVICES })}</Text>
 
                 {rows.length > 1 ? (
-                    <Pressable style={styles.removeThis} disabled={!!busy} onPress={confirmRemoveThis}>
-                        {busy === 'this' ? (
+                    <Pressable style={styles.removeThis} disabled={!!busy || removeThis.busy} onPress={removeThis.confirm}>
+                        {removeThis.busy ? (
                             <ActivityIndicator color={p.danger} />
                         ) : (
                             <Text style={styles.removeThisText}>{t('devices.removeThis')}</Text>

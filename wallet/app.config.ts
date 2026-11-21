@@ -214,6 +214,15 @@ export default (context: ConfigContext): ExpoConfig => {
                     autoVerify: true,
                     data: [{ scheme: 'https', host: '*.privasys.id', pathPrefix: '/scp' }],
                     category: ['BROWSABLE', 'DEFAULT']
+                },
+                // The account-deletion page's hand-over (routes/account/delete/
+                // confirm). On privasys.id itself, which the wildcard above
+                // does not cover.
+                {
+                    action: 'VIEW',
+                    autoVerify: true,
+                    data: [{ scheme: 'https', host: 'privasys.id', pathPrefix: '/account/delete/confirm' }],
+                    category: ['BROWSABLE', 'DEFAULT']
                 }
             ]
         },

@@ -56,6 +56,7 @@ export const TASK_ROUTES = new Set([
     'device-send',
     'export',
     'import',
+    'account/delete/confirm',
 ]);
 
 /** The section each route belongs to, for the sidebar and the list beside it. */

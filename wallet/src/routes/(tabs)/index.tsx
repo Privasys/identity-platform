@@ -25,6 +25,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { AccountDeletionBanner } from '@/components/AccountDeletionBanner';
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -39,7 +40,6 @@ import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { runPendingSecure } from '@/services/device-flows';
 import { hasRecoveredPairwiseSeed, takeRecoveredPairwiseSeed } from '@/services/sovereign';
-import { wipeWallet } from '@/services/wipe';
 import { BIOMETRIC_TIMEOUT_MS, withTimeout } from '@/utils/timeout';
 import { useAvatarChooser } from '@/hooks/useAvatarChooser';
 import { useAuthStore } from '@/stores/auth';
@@ -87,10 +87,6 @@ export default function ProfileScreen() {
     // (biometric confirmed → key created → identity ready).
     const [setupBusy, setSetupBusy] = useState(false);
     const [setupDone, setSetupDone] = useState(0);
-    // A wipe deletes the sovereign root asynchronously. Setup must not start
-    // until that lands, or the fresh identity can pick the old pairwise seed
-    // back up out of the not-yet-deleted stash.
-    const [wiping, setWiping] = useState(false);
     /**
      * True when a recovery finished but no local profile exists yet.
      *
@@ -312,12 +308,12 @@ export default function ProfileScreen() {
                         style={[
                             styles.createProfileButton,
                             styles.setupButton,
-                            (setupBusy || wiping) && { opacity: 0.6 }
+                            setupBusy && { opacity: 0.6 }
                         ]}
                         onPress={handleSetup}
-                        disabled={setupBusy || wiping}
+                        disabled={setupBusy}
                     >
-                        {setupBusy || wiping ? (
+                        {setupBusy ? (
                             <ActivityIndicator color="#FFFFFF" size="small" />
                         ) : (
                             <>
@@ -364,6 +360,7 @@ export default function ProfileScreen() {
                 contentContainerStyle={[styles.scrollContent, pane ? null : { paddingTop: insets.top + 12 }]}
                 showsVerticalScrollIndicator={false}
             >
+                <AccountDeletionBanner />
                 <IdentityCard
                     name={shownName}
                     email={profile.email}
@@ -577,53 +574,8 @@ export default function ProfileScreen() {
                     </RNView>
                 </RNView>
 
-                {/* Danger Zone */}
-                <RNView style={styles.dangerSection}>
-                    <RNView style={styles.dangerDivider} />
-                    <Text style={styles.dangerTitle}>{t('profile.dangerZone')}</Text>
-                    {/* Only the wipe is left here. Removing a credential stops
-                        one app signing in; this destroys the identity itself,
-                        which is why it stays beside who you are. */}
-                    <Text style={styles.dangerDescription}>{t('profile.dangerClearHint')}</Text>
-                    <Pressable
-                        style={styles.dangerButton}
-                        onPress={() => {
-                            Alert.alert(
-                                t('profile.clearAllData'),
-                                t('profile.clearAllDataBody'),
-                                [
-                                    { text: t('common.cancel'), style: 'cancel' },
-                                    {
-                                        text: t('profile.clearEverything'),
-                                        style: 'destructive',
-                                        onPress: () => {
-                                            // Everything the wipe touches lives in
-                                            // services/wipe.ts, which is covered by a test
-                                            // that fails when a new persisted key appears
-                                            // without a clear. Enumerating stores here is
-                                            // what let sessions, consent history, KYC
-                                            // records and the recovery-phrase flag survive
-                                            // a "Clear All Data" (2026-08-26).
-                                            setWiping(true);
-                                            void wipeWallet().finally(() => {
-                                                // Reset the setup ceremony so the re-shown
-                                                // setup screen starts clean (stale
-                                                // busy/done state froze the button,
-                                                // 2026-08-22).
-                                                setSetupBusy(false);
-                                                setSetupDone(0);
-                                                setWiping(false);
-                                            });
-                                        }
-                                    }
-                                ]
-                            );
-                        }}
-                    >
-                        <Ionicons name="trash-outline" size={18} color={p.danger} />
-                        <Text style={styles.dangerButtonText}>{t('profile.clearAllData')}</Text>
-                    </Pressable>
-                </RNView>
+                {/* Removing this device and deleting the account live at the bottom
+                    of Settings ("This device and your account"). */}
             </ScrollView>
         </RNView>
     );
@@ -809,42 +761,4 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     sharingLabel: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
     sharingDetail: { fontSize: 13, color: p.textSecondary },
 
-    dangerSection: {
-        marginTop: 40,
-        alignItems: 'center',
-        gap: 10,
-        paddingBottom: 20,
-    },
-    dangerDivider: {
-        width: 40,
-        height: 1,
-        backgroundColor: p.border,
-        marginBottom: 4,
-    },
-    dangerTitle: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: p.textMuted,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    dangerDescription: {
-        fontSize: 13,
-        color: p.textMuted,
-        textAlign: 'center',
-        lineHeight: 18,
-        maxWidth: 280,
-        marginBottom: 4,
-    },
-    dangerButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        borderRadius: 10,
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderWidth: 1,
-        borderColor: p.border,
-    },
-    dangerButtonText: { color: p.danger, fontSize: 14, fontWeight: '500' },
 });

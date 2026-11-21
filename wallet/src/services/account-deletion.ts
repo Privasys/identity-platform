@@ -22,6 +22,7 @@
 
 import { ed25519 } from '@noble/curves/ed25519.js';
 
+import { currentLocale } from '@/i18n';
 import { localRegistry } from '@/services/devices';
 import { deriveRecoveryKey, epochCandidates, identityChallenge } from '@/services/identities';
 import { ensurePrivasysSession } from '@/services/privasys-id';
@@ -39,6 +40,16 @@ const OUTBOX_KEY = 'privasys.account-deletion.outbox';
 const MESSAGE_INFO = 'privasys-account-deletion/v1';
 
 export type DeletionAction = 'schedule' | 'cancel';
+
+/** A refusal from privasys.id, with its status: 404 an expired request, 409 blocked. */
+export class DeletionError extends Error {
+    constructor(
+        readonly status: number,
+        message: string,
+    ) {
+        super(message);
+    }
+}
 
 /** What this wallet knows of a pending deletion, for the banner. */
 export type DeletionState = { state: 'none' } | { state: 'pending'; deleteAt: string | null; pageUrl: string };
@@ -88,6 +99,15 @@ const headers = (session?: string): HeadersInit => ({
     'Content-Type': 'application/json',
     ...(session ? { Authorization: `Bearer wallet:${session}` } : {}),
 });
+
+/** A deletion date the way the holder reads dates, e.g. "28 November 2026". */
+export function deletionDate(at: Date): string {
+    try {
+        return at.toLocaleDateString(currentLocale(), { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch {
+        return at.toDateString();
+    }
+}
 
 // ---------------------------------------------------------------- state
 
@@ -182,7 +202,7 @@ export async function confirmDeletion(requestId: string): Promise<string> {
         body: JSON.stringify({ request_id: requestId }),
     });
     if (r.status !== 200 || !r.body?.delete_at) {
-        throw new Error(r.body?.error ?? `the deletion could not be confirmed (HTTP ${r.status})`);
+        throw new DeletionError(r.status, r.body?.error ?? `the deletion could not be confirmed (HTTP ${r.status})`);
     }
     const deleteAt = r.body.delete_at;
     await saveDeletionState({ state: 'pending', deleteAt, pageUrl: DELETE_PAGE_URL });

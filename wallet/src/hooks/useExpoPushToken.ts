@@ -21,6 +21,7 @@ import { useAppLockStore } from '../stores/app-lock';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 import { vaultBatchRouteName } from '../services/vault-approval-batch';
 import { isRouteActive } from '../utils/active-route';
+import { DELETION_PUSH_TYPES, handleDeletionPush } from '../services/account-deletion-events';
 
 let _notificationsSetup = false;
 
@@ -166,6 +167,13 @@ async function fileDriveNotification(data: Record<string, unknown>): Promise<boo
  *  into the drive-notifications store and open the requests screen; everything
  *  else runs through the auth/voucher connect flow. */
 async function dispatchPush(data: Record<string, unknown>, router: Router): Promise<void> {
+    if (typeof data?.type === 'string' && DELETION_PUSH_TYPES.has(data.type)) {
+        // An account deletion: the banner, a cancel from elsewhere, or the end.
+        // Each push carries only its type; what it means is read from
+        // privasys.id, and the wallet is never cleared on a push alone.
+        await handleDeletionPush(data.type).catch((e) => console.warn('[notifications] account deletion', e));
+        return;
+    }
     if (data?.type === 'device-relay') {
         // Another phone of the holder sent an update: fetch it. Silent.
         await pullRelay().catch((e) => console.warn('[notifications] device relay failed', e));

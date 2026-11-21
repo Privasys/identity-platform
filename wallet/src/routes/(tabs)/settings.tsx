@@ -11,7 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Pressable, Alert, ScrollView, Switch, View as RNView } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -22,6 +22,9 @@ import { sectionTitleStyle } from '@/components/section-title';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { useExpoPushToken } from '@/hooks/useExpoPushToken';
 import { APP_LOCK_DEFAULT, APP_LOCK_OPTIONS, type AppLockSeconds } from '@/services/app-lock';
+import { AccountDeletionBanner } from '@/components/AccountDeletionBanner';
+import { useRemoveThisDevice } from '@/hooks/useRemoveThisDevice';
+import { DELETE_PAGE_URL } from '@/services/account-deletion';
 import { isDemo } from '@/services/demo/gate';
 import { deviceIcon, listDevices } from '@/services/devices';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
@@ -54,6 +57,7 @@ export default function SettingsScreen() {
     const pushToken = useExpoPushToken();
     // Devices shows from the first phone: it is where the phone is named.
     const [phones, setPhones] = useState(0);
+    const removeThis = useRemoveThisDevice();
     useFocusEffect(
         useCallback(() => {
             void listDevices()
@@ -67,6 +71,7 @@ export default function SettingsScreen() {
             <TabHeader title={t('settings.title')} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
+                <AccountDeletionBanner />
                 <LanguagePicker />
 
                 {/* App lock (services/app-lock). Not in the demo build. */}
@@ -202,6 +207,43 @@ export default function SettingsScreen() {
                     <Text style={styles.logsButtonText}>{t('settings.logsView')}</Text>
                     <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
                 </Pressable>
+
+                {/* This device and your account. Remove this device only when the
+                    holder has another: on the only one there is nothing to
+                    move to, and a phone is moved by adding the new one first.
+                    Deleting the account is a page at privasys.id. */}
+                {isDemo() ? null : (
+                    <>
+                        <Text style={styles.sectionTitle}>{t('accountDeletion.sectionTitle')}</Text>
+                        {phones > 1 ? (
+                            <>
+                                <Text style={styles.sectionDescription}>{t('accountDeletion.removeDeviceHint')}</Text>
+                                <Pressable
+                                    style={styles.logsButton}
+                                    onPress={removeThis.confirm}
+                                    disabled={removeThis.busy}
+                                    testID="settings-remove-device"
+                                >
+                                    <Ionicons name="exit-outline" size={18} color={p.danger} />
+                                    <Text style={[styles.logsButtonText, { color: p.danger }]}>{t('devices.removeThis')}</Text>
+                                    {removeThis.busy ? <ActivityIndicator color={p.textMuted} /> : null}
+                                </Pressable>
+                            </>
+                        ) : (
+                            <Text style={styles.sectionDescription}>{t('accountDeletion.onlyDeviceHint')}</Text>
+                        )}
+                        <Text style={styles.sectionDescription}>{t('accountDeletion.deleteAccountHint')}</Text>
+                        <Pressable
+                            style={styles.logsButton}
+                            onPress={() => void Linking.openURL(DELETE_PAGE_URL)}
+                            testID="settings-delete-account"
+                        >
+                            <Ionicons name="trash-outline" size={18} color={p.danger} />
+                            <Text style={[styles.logsButtonText, { color: p.danger }]}>{t('accountDeletion.deleteAccount')}</Text>
+                            <Ionicons name="open-outline" size={18} color={p.textMuted} />
+                        </Pressable>
+                    </>
+                )}
 
                 {/* About — one tile: everything as key/value rows. */}
                 <Text style={styles.sectionTitle}>{t('settings.aboutTitle')}</Text>

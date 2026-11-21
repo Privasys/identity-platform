@@ -163,6 +163,18 @@ export default function TabScanScreen() {
                 }
             }
 
+            // 1b. The account-deletion page's code, shown on a computer: the
+            //     same hand-over the phone's Camera makes through the
+            //     universal link.
+            const deletion = /^https:\/\/privasys\.id\/account\/delete\/confirm\/?\?(?:[^#]*&)?r=([A-Za-z0-9_-]{8,128})(?:[&#]|$)/.exec(
+                result.data,
+            );
+            if (deletion) {
+                navigating.current = true;
+                router.replace({ pathname: '/account/delete/confirm', params: { r: deletion[1] } });
+                return;
+            }
+
             // 2a. The code a new phone of the holder shows: send this wallet to it,
             //     after the holder confirms on the next screen.
             const pair = parsePairingLink(result.data);

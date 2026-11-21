@@ -5,6 +5,7 @@ jest.mock('@/services/privasys-id', () => ({ ensurePrivasysSession: jest.fn() })
 jest.mock('@/services/identities', () => ({}));
 jest.mock('@/services/devices', () => ({}));
 jest.mock('@/utils/storage', () => ({}));
+jest.mock('@/i18n', () => ({ currentLocale: () => 'en-GB' }));
 
 import { deletionMessage } from '@/services/account-deletion';
 

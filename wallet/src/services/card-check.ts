@@ -4,16 +4,19 @@
 /**
  * A billing address confirmed by the holder's card's bank.
  *
- * A £0 card check, run on privasys.id (the card form belongs in a browser): the
- * bank confirms, or not, the first line and the postcode the holder typed. The
- * wallet then has the Privasys Attribute Verifier sign the fields that passed,
- * and keeps the proof with the check's result.
+ * A £0 card check on the payment provider's hosted card page (the card form
+ * belongs in a browser, never in the wallet): the bank confirms, or not, the
+ * first line and the postcode the holder typed. The wallet then has the
+ * Privasys Attribute Verifier sign the fields that passed, and keeps the proof
+ * with the check's result.
  *
- *  1. Open privasys.id/account/card-check with the holder commitment (a fresh
- *     salt: no two checks can be linked), a PKCE challenge, and the wallet's
- *     return link.
- *  2. The page hands back a one-time code; the wallet claims the result with
- *     the PKCE verifier, so no other app that caught the redirect can.
+ *  1. Start the check on the control plane with the holder commitment (a
+ *     fresh salt: no two checks can be linked), a PKCE challenge and the
+ *     wallet's return link, and open the provider's page it answers with in
+ *     the system's sign-in browser. No privasys.id page, so no second sign-in.
+ *  2. The control plane hands back a one-time code; the wallet claims the
+ *     result with the PKCE verifier, so no other app that caught the redirect
+ *     can.
  *  3. The verifier asks the back office about the check and signs the passed
  *     fields as the canonical "address" (street_address, postal_code). The
  *     card's brand and country are display data in its label.
@@ -29,16 +32,15 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { attest, newCommitment, type AttributeProof } from '@/services/attribute-verifier';
 import { thisDeviceBinding } from '@/services/attribute-proofs';
+import { getPlatformToken } from '@/services/platform-token';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { bytesToBase64url } from '@/utils/encoding';
 
-const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 /** The control plane the check's result is claimed from: the test one for preview builds. */
 const API_BASE =
     process.env.EXPO_PUBLIC_ATTRIBUTE_VERIFIER_PLATFORM_URL ??
     process.env.EXPO_PUBLIC_PLATFORM_API_URL ??
     'https://api.developer.privasys.org';
-const TEST_API = /\.test\.privasys\.org$/.test(API_BASE.replace(/\/+$/, ''));
 
 export type CardCheckFailure = 'cancelled' | 'failed' | 'nothing-confirmed' | 'unverified';
 
@@ -72,15 +74,33 @@ async function pkce(): Promise<{ verifier: string; challenge: string }> {
     return { verifier, challenge: digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') };
 }
 
-/** Run the check on privasys.id and claim its result. */
+/**
+ * Start the check on the control plane, which answers with the payment
+ * provider's hosted card page. Opened in the system's sign-in browser (never a
+ * view inside the wallet): no privasys.id page, so no second sign-in.
+ */
+async function startCheck(commitment: string, challenge: string, returnUrl: string): Promise<string> {
+    const token = await getPlatformToken();
+    const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/v1/billing/address-checks/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ holder_binding: commitment, code_challenge: challenge, return: returnUrl }),
+    });
+    if (!res.ok) throw new CardCheckError('failed', `the card check could not start (HTTP ${res.status})`);
+    const j = (await res.json()) as { checkout_url?: string; url?: string };
+    const url = j.checkout_url ?? j.url;
+    if (!url || !/^https:\/\//.test(url)) throw new CardCheckError('failed', 'the card check returned no page');
+    return url;
+}
+
+/** Run the check on the provider's page and claim its result. */
 async function runCheck(commitment: string): Promise<CheckResult> {
     const { verifier, challenge } = await pkce();
     const scheme = Constants.expoConfig?.scheme ?? 'privasys-wallet';
     const returnUrl = `${scheme}://card-check`;
-    const params = new URLSearchParams({ hb: commitment, code_challenge: challenge, return: returnUrl });
-    if (TEST_API) params.set('api', 'test');
+    const checkoutUrl = await startCheck(commitment, challenge, returnUrl);
 
-    const r = await WebBrowser.openAuthSessionAsync(`${IDP_BASE}/account/card-check?${params.toString()}`, returnUrl);
+    const r = await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);
     if (r.type !== 'success' || !r.url) throw new CardCheckError('cancelled', 'the card check was closed');
     const back = new URL(r.url);
     const error = back.searchParams.get('error');

@@ -190,6 +190,18 @@ export interface AuthFrameConfig {
      * are taken from the request, and the wallet is the only method.
      */
     deviceRequest?: { userCode: string };
+    /**
+     * Approve one operation someone started elsewhere, such as a vault
+     * approval the terminal asked for, named by its challenge. The gate shows
+     * that the wallet was notified, the QR code that opens the approval in the
+     * wallet (`walletLink`), and a passkey button that calls `onPasskey`
+     * when given. `signIn()` resolves with `approved: true` once the
+     * operation is approved, however it was.
+     *
+     * For the identity provider's own pages only: the gate refuses it from
+     * any other origin.
+     */
+    operationApproval?: { challenge: string; walletLink: string; onPasskey?: () => void };
     /** Management service API base URL. */
     apiBase: string;
     /** App name or UUID as registered on the platform. */
@@ -356,8 +368,9 @@ export interface SignInResult {
     pushToken?: string;
     /** JWT access_token from the IdP (present when clientId was set in config). */
     accessToken?: string;
-    /** Set on the result of a {@link AuthFrameConfig.deviceRequest} only:
-     *  the request is approved, and this page gets no token. */
+    /** Set on the result of a {@link AuthFrameConfig.deviceRequest} or an
+     *  {@link AuthFrameConfig.operationApproval} only: the request is
+     *  approved, and this page gets no token. */
     approved?: boolean;
     /** Set on the result of {@link AuthFrame.linkIdentity} only. */
     linked?: boolean;
@@ -1259,6 +1272,15 @@ export class AuthFrame {
                                     caps: ['parent-navigate', ...(headless ? ['headless'] : [])],
                                     ...(this.connectHint && !link ? { connect: this.connectHint } : {}),
                                     ...(link ? { link: { nonce: link }, presentation: 'modal' } : {}),
+                                    // A function cannot cross into the frame:
+                                    // the frame only learns a passkey is offered.
+                                    ...(this.config.operationApproval ? {
+                                        operationApproval: {
+                                            challenge: this.config.operationApproval.challenge,
+                                            walletLink: this.config.operationApproval.walletLink,
+                                            passkey: !!this.config.operationApproval.onPasskey,
+                                        },
+                                    } : {}),
                                 },
                             },
                             this.authOrigin,
@@ -1331,6 +1353,10 @@ export class AuthFrame {
                         }
                         break;
                     }
+
+                    case 'privasys:operation:passkey':
+                        this.config.operationApproval?.onPasskey?.();
+                        break;
 
                     case 'privasys:cancel':
                         cleanup();

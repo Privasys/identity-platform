@@ -340,6 +340,38 @@ async function lookupDeviceRequest(idpBase: string, userCode: string): Promise<D
     };
 }
 
+/** An operation to approve, as the page passed it. */
+interface OperationRequest {
+    challenge: string;
+    walletLink: string;
+    passkey: boolean;
+}
+
+/** The wallet links an operation approval may carry: the production wallet's
+ *  scheme, or a dev or preview build's. */
+const OPERATION_WALLET_LINK = /^privasys-wallet(-dev|-preview)?:\/\/vault-approvals\?vault_op=[A-Za-z0-9_%-]+$/;
+
+function sanitiseOperation(raw: unknown): OperationRequest | undefined {
+    const o = raw as { challenge?: unknown; walletLink?: unknown; passkey?: unknown } | null | undefined;
+    if (!o || typeof o.challenge !== 'string' || typeof o.walletLink !== 'string') return undefined;
+    if (!/^[A-Za-z0-9_-]{16,256}$/.test(o.challenge) || !OPERATION_WALLET_LINK.test(o.walletLink)) return undefined;
+    return { challenge: o.challenge, walletLink: o.walletLink, passkey: o.passkey === true };
+}
+
+/** Waits until the identity provider says the operation is approved. */
+async function waitOperation(idpBase: string, challenge: string, timeoutMs = 300_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const resp = await fetch(`${idpBase}/fido2/vault-approval/status?challenge=${encodeURIComponent(challenge)}`, { cache: 'no-store' });
+        const data = resp.ok ? await resp.json().catch(() => null) : null;
+        if (data?.status === 'approved') return;
+        if (data?.status === 'declined') throw new Error('The approval was declined.');
+        if (data?.status === 'gone') throw new Error('This approval has expired. Run the command again.');
+        await new Promise((r) => setTimeout(r, 1500));
+    }
+    throw new Error('This approval has expired. Run the command again.');
+}
+
 /** Waits until the identity provider says a session is authenticated. */
 async function waitAuthenticated(pollUrl: string, timeoutMs = 120_000): Promise<void> {
     const deadline = Date.now() + timeoutMs;
@@ -1122,6 +1154,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
             link?: unknown;
             /** Approve a sign-in another device started; sanitised below. */
             deviceRequest?: unknown;
+            /** Approve an operation someone started; sanitised below. */
+            operationApproval?: unknown;
         } = data.config;
         const parentOrigin = e.origin;
         // A link is a Privasys ID sign-in whose only result is an ID token
@@ -1232,6 +1266,54 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // token, so it must never serve a widened attribute request — a
         // widened set needs a freshly minted token, which only the OIDC
         // ceremony (and its step-up push path) can produce.
+        // An operation to approve (a vault approval the terminal asked for).
+        // Only the identity provider's own pages may run it: the challenge is
+        // the capability, and a foreign page must not walk a visitor through
+        // approving someone else's operation.
+        if (config.operationApproval !== undefined) {
+            const operation = sanitiseOperation(config.operationApproval);
+            if (!operation || linkNonce || device || parentOrigin !== globalThis.location.origin) {
+                window.parent.postMessage({ type: 'privasys:error', error: 'this approval cannot be shown on this page' }, parentOrigin);
+                return;
+            }
+            const operationUI = new AuthUI({
+                apiBase: globalThis.location.origin,
+                onContentHeight,
+                appName: config.appName,
+                rpId: config.rpId || config.appName,
+                presentation,
+                app,
+                pitch,
+                theme,
+                legal,
+                onNavigate,
+                operationApproval: {
+                    walletLink: operation.walletLink,
+                    ...(operation.passkey
+                        ? { onPasskey: () => window.parent.postMessage({ type: 'privasys:operation:passkey' }, parentOrigin) }
+                        : {}),
+                    wait: () => waitOperation(globalThis.location.origin, operation.challenge),
+                },
+            });
+            activeUI = operationUI;
+            try {
+                await operationUI.signIn();
+                window.parent.postMessage(
+                    { type: 'privasys:result', result: { approved: true, sessionToken: '', method: 'wallet', sessionId: '' } },
+                    parentOrigin,
+                );
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : '';
+                if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
+                    window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
+                } else {
+                    window.parent.postMessage({ type: 'privasys:error', error: msg || 'The approval was not completed' }, parentOrigin);
+                }
+            } finally {
+                if (activeUI === operationUI) activeUI = null;
+            }
+            return;
+        }
         if (config.connect?.mode === 'approve' && config.sessionRelay?.appHost
             && config.connect.reason !== 'attributes-widened') {
             const rpId = config.rpId || config.appName;

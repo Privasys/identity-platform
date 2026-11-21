@@ -105,6 +105,21 @@ export interface AuthUIConfig {
          *  have the host run the full ceremony. */
         run: () => Promise<void>;
     };
+    /** Approve one operation someone started elsewhere (a vault approval
+     *  the terminal asked for), not a sign-in. The wallet was notified when
+     *  the operation was asked for; the gate shows that, the QR code that
+     *  opens the approval in the wallet, and a passkey fallback, and waits.
+     *  `signIn()` resolves once `wait()` does, with an empty result. */
+    operationApproval?: {
+        /** The wallet link that opens this approval. */
+        walletLink: string;
+        /** Approve with a passkey on this computer instead; absent when the
+         *  page cannot. */
+        onPasskey?: () => void;
+        /** Resolves once the operation is approved; rejects with the reason
+         *  it will not be (declined, expired). */
+        wait: () => Promise<void>;
+    };
     /** Push token from a previous session. When present the UI will offer
      *  to send a push notification instead of showing a QR code. */
     pushToken?: string;
@@ -1193,7 +1208,12 @@ export class AuthUI {
             this.viaPoll = false;
             this.mount();
 
-            if (this.cfg.approveFlow) {
+            if (this.cfg.operationApproval) {
+                // An operation to approve: the wallet already has it.
+                this.autoStarted = true;
+                this.autoFirstScreen = 'approve-waiting';
+                this.startOperationApproval();
+            } else if (this.cfg.approveFlow) {
                 // Re-verification of an existing session: approval push only.
                 this.autoStarted = true;
                 this.autoFirstScreen = 'approve-waiting';
@@ -1495,7 +1515,8 @@ export class AuthUI {
         // modes), flow states get a heading of their own above the tile.
         const flowHeading = (inline || isPage) && !isIdle && this.state !== 'success' && this.state !== 'error'
             && this.state !== 'profile-required'
-            ? (this.method === 'passkey' ? 'Sign in with a passkey' : 'Connecting you to Privasys ID')
+            ? (this.cfg.operationApproval ? 'Approve in your Privasys Wallet'
+                : this.method === 'passkey' ? 'Sign in with a passkey' : 'Connecting you to Privasys ID')
             : null;
 
         // Left panel content: the adopter's pitch (page mode — that panel is
@@ -1569,7 +1590,7 @@ export class AuthUI {
                 // answering WHY this screen is shown.
                 (isPage && flowHeading) ? el('p', { className: 'gate-request' },
                     el('strong', null, appDisplay),
-                    ' wants to authenticate you',
+                    this.cfg.operationApproval ? ' asks for your approval' : ' wants to authenticate you',
                 ) : null,
                 flowHeading ? el('h2', { className: 'auth-panel-heading' }, flowHeading) : null,
                 // Shown when the brand panel carries no progress steps:
@@ -1882,6 +1903,7 @@ export class AuthUI {
 
     /** Approve-only flow: waiting for the one-tap wallet re-verification. */
     private renderApproveWaiting(): HTMLElement {
+        if (this.cfg.operationApproval) return this.renderOperationApproval();
         const flow = this.cfg.approveFlow!;
         const why = flow.reason === 'workload-changed'
             ? `${flow.appLabel} was updated since you last verified it.`
@@ -1915,6 +1937,64 @@ export class AuthUI {
                 style: 'font-size: 13px; display: block; text-align: center; width: 100%;',
                 onClick: () => this.finishApproveFallback(),
             }, 'Sign in another way'),
+        );
+    }
+
+    /** An operation to approve: the wallet was notified when it was asked
+     *  for, the QR code opens it in the wallet when the notification is late
+     *  or never comes, and a passkey on this computer can approve it too. */
+    private renderOperationApproval(): HTMLElement {
+        const op = this.cfg.operationApproval!;
+        const mobile = isMobileDevice();
+        return el('div', null,
+            el('p', { className: 'scan-hint', style: 'margin-bottom: 16px; max-width: none; text-align: center;' },
+                mobile
+                    ? 'A notification was sent to your phone. Approve it in your Privasys Wallet, or open the wallet here.'
+                    : 'A notification was sent to your phone. Approve it in your Privasys Wallet, or scan this code if it has not arrived.',
+            ),
+            mobile
+                ? el('a', {
+                    className: 'btn-provider primary',
+                    href: op.walletLink,
+                    target: '_top',
+                    onClick: (e: Event) => {
+                        if (this.cfg.onNavigate) {
+                            e.preventDefault();
+                            this.cfg.onNavigate(op.walletLink);
+                        }
+                    },
+                },
+                    el('span', { html: ICON_LOGO }),
+                    el('span', { className: 'btn-label' }, 'Open in Privasys Wallet'),
+                )
+                : el('div', { className: 'qr-section' },
+                    el('div', { className: 'qr-frame', html: renderQRSvg(op.walletLink) }),
+                    el('div', { className: 'scan-label' },
+                        el('span', { className: 'pulse' }),
+                        'Scan with Privasys Wallet',
+                    ),
+                ),
+            op.onPasskey ? el('div', { className: 'divider' }, el('span', null, 'or')) : null,
+            op.onPasskey ? el('button', {
+                className: 'link-btn',
+                style: 'font-size: 13px; display: block; text-align: center; width: 100%;',
+                onClick: () => op.onPasskey?.(),
+            }, 'Use a passkey on this computer') : null,
+        );
+    }
+
+    private startOperationApproval(): void {
+        const op = this.cfg.operationApproval!;
+        this.method = 'wallet';
+        this.state = 'approve-waiting';
+        this.render();
+        op.wait().then(
+            () => this.complete(),
+            (err: unknown) => {
+                this.state = 'error';
+                this.errorMsg = (err as Error)?.message ?? 'The approval was not completed.';
+                this.render();
+            },
         );
     }
 
@@ -2091,7 +2171,8 @@ export class AuthUI {
             // badge: the user already saw the verification in the wallet.
             el('div', { className: 'success-icon', html: ICON_CHECK_CIRCLE }),
             el('div', { className: 'success-title' },
-                this.cfg.approveFlow ? 'Approved on Privasys ID' : `Authenticated via ${methodLabel}`),
+                this.cfg.operationApproval ? 'Approved'
+                    : this.cfg.approveFlow ? 'Approved on Privasys ID' : `Authenticated via ${methodLabel}`),
             showTrust ? el('div', { style: 'width: 100%;' },
                 el('p', { style: 'font-size: 14px; font-weight: 500; margin-bottom: 6px;' },
                     'Trust this device?',
@@ -2117,12 +2198,29 @@ export class AuthUI {
                     onClick: () => this.finishWithTrust(false),
                 }, 'Not now'),
             ) : el('div', { className: 'footer' },
-                'Your session is ready. This dialog will close automatically.',
+                this.cfg.operationApproval
+                    ? 'Your terminal continues on its own. You can close this tab.'
+                    : 'Your session is ready. This dialog will close automatically.',
             ),
         );
     }
 
     private renderError(): HTMLElement {
+        // An operation to approve: try again only waits again, which helps
+        // when the wait gave up while the approval is still open.
+        if (this.cfg.operationApproval) {
+            return el('div', null,
+                el('div', { className: 'error-icon', html: ICON_X_CIRCLE }),
+                el('div', { className: 'error-title' }, 'Approval not completed'),
+                el('div', { className: 'error-msg' }, this.errorMsg || 'The approval was not completed.'),
+                el('button', { className: 'btn-retry', onClick: () => {
+                    this.errorMsg = '';
+                    this.startOperationApproval();
+                } },
+                    'Try again',
+                ),
+            );
+        }
         // Approve-only flow: retry re-sends the push; there is no idle menu
         // to return to (this instance has no ceremony wiring), so the escape
         // hatch hands control back to the host for a full sign-in.

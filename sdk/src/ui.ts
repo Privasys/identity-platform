@@ -1033,14 +1033,47 @@ function walletSchemeUrl(qrPayload: string): string {
     return qrPayload.replace(/^https:\/\/privasys\.id\//, 'privasys-wallet://');
 }
 
+/** The logo's side as a share of a QR code's, quiet zone excluded. */
+const QR_LOGO_SHARE = 0.24;
+
+/**
+ * The Privasys mark on a white rounded tile, as SVG to lay over the centre
+ * of a QR code. The tile gives the mark a clear edge against the modules;
+ * the mark's own ids differ from ICON_LOGO's, which shares pages with it.
+ */
+function qrLogoSvg(x: number, y: number, side: number): string {
+    const inset = side * 0.14;
+    const mark = side - inset * 2;
+    return `<g shape-rendering="geometricPrecision">`
+        + `<rect x="${x}" y="${y}" width="${side}" height="${side}" rx="${side * 0.18}" fill="#fff"/>`
+        + `<svg x="${x + inset}" y="${y + inset}" width="${mark}" height="${mark}" viewBox="0 0 500 500">`
+        + '<defs><linearGradient id="qrpg" y2="1"><stop offset="21%" stop-color="#34E89E"/><stop offset="42%" stop-color="#12B06E"/></linearGradient>'
+        + '<linearGradient id="qrpb" x1="1" y1="1" x2="0" y2="0"><stop offset="21%" stop-color="#00BCF2"/><stop offset="42%" stop-color="#00A0EB"/></linearGradient></defs>'
+        + '<path d="M100 0H450L0 450V100A100 100 0 0 1 100 0Z" fill="url(#qrpg)"/>'
+        + '<path d="M500 50V400A100 100 0 0 1 400 500H50L500 50Z" fill="url(#qrpb)"/>'
+        + '<polygon fill="#fff" points="0,500 50,500 500,50 500,0"/></svg></g>';
+}
+
+/**
+ * A QR code with the Privasys logo in its centre. The code is made at the
+ * highest error-correction level (H, up to 30% recovered), so the modules
+ * under the logo are read back from the rest.
+ */
 function renderQRSvg(payload: string): string {
     try {
-        const qr = qrcode(0, 'M');
+        const qr = qrcode(0, 'H');
         qr.addData(payload);
         qr.make();
         const count = qr.getModuleCount();
         const cellSize = Math.max(3, Math.floor(200 / count));
-        return qr.createSvgTag({ cellSize, margin: 4, scalable: true });
+        const margin = 4;
+        const side = count * cellSize;
+        const logo = side * QR_LOGO_SHARE;
+        const at = margin + (side - logo) / 2;
+        const svg = qr.createSvgTag({ cellSize, margin, scalable: true });
+        const end = svg.lastIndexOf('</svg>');
+        if (end < 0) return svg;
+        return svg.slice(0, end) + qrLogoSvg(at, at, logo) + svg.slice(end);
     } catch {
         return `<div style="padding:16px;font-size:11px;word-break:break-all">${payload}</div>`;
     }

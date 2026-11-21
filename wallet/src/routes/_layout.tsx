@@ -21,7 +21,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useConsentStore } from '@/stores/consent';
 import { useDependencyApprovalsStore } from '@/stores/dependency-approvals';
 import { useProfileStore } from '@/stores/profile';
-import { pullRelay, requestSync, watchProfileForDevices } from '@/services/device-sync';
+import { pullRelay, requestSync, sendIfPasskeysChanged, watchProfileForDevices } from '@/services/device-sync';
 import { syncRegistry } from '@/services/devices';
 import { migrateToThisDeviceOnly } from '@/utils/storage';
 
@@ -38,6 +38,7 @@ const DEVICE_ONLY_KEYS = [
     'privasys.identities.legacy',
 ];
 import { deletionStartup } from '@/services/account-deletion-events';
+import { installPasskeyRoot } from '@/services/website-passkeys';
 import { restoreFromAutoBackupIfEmpty, watchProfileForBackup } from '@/services/profile-backup';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useSessionsStore } from '@/stores/sessions';
@@ -139,6 +140,11 @@ export default function RootLayout() {
             // A deletion: marks still to send, the banner, and whether this
             // wallet's account (or this device) is gone.
             void deletionStartup();
+            // The passkey provider's root, from the seed, and the backed-up
+            // website passkeys this device made since it last told the others.
+            void installPasskeyRoot(useProfileStore.getState().profile?.pairwiseSeed)
+                .then(() => sendIfPasskeysChanged())
+                .catch((e: any) => console.warn('[website-passkeys] start-up:', e?.message ?? e));
         }));
     }, []);
 

@@ -58,7 +58,7 @@ export default function DevicesScreen() {
         });
 
     const confirmRevoke = (d: RegistryDevice) =>
-        Alert.alert(t('devices.revokeTitle', { name: d.name }), t('devices.revokeBody'), [
+        Alert.alert(t('devices.revokeTitle', { name: d.name }), `${t('devices.revokeBody')}\n\n${t('devices.revokeOtherPasskeys')}`, [
             { text: t('common.cancel'), style: 'cancel' },
             {
                 text: t('devices.revokeConfirm'),

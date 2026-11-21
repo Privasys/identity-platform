@@ -44,6 +44,7 @@
  */
 
 import { clearAccountDeletionLocalState } from '@/services/account-deletion';
+import { clearPasskeyRoot } from '@/services/website-passkeys';
 import { deleteDeviceKey } from '@/services/did';
 import { clearKycRecords } from '@/services/kyc';
 import { clearGrantsIndexLocalState } from '@/services/grants-index';
@@ -134,6 +135,9 @@ export async function wipeWallet(): Promise<void> {
         settle('device sync', clearDeviceSyncLocalState()),
         settle('device flows', clearDeviceFlowsLocalState()),
         settle('account deletion', clearAccountDeletionLocalState()),
+        // The passkey provider's root for website passkeys backed up to the
+        // holder's devices: without it this device can no longer derive them.
+        settle('website passkey root', clearPasskeyRoot()),
         // The automatic copy of the profile goes too: the phone's own backup
         // must not carry the last identity's details to the next one.
         settle('profile backup', clearProfileBackupLocalState()),

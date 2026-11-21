@@ -20,6 +20,7 @@ import { Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { removeThisPhone } from '@/services/device-flows';
+import { localWebsitePasskeyCount } from '@/services/website-passkeys';
 import { wipeWallet } from '@/services/wipe';
 
 /** privasys.id could not be reached: the wallet's own network error, or fetch's. */
@@ -66,11 +67,21 @@ export function useRemoveThisDevice(): { confirm: () => void; busy: boolean } {
         }
     };
 
+    // The website passkeys kept on this device only are lost with it: said with
+    // their number, and only when there are any. Backed-up ones live on.
     const confirm = () =>
-        Alert.alert(t('devices.removeThisTitle'), `${t('devices.removeThisBody')}\n\n${t('devices.removeThisPasskeys')}`, [
-            { text: t('common.cancel'), style: 'cancel' },
-            { text: t('devices.removeThisConfirm'), style: 'destructive', onPress: () => void remove() },
-        ]);
+        void localWebsitePasskeyCount().then((n) =>
+            Alert.alert(
+                t('devices.removeThisTitle'),
+                n > 0
+                    ? `${t('devices.removeThisBody')}\n\n${t('devices.removeThisPasskeysCount', { count: n })}`
+                    : t('devices.removeThisBody'),
+                [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('devices.removeThisConfirm'), style: 'destructive', onPress: () => void remove() },
+                ],
+            ),
+        );
 
     return { confirm, busy };
 }

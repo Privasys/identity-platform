@@ -28,6 +28,7 @@ jest.mock('@/utils/storage', () => {
     };
 });
 jest.mock('@/services/kyc', () => ({ loadKycRecords: async () => [], saveKycRecord: async () => undefined }));
+jest.mock('@/services/website-passkeys', () => ({ syncedWebsitePasskeys: async () => [], importSyncedWebsitePasskeys: async () => 0 }));
 jest.mock('expo-device', () => ({ modelName: 'Test Phone' }));
 jest.mock('@/services/sovereign', () => ({
     ensureDataRoot: jest.fn(async () => new Uint8Array(32).fill(9)),

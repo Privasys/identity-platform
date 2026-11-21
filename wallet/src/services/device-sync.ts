@@ -28,6 +28,7 @@ import * as Crypto from 'expo-crypto';
 
 import { deviceTagFor, ensureDevice, localRegistry, mainAccountUserId, relayAddressFor, type RegistryDevice } from '@/services/devices';
 import { loadKycRecords, saveKycRecord, type KycRecord } from '@/services/kyc';
+import { importSyncedWebsitePasskeys, syncedWebsitePasskeys, type WebsitePasskey } from '@/services/website-passkeys';
 import { peekDataRoot } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore, type UserProfile } from '@/stores/profile';
@@ -45,7 +46,16 @@ const utf8 = (s: string) => new TextEncoder().encode(s);
 type SyncedProfile = Omit<UserProfile, 'pairwiseSeed' | 'did'>;
 
 export type RelayMessage =
-    | { kind: 'profile'; id: string; from: string; at: number; profile: SyncedProfile; kycRecords: KycRecord[] }
+    | {
+          kind: 'profile';
+          id: string;
+          from: string;
+          at: number;
+          profile: SyncedProfile;
+          kycRecords: KycRecord[];
+          /** Website passkeys backed up to the holder's devices (their records; the keys are derived). */
+          websitePasskeys?: WebsitePasskey[];
+      }
     | { kind: 'ack'; id: string; from: string }
     | { kind: 'sync-request'; id: string; from: string };
 
@@ -146,6 +156,7 @@ export async function sendProfile(): Promise<void> {
         at: profile.updatedAt,
         profile: rest,
         kycRecords: await loadKycRecords(),
+        websitePasskeys: await syncedWebsitePasskeys(),
     };
     await SecureStore.setItemAsync(OUTBOX_KEY, JSON.stringify({ message, pending: to.map((d) => d.id) } satisfies Outbox));
     await post(root, to, message);
@@ -217,6 +228,9 @@ async function applyProfile(m: Extract<RelayMessage, { kind: 'profile' }>): Prom
         if (m.at > store.profile.updatedAt) store.applySyncedProfile(m.profile);
         const held = new Set((await loadKycRecords()).map((r) => r.jti));
         for (const r of m.kycRecords ?? []) if (!held.has(r.jti)) await saveKycRecord(r);
+        // Website passkeys another device backed up: this one can derive their
+        // keys, so it takes their records and offers them to the system.
+        await importSyncedWebsitePasskeys(m.websitePasskeys);
     } finally {
         applying = false;
     }
@@ -233,6 +247,21 @@ export async function requestSync(): Promise<void> {
 let watching = false;
 
 /** Send the profile a few seconds after it last changed on this phone. Called once at start-up. */
+const PASSKEYS_SENT_KEY = 'privasys.devices.passkeys-sent';
+
+/**
+ * A website passkey made in the passkey provider changes no profile, so the
+ * usual trigger misses it: at start-up, send the profile again when the list
+ * of backed-up passkeys is not the one last sent.
+ */
+export async function sendIfPasskeysChanged(): Promise<void> {
+    const list = await syncedWebsitePasskeys();
+    const digest = bytesToBase64url(sha256(new TextEncoder().encode(JSON.stringify(list.map((p) => `${p.rpId} ${p.credentialId}`).sort()))));
+    if ((await SecureStore.getItemAsync(PASSKEYS_SENT_KEY)) === digest) return;
+    await sendProfile();
+    await SecureStore.setItemAsync(PASSKEYS_SENT_KEY, digest);
+}
+
 export function watchProfileForDevices(): void {
     if (watching) return;
     watching = true;
@@ -250,4 +279,5 @@ export function watchProfileForDevices(): void {
 export async function clearDeviceSyncLocalState(): Promise<void> {
     await SecureStore.deleteItemAsync(OUTBOX_KEY);
     await SecureStore.deleteItemAsync(SEEN_KEY);
+    await SecureStore.deleteItemAsync(PASSKEYS_SENT_KEY);
 }

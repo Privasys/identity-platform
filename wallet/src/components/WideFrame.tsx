@@ -5,8 +5,8 @@
  * The wallet on a wide window: tablets, and unfolded phones (iPhone Duo,
  * Android foldables). From WIDE_MIN_WIDTH a sidebar takes the tab bar's place
  * and the green header band goes; from TWO_PANE_MIN_WIDTH Access and Settings
- * show their list and the open item side by side (Drive does the same inside
- * its own screen). Tasks, which ask one thing at a time, are a centred sheet.
+ * show the open item beside a narrowed list (Drive does the same inside its
+ * own screen); with nothing open, the list has the window to itself. Tasks, which ask one thing at a time, are a centred sheet.
  *
  * The root stack wraps every screen in this frame (its screenLayout), so the
  * routes stay as they are: a list item still pushes its route, and the frame
@@ -30,6 +30,7 @@ import { useAppMessagesStore } from '@/stores/app-messages';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
+import { profileDisplayName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 
@@ -83,6 +84,11 @@ const SHEET_MAX_HEIGHT = 820;
 
 const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
 
+/** The side padding that centres a column of readable width in a pane this wide. */
+export function readableGutter(width: number): number {
+    return Math.max(0, Math.floor((width - READABLE_WIDTH) / 2));
+}
+
 /** Whether the window shows the sidebar: wide, and the wallet set up (before
  *  that, onboarding keeps the centred column of a large screen). */
 export function useSidebarLayout(): boolean {
@@ -112,6 +118,7 @@ export function WideFrame({ routeName, children }: { routeName: string; children
     const { width } = useWindowDimensions();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
+    const router = useRouter();
 
     // The phone layout, and the wallet before it has a profile (onboarding
     // asks one thing at a time and has nowhere to go yet).
@@ -141,13 +148,14 @@ export function WideFrame({ routeName, children }: { routeName: string; children
                 </View>
             );
         }
+        // Nothing open yet: the list has the window, in a column of
+        // readable width. It narrows when an item opens beside it.
         return (
             <View style={styles.row}>
                 {side}
-                <PaneContext.Provider value={{ kind: 'list', width: LIST_WIDTH, twoPane }}>
-                    <View style={[styles.list, { width: LIST_WIDTH }]}>{children}</View>
+                <PaneContext.Provider value={{ kind: 'list', width: Math.min(rest, READABLE_WIDTH), twoPane }}>
+                    <View style={[styles.fill, { paddingHorizontal: readableGutter(rest) }]}>{children}</View>
                 </PaneContext.Provider>
-                <ChooseItem />
             </View>
         );
     }
@@ -163,7 +171,14 @@ export function WideFrame({ routeName, children }: { routeName: string; children
                         <List />
                     </View>
                 </PaneContext.Provider>
-                <PaneContext.Provider value={{ kind: 'detail', width: rest - LIST_WIDTH, twoPane }}>
+                <PaneContext.Provider
+                    value={{
+                        kind: 'detail',
+                        width: rest - LIST_WIDTH,
+                        twoPane,
+                        close: () => (router.canGoBack() ? router.back() : router.replace(`/${section}` as never)),
+                    }}
+                >
                     <View style={styles.fill}>{children}</View>
                 </PaneContext.Provider>
             </View>
@@ -171,10 +186,10 @@ export function WideFrame({ routeName, children }: { routeName: string; children
     }
 
     // A screen of its own: Profile, and anything opened without a list
-    // beside it. Profile lays itself out in columns; the rest keep a column
-    // of readable width.
-    const pane: Pane = { kind: 'page', width: rest, twoPane };
-    const gutter = routeName === '(tabs)' ? 0 : Math.max(0, Math.floor((rest - READABLE_WIDTH) / 2));
+    // beside it. One column of readable width: a long page scrolls, it never
+    // spills into a second column.
+    const pane: Pane = { kind: 'page', width: Math.min(rest, READABLE_WIDTH), twoPane };
+    const gutter = readableGutter(rest);
     return (
         <View style={styles.row}>
             {side}
@@ -225,7 +240,7 @@ function Sidebar({ active, width, styles }: { active: Section; width: number; st
                     )}
                     <View style={styles.fill}>
                         <Text style={styles.whoName} numberOfLines={1}>
-                            {profile.displayName}
+                            {profileDisplayName(profile, t('profile.defaultDisplayName'))}
                         </Text>
                         {!!profile.email && (
                             <Text style={styles.whoSub} numberOfLines={1}>
@@ -267,19 +282,6 @@ function Sidebar({ active, width, styles }: { active: Section; width: number; st
                 <Ionicons name="qr-code-outline" size={20} color="#FFFFFF" />
                 <Text style={styles.scanText}>{t('home.scanQrCode')}</Text>
             </Pressable>
-        </View>
-    );
-}
-
-/** What an empty detail pane shows: nothing is open yet. */
-export function ChooseItem() {
-    const { t } = useTranslation();
-    const p = usePalette();
-    const styles = useMemo(() => makeStyles(p), [p]);
-    return (
-        <View style={[styles.fill, styles.choose]}>
-            <Ionicons name="albums-outline" size={40} color={p.textMuted} />
-            <Text style={styles.chooseText}>{t('tabs.chooseItem')}</Text>
         </View>
     );
 }
@@ -359,8 +361,6 @@ const makeStyles = (p: Palette) =>
             backgroundColor: p.action,
         },
         scanText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
-        choose: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
-        chooseText: { fontSize: 16, color: p.textSecondary, textAlign: 'center' },
         backdrop: {
             flex: 1,
             backgroundColor: 'rgba(15,23,42,0.45)',

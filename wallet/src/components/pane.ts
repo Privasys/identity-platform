@@ -24,6 +24,9 @@ export interface Pane {
     width: number;
     /** Whether a list has its detail beside it (a wide enough window). */
     twoPane: boolean;
+    /** For the item open beside its list: closes it, so the list has the
+     *  window again. */
+    close?: () => void;
 }
 
 export const PaneContext = createContext<Pane | null>(null);

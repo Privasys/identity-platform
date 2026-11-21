@@ -7,9 +7,10 @@
  * optional right-hand action. Screens render their own header because the root
  * Stack runs with headerShown:false.
  *
- * On a wide window (components/WideFrame) the band goes: a list or the item
- * open beside it is headed by its title alone, with nothing to go back to;
- * a screen of its own or a task keeps a back button, in the action blue.
+ * On a wide window (components/WideFrame) the band goes: a list is headed by
+ * its title alone; the item open beside it has a close button, which gives the
+ * list the window again; a screen of its own or a task keeps a back button, in
+ * the action blue.
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -21,8 +22,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { HeaderBleed } from '@/components/HeaderBleed';
 import { usePane } from '@/components/pane';
+import { useTranslation } from 'react-i18next';
 
 export function SubPageHeader({ title, right }: { title: string; right?: ReactNode }) {
+    const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const insets = useSafeAreaInsets();
@@ -46,6 +49,18 @@ export function SubPageHeader({ title, right }: { title: string; right?: ReactNo
                     {title}
                 </Text>
                 <RNView style={styles.plainRight}>{right}</RNView>
+                {pane.kind === 'detail' && pane.close && (
+                    <Pressable
+                        onPress={pane.close}
+                        style={styles.plainClose}
+                        hitSlop={10}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('common.close')}
+                        testID="pane-close"
+                    >
+                        <Ionicons name="close" size={22} color={p.textSecondary} />
+                    </Pressable>
+                )}
             </RNView>
         );
     }
@@ -87,4 +102,12 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     plainTitle: { flex: 1, fontSize: 22, fontWeight: '700', color: p.textPrimary },
     plainTitleBig: { flex: 1, fontSize: 30, fontWeight: '700', color: p.textPrimary, letterSpacing: -0.5 },
     plainRight: { minWidth: 36, alignItems: 'flex-end' },
+    plainClose: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: p.card,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 });

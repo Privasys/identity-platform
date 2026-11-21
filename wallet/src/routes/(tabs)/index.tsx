@@ -51,11 +51,9 @@ import { TabHeader } from '@/components/TabHeader';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
-    // A wide window gives Profile two columns: who the holder is and their
-    // data on the left, their files, recovery and the rest on the right.
+    // On a wide window Profile is one column of readable width, beside the
+    // sidebar (components/WideFrame): a long page scrolls.
     const pane = usePane();
-    const twoColumns = !!pane && pane.width >= PROFILE_TWO_COLUMNS;
-    const column = twoColumns ? { flex: 1, minWidth: 0 } : undefined;
     const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
@@ -366,8 +364,6 @@ export default function ProfileScreen() {
                 contentContainerStyle={[styles.scrollContent, pane ? null : { paddingTop: insets.top + 12 }]}
                 showsVerticalScrollIndicator={false}
             >
-                <RNView style={twoColumns ? styles.columns : undefined}>
-                <RNView style={column}>
                 <IdentityCard
                     name={shownName}
                     email={profile.email}
@@ -474,8 +470,6 @@ export default function ProfileScreen() {
                     </RNView>
                 </Pressable>
 
-                </RNView>
-                <RNView style={column}>
                 {/* Drive: the holder's files, which is their data too. It was a
                     tab; one row here is all it needs. */}
                 {/* A wide window has Drive in its sidebar. */}
@@ -630,15 +624,12 @@ export default function ProfileScreen() {
                         <Text style={styles.dangerButtonText}>{t('profile.clearAllData')}</Text>
                     </Pressable>
                 </RNView>
-                </RNView>
-                </RNView>
             </ScrollView>
         </RNView>
     );
 }
 
 /** The room Profile needs for two columns. */
-const PROFILE_TWO_COLUMNS = 900;
 
 const makeStyles = (p: Palette) => StyleSheet.create({
     screen: { flex: 1, backgroundColor: p.screenBg },
@@ -657,7 +648,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     },
     scrollView: { flex: 1 },
     scrollContent: { padding: 20, paddingBottom: 40 },
-    columns: { flexDirection: 'row', alignItems: 'flex-start', gap: 32, maxWidth: 1120 },
     emptyState: {
         flex: 1,
         alignItems: 'center',

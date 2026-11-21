@@ -281,9 +281,21 @@ func (h *Handler) HandleEnrolIdentity(w http.ResponseWriter, r *http.Request) {
 // --- revocation ---
 
 func (h *Handler) revoke(userID, deviceTag, keep string) ([]string, error) {
+	// Read before the removal deletes them: where to tell the phone it was
+	// removed. ("All other phones", after a phrase recovery, names no single
+	// phone; those learn it from the tombstone when they next start.)
+	var targets []store.PushTarget
+	if deviceTag != store.AllOtherDevices {
+		targets = h.db.GetDevicePushTargets(userID, deviceTag)
+	}
 	ids, err := h.db.RevokeDevice(userID, deviceTag, keep)
 	if err != nil {
 		return nil, err
+	}
+	if len(ids) > 0 {
+		for _, t := range targets {
+			go h.tellRemoved(userID, t.Token)
+		}
 	}
 	if len(ids) > 0 && h.endSessions != nil {
 		h.endSessions(ids)
@@ -294,6 +306,16 @@ func (h *Handler) revoke(userID, deviceTag, keep string) ([]string, error) {
 	// one tap per site, through the SDK's signed-out recovery.
 	if len(ids) > 0 && h.revokeSealedSessions != nil {
 		h.revokeSealedSessions(userID)
+	}
+	// The removed phone is told it was removed the next time it asks
+	// (GET /account-deletion/tombstone answers 410 device_removed), so a
+	// genuine wallet clears itself even if it missed every push. One keyed
+	// row per passkey, nothing linking them. Best effort: the removal itself
+	// has already happened.
+	if len(ids) > 0 && h.tombstoneKey != nil {
+		if err := h.db.AddTombstones(h.tombstoneKey, ids, store.TombstoneDeviceRemoved, time.Now()); err != nil {
+			log.Printf("[devices] tombstone removed passkeys: %v", err)
+		}
 	}
 	log.Printf("[devices] revoked %d passkey(s) of one phone on %s…", len(ids), userID[:min(8, len(userID))])
 	return ids, nil
@@ -545,6 +567,17 @@ func (h *Handler) HandlePostRelay(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSONStatus(w, http.StatusOK, map[string]string{"status": "relayed"})
+}
+
+// tellRemoved sends a silent push to a phone just removed from the account.
+// It carries only its type: the wallet asks privasys.id (the tombstone) before
+// clearing anything, so a forged push cannot clear a wallet.
+func (h *Handler) tellRemoved(account, token string) {
+	if err := push.Notify(context.Background(), h.db, account, push.Message{
+		Token: token, Background: true, Data: map[string]string{"type": "device-removed"},
+	}); err != nil {
+		log.Printf("[devices] tell removed: %v", err)
+	}
 }
 
 // wake sends a silent push to one phone of an account, telling it to read the

@@ -522,6 +522,7 @@ func main() {
 	mux.HandleFunc("POST /wallet/email/verify/begin", emailVerify.HandleBegin)
 	mux.HandleFunc("POST /wallet/email/verify/complete", emailVerify.HandleComplete)
 	recoveryHandler.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
+	recoveryHandler.SetTombstoneKey(issuer.DeriveSecret("credential-tombstone"))
 	recoveryHandler.SetWalletSessionEnder(fido2Handler.WalletSessionEnder())
 	recoveryHandler.SetSessionCredential(fido2Handler.SessionCredential)
 	recoveryHandler.SetSealedSessionRevoker(func(userID string) {

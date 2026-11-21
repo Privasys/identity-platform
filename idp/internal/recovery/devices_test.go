@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Privasys/idp/internal/store"
 )
@@ -342,5 +343,27 @@ func TestDeviceMessagesMatchTheWallet(t *testing.T) {
 	}
 	if got := hex.EncodeToString(IdentityRevokeMessage("user-1", c, "tag", "newpub")); got != "70726976617379732d6964656e746974792d7265766f6b652f763100757365722d31000102030400746167006e6577707562" {
 		t.Fatalf("revoke message: %s", got)
+	}
+}
+
+// A removed phone is told so the next time it asks: its passkeys are
+// tombstoned as device_removed, and the phone that stays is not.
+func TestRevokedPhoneIsTombstoned(t *testing.T) {
+	h, db, mux := devicesTestHandler(t)
+	key := []byte("tombstone-key")
+	h.SetTombstoneKey(key)
+	h.SetSessionCredential(func(string) string { return "cred-a" })
+	addCredential(t, db, "bob", "cred-a", "")
+	addCredential(t, db, "bob", "cred-b", tagB)
+
+	rec := call(mux, "POST", "/devices/revoke", `{"device_tag":"`+tagB+`"}`, "wallet:bob")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("revoke: %d %s", rec.Code, rec.Body)
+	}
+	if got := db.TombstoneReason(key, "cred-b", time.Now()); got != store.TombstoneDeviceRemoved {
+		t.Fatalf("removed passkey tombstone = %q, want %q", got, store.TombstoneDeviceRemoved)
+	}
+	if got := db.TombstoneReason(key, "cred-a", time.Now()); got != "" {
+		t.Fatalf("the phone that stays is tombstoned: %q", got)
 	}
 }

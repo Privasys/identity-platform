@@ -40,7 +40,14 @@ type Handler struct {
 	// (internal/sessions): the sessions a removed or replaced phone approved
 	// must not outlive it on their vouchers.
 	revokeSealedSessions func(userID string)
+	// tombstoneKey keys the credential tombstones a removed phone's
+	// passkeys are recorded under (store.AddTombstones).
+	tombstoneKey []byte
 }
+
+// SetTombstoneKey wires the key credential tombstones are kept under, the
+// same one account deletion uses, so a removed phone learns it was removed.
+func (h *Handler) SetTombstoneKey(key []byte) { h.tombstoneKey = key }
 
 // SetSealedSessionRevoker wires the sessions store's revoke-all, run when a
 // phone is removed from an account and when a recovery completes.

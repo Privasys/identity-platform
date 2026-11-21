@@ -47,10 +47,16 @@
   .qr-sep::before, .qr-sep::after { content:""; flex:1; height:1px; background:var(--line); }
   .qr-frame { width:200px; max-width:70%; margin:0 auto; background:#fff; padding:12px; border-radius:12px; }
   .qr-frame svg { display:block; width:100%; height:auto; }
+  /* The shared sign-in gate fills the page; "deny" stays reachable over it. */
+  #gate { position:fixed; inset:0; background:#fff; z-index:10; }
+  #gateDeny { position:fixed; left:24px; bottom:18px; z-index:20; width:auto; margin:0; padding:6px 10px;
+              background:#fff; color:#b91c1c; border-radius:8px; font-size:14px; }
 </style>
 </head>
 <body>
-<div class="card">
+<div id="gate" class="hidden"></div>
+<button class="btn btn-deny hidden" id="gateDeny">Not me, deny</button>
+<div class="card" id="card">
   <div class="logo">Privasys ID</div>
 
   <!-- Step 1: enter code (shown only when no user_code in URL) -->
@@ -523,7 +529,81 @@ var PrivasysQR = (function () {
 
   function norm(c) { return (c || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
 
+  // The shared sign-in gate, run on this request: the same view every app
+  // signs in with. It shows the app that asked, sends a notification to the
+  // wallet this browser knows or shows the QR code when it knows none, and
+  // the wallet approves this very request, so the device gets the app's own
+  // consent and what it asked for. The card below stays as the fallback when
+  // the gate cannot open.
+  var gate = null;
+  var approvedAt = 0;
+  var done = false;
+
+  function closeGate() {
+    $("gate").classList.add("hidden");
+    $("gateDeny").classList.add("hidden");
+    $("card").classList.remove("hidden");
+    var g = gate;
+    gate = null;
+    if (g) { try { g.cancel(); } catch (e) { /* already closed */ } }
+  }
+
+  function openGate(d) {
+    if (!window.Privasys || !Privasys.AuthFrame || !d.qr_payload) return false;
+    var name = d.client_name || "An application";
+    var shown = userCode.length === 8 ? userCode.slice(0, 4) + "-" + userCode.slice(4) : userCode;
+    var bullets = ["The code on your device is " + shown + ". Continue only if it matches."];
+    var scopes = (d.scope || "").split(/\s+/).filter(function (x) { return x && x.indexOf("audience:") !== 0; });
+    if (scopes.length) bullets.push("It asks for: " + scopes.join(", "));
+    if (d.requested_by) {
+      bullets.push("Requested by “" + String(d.requested_by).slice(0, 80) +
+        "”. Approving lets it act as you until you revoke it in your wallet.");
+    }
+    try {
+      gate = new Privasys.AuthFrame({
+        apiBase: "https://api.developer.privasys.org",
+        appName: name,
+        rpId: "privasys.id",
+        deviceRequest: { userCode: userCode },
+        presentation: "page",
+        container: $("gate"),
+        pitch: {
+          title: "Authorize sign-in",
+          description: name + " wants to sign in to your Privasys account from another device.",
+          bullets: bullets
+        }
+      });
+    } catch (e) { gate = null; return false; }
+    $("card").classList.add("hidden");
+    $("gate").classList.remove("hidden");
+    $("gateDeny").classList.remove("hidden");
+    var mine = gate;
+    mine.signIn().then(function (res) {
+      if (gate !== mine || done) return;
+      if (res && res.approved) {
+        finish(true, "Approved ✓", "You can return to your device. This page can be closed.");
+      } else {
+        closeGate();
+        renderConsent(d);
+      }
+    }).catch(function (e) {
+      if (gate !== mine || done) return;
+      closeGate();
+      renderConsent(d);
+      var msg = (e && e.message) || "";
+      if (msg && msg !== "Authentication cancelled") {
+        $("status").className = "status err";
+        $("status").textContent = msg;
+      }
+    });
+    return true;
+  }
+
+  $("gateDeny").addEventListener("click", function () { $("denyBtn").click(); });
+
   function finish(ok, title, msg) {
+    done = true;
+    closeGate();
     if (pollTimer) clearInterval(pollTimer);
     $("resultTitle").textContent = title;
     $("resultTitle").className = ok ? "ok" : "err";
@@ -582,7 +662,17 @@ var PrivasysQR = (function () {
     pollTimer = setInterval(async function () {
       try {
         var d = await lookup();
-        if (d.status === "approved") finish(true, "Approved ✓", "You can return to your terminal. This page can be closed.");
+        if (d.status === "approved") {
+          // While the gate is open it reports the approval itself, once it
+          // has handed over what the wallet shared: closing it on the first
+          // sign of approval would cut that short. It gets a moment, which
+          // also covers an approval given elsewhere (the terminal's QR code).
+          if (gate) {
+            if (!approvedAt) approvedAt = Date.now();
+            if (Date.now() - approvedAt < 15000) return;
+          }
+          finish(true, "Approved ✓", "You can return to your terminal. This page can be closed.");
+        }
         else if (d.status === "denied") finish(false, "Request denied", "The sign-in request was rejected.");
       } catch (e) { finish(false, "Expired", e.message); }
     }, 2500);
@@ -647,7 +737,8 @@ var PrivasysQR = (function () {
       var d = await lookup();
       if (d.status === "approved") return finish(true, "Already approved ✓", "You can return to your terminal.");
       if (d.status === "denied") return finish(false, "Request denied", "This request was rejected.");
-      renderConsent(d);
+      if (openGate(d)) startPolling();
+      else renderConsent(d);
     } catch (e) {
       if (params.get("user_code")) { show("enter"); $("enterErr").textContent = e.message; }
       else { $("enterErr").textContent = e.message; }

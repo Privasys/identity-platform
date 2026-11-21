@@ -20,7 +20,10 @@
  * real eMRTD chip data here without changing this interface.
  */
 
+import { p256 } from '@noble/curves/nist.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import * as Crypto from 'expo-crypto';
+import { deriveHolderKey } from '@/services/holder-keys';
 
 import { getAttestationServerToken } from '@/services/app-attest';
 import {
@@ -183,6 +186,12 @@ export interface KycRecord {
      *  the enclave can match a FRESH selfie against this document's photo.
      *  Absent on records that predate presence support (re-verify to enable). */
     dg2?: string;
+    /** The salt of the holder commitment in the IVR (base64url), so any device
+     *  of the holder can have it rebound to itself. Absent on IVRs issued
+     *  before holder commitments (Identity Verifier < 0.7.0). */
+    holderSalt?: string;
+    /** The device key (base64url SEC1) this copy of the IVR is bound to. */
+    boundHolderPub?: string;
 }
 
 export interface VerifyIdentityResult {
@@ -581,12 +590,20 @@ export async function verifyIdentity(
     // fleet enforces it).
     await ensureWia().catch(() => undefined);
 
+    // The holder key (the same on every device of the holder) signs the device
+    // key, so the IVR carries a holder commitment as well as the device
+    // binding, and any of the holder's devices can have it rebound later.
+    const holder = identityHolderBlock(
+        new TextEncoder().encode(canonicalJson({ holder_pub: holderPub, op: 'verify_identity' })),
+    );
+
     const resp = await postToVerifier<{
         ivr: string;
         salts: Record<string, string>;
         fields: Record<string, string>;
     }>('/verify-identity', {
         holder_pub: holderPub,
+        holder: holder.block,
         fields: doc.fields,
         // The enclave certifies from the raw chip bytes (SOD + DGs); it runs
         // Passive Authentication against the configured CSCA trust anchors and
@@ -616,7 +633,9 @@ export async function verifyIdentity(
         verifiedAt: Math.floor(Date.now() / 1000),
         // Keep the DG2 the enclave committed to (salts.picture_dg2), so a
         // later /prove/presence can re-open the portrait commitment.
-        ...(doc.dataGroups?.['2'] ? { dg2: doc.dataGroups['2'] } : {})
+        ...(doc.dataGroups?.['2'] ? { dg2: doc.dataGroups['2'] } : {}),
+        holderSalt: holder.salt,
+        boundHolderPub: holderPub,
     };
     await saveKycRecord(record);
 
@@ -795,7 +814,70 @@ async function buildSignedBase(
 async function requireRecord(): Promise<KycRecord> {
     const record = await getLatestKycRecord();
     if (!record) throw new Error('No verified identity on file. Verify your ID first.');
-    return record;
+    return ivrForThisDevice(record);
+}
+
+// ── Holder key and rebinding (Identity Verifier >= 0.7.0) ──────────────────
+
+/** The holder block for the Identity Verifier: its own key, derived from the
+ *  seed (services/holder-keys), a salt, and that key's signature over msg. */
+function identityHolderBlock(msg: Uint8Array, salt?: string): { block: { hk_pub: string; salt: string; sig: string }; salt: string } {
+    const seed = useProfileStore.getState().profile?.pairwiseSeed;
+    if (!seed) throw new Error('Profile is not initialised');
+    const s = salt ?? b64uBytes(Crypto.getRandomBytes(16));
+    const { secretKey, publicKey } = deriveHolderKey(seed, 'identity');
+    return { block: { hk_pub: b64uBytes(publicKey), salt: s, sig: b64uBytes(p256.sign(msg, secretKey)) }, salt: s };
+}
+
+/** The device binding an IVR names: base64url(SHA-256(SEC1 device key)). */
+function ivrBinding(ivr: string): string | undefined {
+    try {
+        const payload = JSON.parse(new TextDecoder().decode(b64uToBytes(ivr.split('.')[1] ?? '')));
+        return typeof payload?.holder_binding === 'string' ? payload.holder_binding : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * The IVR, bound to this device. Device sync copies an IVR to the holder's
+ * other devices, where the key it is bound to does not exist. The Identity
+ * Verifier re-issues it for this device when the holder key opens its
+ * commitment (nothing is re-checked). An IVR from before holder commitments is
+ * upgraded once, on the device it is bound to, which signs as the legacy key;
+ * elsewhere it cannot be rebound and the ID has to be checked again there.
+ *
+ * Runs only when a disclosure is about to be made, inside its biometric grace,
+ * so it adds no prompt of its own.
+ */
+async function ivrForThisDevice(record: KycRecord): Promise<KycRecord> {
+    const mine = await getHolderPublicKey();
+    const mineBinding = b64uBytes(sha256(b64uToBytes(mine)));
+    const boundHere = record.boundHolderPub ? record.boundHolderPub === mine : ivrBinding(record.ivr) === mineBinding;
+    if (boundHere && record.holderSalt) return record;
+    if (!boundHere && !record.holderSalt) {
+        throw new Error('This ID check was made on another device before it could move between devices. Open Privasys Wallet on that device once, or check your ID again here.');
+    }
+
+    const { challenge } = await postToVerifier<{ challenge: string }>('/rebind-challenge', {});
+    const msg = new TextEncoder().encode(canonicalJson({ challenge, ivr: record.jti, op: 'rebind' }));
+    const holder = identityHolderBlock(msg, record.holderSalt);
+    const deviceSig = b64uBytes(derToRawEcdsa(b64uToBytes(await signWithDeviceKey(b64uBytes(msg), HOLDER_KEY_ID))));
+    const resp = await postToVerifier<{ ivr: string }>('/rebind', {
+        ivr: record.ivr,
+        challenge,
+        holder_pub: mine,
+        holder_sig: deviceSig,
+        holder: holder.block,
+        // Upgrading an IVR from before holder commitments: the device it is
+        // bound to (this one) signs once more.
+        ...(record.holderSalt ? {} : { legacy: { holder_pub: mine, holder_sig: deviceSig } }),
+    });
+    const jti = JSON.parse(new TextDecoder().decode(b64uToBytes(resp.ivr.split('.')[1] ?? ''))).jti as string;
+    const rebound: KycRecord = { ...record, jti, ivr: resp.ivr, holderSalt: holder.salt, boundHolderPub: mine };
+    const others = (await loadKycRecords()).filter((r) => r.jti !== record.jti && r.jti !== jti);
+    await SecureStore.setItemAsync(KYC_STORE_KEY, JSON.stringify([rebound, ...others]));
+    return rebound;
 }
 
 /** prove_age_over: signed "age_over_N = yes/no" without revealing the birth date. */

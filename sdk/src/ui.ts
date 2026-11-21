@@ -120,6 +120,10 @@ export interface AuthUIConfig {
          *  it will not be (declined, expired). */
         wait: () => Promise<void>;
     };
+    /** Stay open on success, showing this outcome, instead of closing: for a
+     *  page whose whole purpose was the approval (a device's sign-in, an
+     *  operation), so the person ends on the same view they approved in. */
+    finalScreen?: { title: string; message: string };
     /** Push token from a previous session. When present the UI will offer
      *  to send a push notification instead of showing a QR code. */
     pushToken?: string;
@@ -1145,6 +1149,8 @@ export class AuthUI {
     private autoFirstScreen: UIState | null = null;
     // Mobile handoff: whether the user expanded the QR ("scan with another
     // device") instead of using the Open-in-Wallet button.
+    /** The outcome is on screen for good (see AuthUIConfig.finalScreen). */
+    private finished = false;
     private showQrOnMobile = false;
     // Set when the wallet handoff visibly failed (page never lost focus
     // after the tap — the app is most likely not installed).
@@ -1206,6 +1212,7 @@ export class AuthUI {
             this.showQrOnMobile = false;
             this.walletOpenFailed = false;
             this.viaPoll = false;
+            this.finished = false;
             this.mount();
 
             if (this.cfg.operationApproval) {
@@ -1563,7 +1570,8 @@ export class AuthUI {
                         el('strong', null, 'Privasys ID'),
                     ),
                 ),
-                el('button', { className: 'gate-close', onClick: () => this.handleCancel() },
+                // Once the outcome is on screen for good there is nothing to close.
+                this.finished ? null : el('button', { className: 'gate-close', onClick: () => this.handleCancel() },
                     el('span', { className: 'gate-close-x' }, '✕'),
                     'Close',
                 ),
@@ -1993,6 +2001,7 @@ export class AuthUI {
             (err: unknown) => {
                 this.state = 'error';
                 this.errorMsg = (err as Error)?.message ?? 'The approval was not completed.';
+                this.finished = true;
                 this.render();
             },
         );
@@ -2162,7 +2171,8 @@ export class AuthUI {
         // approval (cfg.pushToken) — the device already behaves as trusted,
         // so the question is contradictory. Only first-time wallet auth
         // (QR) on an untrusted device earns the prompt.
-        const showTrust = !!this.pushToken && (!this.cfg.deviceTrusted || this.addingDevice) && !this.cfg.pushToken;
+        const showTrust = !this.finished
+            && !!this.pushToken && (!this.cfg.deviceTrusted || this.addingDevice) && !this.cfg.pushToken;
         const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
 
         return el('div', null,
@@ -2171,7 +2181,7 @@ export class AuthUI {
             // badge: the user already saw the verification in the wallet.
             el('div', { className: 'success-icon', html: ICON_CHECK_CIRCLE }),
             el('div', { className: 'success-title' },
-                this.cfg.operationApproval ? 'Approved'
+                this.cfg.finalScreen ? this.cfg.finalScreen.title
                     : this.cfg.approveFlow ? 'Approved on Privasys ID' : `Authenticated via ${methodLabel}`),
             showTrust ? el('div', { style: 'width: 100%;' },
                 el('p', { style: 'font-size: 14px; font-weight: 500; margin-bottom: 6px;' },
@@ -2198,27 +2208,21 @@ export class AuthUI {
                     onClick: () => this.finishWithTrust(false),
                 }, 'Not now'),
             ) : el('div', { className: 'footer' },
-                this.cfg.operationApproval
-                    ? 'Your terminal continues on its own. You can close this tab.'
+                this.cfg.finalScreen
+                    ? this.cfg.finalScreen.message
                     : 'Your session is ready. This dialog will close automatically.',
             ),
         );
     }
 
     private renderError(): HTMLElement {
-        // An operation to approve: try again only waits again, which helps
-        // when the wait gave up while the approval is still open.
+        // An operation that will not be approved (declined, expired): the
+        // outcome is final, and the terminal asks again if it is wanted.
         if (this.cfg.operationApproval) {
             return el('div', null,
                 el('div', { className: 'error-icon', html: ICON_X_CIRCLE }),
                 el('div', { className: 'error-title' }, 'Approval not completed'),
                 el('div', { className: 'error-msg' }, this.errorMsg || 'The approval was not completed.'),
-                el('button', { className: 'btn-retry', onClick: () => {
-                    this.errorMsg = '';
-                    this.startOperationApproval();
-                } },
-                    'Try again',
-                ),
             );
         }
         // Approve-only flow: retry re-sends the push; there is no idle menu
@@ -2440,7 +2444,14 @@ export class AuthUI {
             sessionRelay: this.sessionRelay,
             ...(this.viaPoll ? { completedViaPoll: true } : {}),
         };
-        this.close();
+        if (this.cfg.finalScreen) {
+            // The outcome stays on screen; the trust question, if it was
+            // asked, has been answered.
+            this.finished = true;
+            this.render();
+        } else {
+            this.close();
+        }
         this.resolve?.(result);
         this.resolve = null;
         this.reject = null;

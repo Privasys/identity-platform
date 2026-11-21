@@ -1179,6 +1179,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
         }
         // The inline frame reports its content height so the embedding page
         // can size the iframe to it (frame-size.ts); throttled to a frame.
+        // Only the device and operation approvals below keep the gate open on
+        // their outcome; a page cannot ask for it.
+        delete config.finalScreen;
         // A device request: the ceremony runs on the request the other device
         // created, for the app that asked, so the holder sees that app's
         // consent and the device gets what it asked for. Only the identity
@@ -1199,6 +1202,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 return;
             }
             config.methods = ['wallet'];
+            config.finalScreen = { title: 'Approved', message: 'Your device continues on its own. You can close this tab.' };
             config.clientId = device.clientId;
             config.appName = device.appName;
             config.rpId = device.rpId;
@@ -1287,6 +1291,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 theme,
                 legal,
                 onNavigate,
+                finalScreen: { title: 'Approved', message: 'Your terminal continues on its own. You can close this tab.' },
                 operationApproval: {
                     walletLink: operation.walletLink,
                     ...(operation.passkey

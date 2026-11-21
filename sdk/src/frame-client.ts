@@ -1166,6 +1166,12 @@ export class AuthFrame {
                     this.sealedIframe = iframe;
                     this.sealedHandler = handler;
                     resolve(result);
+                } else if (result.approved) {
+                    // A device's sign-in or an operation, approved: the gate
+                    // stays on its outcome, in the page that holds it.
+                    window.removeEventListener('message', handler);
+                    this.cancelSignIn = null;
+                    resolve(result);
                 } else {
                     cleanup();
                     resolve(result);

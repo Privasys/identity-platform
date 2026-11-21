@@ -26,7 +26,11 @@
             "extends": "base",
             "distribution": "store",
             "autoIncrement": true,
-            "env": { "NODE_ENV": "development", "STAGE": "preview" }
+            "env": {
+                "NODE_ENV": "development",
+                "STAGE": "preview",
+                "EXPO_PUBLIC_ATTRIBUTE_VERIFIER_PLATFORM_URL": "https://api.developer.test.privasys.org"
+            }
         },
         "production": {
             "extends": "base",

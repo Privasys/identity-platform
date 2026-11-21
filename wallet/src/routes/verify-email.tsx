@@ -34,6 +34,7 @@ import {
     EmailVerifyError,
     type EmailVerifyFailure,
 } from '@/services/email-verification';
+import { thisDeviceBinding } from '@/services/attribute-proofs';
 import { notify, useNoticeStore } from '@/stores/notice';
 import { useProfileStore } from '@/stores/profile';
 
@@ -112,22 +113,24 @@ export default function VerifyEmailScreen() {
         setPhase('checking');
         try {
             const result = await confirmEmailCode(address, code);
-            // The address as the server normalised it, so what is stored is
-            // what the receipt attests. The receipt itself is evidence on the
-            // attribute: kept for the holder's own audit trail, never sent to
-            // an app asking for their email.
-            const now = Math.floor(Date.now() / 1000);
+            // The address as the verifier normalised it, so what is stored is
+            // what the proof attests. The proof is kept on the attribute and
+            // disclosed afresh to an app at sign-in (services/attribute-proofs).
+            const device = await thisDeviceBinding();
             useProfileStore.getState().updateAttributeValue('email', address, {
                 value: result.email,
                 verified: true,
                 verifications: [
                     {
-                        verifier: 'privasys.id',
+                        verifier: result.proof.source,
                         verifierDisplayName: 'Privasys',
                         method: 'email_code',
                         assurance: 'provider',
-                        verifiedAt: result.verifiedAt || now,
-                        evidence: result.receipt,
+                        verifiedAt: result.verifiedAt,
+                        evidence: `verifier:${result.proof.source}:${result.proof.method}`,
+                        proof: result.proof.proof,
+                        proofDevice: device,
+                        proofSalt: result.salt,
                     },
                 ],
             });

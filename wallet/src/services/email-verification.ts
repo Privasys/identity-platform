@@ -6,18 +6,16 @@
  *
  * An email is either imported from a provider that says it checked it, or it
  * is typed here, in which case nobody has checked anything. This is the second
- * case: privasys.id mails a code to the address, the holder types it back, and
- * what comes back is a receipt signed by privasys.id saying this account
- * proved this address.
+ * case: the Privasys Attribute Verifier mails a code to the address, the holder
+ * types it back, and the verifier signs a proof that this holder proved this
+ * address (services/attribute-verifier). The proof is kept on the attribute,
+ * and disclosed afresh to an app at sign-in (services/attribute-proofs).
  *
- * The receipt is kept as the attribute's evidence. privasys.id keeps nothing:
- * it holds the address only while the code is outstanding, so the wallet is
- * the only place the result lives.
+ * The verifier keeps nothing: the code's state travels in the token it hands
+ * back, so the wallet is the only place the result lives.
  */
 
-import { getPlatformToken } from '@/services/platform-token';
-
-const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
+import { attest, AttributeVerifierError, newCommitment, startMailCode, type AttributeProof } from '@/services/attribute-verifier';
 
 /** How the check failed, so the screen can say something true about it. */
 export type EmailVerifyFailure =
@@ -55,94 +53,58 @@ export interface CodeSent {
 }
 
 export interface EmailVerified {
-    /** The address as the server normalised it, which is what to store. */
+    /** The address as the verifier normalised it, which is what to store. */
     email: string;
     verifiedAt: number;
-    /** The signed receipt. Audit evidence on the attribute, never shown to apps. */
-    receipt: string;
+    /** The verifier's signed proof, bound to this device. */
+    proof: AttributeProof;
+    /** The salt of the holder commitment the proof was made under. */
+    salt: string;
 }
 
-async function post(path: string, body: unknown): Promise<Response> {
-    const token = await getPlatformToken();
-    return fetch(`${IDP_BASE}${path}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-}
+/** The code in flight, per address: the verifier's token and the salt it was asked under. */
+const pending = new Map<string, { mailToken: string; salt: string }>();
 
-/** Read the server's message, without letting a stray body become the error. */
-async function errorBody(res: Response): Promise<{ error?: string; attempts_left?: number }> {
-    try {
-        return (await res.json()) as { error?: string; attempts_left?: number };
-    } catch {
-        return {};
-    }
+/** A failure to reach the verifier at all, as opposed to a refusal from it. */
+function offline(e: unknown): boolean {
+    return !(e instanceof AttributeVerifierError) || e.status === 0;
 }
 
 /** Ask for a code to be mailed to `email`. */
 export async function sendEmailCode(email: string): Promise<CodeSent> {
-    let res: Response;
+    const { salt } = newCommitment();
     try {
-        res = await post('/wallet/email/verify/begin', { email });
+        const r = await startMailCode(email, salt);
+        pending.set(email.toLowerCase(), { mailToken: r.mailToken, salt });
+        return { expiresAt: r.expiresAt, resendAfter: r.resendAfter, codeLength: r.codeLength };
     } catch (e) {
-        throw new EmailVerifyError('offline', e instanceof Error ? e.message : 'could not reach privasys.id');
+        if (offline(e)) throw new EmailVerifyError('offline', e instanceof Error ? e.message : 'could not reach the verifier');
+        const err = e as AttributeVerifierError;
+        if (err.status === 400) throw new EmailVerifyError('bad-address', err.message);
+        if (err.status === 429) throw new EmailVerifyError('too-soon', err.message);
+        if (err.status === 503) throw new EmailVerifyError('no-mail', err.message);
+        throw new EmailVerifyError('send-failed', err.message);
     }
-    if (res.ok) {
-        const body = (await res.json()) as {
-            expires_at?: number;
-            resend_after?: number;
-            code_length?: number;
-        };
-        return {
-            expiresAt: body.expires_at ?? 0,
-            resendAfter: body.resend_after ?? 60,
-            codeLength: body.code_length ?? 6,
-        };
-    }
-    const body = await errorBody(res);
-    const message = body.error || `the code could not be sent (${res.status})`;
-    if (res.status === 400) throw new EmailVerifyError('bad-address', message);
-    if (res.status === 429) {
-        const header = Number(res.headers.get('Retry-After'));
-        throw new EmailVerifyError('too-soon', message, {
-            retryAfter: Number.isFinite(header) && header > 0 ? header : undefined,
-        });
-    }
-    if (res.status === 503) throw new EmailVerifyError('no-mail', message);
-    throw new EmailVerifyError('send-failed', message);
 }
 
-/** Hand back the code the holder read, and take the receipt. */
+/** Hand back the code the holder read, and take the verifier's proof. */
 export async function confirmEmailCode(email: string, code: string): Promise<EmailVerified> {
-    let res: Response;
+    const inFlight = pending.get(email.toLowerCase());
+    if (!inFlight) throw new EmailVerifyError('expired', 'no code was asked for this address on this device');
+    let proofs: AttributeProof[];
     try {
-        res = await post('/wallet/email/verify/complete', { email, code: code.trim() });
+        proofs = await attest('mail_code', { email, code: code.trim(), mail_token: inFlight.mailToken }, inFlight.salt);
     } catch (e) {
-        throw new EmailVerifyError('offline', e instanceof Error ? e.message : 'could not reach privasys.id');
+        if (offline(e)) throw new EmailVerifyError('offline', e instanceof Error ? e.message : 'could not reach the verifier');
+        const err = e as AttributeVerifierError;
+        const left = err.body?.attempts_left;
+        if (typeof left === 'number') throw new EmailVerifyError('wrong-code', err.message, { attemptsLeft: left });
+        // Expired, already used, out of tries: the only way on is a new code.
+        if (/expired|already used|too many|ask for a new one/i.test(err.message)) throw new EmailVerifyError('expired', err.message);
+        throw new EmailVerifyError('send-failed', err.message);
     }
-    if (res.ok) {
-        const body = (await res.json()) as { email?: string; verified_at?: number; receipt?: string };
-        if (!body.receipt || !body.email) {
-            throw new EmailVerifyError('send-failed', 'the server did not return a result');
-        }
-        return {
-            email: body.email,
-            verifiedAt: body.verified_at ?? Math.floor(Date.now() / 1000),
-            receipt: body.receipt,
-        };
-    }
-    const body = await errorBody(res);
-    const message = body.error || `the code could not be checked (${res.status})`;
-    // 410 covers expired, already used, and out of tries: in every one of them
-    // the only way on is a new code, which is what the screen offers.
-    if (res.status === 410) throw new EmailVerifyError('expired', message);
-    if (res.status === 400) {
-        throw new EmailVerifyError(
-            body.attempts_left === undefined ? 'bad-address' : 'wrong-code',
-            message,
-            { attemptsLeft: body.attempts_left },
-        );
-    }
-    throw new EmailVerifyError('send-failed', message);
+    const proof = proofs.find((p) => p.attr === 'email');
+    if (!proof || typeof proof.value !== 'string') throw new EmailVerifyError('send-failed', 'the verifier did not return a proof');
+    pending.delete(email.toLowerCase());
+    return { email: proof.value, verifiedAt: Math.floor(Date.now() / 1000), proof, salt: inFlight.salt };
 }

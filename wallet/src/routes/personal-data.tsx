@@ -24,6 +24,7 @@ import {
     View as RNView,
     TextInput,
     Alert,
+    ActivityIndicator,
     Image,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -34,7 +35,9 @@ import { useAvatarChooser } from '@/hooks/useAvatarChooser';
 import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES, isGovVerified } from '@/services/attributes';
-import { isFresh, useNoticeStore } from '@/stores/notice';
+import { isFresh, notify, useNoticeStore } from '@/stores/notice';
+import { cardBankSource, CardCheckError, checkAddressWithCard, formatAddress } from '@/services/card-check';
+import { currentLocale } from '@/i18n';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
 export default function PersonalDataScreen() {
@@ -46,6 +49,34 @@ export default function PersonalDataScreen() {
     const { profile, updateProfile, setAttribute, updateAttributeValue, removeAttributeValue } = useProfileStore();
 
     const [addingAttribute, setAddingAttribute] = useState<string | null>(null);
+    const [checkingAddress, setCheckingAddress] = useState(false);
+
+    // Explained first: a card check is unusual enough to say what happens,
+    // what is charged (nothing) and what is kept (no card details).
+    const confirmAddress = () =>
+        Alert.alert(t('cardCheck.explainTitle'), t('cardCheck.explainBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+                text: t('common.continue'),
+                onPress: async () => {
+                    setCheckingAddress(true);
+                    try {
+                        await checkAddressWithCard();
+                        useNoticeStore.getState().markFresh([{ key: 'address', value: useProfileStore.getState().profile?.attributes.find((a) => a.key === 'address')?.value ?? '' }]);
+                        notify(t('cardCheck.doneTitle'), t('cardCheck.doneBody'));
+                    } catch (e: any) {
+                        if (e instanceof CardCheckError && e.reason === 'cancelled') return;
+                        if (e instanceof CardCheckError && e.reason === 'nothing-confirmed') {
+                            Alert.alert(t('cardCheck.nothingConfirmed'));
+                        } else {
+                            Alert.alert(t('cardCheck.failed', { reason: e?.message ?? String(e) }));
+                        }
+                    } finally {
+                        setCheckingAddress(false);
+                    }
+                },
+            },
+        ]);
     const [newAttrValue, setNewAttrValue] = useState('');
     const chooseAvatar = useAvatarChooser();
 
@@ -270,6 +301,17 @@ export default function PersonalDataScreen() {
                     </RNView>
                 ) : null}
 
+                {/* An address confirmed by the holder's card's bank, through a £0
+                    check on privasys.id (services/card-check). */}
+                <Pressable style={styles.importButton} onPress={() => void confirmAddress()} disabled={checkingAddress} testID="add-bank-address">
+                    {checkingAddress ? (
+                        <ActivityIndicator color={p.blue} />
+                    ) : (
+                        <Ionicons name="card-outline" size={18} color={p.blue} />
+                    )}
+                    <Text style={styles.importButtonText}>{t('cardCheck.entry')}</Text>
+                </Pressable>
+
                 {/* Import — opens the dedicated Import Data subpage */}
                 <Pressable style={styles.importButton} onPress={() => router.push('/import' as never)}>
                     <Ionicons name="cloud-download-outline" size={18} color={p.blue} />
@@ -311,7 +353,9 @@ function AttributeCard({
     const fresh = useNoticeStore((st) => isFresh(st.fresh, attr.key, attr.value));
 
     const sourceLabel =
-        attr.source === 'provider' && attr.sourceProvider
+        attr.sourceProvider === 'card_bank'
+            ? cardBankSource(attr, t, currentLocale())
+            : attr.source === 'provider' && attr.sourceProvider
             ? t('personalData.viaProvider', { provider: attr.sourceProvider })
             : attr.source === 'manual'
             ? t('personalData.enteredManually')
@@ -439,7 +483,9 @@ function AttributeCard({
                             </Pressable>
                         ) : (
                             <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={[styles.attributeValue, { flex: 1 }]} numberOfLines={2}>{attr.value}</Text>
+                                <Text style={[styles.attributeValue, { flex: 1 }]} numberOfLines={2}>
+                                    {attr.key === 'address' ? formatAddress(attr.value) : attr.value}
+                                </Text>
                                 {!isImage && (
                                     <Pressable onPress={handleStartEdit} hitSlop={8}>
                                         <Ionicons name="pencil-outline" size={16} color={p.textMuted} />

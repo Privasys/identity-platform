@@ -14,13 +14,32 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo } from 'react';
 import { StyleSheet, Pressable, View as RNView } from 'react-native';
 
-import { Text, usePalette, type Palette } from '@/components/Themed';
+import { Image, Text, usePalette, type Palette } from '@/components/Themed';
+import { formatAddress } from '@/services/card-check';
 import type { ProfileAttribute } from '@/stores/profile';
 
 export interface AttributeConflict {
     existing: ProfileAttribute;
     incoming: ProfileAttribute;
     multiValued: boolean;
+}
+
+/** A value that is a picture (an avatar, a photo): shown, never spelled out. */
+function isPicture(attr: ProfileAttribute): boolean {
+    const v = attr.value.trim();
+    return v.startsWith('data:image/') || (/picture|avatar|photo/i.test(attr.key) && /^https?:\/\//.test(v));
+}
+
+/** One option's value, the way the holder would recognise it. */
+function OptionValue({ attr, styles }: { attr: ProfileAttribute; styles: ReturnType<typeof makeStyles> }) {
+    if (isPicture(attr)) {
+        return <Image source={{ uri: attr.value.trim() }} style={styles.picture} contentFit="cover" accessibilityIgnoresInvertColors />;
+    }
+    return (
+        <Text style={styles.optionValue} numberOfLines={3}>
+            {attr.key === 'address' ? formatAddress(attr.value) : attr.value}
+        </Text>
+    );
 }
 
 function sourcesSummary(attr: ProfileAttribute): string {
@@ -59,7 +78,7 @@ export function ConflictResolutionSheet({
 
             <Pressable style={styles.option} onPress={() => onResolve('keep')}>
                 <RNView style={{ flex: 1 }}>
-                    <Text style={styles.optionValue}>{existing.value}</Text>
+                    <OptionValue attr={existing} styles={styles} />
                     <Text style={styles.optionMeta}>Current {sourcesSummary(existing)}</Text>
                 </RNView>
                 <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
@@ -67,7 +86,7 @@ export function ConflictResolutionSheet({
 
             <Pressable style={styles.option} onPress={() => onResolve('replace')}>
                 <RNView style={{ flex: 1 }}>
-                    <Text style={styles.optionValue}>{incoming.value}</Text>
+                    <OptionValue attr={incoming} styles={styles} />
                     <Text style={styles.optionMeta}>New {sourcesSummary(incoming)}</Text>
                 </RNView>
                 <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
@@ -95,6 +114,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         borderWidth: 1, borderColor: p.border,
     },
     optionValue: { fontSize: 15, fontWeight: '600', color: p.textPrimary },
+    picture: { width: 64, height: 64, borderRadius: 32, backgroundColor: p.border },
     optionMeta: { fontSize: 12, color: p.textMuted, marginTop: 2 },
     bothOption: { justifyContent: 'center', borderColor: p.infoBorder, backgroundColor: p.infoBg },
     bothText: { fontSize: 15, fontWeight: '600', color: p.blue },

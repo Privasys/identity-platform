@@ -559,23 +559,14 @@ var PrivasysQR = (function () {
       // universal links for same-domain navigations, so a tap on this page
       // (privasys.id) to privasys.id/scp opens Safari, not the wallet: the
       // button uses the wallet's custom scheme.
-      // A computer has no wallet to open. There the button signs in through
-      // the sign-in gate, which sends a notification to the wallet this
-      // browser knows, and offers a passkey and the other ways when it knows
-      // none. The QR code stays for scanning with any wallet.
+      // A computer has no wallet to open, so there the QR code is the way:
+      // it carries this request to the wallet, which shows the app's own
+      // consent and shares what the app asks for.
       if (/iPhone|iPad|Android/i.test(navigator.userAgent)) {
         $("walletBtn").href = d.qr_payload.replace(/^https:\/\/privasys\.id\/scp/, "privasys-wallet://scp");
       } else {
-        $("walletBtn").textContent = "Continue";
-        $("walletBtn").setAttribute("role", "button");
-        $("walletBtn").setAttribute("tabindex", "0");
-        $("walletBtn").style.cursor = "pointer";
-        $("walletBtn").addEventListener("click", approveThroughGate);
-        $("walletBtn").addEventListener("keydown", function (e) {
-          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); approveThroughGate(); }
-        });
-        $("passkeyBtn").classList.add("hidden");
-        $("qrSep").textContent = "or scan with the Privasys Wallet";
+        $("walletBtn").classList.add("hidden");
+        $("qrSep").textContent = "Scan with the Privasys Wallet";
       }
       try {
         $("qrImg").innerHTML = PrivasysQR.svg(d.qr_payload, { ecc: "H", border: 4, logo: true });
@@ -607,8 +598,10 @@ var PrivasysQR = (function () {
     } catch (e) { $("status").textContent = e.message; }
   });
 
-  // Sign in through the gate (wallet notification, passkey or another way),
-  // then approve the device with the resulting IdP access token.
+  // Without the wallet's QR code: sign in through the gate (passkey or
+  // another way), then approve the device with the resulting IdP access
+  // token. This signs in to privasys.id, so it carries no consent to the
+  // app's attributes; the wallet's QR code is the path that does.
   var gateOpen = false;
   async function approveThroughGate() {
     if (gateOpen) return;
@@ -620,7 +613,10 @@ var PrivasysQR = (function () {
       var auth = new Privasys.AuthFrame({
         apiBase: "https://api.developer.privasys.org",
         appName: "Privasys CLI",
-        clientId: "privasys-cli"
+        clientId: "privasys-cli",
+        // The identity is the holder's privasys.id one. Left out, it would
+        // default to the app name, which no wallet holds an identity for.
+        rpId: "privasys.id"
       });
       var res = await auth.signIn();
       if (!res || !res.accessToken) throw new Error("Sign-in did not return a token.");

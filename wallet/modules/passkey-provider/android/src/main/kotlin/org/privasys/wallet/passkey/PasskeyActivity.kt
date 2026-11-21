@@ -4,10 +4,14 @@
 package org.privasys.wallet.passkey
 
 import android.app.Activity
+import android.hardware.biometrics.BiometricManager.Authenticators
+import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.util.Base64
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -21,6 +25,7 @@ import org.json.JSONObject
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 import android.security.keystore.KeyGenParameterSpec
@@ -31,6 +36,11 @@ import java.util.UUID
  * Activity launched by PendingIntent when the system invokes Privasys Wallet
  * as a credential provider. Verifies enclave attestation via RA-TLS before
  * creating or signing WebAuthn credentials.
+ *
+ * Two kinds of website passkey (.operations/plans/website-passkeys-plan.md):
+ * - "local": a StrongBox/TEE Keystore key that never leaves this device.
+ * - "synced": derived from the holder's passkey root, so the holder's other
+ *   devices can derive it again. Its credential id carries the random input.
  */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class PasskeyActivity : Activity() {
@@ -43,16 +53,42 @@ class PasskeyActivity : Activity() {
         private const val PREFS_NAME = "org.privasys.wallet.credentials"
         private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
 
+        const val KIND_LOCAL = "local"
+        const val KIND_SYNCED = "synced"
+
+        // Authenticator data flags. BE (backup eligible) and BS (backed up)
+        // tell the site a synced passkey survives the loss of this device.
+        private const val FLAGS_REGISTER_LOCAL: Byte = 0x45 // UP | UV | AT
+        private const val FLAGS_ASSERT_LOCAL: Byte = 0x05 // UP | UV
+        private const val FLAGS_REGISTER_SYNCED: Byte = 0x5D // UP | UV | BE | BS | AT
+        private const val FLAGS_ASSERT_SYNCED: Byte = 0x1D // UP | UV | BE | BS
+
         private val AAGUID = byteArrayOf(
             0xf4.toByte(), 0x7a.toByte(), 0xc1.toByte(), 0x0b.toByte(),
             0x58.toByte(), 0xcc.toByte(), 0x43.toByte(), 0x72.toByte(),
             0xa5.toByte(), 0x67.toByte(), 0x0e.toByte(), 0x02.toByte(),
             0xb2.toByte(), 0xc3.toByte(), 0xd4.toByte(), 0x79.toByte()
         )
+
+        private const val WARNING_LOCAL = "It stays on this device and is lost with it."
+    }
+
+    /** What the holder may choose between when a passkey is created. */
+    private enum class SaveOptions {
+        /** The site asked for attestation, so a hardware-bound key: no choice. */
+        LOCAL_HARDWARE_REQUIRED,
+
+        /** The wallet has not set a passkey root (no seed yet), so only local is possible. */
+        LOCAL_NO_ROOT,
+
+        /** Both kinds on offer. */
+        CHOICE,
     }
 
     private lateinit var statusText: TextView
     private lateinit var detailText: TextView
+    private lateinit var noteText: TextView
+    private lateinit var syncButton: Button
     private lateinit var approveButton: Button
     private lateinit var cancelButton: Button
     private lateinit var spinner: ProgressBar
@@ -70,11 +106,13 @@ class PasskeyActivity : Activity() {
         when (action) {
             ACTION_CREATE -> handleCreate()
             ACTION_GET -> handleGet()
-            else -> {
-                setResult(RESULT_CANCELED)
-                finish()
-            }
+            else -> cancel()
         }
+    }
+
+    private fun cancel() {
+        setResult(RESULT_CANCELED)
+        finish()
     }
 
     // ─── Registration Flow ─────────────────────────────────────────────
@@ -82,8 +120,7 @@ class PasskeyActivity : Activity() {
     private fun handleCreate() {
         val request = PendingIntentHandler.retrieveProviderCreateCredentialRequest(intent)
         if (request == null) {
-            setResult(RESULT_CANCELED)
-            finish()
+            cancel()
             return
         }
 
@@ -93,49 +130,77 @@ class PasskeyActivity : Activity() {
                     ?.requestJson ?: ""
             )
         } catch (_: Exception) {
-            setResult(RESULT_CANCELED)
-            finish()
+            cancel()
             return
         }
 
         val rpId = requestJson.optJSONObject("rp")?.optString("id", "") ?: ""
-        val rpName = requestJson.optJSONObject("rp")?.optString("name", rpId) ?: rpId
+        // user.id arrives base64url encoded in the WebAuthn JSON; it is kept as
+        // is and is the userHandle the site gets back at sign-in.
         val userId = requestJson.optJSONObject("user")?.optString("id", "") ?: ""
         val userName = requestJson.optJSONObject("user")?.optString("name", "") ?: ""
 
-        showVerifying(rpId)
-        verifyAndPrompt(rpId) { approved ->
-            if (!approved) {
-                setResult(RESULT_CANCELED)
-                finish()
-                return@verifyAndPrompt
-            }
-
-            val credential = createCredential(rpId, userId)
-            if (credential == null) {
-                setResult(RESULT_CANCELED)
-                finish()
-                return@verifyAndPrompt
-            }
-
-            val responseJson = JSONObject().apply {
-                put("id", credential.credentialIdB64)
-                put("rawId", credential.credentialIdB64)
-                put("type", "public-key")
-                put("response", JSONObject().apply {
-                    put("attestationObject", base64UrlEncode(credential.attestationObject))
-                    put("clientDataJSON", base64UrlEncode(ByteArray(0))) // System provides real clientDataJSON
-                })
-            }
-
-            val resultData = android.content.Intent()
-            PendingIntentHandler.setCreateCredentialResponse(
-                resultData,
-                CreatePublicKeyCredentialResponse(responseJson.toString())
-            )
-            setResult(RESULT_OK, resultData)
-            finish()
+        val options = when {
+            requiresHardwareKey(requestJson) -> SaveOptions.LOCAL_HARDWARE_REQUIRED
+            !PasskeyRootStore.exists(this) -> SaveOptions.LOCAL_NO_ROOT
+            else -> SaveOptions.CHOICE
         }
+
+        showVerifying(rpId)
+        verifyAndPrompt(
+            rpId,
+            onVerified = {
+                showSaveChoice(options) { kind ->
+                    if (kind == KIND_SYNCED) {
+                        // The root is touched only after the holder proves
+                        // presence, as the UV flag in the response claims.
+                        authenticateHolder(rpId, "Save your passkey") { ok ->
+                            if (ok) finishCreate(createSyncedCredential(rpId, userId, userName)) else cancel()
+                        }
+                    } else {
+                        finishCreate(createLocalCredential(rpId, userId, userName))
+                    }
+                }
+            },
+            onRejected = { cancel() }
+        )
+    }
+
+    /**
+     * A site that asks for "direct" or "enterprise" attestation wants to know
+     * the key is bound to hardware, which a synced key is not. Only the
+     * attestation preference says so; residentKey and the WebAuthn hints
+     * ("security-key", "client-device", "hybrid") describe where a key is
+     * found, not whether it may be backed up.
+     */
+    private fun requiresHardwareKey(requestJson: JSONObject): Boolean =
+        when (requestJson.optString("attestation", "none")) {
+            "direct", "enterprise" -> true
+            else -> false
+        }
+
+    private fun finishCreate(credential: CreatedCredential?) {
+        if (credential == null) {
+            cancel()
+            return
+        }
+        val responseJson = JSONObject().apply {
+            put("id", credential.credentialIdB64)
+            put("rawId", credential.credentialIdB64)
+            put("type", "public-key")
+            put("response", JSONObject().apply {
+                put("attestationObject", base64UrlEncode(credential.attestationObject))
+                put("clientDataJSON", base64UrlEncode(ByteArray(0))) // System provides real clientDataJSON
+            })
+        }
+
+        val resultData = android.content.Intent()
+        PendingIntentHandler.setCreateCredentialResponse(
+            resultData,
+            CreatePublicKeyCredentialResponse(responseJson.toString())
+        )
+        setResult(RESULT_OK, resultData)
+        finish()
     }
 
     // ─── Assertion Flow ────────────────────────────────────────────────
@@ -143,13 +208,12 @@ class PasskeyActivity : Activity() {
     private fun handleGet() {
         val request = PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
         if (request == null) {
-            setResult(RESULT_CANCELED)
-            finish()
+            cancel()
             return
         }
 
-        // The passkey option carries the WebAuthn request JSON and — for
-        // privileged callers (browsers) — the precomputed clientDataHash the
+        // The passkey option carries the WebAuthn request JSON and, for
+        // privileged callers (browsers), the precomputed clientDataHash the
         // assertion signature MUST cover. The previous code read the hash from
         // an intent extra nobody set and silently signed over 32 zero bytes,
         // producing signatures every relying party rejects.
@@ -157,62 +221,67 @@ class PasskeyActivity : Activity() {
             .filterIsInstance<androidx.credentials.GetPublicKeyCredentialOption>()
             .firstOrNull()
         if (option == null) {
-            setResult(RESULT_CANCELED)
-            finish()
+            cancel()
             return
         }
 
         val rpId = intent.getStringExtra("rpId") ?: ""
 
         showVerifying(rpId)
-        verifyAndPrompt(rpId) { approved ->
-            if (!approved) {
-                setResult(RESULT_CANCELED)
-                finish()
-                return@verifyAndPrompt
-            }
+        verifyAndPrompt(
+            rpId,
+            onVerified = {
+                approveButton.text = "Approve"
+                approveButton.visibility = View.VISIBLE
+                approveButton.setOnClickListener {
+                    approveButton.isEnabled = false
+                    val credentialIdB64 = intent.getStringExtra("credentialId") ?: ""
+                    val credentialId = Base64.decode(credentialIdB64, Base64.URL_SAFE or Base64.NO_WRAP)
 
-            val credentialIdB64 = intent.getStringExtra("credentialId") ?: ""
-            val credentialId = Base64.decode(credentialIdB64, Base64.URL_SAFE or Base64.NO_WRAP)
+                    // Privileged caller: sign its hash, the system supplies the
+                    // clientDataJSON. Ordinary app: build clientDataJSON
+                    // ourselves (challenge from the request, android:apk-key-hash
+                    // origin of the caller), sign over its hash, and return it.
+                    val providedHash = option.clientDataHash
+                    val builtClientData: ByteArray? =
+                        if (providedHash == null) buildClientDataJson(option.requestJson, request.callingAppInfo)
+                        else null
+                    val clientDataHash = providedHash
+                        ?: MessageDigest.getInstance("SHA-256").digest(builtClientData!!)
 
-            // Privileged caller → sign its hash, the system supplies the
-            // clientDataJSON. Ordinary app → build clientDataJSON ourselves
-            // (challenge from the request, android:apk-key-hash origin of the
-            // caller), sign over its hash, and return it in the response.
-            val providedHash = option.clientDataHash
-            val builtClientData: ByteArray? =
-                if (providedHash == null) buildClientDataJson(option.requestJson, request.callingAppInfo)
-                else null
-            val clientDataHash = providedHash
-                ?: MessageDigest.getInstance("SHA-256").digest(builtClientData!!)
+                    signAssertion(rpId, credentialId, clientDataHash) { assertion ->
+                        finishGet(credentialIdB64, assertion, builtClientData)
+                    }
+                }
+            },
+            onRejected = { cancel() }
+        )
+    }
 
-            val assertion = signAssertion(rpId, credentialId, clientDataHash)
-            if (assertion == null) {
-                setResult(RESULT_CANCELED)
-                finish()
-                return@verifyAndPrompt
-            }
-
-            val responseJson = JSONObject().apply {
-                put("id", credentialIdB64)
-                put("rawId", credentialIdB64)
-                put("type", "public-key")
-                put("response", JSONObject().apply {
-                    put("authenticatorData", base64UrlEncode(assertion.authData))
-                    put("signature", base64UrlEncode(assertion.signature))
-                    put("userHandle", assertion.userHandleB64)
-                    put("clientDataJSON", base64UrlEncode(builtClientData ?: ByteArray(0)))
-                })
-            }
-
-            val resultData = android.content.Intent()
-            PendingIntentHandler.setGetCredentialResponse(
-                resultData,
-                GetCredentialResponse(PublicKeyCredential(responseJson.toString()))
-            )
-            setResult(RESULT_OK, resultData)
-            finish()
+    private fun finishGet(credentialIdB64: String, assertion: SignedAssertion?, builtClientData: ByteArray?) {
+        if (assertion == null) {
+            cancel()
+            return
         }
+        val responseJson = JSONObject().apply {
+            put("id", credentialIdB64)
+            put("rawId", credentialIdB64)
+            put("type", "public-key")
+            put("response", JSONObject().apply {
+                put("authenticatorData", base64UrlEncode(assertion.authData))
+                put("signature", base64UrlEncode(assertion.signature))
+                if (assertion.userHandleB64.isNotEmpty()) put("userHandle", assertion.userHandleB64)
+                put("clientDataJSON", base64UrlEncode(builtClientData ?: ByteArray(0)))
+            })
+        }
+
+        val resultData = android.content.Intent()
+        PendingIntentHandler.setGetCredentialResponse(
+            resultData,
+            GetCredentialResponse(PublicKeyCredential(responseJson.toString()))
+        )
+        setResult(RESULT_OK, resultData)
+        finish()
     }
 
     /** WebAuthn clientDataJSON for a non-privileged caller: the challenge from
@@ -234,7 +303,7 @@ class PasskeyActivity : Activity() {
         }.toString().toByteArray()
     }
 
-    /** `android:apk-key-hash:<b64url SHA-256 of the caller's signing cert>` —
+    /** `android:apk-key-hash:<b64url SHA-256 of the caller's signing cert>`,
      *  the origin format RPs registered for Android app callers expect. */
     private fun androidAppOrigin(info: androidx.credentials.provider.CallingAppInfo?): String {
         val cert = info?.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
@@ -246,13 +315,21 @@ class PasskeyActivity : Activity() {
     // ─── Attestation Verification ──────────────────────────────────────
 
     private fun showVerifying(rpId: String) {
-        spinner.visibility = android.view.View.VISIBLE
+        spinner.visibility = View.VISIBLE
         statusText.text = "Verifying server…"
         detailText.text = rpId
-        approveButton.visibility = android.view.View.GONE
+        approveButton.visibility = View.GONE
+        syncButton.visibility = View.GONE
+        noteText.visibility = View.GONE
     }
 
-    private fun verifyAndPrompt(rpId: String, callback: (Boolean) -> Unit) {
+    /**
+     * Checks the site's attestation over RA-TLS. On success it shows the
+     * verified details and hands over to [onVerified], which puts up the
+     * buttons for this flow; Cancel then rejects. On failure it rejects
+     * after a short pause so the holder can read why.
+     */
+    private fun verifyAndPrompt(rpId: String, onVerified: () -> Unit, onRejected: () -> Unit) {
         Thread {
             val parts = rpId.split(":", limit = 2)
             val host = parts[0]
@@ -266,7 +343,7 @@ class PasskeyActivity : Activity() {
                     val valid = json?.optBoolean("valid", false) ?: false
 
                     if (valid) {
-                        spinner.visibility = android.view.View.GONE
+                        spinner.visibility = View.GONE
                         statusText.text = "Server Verified ✓"
 
                         val teeType = json?.optString("tee_type", "") ?: ""
@@ -278,22 +355,21 @@ class PasskeyActivity : Activity() {
                         }
                         detailText.text = detail
 
-                        approveButton.visibility = android.view.View.VISIBLE
-                        approveButton.setOnClickListener { callback(true) }
-                        cancelButton.setOnClickListener { callback(false) }
+                        cancelButton.setOnClickListener { onRejected() }
+                        onVerified()
                     } else {
-                        spinner.visibility = android.view.View.GONE
+                        spinner.visibility = View.GONE
                         statusText.text = "Attestation Failed"
                         detailText.text = "$rpId\nCould not verify server integrity."
-                        approveButton.visibility = android.view.View.GONE
-                        cancelButton.postDelayed({ callback(false) }, 2000)
+                        approveButton.visibility = View.GONE
+                        cancelButton.postDelayed({ onRejected() }, 2000)
                     }
                 } else {
-                    spinner.visibility = android.view.View.GONE
+                    spinner.visibility = View.GONE
                     statusText.text = "Attestation Unavailable"
                     detailText.text = "$rpId\nRA-TLS library not loaded."
-                    approveButton.visibility = android.view.View.GONE
-                    cancelButton.postDelayed({ callback(false) }, 2000)
+                    approveButton.visibility = View.GONE
+                    cancelButton.postDelayed({ onRejected() }, 2000)
                 }
             }
         }.start()
@@ -322,6 +398,63 @@ class PasskeyActivity : Activity() {
         }
     }
 
+    // ─── Save choice ───────────────────────────────────────────────────
+
+    /**
+     * After the server is verified, the holder picks where the passkey lives.
+     * "This device only" always carries the warning that it is lost with the
+     * device; "your devices" is offered only when the site does not insist on
+     * hardware and the wallet has a passkey root.
+     */
+    private fun showSaveChoice(options: SaveOptions, onChosen: (kind: String) -> Unit) {
+        noteText.visibility = View.VISIBLE
+        noteText.text = when (options) {
+            SaveOptions.CHOICE ->
+                "Where should this passkey be saved?\n\n" +
+                    "Your devices: backed up to your other devices through your Privasys Wallet. Never to Google.\n\n" +
+                    "This device only: $WARNING_LOCAL"
+            SaveOptions.LOCAL_HARDWARE_REQUIRED ->
+                "This website asks for a passkey kept in this device's secure hardware, " +
+                    "so it is saved on this device only. $WARNING_LOCAL"
+            SaveOptions.LOCAL_NO_ROOT ->
+                "This passkey is saved on this device only. $WARNING_LOCAL"
+        }
+
+        approveButton.text = "Save on this device only"
+        approveButton.visibility = View.VISIBLE
+
+        syncButton.visibility = if (options == SaveOptions.CHOICE) View.VISIBLE else View.GONE
+
+        val choose = { kind: String ->
+            // One tap only: the system expects a single result.
+            approveButton.isEnabled = false
+            syncButton.isEnabled = false
+            onChosen(kind)
+        }
+        approveButton.setOnClickListener { choose(KIND_LOCAL) }
+        syncButton.setOnClickListener { choose(KIND_SYNCED) }
+    }
+
+    // ─── Holder check ──────────────────────────────────────────────────
+
+    /**
+     * Biometric or device passcode, asked for by the provider itself, before a
+     * synced key is derived. The key is software, so this prompt (not the
+     * Keystore) is what stands between the root and a signature.
+     */
+    private fun authenticateHolder(rpId: String, title: String, onResult: (Boolean) -> Unit) {
+        val prompt = BiometricPrompt.Builder(this)
+            .setTitle(title)
+            .setSubtitle(rpId)
+            .setAllowedAuthenticators(Authenticators.BIOMETRIC_STRONG or Authenticators.DEVICE_CREDENTIAL)
+            .build()
+        prompt.authenticate(CancellationSignal(), mainExecutor, object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = onResult(true)
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = onResult(false)
+            // onAuthenticationFailed (a finger not recognised) leaves the prompt up for another try.
+        })
+    }
+
     // ─── Credential Creation ───────────────────────────────────────────
 
     private data class CreatedCredential(
@@ -329,7 +462,7 @@ class PasskeyActivity : Activity() {
         val attestationObject: ByteArray,
     )
 
-    private fun createCredential(rpId: String, userId: String): CreatedCredential? {
+    private fun createLocalCredential(rpId: String, userId: String, userName: String): CreatedCredential? {
         val keyAlias = "org.privasys.wallet.fido2.$rpId.${UUID.randomUUID()}"
 
         val keyPairGen = KeyPairGenerator.getInstance(
@@ -360,13 +493,41 @@ class PasskeyActivity : Activity() {
         val credentialId = MessageDigest.getInstance("SHA-256").digest(publicKeyEncoded)
         val credentialIdB64 = Base64.encodeToString(credentialId, Base64.URL_SAFE or Base64.NO_WRAP)
 
-        // Build authenticator data
         val rpIdHash = MessageDigest.getInstance("SHA-256").digest(rpId.toByteArray())
-        val authData = buildRegistrationAuthData(rpIdHash, credentialId, rawPublicKey)
+        val authData = buildRegistrationAuthData(rpIdHash, FLAGS_REGISTER_LOCAL, credentialId, rawPublicKey)
         val attestationObject = buildAttestationObjectCBOR(authData)
 
-        // Store credential mapping
-        storeCredential(rpId, credentialId, keyAlias, userId)
+        storeCredential(rpId, credentialId, KIND_LOCAL, keyAlias, userId, userName)
+
+        return CreatedCredential(credentialIdB64, attestationObject)
+    }
+
+    /**
+     * A synced passkey: credential id 0x01 || r, key derived from the passkey
+     * root, r and the rpId. Nothing secret is stored; the record only lets the
+     * picker list it and the wallet copy it to the holder's other devices.
+     */
+    private fun createSyncedCredential(rpId: String, userId: String, userName: String): CreatedCredential? {
+        val root = PasskeyRootStore.read(this) ?: return null
+        val r = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val credentialId = byteArrayOf(SyncedPasskeyDerivation.SYNCED_ID_VERSION) + r
+
+        val key = try {
+            SyncedPasskeyDerivation.derive(root, r, rpId)
+        } catch (_: Exception) {
+            return null
+        } finally {
+            root.fill(0)
+        }
+        // Registration needs only the public key; the scalar goes at once.
+        key.wipe()
+
+        val credentialIdB64 = Base64.encodeToString(credentialId, Base64.URL_SAFE or Base64.NO_WRAP)
+        val rpIdHash = MessageDigest.getInstance("SHA-256").digest(rpId.toByteArray())
+        val authData = buildRegistrationAuthData(rpIdHash, FLAGS_REGISTER_SYNCED, credentialId, key.rawPublicKey)
+        val attestationObject = buildAttestationObjectCBOR(authData)
+
+        storeCredential(rpId, credentialId, KIND_SYNCED, null, userId, userName)
 
         return CreatedCredential(credentialIdB64, attestationObject)
     }
@@ -382,44 +543,128 @@ class PasskeyActivity : Activity() {
     private fun signAssertion(
         rpId: String,
         credentialId: ByteArray,
-        clientDataHash: ByteArray
-    ): SignedAssertion? {
+        clientDataHash: ByteArray,
+        onSigned: (SignedAssertion?) -> Unit
+    ) {
         val credIdB64 = Base64.encodeToString(credentialId, Base64.URL_SAFE or Base64.NO_WRAP)
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val json = prefs.getString("$rpId:$credIdB64", null) ?: return null
+        val entry = prefs.getString("$rpId:$credIdB64", null)
+            ?.let { try { JSONObject(it) } catch (_: Exception) { null } }
+        if (entry == null) {
+            onSigned(null)
+            return
+        }
 
-        val entry = try { JSONObject(json) } catch (_: Exception) { return null }
-        val keyAlias = entry.optString("keyAlias") ?: return null
-        val userId = entry.optString("userId", "")
-
-        val privateKeyEntry = keyStore.getEntry(keyAlias, null) as? KeyStore.PrivateKeyEntry
-            ?: return null
-
+        // user.id was stored as the site sent it, base64url, which is what the
+        // response's userHandle wants. Re-encoding it would hand the site a
+        // userHandle it never issued.
+        val userHandle = entry.optString("userHandle", "").ifEmpty { entry.optString("userId", "") }
         val rpIdHash = MessageDigest.getInstance("SHA-256").digest(rpId.toByteArray())
-        val authData = buildAssertionAuthData(rpIdHash, credentialId)
 
-        val signInput = authData + clientDataHash
+        // Records written before "kind" existed are local.
+        if (entry.optString("kind", KIND_LOCAL) == KIND_SYNCED) {
+            if (!SyncedPasskeyDerivation.isSyncedCredentialId(credentialId)) {
+                onSigned(null)
+                return
+            }
+            authenticateHolder(rpId, "Sign in with your passkey") { ok ->
+                if (!ok) {
+                    onSigned(null)
+                    return@authenticateHolder
+                }
+                val authData = buildAssertionAuthData(rpIdHash, FLAGS_ASSERT_SYNCED)
+                val signature = signSynced(rpId, credentialId, authData + clientDataHash)
+                onSigned(signature?.let { SignedAssertion(authData, it, userHandle) })
+            }
+            return
+        }
+
+        val keyAlias = entry.optString("keyAlias", "")
+        val privateKeyEntry = (if (keyAlias.isEmpty()) null else keyStore.getEntry(keyAlias, null))
+            as? KeyStore.PrivateKeyEntry
+        if (privateKeyEntry == null) {
+            onSigned(null)
+            return
+        }
+
+        val authData = buildAssertionAuthData(rpIdHash, FLAGS_ASSERT_LOCAL)
         val sig = Signature.getInstance("SHA256withECDSA")
         sig.initSign(privateKeyEntry.privateKey)
-        sig.update(signInput)
-        val signature = sig.sign()
 
-        return SignedAssertion(
-            authData,
-            signature,
-            Base64.encodeToString(userId.toByteArray(), Base64.URL_SAFE or Base64.NO_WRAP)
+        // The local key is made with per-use strong biometric authentication
+        // (timeout 0), so the Keystore refuses to sign unless this very
+        // Signature is unlocked through a BiometricPrompt CryptoObject.
+        // Biometric only, as that key allows no passcode.
+        val prompt = BiometricPrompt.Builder(this)
+            .setTitle("Sign in with your passkey")
+            .setSubtitle(rpId)
+            .setAllowedAuthenticators(Authenticators.BIOMETRIC_STRONG)
+            .setNegativeButton("Cancel", mainExecutor) { _, _ -> onSigned(null) }
+            .build()
+        prompt.authenticate(
+            BiometricPrompt.CryptoObject(sig), CancellationSignal(), mainExecutor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    val unlocked = result.cryptoObject?.signature ?: sig
+                    val signature = try {
+                        unlocked.update(authData + clientDataHash)
+                        unlocked.sign()
+                    } catch (_: Exception) {
+                        null
+                    }
+                    onSigned(signature?.let { SignedAssertion(authData, it, userHandle) })
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = onSigned(null)
+            }
         )
+    }
+
+    /** Derive the synced key, sign (ES256, DER) and forget the key. */
+    private fun signSynced(rpId: String, credentialId: ByteArray, message: ByteArray): ByteArray? {
+        val root = PasskeyRootStore.read(this) ?: return null
+        var scalar: ByteArray? = null
+        return try {
+            val derived = SyncedPasskeyDerivation.deriveScalar(root, SyncedPasskeyDerivation.randomOf(credentialId), rpId)
+            scalar = derived
+            Signature.getInstance("SHA256withECDSA").run {
+                initSign(SyncedPasskeyDerivation.privateKeyFor(derived))
+                update(message)
+                sign()
+            }
+        } catch (_: Exception) {
+            null
+        } finally {
+            root.fill(0)
+            scalar?.fill(0)
+        }
     }
 
     // ─── Credential Storage ────────────────────────────────────────────
 
-    private fun storeCredential(rpId: String, credentialId: ByteArray, keyAlias: String, userId: String) {
+    /**
+     * Record shape shared with NativeKeysModule (listWebsitePasskeys,
+     * importWebsitePasskeys, deleteWebsitePasskey): keyed "$rpId:$credIdB64"
+     * with the id in URL_SAFE | NO_WRAP Base64 (padded), as records always were.
+     * "userId" is kept for records older than "userHandle".
+     */
+    private fun storeCredential(
+        rpId: String,
+        credentialId: ByteArray,
+        kind: String,
+        keyAlias: String?,
+        userId: String,
+        userName: String,
+    ) {
         val credIdB64 = Base64.encodeToString(credentialId, Base64.URL_SAFE or Base64.NO_WRAP)
         val stored = JSONObject().apply {
             put("rpId", rpId)
             put("credentialId", credIdB64)
-            put("keyAlias", keyAlias)
+            put("kind", kind)
+            if (keyAlias != null) put("keyAlias", keyAlias)
             put("userId", userId)
+            put("userHandle", userId)
+            put("userName", userName)
             put("createdAt", System.currentTimeMillis())
         }
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -432,6 +677,7 @@ class PasskeyActivity : Activity() {
 
     private fun buildRegistrationAuthData(
         rpIdHash: ByteArray,
+        flags: Byte,
         credentialId: ByteArray,
         rawPublicKey: ByteArray
     ): ByteArray {
@@ -441,7 +687,7 @@ class PasskeyActivity : Activity() {
 
         val buf = mutableListOf<Byte>()
         buf.addAll(rpIdHash.toList())
-        buf.add(0x45) // flags: UP | UV | AT
+        buf.add(flags)
         buf.addAll(byteArrayOf(0, 0, 0, 0).toList()) // signCount = 0
         buf.addAll(AAGUID.toList())
         buf.add(((credentialId.size shr 8) and 0xFF).toByte())
@@ -451,11 +697,12 @@ class PasskeyActivity : Activity() {
         return buf.toByteArray()
     }
 
-    private fun buildAssertionAuthData(rpIdHash: ByteArray, credentialId: ByteArray): ByteArray {
+    private fun buildAssertionAuthData(rpIdHash: ByteArray, flags: Byte): ByteArray {
         val buf = mutableListOf<Byte>()
         buf.addAll(rpIdHash.toList())
-        buf.add(0x05) // flags: UP | UV
-        // Platform authenticator: always send signCount=0 (non-exportable key)
+        buf.add(flags)
+        // signCount stays 0: a synced key is used from several devices, and a
+        // local one has no counter to keep, so 0 tells the site not to check.
         buf.add(0)
         buf.add(0)
         buf.add(0)
@@ -536,18 +783,29 @@ class PasskeyActivity : Activity() {
         }
         layout.addView(detailText)
 
+        noteText = TextView(this).apply {
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+            visibility = View.GONE
+        }
+        layout.addView(noteText)
+
+        syncButton = Button(this).apply {
+            text = "Save to your devices"
+            visibility = View.GONE
+        }
+        layout.addView(syncButton)
+
         approveButton = Button(this).apply {
             text = "Approve"
-            visibility = android.view.View.GONE
+            visibility = View.GONE
         }
         layout.addView(approveButton)
 
         cancelButton = Button(this).apply {
             text = "Cancel"
-            setOnClickListener {
-                setResult(RESULT_CANCELED)
-                finish()
-            }
+            setOnClickListener { cancel() }
         }
         layout.addView(cancelButton)
 

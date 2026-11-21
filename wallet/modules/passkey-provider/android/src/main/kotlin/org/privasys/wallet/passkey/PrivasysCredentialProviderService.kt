@@ -33,6 +33,52 @@ import java.security.MessageDigest
 import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 import java.util.UUID
+import javax.crypto.Cipher
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
+
+/**
+ * Reads the website passkey root the wallet stored with
+ * NativeKeysModule.setPasskeyRoot.
+ *
+ * This is a deliberate duplicate of the reading half of the store in
+ * modules/native-keys (NativeKeysModule.kt, "Website passkey root"): the two
+ * are separate Gradle libraries with no dependency between them, and the
+ * credential provider runs in the app's own process, so reading the same
+ * private SharedPreferences and the same Keystore key is enough. The names
+ * and the blob layout below MUST stay identical to that file.
+ *
+ * Layout: prefs [ROOT_PREFS], key [ROOT_PREF_KEY], value base64(iv(12) || AES-GCM(root) || tag).
+ */
+internal object PasskeyRootStore {
+    const val ROOT_PREFS = "org.privasys.wallet.passkey-root"
+    const val ROOT_PREF_KEY = "root"
+    const val WRAP_KEY_ALIAS = "org.privasys.wallet.passkey-root-wrap"
+    private const val GCM_IV_BYTES = 12
+    private const val GCM_TAG_BITS = 128
+
+    fun exists(context: Context): Boolean =
+        context.getSharedPreferences(ROOT_PREFS, Context.MODE_PRIVATE).contains(ROOT_PREF_KEY)
+
+    /** The 32-byte root, or null when the wallet has none (no seed yet, or wiped). The caller wipes it after use. */
+    fun read(context: Context): ByteArray? = try {
+        val blob = context.getSharedPreferences(ROOT_PREFS, Context.MODE_PRIVATE)
+            .getString(ROOT_PREF_KEY, null)
+            ?.let { Base64.decode(it, Base64.NO_WRAP) }
+        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        val key = keyStore.getKey(WRAP_KEY_ALIAS, null) as? SecretKey
+        if (blob == null || key == null || blob.size <= GCM_IV_BYTES) {
+            null
+        } else {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, blob, 0, GCM_IV_BYTES))
+            cipher.doFinal(blob, GCM_IV_BYTES, blob.size - GCM_IV_BYTES).takeIf { it.size == 32 }
+        }
+    } catch (_: Exception) {
+        // A missing or unreadable root means "no synced passkeys here", never a crash in the picker.
+        null
+    }
+}
 
 /**
  * Privasys Wallet Credential Provider Service.
@@ -172,12 +218,17 @@ class PrivasysCredentialProviderService : CredentialProviderService() {
                 return
             }
 
+            // Without the root a synced passkey cannot be derived, so offering
+            // it would only lead to a failed sign-in.
+            val hasRoot = PasskeyRootStore.exists(applicationContext)
+
             val entries = mutableListOf<CredentialEntry>()
             for ((key, value) in allCredentials) {
                 if (value !is String) continue
                 try {
                     val entry = JSONObject(value)
                     val rpId = entry.getString("rpId")
+                    if (entry.optString("kind", "local") == "synced" && !hasRoot) continue
                     val beginOption = request.beginGetCredentialOptions
                         .filterIsInstance<androidx.credentials.provider.BeginGetPublicKeyCredentialOption>()
                         .firstOrNull() ?: continue
@@ -194,7 +245,8 @@ class PrivasysCredentialProviderService : CredentialProviderService() {
                     entries.add(
                         PublicKeyCredentialEntry.Builder(
                             applicationContext,
-                            rpId,
+                            // The account name tells two passkeys for one site apart; older records have none.
+                            entry.optString("userName", "").ifEmpty { rpId },
                             android.app.PendingIntent.getActivity(
                                 applicationContext, entries.size,
                                 android.content.Intent(applicationContext, PasskeyActivity::class.java).apply {
@@ -258,20 +310,13 @@ class PrivasysCredentialProviderService : CredentialProviderService() {
         cancellationSignal: CancellationSignal,
         callback: OutcomeReceiver<Void?, ClearCredentialException>
     ) {
-        // Delete all credential entries
-        val prefs = getPrefs()
-        val allCredentials = prefs.all
-        for ((_, value) in allCredentials) {
-            if (value !is String) continue
-            try {
-                val entry = JSONObject(value)
-                val keyAlias = entry.getString("keyAlias")
-                keyStore.deleteEntry(keyAlias)
-            } catch (_: Exception) {
-                // Best effort
-            }
-        }
-        prefs.edit().clear().apply()
+        // Any app calls clearCredentialState when its user signs out. It asks
+        // the provider to forget session state (a remembered choice, say), not
+        // to destroy credentials: deleting every passkey here would wipe the
+        // holder's passkeys for all websites whenever any one app signed out.
+        // We keep no such session state, so there is nothing to clear.
+        // Passkeys are removed only through deleteWebsitePasskey or the
+        // wallet's wipe.
         callback.onResult(null)
     }
 
@@ -283,6 +328,7 @@ class PrivasysCredentialProviderService : CredentialProviderService() {
             put("rpId", rpId)
             put("credentialId", credIdB64)
             put("keyAlias", keyAlias)
+            put("kind", "local")
             put("createdAt", System.currentTimeMillis())
         }
         getPrefs().edit()

@@ -426,6 +426,78 @@
       <a href="mailto:support@privasys.org">Need help? support@privasys.org</a>
     </div>
   </div>
+
+  <!-- Deleting the account: /account/delete. Linked from the account page
+       once a wallet that confirms deletions is in the stores. -->
+  <div id="del" class="hidden">
+    <header class="acct-head">
+      <h1>Delete your account.</h1>
+      <p class="who"><span id="delWhen">Your Privasys account is deleted 7 days after you confirm.</span></p>
+    </header>
+
+    <section class="section" id="delBlocked" hidden>
+      <div class="section-head"><h2>Before you can delete it</h2></div>
+      <p class="section-lead">These are yours and would be lost, so they need to go first. Delete them, or hand them over to someone else, in the developer portal.</p>
+      <div class="apps" id="delBlockers"></div>
+      <div class="add-app"><p><a href="https://developer.privasys.org/dashboard">Open the developer portal</a></p></div>
+    </section>
+
+    <section class="section" id="delWhat">
+      <div class="section-head"><h2>What happens</h2></div>
+      <div class="apps">
+        <div class="app"><div><div class="app-name">7 days to change your mind</div><div class="hint">Your account keeps working as usual until then. You can cancel at any time from Privasys Wallet.</div></div></div>
+        <div class="app"><div><div class="app-name">Then everything here goes</div><div class="hint">Your passkeys, sign-ins, backups and app permissions on privasys.id are deleted, and every phone with your wallet clears itself.</div></div></div>
+        <div class="app"><div><div class="app-name">Save what you need from your apps first</div><div class="hint">Apps that hold your files or messages, such as Privasys Drive, are told your account is gone. Open each one before the date to save a copy.</div></div></div>
+        <div class="app"><div><div class="app-name">Your wallet data</div><div class="hint">To keep a copy of what is in your wallet, save it from Privasys Wallet.</div></div></div>
+      </div>
+    </section>
+
+    <section class="section" id="delMoney" hidden>
+      <div class="section-head"><h2>Your money balance</h2></div>
+      <p class="section-lead">You have <strong id="delAmount"></strong> of money you paid in. It is refunded to the card you paid with once your account is deleted, minus what you use until then. Credits we gave you are not refunded.</p>
+      <div id="delChoiceBox" hidden>
+        <label class="hint" style="display:flex;gap:.6rem;align-items:flex-start;margin-top:.8rem">
+          <input type="checkbox" id="delDonate" style="margin-top:.25rem">
+          <span>I give up my refund so that it goes to Cancer Research UK. Privasys makes the donation, once a year, so Gift Aid does not apply and no donation receipt is issued to you. <a href="https://privasys.org/legal/charity/">How it works</a></span>
+        </label>
+        <p class="note" style="margin-top:.6rem">100% of unused balance on account deletion will be donated to Cancer Research UK via Work for Good.</p>
+        <div class="row" style="margin-top:1rem">
+          <button class="btn btn-outline btn-sm" id="delRefundNow" type="button">Refund me now</button>
+        </div>
+        <p class="note">Refunding now ends paid use straight away. Every refund is checked by our team before the money leaves, which usually takes a few working days.</p>
+      </div>
+      <div class="apps" id="delCases"></div>
+      <div class="err" id="delMoneyErr"></div>
+    </section>
+
+    <section class="section" id="delStart" hidden>
+      <div class="section-head"><h2>Confirm in Privasys Wallet</h2></div>
+      <p class="section-lead">Deleting your account is confirmed on your phone.</p>
+      <div class="row"><button class="btn" id="delStartBtn" type="button">Delete my account</button></div>
+      <div id="delHandoff" hidden style="margin-top:1rem">
+        <p class="hint" id="delHandoffText"></p>
+        <div class="row" style="margin-top:.8rem"><a class="btn" id="delOpenWallet" href="#">Open Privasys Wallet</a></div>
+        <div id="delQR" style="width:200px;max-width:70%;margin-top:1rem;background:#fff;padding:12px;border-radius:12px"></div>
+      </div>
+      <div class="err" id="delErr"></div>
+    </section>
+
+    <section class="section" id="delPending" hidden>
+      <div class="section-head"><h2>Deletion scheduled</h2></div>
+      <p class="section-lead">Your account will be deleted on <strong id="delDate"></strong>. <strong>To cancel, open Privasys Wallet</strong>: the banner at the top has a Cancel button.</p>
+    </section>
+
+    <div class="quiet-links">
+      <a href="/account">Back to your account</a>
+      <a href="mailto:support@privasys.org">Need help? support@privasys.org</a>
+    </div>
+  </div>
+
+  <!-- /account/delete/confirm opened in a browser: the wallet was not there to take the link. -->
+  <section id="delConfirmInfo" class="connect hidden">
+    <h1>Open this on your phone.</h1>
+    <p>This link confirms deleting a Privasys account. Open it on the phone that has Privasys Wallet, or scan the code shown on the deletion page with the wallet.</p>
+  </section>
 </main>
 
 <footer class="footer">
@@ -441,6 +513,7 @@
 </footer>
 
 <script src="/auth/privasys-auth-client.iife.js"></script>
+<script src="/account/qr.js"></script>
 <script>
 (function () {
   "use strict";
@@ -944,6 +1017,133 @@
         });
       });
     });
+  }
+
+  // --- Deleting the account (/account/delete) ---
+  //
+  // The page is signed in as the person's privasys.id identity. privasys.id
+  // keeps no link to their other identities, so the deletion is confirmed in
+  // the wallet, which marks each identity itself: the page asks for a
+  // one-time confirm link and hands it to the wallet (a button on this
+  // phone, a QR code from a computer), then waits for the answer.
+  var onDeletePage = location.pathname.indexOf("/account/delete") === 0;
+  var onConfirmPage = location.pathname.indexOf("/account/delete/confirm") === 0;
+
+  function longDate(iso) {
+    return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  }
+  function pence(p) {
+    return "£" + ((p || 0) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function isPhone() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); }
+
+  async function loadDeletion() {
+    $("connect").classList.add("hidden");
+    $("navConnect").classList.add("hidden");
+    $("navUser").classList.remove("hidden");
+    $("main").classList.add("hidden");
+    $("del").classList.remove("hidden");
+    $("delErr").textContent = "";
+    var state = await idp("/account-deletion");
+    if (state && state.state === "pending") {
+      $("delStart").hidden = true;
+      $("delBlocked").hidden = true;
+      $("delPending").hidden = false;
+      $("delDate").textContent = longDate(state.delete_at);
+      $("delWhen").textContent = "Your Privasys account will be deleted on " + longDate(state.delete_at) + ".";
+      await loadMoney(true);
+      return;
+    }
+    $("delPending").hidden = true;
+    var check = null;
+    try { check = await idp("/account-deletion/check"); }
+    catch (e) { $("delErr").textContent = e.message; $("delStart").hidden = false; $("delStartBtn").disabled = true; return; }
+    var blockers = (check && check.blockers) || [];
+    $("delBlocked").hidden = blockers.length === 0;
+    $("delBlockers").innerHTML = blockers.map(function (b) {
+      return '<div class="app"><div><div class="app-name">' + esc(b.label) + '</div></div></div>';
+    }).join("");
+    $("delStart").hidden = false;
+    $("delStartBtn").disabled = blockers.length > 0;
+    await loadMoney(false);
+  }
+
+  // The money balance: shown before; chosen (refund or donate) and Refund now
+  // once the deletion is scheduled.
+  async function loadMoney(pending) {
+    var c = null;
+    try { c = await mgmt("/billing/closure"); } catch (e) { return; }
+    var amount = (c && c.refundable_pence) || 0;
+    var cases = (c && c.cases) || [];
+    $("delMoney").hidden = amount <= 0 && cases.length === 0;
+    $("delAmount").textContent = pence(amount);
+    $("delChoiceBox").hidden = !pending || amount <= 0;
+    $("delDonate").checked = c && c.choice === "donate";
+    $("delCases").innerHTML = cases.map(function (k) {
+      var what = k.destination === "donation"
+        ? "Given up for the donation to Cancer Research UK"
+        : (k.status === "refunded" ? "Refunded" : k.status === "rejected" ? "Refund declined, money back on your account" : "Refund being checked by our team");
+      return '<div class="app"><div><div class="app-name">' + esc(pence(k.amount_pence)) + '</div><div class="hint">' + esc(what) + '</div></div></div>';
+    }).join("");
+  }
+
+  $("delDonate").addEventListener("change", async function () {
+    $("delMoneyErr").textContent = "";
+    var choice = this.checked ? "donate" : "refund";
+    try { await mgmt("/billing/closure/choice", { method: "POST", body: { choice: choice } }); }
+    catch (e) { $("delMoneyErr").textContent = e.message; this.checked = !this.checked; }
+  });
+
+  $("delRefundNow").addEventListener("click", async function () {
+    var donating = $("delDonate").checked;
+    var q = donating
+      ? "Give up your money balance for the donation now? Paid use ends straight away."
+      : "Refund your money balance now? Paid use ends straight away, and our team checks the refund before the money leaves.";
+    if (!confirm(q)) return;
+    $("delMoneyErr").textContent = "";
+    try { await mgmt("/billing/closure/refund-now", { method: "POST" }); await loadMoney(true); }
+    catch (e) { $("delMoneyErr").textContent = e.message; }
+  });
+
+  var pollTimer = null;
+  $("delStartBtn").addEventListener("click", async function () {
+    $("delErr").textContent = "";
+    var req;
+    try { req = await idp("/account-deletion/request", { method: "POST" }); }
+    catch (e) { $("delErr").textContent = e.message; return; }
+    $("delHandoff").hidden = false;
+    $("delOpenWallet").href = req.confirm_url;
+    $("delOpenWallet").style.display = isPhone() ? "" : "none";
+    $("delQR").style.display = isPhone() ? "none" : "";
+    $("delHandoffText").textContent = isPhone()
+      ? "Open Privasys Wallet to confirm. This link works for 10 minutes."
+      : "Scan this code with Privasys Wallet, or with your phone's camera, to confirm. It works for 10 minutes.";
+    if (!isPhone() && window.PrivasysQR) {
+      $("delQR").innerHTML = PrivasysQR.svg(req.confirm_url, { ecc: "M", border: 4, logo: true });
+    }
+    if (pollTimer) clearInterval(pollTimer);
+    var until = Date.now() + 10 * 60 * 1000;
+    pollTimer = setInterval(async function () {
+      if (Date.now() > until) { clearInterval(pollTimer); $("delHandoff").hidden = true; $("delErr").textContent = "The link expired. Start again."; return; }
+      try {
+        var st = await idp("/account-deletion/request/" + encodeURIComponent(req.request_id));
+        if (st && st.status === "scheduled") { clearInterval(pollTimer); $("delHandoff").hidden = true; await loadDeletion(); }
+      } catch (e) { /* keep waiting */ }
+    }, 2500);
+  });
+
+  if (onConfirmPage) {
+    // The wallet takes this link when installed; a browser that got it shows
+    // where to open it, and needs no sign-in.
+    $("connect").classList.add("hidden");
+    $("delConfirmInfo").classList.remove("hidden");
+    return;
+  }
+  if (onDeletePage) {
+    // Same sign-in as the account page; once signed in, show the deletion.
+    load = async function () {
+      try { await loadDeletion(); } catch (e) { $("delErr").textContent = e.message; }
+    };
   }
 
   restore();

@@ -32,3 +32,15 @@ func HandleAccountPage(apiBase string) http.HandlerFunc {
 		w.Write(page)
 	}
 }
+
+//go:embed qr.js
+var qrJS []byte
+
+// HandleQRScript serves the self-contained QR encoder the account pages use
+// to show a wallet link to a phone (the deletion confirm link).
+func HandleQRScript(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Write(qrJS)
+}

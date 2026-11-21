@@ -444,7 +444,10 @@ func migrate(db *sql.DB) error {
 		}
 	}
 
-	return migrateDevices(db)
+	if err := migrateDevices(db); err != nil {
+		return err
+	}
+	return migrateAccountDeletion(db)
 }
 
 // --- User operations ---

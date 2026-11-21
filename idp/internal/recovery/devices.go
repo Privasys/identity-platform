@@ -220,6 +220,13 @@ func (h *Handler) HandleRedeemEnrolTicket(w http.ResponseWriter, r *http.Request
 // verifyIdentitySignature pops the challenge and checks a signature by the
 // identity's current recovery key over msg(challenge). Writes the error
 // response and returns false when anything does not hold.
+// VerifyIdentitySignature is verifyIdentitySignature for other packages'
+// identity-signed requests (challenge from /recovery/identity/begin; 400 for
+// a bad or foreign challenge, 403 for a signature that does not match).
+func (h *Handler) VerifyIdentitySignature(w http.ResponseWriter, userID, challengeB64, signatureB64 string, msg func([]byte) []byte) bool {
+	return h.verifyIdentitySignature(w, userID, challengeB64, signatureB64, msg)
+}
+
 func (h *Handler) verifyIdentitySignature(w http.ResponseWriter, userID, challengeB64, signatureB64 string, msg func([]byte) []byte) bool {
 	challenge, err1 := decodeB64URL(challengeB64)
 	sig, err2 := decodeB64URL(signatureB64)

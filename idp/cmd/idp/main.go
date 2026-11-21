@@ -37,6 +37,7 @@ import (
 
 	"github.com/Privasys/idp/internal/admin"
 	"github.com/Privasys/idp/internal/appmessages"
+	"github.com/Privasys/idp/internal/accountdeletion"
 	"github.com/Privasys/idp/internal/apps"
 	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/capasks"
@@ -305,6 +306,7 @@ func main() {
 	// calls it with the user's bearer.
 	mux.HandleFunc("GET /account", oidc.HandleAccountPage(cfg.AccountAPIBase))
 	mux.HandleFunc("GET /account/", oidc.HandleAccountPage(cfg.AccountAPIBase))
+	mux.HandleFunc("GET /account/qr.js", oidc.HandleQRScript)
 	// A non-enclave relying party registers where it publishes spend keys.
 	mux.HandleFunc("POST /clients/{id}/spend", clients.HandleSetSpendJWKS(clientReg, cfg.AdminToken))
 	mux.HandleFunc("POST /clients/{id}/subject", clients.HandleSetSubjectMode(clientReg, cfg.AdminToken))
@@ -524,6 +526,58 @@ func main() {
 		}
 		log.Printf("[recovery] ended %d sealed session(s) of %s…", n, userID[:min(8, len(userID))])
 	})
+	// Deleting an account, 7 days after the holder asks: independent marks
+	// per user_id, made by the wallet for each identity it holds. See
+	// internal/accountdeletion.
+	var deletionCP accountdeletion.ControlPlane
+	if cfg.MgmtURL != "" && cfg.IdpMgmtToken != "" {
+		deletionCP = &accountdeletion.MgmtControlPlane{URL: cfg.MgmtURL, Token: cfg.IdpMgmtToken}
+	}
+	accountDeletion := accountdeletion.New(accountdeletion.Deps{
+		DB:                 db,
+		AuthBearer:         recoveryHandler.AuthenticateBearer,
+		FreshWalletSession: fido2Handler.FreshSession,
+		VerifyIdentity:     recoveryHandler.VerifyIdentitySignature,
+		PlatformSubject: func(userID string) string {
+			return issuer.SubjectFor(userID, clientReg.SectorOf("privasys-platform"))
+		},
+		RevokeSpend: func(userID string) {
+			consents, err := spendStore.List(userID)
+			if err != nil {
+				log.Printf("[account-deletion] list spend consents: %v", err)
+				return
+			}
+			for _, c := range consents {
+				if err := spendStore.Revoke(userID, c.AppID); err == nil {
+					spendHandler.NotifyRevoked(c)
+				}
+			}
+		},
+		EndWalletSessions: fido2Handler.WalletSessionEnder(),
+		RevokeSessions: func(userID string) {
+			if _, err := sessionsStore.RevokeAllForUser(userID); err != nil {
+				log.Printf("[account-deletion] end sessions: %v", err)
+			}
+		},
+		TombstoneKey: issuer.DeriveSecret("credential-tombstone"),
+		ControlPlane: deletionCP,
+		PageURL:      cfg.IssuerURL + "/account/delete",
+		ConfirmURL:   cfg.IssuerURL + "/account/delete/confirm",
+		Push: func(ctx context.Context, userID string, m push.Message) error {
+			return push.Notify(ctx, db, userID, m)
+		},
+	})
+	fido2Handler.SetOnFirstCredential(accountDeletion.CancelForRecovery)
+	mux.HandleFunc("GET /account-deletion", accountDeletion.HandleGet)
+	mux.HandleFunc("POST /account-deletion", accountDeletion.HandleConfirm)
+	mux.HandleFunc("DELETE /account-deletion", accountDeletion.HandleCancel)
+	mux.HandleFunc("GET /account-deletion/check", accountDeletion.HandleCheck)
+	mux.HandleFunc("POST /account-deletion/request", accountDeletion.HandleRequest)
+	mux.HandleFunc("GET /account-deletion/request/{id}", accountDeletion.HandleRequestStatus)
+	mux.HandleFunc("POST /account-deletion/identity", accountDeletion.HandleIdentity)
+	mux.HandleFunc("GET /account-deletion/tombstone", accountDeletion.HandleTombstone)
+	go accountDeletion.Run(context.Background(), 5*time.Minute)
+
 	// Recovery phrase (BIP39) endpoints — preferred names.
 	mux.HandleFunc("POST /recovery/phrase/regenerate", recoveryHandler.HandleRegeneratePhrase)
 	mux.HandleFunc("POST /recovery/phrase/register", recoveryHandler.HandleRegisterPhraseHash)

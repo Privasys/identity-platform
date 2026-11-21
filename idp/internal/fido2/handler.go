@@ -88,6 +88,10 @@ type Handler struct {
 	db             *store.DB
 	challenges     *challengeStore
 	walletSessions *walletSessionStore
+	// onFirstCredential runs when a user_id gets its first passkey after
+	// having none: a new account, or the end of a recovery (which removes
+	// every passkey first). A pending account deletion is cancelled there.
+	onFirstCredential func(userID string)
 	vaultResults   *vaultResultStore
 	vaultPending   *vaultPendingStore
 	vaultBatches   *vaultBatchStore
@@ -122,6 +126,9 @@ type walletSessionEntry struct {
 	// phone ends the sessions its passkeys opened.
 	credentialID string
 	expiresAt    time.Time
+	// issuedAt is when the passkey ceremony opened the session, so an act
+	// that needs a fresh confirmation can ask for a recent one.
+	issuedAt time.Time
 }
 
 const walletSessionTTL = 30 * time.Minute
@@ -140,7 +147,8 @@ func newWalletSessionStore() *walletSessionStore {
 func (s *walletSessionStore) issue(userID, credentialID string) string {
 	token := generateToken()
 	s.mu.Lock()
-	s.sessions[token] = walletSessionEntry{userID: userID, credentialID: credentialID, expiresAt: time.Now().Add(walletSessionTTL)}
+	now := time.Now()
+	s.sessions[token] = walletSessionEntry{userID: userID, credentialID: credentialID, expiresAt: now.Add(walletSessionTTL), issuedAt: now}
 	s.mu.Unlock()
 	return token
 }
@@ -189,6 +197,23 @@ func (s *walletSessionStore) endForCredentials(credentialIDs []string) {
 // removing passkeys, so a revoked phone's open sessions end with them.
 func (h *Handler) WalletSessionEnder() func([]string) {
 	return h.walletSessions.endForCredentials
+}
+
+// SetOnFirstCredential sets the hook run when a user_id gets its first
+// passkey (a new account, or the end of a recovery).
+func (h *Handler) SetOnFirstCredential(f func(userID string)) { h.onFirstCredential = f }
+
+// FreshSession returns the account behind a wallet session opened by a
+// passkey ceremony less than maxAge ago (user verification is required at
+// every ceremony), for acts that need a fresh confirmation.
+func (h *Handler) FreshSession(token string, maxAge time.Duration) (string, bool) {
+	h.walletSessions.mu.Lock()
+	defer h.walletSessions.mu.Unlock()
+	e, ok := h.walletSessions.sessions[token]
+	if !ok || time.Now().After(e.expiresAt) || time.Since(e.issuedAt) > maxAge {
+		return "", false
+	}
+	return e.userID, true
 }
 
 // SessionCredential returns the passkey behind a wallet session, "" when the
@@ -620,6 +645,9 @@ func (h *Handler) CompleteRegistration(
 		if priorCredentials == 0 && credCountErr == nil {
 			if err := h.db.MarkRecoveryCodesUsed(userID); err != nil {
 				log.Printf("fido2/register/complete: retire recovery codes: %v", err)
+			}
+			if h.onFirstCredential != nil {
+				h.onFirstCredential(userID)
 			}
 		}
 		if priorCredentials == 0 && credCountErr == nil && !entry.clientPhrase {

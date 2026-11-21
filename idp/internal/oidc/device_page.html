@@ -73,7 +73,7 @@
     <div class="scopes" id="scopes"></div>
     <a class="btn btn-primary" id="walletBtn">Open Privasys Wallet</a>
     <div class="qr hidden" id="qrBlock">
-      <div class="qr-sep">or scan on another device</div>
+      <div class="qr-sep" id="qrSep">or scan on another device</div>
       <div class="qr-frame" id="qrImg"></div>
     </div>
     <button class="btn btn-secondary" id="passkeyBtn">Use a passkey or sign in another way</button>
@@ -555,13 +555,28 @@ var PrivasysQR = (function () {
       scopeBox.appendChild(el);
     });
     if (d.qr_payload) {
-      // iOS suppresses universal links for same-domain navigations, so a tap
-      // on this page (privasys.id) to privasys.id/scp opens Safari, not the
-      // wallet. On phones point the button at the wallet's custom scheme;
-      // desktops keep the https link (and the QR for cross-device scan).
-      var deepLink = d.qr_payload.replace(/^https:\/\/privasys\.id\/scp/, "privasys-wallet://scp");
-      var mobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
-      $("walletBtn").href = mobile ? deepLink : d.qr_payload;
+      // On a phone the button opens the wallet on this device. iOS suppresses
+      // universal links for same-domain navigations, so a tap on this page
+      // (privasys.id) to privasys.id/scp opens Safari, not the wallet: the
+      // button uses the wallet's custom scheme.
+      // A computer has no wallet to open. There the button signs in through
+      // the sign-in gate, which sends a notification to the wallet this
+      // browser knows, and offers a passkey and the other ways when it knows
+      // none. The QR code stays for scanning with any wallet.
+      if (/iPhone|iPad|Android/i.test(navigator.userAgent)) {
+        $("walletBtn").href = d.qr_payload.replace(/^https:\/\/privasys\.id\/scp/, "privasys-wallet://scp");
+      } else {
+        $("walletBtn").textContent = "Continue";
+        $("walletBtn").setAttribute("role", "button");
+        $("walletBtn").setAttribute("tabindex", "0");
+        $("walletBtn").style.cursor = "pointer";
+        $("walletBtn").addEventListener("click", approveThroughGate);
+        $("walletBtn").addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); approveThroughGate(); }
+        });
+        $("passkeyBtn").classList.add("hidden");
+        $("qrSep").textContent = "or scan with the Privasys Wallet";
+      }
       try {
         $("qrImg").innerHTML = PrivasysQR.svg(d.qr_payload, { ecc: "H", border: 4, logo: true });
         $("qrBlock").classList.remove("hidden");
@@ -592,9 +607,13 @@ var PrivasysQR = (function () {
     } catch (e) { $("status").textContent = e.message; }
   });
 
-  // No-wallet path: authenticate via the SDK (passkey / social / wallet
-  // modal), then approve the device with the resulting IdP access token.
-  $("passkeyBtn").addEventListener("click", async function () {
+  // Sign in through the gate (wallet notification, passkey or another way),
+  // then approve the device with the resulting IdP access token.
+  var gateOpen = false;
+  async function approveThroughGate() {
+    if (gateOpen) return;
+    gateOpen = true;
+    $("status").className = "status";
     $("status").innerHTML = '<span class="spin"></span> Opening sign-in…';
     try {
       if (!window.Privasys || !Privasys.AuthFrame) throw new Error("Sign-in unavailable. Try the wallet.");
@@ -615,8 +634,11 @@ var PrivasysQR = (function () {
     } catch (e) {
       $("status").className = "status err";
       $("status").textContent = e.message || "Sign-in failed.";
+    } finally {
+      gateOpen = false;
     }
-  });
+  }
+  $("passkeyBtn").addEventListener("click", approveThroughGate);
 
   $("codeContinue").addEventListener("click", function () {
     userCode = norm($("codeInput").value);

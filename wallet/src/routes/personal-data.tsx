@@ -37,6 +37,7 @@ import { Text, usePalette, type Palette } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES, isGovVerified } from '@/services/attributes';
 import { isFresh, notify, useNoticeStore } from '@/stores/notice';
 import { cardBankSource, CardCheckError, checkAddressWithCard, formatAddress } from '@/services/card-check';
+import { provedBy } from '@/services/attribute-proofs';
 import { currentLocale } from '@/i18n';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 
@@ -129,17 +130,25 @@ export default function PersonalDataScreen() {
         if (!def) return;
 
         const now = Math.floor(Date.now() / 1000);
-        setAttribute({
-            key: addingAttribute,
-            label: def.label,
-            value: newAttrValue.trim(),
-            source: 'manual',
-            acquiredAt: now,
-            updatedAt: now,
-            verified: false,
-        });
+        // Merged, not set: setAttribute replaces the value already held for
+        // this key, which turned "add a second email" into "replace my email".
+        const hadOne = existingKeys.has(addingAttribute);
+        useProfileStore.getState().mergeAttribute(
+            {
+                key: addingAttribute,
+                label: def.label,
+                value: newAttrValue.trim(),
+                source: 'manual',
+                acquiredAt: now,
+                updatedAt: now,
+                verified: false,
+            },
+            !!def.multiValued,
+        );
 
-        if (def.profileField === 'email') updateProfile({ email: newAttrValue.trim() });
+        // The profile's own field follows the first value only: a second
+        // email does not become the main one.
+        if (def.profileField === 'email' && !hadOne) updateProfile({ email: newAttrValue.trim() });
         if (def.profileField === 'displayName') updateProfile({ displayName: newAttrValue.trim() });
         if (def.profileField === 'locale') updateProfile({ locale: newAttrValue.trim() });
 
@@ -166,8 +175,10 @@ export default function PersonalDataScreen() {
     // (2026-08-26). Date of Birth and Nationality stay: those are self-asserted
     // keys with gov-verified twins (birthdate_id, nationality_id), and the
     // disclosure path already knows the difference.
+    // What can be added: a detail not there yet, and another value of one
+    // that takes several (a second email, another phone number).
     const missingAttributes = CANONICAL_ATTRIBUTES.filter(
-        (a) => !existingKeys.has(a.key) && !isGovVerified(a.key),
+        (a) => (a.multiValued || !existingKeys.has(a.key)) && !isGovVerified(a.key),
     );
 
     // Logical display order, not insertion order: keep related attributes together
@@ -352,8 +363,12 @@ function AttributeCard({
     // for a few seconds, in place of a page that said so.
     const fresh = useNoticeStore((st) => isFresh(st.fresh, attr.key, attr.value));
 
+    // Who proved the value, when something did; otherwise where it came from.
+    const proved = provedBy(attr, t);
     const sourceLabel =
-        attr.sourceProvider === 'card_bank'
+        proved?.kind === 'text'
+            ? proved.text
+            : proved?.kind === 'card' || attr.sourceProvider === 'card_bank'
             ? cardBankSource(attr, t, currentLocale())
             : attr.source === 'provider' && attr.sourceProvider
             ? t('personalData.viaProvider', { provider: attr.sourceProvider })
@@ -516,7 +531,7 @@ function AttributeCard({
                                     ) : null}
                                 </RNView>
                             )}
-                            {confirmed ? (
+                            {confirmed && !proved ? (
                                 <RNView style={styles.confirmBadge}>
                                     <Ionicons name="shield-checkmark" size={12} color={p.blue} />
                                     <Text style={styles.confirmText}>

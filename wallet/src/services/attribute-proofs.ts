@@ -159,3 +159,44 @@ export async function disclosureFor(key: string, value: string, clientId: string
         return undefined;
     }
 }
+
+const SOURCE_NAMES: Record<string, string> = {
+    google: 'Google',
+    microsoft: 'Microsoft',
+    linkedin: 'LinkedIn',
+    github: 'GitHub',
+};
+
+/** A verifier source's name for people: a known provider, or an OIDC issuer's host. */
+function sourceName(source: string): string {
+    if (SOURCE_NAMES[source]) return SOURCE_NAMES[source];
+    if (source.startsWith('oidc:')) {
+        try {
+            return new URL(source.slice(5)).host;
+        } catch {
+            return source.slice(5);
+        }
+    }
+    return source;
+}
+
+/**
+ * Who proved a value, for the line under it: the proof's source when it has
+ * one ("Verified by Google", "Verified by email code", the card's bank), or
+ * privasys.id's own mail-code receipt from before the verifier. Undefined when
+ * nothing proved it, so the screen falls back to where the value came from.
+ * The card's bank, which needs the proof's label, is the caller's.
+ */
+export function provedBy(
+    attr: ProfileAttribute,
+    t: (key: string, opts?: Record<string, unknown>) => string,
+): { kind: 'card' } | { kind: 'text'; text: string } | undefined {
+    const rec =
+        attr.verifications?.find((v) => v.proof) ??
+        attr.verifications?.find((v) => v.verifier === 'privasys.id' && v.method === 'email_code');
+    if (!rec) return undefined;
+    if (rec.verifier === 'card_bank') return { kind: 'card' };
+    if (rec.verifier === 'privasys_mail' || rec.verifier === 'privasys.id') return { kind: 'text', text: t('personalData.verifiedByMail') };
+    if (rec.assurance !== 'provider') return { kind: 'text', text: t('personalData.fromProviderAccount', { provider: sourceName(rec.verifier) }) };
+    return { kind: 'text', text: t('personalData.verifiedByProvider', { provider: sourceName(rec.verifier) }) };
+}

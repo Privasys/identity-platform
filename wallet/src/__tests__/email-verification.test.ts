@@ -3,25 +3,33 @@
 
 // The verifier client is the network here; what this module adds is turning
 // its answers into reasons the screen can say something true about.
-class MockVerifierError extends Error {
-    constructor(
-        readonly status: number,
-        message: string,
-        readonly body: Record<string, unknown> | null = null,
-    ) {
-        super(message);
-    }
-}
 const mockStart = jest.fn();
 const mockAttest = jest.fn();
 jest.mock('@/services/attribute-verifier', () => ({
-    AttributeVerifierError: MockVerifierError,
+    // Defined here: the imports below are hoisted above anything declared in
+    // this file, and the factory runs when they are.
+    AttributeVerifierError: class extends Error {
+        status: number;
+        body: Record<string, unknown> | null;
+        constructor(s: number, message: string, b: Record<string, unknown> | null = null) {
+            super(message);
+            this.status = s;
+            this.body = b;
+        }
+    },
     newCommitment: () => ({ salt: 'c2FsdA', commitment: 'commit' }),
     startMailCode: (...a: unknown[]) => mockStart(...a),
     attest: (...a: unknown[]) => mockAttest(...a),
 }));
 
+import { AttributeVerifierError } from '@/services/attribute-verifier';
 import { confirmEmailCode, sendEmailCode } from '@/services/email-verification';
+
+const MockVerifierError = AttributeVerifierError as unknown as new (
+    status: number,
+    message: string,
+    body?: Record<string, unknown> | null,
+) => Error;
 
 const sent = { mailToken: 'mt', expiresAt: 1234, codeLength: 6, maxAttempts: 5, resendAfter: 60 };
 

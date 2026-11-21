@@ -338,8 +338,21 @@ class PasskeyActivity : Activity() {
             val attestation = inspectEnclave(host, port)
 
             runOnUiThread {
-                if (attestation != null) {
-                    val json = try { JSONObject(attestation) } catch (_: Exception) { null }
+                val json = attestation?.let { try { JSONObject(it) } catch (_: Exception) { null } }
+                // A Privasys enclave is a host whose RA-TLS answer carries its
+                // measurements. Anything else is an ordinary website (or one
+                // the RA-TLS library could not inspect): the wallet is a
+                // general passkey provider, so it gets a plain consent prompt,
+                // as on iOS, instead of being refused. An enclave whose
+                // attestation fails is still a hard stop.
+                val isEnclave = json != null && (json.has("mrtd") || json.has("mrenclave"))
+                if (!isEnclave) {
+                    spinner.visibility = View.GONE
+                    statusText.text = "Use your Privasys passkey?"
+                    detailText.text = rpId
+                    cancelButton.setOnClickListener { onRejected() }
+                    onVerified()
+                } else if (attestation != null) {
                     val valid = json?.optBoolean("valid", false) ?: false
 
                     if (valid) {

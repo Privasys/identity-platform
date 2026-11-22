@@ -47,15 +47,12 @@
   .qr-sep::before, .qr-sep::after { content:""; flex:1; height:1px; background:var(--line); }
   .qr-frame { width:200px; max-width:70%; margin:0 auto; background:#fff; padding:12px; border-radius:12px; }
   .qr-frame svg { display:block; width:100%; height:auto; }
-  /* The shared sign-in gate fills the page; "deny" stays reachable over it. */
+  /* The shared sign-in gate fills the page; it offers "deny" itself. */
   #gate { position:fixed; inset:0; background:#fff; z-index:10; }
-  #gateDeny { position:fixed; left:24px; bottom:18px; z-index:20; width:auto; margin:0; padding:6px 10px;
-              background:#fff; color:#b91c1c; border-radius:8px; font-size:14px; }
 </style>
 </head>
 <body>
 <div id="gate" class="hidden"></div>
-<button class="btn btn-deny hidden" id="gateDeny">Not me, deny</button>
 <div class="card" id="card">
   <div class="logo">Privasys ID</div>
 
@@ -541,7 +538,6 @@ var PrivasysQR = (function () {
 
   function closeGate() {
     $("gate").classList.add("hidden");
-    $("gateDeny").classList.add("hidden");
     $("card").classList.remove("hidden");
     var g = gate;
     gate = null;
@@ -576,7 +572,6 @@ var PrivasysQR = (function () {
     } catch (e) { gate = null; return false; }
     $("card").classList.add("hidden");
     $("gate").classList.remove("hidden");
-    $("gateDeny").classList.remove("hidden");
     var mine = gate;
     mine.signIn().then(function (res) {
       if (gate !== mine || done) return;
@@ -584,7 +579,6 @@ var PrivasysQR = (function () {
         // The gate shows the outcome itself and stays.
         done = true;
         if (pollTimer) clearInterval(pollTimer);
-        $("gateDeny").classList.add("hidden");
       } else {
         closeGate();
         renderConsent(d);
@@ -601,8 +595,6 @@ var PrivasysQR = (function () {
     });
     return true;
   }
-
-  $("gateDeny").addEventListener("click", function () { $("denyBtn").click(); });
 
   function finish(ok, title, msg) {
     done = true;
@@ -676,7 +668,11 @@ var PrivasysQR = (function () {
           }
           finish(true, "Approved ✓", "You can return to your terminal. This page can be closed.");
         }
-        else if (d.status === "denied") finish(false, "Request denied", "The sign-in request was rejected.");
+        else if (d.status === "denied") {
+          // Denied from the gate: it shows the outcome itself and stays.
+          if (gate) { done = true; clearInterval(pollTimer); return; }
+          finish(false, "Request denied", "The sign-in request was rejected.");
+        }
       } catch (e) { finish(false, "Expired", e.message); }
     }, 2500);
   }

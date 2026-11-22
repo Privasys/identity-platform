@@ -124,6 +124,10 @@ export interface AuthUIConfig {
      *  page whose whole purpose was the approval (a device's sign-in, an
      *  operation), so the person ends on the same view they approved in. */
     finalScreen?: { title: string; message: string };
+    /** A way to refuse the request from the gate itself, under the
+     *  ceremony: `run` refuses it, and the gate then stays on `title` and
+     *  `message`. */
+    decline?: { label: string; title: string; message: string; run: () => Promise<void> };
     /** Push token from a previous session. When present the UI will offer
      *  to send a push notification instead of showing a QR code. */
     pushToken?: string;
@@ -1151,6 +1155,9 @@ export class AuthUI {
     // device") instead of using the Open-in-Wallet button.
     /** The outcome is on screen for good (see AuthUIConfig.finalScreen). */
     private finished = false;
+    /** The request was refused from the gate (see AuthUIConfig.decline). */
+    private declined = false;
+    private declining = false;
     private showQrOnMobile = false;
     // Set when the wallet handoff visibly failed (page never lost focus
     // after the tap — the app is most likely not installed).
@@ -1213,6 +1220,8 @@ export class AuthUI {
             this.walletOpenFailed = false;
             this.viaPoll = false;
             this.finished = false;
+            this.declined = false;
+            this.declining = false;
             this.mount();
 
             if (this.cfg.operationApproval) {
@@ -1606,6 +1615,15 @@ export class AuthUI {
                 // the brand panel collapses to a compact header).
                 (this.isFlowState() && stepsUnderway) ? el('div', { className: 'mobile-progress-header' }, this.renderBrandProgress()) : null,
                 content,
+                // Refusing the request sits with the ceremony, while it waits.
+                (this.cfg.decline && !this.finished
+                    && ['idle', 'qr-scanning', 'push-waiting', 'approve-waiting'].includes(this.state))
+                    ? el('button', {
+                        className: 'link-btn',
+                        style: 'margin-top: 16px; font-size: 13px; display: block; text-align: center; width: 100%; color: #B91C1C;',
+                        onClick: () => this.runDecline(),
+                    }, this.declining ? 'Declining…' : this.cfg.decline.label)
+                    : null,
             ),
             // Footer spans both columns
             (this.cfg.legal === false && (inline || isPage)) ? null : el('div', { className: 'footer' },
@@ -1999,6 +2017,8 @@ export class AuthUI {
         op.wait().then(
             () => this.complete(),
             (err: unknown) => {
+                // Declined from this gate: its own outcome is already shown.
+                if (this.declined) return;
                 this.state = 'error';
                 this.errorMsg = (err as Error)?.message ?? 'The approval was not completed.';
                 this.finished = true;
@@ -2215,7 +2235,41 @@ export class AuthUI {
         );
     }
 
+    /** Refuse the request from the gate, then stay on the outcome. */
+    private runDecline(): void {
+        const decline = this.cfg.decline;
+        if (!decline || this.declining || this.finished) return;
+        this.declining = true;
+        this.render();
+        decline.run().then(
+            () => {
+                this.cleanup();
+                this.declined = true;
+                this.finished = true;
+                this.state = 'error';
+                this.errorMsg = decline.message;
+            },
+            (err: unknown) => {
+                // Usually the request was answered or expired meanwhile.
+                this.cleanup();
+                this.state = 'error';
+                this.finished = true;
+                this.errorMsg = `Could not decline: ${(err as Error)?.message || 'the request is no longer open'}`;
+            },
+        ).finally(() => {
+            this.declining = false;
+            this.render();
+        });
+    }
+
     private renderError(): HTMLElement {
+        if (this.declined) {
+            return el('div', null,
+                el('div', { className: 'error-icon', html: ICON_X_CIRCLE }),
+                el('div', { className: 'error-title' }, this.cfg.decline!.title),
+                el('div', { className: 'error-msg' }, this.errorMsg),
+            );
+        }
         // An operation that will not be approved (declined, expired): the
         // outcome is final, and the terminal asks again if it is wanted.
         if (this.cfg.operationApproval) {

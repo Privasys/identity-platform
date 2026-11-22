@@ -31,15 +31,12 @@
   .wallet p { margin: 10px 0 0; }
   .or { display: flex; align-items: center; gap: 10px; color: #6b7180; font-size: 12px; margin: 18px 0 4px; }
   .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid #262a36; }
-  /* The shared sign-in gate fills the page; "decline" stays reachable over it. */
+  /* The shared sign-in gate fills the page; it offers "decline" itself. */
   #gate { position: fixed; inset: 0; background: #fff; z-index: 10; }
-  #gateDecline { position: fixed; left: 24px; bottom: 18px; z-index: 20; width: auto; margin: 0;
-                 padding: 6px 10px; background: #fff; color: #b91c1c; font-size: 14px; border-radius: 8px; }
 </style>
 </head>
 <body>
   <div id="gate" hidden></div>
-  <button id="gateDecline" hidden>Not me, decline</button>
   <div class="card" id="card">
     <h1>Approve vault operation</h1>
     <p>Your terminal requested a hardware-backed approval. Review the operation, then
@@ -213,13 +210,11 @@ function showApproved() {
 // outcome however the approval was given. The card above stays as the
 // fallback when the gate cannot open.
 const gateEl = document.getElementById("gate");
-const declineEl = document.getElementById("gateDecline");
 const cardEl = document.getElementById("card");
 let gate = null;
 
 function showCard() {
   gateEl.hidden = true;
-  declineEl.hidden = true;
   cardEl.hidden = false;
   const g = gate;
   gate = null;
@@ -256,12 +251,11 @@ function openGate() {
   } catch (e) { gate = null; return false; }
   cardEl.hidden = true;
   gateEl.hidden = false;
-  declineEl.hidden = false;
   const mine = gate;
   mine.signIn().then(function (res) {
     if (gate !== mine) return;
     // The gate shows the outcome itself and stays.
-    if (res && res.approved) { declineEl.hidden = true; return; }
+    if (res && res.approved) return;
     showCard();
   }).catch(function (e) {
     if (gate !== mine) return;
@@ -271,27 +265,6 @@ function openGate() {
   });
   return true;
 }
-
-declineEl.addEventListener("click", async function () {
-  const vaultOp = vaultOpOf(payload);
-  declineEl.hidden = true;
-  if (!vaultOp) { showCard(); return; }
-  try {
-    const r = await fetch("/fido2/vault-approval/decline?challenge=" + encodeURIComponent(vaultOp), { method: "POST" });
-    if (r.status !== 204) throw new Error("this approval is no longer open");
-    // The gate watches this approval and shows the decline itself.
-    if (gate) return;
-    btn.style.display = "none";
-    document.getElementById("wallet").hidden = true;
-    document.getElementById("or").hidden = true;
-    statusEl.className = "status err";
-    statusEl.textContent = "Declined. Your terminal stops waiting; you can close this tab.";
-    document.getElementById("hint").textContent = "";
-  } catch (e) {
-    showCard();
-    fail("Could not decline: " + (e && e.message ? e.message : e));
-  }
-});
 
 if (payload) openGate();
 </script>

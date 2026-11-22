@@ -1182,6 +1182,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // Only the device and operation approvals below keep the gate open on
         // their outcome; a page cannot ask for it.
         delete config.finalScreen;
+        delete config.decline;
         // A device request: the ceremony runs on the request the other device
         // created, for the app that asked, so the holder sees that app's
         // consent and the device gets what it asked for. Only the identity
@@ -1203,6 +1204,19 @@ window.addEventListener('message', async (e: MessageEvent) => {
             }
             config.methods = ['wallet'];
             config.finalScreen = { title: 'Approved', message: 'Your device continues on its own. You can close this tab.' };
+            config.decline = {
+                label: 'Not me, deny',
+                title: 'Request denied',
+                message: 'You rejected this sign-in request. You can close this tab.',
+                run: async () => {
+                    const resp = await fetch(`${globalThis.location.origin}/device/deny`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_code: userCode }),
+                    });
+                    if (!resp.ok) throw new Error('this request is no longer open');
+                },
+            };
             config.clientId = device.clientId;
             config.appName = device.appName;
             config.rpId = device.rpId;
@@ -1292,6 +1306,18 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 legal,
                 onNavigate,
                 finalScreen: { title: 'Approved', message: 'Your terminal continues on its own. You can close this tab.' },
+                decline: {
+                    label: 'Not me, decline',
+                    title: 'Declined',
+                    message: 'Your terminal stops waiting. You can close this tab.',
+                    run: async () => {
+                        const resp = await fetch(
+                            `${globalThis.location.origin}/fido2/vault-approval/decline?challenge=${encodeURIComponent(operation.challenge)}`,
+                            { method: 'POST' },
+                        );
+                        if (resp.status !== 204) throw new Error('this approval is no longer open');
+                    },
+                },
                 operationApproval: {
                     walletLink: operation.walletLink,
                     ...(operation.passkey

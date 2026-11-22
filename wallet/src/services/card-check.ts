@@ -34,6 +34,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { attest, AttributeVerifierError, newCommitment, type AttributeProof } from '@/services/attribute-verifier';
 import { thisDeviceBinding } from '@/services/attribute-proofs';
+import { attributeLabel } from '@/services/attributes';
 import { getPlatformToken } from '@/services/platform-token';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { bytesToBase64url } from '@/utils/encoding';
@@ -150,37 +151,47 @@ export async function checkAddressWithCard(): Promise<AttributeProof> {
     const proof = proofs.find((p) => p.attr === 'address');
     if (!proof) throw new CardCheckError('unverified', 'the verifier signed no address');
 
-    const value = JSON.stringify(proof.value);
+    const device = await thisDeviceBinding();
     const now = Math.floor(Date.now() / 1000);
-    const attr: ProfileAttribute = {
-        key: 'address',
-        label: 'Address',
-        value,
-        source: 'provider',
-        sourceProvider: 'card_bank',
-        acquiredAt: now,
-        updatedAt: now,
-        verified: proof.method === 'proven',
-        verifications: [
-            {
-                verifier: proof.source,
-                verifierDisplayName: 'card_bank',
-                method: 'card_check',
-                assurance: proof.method === 'proven' ? 'provider' : 'none',
-                verifiedAt: now,
-                evidence: `verifier:${proof.source}:${proof.method}`,
-                proof: proof.proof,
-                proofDevice: await thisDeviceBinding(),
-                proofSalt: salt,
-                proofMaterial: { kind: 'card_check', data: { ...material, label: proof.label } },
-            },
-        ],
+    const keep = (p: AttributeProof, label: string, value: string) => {
+        const attr: ProfileAttribute = {
+            key: p.attr,
+            label,
+            value,
+            source: 'provider',
+            sourceProvider: 'card_bank',
+            acquiredAt: now,
+            updatedAt: now,
+            verified: p.method === 'proven',
+            verifications: [
+                {
+                    verifier: p.source,
+                    verifierDisplayName: 'card_bank',
+                    method: 'card_check',
+                    assurance: p.method === 'proven' ? 'provider' : 'none',
+                    verifiedAt: now,
+                    evidence: `verifier:${p.source}:${p.method}`,
+                    proof: p.proof,
+                    proofDevice: device,
+                    proofSalt: salt,
+                    proofMaterial: { kind: 'card_check', data: { ...material, label: p.label } },
+                },
+            ],
+        };
+        // Single-valued: a different value already there is replaced by the
+        // one the holder has just typed and their bank has confirmed.
+        const store = useProfileStore.getState();
+        const merged = store.mergeAttribute(attr, false);
+        if (merged.status === 'conflict') store.resolveConflict(merged.existing, merged.incoming, 'replace');
     };
-    // An address is single-valued: a different one already there is replaced
-    // by the one the holder has just typed and their bank has confirmed.
-    const store = useProfileStore.getState();
-    const merged = store.mergeAttribute(attr, false);
-    if (merged.status === 'conflict') store.resolveConflict(merged.existing, merged.incoming, 'replace');
+    keep(proof, attributeLabel('address'), JSON.stringify(proof.value));
+    // The billing country, signed on its own so it can be shared without the
+    // address: only on a full match, and when the card's country is the one
+    // the holder typed (the verifier's rule).
+    const country = proofs.find((p) => p.attr === 'billing_country');
+    if (country && typeof country.value === 'string') {
+        keep(country, attributeLabel('billing_country'), country.value.toUpperCase());
+    }
     return proof;
 }
 
@@ -211,7 +222,7 @@ const BRANDS: Record<string, string> = {
  * translating and the phone's JavaScript engine has no country names (it
  * showed "GB"). Anything not a two-letter code is shown as it is.
  */
-function countryFlag(code: string): string {
+export function countryFlag(code: string): string {
     const c = code.trim().toUpperCase();
     if (!/^[A-Z]{2}$/.test(c)) return c;
     return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
@@ -232,7 +243,12 @@ export function cardBankSource(
         | undefined;
     const brand = label?.brand ? BRANDS[label.brand.toLowerCase()] ?? label.brand : null;
     const country = label?.country ? countryFlag(label.country) : null;
-    if (brand && country) return t('cardCheck.confirmedByCard', { card: `${brand} ${country}` });
-    if (brand || country) return t('cardCheck.confirmedByCard', { card: brand ?? country });
-    return t('cardCheck.confirmedByBank');
+    // The billing country is its own statement, shared without the address.
+    const [byCard, byBank] =
+        attr.key === 'billing_country'
+            ? ['cardCheck.countryConfirmedByCard', 'cardCheck.countryConfirmedByBank']
+            : ['cardCheck.confirmedByCard', 'cardCheck.confirmedByBank'];
+    if (brand && country) return t(byCard, { card: `${brand} ${country}` });
+    if (brand || country) return t(byCard, { card: brand ?? country });
+    return t(byBank);
 }

@@ -46,6 +46,7 @@ import {
     openRegistry,
     openTransfer,
     pairingCode,
+    sameCode,
     pairingKeys,
     pairingLink,
     parsePairingLink,
@@ -117,6 +118,14 @@ describe('registry', () => {
 });
 
 describe('pairing', () => {
+    it('accepts the typed code with or without its space, and nothing else', () => {
+        expect(sameCode('975814', '975 814')).toBe(true);
+        expect(sameCode('975 814', '975 814')).toBe(true);
+        expect(sameCode('975 815', '975 814')).toBe(false);
+        expect(sameCode('97581', '975 814')).toBe(false);
+        expect(sameCode('', '975 814')).toBe(false);
+    });
+
     it('opens only with the new phone’s key, and both phones show the same code', () => {
         const receiver = pairingKeys();
         const receiverPub = bytesToBase64url(receiver.publicKey);

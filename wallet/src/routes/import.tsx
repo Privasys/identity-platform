@@ -3,7 +3,8 @@
 
 /**
  * Import Data sub-page. Link an external IdP (Google / LinkedIn / Microsoft /
- * GitHub) and choose which returned attributes to import. Government-verified
+ * GitHub) and choose which returned attributes to import; or bring in an
+ * address the holder's bank confirms with a £0 card check. Government-verified
  * import (scan an ID document) is its own "ID Verify & Import" entry on the
  * profile screen, routed straight to the KYC flow.
  */
@@ -15,6 +16,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View as RN
 import { ConflictResolutionSheet, type AttributeConflict } from '@/components/ConflictResolutionSheet';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { useCardAddressCheck } from '@/hooks/useCardAddressCheck';
 import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { ATTRIBUTE_MAP } from '@/services/attributes';
@@ -40,6 +42,7 @@ export default function ImportDataScreen() {
     const [conflicts, setConflicts] = useState<AttributeConflict[]>([]);
     const [conflictIndex, setConflictIndex] = useState(0);
     const [tally, setTally] = useState({ added: 0, strengthened: 0, kept: 0 });
+    const { start: startCardCheck, busy: checkingAddress } = useCardAddressCheck();
 
     const startImport = async (providerKey: string) => {
         setLinkingProvider(providerKey);
@@ -159,12 +162,8 @@ export default function ImportDataScreen() {
                     />
                 ) : (
                     <>
-                        <Text style={styles.sectionTitle}>Import from an account</Text>
-                        <Text style={styles.sectionSub}>
-                            Sign in once to fill your profile. The provider cannot access your
-                            Privasys data, and you choose what to import. For government-verified
-                            attributes, use ID Verify &amp; Import on the profile screen.
-                        </Text>
+                        <Text style={styles.sectionTitle}>{t('import.fromAccountTitle')}</Text>
+                        <Text style={styles.sectionSub}>{t('import.fromAccountBody')}</Text>
                         {Object.entries(PROVIDERS).map(([key, config]) => {
                             const isLinking = linkingProvider === key;
                             return (
@@ -184,6 +183,25 @@ export default function ImportDataScreen() {
                                 </Pressable>
                             );
                         })}
+
+                        {/* A billing address the holder's bank confirms
+                            (services/card-check), as Personal Data offers it. */}
+                        <Text style={[styles.sectionTitle, styles.sectionGap]}>{t('import.fromBankTitle')}</Text>
+                        <Text style={styles.sectionSub}>{t('import.fromBankBody')}</Text>
+                        <Pressable
+                            style={styles.providerRow}
+                            onPress={startCardCheck}
+                            disabled={checkingAddress || linkingProvider !== null}
+                            testID="import-card-address"
+                        >
+                            <Ionicons name="card-outline" size={22} color={p.textSecondary} />
+                            <Text style={styles.providerName}>{t('import.cardAddress')}</Text>
+                            {checkingAddress ? (
+                                <ActivityIndicator size="small" color={p.blue} />
+                            ) : (
+                                <Ionicons name="chevron-forward" size={18} color={p.textMuted} />
+                            )}
+                        </Pressable>
                     </>
                 )}
             </ScrollView>
@@ -196,6 +214,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     content: { padding: 20 },
     sectionTitle: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 4 },
     sectionSub: { fontSize: 13, color: p.textSecondary, lineHeight: 18, marginBottom: 12 },
+    sectionGap: { marginTop: 20 },
     providerRow: {
         flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: p.card,
         borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16, marginBottom: 8,

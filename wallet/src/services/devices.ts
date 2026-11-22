@@ -344,6 +344,19 @@ async function fetchRemote(session: string): Promise<{ reg: Registry | null; ver
     return { reg, version: body.version ?? 0 };
 }
 
+/** The devices the stored registry lists, read without writing anything; null
+ *  when none is stored yet. */
+export async function remoteDevices(session: string): Promise<RegistryDevice[] | null> {
+    const { reg } = await fetchRemote(session);
+    return reg?.devices ?? null;
+}
+
+/** Whether a typed code is the pairing code: its digits, spaces or not. */
+export function sameCode(typed: string, code: string): boolean {
+    const digits = (s: string) => s.replace(/\D/g, '');
+    return digits(typed).length === 6 && digits(typed) === digits(code);
+}
+
 /**
  * Bring this phone's registry and the stored one together, and store the merge
  * when it adds anything. Uses the main account's session only if one is open,

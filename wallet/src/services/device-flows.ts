@@ -39,6 +39,7 @@ import {
     mergeRegistries,
     openTransfer,
     pairingCode,
+    remoteDevices,
     pairingKeys,
     revokeMessage,
     saveLocalRegistry,
@@ -79,6 +80,8 @@ const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 const PRIVASYS_ORIGIN = 'privasys.id';
 const SESSION_TTL_MS = 25 * 60 * 1000;
 const PAIRING_POLL_MS = 2000;
+/** How often the sending device looks for the new one. */
+const NEW_DEVICE_POLL_MS = 3000;
 
 export class DeviceError extends Error {
     constructor(
@@ -131,11 +134,21 @@ function aliasFor(rpId: string): string {
 
 // ---------------------------------------------------------------- the old phone
 
+/** What the sending device keeps once it has sent: the code to show, and what
+ *  it needs to notice the new device has finished. */
+export interface SentTransfer {
+    code: string;
+    session: string;
+    /** The devices the account had before. */
+    known: string[];
+}
+
 /**
- * Send this wallet to a new phone whose QR code was scanned. Asks for Face ID
- * (the main account's session). Returns the six digits to show.
+ * Send this wallet to a new device whose QR code was scanned. Asks for the
+ * holder's biometric (the main account's session). Returns the six digits the
+ * holder types on the new device.
  */
-export async function sendToNewPhone(link: { slot: string; key: string }): Promise<string> {
+export async function sendToNewPhone(link: { slot: string; key: string }): Promise<SentTransfer> {
     const profile = useProfileStore.getState().profile;
     if (!profile?.pairwiseSeed) throw new DeviceError('no-seed', 'this wallet is not set up');
     const { sessionToken } = await ensurePrivasysSession();
@@ -170,7 +183,33 @@ export async function sendToNewPhone(link: { slot: string; key: string }): Promi
     if (put.status === 404) throw new DeviceError('expired', 'the code on the new phone has expired');
     if (put.status === 409) throw new DeviceError('used', 'that code was already used');
     if (put.status !== 200) throw new DeviceError('network', put.body?.error ?? `could not send (HTTP ${put.status})`);
-    return pairingCode(link.key, senderPub);
+    return { code: pairingCode(link.key, senderPub), session: sessionToken, known: reg.devices.map((d) => d.id) };
+}
+
+/**
+ * On the sending device: wait for the new one to finish. Its install ends by
+ * adding itself to the account's devices, so a device the account did not
+ * have before means it is done. Returns its name, or null on abort or after
+ * the wait runs out (the holder can always leave sooner).
+ */
+export async function waitForNewDevice(
+    sent: SentTransfer,
+    signal?: { aborted: boolean },
+    waitMs = 15 * 60 * 1000,
+): Promise<string | null> {
+    const known = new Set(sent.known);
+    const until = Date.now() + waitMs;
+    while (!signal?.aborted && Date.now() < until) {
+        await new Promise((r) => setTimeout(r, NEW_DEVICE_POLL_MS));
+        if (signal?.aborted) break;
+        try {
+            const fresh = (await remoteDevices(sent.session))?.find((d) => !known.has(d.id));
+            if (fresh) return fresh.name;
+        } catch {
+            // A missed read: the next one tries again.
+        }
+    }
+    return null;
 }
 
 // ---------------------------------------------------------------- the new phone

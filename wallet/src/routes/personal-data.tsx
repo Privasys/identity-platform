@@ -35,8 +35,9 @@ import { useAvatarChooser } from '@/hooks/useAvatarChooser';
 import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { CANONICAL_ATTRIBUTES, isGovVerified } from '@/services/attributes';
-import { isFresh, notify, useNoticeStore } from '@/stores/notice';
-import { cardBankSource, CardCheckError, checkAddressWithCard, formatAddress } from '@/services/card-check';
+import { isFresh, useNoticeStore } from '@/stores/notice';
+import { cardBankSource, countryFlag, formatAddress } from '@/services/card-check';
+import { useCardAddressCheck } from '@/hooks/useCardAddressCheck';
 import { provedBy } from '@/services/attribute-proofs';
 import { currentLocale } from '@/i18n';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
@@ -50,34 +51,7 @@ export default function PersonalDataScreen() {
     const { profile, updateProfile, setAttribute, updateAttributeValue, removeAttributeValue } = useProfileStore();
 
     const [addingAttribute, setAddingAttribute] = useState<string | null>(null);
-    const [checkingAddress, setCheckingAddress] = useState(false);
-
-    // Explained first: a card check is unusual enough to say what happens,
-    // what is charged (nothing) and what is kept (no card details).
-    const confirmAddress = () =>
-        Alert.alert(t('cardCheck.explainTitle'), t('cardCheck.explainBody'), [
-            { text: t('common.cancel'), style: 'cancel' },
-            {
-                text: t('common.continue'),
-                onPress: async () => {
-                    setCheckingAddress(true);
-                    try {
-                        await checkAddressWithCard();
-                        useNoticeStore.getState().markFresh([{ key: 'address', value: useProfileStore.getState().profile?.attributes.find((a) => a.key === 'address')?.value ?? '' }]);
-                        notify(t('cardCheck.doneTitle'), t('cardCheck.doneBody'));
-                    } catch (e: any) {
-                        if (e instanceof CardCheckError && e.reason === 'cancelled') return;
-                        if (e instanceof CardCheckError && e.reason === 'nothing-confirmed') {
-                            Alert.alert(t('cardCheck.nothingConfirmed'));
-                        } else {
-                            Alert.alert(t('cardCheck.failed', { reason: e?.message ?? String(e) }));
-                        }
-                    } finally {
-                        setCheckingAddress(false);
-                    }
-                },
-            },
-        ]);
+    const { start: confirmAddress, busy: checkingAddress } = useCardAddressCheck();
     const [newAttrValue, setNewAttrValue] = useState('');
     const chooseAvatar = useAvatarChooser();
 
@@ -187,7 +161,7 @@ export default function PersonalDataScreen() {
     // (stable sort). Unlisted keys fall to the end.
     const ATTR_ORDER = [
         'name', 'given_name', 'given_name_id', 'family_name', 'family_name_id',
-        'nickname', 'picture', 'picture_id', 'email', 'phone_number',
+        'nickname', 'picture', 'picture_id', 'email', 'phone_number', 'address', 'billing_country',
         'birthdate', 'birthdate_id', 'age_over_18', 'age_over_21', 'sex',
         'nationality', 'nationality_id',
         'place_of_birth', 'document_type', 'document_number', 'doc_expiry',
@@ -499,7 +473,11 @@ function AttributeCard({
                         ) : (
                             <RNView style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Text style={[styles.attributeValue, { flex: 1 }]} numberOfLines={2}>
-                                    {attr.key === 'address' ? formatAddress(attr.value) : attr.value}
+                                    {attr.key === 'address'
+                                        ? formatAddress(attr.value)
+                                        : attr.key === 'billing_country'
+                                          ? `${countryFlag(attr.value)} ${attr.value}`
+                                          : attr.value}
                                 </Text>
                                 {!isImage && (
                                     <Pressable onPress={handleStartEdit} hitSlop={8}>

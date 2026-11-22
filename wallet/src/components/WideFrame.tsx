@@ -25,7 +25,9 @@ import { useTranslation } from 'react-i18next';
 import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PaneContext, type Pane, type PaneKind } from '@/components/pane';
+import { PaneProvider } from '@/components/PaneProvider';
+
+export { PaneProvider };
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { READABLE_WIDTH, TWO_PANE_MIN_WIDTH, useWideLayout } from '@/hooks/useLargeScreen';
 import ProfileScreen from '@/routes/(tabs)/index';
@@ -319,37 +321,6 @@ function Sidebar({ active, width, styles }: { active: Section; width: number; st
             </Pressable>
         </View>
     );
-}
-
-/**
- * The pane a screen is drawn in, the same value from one render to the next
- * until its kind, width or layout changes. A fresh value each time the frame
- * draws re-renders every screen that reads it; a screen that then sets its
- * navigation options (Stack.Screen) has the frame draw again, and so on
- * without end ("Maximum update depth exceeded", Service Details on iPad in
- * 1.4.77). The close action is kept current without changing the value.
- */
-export function PaneProvider({
-    kind,
-    width,
-    twoPane,
-    close,
-    children,
-}: {
-    kind: PaneKind;
-    width: number;
-    twoPane: boolean;
-    close?: () => void;
-    children: ReactNode;
-}) {
-    const closeRef = useRef(close);
-    closeRef.current = close;
-    const canClose = close != null;
-    const value = useMemo<Pane>(
-        () => ({ kind, width, twoPane, close: canClose ? () => closeRef.current?.() : undefined }),
-        [kind, width, twoPane, canClose],
-    );
-    return <PaneContext.Provider value={value}>{children}</PaneContext.Provider>;
 }
 
 /** What the second column shows with nothing open in it. */

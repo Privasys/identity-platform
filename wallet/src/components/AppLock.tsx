@@ -63,6 +63,8 @@ const OPEN_MS = 450;
 const CLOSE_MS = 300;
 /** The longest the lock waits for a tapped push to open its screen. */
 const PUSH_WAIT_MS = 4000;
+/** On a return, how long the lock lets a tapped push land before asking. */
+const RETURN_WAIT_MS = 350;
 
 /** Ask for Face ID to open the wallet. True once the holder is verified. */
 export async function unlockWallet(prompt: string, cancel: string): Promise<boolean> {
@@ -225,19 +227,29 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
         }
     }, [busy, t]);
 
-    // Ask once by itself each time the lock appears in front of the holder; a
-    // short wait lets a push that opens a request screen land first.
+    // Ask once by itself each time the lock appears in front of the holder. On
+    // a return, a short wait lets a tapped push that opens a request screen
+    // land first (its response comes just after the app turns active). At
+    // start there is no wait: the launch push has been read and marked before
+    // pushWaiting clears (hooks/useExpoPushToken, setLaunchPushChecked).
     const asked = useRef(false);
+    const firstAsk = useRef(true);
     useEffect(() => {
         if (!showLock) {
             asked.current = false;
             return;
         }
         if (asked.current || appState !== 'active' || pushWaiting) return;
-        const timer = setTimeout(() => {
+        const ask = () => {
             asked.current = true;
+            firstAsk.current = false;
             void unlock();
-        }, 350);
+        };
+        if (firstAsk.current) {
+            ask();
+            return;
+        }
+        const timer = setTimeout(ask, RETURN_WAIT_MS);
         return () => clearTimeout(timer);
     }, [showLock, appState, pushWaiting, unlock]);
 

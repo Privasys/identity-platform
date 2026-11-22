@@ -1559,6 +1559,9 @@
     "confirmedByBank": "A számlázási címet kártyája bankja erősítette meg",
     "countryConfirmedByCard": "A számlázási országot kártyája bankja erősítette meg ({{card}})",
     "countryConfirmedByBank": "A számlázási országot kártyája bankja erősítette meg",
-    "declinedHint": "Ha a bankja elutasította a kártya ellenőrzését, nem vontunk le pénzt. Próbáljon meg egy másik kártyát, vagy ellenőrizze, hogy a cím egyezik-e a bankjánál nyilvántartottal."
+    "declinedHint": "Ha a bankja elutasította a kártya ellenőrzését, nem vontunk le pénzt. Próbáljon meg egy másik kártyát, vagy ellenőrizze, hogy a cím egyezik-e a bankjánál nyilvántartottal.",
+    "walletNoteApple": "Apple Pay esetén a bankja a kártyájával együtt a Walletben tárolt számlázási címet ellenőrzi. Győződjön meg róla, hogy naprakész.",
+    "walletNoteGoogle": "Google Pay esetén a bankja a kártyájával együtt a Google Walletben tárolt számlázási címet ellenőrzi. Győződjön meg róla, hogy naprakész.",
+    "walletRetry": "Ha Apple Payt vagy Google Payt használt, frissítse a kártyája számlázási címét a Walletben, majd próbálja újra."
   }
 }

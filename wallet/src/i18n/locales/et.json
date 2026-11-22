@@ -1570,6 +1570,9 @@
     "confirmedByBank": "Arveldusaadressi kinnitas teie kaardi pank",
     "countryConfirmedByCard": "Arveldusriigi kinnitas teie kaardi pank ({{card}})",
     "countryConfirmedByBank": "Arveldusriigi kinnitas teie kaardi pank",
-    "declinedHint": "Kui teie pank lükkas kaardi kontrolli tagasi, ei võetud raha. Proovige teist kaarti või kontrollige, et aadress vastab teie panga andmetele."
+    "declinedHint": "Kui teie pank lükkas kaardi kontrolli tagasi, ei võetud raha. Proovige teist kaarti või kontrollige, et aadress vastab teie panga andmetele.",
+    "walletNoteApple": "Apple Pay puhul kontrollib teie pank arveldusaadressi, mis on teie kaardiga Walletis salvestatud. Veenduge, et see on ajakohane.",
+    "walletNoteGoogle": "Google Pay puhul kontrollib teie pank arveldusaadressi, mis on teie kaardiga Google Walletis salvestatud. Veenduge, et see on ajakohane.",
+    "walletRetry": "Kui kasutasite Apple Payd või Google Payd, värskendage oma kaardi arveldusaadressi Walletis ja proovige uuesti."
   }
 }

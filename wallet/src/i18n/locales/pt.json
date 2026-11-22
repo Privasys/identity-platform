@@ -1588,6 +1588,9 @@
     "confirmedByBank": "Endereço de faturação confirmado pelo banco do seu cartão",
     "countryConfirmedByCard": "País de faturação confirmado pelo banco do seu cartão ({{card}})",
     "countryConfirmedByBank": "País de faturação confirmado pelo banco do seu cartão",
-    "declinedHint": "Se o seu banco recusou a verificação do cartão, não foi cobrado nada. Experimente outro cartão, ou confirme que o endereço corresponde ao registado no seu banco."
+    "declinedHint": "Se o seu banco recusou a verificação do cartão, não foi cobrado nada. Experimente outro cartão, ou confirme que o endereço corresponde ao registado no seu banco.",
+    "walletNoteApple": "Com o Apple Pay, o seu banco verifica o endereço de faturação guardado com o cartão na Wallet. Confirme que está atualizado.",
+    "walletNoteGoogle": "Com o Google Pay, o seu banco verifica o endereço de faturação guardado com o cartão na Google Wallet. Confirme que está atualizado.",
+    "walletRetry": "Se usou o Apple Pay ou o Google Pay, atualize o endereço de faturação do cartão na Wallet e tente novamente."
   }
 }

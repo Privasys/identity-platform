@@ -1601,6 +1601,9 @@
     "confirmedByBank": "Fakturačná adresa potvrdená bankou vašej karty",
     "countryConfirmedByCard": "Fakturačná krajina potvrdená bankou vašej karty ({{card}})",
     "countryConfirmedByBank": "Fakturačná krajina potvrdená bankou vašej karty",
-    "declinedHint": "Ak vaša banka kontrolu karty zamietla, neboli stiahnuté žiadne peniaze. Skúste inú kartu alebo overte, či adresa zodpovedá údajom vo vašej banke."
+    "declinedHint": "Ak vaša banka kontrolu karty zamietla, neboli stiahnuté žiadne peniaze. Skúste inú kartu alebo overte, či adresa zodpovedá údajom vo vašej banke.",
+    "walletNoteApple": "S Apple Pay vaša banka overuje fakturačnú adresu uloženú s vašou kartou vo Wallete. Uistite sa, že je aktuálna.",
+    "walletNoteGoogle": "S Google Pay vaša banka overuje fakturačnú adresu uloženú s vašou kartou v Google Wallete. Uistite sa, že je aktuálna.",
+    "walletRetry": "Ak ste použili Apple Pay alebo Google Pay, aktualizujte fakturačnú adresu karty vo Wallete a skúste to znova."
   }
 }

@@ -1617,6 +1617,9 @@
     "confirmedByBank": "Adres rozliczeniowy potwierdzony przez bank Twojej karty",
     "countryConfirmedByCard": "Kraj rozliczeniowy potwierdzony przez bank Twojej karty ({{card}})",
     "countryConfirmedByBank": "Kraj rozliczeniowy potwierdzony przez bank Twojej karty",
-    "declinedHint": "Jeśli Twój bank odrzucił weryfikację karty, nie pobrano żadnych pieniędzy. Spróbuj innej karty lub sprawdź, czy adres zgadza się z danymi w Twoim banku."
+    "declinedHint": "Jeśli Twój bank odrzucił weryfikację karty, nie pobrano żadnych pieniędzy. Spróbuj innej karty lub sprawdź, czy adres zgadza się z danymi w Twoim banku.",
+    "walletNoteApple": "Przy Apple Pay Twój bank sprawdza adres rozliczeniowy zapisany z Twoją kartą w aplikacji Portfel. Upewnij się, że jest aktualny.",
+    "walletNoteGoogle": "Przy Google Pay Twój bank sprawdza adres rozliczeniowy zapisany z Twoją kartą w Portfelu Google. Upewnij się, że jest aktualny.",
+    "walletRetry": "Jeśli użyto Apple Pay lub Google Pay, zaktualizuj adres rozliczeniowy karty w aplikacji Portfel i spróbuj ponownie."
   }
 }

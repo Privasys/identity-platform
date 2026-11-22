@@ -1559,6 +1559,9 @@
     "confirmedByBank": "Rechnungsadresse bestätigt von der Bank Ihrer Karte",
     "countryConfirmedByCard": "Rechnungsland bestätigt von der Bank Ihrer Karte ({{card}})",
     "countryConfirmedByBank": "Rechnungsland bestätigt von der Bank Ihrer Karte",
-    "declinedHint": "Falls Ihre Bank die Kartenprüfung abgelehnt hat, wurde kein Geld abgebucht. Versuchen Sie eine andere Karte, oder prüfen Sie, ob die Adresse mit den Angaben Ihrer Bank übereinstimmt."
+    "declinedHint": "Falls Ihre Bank die Kartenprüfung abgelehnt hat, wurde kein Geld abgebucht. Versuchen Sie eine andere Karte, oder prüfen Sie, ob die Adresse mit den Angaben Ihrer Bank übereinstimmt.",
+    "walletNoteApple": "Mit Apple Pay prüft Ihre Bank die Rechnungsadresse, die zu Ihrer Karte in Wallet gespeichert ist. Achten Sie darauf, dass sie aktuell ist.",
+    "walletNoteGoogle": "Mit Google Pay prüft Ihre Bank die Rechnungsadresse, die zu Ihrer Karte in Google Wallet gespeichert ist. Achten Sie darauf, dass sie aktuell ist.",
+    "walletRetry": "Falls Sie Apple Pay oder Google Pay verwendet haben, aktualisieren Sie die Rechnungsadresse Ihrer Karte in Wallet und versuchen Sie es erneut."
   }
 }

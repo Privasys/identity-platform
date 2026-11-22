@@ -1657,6 +1657,9 @@
     "confirmedByBank": "Indirizz tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek",
     "countryConfirmedByCard": "Pajjiż tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek ({{card}})",
     "countryConfirmedByBank": "Pajjiż tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek",
-    "declinedHint": "Jekk il-bank tiegħek irrifjuta l-verifika tal-kard, ma ttieħdu l-ebda flus. Ipprova kard oħra, jew iċċekkja li l-indirizz jaqbel mar-rekords tal-bank tiegħek."
+    "declinedHint": "Jekk il-bank tiegħek irrifjuta l-verifika tal-kard, ma ttieħdu l-ebda flus. Ipprova kard oħra, jew iċċekkja li l-indirizz jaqbel mar-rekords tal-bank tiegħek.",
+    "walletNoteApple": "Bl-Apple Pay, il-bank tiegħek jiċċekkja l-indirizz tal-kontijiet issejvjat mal-kard tiegħek fil-Wallet. Kun żgur li huwa aġġornat.",
+    "walletNoteGoogle": "Bil-Google Pay, il-bank tiegħek jiċċekkja l-indirizz tal-kontijiet issejvjat mal-kard tiegħek fil-Google Wallet. Kun żgur li huwa aġġornat.",
+    "walletRetry": "Jekk użajt Apple Pay jew Google Pay, aġġorna l-indirizz tal-kontijiet tal-kard tiegħek fil-Wallet, imbagħad erġa' pprova."
   }
 }

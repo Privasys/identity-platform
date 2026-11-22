@@ -1599,6 +1599,9 @@
     "confirmedByBank": "Adresă de facturare confirmată de banca cardului tău",
     "countryConfirmedByCard": "Țară de facturare confirmată de banca cardului tău ({{card}})",
     "countryConfirmedByBank": "Țară de facturare confirmată de banca cardului tău",
-    "declinedHint": "Dacă banca ta a refuzat verificarea cardului, nu s-au luat bani. Încearcă alt card sau verifică dacă adresa se potrivește cu datele de la banca ta."
+    "declinedHint": "Dacă banca ta a refuzat verificarea cardului, nu s-au luat bani. Încearcă alt card sau verifică dacă adresa se potrivește cu datele de la banca ta.",
+    "walletNoteApple": "Cu Apple Pay, banca ta verifică adresa de facturare salvată cu cardul tău în Wallet. Asigură-te că este actualizată.",
+    "walletNoteGoogle": "Cu Google Pay, banca ta verifică adresa de facturare salvată cu cardul tău în Google Wallet. Asigură-te că este actualizată.",
+    "walletRetry": "Dacă ai folosit Apple Pay sau Google Pay, actualizează adresa de facturare a cardului în Wallet, apoi încearcă din nou."
   }
 }

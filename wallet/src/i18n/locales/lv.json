@@ -1599,6 +1599,9 @@
     "confirmedByBank": "Norēķinu adresi apstiprinājusi jūsu kartes banka",
     "countryConfirmedByCard": "Norēķinu valsti apstiprinājusi jūsu kartes banka ({{card}})",
     "countryConfirmedByBank": "Norēķinu valsti apstiprinājusi jūsu kartes banka",
-    "declinedHint": "Ja jūsu banka noraidīja kartes pārbaudi, nauda netika iekasēta. Mēģiniet citu karti vai pārbaudiet, vai adrese atbilst jūsu bankas datiem."
+    "declinedHint": "Ja jūsu banka noraidīja kartes pārbaudi, nauda netika iekasēta. Mēģiniet citu karti vai pārbaudiet, vai adrese atbilst jūsu bankas datiem.",
+    "walletNoteApple": "Ar Apple Pay jūsu banka pārbauda norēķinu adresi, kas saglabāta kopā ar jūsu karti lietotnē Wallet. Pārliecinieties, ka tā ir aktuāla.",
+    "walletNoteGoogle": "Ar Google Pay jūsu banka pārbauda norēķinu adresi, kas saglabāta kopā ar jūsu karti Google Wallet. Pārliecinieties, ka tā ir aktuāla.",
+    "walletRetry": "Ja izmantojāt Apple Pay vai Google Pay, atjauniniet kartes norēķinu adresi lietotnē Wallet un mēģiniet vēlreiz."
   }
 }

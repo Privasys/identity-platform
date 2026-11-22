@@ -1601,6 +1601,9 @@
     "confirmedByBank": "Atsiskaitymo adresą patvirtino jūsų kortelės bankas",
     "countryConfirmedByCard": "Atsiskaitymo šalį patvirtino jūsų kortelės bankas ({{card}})",
     "countryConfirmedByBank": "Atsiskaitymo šalį patvirtino jūsų kortelės bankas",
-    "declinedHint": "Jei jūsų bankas atmetė kortelės patikrą, pinigų nebuvo nuskaičiuota. Pabandykite kitą kortelę arba patikrinkite, ar adresas sutampa su jūsų banko duomenimis."
+    "declinedHint": "Jei jūsų bankas atmetė kortelės patikrą, pinigų nebuvo nuskaičiuota. Pabandykite kitą kortelę arba patikrinkite, ar adresas sutampa su jūsų banko duomenimis.",
+    "walletNoteApple": "Naudojant Apple Pay, jūsų bankas tikrina atsiskaitymo adresą, išsaugotą su jūsų kortele Wallet programoje. Įsitikinkite, kad jis atnaujintas.",
+    "walletNoteGoogle": "Naudojant Google Pay, jūsų bankas tikrina atsiskaitymo adresą, išsaugotą su jūsų kortele Google Wallet. Įsitikinkite, kad jis atnaujintas.",
+    "walletRetry": "Jei naudojote Apple Pay arba Google Pay, atnaujinkite kortelės atsiskaitymo adresą Wallet programoje ir bandykite dar kartą."
   }
 }

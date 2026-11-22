@@ -1559,6 +1559,9 @@
     "confirmedByBank": "Laskutusosoitteen vahvisti korttisi pankki",
     "countryConfirmedByCard": "Laskutusmaan vahvisti korttisi pankki ({{card}})",
     "countryConfirmedByBank": "Laskutusmaan vahvisti korttisi pankki",
-    "declinedHint": "Jos pankkisi hylkäsi korttitarkistuksen, rahaa ei veloitettu. Kokeile toista korttia tai tarkista, että osoite vastaa pankkisi tietoja."
+    "declinedHint": "Jos pankkisi hylkäsi korttitarkistuksen, rahaa ei veloitettu. Kokeile toista korttia tai tarkista, että osoite vastaa pankkisi tietoja.",
+    "walletNoteApple": "Apple Payta käytettäessä pankkisi tarkistaa laskutusosoitteen, joka on tallennettu korttisi kanssa Walletiin. Varmista, että se on ajan tasalla.",
+    "walletNoteGoogle": "Google Payta käytettäessä pankkisi tarkistaa laskutusosoitteen, joka on tallennettu korttisi kanssa Google Walletiin. Varmista, että se on ajan tasalla.",
+    "walletRetry": "Jos käytit Apple Payta tai Google Payta, päivitä korttisi laskutusosoite Walletissa ja yritä uudelleen."
   }
 }

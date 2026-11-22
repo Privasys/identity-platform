@@ -1588,6 +1588,9 @@
     "confirmedByBank": "Indirizzo di fatturazione confermato dalla banca della tua carta",
     "countryConfirmedByCard": "Paese di fatturazione confermato dalla banca della tua carta ({{card}})",
     "countryConfirmedByBank": "Paese di fatturazione confermato dalla banca della tua carta",
-    "declinedHint": "Se la tua banca ha rifiutato la verifica della carta, non è stato addebitato nulla. Prova un'altra carta, oppure controlla che l'indirizzo corrisponda a quello registrato dalla tua banca."
+    "declinedHint": "Se la tua banca ha rifiutato la verifica della carta, non è stato addebitato nulla. Prova un'altra carta, oppure controlla che l'indirizzo corrisponda a quello registrato dalla tua banca.",
+    "walletNoteApple": "Con Apple Pay, la tua banca verifica l'indirizzo di fatturazione salvato con la carta in Wallet. Assicurati che sia aggiornato.",
+    "walletNoteGoogle": "Con Google Pay, la tua banca verifica l'indirizzo di fatturazione salvato con la carta in Google Wallet. Assicurati che sia aggiornato.",
+    "walletRetry": "Se hai usato Apple Pay o Google Pay, aggiorna l'indirizzo di fatturazione della carta in Wallet, poi riprova."
   }
 }

@@ -1590,6 +1590,9 @@
     "confirmedByBank": "Fakturační adresa potvrzena bankou vaší karty",
     "countryConfirmedByCard": "Fakturační země potvrzena bankou vaší karty ({{card}})",
     "countryConfirmedByBank": "Fakturační země potvrzena bankou vaší karty",
-    "declinedHint": "Pokud vaše banka kontrolu karty zamítla, nebyly strženy žádné peníze. Zkuste jinou kartu, nebo ověřte, že adresa odpovídá údajům ve vaší bance."
+    "declinedHint": "Pokud vaše banka kontrolu karty zamítla, nebyly strženy žádné peníze. Zkuste jinou kartu, nebo ověřte, že adresa odpovídá údajům ve vaší bance.",
+    "walletNoteApple": "S Apple Pay vaše banka ověřuje fakturační adresu uloženou u vaší karty ve Wallet. Ujistěte se, že je aktuální.",
+    "walletNoteGoogle": "S Google Pay vaše banka ověřuje fakturační adresu uloženou u vaší karty v Google Wallet. Ujistěte se, že je aktuální.",
+    "walletRetry": "Pokud jste použili Apple Pay nebo Google Pay, aktualizujte fakturační adresu u karty ve Wallet a zkuste to znovu."
   }
 }

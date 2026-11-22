@@ -1588,6 +1588,9 @@
     "confirmedByBank": "Adresse de facturation confirmée par la banque de votre carte",
     "countryConfirmedByCard": "Pays de facturation confirmé par la banque de votre carte ({{card}})",
     "countryConfirmedByBank": "Pays de facturation confirmé par la banque de votre carte",
-    "declinedHint": "Si votre banque a refusé la vérification de la carte, aucun montant n'a été prélevé. Essayez une autre carte, ou vérifiez que l'adresse correspond à celle que connaît votre banque."
+    "declinedHint": "Si votre banque a refusé la vérification de la carte, aucun montant n'a été prélevé. Essayez une autre carte, ou vérifiez que l'adresse correspond à celle que connaît votre banque.",
+    "walletNoteApple": "Avec Apple Pay, votre banque vérifie l'adresse de facturation enregistrée avec votre carte dans Cartes. Assurez-vous qu'elle est à jour.",
+    "walletNoteGoogle": "Avec Google Pay, votre banque vérifie l'adresse de facturation enregistrée avec votre carte dans Google Wallet. Assurez-vous qu'elle est à jour.",
+    "walletRetry": "Si vous avez utilisé Apple Pay ou Google Pay, mettez à jour l'adresse de facturation de votre carte dans Cartes, puis réessayez."
   }
 }

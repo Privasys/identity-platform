@@ -1657,6 +1657,9 @@
     "confirmedByBank": "Seoladh billeála deimhnithe ag banc do chárta",
     "countryConfirmedByCard": "Tír bhilleála deimhnithe ag banc do chárta ({{card}})",
     "countryConfirmedByBank": "Tír bhilleála deimhnithe ag banc do chárta",
-    "declinedHint": "Má dhiúltaigh do bhanc seiceáil an chárta, níor tógadh aon airgead. Bain triail as cárta eile, nó seiceáil go bhfuil an seoladh mar an gcéanna le taifid do bhainc."
+    "declinedHint": "Má dhiúltaigh do bhanc seiceáil an chárta, níor tógadh aon airgead. Bain triail as cárta eile, nó seiceáil go bhfuil an seoladh mar an gcéanna le taifid do bhainc.",
+    "walletNoteApple": "Le Apple Pay, seiceálann do bhanc an seoladh billeála atá sábháilte le do chárta in Wallet. Déan cinnte go bhfuil sé cothrom le dáta.",
+    "walletNoteGoogle": "Le Google Pay, seiceálann do bhanc an seoladh billeála atá sábháilte le do chárta in Google Wallet. Déan cinnte go bhfuil sé cothrom le dáta.",
+    "walletRetry": "Má d'úsáid tú Apple Pay nó Google Pay, nuashonraigh an seoladh billeála ar do chárta in Wallet, ansin bain triail eile as."
   }
 }

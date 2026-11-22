@@ -1570,6 +1570,9 @@
     "confirmedByBank": "Billing address confirmed by your card's bank",
     "countryConfirmedByCard": "Billing country confirmed by your card's bank ({{card}})",
     "countryConfirmedByBank": "Billing country confirmed by your card's bank",
-    "declinedHint": "If your bank declined the card check, no money was taken. Try another card, or check that the address matches your bank's records."
+    "declinedHint": "If your bank declined the card check, no money was taken. Try another card, or check that the address matches your bank's records.",
+    "walletNoteApple": "With Apple Pay, your bank checks the billing address saved with your card in Wallet. Make sure it's up to date.",
+    "walletNoteGoogle": "With Google Pay, your bank checks the billing address saved with your card in Google Wallet. Make sure it's up to date.",
+    "walletRetry": "If you used Apple Pay or Google Pay, update the billing address on your card in Wallet, then try again."
   }
 }

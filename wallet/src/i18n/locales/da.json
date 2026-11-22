@@ -1559,6 +1559,9 @@
     "confirmedByBank": "Faktureringsadresse bekræftet af dit korts bank",
     "countryConfirmedByCard": "Faktureringsland bekræftet af dit korts bank ({{card}})",
     "countryConfirmedByBank": "Faktureringsland bekræftet af dit korts bank",
-    "declinedHint": "Hvis din bank afviste kortkontrollen, blev der ikke trukket nogen penge. Prøv et andet kort, eller tjek, at adressen svarer til din banks oplysninger."
+    "declinedHint": "Hvis din bank afviste kortkontrollen, blev der ikke trukket nogen penge. Prøv et andet kort, eller tjek, at adressen svarer til din banks oplysninger.",
+    "walletNoteApple": "Med Apple Pay tjekker din bank den faktureringsadresse, der er gemt med dit kort i Wallet. Sørg for, at den er opdateret.",
+    "walletNoteGoogle": "Med Google Pay tjekker din bank den faktureringsadresse, der er gemt med dit kort i Google Wallet. Sørg for, at den er opdateret.",
+    "walletRetry": "Hvis du brugte Apple Pay eller Google Pay, så opdater faktureringsadressen på dit kort i Wallet, og prøv igen."
   }
 }

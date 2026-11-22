@@ -1559,6 +1559,9 @@
     "confirmedByBank": "Faktureringsadress bekräftad av ditt korts bank",
     "countryConfirmedByCard": "Faktureringsland bekräftat av ditt korts bank ({{card}})",
     "countryConfirmedByBank": "Faktureringsland bekräftat av ditt korts bank",
-    "declinedHint": "Om din bank avvisade kortkontrollen drogs inga pengar. Prova ett annat kort, eller kontrollera att adressen stämmer med din banks uppgifter."
+    "declinedHint": "Om din bank avvisade kortkontrollen drogs inga pengar. Prova ett annat kort, eller kontrollera att adressen stämmer med din banks uppgifter.",
+    "walletNoteApple": "Med Apple Pay kontrollerar din bank faktureringsadressen som är sparad med ditt kort i Plånbok. Se till att den är aktuell.",
+    "walletNoteGoogle": "Med Google Pay kontrollerar din bank faktureringsadressen som är sparad med ditt kort i Google Wallet. Se till att den är aktuell.",
+    "walletRetry": "Om du använde Apple Pay eller Google Pay, uppdatera faktureringsadressen för ditt kort i Plånbok och försök igen."
   }
 }

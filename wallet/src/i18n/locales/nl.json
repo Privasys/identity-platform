@@ -1559,6 +1559,9 @@
     "confirmedByBank": "Factuuradres bevestigd door de bank van je kaart",
     "countryConfirmedByCard": "Factuurland bevestigd door de bank van je kaart ({{card}})",
     "countryConfirmedByBank": "Factuurland bevestigd door de bank van je kaart",
-    "declinedHint": "Als je bank de kaartcontrole heeft geweigerd, is er geen geld afgeschreven. Probeer een andere kaart, of controleer of het adres overeenkomt met wat je bank heeft."
+    "declinedHint": "Als je bank de kaartcontrole heeft geweigerd, is er geen geld afgeschreven. Probeer een andere kaart, of controleer of het adres overeenkomt met wat je bank heeft.",
+    "walletNoteApple": "Met Apple Pay controleert je bank het factuuradres dat bij je kaart in Wallet is opgeslagen. Zorg dat het actueel is.",
+    "walletNoteGoogle": "Met Google Pay controleert je bank het factuuradres dat bij je kaart in Google Wallet is opgeslagen. Zorg dat het actueel is.",
+    "walletRetry": "Als je Apple Pay of Google Pay hebt gebruikt, werk dan het factuuradres van je kaart in Wallet bij en probeer het opnieuw."
   }
 }

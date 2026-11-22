@@ -1599,6 +1599,9 @@
     "confirmedByBank": "Adresu za naplatu potvrdila je banka vaše kartice",
     "countryConfirmedByCard": "Državu za naplatu potvrdila je banka vaše kartice ({{card}})",
     "countryConfirmedByBank": "Državu za naplatu potvrdila je banka vaše kartice",
-    "declinedHint": "Ako je vaša banka odbila provjeru kartice, novac nije naplaćen. Pokušajte s drugom karticom ili provjerite odgovara li adresa podacima u vašoj banci."
+    "declinedHint": "Ako je vaša banka odbila provjeru kartice, novac nije naplaćen. Pokušajte s drugom karticom ili provjerite odgovara li adresa podacima u vašoj banci.",
+    "walletNoteApple": "Uz Apple Pay vaša banka provjerava adresu za naplatu spremljenu uz vašu karticu u Novčaniku. Provjerite je li ažurna.",
+    "walletNoteGoogle": "Uz Google Pay vaša banka provjerava adresu za naplatu spremljenu uz vašu karticu u Google Walletu. Provjerite je li ažurna.",
+    "walletRetry": "Ako ste koristili Apple Pay ili Google Pay, ažurirajte adresu za naplatu na kartici u Novčaniku, a zatim pokušajte ponovno."
   }
 }

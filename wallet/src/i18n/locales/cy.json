@@ -1686,6 +1686,9 @@
     "confirmedByBank": "Cyfeiriad bilio wedi'i gadarnhau gan fanc eich cerdyn",
     "countryConfirmedByCard": "Gwlad bilio wedi'i chadarnhau gan fanc eich cerdyn ({{card}})",
     "countryConfirmedByBank": "Gwlad bilio wedi'i chadarnhau gan fanc eich cerdyn",
-    "declinedHint": "Os gwrthododd eich banc wiriad y cerdyn, ni chymerwyd unrhyw arian. Rhowch gynnig ar gerdyn arall, neu gwiriwch fod y cyfeiriad yn cyfateb i gofnodion eich banc."
+    "declinedHint": "Os gwrthododd eich banc wiriad y cerdyn, ni chymerwyd unrhyw arian. Rhowch gynnig ar gerdyn arall, neu gwiriwch fod y cyfeiriad yn cyfateb i gofnodion eich banc.",
+    "walletNoteApple": "Gydag Apple Pay, mae eich banc yn gwirio'r cyfeiriad bilio sydd wedi'i gadw gyda'ch cerdyn yn Wallet. Gwnewch yn siŵr ei fod yn gyfredol.",
+    "walletNoteGoogle": "Gyda Google Pay, mae eich banc yn gwirio'r cyfeiriad bilio sydd wedi'i gadw gyda'ch cerdyn yn Google Wallet. Gwnewch yn siŵr ei fod yn gyfredol.",
+    "walletRetry": "Os gwnaethoch ddefnyddio Apple Pay neu Google Pay, diweddarwch y cyfeiriad bilio ar eich cerdyn yn Wallet, yna rhowch gynnig arall arni."
   }
 }

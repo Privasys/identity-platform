@@ -22,7 +22,7 @@ import { getAttestationServerToken } from '@/services/app-attest';
 import { demo, isDemo } from '@/services/demo/gate';
 import { inspectAttestation, attestEnclave, type AttestationResult } from '@/services/attestation';
 import { apiBasesForHost, appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
-import { getDriveToken, getPlatformToken, rememberDriveAppId, rememberDriveHost, tokenForHost } from '@/services/platform-token';
+import { callWithPlatformToken, getDriveToken, rememberDriveAppId, rememberDriveHost, tokenForHost } from '@/services/platform-token';
 import { useSettingsStore, type VerificationMode } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
@@ -364,11 +364,17 @@ async function setupDriveAt(
     appId: string,
 ): Promise<{ tenant: Tenant; key: { status: string; handle: string } }> {
     const tenant = await drive.ensurePersonalTenant();
-    const platformToken = await getPlatformToken();
-    const res = await fetch(
-        `${mgmtBaseUrl.replace(/\/$/, '')}/api/v1/apps/${encodeURIComponent(appId)}/data-keys/grant`,
-        { method: 'POST', headers: { Authorization: `Bearer ${platformToken}` } },
+    // A token whose session was ended elsewhere is replaced (platform-token).
+    const called = await callWithPlatformToken(
+        (token) =>
+            fetch(`${mgmtBaseUrl.replace(/\/$/, '')}/api/v1/apps/${encodeURIComponent(appId)}/data-keys/grant`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            }),
+        { interactive: true },
     );
+    if (!called) throw new Error('data-key grant: no platform token');
+    const { res } = called;
     if (!res.ok) {
         throw new Error(`data-key grant failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
     }

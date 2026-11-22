@@ -49,7 +49,7 @@ import {
     type HeldCapability,
     type Permission,
 } from '@/services/capabilities';
-import { getPlatformToken } from '@/services/platform-token';
+import { callWithPlatformToken } from '@/services/platform-token';
 import { ensureDataRoot } from '@/services/sovereign';
 import { useCapabilitiesStore, type CapabilityRecord } from '@/stores/capabilities';
 import * as SecureStore from '@/utils/storage';
@@ -169,20 +169,28 @@ export function openIndex(root: Uint8Array, blob: string): GrantsIndex | null {
 
 // The platform token, not the wallet session: it is cached for days, so a sync
 // never prompts for Face ID, and the IdP keys it on the same user id.
+// A token whose session was ended elsewhere is replaced (platform-token).
 async function getIndexBlob(): Promise<Response> {
-    const token = await getPlatformToken();
-    return fetch(`${IDP_BASE}/recovery/grants-index`, {
-        headers: { Authorization: `Bearer ${token}` },
-    });
+    const called = await callWithPlatformToken(
+        (token) => fetch(`${IDP_BASE}/recovery/grants-index`, { headers: { Authorization: `Bearer ${token}` } }),
+        { interactive: true },
+    );
+    if (!called) throw new Error('no platform token');
+    return called.res;
 }
 
 async function putIndexBlob(blob: string): Promise<Response> {
-    const token = await getPlatformToken();
-    return fetch(`${IDP_BASE}/recovery/grants-index`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blob }),
-    });
+    const called = await callWithPlatformToken(
+        (token) =>
+            fetch(`${IDP_BASE}/recovery/grants-index`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blob }),
+            }),
+        { interactive: true },
+    );
+    if (!called) throw new Error('no platform token');
+    return called.res;
 }
 
 // ---------------------------------------------------------------- sync

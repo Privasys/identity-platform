@@ -35,7 +35,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { attest, AttributeVerifierError, newCommitment, type AttributeProof } from '@/services/attribute-verifier';
 import { thisDeviceBinding } from '@/services/attribute-proofs';
 import { attributeLabel } from '@/services/attributes';
-import { getPlatformToken } from '@/services/platform-token';
+import { callWithPlatformToken } from '@/services/platform-token';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { bytesToBase64url } from '@/utils/encoding';
 
@@ -83,12 +83,17 @@ async function pkce(): Promise<{ verifier: string; challenge: string }> {
  * view inside the wallet): no privasys.id page, so no second sign-in.
  */
 async function startCheck(commitment: string, challenge: string, returnUrl: string): Promise<string> {
-    const token = await getPlatformToken();
-    const res = await fetch(`${API_BASE.replace(/\/+$/, '')}/api/v1/billing/address-checks/start`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ holder_binding: commitment, code_challenge: challenge, return: returnUrl }),
-    });
+    const called = await callWithPlatformToken(
+        (token) =>
+            fetch(`${API_BASE.replace(/\/+$/, '')}/api/v1/billing/address-checks/start`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ holder_binding: commitment, code_challenge: challenge, return: returnUrl }),
+            }),
+        { interactive: true },
+    );
+    if (!called) throw new CardCheckError('failed', 'no platform token');
+    const { res } = called;
     if (!res.ok) throw new CardCheckError('failed', `the card check could not start (HTTP ${res.status})`);
     const j = (await res.json()) as { checkout_url?: string; url?: string };
     const url = j.checkout_url ?? j.url;

@@ -41,7 +41,8 @@ type Phase =
     | { kind: 'busy'; source: ConfirmedSource; decision: Decision }
     // Carries the app's name: the message itself may already have been removed.
     | { kind: 'refused'; reason: AnswerFailure; app: string }
-    | { kind: 'failed'; source: ConfirmedSource; reason: AnswerFailure };
+    // detail: the step and status that failed, so a report can name it.
+    | { kind: 'failed'; source: ConfirmedSource; reason: AnswerFailure; detail?: string };
 
 function useSecondsLeft(expiresAt?: number): number | undefined {
     const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -121,7 +122,9 @@ export default function ApprovalScreen() {
         } catch (e) {
             const reason = e instanceof AnswerError ? e.reason : 'unreachable';
             if (reason === 'gone') forget(message.id);
-            setPhase(reason === 'cancelled' ? { kind: 'ready', source } : { kind: 'failed', source, reason });
+            const detail = e instanceof Error ? e.message : String(e);
+            if (reason !== 'cancelled') console.warn(`[ANSWER] failed (${reason}): ${detail}`);
+            setPhase(reason === 'cancelled' ? { kind: 'ready', source } : { kind: 'failed', source, reason, detail });
         }
     };
 
@@ -246,7 +249,14 @@ export default function ApprovalScreen() {
                 ) : null}
 
                 {phase.kind === 'failed' ? (
-                    <Text style={styles.error}>{t(`appForm.failed.${phase.reason}`, { app })}</Text>
+                    <>
+                        <Text style={styles.error}>{t(`appForm.failed.${phase.reason}`, { app })}</Text>
+                        {phase.detail && phase.detail !== phase.reason ? (
+                            <Text style={styles.note} selectable testID="answer-failed-detail">
+                                {phase.detail}
+                            </Text>
+                        ) : null}
+                    </>
                 ) : null}
                 {source && !supported ? <Text style={styles.error}>{t('approval.unsupported')}</Text> : null}
 

@@ -18,7 +18,7 @@ import { APPROVAL_TYPE, readApprovalPayload, type Approval } from '@/services/ap
 import { appMessageLink, readAppMessage, APP_MESSAGE_TYPE, type AppMessageContent } from '@/services/app-message';
 import { isDemo } from '@/services/demo/gate';
 import { openSealedNotification } from '@/services/notify-seal';
-import { getCachedPlatformToken } from '@/services/platform-token';
+import { callWithPlatformToken } from '@/services/platform-token';
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
@@ -140,12 +140,14 @@ let inflight: Promise<void> | null = null;
 
 export async function dismissAppMessage(id: string): Promise<void> {
     try {
-        const token = await getCachedPlatformToken();
-        if (!token) return;
-        await fetch(`${IDP_BASE}/wallet/app-messages/${encodeURIComponent(id)}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
-        });
+        await callWithPlatformToken(
+            (token) =>
+                fetch(`${IDP_BASE}/wallet/app-messages/${encodeURIComponent(id)}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+            { interactive: false },
+        );
     } catch {
         // It expires at the IdP within days anyway.
     }
@@ -160,12 +162,19 @@ export const useAppMessagesStore = create<AppMessagesState>((set, get) => ({
         if (inflight) return inflight;
         inflight = (async () => {
             try {
-                const token = await getCachedPlatformToken();
-                if (!token) return;
-                const res = await fetch(`${IDP_BASE}/wallet/app-messages`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                if (!res.ok) return;
+                // A token privasys.id refuses is dropped (platform-token), so the
+                // next thing the holder does mints one rather than this list
+                // staying empty for good.
+                const called = await callWithPlatformToken(
+                    (token) => fetch(`${IDP_BASE}/wallet/app-messages`, { headers: { Authorization: `Bearer ${token}` } }),
+                    { interactive: false },
+                );
+                if (!called) return;
+                const { res } = called;
+                if (!res.ok) {
+                    console.warn(`[APP-MESSAGE] could not list waiting messages (${res.status})`);
+                    return;
+                }
                 set({ messages: await readListed(await res.json(), Math.floor(Date.now() / 1000)) });
             } catch (e) {
                 console.warn('[APP-MESSAGE] could not list waiting messages', e);

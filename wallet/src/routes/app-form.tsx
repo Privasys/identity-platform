@@ -50,7 +50,8 @@ type Phase =
     | { kind: 'busy'; source: ConfirmedSource; action: string }
     // Carries what it shows: the message itself may already have been removed.
     | { kind: 'refused'; reason: AnswerFailure; app: string; invitation: boolean }
-    | { kind: 'failed'; source: ConfirmedSource; reason: AnswerFailure };
+    // detail: the step and status that failed, so a report can name it.
+    | { kind: 'failed'; source: ConfirmedSource; reason: AnswerFailure; detail?: string };
 
 export default function AppFormScreen() {
     const { t } = useTranslation();
@@ -117,7 +118,9 @@ export default function AppFormScreen() {
             const reason = e instanceof AnswerError ? e.reason : 'unreachable';
             if (reason === 'gone') forget(message.id);
             // A cancelled biometric is not a failure worth a message: back to the form.
-            setPhase(reason === 'cancelled' ? { kind: 'ready', source } : { kind: 'failed', source, reason });
+            const detail = e instanceof Error ? e.message : String(e);
+            if (reason !== 'cancelled') console.warn(`[ANSWER] failed (${reason}): ${detail}`);
+            setPhase(reason === 'cancelled' ? { kind: 'ready', source } : { kind: 'failed', source, reason, detail });
         }
     };
 
@@ -213,7 +216,14 @@ export default function AppFormScreen() {
                 ) : null}
 
                 {phase.kind === 'failed' ? (
-                    <Text style={styles.error}>{t(`appForm.failed.${phase.reason}`, { app })}</Text>
+                    <>
+                        <Text style={styles.error}>{t(`appForm.failed.${phase.reason}`, { app })}</Text>
+                        {phase.detail && phase.detail !== phase.reason ? (
+                            <Text style={styles.note} selectable testID="answer-failed-detail">
+                                {phase.detail}
+                            </Text>
+                        ) : null}
+                    </>
                 ) : null}
 
                 {source ? (

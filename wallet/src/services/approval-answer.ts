@@ -27,6 +27,8 @@ import { Platform } from 'react-native';
 import {
     AnswerError,
     ANSWER_HOST,
+    beginWithPlatformToken,
+    bearerJson,
     confirmAppSource,
     sameApp,
     type ConfirmedSource,
@@ -36,7 +38,6 @@ import { resolveStepUpCredential, type StepUpAssertionOptions } from '@/services
 import { inspectAttestation } from '@/services/attestation';
 import { demo, isDemo } from '@/services/demo/gate';
 import { signVaultAssertion } from '@/services/fido2';
-import { getCachedPlatformToken } from '@/services/platform-token';
 import { appIdFromOids } from '@/services/release-provenance';
 import type { Approval, Decision } from '@/services/approval';
 import { useAppLockStore } from '@/stores/app-lock';
@@ -95,13 +96,13 @@ export async function answerApproval(args: {
     const { messageId, approval, appId, host, decision } = args;
     if (approval.assurance !== 'device') throw new AnswerError('unverified', 'this approval needs a check this wallet cannot make yet');
     if (!ANSWER_HOST.test(host)) throw new AnswerError('not-the-app');
-    const token = await getCachedPlatformToken();
-    if (!token) throw new AnswerError('signed-out');
-    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const base = `${IDP_BASE}/wallet/approvals/${encodeURIComponent(messageId)}`;
 
     // 1. Begin: the IdP names what it will bind. It must be exactly this.
-    const beginRes = await fetch(`${base}/begin`, { method: 'POST', headers: auth, body: JSON.stringify({ decision }) });
+    const { res: beginRes, token } = await beginWithPlatformToken((t) =>
+        fetch(`${base}/begin`, { method: 'POST', headers: bearerJson(t), body: JSON.stringify({ decision }) }),
+    );
+    const auth = bearerJson(token);
     if (beginRes.status === 404) throw new AnswerError('gone');
     if (!beginRes.ok) throw new AnswerError('unreachable', `begin failed (${beginRes.status})`);
     const begin = (await beginRes.json()) as {

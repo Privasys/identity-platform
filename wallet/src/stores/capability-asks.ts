@@ -20,7 +20,7 @@
 
 import { create } from 'zustand';
 
-import { getCachedPlatformToken } from '@/services/platform-token';
+import { callWithPlatformToken } from '@/services/platform-token';
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
@@ -69,12 +69,12 @@ export const useCapabilityAsksStore = create<CapabilityAsksState>((set, get) => 
         if (inflight) return inflight;
         inflight = (async () => {
             try {
-                const token = await getCachedPlatformToken();
-                if (!token) return;
-                const res = await fetch(`${IDP_BASE}/capability-requests/pending`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                if (!res.ok) return;
+                const called = await callWithPlatformToken(
+                    (token) => fetch(`${IDP_BASE}/capability-requests/pending`, { headers: { Authorization: `Bearer ${token}` } }),
+                    { interactive: false },
+                );
+                if (!called?.res.ok) return;
+                const { res } = called;
                 set({ asks: parseAsks(await res.json(), Math.floor(Date.now() / 1000)) });
             } catch (e) {
                 console.warn('[CAPABILITY] could not list open access requests', e);
@@ -90,12 +90,14 @@ export const useCapabilityAsksStore = create<CapabilityAsksState>((set, get) => 
     dismiss: async (nonce) => {
         set({ asks: get().asks.filter((a) => a.nonce !== nonce) });
         try {
-            const token = await getCachedPlatformToken();
-            if (!token) return;
-            await fetch(`${IDP_BASE}/capability-requests/pending/${encodeURIComponent(nonce)}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            await callWithPlatformToken(
+                (token) =>
+                    fetch(`${IDP_BASE}/capability-requests/pending/${encodeURIComponent(nonce)}`, {
+                        method: 'DELETE',
+                        headers: { Authorization: `Bearer ${token}` },
+                    }),
+                { interactive: false },
+            );
         } catch {
             // The IdP forgets it within minutes anyway.
         }

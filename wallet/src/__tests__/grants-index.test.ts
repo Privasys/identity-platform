@@ -17,6 +17,7 @@ jest.mock('../../modules/native-ratls/src/index', () => ({ makeRaTlsFetch: jest.
 jest.mock('@/services/wia', () => ({ ensureWia: jest.fn(async () => null) }));
 jest.mock('@/services/platform-token', () => ({
     getPlatformToken: jest.fn(async () => 'tok'),
+    callWithPlatformToken: jest.fn(async (call: (t: string) => Promise<Response>) => ({ res: await call('tok'), token: 'tok' })),
     tokenForHost: jest.fn(async () => 'tok'),
     cachedTokenForHost: jest.fn(async () => 'tok'),
 }));

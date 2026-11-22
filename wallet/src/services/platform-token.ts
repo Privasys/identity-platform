@@ -254,3 +254,48 @@ async function platformSessionToken(): Promise<string> {
     }
     return result.sessionToken;
 }
+
+/**
+ * Forget a cached token privasys.id refused (401): the session it names was
+ * ended, by a sign-out from another device or Access > Active Sessions. The
+ * token's own expiry says nothing about that, so without this the wallet would
+ * keep sending a dead token for the rest of its year. Only the token refused
+ * is dropped, never one minted since.
+ */
+export async function dropPlatformToken(token: string, clientId?: string): Promise<void> {
+    try {
+        const raw = await SecureStore.getItemAsync(storeKeyFor(clientId));
+        if (!raw || (JSON.parse(raw) as StoredToken).token !== token) return;
+        await SecureStore.deleteItemAsync(storeKeyFor(clientId));
+        console.warn('[platform-token] privasys.id refused the cached token; dropped it');
+    } catch {
+        /* nothing cached, or storage unavailable */
+    }
+}
+
+/**
+ * Make a call to privasys.id (or the platform) with the platform token, and
+ * recover from a token whose session was ended.
+ *
+ * On a 401 the token is dropped. When `interactive` (the holder just tapped
+ * something), a new one is minted, which may ask for Face ID, and the call is
+ * made once more. In the background nothing prompts: the call resolves null
+ * without a usable token, and the next thing the holder does mints one.
+ *
+ * Resolves with the response and the token it was made with, or null when
+ * there is no token to use. Throws only what minting throws.
+ */
+export async function callWithPlatformToken(
+    call: (token: string) => Promise<Response>,
+    opts: { interactive: boolean; audience?: string; clientId?: string },
+): Promise<{ res: Response; token: string } | null> {
+    const { interactive, audience = PLATFORM_AUDIENCE, clientId } = opts;
+    const token = interactive ? await getPlatformToken(audience, clientId) : await getCachedPlatformToken(audience, clientId);
+    if (!token) return null;
+    const res = await call(token);
+    if (res.status !== 401) return { res, token };
+    await dropPlatformToken(token, clientId);
+    if (!interactive) return null;
+    const fresh = await getPlatformToken(audience, clientId);
+    return { res: await call(fresh), token: fresh };
+}

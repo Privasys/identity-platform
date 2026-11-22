@@ -8,7 +8,9 @@ jest.mock('../services/notify-seal', () => ({
         return null;
     }),
 }));
-jest.mock('../services/platform-token', () => ({ getCachedPlatformToken: jest.fn(async () => 'tok') }));
+jest.mock('../services/platform-token', () => ({
+    callWithPlatformToken: jest.fn(async (call: (t: string) => Promise<Response>) => ({ res: await call('tok'), token: 'tok' })),
+}));
 jest.mock('../services/attestation', () => ({ inspectAttestation: jest.fn(), attestEnclave: jest.fn() }));
 jest.mock('../services/app-attest', () => ({ getAttestationServerToken: jest.fn(async () => 'as') }));
 jest.mock('../stores/settings', () => ({ useSettingsStore: { getState: () => ({ verificationMode: 'deterministic' }) } }));

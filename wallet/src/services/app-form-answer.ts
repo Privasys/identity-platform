@@ -23,7 +23,7 @@ import { attestEnclave, inspectAttestation, type AttestationResult } from '@/ser
 import { resolveStepUpCredential, type StepUpAssertionOptions } from '@/services/attribute-approval-api';
 import { getAttestationServerToken } from '@/services/app-attest';
 import { signVaultAssertion } from '@/services/fido2';
-import { getCachedPlatformToken } from '@/services/platform-token';
+import { callWithPlatformToken } from '@/services/platform-token';
 import { demo, isDemo } from '@/services/demo/gate';
 import { appIdFromOids } from '@/services/release-provenance';
 import { useSettingsStore } from '@/stores/settings';
@@ -77,6 +77,31 @@ export function sameApp(a: string, b: string): boolean {
  */
 export function removedWhenRefused(reason: AnswerFailure): boolean {
     return reason === 'not-confirmed' || reason === 'not-the-app';
+}
+
+/** JSON headers carrying a platform token. */
+export function bearerJson(token: string): Record<string, string> {
+    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+/**
+ * The first call of an answer, made with the platform token. A token whose
+ * session was ended elsewhere (signed out from another device) is replaced,
+ * with one Face ID, instead of failing the holder's tap (platform-token).
+ * Resolves with the response and the token that made it.
+ */
+export async function beginWithPlatformToken(
+    call: (token: string) => Promise<Response>,
+): Promise<{ res: Response; token: string }> {
+    let begun: Awaited<ReturnType<typeof callWithPlatformToken>>;
+    try {
+        begun = await callWithPlatformToken(call, { interactive: true });
+    } catch (e) {
+        throw new AnswerError('signed-out', `no privasys.id token: ${String(e)}`);
+    }
+    if (!begun) throw new AnswerError('signed-out');
+    if (begun.res.status === 401) throw new AnswerError('signed-out', 'privasys.id refused the token at begin (401)');
+    return begun;
 }
 
 /** What the screen shows once a form is confirmed, and links to. */
@@ -183,13 +208,13 @@ export async function answerForm(args: {
     const { messageId, form, appId, host, action } = args;
     if (!form.actions.some((a) => a.id === action)) throw new AnswerError('mismatch');
     if (!ANSWER_HOST.test(host)) throw new AnswerError('not-the-app');
-    const token = await getCachedPlatformToken();
-    if (!token) throw new AnswerError('signed-out');
-    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const base = `${IDP_BASE}/wallet/app-forms/${encodeURIComponent(messageId)}`;
 
     // 1. Begin: the IdP names what it will bind. It must be exactly this form.
-    const beginRes = await fetch(`${base}/begin`, { method: 'POST', headers: auth, body: JSON.stringify({ action }) });
+    const { res: beginRes, token } = await beginWithPlatformToken((t) =>
+        fetch(`${base}/begin`, { method: 'POST', headers: bearerJson(t), body: JSON.stringify({ action }) }),
+    );
+    const auth = bearerJson(token);
     if (beginRes.status === 404) throw new AnswerError('gone');
     if (!beginRes.ok) throw new AnswerError('unreachable', `begin failed (${beginRes.status})`);
     const begin = (await beginRes.json()) as {

@@ -12,7 +12,9 @@
  * Targets (pixels, from App Store Connect's and Play Console's specifications):
  *   iphone       1320 x 2868  App Store, iPhone 6.9" (Dynamic Island, large)
  *   iphone-63    1206 x 2622  App Store, iPhone 6.1" or 6.3" (Dynamic Island,
- *                             medium): the iPhone size Apple requires
+ *                             medium)
+ *   iphone-65    1284 x 2778  App Store, iPhone 6.5": the size App Store
+ *                             Connect asked for (2026-11-22)
  *   ipad         2064 x 2752  App Store, iPad 13"
  *   duo          2007 x 2853  App Store, iPhone Duo inner display
  *   play-phone   1080 x 1920  Google Play, phone (9:16)
@@ -37,6 +39,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const TARGETS = {
     iphone: { w: 1320, h: 2868, layout: 'portrait' },
     'iphone-63': { w: 1206, h: 2622, layout: 'portrait' },
+    'iphone-65': { w: 1284, h: 2778, layout: 'portrait' },
     ipad: { w: 2064, h: 2752, layout: 'portrait' },
     duo: { w: 2007, h: 2853, layout: 'portrait' },
     'play-phone': { w: 1080, h: 1920, layout: 'portrait' },

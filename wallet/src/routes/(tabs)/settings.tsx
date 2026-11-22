@@ -258,7 +258,11 @@ export default function SettingsScreen() {
                     Deleting the account is a page at privasys.id. */}
                 {isDemo() ? null : (
                     <>
-                        <View style={styles.dangerDivider} />
+                        <View style={styles.dangerRule} accessibilityRole="header">
+                            <View style={styles.dangerLine} />
+                            <Text style={styles.dangerTitle}>{t('profile.dangerZone')}</Text>
+                            <View style={styles.dangerLine} />
+                        </View>
                         <Text style={styles.sectionTitle}>{t('accountDeletion.sectionTitle')}</Text>
                         {phones > 1 ? (
                             <>
@@ -418,7 +422,10 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         paddingVertical: 14,
         marginBottom: 8,
     },
-    dangerDivider: { height: StyleSheet.hairlineWidth, backgroundColor: p.border, marginTop: 32, marginBottom: 8 },
+    // The separator carries the zone's name, centred: what follows removes things.
+    dangerRule: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 32, marginBottom: 8 },
+    dangerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: p.border },
+    dangerTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: p.danger },
     logsButtonText: { flex: 1, fontSize: 15, fontWeight: '500', color: p.textPrimary },
     toggleRow: {
         flexDirection: 'row',

@@ -59,8 +59,6 @@ export const TASK_ROUTES = new Set([
     'scp',
     'device-add',
     'device-send',
-    'export',
-    'import',
     'account/delete/confirm',
 ]);
 
@@ -77,6 +75,9 @@ const SECTION_OF: Record<string, Section> = {
     'drive-file': 'drive',
     identities: 'profile',
     'personal-data': 'profile',
+    // Pages to browse, not one-off tasks: beside Profile, as its other rows.
+    import: 'profile',
+    export: 'profile',
     drive: 'drive',
     devices: 'settings',
     'how-it-works': 'settings',
@@ -97,6 +98,12 @@ const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
 /** The side padding that centres a column of readable width in a pane this wide. */
 export function readableGutter(width: number): number {
     return Math.max(0, Math.floor((width - READABLE_WIDTH) / 2));
+}
+
+/** The first column with an item of Profile, Access or Settings open beside
+ *  it: half the room, never narrower than a list needs. */
+export function openListWidth(rest: number): number {
+    return Math.max(LIST_WIDTH, Math.min(Math.floor(rest / 2), emptyListWidth(rest)));
 }
 
 /** The first column with nothing open beside it: the wider one, up to a
@@ -187,17 +194,20 @@ export function WideFrame({ routeName, children }: { routeName: string; children
     // An item opened from Profile, Access or Settings: beside its screen.
     if (twoPane && section !== 'drive' && SECTION_OF[routeName]) {
         const List = section === 'access' ? AccessScreen : section === 'settings' ? SettingsScreen : ProfileScreen;
+        // Two equal columns: a section's own screen reads as well as what it
+        // opens. Drive alone narrows its list, for the document's sake.
+        const first = openListWidth(rest);
         return (
             <View style={styles.row}>
                 {side}
-                <PaneProvider kind="list" width={LIST_WIDTH} twoPane={twoPane}>
-                    <View style={[styles.list, { width: LIST_WIDTH }]}>
+                <PaneProvider kind="list" width={first} twoPane={twoPane}>
+                    <View style={[styles.list, { width: first }]}>
                         <List />
                     </View>
                 </PaneProvider>
                 <PaneProvider
                     kind="detail"
-                    width={rest - LIST_WIDTH}
+                    width={rest - first}
                     twoPane={twoPane}
                     close={() =>
                         router.canGoBack()

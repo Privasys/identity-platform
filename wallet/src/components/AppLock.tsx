@@ -60,6 +60,8 @@ const LOGO_INK = '#0F172A';
 /** The white gap between the halves. */
 const GAP = 20;
 const OPEN_MS = 450;
+/** How long the open lock shows after Face ID, before the halves part. */
+const OPEN_LOCK_MS = 350;
 const CLOSE_MS = 300;
 /** The longest the lock waits for a tapped push to open its screen. */
 const PUSH_WAIT_MS = 4000;
@@ -67,9 +69,12 @@ const PUSH_WAIT_MS = 4000;
 const RETURN_WAIT_MS = 350;
 
 /** Ask for Face ID to open the wallet. True once the holder is verified. */
-export async function unlockWallet(prompt: string, cancel: string): Promise<boolean> {
+export async function unlockWallet(prompt: string, cancel: string, beforeUnlock?: () => void): Promise<boolean> {
     const r = await withPrompt(() => LocalAuthentication.authenticateAsync({ promptMessage: prompt, cancelLabel: cancel }));
-    if (r.success) useAppLockStore.getState().unlock();
+    if (r.success) {
+        beforeUnlock?.();
+        useAppLockStore.getState().unlock();
+    }
     return r.success;
 }
 
@@ -94,6 +99,10 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
     const [busy, setBusy] = useState(false);
     // Face ID was cancelled or failed: Unlock shows.
     const [failed, setFailed] = useState(false);
+    // Face ID has just succeeded: the lock in the gap shows open for a moment
+    // before the halves slide apart.
+    const [openLock, setOpenLock] = useState(false);
+    const openLockShown = useRef(false);
 
     // The halves start closed. With the lock on, the start is a lock.
     const [launching, setLaunching] = useState(true);
@@ -181,16 +190,27 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
             setMode('gone');
             return;
         }
-        setMode('opening');
-        progress.value = withTiming(1, { duration: OPEN_MS, easing: Easing.in(Easing.cubic) }, (done) => {
-            if (done) runOnJS(finishOpen)();
-        });
+        const slide = () => {
+            setOpenLock(false);
+            setMode('opening');
+            progress.value = withTiming(1, { duration: OPEN_MS, easing: Easing.in(Easing.cubic) }, (done) => {
+                if (done) runOnJS(finishOpen)();
+            });
+        };
+        // Just unlocked with Face ID: the open lock first, then the slide.
+        if (openLockShown.current) {
+            openLockShown.current = false;
+            const timer = setTimeout(slide, OPEN_LOCK_MS);
+            return () => clearTimeout(timer);
+        }
+        slide();
         // `mode` is read, not followed: the effect answers `shut` changing.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [shut, launching, showLock]);
 
     useEffect(() => {
         if (!showLock) setFailed(false);
+        else setOpenLock(false);
     }, [showLock]);
 
     // A tapped approval push is on its way to its screen: the lock waits for
@@ -220,7 +240,11 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
         if (busy) return;
         setBusy(true);
         try {
-            const ok = await unlockWallet(t('appLock.prompt'), t('common.cancel'));
+            const ok = await unlockWallet(t('appLock.prompt'), t('common.cancel'), () => {
+                // Set before the store unlocks, so the halves wait for it.
+                openLockShown.current = true;
+                setOpenLock(true);
+            });
             setFailed(!ok);
         } finally {
             setBusy(false);
@@ -294,9 +318,9 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
                 ]}
             />
             {/* The lock sits in the gap while the wallet is locked. */}
-            {closed && on && (locked || cover) ? (
+            {closed && on && (locked || cover || openLock) ? (
                 <RNView style={[styles.gapLock, { top: H / 2 - GAP_LOCK / 2, left: W / 2 - GAP_LOCK / 2 }]} pointerEvents="none">
-                    <Ionicons name="lock-closed" size={18} color={LOGO_INK} />
+                    <Ionicons name={openLock && !locked ? 'lock-open' : 'lock-closed'} size={18} color={LOGO_INK} />
                 </RNView>
             ) : null}
             {closed && showLock && failed && !cover ? (

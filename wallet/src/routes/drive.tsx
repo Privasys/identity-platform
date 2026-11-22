@@ -30,9 +30,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { AttestationView } from '@/components/AttestationView';
-import { PaneContext, useHeaderTint, usePane } from '@/components/pane';
+import { useHeaderTint, usePane } from '@/components/pane';
 import { SubPageHeader } from '@/components/SubPageHeader';
-import { ChooseItem, emptyListWidth, LIST_WIDTH, SHEET_WIDTH } from '@/components/WideFrame';
+import { ChooseItem, emptyListWidth, LIST_WIDTH, PaneProvider, SHEET_WIDTH } from '@/components/WideFrame';
 import { DriveFileView, type DriveFileParams } from '@/routes/drive-file';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
@@ -424,11 +424,9 @@ export default function DriveScreen() {
             {list}
             {open ? (
                 <RNView style={styles.detailPane}>
-                    <PaneContext.Provider
-                        value={{ kind: 'detail', width: pane.width - LIST_PANE_WIDTH, twoPane: true, close: () => setOpen(null) }}
-                    >
+                    <PaneProvider kind="detail" width={pane.width - LIST_PANE_WIDTH} twoPane close={() => setOpen(null)}>
                         <DriveFileView key={`${open.tenant}/${open.id}`} params={open} />
-                    </PaneContext.Provider>
+                    </PaneProvider>
                 </RNView>
             ) : (
                 <ChooseItem />

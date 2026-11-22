@@ -14,7 +14,7 @@
  * user is not currently being asked about.
  */
 
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { View as RNView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -34,7 +34,6 @@ export default function HowItWorksScreen() {
 
     return (
         <RNView style={{ flex: 1, backgroundColor: p.screenBg }}>
-            <Stack.Screen options={{ headerShown: false }} />
             <SubPageHeader title={t('firstConnect.settingsRow')} />
             {/* No onSkip: the header's back button is the way out, and a
                 "Skip" button here would have nothing to skip to. */}

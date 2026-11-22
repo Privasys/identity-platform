@@ -11,7 +11,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useState, useCallback, useMemo } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
@@ -75,7 +75,6 @@ export default function LogsScreen() {
 
     return (
         <RNView style={styles.screen}>
-            <Stack.Screen options={{ headerShown: false }} />
             {bandless ? (
                 <SubPageHeader title="Logs" right={<Text style={{ color: p.textSecondary }}>{entries.length} entries</Text>} />
             ) : (

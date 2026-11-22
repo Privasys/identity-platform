@@ -17,7 +17,7 @@
 
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Clipboard from 'expo-clipboard';
-import { useRouter, useLocalSearchParams, Stack, type Href } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     StyleSheet,
@@ -2933,7 +2933,6 @@ function ConnectFlow() {
 
     return (
         <>
-            <Stack.Screen options={{ headerShown: false }} />
             <View style={styles.container}>
                 {step === 'verifying' && (
                     <View style={styles.centered}>

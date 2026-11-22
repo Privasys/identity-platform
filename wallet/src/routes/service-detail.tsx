@@ -10,7 +10,7 @@
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Pressable, Alert, Linking, ScrollView, Switch, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -433,7 +433,6 @@ export default function ServiceDetailScreen() {
     if (!latest && !app) {
         return (
             <>
-                <Stack.Screen options={{ headerShown: false }} />
                 <RNView style={[styles.screen, { paddingTop: insets.top }]}>
                     <Text style={styles.notFound}>Service not found</Text>
                     <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -457,7 +456,6 @@ export default function ServiceDetailScreen() {
 
     return (
         <>
-            <Stack.Screen options={{ headerShown: false }} />
             <RNView style={styles.screen}>
                 {/* Header */}
                 {bandless ? (

@@ -25,7 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PaneContext, type Pane } from '@/components/pane';
+import { PaneContext, type Pane, type PaneKind } from '@/components/pane';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { READABLE_WIDTH, TWO_PANE_MIN_WIDTH, useWideLayout } from '@/hooks/useLargeScreen';
 import ProfileScreen from '@/routes/(tabs)/index';
@@ -164,9 +164,9 @@ export function WideFrame({ routeName, children }: { routeName: string; children
             return (
                 <View style={styles.row}>
                     {side}
-                    <PaneContext.Provider value={{ kind: 'list', width: rest, twoPane }}>
+                    <PaneProvider kind="list" width={rest} twoPane={twoPane}>
                         <View style={styles.fill}>{children}</View>
-                    </PaneContext.Provider>
+                    </PaneProvider>
                 </View>
             );
         }
@@ -176,9 +176,9 @@ export function WideFrame({ routeName, children }: { routeName: string; children
         return (
             <View style={styles.row}>
                 {side}
-                <PaneContext.Provider value={{ kind: 'list', width: first, twoPane }}>
+                <PaneProvider kind="list" width={first} twoPane={twoPane}>
                     <View style={[styles.list, { width: first }]}>{children}</View>
-                </PaneContext.Provider>
+                </PaneProvider>
                 <ChooseItem />
             </View>
         );
@@ -190,24 +190,23 @@ export function WideFrame({ routeName, children }: { routeName: string; children
         return (
             <View style={styles.row}>
                 {side}
-                <PaneContext.Provider value={{ kind: 'list', width: LIST_WIDTH, twoPane }}>
+                <PaneProvider kind="list" width={LIST_WIDTH} twoPane={twoPane}>
                     <View style={[styles.list, { width: LIST_WIDTH }]}>
                         <List />
                     </View>
-                </PaneContext.Provider>
-                <PaneContext.Provider
-                    value={{
-                        kind: 'detail',
-                        width: rest - LIST_WIDTH,
-                        twoPane,
-                        close: () =>
-                            router.canGoBack()
-                                ? router.back()
-                                : router.replace((section === 'profile' ? '/' : `/${section}`) as never),
-                    }}
+                </PaneProvider>
+                <PaneProvider
+                    kind="detail"
+                    width={rest - LIST_WIDTH}
+                    twoPane={twoPane}
+                    close={() =>
+                        router.canGoBack()
+                            ? router.back()
+                            : router.replace((section === 'profile' ? '/' : `/${section}`) as never)
+                    }
                 >
                     <View style={styles.fill}>{children}</View>
-                </PaneContext.Provider>
+                </PaneProvider>
             </View>
         );
     }
@@ -215,14 +214,13 @@ export function WideFrame({ routeName, children }: { routeName: string; children
     // A screen of its own (anything opened without a section beside it, or
     // any screen in a window too narrow for two columns): one column of
     // readable width. A long page scrolls; it never spills into a second.
-    const pane: Pane = { kind: 'page', width: Math.min(rest, READABLE_WIDTH), twoPane };
     const gutter = readableGutter(rest);
     return (
         <View style={styles.row}>
             {side}
-            <PaneContext.Provider value={pane}>
+            <PaneProvider kind="page" width={Math.min(rest, READABLE_WIDTH)} twoPane={twoPane}>
                 <View style={[styles.fill, { paddingHorizontal: gutter }]}>{children}</View>
-            </PaneContext.Provider>
+            </PaneProvider>
         </View>
     );
 }
@@ -313,6 +311,37 @@ function Sidebar({ active, width, styles }: { active: Section; width: number; st
     );
 }
 
+/**
+ * The pane a screen is drawn in, the same value from one render to the next
+ * until its kind, width or layout changes. A fresh value each time the frame
+ * draws re-renders every screen that reads it; a screen that then sets its
+ * navigation options (Stack.Screen) has the frame draw again, and so on
+ * without end ("Maximum update depth exceeded", Service Details on iPad in
+ * 1.4.77). The close action is kept current without changing the value.
+ */
+export function PaneProvider({
+    kind,
+    width,
+    twoPane,
+    close,
+    children,
+}: {
+    kind: PaneKind;
+    width: number;
+    twoPane: boolean;
+    close?: () => void;
+    children: ReactNode;
+}) {
+    const closeRef = useRef(close);
+    closeRef.current = close;
+    const canClose = close != null;
+    const value = useMemo<Pane>(
+        () => ({ kind, width, twoPane, close: canClose ? () => closeRef.current?.() : undefined }),
+        [kind, width, twoPane, canClose],
+    );
+    return <PaneContext.Provider value={value}>{children}</PaneContext.Provider>;
+}
+
 /** What the second column shows with nothing open in it. */
 export function ChooseItem() {
     const { t } = useTranslation();
@@ -341,9 +370,9 @@ function TaskSheet({ children, styles }: { children: ReactNode; styles: Styles }
                 {/* The sheet sits clear of the status bar and the home
                     indicator, so the screen inside needs no room for them. */}
                 <SafeAreaInsetsContext.Provider value={NO_INSETS}>
-                    <PaneContext.Provider value={{ kind: 'task', width: sheetWidth, twoPane: false }}>
+                    <PaneProvider kind="task" width={sheetWidth} twoPane={false}>
                         {children}
-                    </PaneContext.Provider>
+                    </PaneProvider>
                 </SafeAreaInsetsContext.Provider>
             </View>
         </View>

@@ -22,7 +22,7 @@
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -102,7 +102,6 @@ export default function LanguageScreen() {
 
     return (
         <RNView style={styles.screen}>
-            <Stack.Screen options={{ headerShown: false }} />
             {bandless ? (
                 <SubPageHeader title={t('language.title')} />
             ) : (

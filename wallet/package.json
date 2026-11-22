@@ -2,7 +2,7 @@
   "name": "privasys-wallet",
   "version": "1.4.80",
   "private": true,
-  "main": "expo-router/entry",
+  "main": "./entry.ts",
   "scripts": {
     "sync-shared": "cp ../shared/canonical-attributes.json src/shared/canonical-attributes.json",
     "android": "expo run:android",
@@ -51,6 +51,7 @@
     "expo-sharing": "~55.0.6",
     "expo-splash-screen": "~55.0.12",
     "expo-system-ui": "~55.0.10",
+    "expo-task-manager": "~55.0.20",
     "expo-updates": "~55.0.15",
     "expo-web-browser": "~55.0.10",
     "i18next": "^25.10.10",

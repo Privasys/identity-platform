@@ -22,6 +22,7 @@ import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 import { vaultBatchRouteName } from '../services/vault-approval-batch';
 import { isRouteActive } from '../utils/active-route';
 import { DELETION_PUSH_TYPES, handleDeletionPush } from '../services/account-deletion-events';
+import { dismissElsewhere, dismissHere, dismissStale, DISMISS_TYPE } from '../services/notification-dismiss';
 
 let _notificationsSetup = false;
 
@@ -172,6 +173,11 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         // Each push carries only its type; what it means is read from
         // privasys.id, and the wallet is never cleared on a push alone.
         await handleDeletionPush(data.type).catch((e) => console.warn('[notifications] account deletion', e));
+        return;
+    }
+    if (data?.type === DISMISS_TYPE) {
+        // Answered on another of the holder's phones: off this one too. Silent.
+        if (typeof data.key === 'string') await dismissHere(data.key).catch(() => 0);
         return;
     }
     if (data?.type === 'device-relay') {
@@ -457,6 +463,29 @@ async function sweepPresentedApprovals(): Promise<void> {
  *  so the IdP can push vault approvals keyed by the owner sub. Also registers
  *  the device's notification-sealing public key so app notifications (drive
  *  share requests) can carry sealed payloads. Best-effort. */
+/** A notification tapped here: tell the holder's other phones to clear their
+ *  copy. On a cold start the token may not be published yet; a notification
+ *  arrived, so permission is there to read it. */
+async function answeredHere(data: Record<string, unknown>): Promise<void> {
+    if (Platform.OS === 'web') return;
+    let token = ambientPushToken;
+    if (!token) {
+        try {
+            const Notifications = await getNotifications();
+            token = (await Notifications.getExpoPushTokenAsync()).data;
+        } catch {
+            return;
+        }
+    }
+    await dismissElsewhere(data, token);
+}
+
+/** Clear notifications that can no longer be answered, then file the rest. */
+async function sweepTray(): Promise<void> {
+    await dismissStale().catch((e) => console.warn('[notifications] stale sweep failed', e));
+    await sweepPresentedApprovals();
+}
+
 async function maybeRegisterPushToken(token: string): Promise<void> {
     const account = getPrivasysAccount();
     if (!account?.sessionToken) return;
@@ -584,6 +613,7 @@ async function setupListeners(router: Router): Promise<void> {
                 if (data) {
                     // Defer one tick so the router is mounted before pushing.
                     setTimeout(() => void dispatchPush(data, router), 0);
+                    void answeredHere(data);
                 }
             }
         } catch (e) {
@@ -615,14 +645,15 @@ async function setupListeners(router: Router): Promise<void> {
             | undefined;
         if (!data) return;
         void dispatchPush(data, router);
+        void answeredHere(data);
     });
 
     // Surface pending approvals the user never tapped: sweep the tray now (app
     // just came up) and again whenever it returns to the foreground.
-    void sweepPresentedApprovals();
+    void sweepTray();
     AppState.addEventListener('change', (state) => {
         if (state === 'active') {
-            void sweepPresentedApprovals();
+            void sweepTray();
             void pullRelay().catch(() => undefined);
         }
     });

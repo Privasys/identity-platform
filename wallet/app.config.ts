@@ -369,7 +369,12 @@ export default (context: ConfigContext): ExpoConfig => {
             'expo-font',
             'expo-image',
             'expo-web-browser',
-            ['expo-notifications', { icon: './assets/notification-icon.png', color: '#B21D36' }],
+            [
+                'expo-notifications',
+                // Background remote notifications: a silent push from privasys.id
+                // clears a notification answered on the holder's other phone.
+                { icon: './assets/notification-icon.png', color: '#B21D36', enableBackgroundRemoteNotifications: true },
+            ],
             // These two add the passkey and notification extensions, with the
             // shared keychain group; the demo carries neither.
             DEMO ? 'noop' : './modules/passkey-provider/app.plugin',

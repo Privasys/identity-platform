@@ -57,7 +57,7 @@ privasys.id {
     }
 
     # OIDC / FIDO2 / session endpoints -> IdP backend
-    @idp path /.well-known/openid-configuration /jwks /authorize /token /userinfo /fido2/* /session/* /sessions /sessions/* /api-keys /api-keys/* /clients /clients/* /admin/* /healthz /e2e/* /recovery/* /guardians/* /devices /devices/* /push-token /device_authorization /device /device/* /wallet/* /referential/* /vault/* /wia/* /wallet-provider/* /spend /spend/* /account /account/ /capability-requests/*
+    @idp path /.well-known/openid-configuration /jwks /authorize /token /userinfo /fido2/* /session/* /sessions /sessions/* /api-keys /api-keys/* /clients /clients/* /admin/* /healthz /e2e/* /recovery/* /guardians/* /devices /devices/* /push-token /push/dismiss /device_authorization /device /device/* /wallet/* /referential/* /vault/* /wia/* /wallet-provider/* /spend /spend/* /account /account/ /account/* /account-deletion /account-deletion/* /capability-requests/*
     handle @idp {
         @sessionsApi path /sessions /sessions/*
         header @sessionsApi Cache-Control "no-store"

@@ -1685,6 +1685,7 @@
     "confirmedByCard": "Cyfeiriad bilio wedi'i gadarnhau gan fanc eich cerdyn ({{card}})",
     "confirmedByBank": "Cyfeiriad bilio wedi'i gadarnhau gan fanc eich cerdyn",
     "countryConfirmedByCard": "Gwlad bilio wedi'i chadarnhau gan fanc eich cerdyn ({{card}})",
-    "countryConfirmedByBank": "Gwlad bilio wedi'i chadarnhau gan fanc eich cerdyn"
+    "countryConfirmedByBank": "Gwlad bilio wedi'i chadarnhau gan fanc eich cerdyn",
+    "declinedHint": "Os gwrthododd eich banc wiriad y cerdyn, ni chymerwyd unrhyw arian. Rhowch gynnig ar gerdyn arall, neu gwiriwch fod y cyfeiriad yn cyfateb i gofnodion eich banc."
   }
 }

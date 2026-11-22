@@ -1598,6 +1598,7 @@
     "confirmedByCard": "Norēķinu adresi apstiprinājusi jūsu kartes banka ({{card}})",
     "confirmedByBank": "Norēķinu adresi apstiprinājusi jūsu kartes banka",
     "countryConfirmedByCard": "Norēķinu valsti apstiprinājusi jūsu kartes banka ({{card}})",
-    "countryConfirmedByBank": "Norēķinu valsti apstiprinājusi jūsu kartes banka"
+    "countryConfirmedByBank": "Norēķinu valsti apstiprinājusi jūsu kartes banka",
+    "declinedHint": "Ja jūsu banka noraidīja kartes pārbaudi, nauda netika iekasēta. Mēģiniet citu karti vai pārbaudiet, vai adrese atbilst jūsu bankas datiem."
   }
 }

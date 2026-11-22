@@ -1600,6 +1600,7 @@
     "confirmedByCard": "Fakturačná adresa potvrdená bankou vašej karty ({{card}})",
     "confirmedByBank": "Fakturačná adresa potvrdená bankou vašej karty",
     "countryConfirmedByCard": "Fakturačná krajina potvrdená bankou vašej karty ({{card}})",
-    "countryConfirmedByBank": "Fakturačná krajina potvrdená bankou vašej karty"
+    "countryConfirmedByBank": "Fakturačná krajina potvrdená bankou vašej karty",
+    "declinedHint": "Ak vaša banka kontrolu karty zamietla, neboli stiahnuté žiadne peniaze. Skúste inú kartu alebo overte, či adresa zodpovedá údajom vo vašej banke."
   }
 }

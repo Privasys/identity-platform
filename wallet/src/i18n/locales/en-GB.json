@@ -1569,6 +1569,7 @@
     "confirmedByCard": "Billing address confirmed by your card's bank ({{card}})",
     "confirmedByBank": "Billing address confirmed by your card's bank",
     "countryConfirmedByCard": "Billing country confirmed by your card's bank ({{card}})",
-    "countryConfirmedByBank": "Billing country confirmed by your card's bank"
+    "countryConfirmedByBank": "Billing country confirmed by your card's bank",
+    "declinedHint": "If your bank declined the card check, no money was taken. Try another card, or check that the address matches your bank's records."
   }
 }

@@ -1558,6 +1558,7 @@
     "confirmedByCard": "Factuuradres bevestigd door de bank van je kaart ({{card}})",
     "confirmedByBank": "Factuuradres bevestigd door de bank van je kaart",
     "countryConfirmedByCard": "Factuurland bevestigd door de bank van je kaart ({{card}})",
-    "countryConfirmedByBank": "Factuurland bevestigd door de bank van je kaart"
+    "countryConfirmedByBank": "Factuurland bevestigd door de bank van je kaart",
+    "declinedHint": "Als je bank de kaartcontrole heeft geweigerd, is er geen geld afgeschreven. Probeer een andere kaart, of controleer of het adres overeenkomt met wat je bank heeft."
   }
 }

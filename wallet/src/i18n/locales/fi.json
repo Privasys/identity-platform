@@ -1558,6 +1558,7 @@
     "confirmedByCard": "Laskutusosoitteen vahvisti korttisi pankki ({{card}})",
     "confirmedByBank": "Laskutusosoitteen vahvisti korttisi pankki",
     "countryConfirmedByCard": "Laskutusmaan vahvisti korttisi pankki ({{card}})",
-    "countryConfirmedByBank": "Laskutusmaan vahvisti korttisi pankki"
+    "countryConfirmedByBank": "Laskutusmaan vahvisti korttisi pankki",
+    "declinedHint": "Jos pankkisi hylkäsi korttitarkistuksen, rahaa ei veloitettu. Kokeile toista korttia tai tarkista, että osoite vastaa pankkisi tietoja."
   }
 }

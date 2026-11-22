@@ -28,7 +28,13 @@ export function useCardAddressCheck(): { start: () => void; busy: boolean } {
             useNoticeStore.getState().markFresh([{ key: 'address', value }]);
             notify(t('cardCheck.doneTitle'), t('cardCheck.doneBody'));
         } catch (e: any) {
-            if (e instanceof CardCheckError && e.reason === 'cancelled') return;
+            // The provider's page closes the same way whether the holder left
+            // or their bank declined the check (it said so on its own page),
+            // so the hint covers the decline without assuming one.
+            if (e instanceof CardCheckError && e.reason === 'cancelled') {
+                Alert.alert(t('cardCheck.declinedHint'));
+                return;
+            }
             if (e instanceof CardCheckError && e.reason === 'nothing-confirmed') {
                 Alert.alert(t('cardCheck.nothingConfirmed'));
             } else {

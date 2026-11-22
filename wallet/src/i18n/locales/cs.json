@@ -1589,6 +1589,7 @@
     "confirmedByCard": "Fakturační adresa potvrzena bankou vaší karty ({{card}})",
     "confirmedByBank": "Fakturační adresa potvrzena bankou vaší karty",
     "countryConfirmedByCard": "Fakturační země potvrzena bankou vaší karty ({{card}})",
-    "countryConfirmedByBank": "Fakturační země potvrzena bankou vaší karty"
+    "countryConfirmedByBank": "Fakturační země potvrzena bankou vaší karty",
+    "declinedHint": "Pokud vaše banka kontrolu karty zamítla, nebyly strženy žádné peníze. Zkuste jinou kartu, nebo ověřte, že adresa odpovídá údajům ve vaší bance."
   }
 }

@@ -1616,6 +1616,7 @@
     "confirmedByCard": "Adres rozliczeniowy potwierdzony przez bank Twojej karty ({{card}})",
     "confirmedByBank": "Adres rozliczeniowy potwierdzony przez bank Twojej karty",
     "countryConfirmedByCard": "Kraj rozliczeniowy potwierdzony przez bank Twojej karty ({{card}})",
-    "countryConfirmedByBank": "Kraj rozliczeniowy potwierdzony przez bank Twojej karty"
+    "countryConfirmedByBank": "Kraj rozliczeniowy potwierdzony przez bank Twojej karty",
+    "declinedHint": "Jeśli Twój bank odrzucił weryfikację karty, nie pobrano żadnych pieniędzy. Spróbuj innej karty lub sprawdź, czy adres zgadza się z danymi w Twoim banku."
   }
 }

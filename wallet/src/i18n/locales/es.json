@@ -1587,6 +1587,7 @@
     "confirmedByCard": "Dirección de facturación confirmada por el banco de tu tarjeta ({{card}})",
     "confirmedByBank": "Dirección de facturación confirmada por el banco de tu tarjeta",
     "countryConfirmedByCard": "País de facturación confirmado por el banco de tu tarjeta ({{card}})",
-    "countryConfirmedByBank": "País de facturación confirmado por el banco de tu tarjeta"
+    "countryConfirmedByBank": "País de facturación confirmado por el banco de tu tarjeta",
+    "declinedHint": "Si tu banco rechazó la comprobación de la tarjeta, no se ha cobrado nada. Prueba con otra tarjeta o comprueba que la dirección coincide con la que tiene tu banco."
   }
 }

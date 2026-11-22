@@ -1627,6 +1627,7 @@
     "confirmedByCard": "Naslov za račun je potrdila banka vaše kartice ({{card}})",
     "confirmedByBank": "Naslov za račun je potrdila banka vaše kartice",
     "countryConfirmedByCard": "Državo za račun je potrdila banka vaše kartice ({{card}})",
-    "countryConfirmedByBank": "Državo za račun je potrdila banka vaše kartice"
+    "countryConfirmedByBank": "Državo za račun je potrdila banka vaše kartice",
+    "declinedHint": "Če je vaša banka zavrnila preverjanje kartice, denar ni bil odtegnjen. Poskusite z drugo kartico ali preverite, ali se naslov ujema s podatki v vaši banki."
   }
 }

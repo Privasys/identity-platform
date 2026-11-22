@@ -1656,6 +1656,7 @@
     "confirmedByCard": "Indirizz tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek ({{card}})",
     "confirmedByBank": "Indirizz tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek",
     "countryConfirmedByCard": "Pajjiż tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek ({{card}})",
-    "countryConfirmedByBank": "Pajjiż tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek"
+    "countryConfirmedByBank": "Pajjiż tal-kontijiet ikkonfermat mill-bank tal-kard tiegħek",
+    "declinedHint": "Jekk il-bank tiegħek irrifjuta l-verifika tal-kard, ma ttieħdu l-ebda flus. Ipprova kard oħra, jew iċċekkja li l-indirizz jaqbel mar-rekords tal-bank tiegħek."
   }
 }

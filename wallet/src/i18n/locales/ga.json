@@ -1656,6 +1656,7 @@
     "confirmedByCard": "Seoladh billeála deimhnithe ag banc do chárta ({{card}})",
     "confirmedByBank": "Seoladh billeála deimhnithe ag banc do chárta",
     "countryConfirmedByCard": "Tír bhilleála deimhnithe ag banc do chárta ({{card}})",
-    "countryConfirmedByBank": "Tír bhilleála deimhnithe ag banc do chárta"
+    "countryConfirmedByBank": "Tír bhilleála deimhnithe ag banc do chárta",
+    "declinedHint": "Má dhiúltaigh do bhanc seiceáil an chárta, níor tógadh aon airgead. Bain triail as cárta eile, nó seiceáil go bhfuil an seoladh mar an gcéanna le taifid do bhainc."
   }
 }

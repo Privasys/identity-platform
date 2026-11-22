@@ -1587,6 +1587,7 @@
     "confirmedByCard": "Indirizzo di fatturazione confermato dalla banca della tua carta ({{card}})",
     "confirmedByBank": "Indirizzo di fatturazione confermato dalla banca della tua carta",
     "countryConfirmedByCard": "Paese di fatturazione confermato dalla banca della tua carta ({{card}})",
-    "countryConfirmedByBank": "Paese di fatturazione confermato dalla banca della tua carta"
+    "countryConfirmedByBank": "Paese di fatturazione confermato dalla banca della tua carta",
+    "declinedHint": "Se la tua banca ha rifiutato la verifica della carta, non è stato addebitato nulla. Prova un'altra carta, oppure controlla che l'indirizzo corrisponda a quello registrato dalla tua banca."
   }
 }

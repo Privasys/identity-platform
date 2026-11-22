@@ -1558,6 +1558,7 @@
     "confirmedByCard": "Faktureringsadress bekräftad av ditt korts bank ({{card}})",
     "confirmedByBank": "Faktureringsadress bekräftad av ditt korts bank",
     "countryConfirmedByCard": "Faktureringsland bekräftat av ditt korts bank ({{card}})",
-    "countryConfirmedByBank": "Faktureringsland bekräftat av ditt korts bank"
+    "countryConfirmedByBank": "Faktureringsland bekräftat av ditt korts bank",
+    "declinedHint": "Om din bank avvisade kortkontrollen drogs inga pengar. Prova ett annat kort, eller kontrollera att adressen stämmer med din banks uppgifter."
   }
 }

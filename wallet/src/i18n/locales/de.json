@@ -1558,6 +1558,7 @@
     "confirmedByCard": "Rechnungsadresse bestätigt von der Bank Ihrer Karte ({{card}})",
     "confirmedByBank": "Rechnungsadresse bestätigt von der Bank Ihrer Karte",
     "countryConfirmedByCard": "Rechnungsland bestätigt von der Bank Ihrer Karte ({{card}})",
-    "countryConfirmedByBank": "Rechnungsland bestätigt von der Bank Ihrer Karte"
+    "countryConfirmedByBank": "Rechnungsland bestätigt von der Bank Ihrer Karte",
+    "declinedHint": "Falls Ihre Bank die Kartenprüfung abgelehnt hat, wurde kein Geld abgebucht. Versuchen Sie eine andere Karte, oder prüfen Sie, ob die Adresse mit den Angaben Ihrer Bank übereinstimmt."
   }
 }

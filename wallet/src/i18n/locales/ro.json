@@ -1598,6 +1598,7 @@
     "confirmedByCard": "Adresă de facturare confirmată de banca cardului tău ({{card}})",
     "confirmedByBank": "Adresă de facturare confirmată de banca cardului tău",
     "countryConfirmedByCard": "Țară de facturare confirmată de banca cardului tău ({{card}})",
-    "countryConfirmedByBank": "Țară de facturare confirmată de banca cardului tău"
+    "countryConfirmedByBank": "Țară de facturare confirmată de banca cardului tău",
+    "declinedHint": "Dacă banca ta a refuzat verificarea cardului, nu s-au luat bani. Încearcă alt card sau verifică dacă adresa se potrivește cu datele de la banca ta."
   }
 }

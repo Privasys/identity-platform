@@ -1598,6 +1598,7 @@
     "confirmedByCard": "Adresu za naplatu potvrdila je banka vaše kartice ({{card}})",
     "confirmedByBank": "Adresu za naplatu potvrdila je banka vaše kartice",
     "countryConfirmedByCard": "Državu za naplatu potvrdila je banka vaše kartice ({{card}})",
-    "countryConfirmedByBank": "Državu za naplatu potvrdila je banka vaše kartice"
+    "countryConfirmedByBank": "Državu za naplatu potvrdila je banka vaše kartice",
+    "declinedHint": "Ako je vaša banka odbila provjeru kartice, novac nije naplaćen. Pokušajte s drugom karticom ili provjerite odgovara li adresa podacima u vašoj banci."
   }
 }

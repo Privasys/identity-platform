@@ -1558,6 +1558,7 @@
     "confirmedByCard": "A számlázási címet kártyája bankja erősítette meg ({{card}})",
     "confirmedByBank": "A számlázási címet kártyája bankja erősítette meg",
     "countryConfirmedByCard": "A számlázási országot kártyája bankja erősítette meg ({{card}})",
-    "countryConfirmedByBank": "A számlázási országot kártyája bankja erősítette meg"
+    "countryConfirmedByBank": "A számlázási országot kártyája bankja erősítette meg",
+    "declinedHint": "Ha a bankja elutasította a kártya ellenőrzését, nem vontunk le pénzt. Próbáljon meg egy másik kártyát, vagy ellenőrizze, hogy a cím egyezik-e a bankjánál nyilvántartottal."
   }
 }

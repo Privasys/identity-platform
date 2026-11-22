@@ -1600,6 +1600,7 @@
     "confirmedByCard": "Atsiskaitymo adresą patvirtino jūsų kortelės bankas ({{card}})",
     "confirmedByBank": "Atsiskaitymo adresą patvirtino jūsų kortelės bankas",
     "countryConfirmedByCard": "Atsiskaitymo šalį patvirtino jūsų kortelės bankas ({{card}})",
-    "countryConfirmedByBank": "Atsiskaitymo šalį patvirtino jūsų kortelės bankas"
+    "countryConfirmedByBank": "Atsiskaitymo šalį patvirtino jūsų kortelės bankas",
+    "declinedHint": "Jei jūsų bankas atmetė kortelės patikrą, pinigų nebuvo nuskaičiuota. Pabandykite kitą kortelę arba patikrinkite, ar adresas sutampa su jūsų banko duomenimis."
   }
 }

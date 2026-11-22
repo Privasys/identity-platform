@@ -1587,6 +1587,7 @@
     "confirmedByCard": "Adresse de facturation confirmée par la banque de votre carte ({{card}})",
     "confirmedByBank": "Adresse de facturation confirmée par la banque de votre carte",
     "countryConfirmedByCard": "Pays de facturation confirmé par la banque de votre carte ({{card}})",
-    "countryConfirmedByBank": "Pays de facturation confirmé par la banque de votre carte"
+    "countryConfirmedByBank": "Pays de facturation confirmé par la banque de votre carte",
+    "declinedHint": "Si votre banque a refusé la vérification de la carte, aucun montant n'a été prélevé. Essayez une autre carte, ou vérifiez que l'adresse correspond à celle que connaît votre banque."
   }
 }

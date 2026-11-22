@@ -1569,6 +1569,7 @@
     "confirmedByCard": "Arveldusaadressi kinnitas teie kaardi pank ({{card}})",
     "confirmedByBank": "Arveldusaadressi kinnitas teie kaardi pank",
     "countryConfirmedByCard": "Arveldusriigi kinnitas teie kaardi pank ({{card}})",
-    "countryConfirmedByBank": "Arveldusriigi kinnitas teie kaardi pank"
+    "countryConfirmedByBank": "Arveldusriigi kinnitas teie kaardi pank",
+    "declinedHint": "Kui teie pank lükkas kaardi kontrolli tagasi, ei võetud raha. Proovige teist kaarti või kontrollige, et aadress vastab teie panga andmetele."
   }
 }

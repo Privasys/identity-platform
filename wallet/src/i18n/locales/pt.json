@@ -1587,6 +1587,7 @@
     "confirmedByCard": "Endereço de faturação confirmado pelo banco do seu cartão ({{card}})",
     "confirmedByBank": "Endereço de faturação confirmado pelo banco do seu cartão",
     "countryConfirmedByCard": "País de faturação confirmado pelo banco do seu cartão ({{card}})",
-    "countryConfirmedByBank": "País de faturação confirmado pelo banco do seu cartão"
+    "countryConfirmedByBank": "País de faturação confirmado pelo banco do seu cartão",
+    "declinedHint": "Se o seu banco recusou a verificação do cartão, não foi cobrado nada. Experimente outro cartão, ou confirme que o endereço corresponde ao registado no seu banco."
   }
 }

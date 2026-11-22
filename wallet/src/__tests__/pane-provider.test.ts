@@ -25,7 +25,7 @@ const SetOptions = createContext<(o: object) => void>(() => undefined);
 function Frame({ stable, children }: { stable: boolean; children: ReactNode }) {
     const [, setOptions] = useState<object>({});
     const pane = stable
-        ? h(PaneProvider, { kind: 'detail', width: 500, twoPane: true, close: () => undefined }, children)
+        ? h(PaneProvider, { kind: 'detail', width: 500, twoPane: true, close: () => undefined, children })
         : // The 1.4.77 frame: a fresh value on every draw.
           h(PaneContext.Provider, { value: { kind: 'detail', width: 500, twoPane: true, close: () => undefined } }, children);
     return h(SetOptions.Provider, { value: setOptions }, pane);
@@ -55,7 +55,7 @@ beforeEach(() => {
 describe('PaneProvider', () => {
     it('keeps a screen that sets its options from looping', () => {
         act(() => {
-            TestRenderer.create(h(Frame, { stable: true }, h(Screen)));
+            TestRenderer.create(h(Frame, { stable: true, children: h(Screen) }));
         });
         expect(renders).toBe(1);
     });
@@ -64,7 +64,7 @@ describe('PaneProvider', () => {
         const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
         expect(() =>
             act(() => {
-                TestRenderer.create(h(Frame, { stable: false }, h(Screen)));
+                TestRenderer.create(h(Frame, { stable: false, children: h(Screen) }));
             }),
         ).toThrow(/Maximum update depth exceeded/);
         error.mockRestore();
@@ -73,7 +73,7 @@ describe('PaneProvider', () => {
     it('keeps the same value while its props are the same, and calls the latest close', () => {
         const calls: string[] = [];
         const Host = ({ tag }: { tag: string }) =>
-            h(PaneProvider, { kind: 'list', width: 400, twoPane: true, close: () => calls.push(tag) }, h(Screen));
+            h(PaneProvider, { kind: 'list', width: 400, twoPane: true, close: () => void calls.push(tag), children: h(Screen) });
         let r: TestRenderer.ReactTestRenderer | undefined;
         act(() => {
             r = TestRenderer.create(h(Host, { tag: 'a' }));

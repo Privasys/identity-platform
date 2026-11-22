@@ -398,3 +398,32 @@ func (db *DB) DeviceLimitReached(userID, deviceTag string) (bool, error) {
 	count, err := db.CountDevices(userID)
 	return count >= MaxDevices, err
 }
+
+// PushPeer is another phone of a holder: the user it is registered for and its
+// push token.
+type PushPeer struct {
+	UserID string
+	Token  string
+}
+
+// GetPushPeers returns the other phones registered for any user that token is
+// registered for, each token once, never the token itself.
+func (db *DB) GetPushPeers(token string) []PushPeer {
+	rows, err := db.Query(`SELECT p2.user_id, p2.push_token FROM push_tokens p1
+		JOIN push_tokens p2 ON p2.user_id = p1.user_id
+		WHERE p1.push_token = ? AND p2.push_token <> ? ORDER BY p2.updated_at DESC`, token, token)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	seen := map[string]bool{}
+	var out []PushPeer
+	for rows.Next() {
+		var p PushPeer
+		if rows.Scan(&p.UserID, &p.Token) == nil && p.Token != "" && !seen[p.Token] {
+			seen[p.Token] = true
+			out = append(out, p)
+		}
+	}
+	return out
+}

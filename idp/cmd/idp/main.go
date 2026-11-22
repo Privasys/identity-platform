@@ -654,6 +654,8 @@ func main() {
 	mux.HandleFunc("GET /guardians/recovery-requests", recoveryHandler.HandleListRecoveryRequests)
 	mux.HandleFunc("GET /guardians/qr", recoveryHandler.HandleGetGuardianQR)
 	mux.HandleFunc("POST /push-token", recoveryHandler.HandleRegisterPushToken)
+	// A notification answered on one phone leaves the holder's other phones.
+	mux.HandleFunc("POST /push/dismiss", recoveryHandler.HandleDismissNotification)
 	mux.HandleFunc("GET /devices", recoveryHandler.HandleListDevices)
 	mux.HandleFunc("DELETE /devices", recoveryHandler.HandleRevokeDevice)
 	// Several phones of one holder: adding one (pairing slot, enrolment ticket,

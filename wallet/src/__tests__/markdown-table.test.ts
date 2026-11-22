@@ -27,3 +27,18 @@ describe('markdown table columns', () => {
         expect(columnWidths(b.head, b.rows)).toHaveLength(3);
     });
 });
+
+describe('fitColumns', () => {
+    const { fitColumns } = require('@/services/markdown');
+
+    it('widens the columns in proportion to fill the room, to the pixel', () => {
+        const w = fitColumns([100, 200, 100], 801);
+        expect(w.reduce((a: number, b: number) => a + b, 0)).toBe(801);
+        expect(w[1]).toBe(400);
+    });
+
+    it('keeps the natural widths when the table is wider than the room', () => {
+        expect(fitColumns([300, 300], 400)).toEqual([300, 300]);
+        expect(fitColumns([300, 300], 0)).toEqual([300, 300]);
+    });
+});

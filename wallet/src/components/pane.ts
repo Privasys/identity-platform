@@ -15,6 +15,7 @@
 import { createContext, useContext } from 'react';
 
 import { usePalette } from '@/components/Themed';
+import { useLargeScreen } from '@/hooks/useLargeScreen';
 
 export type PaneKind = 'list' | 'detail' | 'page' | 'task';
 
@@ -36,9 +37,19 @@ export function usePane(): Pane | null {
     return useContext(PaneContext);
 }
 
+/**
+ * Whether headers go without the green band: on every large screen (a tablet,
+ * an unfolded phone), set up or not, and in any pane. The band is the phone's.
+ */
+export function useBandless(): boolean {
+    const pane = usePane();
+    const large = useLargeScreen();
+    return !!pane || large;
+}
+
 /** The colour for icons in a header: white on the green band, the text colour
- *  where a wide window draws the header without it. */
+ *  where the header goes without it. */
 export function useHeaderTint(): string {
     const p = usePalette();
-    return usePane() ? p.action : '#FFFFFF';
+    return useBandless() ? p.action : '#FFFFFF';
 }

@@ -296,3 +296,18 @@ export function columnWidths(head: Inline[][], rows: Inline[][][]): number[] {
         return Math.min(280, Math.max(90, Math.round(longest * 7.5) + 20));
     });
 }
+
+/**
+ * Column widths for the room a table has: the natural widths, widened in
+ * proportion to fill the room when they fit in it, unchanged (the table then
+ * scrolls sideways) when they do not. Whole pixels, so every row adds up the
+ * same.
+ */
+export function fitColumns(natural: number[], room: number): number[] {
+    const total = natural.reduce((a, b) => a + b, 0);
+    if (room <= total || total === 0) return natural;
+    const scaled = natural.map((w) => Math.floor((w * room) / total));
+    // The pixels lost to rounding go to the last column.
+    scaled[scaled.length - 1] += room - scaled.reduce((a, b) => a + b, 0);
+    return scaled;
+}

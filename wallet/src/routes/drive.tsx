@@ -32,7 +32,7 @@ import { useTranslation } from 'react-i18next';
 import { AttestationView } from '@/components/AttestationView';
 import { PaneContext, useHeaderTint, usePane } from '@/components/pane';
 import { SubPageHeader } from '@/components/SubPageHeader';
-import { readableGutter } from '@/components/WideFrame';
+import { ChooseItem, emptyListWidth, LIST_WIDTH, SHEET_WIDTH } from '@/components/WideFrame';
 import { DriveFileView, type DriveFileParams } from '@/routes/drive-file';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { diffTrustedAttestation, type AttestationDiff } from '@/services/attestation-diff';
@@ -266,27 +266,38 @@ export default function DriveScreen() {
     };
 
     if (phase === 'approve' && att) {
+        // A request to answer: a task's width, as the sign-in sheet has.
         return (
-            <AttestationView
-                attestation={att.attestation}
-                rpId={att.origin}
-                displayName={att.displayName}
-                isChanged={isChanged}
-                diff={diff}
-                verificationLevel="fresh-as-verified"
-                verification={{ status: 'verified', mode: att.mode, challenged: att.challenged }}
-                onApprove={handleApproveDrive}
-                onReject={handleRejectDrive}
-                onChallenge={handleChallengeDrive}
-                challengeInFlight={challengeInFlight}
-            />
+            <RNView style={pane ? styles.taskWrap : styles.screen}>
+                <RNView style={pane ? [styles.task, { width: Math.min(SHEET_WIDTH, pane.width - 48) }] : styles.screen}>
+                    <AttestationView
+                        attestation={att.attestation}
+                        rpId={att.origin}
+                        displayName={att.displayName}
+                        isChanged={isChanged}
+                        diff={diff}
+                        verificationLevel="fresh-as-verified"
+                        verification={{ status: 'verified', mode: att.mode, challenged: att.challenged }}
+                        onApprove={handleApproveDrive}
+                        onReject={handleRejectDrive}
+                        onChallenge={handleChallengeDrive}
+                        challengeInFlight={challengeInFlight}
+                    />
+                </RNView>
+            </RNView>
         );
     }
 
     const rootName = section === 'shared' ? t('drive.shared') : t('drive.mine');
 
     const list = (
-        <RNView style={[styles.screen, twoPane && open && styles.listPane]}>
+        <RNView
+            style={[
+                styles.screen,
+                twoPane && styles.listPane,
+                twoPane && { width: open ? LIST_PANE_WIDTH : emptyListWidth(pane?.width ?? 0) },
+            ]}
+        >
             <SubPageHeader
                 title={t('tabs.drive')}
                 right={
@@ -406,25 +417,28 @@ export default function DriveScreen() {
         </RNView>
     );
     if (!twoPane || !pane) return list;
-    // Nothing open: the list has the window, in a column of readable width.
-    // A file opens beside a narrowed list, and its close button widens it again.
-    if (!open) return <RNView style={[styles.screen, { paddingHorizontal: readableGutter(pane.width) }]}>{list}</RNView>;
+    // Nothing open: the list is the wider column, and the second waits for a
+    // file. A file opens beside a narrowed list; its close button widens it again.
     return (
         <RNView style={styles.split}>
             {list}
-            <RNView style={styles.detailPane}>
-                <PaneContext.Provider
-                    value={{ kind: 'detail', width: pane.width - LIST_PANE_WIDTH, twoPane: true, close: () => setOpen(null) }}
-                >
-                    <DriveFileView key={`${open.tenant}/${open.id}`} params={open} />
-                </PaneContext.Provider>
-            </RNView>
+            {open ? (
+                <RNView style={styles.detailPane}>
+                    <PaneContext.Provider
+                        value={{ kind: 'detail', width: pane.width - LIST_PANE_WIDTH, twoPane: true, close: () => setOpen(null) }}
+                    >
+                        <DriveFileView key={`${open.tenant}/${open.id}`} params={open} />
+                    </PaneContext.Provider>
+                </RNView>
+            ) : (
+                <ChooseItem />
+            )}
         </RNView>
     );
 }
 
 /** The list's width when the open file is drawn beside it. */
-const LIST_PANE_WIDTH = 400;
+const LIST_PANE_WIDTH = LIST_WIDTH;
 
 const makeStyles = (p: Palette) =>
     StyleSheet.create({
@@ -432,11 +446,12 @@ const makeStyles = (p: Palette) =>
         split: { flex: 1, flexDirection: 'row', backgroundColor: p.screenBg },
         listPane: {
             flex: 0,
-            width: LIST_PANE_WIDTH,
             borderRightWidth: StyleSheet.hairlineWidth,
             borderRightColor: p.border,
         },
         detailPane: { flex: 1, minWidth: 0 },
+        taskWrap: { flex: 1, alignItems: 'center', backgroundColor: p.screenBg },
+        task: { flex: 1 },
         bell: {
             width: 36,
             height: 36,

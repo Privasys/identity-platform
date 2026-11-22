@@ -48,7 +48,8 @@ import { useSessionsStore } from '@/stores/sessions';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
-import { HeaderBleed } from '@/components/HeaderBleed';
+import { useBandless } from '@/components/pane';
+import { SubPageHeader } from '@/components/SubPageHeader';
 
 function appName(rpId: string): string {
     const dot = rpId.indexOf('.');
@@ -101,6 +102,7 @@ export default function ServiceDetailScreen() {
     const serviceKey = params.serviceKey || params.rpId || '';
     const insets = useSafeAreaInsets();
     const p = usePalette();
+    const bandless = useBandless();
     const styles = useMemo(() => makeStyles(p), [p]);
 
     const { apps, remove: removeTrustedApp } = useTrustedAppsStore();
@@ -458,14 +460,17 @@ export default function ServiceDetailScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <RNView style={styles.screen}>
                 {/* Header */}
-                <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                    <HeaderBleed />
-                    <Pressable onPress={() => router.back()} style={styles.backArrow}>
-                        <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-                    </Pressable>
-                    <Text style={styles.headerTitle}>{t('serviceDetail.title')}</Text>
-                    <RNView style={{ width: 36 }} />
-                </RNView>
+                {bandless ? (
+                    <SubPageHeader title={t('serviceDetail.title')} />
+                ) : (
+                    <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                        <Pressable onPress={() => router.back()} style={styles.backArrow}>
+                            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                        </Pressable>
+                        <Text style={styles.headerTitle}>{t('serviceDetail.title')}</Text>
+                        <RNView style={{ width: 36 }} />
+                    </RNView>
+                )}
 
                 <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
                     {/* Service icon + name */}

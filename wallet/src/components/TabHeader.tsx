@@ -12,15 +12,14 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeaderBleed } from '@/components/HeaderBleed';
-import { usePane } from '@/components/pane';
+import { useBandless } from '@/components/pane';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 
 export function TabHeader({ title }: { title: string }) {
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const insets = useSafeAreaInsets();
-    const pane = usePane();
-    if (pane) {
+    if (useBandless()) {
         return (
             <View style={[styles.plain, { paddingTop: insets.top + 24 }]}>
                 <Text style={styles.plainTitle} accessibilityRole="header">

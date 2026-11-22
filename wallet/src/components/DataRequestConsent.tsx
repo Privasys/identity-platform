@@ -35,7 +35,8 @@ import { Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react
 import { Trans, useTranslation } from 'react-i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { HeaderBleed } from '@/components/HeaderBleed';
+import { useBandless } from '@/components/pane';
+import { SubPageHeader } from '@/components/SubPageHeader';
 
 export interface ConsentDataItem {
     key: string;
@@ -113,6 +114,7 @@ export function DataRequestConsent({
     contentTopInset?: number;
 }) {
     const p = usePalette();
+    const bandless = useBandless();
     const { t } = useTranslation();
     const styles = useMemo(() => makeStyles(p), [p]);
     // Defaults resolve here rather than in the parameter list, so they follow
@@ -125,9 +127,10 @@ export function DataRequestConsent({
 
     return (
         <RNView style={styles.flex}>
-            {title ? (
+            {title && bandless ? (
+                <SubPageHeader title={title} back={false} />
+            ) : title ? (
                 <RNView style={[styles.header, { paddingTop: contentTopInset + 14 }]}>
-                    <HeaderBleed />
                     <Text style={styles.headerTitle}>{title}</Text>
                 </RNView>
             ) : null}

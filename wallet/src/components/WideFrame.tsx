@@ -4,9 +4,13 @@
 /**
  * The wallet on a wide window: tablets, and unfolded phones (iPhone Duo,
  * Android foldables). From WIDE_MIN_WIDTH a sidebar takes the tab bar's place
- * and the green header band goes; from TWO_PANE_MIN_WIDTH Access and Settings
- * show the open item beside a narrowed list (Drive does the same inside its
- * own screen); with nothing open, the list has the window to itself. Tasks, which ask one thing at a time, are a centred sheet.
+ * and the green header band goes. From TWO_PANE_MIN_WIDTH each section is two
+ * columns: its own screen (Profile, Access, Settings, Drive) in the first,
+ * and what it opens in the second. With nothing open the first column is the
+ * wider one and the second waits for an item; when one opens, the first
+ * narrows and the item has the room. A long screen scrolls in its column; it
+ * never spills into the second. Tasks, which ask one thing at a time, are a
+ * centred sheet.
  *
  * The root stack wraps every screen in this frame (its screenLayout), so the
  * routes stay as they are: a list item still pushes its route, and the frame
@@ -16,7 +20,7 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePathname, useRouter } from 'expo-router';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +28,7 @@ import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area
 import { PaneContext, type Pane } from '@/components/pane';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { READABLE_WIDTH, TWO_PANE_MIN_WIDTH, useWideLayout } from '@/hooks/useLargeScreen';
+import ProfileScreen from '@/routes/(tabs)/index';
 import AccessScreen from '@/routes/(tabs)/access';
 import SettingsScreen from '@/routes/(tabs)/settings';
 import { useAppMessagesStore } from '@/stores/app-messages';
@@ -70,6 +75,8 @@ const SECTION_OF: Record<string, Section> = {
     credentials: 'access',
     'drive-requests': 'drive',
     'drive-file': 'drive',
+    identities: 'profile',
+    'personal-data': 'profile',
     drive: 'drive',
     devices: 'settings',
     'how-it-works': 'settings',
@@ -79,8 +86,10 @@ const SECTION_OF: Record<string, Section> = {
 
 const SIDEBAR_WIDTH = 260;
 const SIDEBAR_WIDTH_NARROW = 220;
-const LIST_WIDTH = 400;
-const SHEET_WIDTH = 600;
+/** The first column with an item open beside it. */
+export const LIST_WIDTH = 400;
+/** A task's width: the sheet, or a request answered inside a section. */
+export const SHEET_WIDTH = 600;
 const SHEET_MAX_HEIGHT = 820;
 
 const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
@@ -88,6 +97,12 @@ const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
 /** The side padding that centres a column of readable width in a pane this wide. */
 export function readableGutter(width: number): number {
     return Math.max(0, Math.floor((width - READABLE_WIDTH) / 2));
+}
+
+/** The first column with nothing open beside it: the wider one, up to a
+ *  readable width, and never so wide the second column has no room. */
+export function emptyListWidth(rest: number): number {
+    return Math.max(LIST_WIDTH, Math.min(READABLE_WIDTH, Math.floor(rest * 0.55), rest - 360));
 }
 
 /** Whether the window shows the sidebar: wide, and the wallet set up (before
@@ -114,7 +129,13 @@ function tabSection(pathname: string): Section {
 }
 
 export function WideFrame({ routeName, children }: { routeName: string; children: ReactNode }) {
-    const sidebar = useSidebarLayout();
+    const live = useSidebarLayout();
+    // A task keeps the layout it opened with until it is left. Adding this
+    // device gives the wallet its profile mid-task; redrawing the task in the
+    // sidebar layout then would mount it afresh, and start it over.
+    const opened = useRef<boolean | null>(null);
+    if (opened.current === null) opened.current = live;
+    const sidebar = TASK_ROUTES.has(routeName) ? opened.current : live;
     const pathname = usePathname();
     const { width } = useWindowDimensions();
     const p = usePalette();
@@ -137,7 +158,7 @@ export function WideFrame({ routeName, children }: { routeName: string; children
 
     // Drive draws its list and the open file itself: one screen, so the
     // attestation it starts with runs once.
-    const isList = (routeName === '(tabs)' && section !== 'profile') || routeName === 'drive';
+    const isList = routeName === '(tabs)' || routeName === 'drive';
     if (isList) {
         if (!twoPane || routeName === 'drive') {
             return (
@@ -149,21 +170,23 @@ export function WideFrame({ routeName, children }: { routeName: string; children
                 </View>
             );
         }
-        // Nothing open yet: the list has the window, in a column of
-        // readable width. It narrows when an item opens beside it.
+        // Nothing open yet: the first column is the wider one, and the
+        // second waits for an item.
+        const first = emptyListWidth(rest);
         return (
             <View style={styles.row}>
                 {side}
-                <PaneContext.Provider value={{ kind: 'list', width: Math.min(rest, READABLE_WIDTH), twoPane }}>
-                    <View style={[styles.fill, { paddingHorizontal: readableGutter(rest) }]}>{children}</View>
+                <PaneContext.Provider value={{ kind: 'list', width: first, twoPane }}>
+                    <View style={[styles.list, { width: first }]}>{children}</View>
                 </PaneContext.Provider>
+                <ChooseItem />
             </View>
         );
     }
 
-    // An item opened from Access or Settings: beside its list.
-    if (twoPane && (section === 'access' || section === 'settings') && SECTION_OF[routeName]) {
-        const List = section === 'access' ? AccessScreen : SettingsScreen;
+    // An item opened from Profile, Access or Settings: beside its screen.
+    if (twoPane && section !== 'drive' && SECTION_OF[routeName]) {
+        const List = section === 'access' ? AccessScreen : section === 'settings' ? SettingsScreen : ProfileScreen;
         return (
             <View style={styles.row}>
                 {side}
@@ -177,7 +200,10 @@ export function WideFrame({ routeName, children }: { routeName: string; children
                         kind: 'detail',
                         width: rest - LIST_WIDTH,
                         twoPane,
-                        close: () => (router.canGoBack() ? router.back() : router.replace(`/${section}` as never)),
+                        close: () =>
+                            router.canGoBack()
+                                ? router.back()
+                                : router.replace((section === 'profile' ? '/' : `/${section}`) as never),
                     }}
                 >
                     <View style={styles.fill}>{children}</View>
@@ -186,9 +212,9 @@ export function WideFrame({ routeName, children }: { routeName: string; children
         );
     }
 
-    // A screen of its own: Profile, and anything opened without a list
-    // beside it. One column of readable width: a long page scrolls, it never
-    // spills into a second column.
+    // A screen of its own (anything opened without a section beside it, or
+    // any screen in a window too narrow for two columns): one column of
+    // readable width. A long page scrolls; it never spills into a second.
     const pane: Pane = { kind: 'page', width: Math.min(rest, READABLE_WIDTH), twoPane };
     const gutter = readableGutter(rest);
     return (
@@ -287,6 +313,19 @@ function Sidebar({ active, width, styles }: { active: Section; width: number; st
     );
 }
 
+/** What the second column shows with nothing open in it. */
+export function ChooseItem() {
+    const { t } = useTranslation();
+    const p = usePalette();
+    const styles = useMemo(() => makeStyles(p), [p]);
+    return (
+        <View style={[styles.fill, styles.choose]}>
+            <Ionicons name="albums-outline" size={40} color={p.textMuted} />
+            <Text style={styles.chooseText}>{t('tabs.chooseItem')}</Text>
+        </View>
+    );
+}
+
 /** A task: a sheet in the middle of the window, over everything else. */
 function TaskSheet({ children, styles }: { children: ReactNode; styles: Styles }) {
     const { width, height } = useWindowDimensions();
@@ -362,6 +401,8 @@ const makeStyles = (p: Palette) =>
             backgroundColor: p.action,
         },
         scanText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+        choose: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
+        chooseText: { fontSize: 16, color: p.textSecondary, textAlign: 'center' },
         backdrop: {
             flex: 1,
             backgroundColor: 'rgba(15,23,42,0.45)',

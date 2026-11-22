@@ -20,12 +20,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { buildLogExport, clearLogs, formatLogs, getLogs } from '@/utils/logs';
 import { MONO } from '@/constants/fonts';
-import { HeaderBleed } from '@/components/HeaderBleed';
+import { useBandless } from '@/components/pane';
+import { SubPageHeader } from '@/components/SubPageHeader';
 
 export default function LogsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const p = usePalette();
+    const bandless = useBandless();
     const styles = useMemo(() => makeStyles(p), [p]);
     const [refreshKey, setRefreshKey] = useState(0);
     const entries = getLogs();
@@ -74,14 +76,17 @@ export default function LogsScreen() {
     return (
         <RNView style={styles.screen}>
             <Stack.Screen options={{ headerShown: false }} />
-            <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                <HeaderBleed />
-                <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
-                    <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerTitle}>Logs</Text>
-                <Text style={styles.headerCount}>{entries.length} entries</Text>
-            </RNView>
+            {bandless ? (
+                <SubPageHeader title="Logs" right={<Text style={{ color: p.textSecondary }}>{entries.length} entries</Text>} />
+            ) : (
+                <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                    <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
+                        <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                    </Pressable>
+                    <Text style={styles.headerTitle}>Logs</Text>
+                    <Text style={styles.headerCount}>{entries.length} entries</Text>
+                </RNView>
+            )}
 
             <RNView style={styles.actionsRow}>
                 <Pressable style={styles.actionButton} onPress={onCopy}>

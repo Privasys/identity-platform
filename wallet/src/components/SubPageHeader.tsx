@@ -7,10 +7,13 @@
  * optional right-hand action. Screens render their own header because the root
  * Stack runs with headerShown:false.
  *
- * On a wide window (components/WideFrame) the band goes: a list is headed by
- * its title alone; the item open beside it has a close button, which gives the
- * list the window again; a screen of its own or a task keeps a back button, in
- * the action blue.
+ * On a large screen the band goes (components/pane, useBandless): a list is
+ * headed by its title alone; the item open beside it has a close button, which
+ * gives the list the room again; a screen of its own or a task keeps a back
+ * button, in the action blue.
+ *
+ * `back={false}` for a screen that is answered rather than left (a sign-in
+ * request): no back button in either look.
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -20,11 +23,10 @@ import { Pressable, StyleSheet, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { HeaderBleed } from '@/components/HeaderBleed';
-import { usePane } from '@/components/pane';
+import { useBandless, usePane } from '@/components/pane';
 import { useTranslation } from 'react-i18next';
 
-export function SubPageHeader({ title, right }: { title: string; right?: ReactNode }) {
+export function SubPageHeader({ title, right, back: canGoBack = true }: { title: string; right?: ReactNode; back?: boolean }) {
     const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
@@ -35,11 +37,14 @@ export function SubPageHeader({ title, right }: { title: string; right?: ReactNo
         else router.replace('/(tabs)');
     };
     const pane = usePane();
-    if (pane) {
-        const back = pane.kind === 'page' || pane.kind === 'task';
-        const big = pane.kind === 'list';
+    const bandless = useBandless();
+    if (bandless) {
+        // A large screen not yet in panes (the wallet being set up) is a page.
+        const kind = pane?.kind ?? 'page';
+        const back = canGoBack && (kind === 'page' || kind === 'task');
+        const big = kind === 'list';
         return (
-            <RNView style={[styles.plain, { paddingTop: insets.top + (pane.kind === 'task' ? 16 : 24) }]}>
+            <RNView style={[styles.plain, { paddingTop: insets.top + (kind === 'task' ? 16 : 24) }]}>
                 {back && (
                     <Pressable onPress={goBack} style={styles.plainBack} hitSlop={10} accessibilityLabel="Back">
                         <Ionicons name="chevron-back" size={24} color={p.action} />
@@ -49,7 +54,7 @@ export function SubPageHeader({ title, right }: { title: string; right?: ReactNo
                     {title}
                 </Text>
                 <RNView style={styles.plainRight}>{right}</RNView>
-                {pane.kind === 'detail' && pane.close && (
+                {pane?.kind === 'detail' && pane.close && (
                     <Pressable
                         onPress={pane.close}
                         style={styles.plainClose}
@@ -66,10 +71,13 @@ export function SubPageHeader({ title, right }: { title: string; right?: ReactNo
     }
     return (
         <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
-            <HeaderBleed />
-            <Pressable onPress={goBack} style={styles.back} hitSlop={10} accessibilityLabel="Back">
-                <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-            </Pressable>
+            {canGoBack ? (
+                <Pressable onPress={goBack} style={styles.back} hitSlop={10} accessibilityLabel="Back">
+                    <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                </Pressable>
+            ) : (
+                <RNView style={styles.right} />
+            )}
             <Text style={styles.title}>{title}</Text>
             <RNView style={styles.right}>{right}</RNView>
         </RNView>

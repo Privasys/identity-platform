@@ -7,12 +7,12 @@
  * and opens in the phone's browser after the holder sees where it goes.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { columnWidths, openableLink, parseMarkdown, type Block, type Inline } from '@/services/markdown';
+import { columnWidths, fitColumns, openableLink, parseMarkdown, type Block, type Inline } from '@/services/markdown';
 
 import { MONO } from '@/constants/fonts';
 
@@ -88,39 +88,60 @@ export function MarkdownView({ source }: { source: string }) {
                         ))}
                     </RNView>
                 );
-            case 'table': {
-                // One width per column, the same in every row, or each row
-                // lays out its cells on its own and the columns drift apart.
-                const widths = columnWidths(b.head, b.rows);
-                return (
-                    <ScrollView key={k} horizontal style={styles.tableBox} contentContainerStyle={styles.tableInner}>
-                        <RNView style={styles.tableInner}>
-                            {[b.head, ...b.rows].map((row, r) => (
-                                <RNView key={r} style={[styles.tr, r === 0 && styles.th]}>
-                                    {widths.map((w, c) => (
-                                        <Text
-                                            key={c}
-                                            style={[
-                                                styles.td,
-                                                { flexBasis: w, flexGrow: w },
-                                                r === 0 && styles.strong,
-                                                { textAlign: b.align[c] ?? 'left' },
-                                            ]}
-                                        >
-                                            {row[c] ? inline(row[c], `${k}.${r}.${c}`) : null}
-                                        </Text>
-                                    ))}
-                                </RNView>
-                            ))}
-                        </RNView>
-                    </ScrollView>
-                );
-            }
+            case 'table':
+                return <MarkdownTable key={k} table={b} id={k} inline={inline} styles={styles} />;
         }
     };
 
     return <RNView style={styles.doc}>{blocks.map((b, i) => block(b, String(i)))}</RNView>;
 }
+
+/**
+ * A table whose columns line up in every row. Each cell is a box of a set
+ * width holding its text: a text cell sized by flex grows to its own content
+ * on iOS, so each row placed its columns differently. The widths fill the
+ * room the table has when it fits, and the table scrolls sideways when not.
+ */
+function MarkdownTable({
+    table,
+    id,
+    inline,
+    styles,
+}: {
+    table: Extract<Block, { t: 'table' }>;
+    id: string;
+    inline: (nodes: Inline[], key?: string) => ReactNode[];
+    styles: Styles;
+}) {
+    const [room, setRoom] = useState(0);
+    const natural = useMemo(() => columnWidths(table.head, table.rows), [table]);
+    const widths = fitColumns(natural, room);
+    return (
+        <ScrollView
+            horizontal
+            style={styles.tableBox}
+            onLayout={(e) => setRoom(Math.floor(e.nativeEvent.layout.width) - 2)}
+        >
+            <RNView>
+                {[table.head, ...table.rows].map((row, r) => (
+                    <RNView key={r} style={[styles.tr, r === 0 && styles.th]}>
+                        {widths.map((w, c) => (
+                            <RNView key={c} style={[styles.td, { width: w }]}>
+                                <Text
+                                    style={[styles.tdText, r === 0 && styles.strong, { textAlign: table.align[c] ?? 'left' }]}
+                                >
+                                    {row[c] ? inline(row[c], `${id}.${r}.${c}`) : null}
+                                </Text>
+                            </RNView>
+                        ))}
+                    </RNView>
+                ))}
+            </RNView>
+        </ScrollView>
+    );
+}
+
+type Styles = ReturnType<typeof makeStyles>;
 
 const makeStyles = (p: Palette) =>
     StyleSheet.create({
@@ -148,9 +169,8 @@ const makeStyles = (p: Palette) =>
         tableBox: { borderWidth: StyleSheet.hairlineWidth, borderColor: p.border, borderRadius: 8 },
         tr: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: p.border },
         th: { backgroundColor: p.cardAlt },
-        // A table fills the width when it fits, and scrolls sideways when not.
-        tableInner: { flexGrow: 1 },
-        // Widths come from columnWidths: flexBasis and flexGrow, equal in every row.
-        td: { flexShrink: 0, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: p.textPrimary },
+        // Widths come from columnWidths and fitColumns: the same in every row.
+        td: { paddingHorizontal: 10, paddingVertical: 8 },
+        tdText: { fontSize: 14, lineHeight: 20, color: p.textPrimary },
     });
 

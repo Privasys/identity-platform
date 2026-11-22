@@ -45,7 +45,8 @@ import type { AttestationDiff } from '@/services/attestation-diff';
 import type { OsRelease, WorkloadRelease } from '@/services/release-provenance';
 import { sourceRow, type StoreListing } from '@/services/store-listing';
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
-import { HeaderBleed } from '@/components/HeaderBleed';
+import { useBandless } from '@/components/pane';
+import { SubPageHeader } from '@/components/SubPageHeader';
 
 /**
  * The outcome of the enclave verification the screen is showing, so the view
@@ -243,6 +244,7 @@ export function AttestationView({
     const [shownInFull, setShownInFull] = useState<Set<string>>(new Set());
     const insets = useSafeAreaInsets();
     const p = usePalette();
+    const bandless = useBandless();
     const styles = useMemo(() => makeStyles(p), [p]);
 
     // Effective verification status. When no `verification` is supplied we keep
@@ -286,11 +288,14 @@ export function AttestationView({
 
     return (
         <RNView style={styles.screen}>
-            {/* Same green band and white type as every other screen header. */}
-            <RNView style={[styles.header, { paddingTop: insets.top + 14 }]}>
-                <HeaderBleed />
-                <Text style={styles.headerTitle}>{t(reviewOnly ? 'attestation.reviewTitle' : 'attestation.requestTitle')}</Text>
-            </RNView>
+            {/* Same header as every other screen: the green band on a phone. */}
+            {bandless ? (
+                <SubPageHeader title={t(reviewOnly ? 'attestation.reviewTitle' : 'attestation.requestTitle')} back={false} />
+            ) : (
+                <RNView style={[styles.header, { paddingTop: insets.top + 14 }]}>
+                    <Text style={styles.headerTitle}>{t(reviewOnly ? 'attestation.reviewTitle' : 'attestation.requestTitle')}</Text>
+                </RNView>
+            )}
 
             <ScrollView
                 style={styles.scroll}

@@ -40,7 +40,8 @@ import { applyLocale } from '@/i18n';
 import { SUPPORTED_LOCALES, localeMeta } from '@/i18n/locales';
 import { isPackAvailable } from '@/i18n/packs';
 import { useSettingsStore } from '@/stores/settings';
-import { HeaderBleed } from '@/components/HeaderBleed';
+import { useBandless } from '@/components/pane';
+import { SubPageHeader } from '@/components/SubPageHeader';
 
 /** Tags usable without a download. Recomputed only when one is added. */
 function availableTags(): Set<string> {
@@ -51,6 +52,7 @@ export default function LanguageScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const p = usePalette();
+    const bandless = useBandless();
     const styles = useMemo(() => makeStyles(p), [p]);
 
     // `i18n.language` rather than a module read: useTranslation re-renders on
@@ -101,13 +103,16 @@ export default function LanguageScreen() {
     return (
         <RNView style={styles.screen}>
             <Stack.Screen options={{ headerShown: false }} />
-            <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                <HeaderBleed />
-                <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
-                    <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerTitle}>{t('language.title')}</Text>
-            </RNView>
+            {bandless ? (
+                <SubPageHeader title={t('language.title')} />
+            ) : (
+                <RNView style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                    <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
+                        <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                    </Pressable>
+                    <Text style={styles.headerTitle}>{t('language.title')}</Text>
+                </RNView>
+            )}
 
             <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
                 <Text style={styles.description}>{t('language.description')}</Text>

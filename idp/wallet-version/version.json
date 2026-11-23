@@ -1,242 +1,217 @@
 {
   "schema": 1,
-  "issuedAt": "2026-11-17T21:46:34Z",
+  "issuedAt": "2026-11-23T17:02:29Z",
   "platforms": {
     "ios": {
-      "minimum": "1.4.58",
+      "minimum": "1.4.82",
       "level": "required"
     },
     "android": {
-      "minimum": "1.4.58",
+      "minimum": "1.4.82",
       "level": "required"
     }
   },
   "notice": {
-    "id": "2026-11-17-wallet-1.4.58",
+    "id": "2026-11-23-wallet-1.4.82",
     "text": {
       "en-GB": {
         "title": "Update to keep using Privasys Wallet",
-        "body": "This version cannot answer the questions and approval requests apps now send, or open files shared with you. The update keeps your identities and data.",
+        "body": "This version can fail to answer requests and approvals after you sign out on another device. The update keeps your identities and data.",
         "changes": [
-          "Apps can ask you a question or ask you to approve something, and you answer here in the wallet",
-          "Files shared with you open in the wallet, and an approved request takes you to the file",
-          "A short message confirms what you just did, with clearer buttons and a lighter app"
+          "Requests and approvals go through after you sign out on another device",
+          "A notification you answer on one device clears from your others"
         ]
       },
       "bg": {
         "title": "Актуализирайте, за да продължите да използвате Privasys Wallet",
-        "body": "Тази версия не може да отговаря на въпросите и заявките за одобрение, които приложенията вече изпращат, нито да отваря споделени с вас файлове. Актуализацията запазва вашите идентичности и данни.",
+        "body": "Тази версия може да не успее да отговори на заявки и одобрения, след като излезете от профила си на друго устройство. Актуализацията запазва вашите идентичности и данни.",
         "changes": [
-          "Приложенията могат да ви зададат въпрос или да поискат одобрение, а вие отговаряте тук, в портфейла",
-          "Споделените с вас файлове се отварят в портфейла, а одобрената заявка ви отвежда до файла",
-          "Кратко съобщение потвърждава какво току-що направихте, с по-ясни бутони и по-леко приложение"
+          "Заявките и одобренията минават, след като излезете от профила си на друго устройство",
+          "Известие, на което отговорите на едно устройство, изчезва от другите ви устройства"
         ]
       },
       "cs": {
         "title": "Aktualizujte, abyste mohli dál používat Privasys Wallet",
-        "body": "Tato verze neumí odpovídat na otázky a žádosti o schválení, které aplikace nyní posílají, ani otevírat soubory, které s vámi někdo sdílí. Aktualizace zachová vaše identity i data.",
+        "body": "Tato verze nemusí zvládnout odpovědět na žádosti a schválení poté, co se odhlásíte na jiném zařízení. Aktualizace zachová vaše identity i data.",
         "changes": [
-          "Aplikace se vás mohou na něco zeptat nebo požádat o schválení a vy odpovíte přímo v peněžence",
-          "Soubory sdílené s vámi se otevírají v peněžence a schválená žádost vás k souboru dovede",
-          "Krátká zpráva potvrdí, co jste právě udělali, tlačítka jsou přehlednější a aplikace lehčí"
+          "Žádosti a schválení projdou i poté, co se odhlásíte na jiném zařízení",
+          "Oznámení, na které odpovíte na jednom zařízení, zmizí i z ostatních"
         ]
       },
       "cy": {
         "title": "Diweddarwch i barhau i ddefnyddio Privasys Wallet",
-        "body": "Ni all y fersiwn hon ateb y cwestiynau a'r ceisiadau am gymeradwyaeth y mae apiau'n eu hanfon nawr, nac agor ffeiliau a rannwyd gyda chi. Mae'r diweddariad yn cadw eich hunaniaethau a'ch data.",
+        "body": "Gall y fersiwn hon fethu ag ateb ceisiadau a chymeradwyaethau ar ôl i chi allgofnodi ar ddyfais arall. Mae’r diweddariad yn cadw eich hunaniaethau a’ch data.",
         "changes": [
-          "Gall apiau ofyn cwestiwn i chi neu ofyn i chi gymeradwyo rhywbeth, ac rydych chi'n ateb yma yn y waled",
-          "Mae ffeiliau a rannwyd gyda chi'n agor yn y waled, ac mae cais a gymeradwywyd yn mynd â chi i'r ffeil",
-          "Mae neges fer yn cadarnhau beth wnaethoch chi, gyda botymau cliriach ac ap ysgafnach"
+          "Mae ceisiadau a chymeradwyaethau’n mynd drwodd ar ôl i chi allgofnodi ar ddyfais arall",
+          "Mae hysbysiad rydych chi’n ei ateb ar un ddyfais yn diflannu o’ch dyfeisiau eraill"
         ]
       },
       "da": {
         "title": "Opdater for at blive ved med at bruge Privasys Wallet",
-        "body": "Denne version kan ikke besvare de spørgsmål og anmodninger om godkendelse, som apps nu sender, eller åbne filer, der er delt med dig. Opdateringen bevarer dine identiteter og data.",
+        "body": "Denne version kan undlade at besvare anmodninger og godkendelser, efter du er logget ud på en anden enhed. Opdateringen bevarer dine identiteter og data.",
         "changes": [
-          "Apps kan stille dig et spørgsmål eller bede dig godkende noget, og du svarer her i wallet",
-          "Filer, der er delt med dig, åbnes i wallet, og en godkendt anmodning fører dig til filen",
-          "En kort besked bekræfter, hvad du lige har gjort, med tydeligere knapper og en lettere app"
+          "Anmodninger og godkendelser går igennem, efter du er logget ud på en anden enhed",
+          "En notifikation, du besvarer på én enhed, forsvinder fra dine andre"
         ]
       },
       "de": {
         "title": "Aktualisieren Sie, um Privasys Wallet weiter zu nutzen",
-        "body": "Diese Version kann die Fragen und Freigabeanfragen, die Apps jetzt senden, nicht beantworten und keine mit Ihnen geteilten Dateien öffnen. Das Update behält Ihre Identitäten und Daten.",
+        "body": "Diese Version kann Anfragen und Freigaben möglicherweise nicht beantworten, nachdem Sie sich auf einem anderen Gerät abgemeldet haben. Das Update behält Ihre Identitäten und Daten.",
         "changes": [
-          "Apps können Ihnen eine Frage stellen oder Sie um eine Freigabe bitten, und Sie antworten direkt in der Wallet",
-          "Mit Ihnen geteilte Dateien öffnen sich in der Wallet, und eine genehmigte Anfrage führt Sie zur Datei",
-          "Eine kurze Meldung bestätigt, was Sie gerade getan haben, mit klareren Schaltflächen und einer schlankeren App"
+          "Anfragen und Freigaben gehen durch, auch nachdem Sie sich auf einem anderen Gerät abgemeldet haben",
+          "Eine Mitteilung, die Sie auf einem Gerät beantworten, verschwindet auch von Ihren anderen"
         ]
       },
       "el": {
         "title": "Ενημερώστε για να συνεχίσετε να χρησιμοποιείτε το Privasys Wallet",
-        "body": "Αυτή η έκδοση δεν μπορεί να απαντήσει στις ερωτήσεις και στα αιτήματα έγκρισης που στέλνουν πλέον οι εφαρμογές, ούτε να ανοίξει αρχεία που μοιράστηκαν μαζί σας. Η ενημέρωση διατηρεί τις ταυτότητες και τα δεδομένα σας.",
+        "body": "Αυτή η έκδοση ενδέχεται να μην μπορεί να απαντήσει σε αιτήματα και εγκρίσεις αφού αποσυνδεθείτε σε άλλη συσκευή. Η ενημέρωση διατηρεί τις ταυτότητες και τα δεδομένα σας.",
         "changes": [
-          "Οι εφαρμογές μπορούν να σας κάνουν μια ερώτηση ή να σας ζητήσουν να εγκρίνετε κάτι, και απαντάτε εδώ, στο πορτοφόλι",
-          "Τα αρχεία που μοιράστηκαν μαζί σας ανοίγουν στο πορτοφόλι, και ένα εγκεκριμένο αίτημα σας πηγαίνει στο αρχείο",
-          "Ένα σύντομο μήνυμα επιβεβαιώνει τι μόλις κάνατε, με πιο σαφή κουμπιά και ελαφρύτερη εφαρμογή"
+          "Τα αιτήματα και οι εγκρίσεις ολοκληρώνονται αφού αποσυνδεθείτε σε άλλη συσκευή",
+          "Μια ειδοποίηση που απαντάτε σε μία συσκευή εξαφανίζεται από τις υπόλοιπες"
         ]
       },
       "es": {
         "title": "Actualiza para seguir usando Privasys Wallet",
-        "body": "Esta versión no puede responder a las preguntas y solicitudes de aprobación que ahora envían las apps, ni abrir archivos compartidos contigo. La actualización conserva tus identidades y tus datos.",
+        "body": "Esta versión puede no responder a solicitudes y aprobaciones después de cerrar sesión en otro dispositivo. La actualización conserva tus identidades y tus datos.",
         "changes": [
-          "Las apps pueden hacerte una pregunta o pedirte que apruebes algo, y respondes aquí, en la cartera",
-          "Los archivos compartidos contigo se abren en la cartera, y una solicitud aprobada te lleva al archivo",
-          "Un mensaje breve confirma lo que acabas de hacer, con botones más claros y una app más ligera"
+          "Las solicitudes y aprobaciones funcionan después de cerrar sesión en otro dispositivo",
+          "Una notificación que respondes en un dispositivo desaparece de los demás"
         ]
       },
       "et": {
         "title": "Uuendage, et Privasys Walletit edasi kasutada",
-        "body": "See versioon ei oska vastata küsimustele ja kinnitustaotlustele, mida rakendused nüüd saadavad, ega avada teiega jagatud faile. Uuendus säilitab teie identiteedid ja andmed.",
+        "body": "See versioon ei pruugi vastata taotlustele ja kinnitustele pärast seda, kui olete teises seadmes välja loginud. Uuendus säilitab teie identiteedid ja andmed.",
         "changes": [
-          "Rakendused saavad teilt midagi küsida või paluda midagi kinnitada ning te vastate siinsamas rahakotis",
-          "Teiega jagatud failid avanevad rahakotis ja kinnitatud taotlus viib teid failini",
-          "Lühike teade kinnitab, mida just tegite, nupud on selgemad ja rakendus kergem"
+          "Taotlused ja kinnitused lähevad läbi ka pärast teises seadmes väljalogimist",
+          "Ühes seadmes vastatud teavitus kaob ka teistest seadmetest"
         ]
       },
       "fi": {
         "title": "Päivitä, jotta voit jatkaa Privasys Walletin käyttöä",
-        "body": "Tämä versio ei pysty vastaamaan kysymyksiin ja hyväksyntäpyyntöihin, joita sovellukset nyt lähettävät, eikä avaamaan kanssasi jaettuja tiedostoja. Päivitys säilyttää identiteettisi ja tietosi.",
+        "body": "Tämä versio ei välttämättä pysty vastaamaan pyyntöihin ja hyväksyntöihin, kun olet kirjautunut ulos toisella laitteella. Päivitys säilyttää identiteettisi ja tietosi.",
         "changes": [
-          "Sovellukset voivat kysyä sinulta jotain tai pyytää hyväksymään jotain, ja vastaat tässä lompakossa",
-          "Kanssasi jaetut tiedostot avautuvat lompakossa, ja hyväksytty pyyntö vie sinut tiedostoon",
-          "Lyhyt viesti vahvistaa, mitä juuri teit, ja painikkeet ovat selkeämpiä ja sovellus kevyempi"
+          "Pyynnöt ja hyväksynnät menevät läpi, vaikka olisit kirjautunut ulos toisella laitteella",
+          "Yhdellä laitteella vastattu ilmoitus poistuu myös muilta laitteilta"
         ]
       },
       "fr": {
         "title": "Mettez à jour pour continuer à utiliser Privasys Wallet",
-        "body": "Cette version ne peut pas répondre aux questions et demandes d’approbation que les apps envoient désormais, ni ouvrir les fichiers partagés avec vous. La mise à jour conserve vos identités et vos données.",
+        "body": "Cette version peut échouer à répondre aux demandes et approbations après une déconnexion sur un autre appareil. La mise à jour conserve vos identités et vos données.",
         "changes": [
-          "Les apps peuvent vous poser une question ou vous demander d’approuver quelque chose, et vous répondez ici, dans le portefeuille",
-          "Les fichiers partagés avec vous s’ouvrent dans le portefeuille, et une demande approuvée vous mène au fichier",
-          "Un court message confirme ce que vous venez de faire, avec des boutons plus clairs et une app plus légère"
+          "Les demandes et approbations aboutissent après une déconnexion sur un autre appareil",
+          "Une notification à laquelle vous répondez sur un appareil disparaît des autres"
         ]
       },
       "ga": {
         "title": "Nuashonraigh chun leanúint ar aghaidh ag úsáid Privasys Wallet",
-        "body": "Ní féidir leis an leagan seo freagra a thabhairt ar na ceisteanna agus na hiarratais ar cheadú a sheolann aipeanna anois, ná comhaid a roinneadh leat a oscailt. Coinníonn an nuashonrú d’aitheantais agus do shonraí.",
+        "body": "Seans nach mbeidh an leagan seo in ann freagra a thabhairt ar iarratais agus ceaduithe tar éis duit logáil amach ar ghléas eile. Coinníonn an nuashonrú d’aitheantais agus do shonraí.",
         "changes": [
-          "Is féidir le haipeanna ceist a chur ort nó iarraidh ort rud éigin a cheadú, agus freagraíonn tú anseo sa sparán",
-          "Osclaítear comhaid a roinneadh leat sa sparán, agus tugann iarratas ceadaithe chuig an gcomhad thú",
-          "Deimhníonn teachtaireacht ghearr an rud a rinne tú, le cnaipí níos soiléire agus aip níos éadroime"
+          "Téann iarratais agus ceaduithe tríd tar éis duit logáil amach ar ghléas eile",
+          "Imíonn fógra a fhreagraíonn tú ar ghléas amháin ó do ghléasanna eile"
         ]
       },
       "hr": {
         "title": "Ažurirajte kako biste nastavili koristiti Privasys Wallet",
-        "body": "Ova verzija ne može odgovoriti na pitanja i zahtjeve za odobrenje koje aplikacije sada šalju niti otvoriti datoteke podijeljene s vama. Ažuriranje čuva vaše identitete i podatke.",
+        "body": "Ova verzija možda neće moći odgovoriti na zahtjeve i odobrenja nakon što se odjavite na drugom uređaju. Ažuriranje čuva vaše identitete i podatke.",
         "changes": [
-          "Aplikacije vam mogu postaviti pitanje ili zatražiti da nešto odobrite, a vi odgovarate ovdje, u novčaniku",
-          "Datoteke podijeljene s vama otvaraju se u novčaniku, a odobreni zahtjev vodi vas do datoteke",
-          "Kratka poruka potvrđuje što ste upravo učinili, uz jasnije gumbe i lakšu aplikaciju"
+          "Zahtjevi i odobrenja prolaze i nakon što se odjavite na drugom uređaju",
+          "Obavijest na koju odgovorite na jednom uređaju nestaje s ostalih"
         ]
       },
       "hu": {
         "title": "Frissítsen, hogy továbbra is használhassa a Privasys Walletet",
-        "body": "Ez a verzió nem tud válaszolni azokra a kérdésekre és jóváhagyási kérésekre, amelyeket az alkalmazások most küldenek, és nem tudja megnyitni az Önnel megosztott fájlokat. A frissítés megőrzi az identitásait és az adatait.",
+        "body": "Ez a verzió nem mindig tud válaszolni a kérésekre és jóváhagyásokra, miután egy másik eszközön kijelentkezett. A frissítés megőrzi az identitásait és az adatait.",
         "changes": [
-          "Az alkalmazások kérdezhetnek Öntől, vagy kérhetik, hogy hagyjon jóvá valamit, és Ön itt, a tárcában válaszol",
-          "Az Önnel megosztott fájlok a tárcában nyílnak meg, és egy jóváhagyott kérés a fájlhoz vezeti",
-          "Egy rövid üzenet megerősíti, mit tett az imént, egyértelműbb gombokkal és könnyebb alkalmazással"
+          "A kérések és jóváhagyások akkor is átmennek, ha egy másik eszközön kijelentkezett",
+          "Az egyik eszközön megválaszolt értesítés a többiről is eltűnik"
         ]
       },
       "it": {
         "title": "Aggiorna per continuare a usare Privasys Wallet",
-        "body": "Questa versione non può rispondere alle domande e alle richieste di approvazione che le app ora inviano, né aprire i file condivisi con te. L’aggiornamento conserva le tue identità e i tuoi dati.",
+        "body": "Questa versione può non riuscire a rispondere a richieste e approvazioni dopo che ti sei disconnesso su un altro dispositivo. L’aggiornamento conserva le tue identità e i tuoi dati.",
         "changes": [
-          "Le app possono farti una domanda o chiederti di approvare qualcosa, e rispondi qui, nel portafoglio",
-          "I file condivisi con te si aprono nel portafoglio, e una richiesta approvata ti porta al file",
-          "Un breve messaggio conferma ciò che hai appena fatto, con pulsanti più chiari e un’app più leggera"
+          "Richieste e approvazioni vanno a buon fine anche dopo la disconnessione su un altro dispositivo",
+          "Una notifica a cui rispondi su un dispositivo scompare dagli altri"
         ]
       },
       "lt": {
         "title": "Atnaujinkite, kad galėtumėte toliau naudoti Privasys Wallet",
-        "body": "Ši versija negali atsakyti į klausimus ir patvirtinimo prašymus, kuriuos dabar siunčia programėlės, ir atidaryti su jumis bendrinamų failų. Atnaujinimas išsaugo jūsų tapatybes ir duomenis.",
+        "body": "Ši versija gali nesugebėti atsakyti į prašymus ir patvirtinimus, kai atsijungiate kitame įrenginyje. Atnaujinimas išsaugo jūsų tapatybes ir duomenis.",
         "changes": [
-          "Programėlės gali jums užduoti klausimą arba paprašyti ką nors patvirtinti, o jūs atsakote čia, piniginėje",
-          "Su jumis bendrinami failai atsidaro piniginėje, o patvirtintas prašymas nuveda jus prie failo",
-          "Trumpas pranešimas patvirtina, ką ką tik atlikote, mygtukai aiškesni, o programėlė lengvesnė"
+          "Prašymai ir patvirtinimai pavyksta ir atsijungus kitame įrenginyje",
+          "Pranešimas, į kurį atsakote viename įrenginyje, dingsta ir kituose"
         ]
       },
       "lv": {
         "title": "Atjauniniet, lai turpinātu lietot Privasys Wallet",
-        "body": "Šī versija nevar atbildēt uz jautājumiem un apstiprinājuma pieprasījumiem, ko lietotnes tagad sūta, un nevar atvērt ar jums kopīgotus failus. Atjauninājums saglabā jūsu identitātes un datus.",
+        "body": "Šī versija var nespēt atbildēt uz pieprasījumiem un apstiprinājumiem pēc izrakstīšanās citā ierīcē. Atjauninājums saglabā jūsu identitātes un datus.",
         "changes": [
-          "Lietotnes var jums uzdot jautājumu vai lūgt kaut ko apstiprināt, un jūs atbildat tepat makā",
-          "Ar jums kopīgotie faili atveras makā, un apstiprināts pieprasījums jūs aizved līdz failam",
-          "Īss ziņojums apstiprina, ko tikko izdarījāt, pogas ir skaidrākas un lietotne vieglāka"
+          "Pieprasījumi un apstiprinājumi izdodas arī pēc izrakstīšanās citā ierīcē",
+          "Paziņojums, uz kuru atbildat vienā ierīcē, pazūd arī no pārējām"
         ]
       },
       "mt": {
         "title": "Aġġorna biex tibqa’ tuża Privasys Wallet",
-        "body": "Din il-verżjoni ma tistax twieġeb il-mistoqsijiet u t-talbiet għall-approvazzjoni li l-apps issa jibagħtu, u lanqas tiftaħ fajls maqsuma miegħek. L-aġġornament iżomm l-identitajiet u d-dejta tiegħek.",
+        "body": "Din il-verżjoni tista’ ma tirnexxix twieġeb talbiet u approvazzjonijiet wara li toħroġ minn apparat ieħor. L-aġġornament iżomm l-identitajiet u d-dejta tiegħek.",
         "changes": [
-          "L-apps jistgħu jsaqsuk mistoqsija jew jitolbuk tapprova xi ħaġa, u twieġeb hawn fil-kartiera",
-          "Il-fajls maqsuma miegħek jinfetħu fil-kartiera, u talba approvata teħdok għall-fajl",
-          "Messaġġ qasir jikkonferma dak li għadek kif għamilt, b’buttuni aktar ċari u app eħfef"
+          "It-talbiet u l-approvazzjonijiet jgħaddu wara li toħroġ minn apparat ieħor",
+          "Notifika li twieġeb fuq apparat wieħed tisparixxi mill-oħrajn"
         ]
       },
       "nl": {
         "title": "Werk bij om Privasys Wallet te blijven gebruiken",
-        "body": "Deze versie kan de vragen en goedkeuringsverzoeken die apps nu sturen niet beantwoorden, en geen bestanden openen die met je zijn gedeeld. De update behoudt je identiteiten en gegevens.",
+        "body": "Deze versie kan verzoeken en goedkeuringen mogelijk niet beantwoorden nadat je op een ander apparaat bent uitgelogd. De update behoudt je identiteiten en gegevens.",
         "changes": [
-          "Apps kunnen je een vraag stellen of je vragen iets goed te keuren, en je antwoordt hier in de wallet",
-          "Bestanden die met je zijn gedeeld openen in de wallet, en een goedgekeurd verzoek brengt je naar het bestand",
-          "Een kort bericht bevestigt wat je net deed, met duidelijkere knoppen en een lichtere app"
+          "Verzoeken en goedkeuringen komen door, ook nadat je op een ander apparaat bent uitgelogd",
+          "Een melding die je op één apparaat beantwoordt, verdwijnt ook van je andere apparaten"
         ]
       },
       "pl": {
         "title": "Zaktualizuj, aby dalej korzystać z Privasys Wallet",
-        "body": "Ta wersja nie potrafi odpowiadać na pytania i prośby o zatwierdzenie, które aplikacje teraz wysyłają, ani otwierać udostępnionych Ci plików. Aktualizacja zachowuje Twoje tożsamości i dane.",
+        "body": "Ta wersja może nie odpowiedzieć na prośby i zatwierdzenia po wylogowaniu się na innym urządzeniu. Aktualizacja zachowuje Twoje tożsamości i dane.",
         "changes": [
-          "Aplikacje mogą zadać Ci pytanie lub poprosić o zatwierdzenie czegoś, a Ty odpowiadasz tutaj, w portfelu",
-          "Udostępnione Ci pliki otwierają się w portfelu, a zatwierdzona prośba prowadzi Cię do pliku",
-          "Krótki komunikat potwierdza, co właśnie zrobiono, przyciski są czytelniejsze, a aplikacja lżejsza"
+          "Prośby i zatwierdzenia działają także po wylogowaniu się na innym urządzeniu",
+          "Powiadomienie, na które odpowiesz na jednym urządzeniu, znika z pozostałych"
         ]
       },
       "pt": {
         "title": "Atualize para continuar a usar a Privasys Wallet",
-        "body": "Esta versão não consegue responder às perguntas e pedidos de aprovação que as apps agora enviam, nem abrir ficheiros partilhados consigo. A atualização mantém as suas identidades e dados.",
+        "body": "Esta versão pode não conseguir responder a pedidos e aprovações depois de terminar sessão noutro dispositivo. A atualização mantém as suas identidades e dados.",
         "changes": [
-          "As apps podem fazer-lhe uma pergunta ou pedir-lhe que aprove algo, e responde aqui, na carteira",
-          "Os ficheiros partilhados consigo abrem na carteira, e um pedido aprovado leva-o ao ficheiro",
-          "Uma mensagem curta confirma o que acabou de fazer, com botões mais claros e uma app mais leve"
+          "Os pedidos e aprovações funcionam depois de terminar sessão noutro dispositivo",
+          "Uma notificação a que responde num dispositivo desaparece dos outros"
         ]
       },
       "ro": {
         "title": "Actualizează pentru a folosi în continuare Privasys Wallet",
-        "body": "Această versiune nu poate răspunde la întrebările și cererile de aprobare pe care aplicațiile le trimit acum și nici nu poate deschide fișierele partajate cu tine. Actualizarea îți păstrează identitățile și datele.",
+        "body": "Această versiune poate să nu reușească să răspundă la cereri și aprobări după ce te deconectezi pe alt dispozitiv. Actualizarea îți păstrează identitățile și datele.",
         "changes": [
-          "Aplicațiile îți pot pune o întrebare sau îți pot cere să aprobi ceva, iar tu răspunzi aici, în portofel",
-          "Fișierele partajate cu tine se deschid în portofel, iar o cerere aprobată te duce la fișier",
-          "Un mesaj scurt confirmă ce ai făcut, cu butoane mai clare și o aplicație mai ușoară"
+          "Cererile și aprobările funcționează și după ce te deconectezi pe alt dispozitiv",
+          "O notificare la care răspunzi pe un dispozitiv dispare de pe celelalte"
         ]
       },
       "sk": {
         "title": "Aktualizujte, aby ste mohli ďalej používať Privasys Wallet",
-        "body": "Táto verzia nevie odpovedať na otázky a žiadosti o schválenie, ktoré aplikácie teraz posielajú, ani otvárať súbory, ktoré s vami niekto zdieľa. Aktualizácia zachová vaše identity aj údaje.",
+        "body": "Táto verzia nemusí zvládnuť odpovedať na žiadosti a schválenia potom, ako sa odhlásite na inom zariadení. Aktualizácia zachová vaše identity aj údaje.",
         "changes": [
-          "Aplikácie sa vás môžu na niečo opýtať alebo požiadať o schválenie a vy odpoviete priamo v peňaženke",
-          "Súbory zdieľané s vami sa otvárajú v peňaženke a schválená žiadosť vás dovedie k súboru",
-          "Krátka správa potvrdí, čo ste práve urobili, tlačidlá sú prehľadnejšie a aplikácia ľahšia"
+          "Žiadosti a schválenia prejdú aj potom, ako sa odhlásite na inom zariadení",
+          "Upozornenie, na ktoré odpoviete na jednom zariadení, zmizne aj z ostatných"
         ]
       },
       "sl": {
         "title": "Posodobite, da boste lahko še naprej uporabljali Privasys Wallet",
-        "body": "Ta različica ne more odgovarjati na vprašanja in prošnje za odobritev, ki jih aplikacije zdaj pošiljajo, niti odpirati datotek, deljenih z vami. Posodobitev ohrani vaše identitete in podatke.",
+        "body": "Ta različica morda ne bo mogla odgovoriti na prošnje in odobritve, potem ko se odjavite v drugi napravi. Posodobitev ohrani vaše identitete in podatke.",
         "changes": [
-          "Aplikacije vam lahko zastavijo vprašanje ali vas prosijo, da nekaj odobrite, vi pa odgovorite tukaj, v denarnici",
-          "Datoteke, deljene z vami, se odprejo v denarnici, odobrena prošnja pa vas pripelje do datoteke",
-          "Kratko sporočilo potrdi, kaj ste pravkar storili, z jasnejšimi gumbi in lažjo aplikacijo"
+          "Prošnje in odobritve uspejo tudi po odjavi v drugi napravi",
+          "Obvestilo, na katerega odgovorite v eni napravi, izgine iz drugih"
         ]
       },
       "sv": {
         "title": "Uppdatera för att fortsätta använda Privasys Wallet",
-        "body": "Den här versionen kan inte svara på de frågor och godkännandeförfrågningar som appar nu skickar, eller öppna filer som delats med dig. Uppdateringen behåller dina identiteter och data.",
+        "body": "Den här versionen kan misslyckas med att svara på förfrågningar och godkännanden efter att du loggat ut på en annan enhet. Uppdateringen behåller dina identiteter och data.",
         "changes": [
-          "Appar kan ställa en fråga till dig eller be dig godkänna något, och du svarar här i plånboken",
-          "Filer som delats med dig öppnas i plånboken, och en godkänd förfrågan tar dig till filen",
-          "Ett kort meddelande bekräftar vad du just gjorde, med tydligare knappar och en lättare app"
+          "Förfrågningar och godkännanden går igenom efter att du loggat ut på en annan enhet",
+          "En avisering du svarar på i en enhet försvinner från dina andra"
         ]
       }
     }

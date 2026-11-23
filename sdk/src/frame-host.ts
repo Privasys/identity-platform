@@ -219,6 +219,28 @@ async function resumeVoucherSession(
     return null;
 }
 
+/** How long an anonymous session keeps looking for the wallet's voucher in
+ *  the background. Past it, an app's 401 still makes the session look. */
+const IDENTIFY_WINDOW_MS = 10 * 60_000;
+
+/**
+ * Keep trying to identify an anonymous session (the wallet's own bootstrap)
+ * from the wallet's voucher, so the app learns who the caller is as soon as
+ * the voucher lands, not only after the enclave forgets the session.
+ */
+function identifyInBackground(session: PrivasysSession): void {
+    const deadline = Date.now() + IDENTIFY_WINDOW_MS;
+    let wait = 3_000;
+    const attempt = async (): Promise<void> => {
+        if (!session.isAnonymous || Date.now() >= deadline) return;
+        await waitForForeground(deadline);
+        if (await session.identify()) return;
+        wait = Math.min(wait * 1.5, 30_000);
+        setTimeout(() => { void attempt(); }, wait);
+    };
+    setTimeout(() => { void attempt(); }, wait);
+}
+
 /** Resolve once the document is foregrounded, or after a short poll cap so
  *  we still retry if `visibilitychange` never fires. Never resolves later
  *  than `deadline`. */
@@ -1998,9 +2020,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         }, parentOrigin);
                     } else if (uiResult.sessionRelay) {
                         // No voucher landed in time. Fall back to the wallet's
-                        // bootstrap so the app still gets a sealed channel
-                        // (anonymous to the app until a later silent rebind
-                        // picks the voucher up) rather than nothing.
+                        // bootstrap so the app still gets a sealed channel,
+                        // anonymous to the app until the voucher lands: the
+                        // session keeps looking for it, and an app's 401
+                        // makes it look at once (PrivasysSession.identify).
                         console.warn('[frame-host] no EncAuth voucher after the ceremony; installing the anonymous session');
                         await installSessionRelay(uiResult.sessionRelay, parentOrigin);
                     }
@@ -2486,8 +2509,12 @@ async function installSessionRelay(
             // unsealed 401 triggers a voucher-based re-bootstrap with no
             // wallet involvement.
             getEncAuth: makeGetEncAuth(rpId, appHost),
+            // The wallet's own bootstrap: the enclave does not know who
+            // the caller is until the session is rebuilt from the voucher.
+            anonymous: true,
         });
         adoptSession(appHost, session, expiresAtMs, parentOrigin);
+        identifyInBackground(session);
         window.parent.postMessage(
             {
                 type: 'privasys:session:ready',

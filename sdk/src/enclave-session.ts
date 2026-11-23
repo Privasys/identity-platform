@@ -222,6 +222,15 @@ export class PrivasysSession {
      *  the page with nothing to show. */
     private rebindRefused = false;
     private rebindUnavailableWaitsMs = REBIND_UNAVAILABLE_WAITS_MS;
+    /** The session came from the wallet's own bootstrap, which tells the
+     *  enclave nothing about who the caller is: the app sees no subject
+     *  until the session is re-established from the wallet's voucher
+     *  (see {@link identify}). */
+    private anonymous = false;
+    /** The single in-flight {@link identify}. */
+    private identifyInFlight: Promise<boolean> | null = null;
+    /** The enclave refused the voucher: identifying cannot succeed. */
+    private identifyRefused = false;
     private lastState: SealedSessionState = { status: 'ok' };
     /** Liveness listener (see {@link SealedSessionState}); the frame host
      *  forwards it to the adopter page. */
@@ -318,6 +327,9 @@ export class PrivasysSession {
         fetchImpl?: typeof fetch;
         /** Optional EncAuth fetcher enabling silent rebind (see {@link SessionInitOptions.getEncAuth}). */
         getEncAuth?: () => Promise<EncAuthEnvelope | null | undefined>;
+        /** The handshake is the wallet's own bootstrap, which carries no
+         *  caller identity (see {@link PrivasysSession.identify}). */
+        anonymous?: boolean;
     }): Promise<PrivasysSession> {
         const fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
 
@@ -374,7 +386,71 @@ export class PrivasysSession {
             fetchImpl,
         );
         if (opts.getEncAuth) session.getEncAuth = opts.getEncAuth;
+        if (opts.anonymous) session.anonymous = true;
         return session;
+    }
+
+    /** True while the app sees no caller identity on this session. */
+    get isAnonymous(): boolean {
+        return this.anonymous;
+    }
+
+    /**
+     * Re-establish an anonymous session from the wallet's voucher, in place,
+     * so the enclave tells the app who the caller is (X-Privasys-Sub). The
+     * wallet uploads the voucher around the end of its ceremony, and it can
+     * land after the session was installed; until then the session keeps
+     * working, anonymously. Resolves true once the session is identified.
+     * A missing voucher is not a failure here: the caller tries again later.
+     */
+    identify(): Promise<boolean> {
+        if (!this.anonymous) return Promise.resolve(true);
+        if (this.identifyRefused || !this.getEncAuth) return Promise.resolve(false);
+        if (!this.identifyInFlight) {
+            this.identifyInFlight = this.identifyOnce().finally(() => {
+                this.identifyInFlight = null;
+            });
+        }
+        return this.identifyInFlight;
+    }
+
+    private async identifyOnce(): Promise<boolean> {
+        let env: EncAuthEnvelope | null | undefined;
+        try {
+            env = await this.getEncAuth!();
+        } catch {
+            return false;
+        }
+        if (!env) return false;
+        const handshake = await bootstrapWithEncAuth(this.host, env, this.fetchImpl);
+        if (!handshake.ok) {
+            if (handshake.error === 'rejected') this.identifyRefused = true;
+            return false;
+        }
+        try {
+            await this.adoptHandshake(handshake);
+        } catch {
+            return false;
+        }
+        return true;
+    }
+
+    /** Take over the keys and id of a voucher-backed bootstrap, in place.
+     *  Counters restart because the AAD now embeds the new session id. */
+    private async adoptHandshake(handshake: { sessionId: string; sdkPrivateKey: CryptoKey; encPub: string }): Promise<void> {
+        const reborn = await PrivasysSession.fromHandshake({
+            host: this.host,
+            sessionId: handshake.sessionId,
+            sdkPrivateKey: handshake.sdkPrivateKey,
+            encPub: handshake.encPub,
+            fetchImpl: this.fetchImpl,
+        });
+        this.sessionId = reborn.sessionId;
+        this.keys = reborn.keys;
+        this.c2sCtr = 0n;
+        this.s2cCtr = 0n;
+        // A voucher-backed bootstrap always names the caller.
+        this.anonymous = false;
     }
 
     /**
@@ -384,7 +460,14 @@ export class PrivasysSession {
      */
     async request(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedResponse> {
         const sentOn = this.sessionId;
+        const sentAnonymous = this.anonymous;
         const r = await this.requestOnce(method, path, body, init);
+        // The app refused an anonymous caller: identify the session from the
+        // wallet's voucher and send the request once more. The app answered
+        // 401, so it did not act on the first one.
+        if (r.status === 401 && r.sealed && sentAnonymous && await this.identify()) {
+            return this.requestOnce(method, path, body, init);
+        }
         // Silent-rebind: when the enclave rejected our session (expired
         // or evicted) and the caller wired a getEncAuth fetcher, ask
         // the IdP for a fresh voucher and re-bootstrap without going
@@ -495,7 +578,9 @@ export class PrivasysSession {
         if (this.sessionId === sessionId && sealed.ctr >= this.s2cCtr) {
             this.s2cCtr = sealed.ctr + 1n;
         }
-        return { status: resp.status, sealed: true, body: pt, headers: resp.headers };
+        // The relay always answers 200 outside; the app's own status rides
+        // X-Privasys-Inner-Status, as on the stream path.
+        return { status: parseInnerStatus(resp.headers, resp.status), sealed: true, body: pt, headers: resp.headers };
     }
 
     /**
@@ -580,19 +665,7 @@ export class PrivasysSession {
         }
 
         try {
-            const reborn = await PrivasysSession.fromHandshake({
-                host: this.host,
-                sessionId: handshake.sessionId,
-                sdkPrivateKey: handshake.sdkPrivateKey,
-                encPub: handshake.encPub,
-                fetchImpl: this.fetchImpl,
-            });
-            // Adopt the new keys + sessionId in place. Counters are
-            // reset because the AAD now embeds the new sessionId.
-            this.sessionId = reborn.sessionId;
-            this.keys = reborn.keys;
-            this.c2sCtr = 0n;
-            this.s2cCtr = 0n;
+            await this.adoptHandshake(handshake);
             this.setState({ status: 'ok' });
             return true;
         } catch {
@@ -676,7 +749,13 @@ export class PrivasysSession {
      */
     async stream(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedStreamResponse> {
         const sentOn = this.sessionId;
+        const sentAnonymous = this.anonymous;
         const r = await this.streamOnce(method, path, body, init);
+        // As in request(): an app's 401 to an anonymous session.
+        if (r.status === 401 && r.sealed && sentAnonymous && await this.identify()) {
+            try { await r.body.cancel(); } catch { /* tearing down */ }
+            return this.streamOnce(method, path, body, init);
+        }
         // Silent-rebind for the streaming path, mirroring request(): when
         // the enclave no longer recognises our session it answers with an
         // UNSEALED 401 (same shape the gateway returns when there's no

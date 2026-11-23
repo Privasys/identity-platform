@@ -155,8 +155,8 @@ func (h *Handler) verifyWIA(tokenStr string) (*ecdsa.PublicKey, string, error) {
 	}
 
 	// Signature + expiry against the wallet-provider key (h.issuer signs
-	// every WIA; VerifyAccessToken validates exp).
-	claims, err := h.issuer.VerifyAccessToken(tokenStr)
+	// every WIA; VerifySignedTyp checks the typ and requires exp).
+	claims, err := h.issuer.VerifySignedTyp(tokenStr, "wia+jwt")
 	if err != nil {
 		return nil, "", err
 	}

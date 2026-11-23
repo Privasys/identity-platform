@@ -471,7 +471,7 @@ func bearerSubject(r *http.Request, iss *tokens.Issuer) (string, error) {
 	if !strings.HasPrefix(auth, "Bearer ") {
 		return "", fmt.Errorf("missing bearer token")
 	}
-	claims, err := iss.VerifyAccessToken(strings.TrimPrefix(auth, "Bearer "))
+	claims, err := iss.VerifyPlatformAccessToken(strings.TrimPrefix(auth, "Bearer "))
 	if err != nil {
 		return "", err
 	}

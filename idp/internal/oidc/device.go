@@ -423,7 +423,7 @@ func HandleDeviceApprove(issuer *tokens.Issuer, devices *DeviceStore, sessions *
 			errorResponse(w, http.StatusUnauthorized, "invalid_token", "Bearer token required")
 			return
 		}
-		claims, err := issuer.VerifyAccessToken(auth[7:])
+		claims, err := issuer.VerifyPlatformAccessToken(auth[7:])
 		if err != nil {
 			errorResponse(w, http.StatusUnauthorized, "invalid_token", err.Error())
 			return

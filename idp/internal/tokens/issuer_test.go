@@ -62,7 +62,7 @@ func TestIssueAndVerifyIDToken(t *testing.T) {
 	}
 
 	// Verify the token.
-	claims, err := iss.VerifyAccessToken(token)
+	claims, err := iss.verifySigned(token, "")
 	if err != nil {
 		t.Fatalf("VerifyAccessToken: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestIssueVoucher(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IssueVoucher: %v", err)
 	}
-	claims, err := iss.VerifyAccessToken(tok)
+	claims, err := iss.VerifySignedTyp(tok, "voucher+jwt")
 	if err != nil {
 		t.Fatalf("verify voucher: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestEmailVerifiedFollowsTheReceipt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("id token: %v", err)
 		}
-		claims, err := iss.VerifyAccessToken(tok)
+		claims, err := iss.verifySigned(tok, "")
 		if err != nil {
 			t.Fatalf("verify: %v", err)
 		}
@@ -333,7 +333,7 @@ func TestIDTokenAMR(t *testing.T) {
 		if err != nil {
 			t.Fatalf("IssueIDToken: %v", err)
 		}
-		claims, err := iss.VerifyAccessToken(token)
+		claims, err := iss.verifySigned(token, "")
 		if err != nil {
 			t.Fatalf("VerifyAccessToken: %v", err)
 		}

@@ -793,7 +793,7 @@ func (h *Handler) authenticateBearer(w http.ResponseWriter, r *http.Request) str
 	}
 
 	// OIDC JWT path.
-	claims, err := h.issuer.VerifyAccessToken(token)
+	claims, err := h.issuer.VerifyPlatformAccessToken(token)
 	if err != nil {
 		http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
 		return ""

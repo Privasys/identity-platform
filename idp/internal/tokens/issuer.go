@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -654,25 +655,89 @@ func ECPublicJWK(pub *ecdsa.PublicKey) map[string]interface{} {
 	}
 }
 
-// VerifyAccessToken parses and validates a JWT signed by this issuer.
-func (iss *Issuer) VerifyAccessToken(tokenStr string) (map[string]interface{}, error) {
+// PlatformAudience is the audience of the platform's own tokens: the ones
+// the IdP's first-party clients (the account page, the wallet, the portal,
+// the CLI, the control plane's service account) are issued. A client with its
+// own subjects is never issued it (ownClientAudience).
+const PlatformAudience = "privasys-platform"
+
+// accessTokenTyp is the `typ` claim every access token carries.
+const accessTokenTyp = "at+jwt"
+
+// verifySigned checks a JWT's signature against this issuer's key, its
+// expiry (required), and that its JOSE `typ` header is `typ` ("" accepts a
+// token with no typ header or "JWT").
+func (iss *Issuer) verifySigned(tokenStr, typ string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodECDSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		// A ledger-handle statement is signed with the same key and names an
-		// account; it is for the billing layer only and never a bearer here.
-		if typ, _ := t.Header["typ"].(string); typ == LedgerHandleTyp {
-			return nil, fmt.Errorf("not an access token: %s", typ)
+		got, _ := t.Header["typ"].(string)
+		if typ == "" && strings.EqualFold(got, "JWT") {
+			got = ""
+		}
+		if got != typ {
+			return nil, fmt.Errorf("unexpected token type %q", got)
 		}
 		return &iss.privateKey.PublicKey, nil
-	})
+	}, jwt.WithValidMethods([]string{"ES256"}), jwt.WithExpirationRequired())
 	if err != nil {
 		return nil, err
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
 		return nil, fmt.Errorf("invalid token")
+	}
+	return claims, nil
+}
+
+// VerifySignedTyp verifies a token of one explicit JOSE type this issuer
+// signs (e.g. "wia+jwt"): signature, required expiry and the typ header.
+// It is never a bearer check; use VerifyAccessToken for that.
+func (iss *Issuer) VerifySignedTyp(tokenStr, typ string) (map[string]interface{}, error) {
+	if typ == "" {
+		return nil, fmt.Errorf("a token type is required")
+	}
+	return iss.verifySigned(tokenStr, typ)
+}
+
+// VerifyPlatformAccessToken is VerifyAccessToken for the IdP's own account
+// endpoints: the token must also be for the platform audience. A token
+// issued to an app with its own subjects (its own client id, "app:<id>") is
+// that app's to use at the app, never the account's credential here. A
+// client still in the legacy shared sector is issued the platform audience
+// (oidc.go), so its tokens still pass.
+func (iss *Issuer) VerifyPlatformAccessToken(tokenStr string) (map[string]interface{}, error) {
+	claims, err := iss.VerifyAccessToken(tokenStr)
+	if err != nil {
+		return nil, err
+	}
+	aud, err := jwt.MapClaims(claims).GetAudience()
+	if err != nil || !slices.Contains([]string(aud), PlatformAudience) {
+		return nil, fmt.Errorf("token is not for the platform audience")
+	}
+	// A vault approval token authorises one vault operation, for minutes; it
+	// is not the account's credential here (IssueVaultApprovalToken).
+	if _, ok := claims["vault_op"]; ok {
+		return nil, fmt.Errorf("an operation-bound token is not a bearer here")
+	}
+	return claims, nil
+}
+
+// VerifyAccessToken parses and validates an ACCESS TOKEN signed by this
+// issuer: signature, required expiry, the default JOSE typ header ("JWT",
+// or none) and the `typ` claim "at+jwt". Everything else this key
+// signs (spend tokens, disclosures, form answers, approvals, receipts,
+// vouchers, WIAs, ledger-handle statements, key-creation grants) carries an
+// explicit typ header or no typ claim, and is refused here. It does not check
+// the audience; account endpoints use VerifyPlatformAccessToken.
+func (iss *Issuer) VerifyAccessToken(tokenStr string) (map[string]interface{}, error) {
+	claims, err := iss.verifySigned(tokenStr, "")
+	if err != nil {
+		return nil, err
+	}
+	if typ, _ := claims["typ"].(string); typ != accessTokenTyp {
+		return nil, fmt.Errorf("not an access token")
 	}
 	// Every caller of this inside the IdP looks the account up by "sub". A
 	// token issued to a client in its own sector carries that sector's

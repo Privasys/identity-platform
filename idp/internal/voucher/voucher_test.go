@@ -66,7 +66,7 @@ func TestMint(t *testing.T) {
 		t.Fatalf("expected 2 vouchers (one per provider), got %d", len(vs))
 	}
 	// The first voucher verifies and binds RP + provider, no user identity.
-	claims, err := m.issuer.VerifyAccessToken(vs[0].Token)
+	claims, err := m.issuer.VerifySignedTyp(vs[0].Token, "voucher+jwt")
 	if err != nil {
 		t.Fatalf("verify voucher: %v", err)
 	}

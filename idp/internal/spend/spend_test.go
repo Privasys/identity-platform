@@ -171,7 +171,7 @@ func TestTokenIssuedAndBound(t *testing.T) {
 		t.Fatalf("want 200, got %d %v", code, out)
 	}
 	tokStr, _ := out["spend_token"].(string)
-	claims, err := f.issuer.VerifyAccessToken(tokStr)
+	claims, err := f.issuer.VerifySignedTyp(tokStr, "spend+jwt")
 	if err != nil {
 		t.Fatalf("token does not verify against the issuer key: %v", err)
 	}

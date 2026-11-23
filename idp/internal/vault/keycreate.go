@@ -155,13 +155,13 @@ func bearerClaims(r *http.Request, iss *tokens.Issuer) (map[string]interface{}, 
 	if !strings.HasPrefix(auth, "Bearer ") {
 		return nil, errForbidden("missing bearer token")
 	}
-	return iss.VerifyAccessToken(strings.TrimPrefix(auth, "Bearer "))
+	return iss.VerifyPlatformAccessToken(strings.TrimPrefix(auth, "Bearer "))
 }
 
 // accountHasRole reports whether the account `sub` has been granted `role`,
 // read from the DB (the source of truth) rather than the bearer token's
-// audience-filtered `roles` claim - so it holds regardless of which audience
-// the caller's token was minted for.
+// audience-filtered `roles` claim (the bearer is a platform-audience token,
+// bearerClaims).
 func accountHasRole(db *store.DB, sub, role string) bool {
 	if sub == "" {
 		return false

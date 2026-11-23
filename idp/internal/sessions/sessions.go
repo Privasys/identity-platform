@@ -613,7 +613,7 @@ func (s *Store) authBearer(r *http.Request, issuer *tokens.Issuer) (string, stri
 		}
 		return "", "", errors.New("invalid or expired wallet session")
 	}
-	claims, err := issuer.VerifyAccessToken(token)
+	claims, err := issuer.VerifyPlatformAccessToken(token)
 	if err != nil {
 		return "", "", err
 	}

@@ -131,7 +131,7 @@ func checkAppRoleCaller(w http.ResponseWriter, r *http.Request, issuer *tokens.I
 		return "admin", true
 	}
 
-	claims, err := issuer.VerifyAccessToken(raw)
+	claims, err := issuer.VerifyPlatformAccessToken(raw)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "invalid token")
 		return "", false

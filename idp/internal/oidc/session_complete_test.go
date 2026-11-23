@@ -28,3 +28,20 @@ func TestSessionCompleteNeverTakesTheAccountFromTheRequest(t *testing.T) {
 		t.Fatal("the session was marked authenticated")
 	}
 }
+
+// TestPatchedEmailLosesProof proves an address patched onto a code is not
+// reported as proved when it differs from the address that was proved.
+func TestPatchedEmailLosesProof(t *testing.T) {
+	codes := NewCodeStore()
+	code := codes.Create(&AuthCode{UserID: "u", Attributes: map[string]string{"email": "alice@example.com"}})
+	codes.SetEmailVerified(code, true)
+
+	codes.UpdateAttributes(code, map[string]string{"email": "Alice@Example.com", "name": "Alice"})
+	if ac := codes.codes[code]; ac == nil || !ac.EmailVerified {
+		t.Fatal("the same address in another case lost its proof")
+	}
+	codes.UpdateAttributes(code, map[string]string{"email": "ceo@victim.example"})
+	if ac := codes.codes[code]; ac == nil || ac.EmailVerified {
+		t.Fatal("a different address kept the proof of the first")
+	}
+}

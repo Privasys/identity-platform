@@ -432,6 +432,12 @@ func (cs *CodeStore) UpdateAttributes(code string, attrs map[string]string) {
 	if ac.Attributes == nil {
 		ac.Attributes = make(map[string]string)
 	}
+	// A proved address stays proved only while it is the address on the
+	// code: a patch that changes it must prove the new one itself (a
+	// disclosure or receipt, checked when the token is issued).
+	if email, ok := attrs["email"]; ok && !strings.EqualFold(strings.TrimSpace(email), strings.TrimSpace(ac.Attributes["email"])) {
+		ac.EmailVerified = false
+	}
 	for k, v := range attrs {
 		ac.Attributes[k] = v
 	}

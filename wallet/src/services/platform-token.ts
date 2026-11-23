@@ -142,6 +142,15 @@ function activePlatformCredentialId(): string {
 }
 
 /**
+ * Whether this wallet holds a privasys.id identity a platform token could be
+ * minted for. A list that found no token is a failure to load only then: a
+ * wallet with no identity has nothing waiting to miss.
+ */
+export function hasPlatformIdentity(): boolean {
+    return !isDemo() && activePlatformCredentialId() !== '';
+}
+
+/**
  * A valid platform `at+jwt`. Returns a cached one when unexpired; otherwise
  * mints a fresh one via the IdP (which may require a wallet sign-in, i.e. a
  * biometric — so call this from a user-initiated flow, not cold start).

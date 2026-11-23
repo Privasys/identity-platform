@@ -67,6 +67,7 @@ export default function AccessScreen() {
     const refreshApprovals = useVaultApprovalsStore((s) => s.refresh);
     const asks = useCapabilityAsksStore((s) => s.asks);
     const refreshAsks = useCapabilityAsksStore((s) => s.refresh);
+    const asksFailed = useCapabilityAsksStore((s) => s.loadFailed);
     const appMessages = useAppMessagesStore((s) => s.messages);
     const refreshAppMessages = useAppMessagesStore((s) => s.refresh);
     const openAppMessage = useAppMessagesStore((s) => s.open);
@@ -77,6 +78,20 @@ export default function AccessScreen() {
         if (!route) return openAppMessage(m);
         void dismissAppMessage(m.id);
         router.push(route);
+    };
+    // A list privasys.id could not give is said so, rather than looking like
+    // nothing waiting. Try again may mint a token (one Face ID).
+    const listsFailed = useAppMessagesStore((s) => s.loadFailed) || asksFailed;
+    const [retrying, setRetrying] = useState(false);
+    const retryLists = async () => {
+        if (retrying) return;
+        setRetrying(true);
+        try {
+            await refreshAppMessages({ interactive: true });
+            await refreshAsks({ interactive: true });
+        } finally {
+            setRetrying(false);
+        }
     };
     const guardianWaiting = useGuardianRequestsStore(waitingCount);
     const refreshGuardian = useGuardianRequestsStore((s) => s.refresh);
@@ -252,6 +267,28 @@ export default function AccessScreen() {
                             <Text style={styles.bannerMeta}>{t('driveRequests.awaiting')}</Text>
                         </RNView>
                         <Ionicons name="chevron-forward" size={18} color={p.infoText} />
+                    </Pressable>
+                )}
+
+                {listsFailed && (
+                    <Pressable
+                        style={styles.banner}
+                        onPress={retryLists}
+                        disabled={retrying}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t('access.listsFailedTitle')}. ${t('access.listsFailedRetry')}`}
+                        testID="access-lists-failed"
+                    >
+                        <RNView style={styles.bannerIcon}>
+                            <Ionicons name="cloud-offline-outline" size={18} color={p.infoText} />
+                        </RNView>
+                        <RNView style={styles.bannerInfo}>
+                            <Text style={styles.bannerTitle}>{t('access.listsFailedTitle')}</Text>
+                            <Text style={styles.bannerMeta}>
+                                {retrying ? t('access.listsFailedChecking') : t('access.listsFailedRetry')}
+                            </Text>
+                        </RNView>
+                        <Ionicons name="refresh" size={18} color={p.infoText} />
                     </Pressable>
                 )}
 

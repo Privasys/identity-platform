@@ -20,7 +20,8 @@
 
 import { create } from 'zustand';
 
-import { callWithPlatformToken } from '@/services/platform-token';
+import { oneLoadAtATime } from '@/services/idp-list';
+import { callWithPlatformToken, hasPlatformIdentity } from '@/services/platform-token';
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
@@ -35,9 +36,12 @@ export interface CapabilityAsk {
 
 interface CapabilityAsksState {
     asks: CapabilityAsk[];
-    /** Ask the IdP what is open. Silent and never prompts: without a cached
-     *  platform token it leaves the list as it is. */
-    refresh: () => Promise<void>;
+    /** The last load could not read the list: what is shown may be missing
+     *  something. Never set for a wallet with no privasys.id identity. */
+    loadFailed: boolean;
+    /** Ask the IdP what is open. Never prompts unless `interactive` (the
+     *  holder tapped Try again), which may mint a token with Face ID. */
+    refresh: (opts?: { interactive?: boolean }) => Promise<void>;
     /** The holder decided, or the app no longer has it: drop it here and at
      *  the IdP. Never throws. */
     dismiss: (nonce: string) => Promise<void>;
@@ -60,32 +64,36 @@ export function parseAsks(body: unknown, nowSeconds: number): CapabilityAsk[] {
     );
 }
 
-let inflight: Promise<void> | null = null;
+/** Ask the IdP what is open; see services/idp-list for when it may prompt. */
+const loadList = oneLoadAtATime(async (interactive) => {
+    const set = useCapabilityAsksStore.setState;
+    try {
+        const called = await callWithPlatformToken(
+            (token) => fetch(`${IDP_BASE}/capability-requests/pending`, { headers: { Authorization: `Bearer ${token}` } }),
+            { interactive },
+        );
+        if (!called) {
+            set({ loadFailed: hasPlatformIdentity() });
+            return;
+        }
+        const { res } = called;
+        if (!res.ok) {
+            console.warn(`[CAPABILITY] could not list open access requests (${res.status})`);
+            set({ loadFailed: true });
+            return;
+        }
+        set({ asks: parseAsks(await res.json(), Math.floor(Date.now() / 1000)), loadFailed: false });
+    } catch (e) {
+        console.warn('[CAPABILITY] could not list open access requests', e);
+        set({ loadFailed: true });
+    }
+});
 
 export const useCapabilityAsksStore = create<CapabilityAsksState>((set, get) => ({
     asks: [],
+    loadFailed: false,
 
-    refresh: () => {
-        if (inflight) return inflight;
-        inflight = (async () => {
-            try {
-                const called = await callWithPlatformToken(
-                    (token) => fetch(`${IDP_BASE}/capability-requests/pending`, { headers: { Authorization: `Bearer ${token}` } }),
-                    { interactive: false },
-                );
-                if (!called?.res.ok) return;
-                const { res } = called;
-                set({ asks: parseAsks(await res.json(), Math.floor(Date.now() / 1000)) });
-            } catch (e) {
-                console.warn('[CAPABILITY] could not list open access requests', e);
-            }
-        })().finally(() => {
-            // Outside the body: an early return before the first await would
-            // otherwise clear this before it was assigned (see guardian-requests).
-            inflight = null;
-        });
-        return inflight;
-    },
+    refresh: (opts) => loadList(opts),
 
     dismiss: async (nonce) => {
         set({ asks: get().asks.filter((a) => a.nonce !== nonce) });
@@ -103,5 +111,5 @@ export const useCapabilityAsksStore = create<CapabilityAsksState>((set, get) => 
         }
     },
 
-    clearAll: () => set({ asks: [] }),
+    clearAll: () => set({ asks: [], loadFailed: false }),
 }));

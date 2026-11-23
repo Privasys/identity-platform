@@ -18,7 +18,8 @@ import { APPROVAL_TYPE, readApprovalPayload, type Approval } from '@/services/ap
 import { appMessageLink, readAppMessage, APP_MESSAGE_TYPE, type AppMessageContent } from '@/services/app-message';
 import { isDemo } from '@/services/demo/gate';
 import { openSealedNotification } from '@/services/notify-seal';
-import { callWithPlatformToken } from '@/services/platform-token';
+import { oneLoadAtATime } from '@/services/idp-list';
+import { callWithPlatformToken, hasPlatformIdentity } from '@/services/platform-token';
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
@@ -121,8 +122,12 @@ export async function readListed(body: unknown, nowSeconds: number): Promise<Wai
 
 interface AppMessagesState {
     messages: WaitingAppMessage[];
-    /** Ask the IdP what is waiting. Silent and never prompts. */
-    refresh: () => Promise<void>;
+    /** The last load could not read the list: what is shown may be missing
+     *  something. Never set for a wallet with no privasys.id identity. */
+    loadFailed: boolean;
+    /** Ask the IdP what is waiting. Never prompts unless `interactive` (the
+     *  holder tapped Try again), which may mint a token with Face ID. */
+    refresh: (opts?: { interactive?: boolean }) => Promise<void>;
     /** The holder opened or dismissed it: drop it here and at the IdP. */
     dismiss: (id: string) => Promise<void>;
     /** Follow its link, if any, then dismiss it. */
@@ -136,7 +141,34 @@ interface AppMessagesState {
     clearAll: () => void;
 }
 
-let inflight: Promise<void> | null = null;
+/**
+ * Ask the IdP what is waiting. A token privasys.id refuses is dropped
+ * (platform-token); in the background nothing is minted, so the list says it
+ * could not load and the holder's Try again mints one.
+ */
+const loadList = oneLoadAtATime(async (interactive) => {
+    const set = useAppMessagesStore.setState;
+    try {
+        const called = await callWithPlatformToken(
+            (token) => fetch(`${IDP_BASE}/wallet/app-messages`, { headers: { Authorization: `Bearer ${token}` } }),
+            { interactive },
+        );
+        if (!called) {
+            set({ loadFailed: hasPlatformIdentity() });
+            return;
+        }
+        const { res } = called;
+        if (!res.ok) {
+            console.warn(`[APP-MESSAGE] could not list waiting messages (${res.status})`);
+            set({ loadFailed: true });
+            return;
+        }
+        set({ messages: await readListed(await res.json(), Math.floor(Date.now() / 1000)), loadFailed: false });
+    } catch (e) {
+        console.warn('[APP-MESSAGE] could not list waiting messages', e);
+        set({ loadFailed: true });
+    }
+});
 
 export async function dismissAppMessage(id: string): Promise<void> {
     try {
@@ -156,33 +188,12 @@ export async function dismissAppMessage(id: string): Promise<void> {
 export const useAppMessagesStore = create<AppMessagesState>((set, get) => ({
     messages: [],
 
-    refresh: () => {
+    loadFailed: false,
+
+    refresh: (opts) => {
         // The demo's waiting items are seeded; there is no IdP to ask.
         if (isDemo()) return Promise.resolve();
-        if (inflight) return inflight;
-        inflight = (async () => {
-            try {
-                // A token privasys.id refuses is dropped (platform-token), so the
-                // next thing the holder does mints one rather than this list
-                // staying empty for good.
-                const called = await callWithPlatformToken(
-                    (token) => fetch(`${IDP_BASE}/wallet/app-messages`, { headers: { Authorization: `Bearer ${token}` } }),
-                    { interactive: false },
-                );
-                if (!called) return;
-                const { res } = called;
-                if (!res.ok) {
-                    console.warn(`[APP-MESSAGE] could not list waiting messages (${res.status})`);
-                    return;
-                }
-                set({ messages: await readListed(await res.json(), Math.floor(Date.now() / 1000)) });
-            } catch (e) {
-                console.warn('[APP-MESSAGE] could not list waiting messages', e);
-            }
-        })().finally(() => {
-            inflight = null;
-        });
-        return inflight;
+        return loadList(opts);
     },
 
     dismiss: async (id) => {
@@ -209,5 +220,5 @@ export const useAppMessagesStore = create<AppMessagesState>((set, get) => ({
 
     forget: (id) => set({ messages: get().messages.filter((m) => m.id !== id) }),
 
-    clearAll: () => set({ messages: [] }),
+    clearAll: () => set({ messages: [], loadFailed: false }),
 }));

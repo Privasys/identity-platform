@@ -1039,51 +1039,14 @@ func HandleSessionComplete(codes *CodeStore, sessions *SessionStore) http.Handle
 			return
 		}
 
-		// SECURITY: do not mint a synthetic "wallet:<sessionID>" subject when
-		// the caller didn't supply a real user_id. The previous behaviour
-		// allowed the wallet/relay path to silently produce JWTs with a
-		// brand-new sub that had no roles and no profile attributes — users
-		// would re-authenticate after a session drop and lose their admin
-		// role and email/name.
-		// The OIDC session MUST be marked authenticated by the FIDO2 handler
-		// (which knows the real user_id) before frame-host calls this
-		// endpoint. If we get here with an unauthenticated session and no
-		// user_id, the wallet/FIDO2→OIDC linking is broken and we should
-		// surface that as a hard auth failure rather than corrupt the token.
-		if req.UserID == "" {
-			log.Printf("session/complete: refusing to complete session %s without user_id (FIDO2/OIDC linking missing)", req.SessionID)
-			errorResponse(w, http.StatusBadRequest, "invalid_request",
-				"session not authenticated and no user_id supplied")
-			return
-		}
-		userID := req.UserID
-
-		authCode := codes.Create(&AuthCode{
-			ClientID:            session.ClientID,
-			RedirectURI:         session.RedirectURI,
-			UserID:              userID,
-			Scope:               session.Scope,
-			Nonce:               session.Nonce,
-			ACRValues:           session.ACRValues,
-			NamedAttributes:     session.NamedAttributes,
-			CodeChallenge:       session.CodeChallenge,
-			CodeChallengeMethod: session.CodeChallengeMethod,
-			AuthTime:            time.Now(),
-			Attributes:          req.Attributes,
-			// Wallet class only when an enrolled wallet instance asserted
-			// this session over /session/assert-wallet (WIA + holder-key
-			// PoP). This is the wallet-PUSH completion path, so the flag is
-			// what fixes "truest wallet users pay": the wallet asserts
-			// during approval and the code minted here inherits it. Social
-			// logins and forged /session/complete calls never set it.
-			WalletVerified: session.WalletAsserted,
-		})
-		sessions.Complete(req.SessionID, userID, authCode)
-
-		log.Printf("session/complete: session %s authenticated (user %s)", req.SessionID, userID)
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"code": authCode})
+		// A session is authenticated only by the identity provider itself:
+		// the FIDO2 handler (passkey or wallet assertion) or a provider's
+		// callback marks it, knowing the real account. This endpoint only
+		// hands back the code of a session already authenticated; it never
+		// takes the account from the request, which anyone holding a pending
+		// session of their own could otherwise name.
+		log.Printf("session/complete: refused for unauthenticated session %s", req.SessionID)
+		errorResponse(w, http.StatusConflict, "invalid_request", "session not authenticated")
 	}
 }
 

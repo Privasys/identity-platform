@@ -97,3 +97,29 @@ func TestOnlyAccessTokensAreBearers(t *testing.T) {
 		t.Error("an access token without exp verified")
 	}
 }
+
+// A test environment's audience is a platform audience only once configured.
+func TestExtraPlatformAudience(t *testing.T) {
+	iss, err := NewIssuer(filepath.Join(t.TempDir(), "k.pem"), "https://privasys.id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	iss.SetAccountResolver(func(sid string) (string, bool) { return "acct-1", sid == "sid-1" })
+	tok, err := iss.IssueAccessTokenWithSID("acct-1", "privasys-platform-test", "sid-1", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer SetPlatformAudiences(nil)
+
+	SetPlatformAudiences(nil)
+	if _, err := iss.VerifyPlatformAccessToken(tok); err == nil {
+		t.Error("an unconfigured audience verified for the platform")
+	}
+	SetPlatformAudiences([]string{" privasys-platform-test ", ""})
+	if !IsPlatformAudience(PlatformAudience) || !IsPlatformAudience("privasys-platform-test") {
+		t.Fatalf("audiences: %v", PlatformAudiences())
+	}
+	if _, err := iss.VerifyPlatformAccessToken(tok); err != nil {
+		t.Errorf("configured test audience refused: %v", err)
+	}
+}

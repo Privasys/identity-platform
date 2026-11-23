@@ -1302,7 +1302,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 		// control-plane clients (Client.Platform) and legacy clients.
 		audience = ownClientAudience(audience, ac.ClientID, reg.AppIDsOf(ac.ClientID))
 		roles = nil
-	} else if audience == "privasys-platform" {
+	} else if tokens.IsPlatformAudience(audience) {
 		// The platform keys accounts by this, never by an app's subject.
 		if filteredAttrs == nil {
 			filteredAttrs = map[string]string{}
@@ -1545,7 +1545,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	if reg.SectorOf(clientID) != "" && !reg.IsPlatform(clientID) {
 		audience = ownClientAudience(audience, clientID, reg.AppIDsOf(clientID))
 		roles = nil
-	} else if audience == "privasys-platform" {
+	} else if tokens.IsPlatformAudience(audience) {
 		if filteredRefreshAttrs == nil {
 			filteredRefreshAttrs = map[string]string{}
 		}

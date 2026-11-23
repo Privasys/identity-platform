@@ -661,6 +661,31 @@ func ECPublicJWK(pub *ecdsa.PublicKey) map[string]interface{} {
 // own subjects is never issued it (ownClientAudience).
 const PlatformAudience = "privasys-platform"
 
+// platformAudiences are the audiences treated as the platform's own:
+// PlatformAudience, plus any set with SetPlatformAudiences (a test
+// environment's, e.g. "privasys-platform-test", so its roles live in their
+// own namespace on the same IdP and accounts).
+var platformAudiences = []string{PlatformAudience}
+
+// SetPlatformAudiences adds extra platform audiences. PlatformAudience is
+// always one of them. Call once at start-up.
+func SetPlatformAudiences(extra []string) {
+	list := []string{PlatformAudience}
+	for _, a := range extra {
+		a = strings.TrimSpace(a)
+		if a != "" && !slices.Contains(list, a) {
+			list = append(list, a)
+		}
+	}
+	platformAudiences = list
+}
+
+// PlatformAudiences lists the platform audiences.
+func PlatformAudiences() []string { return slices.Clone(platformAudiences) }
+
+// IsPlatformAudience reports whether aud is one of the platform audiences.
+func IsPlatformAudience(aud string) bool { return slices.Contains(platformAudiences, aud) }
+
 // accessTokenTyp is the `typ` claim every access token carries.
 const accessTokenTyp = "at+jwt"
 
@@ -713,7 +738,7 @@ func (iss *Issuer) VerifyPlatformAccessToken(tokenStr string) (map[string]interf
 		return nil, err
 	}
 	aud, err := jwt.MapClaims(claims).GetAudience()
-	if err != nil || !slices.Contains([]string(aud), PlatformAudience) {
+	if err != nil || !slices.ContainsFunc([]string(aud), IsPlatformAudience) {
 		return nil, fmt.Errorf("token is not for the platform audience")
 	}
 	// A vault approval token authorises one vault operation, for minutes; it

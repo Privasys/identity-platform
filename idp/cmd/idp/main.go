@@ -195,6 +195,10 @@ func main() {
 	// session_hint push the delta of a widened attribute set to the holder's
 	// wallet instead of forcing a full QR ceremony.
 	oidc.SetClientOriginEnforcement(os.Getenv("IDP_ENFORCE_CLIENT_ORIGINS") == "true")
+	// Extra platform audiences (comma-separated), e.g. the test
+	// environment's, so its roles live in their own namespace.
+	tokens.SetPlatformAudiences(strings.Split(os.Getenv("IDP_PLATFORM_AUDIENCES"), ","))
+	log.Printf("platform audiences: %v", tokens.PlatformAudiences())
 	// The sign-in frame asks whether a page is one of a client's own before
 	// it gives that page a stored session.
 	mux.HandleFunc("GET /session/client-origin", oidc.HandleClientOrigin(clientReg, cfg.IssuerURL))

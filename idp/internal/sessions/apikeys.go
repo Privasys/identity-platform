@@ -120,7 +120,7 @@ func (s *Store) HandleCreateAPIKey(issuer *tokens.Issuer, defaultAudience string
 				aud = c
 			}
 		}
-		if subject == userID && aud == "privasys-platform" {
+		if subject == userID && tokens.IsPlatformAudience(aud) {
 			// The platform keys accounts by this whatever subject is used.
 			claims = map[string]string{"privasys_account": userID}
 		}

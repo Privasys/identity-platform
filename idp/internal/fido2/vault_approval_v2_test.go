@@ -131,3 +131,36 @@ func TestCheckVaultMemberIdentitiesCoversTheMembers(t *testing.T) {
 		t.Error("an inconsistent identity: accepted")
 	}
 }
+
+// A delete_after whose successor is created (a migration or a rotation) needs
+// no promote beside it: it names the successor, and the target is computed.
+func TestCheckVaultV2DeleteAfterCreatedSuccessor(t *testing.T) {
+	want, err := vaultbinding.DeleteAfterTarget("apps/x/data-v8", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := vaultV2Fields{Operation: "delete_after", Handle: "apps/x/data-v7", Members: []string{memberA}, SuccessorHandle: "apps/x/data-v8"}
+	for _, inBatch := range []bool{false, true} {
+		if got, err := checkVaultV2Fields(base, inBatch); err != nil || got != want {
+			t.Errorf("inBatch=%v: target %q, err %v", inBatch, got, err)
+		}
+	}
+	given := base
+	given.Target = want
+	if got, err := checkVaultV2Fields(given, false); err != nil || got != want {
+		t.Errorf("with the target stated: %q, %v", got, err)
+	}
+	bad := map[string]func(*vaultV2Fields){
+		"its own successor":       func(f *vaultV2Fields) { f.SuccessorHandle = f.Handle },
+		"a target for another":    func(f *vaultV2Fields) { f.Target = strings.Repeat("ab", 32) },
+		"a successor with a line": func(f *vaultV2Fields) { f.SuccessorHandle = "a\nb" },
+		"more than a day":         func(f *vaultV2Fields) { f.TTLSeconds = 86401 },
+	}
+	for name, edit := range bad {
+		f := base
+		edit(&f)
+		if _, err := checkVaultV2Fields(f, false); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}

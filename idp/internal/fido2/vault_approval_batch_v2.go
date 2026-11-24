@@ -57,6 +57,9 @@ func validateVaultBatchV2(label string, entries []vaultBatchEntry, ids []vaultbi
 		if err := checkVaultMemberIdentities(e.Members, ids); err != nil {
 			return nil, fmt.Errorf("entry %d: %v", i, err)
 		}
+		if e.SuccessorHandle != "" && e.Operation != string(vaultbinding.BindDeleteAfter) {
+			return nil, fmt.Errorf("entry %d: successor_handle is for delete_after only", i)
+		}
 		e.Target = target
 		// What the wallet shows as the bound value.
 		e.MeasurementDigest = target
@@ -76,8 +79,8 @@ func validateVaultBatchV2(label string, entries []vaultBatchEntry, ids []vaultbi
 		e.Context.Summary = clipSummary(e.Context.Summary)
 	}
 	for i := range out {
-		if out[i].Operation == string(vaultbinding.BindDeleteAfter) && !successors[out[i].Target] {
-			return nil, fmt.Errorf("entry %d: delete_after needs the promote of its successor in the same batch", i)
+		if out[i].Operation == string(vaultbinding.BindDeleteAfter) && out[i].SuccessorHandle == "" && !successors[out[i].Target] {
+			return nil, fmt.Errorf("entry %d: delete_after needs successor_handle, or the promote of its successor in the same batch", i)
 		}
 	}
 	sort.Slice(out, func(a, b int) bool {

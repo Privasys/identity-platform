@@ -92,12 +92,14 @@ type vaultBatchEntry struct {
 	// measurement_digest; ttl_seconds is for a delete_after only. Binding is
 	// set by the IdP: every field of the entry's binding, its own expiry
 	// included.
-	Target      string              `json:"target,omitempty"`
-	Members     []string            `json:"members,omitempty"`
-	IssuerIndex uint32              `json:"issuer_index,omitempty"`
-	NewPolicy   json.RawMessage     `json:"new_policy,omitempty"`
-	TTLSeconds  int64               `json:"ttl_seconds,omitempty"`
-	Binding     *vaultBindingFields `json:"binding,omitempty"`
+	Target      string          `json:"target,omitempty"`
+	Members     []string        `json:"members,omitempty"`
+	IssuerIndex uint32          `json:"issuer_index,omitempty"`
+	NewPolicy   json.RawMessage `json:"new_policy,omitempty"`
+	TTLSeconds  int64           `json:"ttl_seconds,omitempty"`
+	// A delete_after for a created successor (no promote in the batch).
+	SuccessorHandle string              `json:"successor_handle,omitempty"`
+	Binding         *vaultBindingFields `json:"binding,omitempty"`
 }
 
 // v2Fields is the entry as one v2 operation.
@@ -105,6 +107,7 @@ func (e vaultBatchEntry) v2Fields() vaultV2Fields {
 	return vaultV2Fields{
 		Operation: e.Operation, Handle: e.Handle, Target: e.Target, PolicyVersion: e.PolicyVersion,
 		Members: e.Members, IssuerIndex: e.IssuerIndex, NewPolicy: e.NewPolicy, TTLSeconds: e.TTLSeconds,
+		SuccessorHandle: e.SuccessorHandle,
 	}
 }
 

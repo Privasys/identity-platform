@@ -47,7 +47,11 @@ type vaultV2Fields struct {
 	Members       []string
 	IssuerIndex   uint32
 	NewPolicy     json.RawMessage // update_policy only
-	TTLSeconds    int64           // delete_after only, in a batch
+	TTLSeconds    int64           // delete_after only
+	// SuccessorHandle, on a delete_after, names a successor that is created
+	// (a migration or a rotation), not promoted. The target is then computed
+	// here, and the delete needs no promote beside it.
+	SuccessorHandle string
 }
 
 // vaultBindingFields is the binding as it is returned and shown: every field
@@ -108,14 +112,29 @@ func checkVaultV2Fields(f vaultV2Fields, inBatch bool) (string, error) {
 			return "", errors.New("target is not the digest of new_policy")
 		}
 	case vaultbinding.BindDeleteAfter:
+		if f.TTLSeconds < 0 || f.TTLSeconds > vaultbinding.DeleteAfterMaxTTLSeconds {
+			return "", errors.New("ttl_seconds out of range for delete_after")
+		}
+		if f.SuccessorHandle != "" {
+			// A created successor: the old key goes once that key exists.
+			if f.SuccessorHandle == f.Handle || len(f.SuccessorHandle) > vaultBatchMaxHandleBytes {
+				return "", errors.New("successor_handle must name another key")
+			}
+			want, err := vaultbinding.DeleteAfterTarget(f.SuccessorHandle, "")
+			if err != nil {
+				return "", err
+			}
+			if target != "" && target != want {
+				return "", errors.New("target is not the delete_after target of successor_handle")
+			}
+			return want, nil
+		}
+		// A promoted successor: only beside that promote, in a batch.
 		if !inBatch {
-			return "", errors.New("delete_after is approved only with its successor, in a batch")
+			return "", errors.New("delete_after needs successor_handle, or its successor's promote in a batch")
 		}
 		if !vaultHex64.MatchString(target) {
 			return "", errors.New("target (64 lowercase hex) required for delete_after")
-		}
-		if f.TTLSeconds < 0 || f.TTLSeconds > vaultbinding.DeleteAfterMaxTTLSeconds {
-			return "", errors.New("ttl_seconds out of range for delete_after")
 		}
 	default:
 		return "", errors.New("unknown operation")

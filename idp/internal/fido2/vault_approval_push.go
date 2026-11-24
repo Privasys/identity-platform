@@ -81,6 +81,17 @@ type vaultApprovalSummary struct {
 	Binding          *vaultBindingFields          `json:"binding,omitempty"`
 	MemberIdentities []vaultbinding.VaultIdentity `json:"member_identities,omitempty"`
 	NewPolicy        json.RawMessage              `json:"new_policy,omitempty"`
+	// A delete_after for a created successor: the key the old one waits for.
+	// The wallet recomputes the binding's target from it.
+	SuccessorHandle string `json:"successor_handle,omitempty"`
+}
+
+// withSuccessor names the created successor of a delete_after.
+func (s vaultApprovalSummary) withSuccessor(v2 bool, successor string) vaultApprovalSummary {
+	if v2 {
+		s.SuccessorHandle = successor
+	}
+	return s
 }
 
 // withBindingV2 adds what a v2 approval carries for the wallet. A v1 summary

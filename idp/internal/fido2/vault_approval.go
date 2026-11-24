@@ -274,6 +274,8 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			MemberIdentities []vaultbinding.VaultIdentity `json:"member_identities"`
 			IssuerIndex      uint32                       `json:"issuer_index"`
 			NewPolicy        json.RawMessage              `json:"new_policy"`
+			// delete_after only: the created successor the old key waits for.
+			SuccessorHandle string `json:"successor_handle"`
 			// Advisory display context for the approver's wallet. Not part of the
 			// vault_op binding — the vault enforces only the operation tuple.
 			Context struct {
@@ -317,6 +319,11 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		v2Fields := vaultV2Fields{
 			Operation: req.Operation, Handle: req.Handle, Target: req.Target, PolicyVersion: req.PolicyVersion,
 			Members: req.Members, IssuerIndex: req.IssuerIndex, NewPolicy: req.NewPolicy,
+			SuccessorHandle: req.SuccessorHandle,
+		}
+		deleteAfter := req.BindingVersion == 2 && req.Operation == string(vaultbinding.BindDeleteAfter)
+		if deleteAfter {
+			v2Fields.TTLSeconds = req.TTLSeconds
 		}
 		var v2Target string
 		if v2 {
@@ -329,6 +336,10 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			}
 			// What the wallet shows as the bound value.
 			req.MeasurementDigest = v2Target
+			if req.SuccessorHandle != "" && !deleteAfter {
+				errorJSON(w, http.StatusBadRequest, "successor_handle is for delete_after only")
+				return
+			}
 			if c := req.Context; req.Operation == "reshare" &&
 				!reshareContextFits(c.TargetMrenclave, c.TargetVaults, c.Threshold, c.Helpers, c.PublicKey) {
 				errorJSON(w, http.StatusBadRequest, "reshare context field too long")
@@ -425,6 +436,19 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		}
 		now := time.Now().Unix()
 		exp := now + ttl
+		// The owner answers within the usual window. A delete_after's token
+		// then lives on, to be presented once the migration or rotation has
+		// succeeded.
+		pendingExp := exp
+		if deleteAfter {
+			held := req.TTLSeconds
+			if held <= 0 {
+				held = vaultV2DeleteAfterDefaultTTL
+			}
+			if now+held > exp {
+				exp = now + held
+			}
+		}
 
 		nb := make([]byte, 16)
 		if _, err := rand.Read(nb); err != nil {
@@ -497,7 +521,8 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			VersionID:     req.Context.VersionID,
 		}.withReshare(req.Operation, req.Context.TargetMrenclave, req.Context.TargetVaults,
 			req.Context.Threshold, req.Context.Helpers, req.Context.PublicKey).
-			withBindingV2(v2Binding, req.MemberIdentities, req.NewPolicy).withV1Binding(v2, nonce, exp), exp)
+			withBindingV2(v2Binding, req.MemberIdentities, req.NewPolicy).withV1Binding(v2, nonce, exp).
+			withSuccessor(v2, req.SuccessorHandle), pendingExp)
 		// Log the REQUEST as well as the completion. Only /complete used to
 		// log ("vault-approval issued"), which reads like a request being
 		// created — so an operator watching the log could not tell an

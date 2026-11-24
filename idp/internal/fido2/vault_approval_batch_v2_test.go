@@ -178,3 +178,30 @@ func TestVaultBatchV2Refusals(t *testing.T) {
 		t.Error("an empty batch: accepted")
 	}
 }
+
+func TestVaultBatchV2DeleteAfterCreatedSuccessor(t *testing.T) {
+	a := testVaultIdentity(t, 1)
+	ids := []vaultbinding.VaultIdentity{a}
+	m := []string{a.MemberID}
+	entries, err := validateVaultBatchV2("Rotate", []vaultBatchEntry{
+		{Operation: "delete_after", Handle: "k/v7", SuccessorHandle: "k/v8", Members: m},
+	}, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := vaultbinding.DeleteAfterTarget("k/v8", "")
+	if entries[0].Target != want {
+		t.Fatalf("target %q, want %q", entries[0].Target, want)
+	}
+	if _, _, err := bindVaultBatchV2("u", "Rotate", 1000, 1300, entries, testNonce()); err != nil {
+		t.Fatal(err)
+	}
+	if entries[0].Binding.Target != want || entries[0].Binding.Exp != 1000+3600 {
+		t.Fatalf("binding %+v", entries[0].Binding)
+	}
+	if _, err := validateVaultBatchV2("L", []vaultBatchEntry{
+		{Operation: "promote", Handle: "k2", Target: strings.Repeat("ab", 32), Members: m, SuccessorHandle: "k3"},
+	}, ids); err == nil {
+		t.Error("a successor on a promote: accepted")
+	}
+}

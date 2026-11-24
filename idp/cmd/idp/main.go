@@ -199,6 +199,11 @@ func main() {
 	// environment's, so its roles live in their own namespace.
 	tokens.SetPlatformAudiences(strings.Split(os.Getenv("IDP_PLATFORM_AUDIENCES"), ","))
 	log.Printf("platform audiences: %v", tokens.PlatformAudiences())
+	// Which domains belong to each extra platform ("audience=domain", comma-
+	// separated), served so a wallet picks a key's audience by the host it calls.
+	tokens.SetPlatformDomains(strings.Split(os.Getenv("IDP_PLATFORM_DOMAINS"), ","))
+	log.Printf("platforms: %+v", tokens.Platforms())
+	mux.HandleFunc("GET /wallet/platforms", tokens.HandlePlatforms)
 	// The sign-in frame asks whether a page is one of a client's own before
 	// it gives that page a stored session.
 	mux.HandleFunc("GET /session/client-origin", oidc.HandleClientOrigin(clientReg, cfg.IssuerURL))

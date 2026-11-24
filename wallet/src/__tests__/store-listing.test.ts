@@ -21,7 +21,7 @@ describe('slugForHost', () => {
         // to "not published" on its own approval screen, which is exactly the
         // bug this pins: the enclave host is privasys-drive.apps…, NOT drive.apps…
         expect(slugForHost('privasys-drive.apps.privasys.org')).toBe('privasys-drive');
-        expect(slugForHost('web-search-brave.apps-test.privasys.org')).toBe('web-search-brave');
+        expect(slugForHost('web-search-brave.apps.test.privasys.org')).toBe('web-search-brave');
     });
 
     it('lowercases, because the store slug is lower case', () => {

@@ -64,8 +64,6 @@ describe('audience per platform', () => {
             'https://api.developer.test.privasys.org',
             'https://api.developer.test.privasys.org/api/v1/apps/x/data-keys/grant',
             'drive-demo.apps.test.privasys.org',
-            'old.apps-test.privasys.org',
-            'api-test.developer.privasys.org',
         ]) {
             expect(audienceFor(t)).toBe('privasys-platform-test');
         }

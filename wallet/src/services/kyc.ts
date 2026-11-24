@@ -76,9 +76,8 @@ const VERIFIER_APP_NAME =
 const VERIFIER_IMAGE_OID = '1.3.6.1.4.1.65230.4.2';
 
 /** Fallback verifier coordinates, used only until the app is resolvable from the
- *  store (then the resolved hostname + attested digest win). The old dev/test
- *  deployment (container-app-identity-verifier.apps-test.privasys.org) is gone —
- *  the prod app is the only live verifier, so the unset-env defaults point there;
+ *  store (then the resolved hostname + attested digest win). The prod app is
+ *  the only live verifier, so the unset-env defaults point there;
  *  both overridable per build.
  *  Verifier v0.6.3: certifies every importable government attribute, portrait
  *  included; fail-closed biometrics since v0.3.11. Keep this pinned to the live

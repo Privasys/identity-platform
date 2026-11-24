@@ -29,14 +29,14 @@ const DEFAULT_API_BASE = process.env.EXPO_PUBLIC_PLATFORM_API_URL ?? DEV_API_BAS
 /**
  * Ordered control-plane candidates for an app. The wallet build pins ONE
  * platform API via EXPO_PUBLIC_PLATFORM_API_URL, but a production wallet is
- * routinely shown dev apps (…apps.test.privasys.org, formerly …apps-test) and vice versa — and an
+ * routinely shown dev apps (…apps.test.privasys.org) and vice versa — and an
  * app id only exists on its own control plane, so asking the wrong one 404s
  * and the release card silently vanished. Prefer the base implied by the app
  * host, then fall back through the known environments; a wrong base costs one
  * fast 404, nothing else.
  */
 export function apiBasesForHost(appHost?: string): string[] {
-    const preferred = appHost?.endsWith('.apps.test.privasys.org') || appHost?.endsWith('.apps-test.privasys.org')
+    const preferred = appHost?.endsWith('.apps.test.privasys.org')
         ? DEV_API_BASE
         : appHost?.endsWith('.apps.privasys.org')
             ? PROD_API_BASE

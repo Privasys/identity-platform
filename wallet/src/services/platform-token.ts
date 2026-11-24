@@ -36,12 +36,7 @@ export const TEST_PLATFORM_AUDIENCE = 'privasys-platform-test';
 /** Whether `host` belongs to the test platform. */
 function isTestPlatformHost(host: string): boolean {
     const h = host.toLowerCase().replace(/\.$/, '');
-    return (
-        h === 'test.privasys.org' ||
-        h.endsWith('.test.privasys.org') ||
-        h.endsWith('.apps-test.privasys.org') ||
-        h === 'api-test.developer.privasys.org'
-    );
+    return h === 'test.privasys.org' || h.endsWith('.test.privasys.org');
 }
 
 /**

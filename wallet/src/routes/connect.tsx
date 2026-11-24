@@ -1100,7 +1100,7 @@ function ConnectFlow() {
                 return;
             }
             // The relying-party app the user is actually signing into is
-            // `payload.rpId` (e.g. `lightpanda.apps-test.privasys.org`).
+            // `payload.rpId` (e.g. `lightpanda.apps.test.privasys.org`).
             // `payload.origin` is the FIDO2 ceremony host (the IdP at
             // `privasys.id`) — attesting it would just measure the IdP,
             // not the enclave that holds the user's data, so it is

@@ -21,7 +21,7 @@ const STORE_KEY = 'privasys.sessions.v1';
 export interface RelaySession {
     /** Enclave-issued session id (from /__privasys/session-bootstrap). */
     sessionId: string;
-    /** App rpId (e.g. "confidential-ai-demo.apps-test.privasys.org"). */
+    /** App rpId (e.g. "confidential-ai-demo.apps.test.privasys.org"). */
     rpId: string;
     /** Enclave origin (host:port). */
     origin: string;

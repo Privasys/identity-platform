@@ -12,8 +12,8 @@ const D = 'd'.repeat(64);
 
 function trustedTdx(overrides: Partial<TrustedApp> = {}): TrustedApp {
     return {
-        rpId: 'app.apps-test.privasys.org',
-        origin: 'app.apps-test.privasys.org',
+        rpId: 'app.apps.test.privasys.org',
+        origin: 'app.apps.test.privasys.org',
         mrtd: A,
         codeHash: B,
         configRoot: C,

@@ -9,7 +9,6 @@ const PROD = 'https://api.developer.privasys.org';
 describe('apiBasesForHost', () => {
     it('asks the dev control plane first for a test app host', () => {
         expect(apiBasesForHost('drive-demo.apps.test.privasys.org')[0]).toBe(DEV);
-        expect(apiBasesForHost('drive-demo.apps-test.privasys.org')[0]).toBe(DEV);
     });
 
     it('asks the prod control plane first for a prod app host', () => {

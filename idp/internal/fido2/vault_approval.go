@@ -497,7 +497,7 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			VersionID:     req.Context.VersionID,
 		}.withReshare(req.Operation, req.Context.TargetMrenclave, req.Context.TargetVaults,
 			req.Context.Threshold, req.Context.Helpers, req.Context.PublicKey).
-			withBindingV2(v2Binding, req.MemberIdentities, req.NewPolicy), exp)
+			withBindingV2(v2Binding, req.MemberIdentities, req.NewPolicy).withV1Binding(v2, nonce, exp), exp)
 		// Log the REQUEST as well as the completion. Only /complete used to
 		// log ("vault-approval issued"), which reads like a request being
 		// created — so an operator watching the log could not tell an

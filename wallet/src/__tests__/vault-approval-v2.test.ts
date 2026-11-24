@@ -73,6 +73,7 @@ describe('a v2 vault approval', () => {
             op: 'promote',
             members: [a.member_id, b.member_id].sort(),
             builds: [PUBLISHED],
+            billingIds: ['b'.repeat(64)],
             exp: NOW + 120,
             newPolicy: undefined,
         });
@@ -146,9 +147,33 @@ describe('the vaults\' release', () => {
     });
 
     it('is not, when the vaults differ or GitHub cannot say', async () => {
-        const mixed = { op: 'promote' as const, members: [], builds: [PUBLISHED, 'ee'.repeat(32)], exp: NOW };
+        const mixed = { op: 'promote' as const, members: [], builds: [PUBLISHED, 'ee'.repeat(32)], billingIds: [], exp: NOW };
         expect((await checkV2Release(mixed)).kind).toBe('unpublished');
-        const unknown = { op: 'promote' as const, members: [], builds: ['ee'.repeat(32)], exp: NOW };
+        const unknown = { op: 'promote' as const, members: [], builds: ['ee'.repeat(32)], billingIds: [], exp: NOW };
         expect((await checkV2Release(unknown)).kind).toBe('unreachable');
+    });
+});
+
+describe('a request that leaves its binding out', () => {
+    const { checkV1, requiresV2 } = require('@/services/vault-approval-v2');
+    const { computeVaultOp } = require('@/services/vault-approval-batch');
+
+    it('is refused for an operation that exists only on v2', () => {
+        for (const op of ['update_policy', 'delete', 'delete_after', 'export_assembled', 'issuer_update', 'revoke_pending', 'create']) {
+            expect(requiresV2(op)).toBe(true);
+        }
+        for (const op of ['promote', 'export', 'reshare', 'app-policy', 'policy-update', 'app-recovery']) {
+            expect(requiresV2(op)).toBe(false);
+        }
+    });
+
+    it('is recomputed as v1 when it says what it binds', () => {
+        const s = { handle: 'vaults/x/k', measurement: '09'.repeat(32), policy_version: 4, nonce: 'n1', exp: NOW + 60 };
+        const vaultOp = computeVaultOp(s.handle, s.measurement, 4, 'n1', NOW + 60);
+        expect(checkV1(vaultOp, s, computeVaultOp)).toBe(true);
+        expect(checkV1(vaultOp, { ...s, measurement: '0a'.repeat(32) }, computeVaultOp)).toBe(false);
+        expect(checkV1(vaultOp, { ...s, handle: 'vaults/x/other' }, computeVaultOp)).toBe(false);
+        // An older privasys.id says neither: shown as before.
+        expect(checkV1(vaultOp, { handle: s.handle, measurement: s.measurement }, computeVaultOp)).toBe(true);
     });
 });

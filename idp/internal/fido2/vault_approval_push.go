@@ -68,6 +68,11 @@ type vaultApprovalSummary struct {
 	Helpers         string `json:"helpers,omitempty"`
 	PublicKey       string `json:"public_key,omitempty"`
 
+	// A v1 approval says what it binds beside the fields above (its nonce and
+	// expiry), so the wallet recomputes the challenge from what it shows.
+	Nonce string `json:"nonce,omitempty"`
+	Exp   int64  `json:"exp,omitempty"`
+
 	// Binding v2 only: every field of the text the approval binds, so the
 	// wallet rebuilds it; the vaults' own identities, which the wallet
 	// verifies before it shows the constellation; and, for update_policy, the
@@ -87,6 +92,15 @@ func (s vaultApprovalSummary) withBindingV2(b *vaultBindingFields, ids []vaultbi
 	s.Binding, s.MemberIdentities = b, ids
 	if len(newPolicy) > 0 && string(newPolicy) != "null" {
 		s.NewPolicy = newPolicy
+	}
+	return s
+}
+
+// withV1Binding adds what a v1 approval binds beside its shown fields. A v2
+// summary carries its whole binding instead.
+func (s vaultApprovalSummary) withV1Binding(v2 bool, nonce string, exp int64) vaultApprovalSummary {
+	if !v2 {
+		s.Nonce, s.Exp = nonce, exp
 	}
 	return s
 }

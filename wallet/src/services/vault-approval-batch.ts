@@ -108,6 +108,8 @@ export interface VerifiedVaultBatch {
     /** A v2 batch: the builds the vaults it names claim (distinct, hex). The
      *  card names them as a published release before it offers Approve. */
     builds?: string[];
+    /** A v2 batch: those vaults' billing ids (distinct), which say the platform. */
+    billingIds?: string[];
     options: {
         publicKey: {
             /** Always the recomputed binding, never the server's copy. */
@@ -206,7 +208,7 @@ function verifyV2Entry(
     e: Record<string, unknown>,
     batchExp: number,
     identities: unknown,
-): { entry: VerifiedVaultBatchEntry; builds: string[] } {
+): { entry: VerifiedVaultBatchEntry; builds: string[]; billingIds: string[] } {
     if (typeof e.operation !== 'string' || !BATCHABLE_V2.has(e.operation)) throw new VaultBatchRefused('operation');
     const b = (e.binding ?? {}) as Record<string, unknown>;
     const { handle, vault_op: vaultOp } = e;
@@ -280,6 +282,7 @@ function verifyV2Entry(
     const hint = ((e.context ?? {}) as Record<string, unknown>).version_id;
     return {
         builds: members.builds,
+        billingIds: members.billingIds,
         entry: {
             operation: e.operation as VerifiedVaultBatchEntry['operation'],
             handle,
@@ -317,6 +320,7 @@ export function verifyVaultBatch(requestedBatchId: string, answer: unknown): Ver
     if (v2Count !== 0 && v2Count !== entries.length) throw new VaultBatchRefused('malformed');
     const isV2Batch = v2Count > 0;
     const builds = new Set<string>();
+    const billingIds = new Set<string>();
     const successors = new Set<string>();
 
     const verified: VerifiedVaultBatchEntry[] = [];
@@ -325,6 +329,7 @@ export function verifyVaultBatch(requestedBatchId: string, answer: unknown): Ver
         if (isV2Batch) {
             const got = verifyV2Entry(e, exp as number, a.member_identities);
             for (const b of got.builds) builds.add(b);
+            for (const b of got.billingIds) billingIds.add(b);
             if (got.entry.operation === 'promote') {
                 successors.add(deleteAfterTarget(got.entry.handle, got.entry.measurementDigest));
             }
@@ -393,7 +398,7 @@ export function verifyVaultBatch(requestedBatchId: string, answer: unknown): Ver
         label,
         exp: exp as number,
         entries: verified,
-        ...(isV2Batch ? { builds: [...builds].sort() } : {}),
+        ...(isV2Batch ? { builds: [...builds].sort(), billingIds: [...billingIds].sort() } : {}),
         options: {
             publicKey: {
                 challenge: batchId,

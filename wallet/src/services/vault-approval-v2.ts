@@ -57,6 +57,8 @@ export interface CheckedV2 {
     members: string[];
     /** The builds those vaults claim (one, unless they differ). */
     builds: string[];
+    /** Their billing ids (one, unless they differ): which platform they are on. */
+    billingIds: string[];
     /** Unix seconds: the approval is good until then. */
     exp: number;
     /** The new policy, for a policy update. */
@@ -68,6 +70,31 @@ const dash = (s: string | undefined) => (s === undefined || s === '' ? '-' : s);
 /** Whether a pending approval is a v2 one. */
 export function isV2(summary: { binding?: unknown }): boolean {
     return summary.binding !== undefined && summary.binding !== null;
+}
+
+/**
+ * Operations that exist only on binding v2. A request for one that carries no
+ * binding is not an older, unchecked form of it: it is refused. Otherwise
+ * leaving the binding out would be a way past every check here.
+ */
+const V2_ONLY = new Set<string>(VAULT_OPS.filter((op) => op !== 'promote' && op !== 'export' && op !== 'reshare'));
+
+export function requiresV2(operation: string): boolean {
+    return V2_ONLY.has(operation);
+}
+
+/**
+ * A v1 approval that says what it binds (its nonce and expiry) is recomputed
+ * too: the challenge must be the v1 binding of what the card shows. One that
+ * does not say (an older privasys.id) is shown as before.
+ */
+export function checkV1(
+    vaultOp: string,
+    summary: { handle: string; measurement: string; policy_version?: number; nonce?: string; exp?: number },
+    v1Binding: (handle: string, measurement: string, policyVersion: number, nonce: string, exp: number) => string,
+): boolean {
+    if (typeof summary.nonce !== 'string' || !Number.isSafeInteger(summary.exp)) return true;
+    return v1Binding(summary.handle, summary.measurement ?? '', summary.policy_version ?? 0, summary.nonce, summary.exp as number) === vaultOp;
 }
 
 /**
@@ -124,6 +151,7 @@ export function checkV2(vaultOp: string, summary: V2Summary, nowSeconds: number)
         op: b.op as VaultOp,
         members: members.members,
         builds: members.builds,
+        billingIds: members.billingIds,
         exp: b.exp,
         newPolicy: hasPolicy ? summary.new_policy : undefined,
     };

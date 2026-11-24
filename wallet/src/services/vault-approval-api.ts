@@ -71,6 +71,10 @@ export interface VaultApprovalSummary {
     // approval binds, the identities of the vaults it names, and for a policy
     // update the policy it installs. The wallet checks them all before Approve.
     binding?: BindingFields;
+    // A v1 approval may say what it binds (its nonce and expiry), so the
+    // wallet recomputes the challenge from what the card shows.
+    nonce?: string;
+    exp?: number;
     member_identities?: VaultIdentity[];
     new_policy?: unknown;
 }

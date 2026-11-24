@@ -59,6 +59,8 @@ import {
     type VerifiedVaultBatch,
 } from '@/services/vault-approval-batch';
 import { vaultReleaseFor, type VaultRelease } from '@/services/vault-reshare';
+import { billingPlatform, type BillingPlatform } from '@/services/platforms';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { notify } from '@/stores/notice';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
@@ -105,6 +107,25 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
     const [release, setRelease] = useState<
         { kind: 'checking' } | { kind: 'ok'; release: VaultRelease } | { kind: 'unpublished' } | { kind: 'unreachable' } | null
     >(null);
+    // Which platform those vaults are on: a test vault and a production one
+    // may run the same release.
+    const [platform, setPlatform] = useState<BillingPlatform | null>(null);
+    const billingKey = phase.kind === 'ready' && phase.batch.billingIds ? phase.batch.billingIds.join(',') : null;
+    useEffect(() => {
+        if (billingKey === null) {
+            setPlatform(null);
+            return;
+        }
+        let cancelled = false;
+        const sha256Hex = (text: string) =>
+            Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
+        void billingPlatform(billingKey === '' ? [] : billingKey.split(','), sha256Hex).then((found) => {
+            if (!cancelled) setPlatform(found);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [billingKey]);
     const [readToEnd, setReadToEnd] = useState(false);
     const [busy, setBusy] = useState(false);
     const [now, setNow] = useState(() => Date.now());
@@ -361,7 +382,20 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
                                     : t('vaultApprovals.vaultRelease')}
                             </Text>
                         </RNView>
-                    ) : release ? (
+                    ) : null}
+                    {release?.kind === 'ok' && platform ? (
+                        <RNView style={styles.metaRow} testID="vault-batch-platform">
+                            <Ionicons name="server-outline" size={16} color={p.textSecondary} />
+                            <Text style={styles.meta}>
+                                {platform.kind === 'default'
+                                    ? t('vaultApprovals.platformProduction')
+                                    : platform.kind === 'named'
+                                      ? platform.domain
+                                      : t('vaultApprovals.platformUnknown')}
+                            </Text>
+                        </RNView>
+                    ) : null}
+                    {release && release.kind !== 'ok' && release.kind !== 'checking' ? (
                         <RNView style={styles.metaRow} testID="vault-batch-release-refused">
                             <Ionicons name="warning-outline" size={16} color={p.danger} />
                             <Text style={[styles.meta, { color: p.danger }]}>

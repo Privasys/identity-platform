@@ -120,3 +120,23 @@ it('mints and caches each platform its own key, and clears them all', async () =
     await clearPlatformToken();
     expect(Object.keys(mockStore).filter((k) => k.startsWith('privasys.platform-token'))).toEqual([]);
 });
+
+describe('the platform behind a vault billing id', () => {
+    const { billingPlatform } = require('@/services/platforms');
+    const { createHash } = require('crypto');
+    const sha = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
+    const implicit = (aud: string) => sha(`privasys-billing-implicit-v0\nhttps://privasys.id\n${aud}`);
+
+    it('is the vault vector for the test audience', () => {
+        const v = require('../../../idp/internal/vaultbinding/testdata/v2_vectors.json').billing_id_implicit_v0;
+        expect(implicit(v.audience)).toBe(v.billing_id);
+    });
+
+    it('is production, a published platform by its domain, or unknown', async () => {
+        expect(await billingPlatform([implicit('privasys-platform')], sha)).toEqual({ kind: 'default' });
+        expect(await billingPlatform([implicit('aud-b')], sha)).toEqual({ kind: 'named', domain: 'b.example.org' });
+        expect(await billingPlatform([implicit('aud-zzz')], sha)).toEqual({ kind: 'unknown' });
+        expect(await billingPlatform([implicit('privasys-platform'), implicit('aud-b')], sha)).toEqual({ kind: 'unknown' });
+        expect(await billingPlatform([], sha)).toEqual({ kind: 'unknown' });
+    });
+});

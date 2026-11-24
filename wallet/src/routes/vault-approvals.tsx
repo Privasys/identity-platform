@@ -42,7 +42,10 @@ import {
     type VaultApprovalRequest,
 } from '@/services/vault-approval-api';
 import { checkReshare, forgetPublishedReleases, vaultReleaseFor, type VaultRelease } from '@/services/vault-reshare';
-import { checkV2, checkV2Release, isV2 } from '@/services/vault-approval-v2';
+import { checkV1, checkV2, checkV2Release, isV2, requiresV2 } from '@/services/vault-approval-v2';
+import { computeVaultOp } from '@/services/vault-approval-batch';
+import { billingPlatform, type BillingPlatform } from '@/services/platforms';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { notify } from '@/stores/notice';
 import { freshBiometric } from '@/services/approval-answer';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
@@ -120,7 +123,7 @@ async function checkReshareRequest(req: VaultApprovalRequest): Promise<ReshareCh
  */
 type V2Check =
     | { kind: 'checking' }
-    | { kind: 'ok'; release: VaultRelease; vaults: number }
+    | { kind: 'ok'; release: VaultRelease; vaults: number; platform: BillingPlatform }
     | { kind: 'mismatch' }
     | { kind: 'unpublished'; build: string }
     | { kind: 'unreachable' };
@@ -129,7 +132,12 @@ async function checkV2Request(req: VaultApprovalRequest): Promise<V2Check> {
     const checked = checkV2(req.vault_op, req.summary, Math.floor(Date.now() / 1000));
     if (!checked) return { kind: 'mismatch' };
     const release = await checkV2Release(checked);
-    if (release.kind === 'ok') return { kind: 'ok', release: release.release, vaults: checked.members.length };
+    if (release.kind === 'ok') {
+        const sha256Hex = (text: string) =>
+            Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
+        const platform = await billingPlatform(checked.billingIds, sha256Hex);
+        return { kind: 'ok', release: release.release, vaults: checked.members.length, platform };
+    }
     return release;
 }
 
@@ -384,7 +392,14 @@ function VaultApprovalsScreen() {
                         // An approval on binding v2 is approvable only once
                         // what it shows is what it signs, for vaults on a
                         // published release.
-                        const v2 = isV2(s) ? v2Checks[req.vault_op] ?? { kind: 'checking' as const } : undefined;
+                        // An operation that exists only on v2 and carries no
+                        // binding is refused, never shown as an unchecked v1
+                        // card. A v1 card that says what it binds is recomputed.
+                        const v2: V2Check | undefined = isV2(s)
+                            ? v2Checks[req.vault_op] ?? { kind: 'checking' as const }
+                            : requiresV2(s.operation) || !checkV1(req.vault_op, s, computeVaultOp)
+                              ? { kind: 'mismatch' as const }
+                              : undefined;
                         const isKeyRules = s.operation === 'update_policy';
                         const isKeyDelete = s.operation === 'delete';
                         const canApprove = !busy && (!reshare || reshare.kind === 'ok') && (!v2 || v2.kind === 'ok');
@@ -496,6 +511,21 @@ function VaultApprovalsScreen() {
                                         value={t('vaultApprovals.vaultReleaseName', { version: v2.release.version })}
                                         url={v2.release.url}
                                     />
+                                ) : null}
+                                {/* Which platform those vaults are on: a test
+                                    vault and a production one may run the
+                                    same release. */}
+                                {v2?.kind === 'ok' ? (
+                                    <RNView style={styles.row} testID="vault-v2-platform">
+                                        <Text style={styles.label}>{t('vaultApprovals.vaultPlatform')}</Text>
+                                        <Text style={styles.value}>
+                                            {v2.platform.kind === 'default'
+                                                ? t('vaultApprovals.platformProduction')
+                                                : v2.platform.kind === 'named'
+                                                  ? v2.platform.domain
+                                                  : t('vaultApprovals.platformUnknown')}
+                                        </Text>
+                                    </RNView>
                                 ) : v2?.kind === 'checking' ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>{t('vaultApprovals.vaultRelease')}</Text>

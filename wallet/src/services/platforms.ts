@@ -117,3 +117,36 @@ export async function knownAudiences(): Promise<string[]> {
 export function forgetPlatforms(): void {
     loaded = null;
 }
+
+/** Which platform a vault's billing id belongs to. */
+export type BillingPlatform =
+    /** The default platform (production). */
+    | { kind: 'default' }
+    /** Another platform privasys.id publishes, named by its first domain. */
+    | { kind: 'named'; domain: string }
+    | { kind: 'unknown' };
+
+/**
+ * The platform behind a set of vault billing ids. Until vaults carry a billing
+ * configuration of their own, a vault's billing id is derived from its issuer
+ * and audience: hex SHA-256 of "privasys-billing-implicit-v0\n" issuer "\n"
+ * audience. So the audiences privasys.id publishes say which platform a vault
+ * is on, and the card can tell a test vault from a production one even when
+ * both run the same release. Unknown when the ids differ, match no published
+ * platform, or the platforms cannot be read.
+ */
+export async function billingPlatform(billingIds: string[], sha256Hex: (text: string) => string): Promise<BillingPlatform> {
+    if (billingIds.length !== 1) return { kind: 'unknown' };
+    const implicit = (audience: string) => sha256Hex(`privasys-billing-implicit-v0\n${IDP_BASE_URL}\n${audience}`);
+    if (billingIds[0] === implicit(DEFAULT_AUDIENCE)) return { kind: 'default' };
+    let list: Platform[];
+    try {
+        list = await platforms();
+    } catch {
+        return { kind: 'unknown' };
+    }
+    for (const p of list) {
+        if (billingIds[0] === implicit(p.audience)) return { kind: 'named', domain: p.domains[0] };
+    }
+    return { kind: 'unknown' };
+}

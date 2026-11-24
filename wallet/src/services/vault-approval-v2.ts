@@ -23,7 +23,7 @@
  * build as a published Enclave Vault release, from GitHub.
  */
 
-import { bindingVaultOp, VAULT_OPS, type VaultBinding, type VaultOp } from './vault-binding';
+import { bindingVaultOp, deleteAfterTarget, VAULT_OPS, type VaultBinding, type VaultOp } from './vault-binding';
 import { checkMembers, policyDigest, type VaultIdentity } from './vault-identity';
 import { vaultReleaseFor, type VaultRelease } from './vault-reshare';
 
@@ -49,6 +49,8 @@ export interface V2Summary {
     binding?: BindingFields;
     member_identities?: VaultIdentity[];
     new_policy?: unknown;
+    /** A delete_after for a created successor: the key the old one waits for. */
+    successor_handle?: string;
 }
 
 export interface CheckedV2 {
@@ -63,6 +65,8 @@ export interface CheckedV2 {
     exp: number;
     /** The new policy, for a policy update. */
     newPolicy?: unknown;
+    /** For the delete of an old key: the key that replaces it. */
+    successor?: string;
 }
 
 const dash = (s: string | undefined) => (s === undefined || s === '' ? '-' : s);
@@ -93,7 +97,9 @@ export function checkV1(
     summary: { handle: string; measurement: string; policy_version?: number; nonce?: string; exp?: number },
     v1Binding: (handle: string, measurement: string, policyVersion: number, nonce: string, exp: number) => string,
 ): boolean {
-    if (typeof summary.nonce !== 'string' || !Number.isSafeInteger(summary.exp)) return true;
+    // privasys.id says what every v1 approval binds. One that does not is not
+    // an older form: it is refused.
+    if (typeof summary.nonce !== 'string' || !Number.isSafeInteger(summary.exp)) return false;
     return v1Binding(summary.handle, summary.measurement ?? '', summary.policy_version ?? 0, summary.nonce, summary.exp as number) === vaultOp;
 }
 
@@ -147,6 +153,17 @@ export function checkV2(vaultOp: string, summary: V2Summary, nowSeconds: number)
     } else if (hasPolicy) {
         return null;
     }
+    // The delete of an old key waits for the key that replaces it: the
+    // binding's target must be that of the successor the card names.
+    let successor: string | undefined;
+    if (b.op === 'delete_after') {
+        const s = summary.successor_handle;
+        if (typeof s !== 'string' || s === '' || s === b.handle || /[\n\r]/.test(s)) return null;
+        if (deleteAfterTarget(s, '') !== b.target) return null;
+        successor = s;
+    } else if (summary.successor_handle) {
+        return null;
+    }
     return {
         op: b.op as VaultOp,
         members: members.members,
@@ -154,6 +171,7 @@ export function checkV2(vaultOp: string, summary: V2Summary, nowSeconds: number)
         billingIds: members.billingIds,
         exp: b.exp,
         newPolicy: hasPolicy ? summary.new_policy : undefined,
+        ...(successor ? { successor } : {}),
     };
 }
 

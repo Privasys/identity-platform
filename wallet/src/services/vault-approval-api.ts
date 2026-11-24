@@ -77,6 +77,8 @@ export interface VaultApprovalSummary {
     exp?: number;
     member_identities?: VaultIdentity[];
     new_policy?: unknown;
+    // A delete_after for a created successor: the key the old one waits for.
+    successor_handle?: string;
 }
 
 export interface VaultApprovalRequest {

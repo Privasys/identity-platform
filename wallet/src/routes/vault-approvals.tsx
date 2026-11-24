@@ -123,7 +123,7 @@ async function checkReshareRequest(req: VaultApprovalRequest): Promise<ReshareCh
  */
 type V2Check =
     | { kind: 'checking' }
-    | { kind: 'ok'; release: VaultRelease; vaults: number; platform: BillingPlatform }
+    | { kind: 'ok'; release: VaultRelease; vaults: number; platform: BillingPlatform; successor?: string }
     | { kind: 'mismatch' }
     | { kind: 'unpublished'; build: string }
     | { kind: 'unreachable' };
@@ -136,7 +136,7 @@ async function checkV2Request(req: VaultApprovalRequest): Promise<V2Check> {
         const sha256Hex = (text: string) =>
             Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
         const platform = await billingPlatform(checked.billingIds, sha256Hex);
-        return { kind: 'ok', release: release.release, vaults: checked.members.length, platform };
+        return { kind: 'ok', release: release.release, vaults: checked.members.length, platform, successor: checked.successor };
     }
     return release;
 }
@@ -402,6 +402,7 @@ function VaultApprovalsScreen() {
                               : undefined;
                         const isKeyRules = s.operation === 'update_policy';
                         const isKeyDelete = s.operation === 'delete';
+                        const isOldKeyDelete = s.operation === 'delete_after';
                         const canApprove = !busy && (!reshare || reshare.kind === 'ok') && (!v2 || v2.kind === 'ok');
                         return (
                             <RNView key={req.vault_op} style={[styles.card, highlighted && styles.cardHighlighted]}>
@@ -423,7 +424,9 @@ function VaultApprovalsScreen() {
                                                         ? t('vaultApprovals.approveKeyRules')
                                                         : isKeyDelete
                                                           ? t('vaultApprovals.approveKeyDelete')
-                                                          : t('vaultApprovals.approveOperation')}
+                                                          : isOldKeyDelete
+                                                            ? t('vaultApprovals.approveOldKeyDelete')
+                                                            : t('vaultApprovals.approveOperation')}
                                         </Text>
                                     </RNView>
                                     <RNView style={[styles.ttlPill, urgent && styles.ttlPillUrgent]}>
@@ -456,7 +459,9 @@ function VaultApprovalsScreen() {
                                                 ? t('vaultApprovals.explainKeyRules')
                                                 : isKeyDelete
                                                   ? t('vaultApprovals.explainKeyDelete')
-                                                  : t('vaultApprovals.explainOther')}
+                                                  : isOldKeyDelete
+                                                    ? t('vaultApprovals.explainOldKeyDelete')
+                                                    : t('vaultApprovals.explainOther')}
                                 </Text>
 
                                 {/* The target vault build, as its published
@@ -545,6 +550,17 @@ function VaultApprovalsScreen() {
                                                 {v2.build}
                                             </Text>
                                         ) : null}
+                                    </RNView>
+                                ) : null}
+
+                                {/* The delete of an old key: the key that
+                                    replaces it, which the delete waits for. */}
+                                {v2?.kind === 'ok' && v2.successor ? (
+                                    <RNView style={styles.row} testID="vault-v2-successor">
+                                        <Text style={styles.label}>{t('vaultApprovals.replacedBy')}</Text>
+                                        <Text style={styles.mono} selectable>
+                                            {v2.successor}
+                                        </Text>
                                     </RNView>
                                 ) : null}
 

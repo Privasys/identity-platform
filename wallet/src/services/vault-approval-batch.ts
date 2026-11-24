@@ -85,7 +85,7 @@ export interface VerifiedVaultBatchEntry {
     operation: 'promote' | 'app-policy' | 'update_policy' | 'revoke_pending' | 'delete_after';
     /** A binding v2 entry: when its own approval expires (a delete_after
      *  outlives the batch), and for a policy update the policy it installs. */
-    v2?: { exp: number; newPolicy?: unknown };
+    v2?: { exp: number; newPolicy?: unknown; successor?: string };
     handle: string;
     measurementDigest: string;
     policyVersion: number;
@@ -279,6 +279,15 @@ function verifyV2Entry(
     } else if (hasPolicy) {
         throw new VaultBatchRefused('malformed');
     }
+    // The delete of an old key may name a created successor instead of
+    // standing beside a promote: its target must be that successor's.
+    let successor: string | undefined;
+    const named = e.successor_handle;
+    if (named !== undefined && named !== null && named !== '') {
+        if (e.operation !== 'delete_after' || !validHandle(named) || named === handle) throw new VaultBatchRefused('malformed');
+        if (deleteAfterTarget(named, '') !== target) throw new VaultBatchRefused('entry');
+        successor = named;
+    }
     const hint = ((e.context ?? {}) as Record<string, unknown>).version_id;
     return {
         builds: members.builds,
@@ -289,7 +298,7 @@ function verifyV2Entry(
             measurementDigest: target,
             policyVersion: b.policy_version as number,
             vaultOp,
-            v2: { exp: entryExp, ...(hasPolicy ? { newPolicy: e.new_policy } : {}) },
+            v2: { exp: entryExp, ...(hasPolicy ? { newPolicy: e.new_policy } : {}), ...(successor ? { successor } : {}) },
             ...(e.operation === 'promote' && typeof hint === 'string' && VERSION_ID.test(hint)
                 ? { versionIdHint: hint.toLowerCase() }
                 : {}),
@@ -382,7 +391,7 @@ export function verifyVaultBatch(requestedBatchId: string, answer: unknown): Ver
 
     // The old key's delete is approved only beside the promote of its successor.
     for (const v of verified) {
-        if (v.operation === 'delete_after' && !successors.has(v.measurementDigest)) {
+        if (v.operation === 'delete_after' && !v.v2?.successor && !successors.has(v.measurementDigest)) {
             throw new VaultBatchRefused('operation');
         }
     }

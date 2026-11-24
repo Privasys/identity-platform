@@ -173,7 +173,22 @@ describe('a request that leaves its binding out', () => {
         expect(checkV1(vaultOp, s, computeVaultOp)).toBe(true);
         expect(checkV1(vaultOp, { ...s, measurement: '0a'.repeat(32) }, computeVaultOp)).toBe(false);
         expect(checkV1(vaultOp, { ...s, handle: 'vaults/x/other' }, computeVaultOp)).toBe(false);
-        // An older privasys.id says neither: shown as before.
-        expect(checkV1(vaultOp, { handle: s.handle, measurement: s.measurement }, computeVaultOp)).toBe(true);
+        // One that does not say what it binds is refused, not shown unchecked.
+        expect(checkV1(vaultOp, { handle: s.handle, measurement: s.measurement }, computeVaultOp)).toBe(false);
+        expect(checkV1(vaultOp, { ...s, nonce: undefined }, computeVaultOp)).toBe(false);
+    });
+
+    it('lets the delete of an old key wait for the key that replaces it', () => {
+        const { deleteAfterTarget } = require('@/services/vault-binding');
+        const target = deleteAfterTarget('apps/x/data-v8', '');
+        const good = approval({ op: 'delete_after', handle: 'apps/x/data-v7', target, exp: NOW + 3600 }, { successor_handle: 'apps/x/data-v8' });
+        expect(checkV2(good.vaultOp, good.summary, NOW)?.successor).toBe('apps/x/data-v8');
+        // Another successor than the one bound, none, itself, or one on another operation.
+        expect(checkV2(good.vaultOp, { ...good.summary, successor_handle: 'apps/x/data-v9' }, NOW)).toBeNull();
+        expect(checkV2(good.vaultOp, { ...good.summary, successor_handle: undefined }, NOW)).toBeNull();
+        const self = approval({ op: 'delete_after', handle: 'apps/x/k', target: deleteAfterTarget('apps/x/k', '') }, { successor_handle: 'apps/x/k' });
+        expect(checkV2(self.vaultOp, self.summary, NOW)).toBeNull();
+        const promote = approval({}, { successor_handle: 'apps/x/data-v8' });
+        expect(checkV2(promote.vaultOp, promote.summary, NOW)).toBeNull();
     });
 });

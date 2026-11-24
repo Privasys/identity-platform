@@ -88,6 +88,16 @@ describe('a batch of v2 entries', () => {
         expect(refused([elsewhere, promote])).toThrow(VaultBatchRefused);
     });
 
+    it('accepts an old key\'s delete that names a created successor, alone', () => {
+        const target = deleteAfterTarget('apps/x/data-v8', '');
+        const alone = entry('delete_after', 'apps/x/data-v7', target, { successor_handle: 'apps/x/data-v8' }, EXP + 3300);
+        const ans = answer([alone]);
+        expect(verifyVaultBatch(ans.batch_id, ans).entries[0].v2?.successor).toBe('apps/x/data-v8');
+        expect(refused([{ ...alone, successor_handle: 'apps/x/data-v9' }])).toThrow(VaultBatchRefused);
+        expect(refused([{ ...alone, successor_handle: 'apps/x/data-v7' }])).toThrow(VaultBatchRefused);
+        expect(refused([{ ...promote, successor_handle: 'apps/x/data-v8' }])).toThrow(VaultBatchRefused);
+    });
+
     it('refuses an entry that outlives the batch, unless it is the old key\'s delete, within a day', () => {
         expect(refused([entry('promote', 'apps/x/data-v2', PROFILE, {}, EXP + 60)])).toThrow(VaultBatchRefused);
         const tooLong = entry('delete_after', 'apps/x/data-v1', deleteAfterTarget('apps/x/data-v2', PROFILE), {}, EXP + 86401);

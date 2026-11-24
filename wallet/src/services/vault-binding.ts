@@ -44,6 +44,7 @@ export const VAULT_OPS = [
     'delete',
     'reshare',
     'revoke_pending',
+    'delete_after',
 ] as const;
 export type VaultOp = (typeof VAULT_OPS)[number];
 

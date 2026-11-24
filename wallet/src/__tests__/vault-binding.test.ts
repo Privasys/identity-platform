@@ -66,3 +66,24 @@ describe('vault binding v2', () => {
         expect(() => bindingText({ ...promote, op: 'sign' as any })).toThrow();
     });
 });
+
+describe('the vault\'s own vector', () => {
+    // idp/internal/vaultbinding/testdata/v2_vectors.json is the vault's output.
+    const v = require('../../../idp/internal/vaultbinding/testdata/v2_vectors.json').binding_v2_update_policy_with_pd;
+
+    it('is reproduced byte for byte', () => {
+        const b: VaultBinding = {
+            members: v.members,
+            op: v.op,
+            handle: v.handle,
+            target: v.target === '-' ? undefined : v.target,
+            policyVersion: v.policy_version,
+            approver: v.approver,
+            holderHead: v.holder_head === '-' ? undefined : v.holder_head,
+            nonce: v.nonce,
+            exp: v.exp,
+        };
+        expect(bindingText(b)).toBe(v.text);
+        expect(bindingVaultOp(b)).toBe(v.vault_op);
+    });
+});

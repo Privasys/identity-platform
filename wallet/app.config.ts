@@ -382,6 +382,7 @@ export default (context: ConfigContext): ExpoConfig => {
             './modules/app-attest/app.plugin',
             './plugins/swift-concurrency-fix',
             './plugins/ios-scene-lifecycle',
+            './plugins/ios-script-phase-always-runs',
             './plugins/disable-lint-vital',
             './plugins/android-fold-continuity',
             './plugins/android-optional-portrait',

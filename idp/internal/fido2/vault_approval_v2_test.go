@@ -151,10 +151,10 @@ func TestCheckVaultV2DeleteAfterCreatedSuccessor(t *testing.T) {
 		t.Errorf("with the target stated: %q, %v", got, err)
 	}
 	bad := map[string]func(*vaultV2Fields){
-		"its own successor":       func(f *vaultV2Fields) { f.SuccessorHandle = f.Handle },
-		"a target for another":    func(f *vaultV2Fields) { f.Target = strings.Repeat("ab", 32) },
-		"a successor with a line": func(f *vaultV2Fields) { f.SuccessorHandle = "a\nb" },
-		"more than a day":         func(f *vaultV2Fields) { f.TTLSeconds = 86401 },
+		"its own successor":            func(f *vaultV2Fields) { f.SuccessorHandle = f.Handle },
+		"a target for another":         func(f *vaultV2Fields) { f.Target = strings.Repeat("ab", 32) },
+		"a successor with a line":      func(f *vaultV2Fields) { f.SuccessorHandle = "a\nb" },
+		"held past the ordinary limit": func(f *vaultV2Fields) { f.TTLSeconds = 601 },
 	}
 	for name, edit := range bad {
 		f := base

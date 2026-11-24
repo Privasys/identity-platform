@@ -160,6 +160,10 @@ export function checkV2(vaultOp: string, summary: V2Summary, nowSeconds: number)
         const s = summary.successor_handle;
         if (typeof s !== 'string' || s === '' || s === b.handle || /[\n\r]/.test(s)) return null;
         if (deleteAfterTarget(s, '') !== b.target) return null;
+        // That key exists already, so this approval waits for nothing: it
+        // lives no longer than any other (the vault's limit, with a margin
+        // for clocks).
+        if (b.exp > nowSeconds + 600 + 60) return null;
         successor = s;
     } else if (summary.successor_handle) {
         return null;

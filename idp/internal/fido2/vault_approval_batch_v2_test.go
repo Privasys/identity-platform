@@ -196,8 +196,14 @@ func TestVaultBatchV2DeleteAfterCreatedSuccessor(t *testing.T) {
 	if _, _, err := bindVaultBatchV2("u", "Rotate", 1000, 1300, entries, testNonce()); err != nil {
 		t.Fatal(err)
 	}
-	if entries[0].Binding.Target != want || entries[0].Binding.Exp != 1000+3600 {
+	// Its successor exists already, so it expires with the batch.
+	if entries[0].Binding.Target != want || entries[0].Binding.Exp != 1300 {
 		t.Fatalf("binding %+v", entries[0].Binding)
+	}
+	if _, err := validateVaultBatchV2("L", []vaultBatchEntry{
+		{Operation: "delete_after", Handle: "k/v7", SuccessorHandle: "k/v8", Members: m, TTLSeconds: 601},
+	}, ids); err == nil {
+		t.Error("a created-successor delete held past the ordinary limit: accepted")
 	}
 	if _, err := validateVaultBatchV2("L", []vaultBatchEntry{
 		{Operation: "promote", Handle: "k2", Target: strings.Repeat("ab", 32), Members: m, SuccessorHandle: "k3"},

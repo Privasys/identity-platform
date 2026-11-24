@@ -90,9 +90,12 @@ describe('a batch of v2 entries', () => {
 
     it('accepts an old key\'s delete that names a created successor, alone', () => {
         const target = deleteAfterTarget('apps/x/data-v8', '');
-        const alone = entry('delete_after', 'apps/x/data-v7', target, { successor_handle: 'apps/x/data-v8' }, EXP + 3300);
+        const alone = entry('delete_after', 'apps/x/data-v7', target, { successor_handle: 'apps/x/data-v8' }, EXP);
         const ans = answer([alone]);
         expect(verifyVaultBatch(ans.batch_id, ans).entries[0].v2?.successor).toBe('apps/x/data-v8');
+        // Its successor exists already: held for most of an hour, it is refused.
+        const held = entry('delete_after', 'apps/x/data-v7', target, { successor_handle: 'apps/x/data-v8' }, EXP + 3300);
+        expect(refused([held])).toThrow(VaultBatchRefused);
         expect(refused([{ ...alone, successor_handle: 'apps/x/data-v9' }])).toThrow(VaultBatchRefused);
         expect(refused([{ ...alone, successor_handle: 'apps/x/data-v7' }])).toThrow(VaultBatchRefused);
         expect(refused([{ ...promote, successor_handle: 'apps/x/data-v8' }])).toThrow(VaultBatchRefused);

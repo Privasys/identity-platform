@@ -45,8 +45,12 @@ const BATCHABLE = new Set(['promote', 'app-policy']);
 /** In a batch of binding v2 entries. A delete_after is the old key of a migrate
  *  or upgrade, accepted only beside its successor's promote. */
 const BATCHABLE_V2 = new Set(['promote', 'update_policy', 'revoke_pending', 'delete_after']);
-/** A delete_after may outlive its batch by this much at most. */
+/** A delete_after beside its successor's promote may outlive its batch by this
+ *  much at most: it waits for the migrate or upgrade to succeed. */
 const DELETE_AFTER_MAX_SECONDS = 86400;
+/** One that names a created successor waits for nothing (that key exists
+ *  already), so it gets no more than an ordinary approval's lifetime. */
+const DELETE_AFTER_CREATED_MAX_SECONDS = 600;
 
 const DIGEST_HEX = /^[0-9a-f]{64}$/;
 const BATCH_ID = /^[A-Za-z0-9_-]{43}$/;
@@ -242,8 +246,10 @@ function verifyV2Entry(
     // Every entry expires with the batch, except the old key's delete, which
     // is held until the migrate or upgrade has succeeded.
     const entryExp = b.exp as number;
+    const namesSuccessor = e.successor_handle !== undefined && e.successor_handle !== null && e.successor_handle !== '';
     if (e.operation === 'delete_after') {
-        if (entryExp < batchExp || entryExp > batchExp + DELETE_AFTER_MAX_SECONDS) throw new VaultBatchRefused('entry');
+        const most = namesSuccessor ? DELETE_AFTER_CREATED_MAX_SECONDS : DELETE_AFTER_MAX_SECONDS;
+        if (entryExp < batchExp || entryExp > batchExp + most) throw new VaultBatchRefused('entry');
     } else if (entryExp !== batchExp) {
         throw new VaultBatchRefused('entry');
     }
@@ -283,7 +289,7 @@ function verifyV2Entry(
     // standing beside a promote: its target must be that successor's.
     let successor: string | undefined;
     const named = e.successor_handle;
-    if (named !== undefined && named !== null && named !== '') {
+    if (namesSuccessor) {
         if (e.operation !== 'delete_after' || !validHandle(named) || named === handle) throw new VaultBatchRefused('malformed');
         if (deleteAfterTarget(named, '') !== target) throw new VaultBatchRefused('entry');
         successor = named;

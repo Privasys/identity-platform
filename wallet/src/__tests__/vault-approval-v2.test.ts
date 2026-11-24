@@ -181,8 +181,11 @@ describe('a request that leaves its binding out', () => {
     it('lets the delete of an old key wait for the key that replaces it', () => {
         const { deleteAfterTarget } = require('@/services/vault-binding');
         const target = deleteAfterTarget('apps/x/data-v8', '');
-        const good = approval({ op: 'delete_after', handle: 'apps/x/data-v7', target, exp: NOW + 3600 }, { successor_handle: 'apps/x/data-v8' });
+        const good = approval({ op: 'delete_after', handle: 'apps/x/data-v7', target, exp: NOW + 300 }, { successor_handle: 'apps/x/data-v8' });
         expect(checkV2(good.vaultOp, good.summary, NOW)?.successor).toBe('apps/x/data-v8');
+        // Its successor exists already: held for an hour, it is refused.
+        const held = approval({ op: 'delete_after', handle: 'apps/x/data-v7', target, exp: NOW + 3600 }, { successor_handle: 'apps/x/data-v8' });
+        expect(checkV2(held.vaultOp, held.summary, NOW)).toBeNull();
         // Another successor than the one bound, none, itself, or one on another operation.
         expect(checkV2(good.vaultOp, { ...good.summary, successor_handle: 'apps/x/data-v9' }, NOW)).toBeNull();
         expect(checkV2(good.vaultOp, { ...good.summary, successor_handle: undefined }, NOW)).toBeNull();

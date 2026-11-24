@@ -441,11 +441,10 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		// succeeded.
 		pendingExp := exp
 		if deleteAfter {
-			held := req.TTLSeconds
-			if held <= 0 {
-				held = vaultV2DeleteAfterDefaultTTL
-			}
-			if now+held > exp {
+			// Only a delete beside a promote waits for anything, and that form
+			// is a batch's. Here the successor is created, so it exists: the
+			// token may outlive the tap by the ordinary limit, no more.
+			if held := req.TTLSeconds; held > ttl && now+held > exp {
 				exp = now + held
 			}
 		}

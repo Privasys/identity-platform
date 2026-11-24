@@ -105,7 +105,11 @@ func bindVaultBatchV2(sub, label string, now, exp int64, entries []vaultBatchEnt
 		entryExp := exp
 		if e.Operation == string(vaultbinding.BindDeleteAfter) {
 			ttl := e.TTLSeconds
-			if ttl <= 0 {
+			if ttl <= 0 && e.SuccessorHandle == "" {
+				// Beside a promote, the delete waits for the migration or
+				// upgrade to succeed. A created successor exists already, so
+				// that form expires with the batch unless it asks for more
+				// (within the ordinary limit, checked at validation).
 				ttl = vaultV2DeleteAfterDefaultTTL
 			}
 			if entryExp = now + ttl; entryExp < exp {

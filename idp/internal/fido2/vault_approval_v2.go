@@ -117,6 +117,12 @@ func checkVaultV2Fields(f vaultV2Fields, inBatch bool) (string, error) {
 		}
 		if f.SuccessorHandle != "" {
 			// A created successor: the old key goes once that key exists.
+			// That successor exists already when the delete is asked for (a
+			// migration or a rotation creates it first), so nothing waits:
+			// the approval lives no longer than any other.
+			if f.TTLSeconds > vaultbinding.BindingMaxTTLSeconds {
+				return "", errors.New("ttl_seconds out of range for a delete_after with successor_handle")
+			}
 			if f.SuccessorHandle == f.Handle || len(f.SuccessorHandle) > vaultBatchMaxHandleBytes {
 				return "", errors.New("successor_handle must name another key")
 			}

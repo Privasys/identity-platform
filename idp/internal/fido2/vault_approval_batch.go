@@ -96,6 +96,9 @@ type vaultBatchMeta struct {
 	iat     int64
 	exp     int64
 	entries []vaultBatchEntry
+	// audience is the aud of every token the batch yields
+	// (vaultApprovalAudience).
+	audience string
 }
 
 // vaultBatchHiddenRune reports a character that changes how text reads without
@@ -362,12 +365,20 @@ func (h *Handler) VaultApprovalBatchBegin(iss *tokens.Issuer) http.HandlerFunc {
 			Label      string            `json:"label"`
 			TTLSeconds int64             `json:"ttl_seconds"`
 			Entries    []vaultBatchEntry `json:"entries"`
+			// Audience of the tokens (see VaultApprovalBegin). One batch goes
+			// to vaults of one audience.
+			Audience string `json:"audience"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10)).Decode(&req); err != nil {
 			errorJSON(w, http.StatusBadRequest, "invalid body")
 			return
 		}
 		entries, err := validateVaultBatch(req.Label, req.Entries)
+		if err != nil {
+			errorJSON(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		aud, err := vaultApprovalAudience(req.Audience, "")
 		if err != nil {
 			errorJSON(w, http.StatusBadRequest, err.Error())
 			return
@@ -406,7 +417,7 @@ func (h *Handler) VaultApprovalBatchBegin(iss *tokens.Issuer) http.HandlerFunc {
 			user:        user,
 			expiresAt:   time.Unix(exp, 0),
 			vaultBatch: &vaultBatchMeta{
-				sub: sub, batchID: batchID, label: req.Label, iat: now, exp: exp, entries: entries,
+				sub: sub, batchID: batchID, label: req.Label, iat: now, exp: exp, entries: entries, audience: aud,
 			},
 		})
 		optionsJS, _ := json.Marshal(options)
@@ -498,7 +509,11 @@ func (h *Handler) VaultApprovalBatchComplete(iss *tokens.Issuer, audience string
 		m := entry.vaultBatch
 		issued := make([]vaultBatchToken, 0, len(m.entries))
 		for _, e := range m.entries {
-			tok, err := iss.IssueVaultApprovalToken(m.sub, audience, e.VaultOp, e.Nonce, m.iat, m.exp)
+			aud := m.audience
+			if aud == "" {
+				aud = audience
+			}
+			tok, err := iss.IssueVaultApprovalToken(m.sub, aud, e.VaultOp, e.Nonce, m.iat, m.exp)
 			if err != nil {
 				log.Printf("fido2/vault-approval/batch/complete: issue: %v", err)
 				errorJSON(w, http.StatusInternalServerError, "token issuance failed")

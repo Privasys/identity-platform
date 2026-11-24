@@ -255,7 +255,11 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			// the promoted profile's measurement; "export" has no target
 			// measurement and binds the empty measurement slot, matching the
 			// vault's handle_export OpBinding.
-			Operation         string `json:"operation"`
+			Operation string `json:"operation"`
+			// Audience is the aud of the token this approval yields: the
+			// audience the target vaults accept (one of the platform
+			// audiences). Empty = the default audience.
+			Audience          string `json:"audience"`
 			Handle            string `json:"handle"`
 			MeasurementDigest string `json:"measurement_digest"`
 			PolicyVersion     uint64 `json:"policy_version"`
@@ -288,6 +292,11 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Handle == "" {
 			errorJSON(w, http.StatusBadRequest, "handle required")
+			return
+		}
+		aud, err := vaultApprovalAudience(req.Audience, audience)
+		if err != nil {
+			errorJSON(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		switch req.Operation {
@@ -410,11 +419,12 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			user:        user,
 			expiresAt:   time.Now().Add(5 * time.Minute),
 			vaultApproval: &vaultApprovalMeta{
-				sub:     sub,
-				vaultOp: vaultOp,
-				nonce:   nonce,
-				iat:     now,
-				exp:     exp,
+				sub:      sub,
+				vaultOp:  vaultOp,
+				nonce:    nonce,
+				iat:      now,
+				exp:      exp,
+				audience: aud,
 			},
 		})
 		// Record the pending approval + push the owner's wallet, so the ceremony
@@ -470,7 +480,11 @@ func (h *Handler) VaultApprovalComplete(iss *tokens.Issuer, audience string) htt
 			return
 		}
 		m := entry.vaultApproval
-		tok, err := iss.IssueVaultApprovalToken(m.sub, audience, m.vaultOp, m.nonce, m.iat, m.exp)
+		aud := m.audience
+		if aud == "" {
+			aud = audience
+		}
+		tok, err := iss.IssueVaultApprovalToken(m.sub, aud, m.vaultOp, m.nonce, m.iat, m.exp)
 		if err != nil {
 			log.Printf("fido2/vault-approval/complete: issue: %v", err)
 			errorJSON(w, http.StatusInternalServerError, "token issuance failed")
@@ -487,6 +501,21 @@ func (h *Handler) VaultApprovalComplete(iss *tokens.Issuer, audience string) htt
 		log.Printf("fido2: vault-approval APPROVED by %s (vault_op %s…) — token stashed", m.sub, m.vaultOp[:12])
 		writeJSON(w, map[string]interface{}{"access_token": tok, "expires_at": m.exp})
 	}
+}
+
+// vaultApprovalAudience is the aud of an approval's token: the requested one,
+// which must be a platform audience (each environment's vaults accept their
+// own), or def when none is asked for. The token carries no roles, only the
+// operation it approves, so a choice among the platform's own audiences gives
+// the requester nothing the bound operation does not.
+func vaultApprovalAudience(requested, def string) (string, error) {
+	if requested == "" {
+		return def, nil
+	}
+	if !tokens.IsPlatformAudience(requested) {
+		return "", fmt.Errorf("audience %q is not a platform audience", requested)
+	}
+	return requested, nil
 }
 
 // bearerSubject verifies an `Authorization: Bearer` access token (signed by this

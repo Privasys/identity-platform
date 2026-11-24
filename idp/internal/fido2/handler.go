@@ -92,10 +92,10 @@ type Handler struct {
 	// having none: a new account, or the end of a recovery (which removes
 	// every passkey first). A pending account deletion is cancelled there.
 	onFirstCredential func(userID string)
-	vaultResults   *vaultResultStore
-	vaultPending   *vaultPendingStore
-	vaultBatches   *vaultBatchStore
-	attrPending    *attrPendingStore
+	vaultResults      *vaultResultStore
+	vaultPending      *vaultPendingStore
+	vaultBatches      *vaultBatchStore
+	attrPending       *attrPendingStore
 	// subjectFor names the subject a client sees for an account, so the
 	// wallet can put it in the voucher the enclave asserts.
 	subjectFor func(userID, clientID string) string
@@ -311,6 +311,9 @@ type vaultApprovalMeta struct {
 	nonce   string
 	iat     int64
 	exp     int64
+	// audience is the aud of the token /complete issues: the audience of
+	// the vaults the operation goes to (vaultApprovalAudience).
+	audience string
 }
 
 type challengeStore struct {
@@ -525,7 +528,7 @@ func (h *Handler) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 
 	challengeKey := sessionData.Challenge
 	h.challenges.put(challengeKey, &challengeEntry{
-		sessionData: sessionData,
+		sessionData:  sessionData,
 		user:         user,
 		sessionID:    sessionID,
 		expiresAt:    time.Now().Add(5 * time.Minute),

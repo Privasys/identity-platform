@@ -27,6 +27,9 @@
 
 import { sha256 } from '@noble/hashes/sha2.js';
 
+import { bindingVaultOp, deleteAfterTarget, type VaultOp } from './vault-binding';
+import { checkMembers, policyDigest, type VaultIdentity } from './vault-identity';
+
 const BATCH_DOMAIN = 'privasys-vault-approval-batch-v1';
 const SINGLE_DOMAIN = 'privasys-vault-approval/v1';
 
@@ -39,6 +42,11 @@ const MAX_HANDLE_BYTES = 512;
 /** Only these may share one approval: an export, a key-policy change or a
  *  recovery releases or changes control of a key, and stays one approval each. */
 const BATCHABLE = new Set(['promote', 'app-policy']);
+/** In a batch of binding v2 entries. A delete_after is the old key of a migrate
+ *  or upgrade, accepted only beside its successor's promote. */
+const BATCHABLE_V2 = new Set(['promote', 'update_policy', 'revoke_pending', 'delete_after']);
+/** A delete_after may outlive its batch by this much at most. */
+const DELETE_AFTER_MAX_SECONDS = 86400;
 
 const DIGEST_HEX = /^[0-9a-f]{64}$/;
 const BATCH_ID = /^[A-Za-z0-9_-]{43}$/;
@@ -74,7 +82,10 @@ export class VaultBatchRefused extends Error {
 }
 
 export interface VerifiedVaultBatchEntry {
-    operation: 'promote' | 'app-policy';
+    operation: 'promote' | 'app-policy' | 'update_policy' | 'revoke_pending' | 'delete_after';
+    /** A binding v2 entry: when its own approval expires (a delete_after
+     *  outlives the batch), and for a policy update the policy it installs. */
+    v2?: { exp: number; newPolicy?: unknown };
     handle: string;
     measurementDigest: string;
     policyVersion: number;
@@ -94,6 +105,9 @@ export interface VerifiedVaultBatch {
     label: string;
     exp: number;
     entries: VerifiedVaultBatchEntry[];
+    /** A v2 batch: the builds the vaults it names claim (distinct, hex). The
+     *  card names them as a published release before it offers Approve. */
+    builds?: string[];
     options: {
         publicKey: {
             /** Always the recomputed binding, never the server's copy. */
@@ -183,6 +197,104 @@ export function isVaultBatchId(id: string): boolean {
 }
 
 /**
+ * One binding v2 entry: its binding rebuilt from its fields must be its
+ * vault_op, its own fields must be the binding's, every vault it names must
+ * have an identity that agrees with itself, and a policy update must be bound
+ * to the policy it carries.
+ */
+function verifyV2Entry(
+    e: Record<string, unknown>,
+    batchExp: number,
+    identities: unknown,
+): { entry: VerifiedVaultBatchEntry; builds: string[] } {
+    if (typeof e.operation !== 'string' || !BATCHABLE_V2.has(e.operation)) throw new VaultBatchRefused('operation');
+    const b = (e.binding ?? {}) as Record<string, unknown>;
+    const { handle, vault_op: vaultOp } = e;
+    const target = b.target === '-' ? '' : b.target;
+    if (
+        !validHandle(handle) ||
+        typeof vaultOp !== 'string' ||
+        typeof target !== 'string' ||
+        !DIGEST_HEX.test(target) ||
+        !Number.isSafeInteger(b.policy_version) ||
+        (b.policy_version as number) < 0 ||
+        !Number.isSafeInteger(b.exp) ||
+        typeof b.nonce !== 'string' ||
+        typeof b.approver !== 'string' ||
+        !/^oidc:\d+:.+$/.test(b.approver) ||
+        b.holder_head !== '-' ||
+        !Array.isArray(b.members)
+    ) {
+        throw new VaultBatchRefused('malformed');
+    }
+    // The entry's own fields are the binding's.
+    if (
+        b.op !== e.operation ||
+        b.handle !== handle ||
+        e.policy_version !== b.policy_version ||
+        e.nonce !== b.nonce ||
+        (e.measurement_digest ?? '') !== target
+    ) {
+        throw new VaultBatchRefused('entry');
+    }
+    // Every entry expires with the batch, except the old key's delete, which
+    // is held until the migrate or upgrade has succeeded.
+    const entryExp = b.exp as number;
+    if (e.operation === 'delete_after') {
+        if (entryExp < batchExp || entryExp > batchExp + DELETE_AFTER_MAX_SECONDS) throw new VaultBatchRefused('entry');
+    } else if (entryExp !== batchExp) {
+        throw new VaultBatchRefused('entry');
+    }
+    let rebuilt: string;
+    try {
+        rebuilt = bindingVaultOp({
+            members: b.members as string[],
+            op: e.operation as VaultOp,
+            handle,
+            target,
+            policyVersion: b.policy_version as number,
+            approver: b.approver,
+            nonce: b.nonce,
+            exp: entryExp,
+        });
+    } catch {
+        throw new VaultBatchRefused('malformed');
+    }
+    if (rebuilt !== vaultOp) throw new VaultBatchRefused('entry');
+
+    const members = checkMembers(b.members as string[], identities as VaultIdentity[] | undefined);
+    if (!members) throw new VaultBatchRefused('entry');
+
+    const hasPolicy = e.new_policy !== undefined && e.new_policy !== null;
+    if (e.operation === 'update_policy') {
+        let pd: string;
+        try {
+            pd = policyDigest(e.new_policy);
+        } catch {
+            throw new VaultBatchRefused('malformed');
+        }
+        if (pd !== target) throw new VaultBatchRefused('entry');
+    } else if (hasPolicy) {
+        throw new VaultBatchRefused('malformed');
+    }
+    const hint = ((e.context ?? {}) as Record<string, unknown>).version_id;
+    return {
+        builds: members.builds,
+        entry: {
+            operation: e.operation as VerifiedVaultBatchEntry['operation'],
+            handle,
+            measurementDigest: target,
+            policyVersion: b.policy_version as number,
+            vaultOp,
+            v2: { exp: entryExp, ...(hasPolicy ? { newPolicy: e.new_policy } : {}) },
+            ...(e.operation === 'promote' && typeof hint === 'string' && VERSION_ID.test(hint)
+                ? { versionIdHint: hint.toLowerCase() }
+                : {}),
+        },
+    };
+}
+
+/**
  * Check a `batch/pending` answer against the batch id the wallet asked for.
  * Returns the list only when every value hashes to that id, and throws
  * `VaultBatchRefused` otherwise.
@@ -200,9 +312,25 @@ export function verifyVaultBatch(requestedBatchId: string, answer: unknown): Ver
         throw new VaultBatchRefused('malformed');
     }
 
+    // A batch is all binding v2 or all v1: never a mix.
+    const v2Count = entries.filter((e) => (e as Record<string, unknown> | null)?.binding != null).length;
+    if (v2Count !== 0 && v2Count !== entries.length) throw new VaultBatchRefused('malformed');
+    const isV2Batch = v2Count > 0;
+    const builds = new Set<string>();
+    const successors = new Set<string>();
+
     const verified: VerifiedVaultBatchEntry[] = [];
     for (const raw of entries) {
         const e = (raw ?? {}) as Record<string, unknown>;
+        if (isV2Batch) {
+            const got = verifyV2Entry(e, exp as number, a.member_identities);
+            for (const b of got.builds) builds.add(b);
+            if (got.entry.operation === 'promote') {
+                successors.add(deleteAfterTarget(got.entry.handle, got.entry.measurementDigest));
+            }
+            verified.push(got.entry);
+            continue;
+        }
         if (typeof e.operation !== 'string' || !BATCHABLE.has(e.operation)) {
             throw new VaultBatchRefused('operation');
         }
@@ -247,6 +375,13 @@ export function verifyVaultBatch(requestedBatchId: string, answer: unknown): Ver
         if (order >= 0) throw new VaultBatchRefused('order');
     }
 
+    // The old key's delete is approved only beside the promote of its successor.
+    for (const v of verified) {
+        if (v.operation === 'delete_after' && !successors.has(v.measurementDigest)) {
+            throw new VaultBatchRefused('operation');
+        }
+    }
+
     const batchId = computeVaultBatchId(label, exp as number, verified);
     if (batchId !== requestedBatchId) throw new VaultBatchRefused('binding');
 
@@ -258,6 +393,7 @@ export function verifyVaultBatch(requestedBatchId: string, answer: unknown): Ver
         label,
         exp: exp as number,
         entries: verified,
+        ...(isV2Batch ? { builds: [...builds].sort() } : {}),
         options: {
             publicKey: {
                 challenge: batchId,

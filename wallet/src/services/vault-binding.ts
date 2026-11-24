@@ -106,3 +106,13 @@ export function bindingText(b: VaultBinding): string {
 export function bindingVaultOp(b: VaultBinding): string {
     return bytesToBase64url(sha256(new TextEncoder().encode(bindingText(b))));
 }
+
+/**
+ * The target of a delete_after: the old key may be deleted only after this
+ * successor, and only after that promote. hex SHA-256 of
+ * "privasys-delete-after-v1\n" successor handle "\n" its promote target.
+ */
+export function deleteAfterTarget(successorHandle: string, successorTarget: string): string {
+    const text = `privasys-delete-after-v1\n${successorHandle}\n${successorTarget === '' ? '-' : successorTarget}`;
+    return Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
+}

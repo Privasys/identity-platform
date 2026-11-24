@@ -296,6 +296,16 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			// existed, policy updates had to ride an "export"-labelled
 			// ceremony (2026-08-17).
 			req.MeasurementDigest = ""
+		case "reshare":
+			// Resharing a threshold key: its old vaults deal their shares to
+			// new ones (a renewal, or a move to another constellation). The
+			// measurement slot carries the vault's resharing context (the key,
+			// the helpers, the new vaults, the threshold and the new vaults'
+			// build), so an approval moves the key to exactly those vaults.
+			if len(req.MeasurementDigest) != 64 {
+				errorJSON(w, http.StatusBadRequest, "measurement_digest (the 32-byte resharing context, hex) required for reshare")
+				return
+			}
 		case "", "promote":
 			req.Operation = "promote"
 			if req.MeasurementDigest == "" {

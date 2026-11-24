@@ -192,6 +192,8 @@ func (h *Handler) sendVaultApprovalPush(userID, pushToken, vaultOp string, summa
 		body = "Approve exporting a key for " + who
 	case "policy-update":
 		body = "Approve a key-policy update for " + who
+	case "reshare":
+		body = "Approve moving a key to new vaults for " + who
 	default:
 		body = "A vault operation needs your approval"
 	}

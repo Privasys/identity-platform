@@ -50,7 +50,7 @@ export const DRIVE_ID = /^[A-Za-z0-9-]{1,64}$/;
 async function driveFetch(path: string, init?: RequestInit): Promise<Response> {
     const s = await ensureDrive();
     if (!s) throw new Error('Drive is unavailable');
-    const token = await getDriveToken();
+    const token = await getDriveToken(s.origin);
     const raFetch = makeRaTlsFetch({ enclaveHost: s.origin, platformFetch: fetch });
     return raFetch(`https://${s.origin}${path}`, {
         ...init,
@@ -136,7 +136,7 @@ export async function readFile(tenantId: string, fileId: string): Promise<Uint8A
     if (isDemo()) return demo().readFile(tenantId, fileId);
     const s = await ensureDrive();
     if (!s) throw new Error('Drive is unavailable');
-    const token = await getDriveToken();
+    const token = await getDriveToken(s.origin);
     const res = await requestBytes(
         'GET',
         s.origin,

@@ -35,7 +35,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { attest, AttributeVerifierError, newCommitment, type AttributeProof } from '@/services/attribute-verifier';
 import { thisDeviceBinding } from '@/services/attribute-proofs';
 import { attributeLabel } from '@/services/attributes';
-import { callWithPlatformToken } from '@/services/platform-token';
+import { audienceFor, callWithPlatformToken } from '@/services/platform-token';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { bytesToBase64url } from '@/utils/encoding';
 
@@ -90,7 +90,7 @@ async function startCheck(commitment: string, challenge: string, returnUrl: stri
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ holder_binding: commitment, code_challenge: challenge, return: returnUrl }),
             }),
-        { interactive: true },
+        { interactive: true, audience: audienceFor(API_BASE) },
     );
     if (!called) throw new CardCheckError('failed', 'no platform token');
     const { res } = called;

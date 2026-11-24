@@ -26,6 +26,39 @@ const IDP_BASE_URL = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id'
  *  it; override per deployment if a narrower audience is required. */
 const PLATFORM_AUDIENCE = process.env['EXPO_PUBLIC_PLATFORM_AUDIENCE'] || 'privasys-platform';
 
+/**
+ * The test platform's audience. One wallet talks to both platforms (a
+ * production wallet is routinely shown test apps), and each accepts only its
+ * own audience, so a token minted for production never reaches a test host.
+ */
+export const TEST_PLATFORM_AUDIENCE = 'privasys-platform-test';
+
+/** Whether `host` belongs to the test platform. */
+function isTestPlatformHost(host: string): boolean {
+    const h = host.toLowerCase().replace(/\.$/, '');
+    return (
+        h === 'test.privasys.org' ||
+        h.endsWith('.test.privasys.org') ||
+        h.endsWith('.apps-test.privasys.org') ||
+        h === 'api-test.developer.privasys.org'
+    );
+}
+
+/**
+ * The audience for a call to `target` (a URL or a bare host): the test
+ * platform's for its hosts, the platform's own everywhere else, privasys.id
+ * included.
+ */
+export function audienceFor(target: string): string {
+    let host = target;
+    try {
+        if (target.includes('://')) host = new URL(target).hostname;
+    } catch {
+        /* a bare host */
+    }
+    return isTestPlatformHost(host.split('/')[0].split(':')[0]) ? TEST_PLATFORM_AUDIENCE : PLATFORM_AUDIENCE;
+}
+
 const STORE_KEY = 'privasys.platform-token';
 
 /**
@@ -88,23 +121,31 @@ export async function isDriveHost(host: string): Promise<boolean> {
  * the platform key everywhere else (the control plane, connectors).
  */
 export async function tokenForHost(host: string): Promise<string> {
-    return (await isDriveHost(host)) ? getPlatformToken(PLATFORM_AUDIENCE, DRIVE_CLIENT_ID) : getPlatformToken();
+    const audience = audienceFor(host);
+    return (await isDriveHost(host)) ? getPlatformToken(audience, DRIVE_CLIENT_ID) : getPlatformToken(audience);
 }
 
 /** tokenForHost without minting, so without a prompt. */
 export async function cachedTokenForHost(host: string): Promise<string | null> {
+    const audience = audienceFor(host);
     return (await isDriveHost(host))
-        ? getCachedPlatformToken(PLATFORM_AUDIENCE, DRIVE_CLIENT_ID)
-        : getCachedPlatformToken();
+        ? getCachedPlatformToken(audience, DRIVE_CLIENT_ID)
+        : getCachedPlatformToken(audience);
 }
 
-/** Drive's own key, for calls to the Drive enclave. */
-export async function getDriveToken(): Promise<string> {
-    return getPlatformToken(PLATFORM_AUDIENCE, DRIVE_CLIENT_ID);
+/** Drive's own key, for calls to the Drive enclave at `host`. */
+export async function getDriveToken(host: string): Promise<string> {
+    return getPlatformToken(audienceFor(host), DRIVE_CLIENT_ID);
 }
 
-function storeKeyFor(clientId?: string): string {
-    return clientId ? `${STORE_KEY}.${clientId}` : STORE_KEY;
+/**
+ * Where a key is cached. Each audience has its own slot, so a call to one
+ * platform never evicts the other's key (and asks for Face ID to mint it
+ * back). The platform's own audience keeps the slot it always had.
+ */
+function storeKeyFor(clientId?: string, audience: string = PLATFORM_AUDIENCE): string {
+    const base = clientId ? `${STORE_KEY}.${clientId}` : STORE_KEY;
+    return audience === PLATFORM_AUDIENCE ? base : `${base}@${audience}`;
 }
 /** Re-mint this long before expiry so a call never rides an about-to-die token. */
 const REFRESH_SKEW_MS = 24 * 60 * 60 * 1000; // 1 day
@@ -161,7 +202,7 @@ export async function getPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: 
     if (isDemo()) throw new Error('no platform token in the demo');
     const cached = await readCached(audience, clientId);
     if (cached) return cached;
-    const key = storeKeyFor(clientId);
+    const key = storeKeyFor(clientId, audience);
     const running = inflight.get(key);
     if (running) return running;
     const p = mint(audience, clientId).finally(() => {
@@ -183,7 +224,11 @@ export async function getCachedPlatformToken(audience = PLATFORM_AUDIENCE, clien
 
 /** Drop the cached platform token (e.g. on sign-out). */
 export async function clearPlatformToken(): Promise<void> {
-    for (const key of [STORE_KEY, storeKeyFor(DRIVE_CLIENT_ID), DRIVE_HOST_KEY]) {
+    const keys = [PLATFORM_AUDIENCE, TEST_PLATFORM_AUDIENCE].flatMap((a) => [
+        storeKeyFor(undefined, a),
+        storeKeyFor(DRIVE_CLIENT_ID, a),
+    ]);
+    for (const key of [...keys, DRIVE_HOST_KEY]) {
         try {
             await SecureStore.deleteItemAsync(key);
         } catch {
@@ -194,7 +239,7 @@ export async function clearPlatformToken(): Promise<void> {
 
 async function readCached(audience: string, clientId?: string): Promise<string | null> {
     try {
-        const raw = await SecureStore.getItemAsync(storeKeyFor(clientId));
+        const raw = await SecureStore.getItemAsync(storeKeyFor(clientId, audience));
         if (!raw) return null;
         const s = JSON.parse(raw) as StoredToken;
         if (
@@ -235,7 +280,7 @@ async function mint(audience: string, clientId?: string): Promise<string> {
         clientId,
         mintedBy: activePlatformCredentialId()
     };
-    await SecureStore.setItemAsync(storeKeyFor(clientId), JSON.stringify(stored)).catch(() => {});
+    await SecureStore.setItemAsync(storeKeyFor(clientId, audience), JSON.stringify(stored)).catch(() => {});
     return body.token;
 }
 
@@ -271,11 +316,16 @@ async function platformSessionToken(): Promise<string> {
  * keep sending a dead token for the rest of its year. Only the token refused
  * is dropped, never one minted since.
  */
-export async function dropPlatformToken(token: string, clientId?: string): Promise<void> {
+export async function dropPlatformToken(
+    token: string,
+    clientId?: string,
+    audience: string = PLATFORM_AUDIENCE,
+): Promise<void> {
     try {
-        const raw = await SecureStore.getItemAsync(storeKeyFor(clientId));
+        const key = storeKeyFor(clientId, audience);
+        const raw = await SecureStore.getItemAsync(key);
         if (!raw || (JSON.parse(raw) as StoredToken).token !== token) return;
-        await SecureStore.deleteItemAsync(storeKeyFor(clientId));
+        await SecureStore.deleteItemAsync(key);
         console.warn('[platform-token] privasys.id refused the cached token; dropped it');
     } catch {
         /* nothing cached, or storage unavailable */
@@ -303,7 +353,7 @@ export async function callWithPlatformToken(
     if (!token) return null;
     const res = await call(token);
     if (res.status !== 401) return { res, token };
-    await dropPlatformToken(token, clientId);
+    await dropPlatformToken(token, clientId, audience);
     if (!interactive) return null;
     const fresh = await getPlatformToken(audience, clientId);
     return { res: await call(fresh), token: fresh };

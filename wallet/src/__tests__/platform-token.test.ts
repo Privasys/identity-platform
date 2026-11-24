@@ -56,3 +56,43 @@ it('gives Drive its own key and everyone else the platform key', async () => {
     expect(await tokenForHost('mail.example')).toBe('platform-key');
     expect(bodies.length).toBe(minted);
 });
+
+describe('audience per platform', () => {
+    it('picks the test audience for test hosts only', () => {
+        const { audienceFor } = require('@/services/platform-token');
+        for (const t of [
+            'https://api.developer.test.privasys.org',
+            'https://api.developer.test.privasys.org/api/v1/apps/x/data-keys/grant',
+            'drive-demo.apps.test.privasys.org',
+            'old.apps-test.privasys.org',
+            'api-test.developer.privasys.org',
+        ]) {
+            expect(audienceFor(t)).toBe('privasys-platform-test');
+        }
+        for (const t of [
+            'https://api.developer.privasys.org',
+            'https://privasys.id',
+            'drive.apps.privasys.org',
+            'test.privasys.org.example.com',
+            'mytest.privasys.org',
+        ]) {
+            expect(audienceFor(t)).toBe('privasys-platform');
+        }
+    });
+
+    it('mints and caches each platform its own key, so neither evicts the other', async () => {
+        bodies.length = 0;
+        (global as any).fetch = jest.fn(async (_url: string, init: any) => {
+            const body = JSON.parse(init.body);
+            bodies.push(body);
+            return {
+                ok: true,
+                json: async () => ({ token: `key-${body.audience}`, expires_at: Math.floor(Date.now() / 1000) + 30 * 86400 }),
+            };
+        });
+        expect(await tokenForHost('chat.apps.test.privasys.org')).toBe('key-privasys-platform-test');
+        expect(await tokenForHost('chat.apps.privasys.org')).toBe('platform-key');
+        expect(await tokenForHost('chat.apps.test.privasys.org')).toBe('key-privasys-platform-test');
+        expect(bodies.map((b) => b.audience)).toEqual(['privasys-platform-test']);
+    });
+});

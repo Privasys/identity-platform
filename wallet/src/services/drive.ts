@@ -22,7 +22,7 @@ import { getAttestationServerToken } from '@/services/app-attest';
 import { demo, isDemo } from '@/services/demo/gate';
 import { inspectAttestation, attestEnclave, type AttestationResult } from '@/services/attestation';
 import { apiBasesForHost, appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
-import { callWithPlatformToken, getDriveToken, rememberDriveAppId, rememberDriveHost, tokenForHost } from '@/services/platform-token';
+import { audienceFor, callWithPlatformToken, getDriveToken, rememberDriveAppId, rememberDriveHost, tokenForHost } from '@/services/platform-token';
 import { useSettingsStore, type VerificationMode } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
@@ -230,7 +230,7 @@ async function setup(): Promise<DriveSession | null> {
 
     // Drive's own key: Drive knows the holder by the identifier its sign-in
     // gives (per-app subjects), and the control plane by the account.
-    const token = await getDriveToken();
+    const token = await getDriveToken(d.origin);
     const drive = PrivasysDrive.connect({
         baseUrl: `https://${d.origin}`,
         token,
@@ -273,7 +273,7 @@ export async function listShareRequests(): Promise<{ tenantId: string; requests:
     if (isDemo()) return demo().listShareRequests();
     const s = await ensureDrive();
     if (!s) throw new Error('Drive is unavailable');
-    const token = await getDriveToken();
+    const token = await getDriveToken(s.origin);
     const raFetch = makeRaTlsFetch({ enclaveHost: s.origin, platformFetch: fetch });
     const res = await raFetch(
         `https://${s.origin}/v1/tenants/${encodeURIComponent(s.tenant.id)}/link-requests`,
@@ -298,7 +298,7 @@ export async function decideShareRequest(
 ): Promise<void> {
     const s = await ensureDrive();
     if (!s) throw new Error('Drive is unavailable');
-    const token = await getDriveToken();
+    const token = await getDriveToken(s.origin);
     const raFetch = makeRaTlsFetch({ enclaveHost: s.origin, platformFetch: fetch });
     const res = await raFetch(
         `https://${s.origin}/v1/tenants/${encodeURIComponent(tenantId)}/link-requests/${encodeURIComponent(requestId)}/${decision}`,
@@ -371,7 +371,7 @@ async function setupDriveAt(
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}` },
             }),
-        { interactive: true },
+        { interactive: true, audience: audienceFor(mgmtBaseUrl) },
     );
     if (!called) throw new Error('data-key grant: no platform token');
     const { res } = called;

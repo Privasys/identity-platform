@@ -32,6 +32,8 @@ import {
     type VerifiedVaultBatch,
 } from './vault-approval-batch';
 import { useAuthStore, type Credential } from '../stores/auth';
+import type { BindingFields } from './vault-approval-v2';
+import type { VaultIdentity } from './vault-identity';
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 const IDP_ORIGIN = new URL(IDP_BASE).hostname;
@@ -65,6 +67,12 @@ export interface VaultApprovalSummary {
     threshold?: string;
     helpers?: string;
     public_key?: string;
+    // Binding v2 (services/vault-approval-v2): every field of the text the
+    // approval binds, the identities of the vaults it names, and for a policy
+    // update the policy it installs. The wallet checks them all before Approve.
+    binding?: BindingFields;
+    member_identities?: VaultIdentity[];
+    new_policy?: unknown;
 }
 
 export interface VaultApprovalRequest {

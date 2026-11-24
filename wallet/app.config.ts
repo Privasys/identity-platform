@@ -381,6 +381,7 @@ export default (context: ConfigContext): ExpoConfig => {
             DEMO ? 'noop' : './modules/notification-service/app.plugin',
             './modules/app-attest/app.plugin',
             './plugins/swift-concurrency-fix',
+            './plugins/ios-scene-lifecycle',
             './plugins/disable-lint-vital',
             './plugins/android-fold-continuity',
             './plugins/android-optional-portrait',

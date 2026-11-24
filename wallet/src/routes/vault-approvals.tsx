@@ -48,6 +48,7 @@ import { freshBiometric } from '@/services/approval-answer';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 import { useActiveRoute } from '@/utils/active-route';
+import { MONO } from '@/constants/fonts';
 
 function shortHandle(handle: string): string {
     const parts = handle.split('/');
@@ -522,9 +523,11 @@ function VaultApprovalsScreen() {
                                 {isKeyRules && v2?.kind === 'ok' && s.new_policy ? (
                                     <RNView style={styles.summaryBox}>
                                         <Text style={styles.summaryLabel}>{t('vaultApprovals.newKeyRules')}</Text>
-                                        <Text style={styles.warnMono} selectable>
-                                            {JSON.stringify(s.new_policy, null, 2)}
-                                        </Text>
+                                        <ScrollView style={styles.rulesScroll} nestedScrollEnabled>
+                                            <Text style={styles.rulesText} selectable>
+                                                {JSON.stringify(s.new_policy, null, 2)}
+                                            </Text>
+                                        </ScrollView>
                                     </RNView>
                                 ) : null}
 
@@ -735,5 +738,9 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     warnBox: { backgroundColor: p.dangerBg, borderRadius: 10, padding: 12, marginBottom: 12, gap: 6 },
     warnText: { fontSize: 14, lineHeight: 20, color: p.dangerText, fontWeight: '600' },
     warnMono: { fontSize: 11, color: p.dangerText, fontFamily: 'monospace' },
+    // The rules a policy update installs: the preview text of the report
+    // screen (connect.tsx previewText), kept to a height the card can hold.
+    rulesScroll: { maxHeight: 220 },
+    rulesText: { fontSize: 11, fontFamily: MONO, color: p.textPrimary, lineHeight: 16 },
     affirmRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
 });

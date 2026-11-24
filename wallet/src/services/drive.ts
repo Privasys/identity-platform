@@ -22,7 +22,7 @@ import { getAttestationServerToken } from '@/services/app-attest';
 import { demo, isDemo } from '@/services/demo/gate';
 import { inspectAttestation, attestEnclave, type AttestationResult } from '@/services/attestation';
 import { apiBasesForHost, appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
-import { audienceFor, callWithPlatformToken, getDriveToken, rememberDriveAppId, rememberDriveHost, tokenForHost } from '@/services/platform-token';
+import { callWithPlatformToken, getDriveToken, rememberDriveAppId, rememberDriveHost, tokenForHost } from '@/services/platform-token';
 import { useSettingsStore, type VerificationMode } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
 
@@ -371,7 +371,7 @@ async function setupDriveAt(
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}` },
             }),
-        { interactive: true, audience: audienceFor(mgmtBaseUrl) },
+        { interactive: true, target: mgmtBaseUrl },
     );
     if (!called) throw new Error('data-key grant: no platform token');
     const { res } = called;

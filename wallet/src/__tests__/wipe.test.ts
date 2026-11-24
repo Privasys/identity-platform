@@ -258,6 +258,9 @@ describe('wipe coverage', () => {
         // wipe lift a required-update wall on a device that is offline, which is
         // the one bypass the gate exists to close.
         'src/services/app-version.ts',
+        // The platforms privasys.id publishes (audience and domains). The same
+        // for every holder, no personal data.
+        'src/services/platforms.ts',
         // The generic SecureStore/localStorage shim itself.
         'src/utils/storage.ts',
     ]);

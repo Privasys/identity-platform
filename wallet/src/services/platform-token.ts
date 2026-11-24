@@ -19,40 +19,17 @@ import { authenticate as fido2Authenticate } from './fido2';
 import { ensurePrivasysSession } from './privasys-id';
 import { isDemo } from '@/services/demo/gate';
 import { useAuthStore } from '@/stores/auth';
+import { DEFAULT_AUDIENCE, audienceFor, knownAudiences } from '@/services/platforms';
 
 const IDP_BASE_URL = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 
-/** Audience the platform token is minted for. The Drive enclave + mgmt verify
- *  it; override per deployment if a narrower audience is required. */
-const PLATFORM_AUDIENCE = process.env['EXPO_PUBLIC_PLATFORM_AUDIENCE'] || 'privasys-platform';
-
 /**
- * The test platform's audience. One wallet talks to both platforms (a
- * production wallet is routinely shown test apps), and each accepts only its
- * own audience, so a token minted for production never reaches a test host.
+ * The audience a key is minted for when the call names no host (privasys.id's
+ * own routes). A call to a named host takes its platform's audience instead
+ * (services/platforms.ts): each platform accepts only its own, so a key for
+ * one never reaches another.
  */
-export const TEST_PLATFORM_AUDIENCE = 'privasys-platform-test';
-
-/** Whether `host` belongs to the test platform. */
-function isTestPlatformHost(host: string): boolean {
-    const h = host.toLowerCase().replace(/\.$/, '');
-    return h === 'test.privasys.org' || h.endsWith('.test.privasys.org');
-}
-
-/**
- * The audience for a call to `target` (a URL or a bare host): the test
- * platform's for its hosts, the platform's own everywhere else, privasys.id
- * included.
- */
-export function audienceFor(target: string): string {
-    let host = target;
-    try {
-        if (target.includes('://')) host = new URL(target).hostname;
-    } catch {
-        /* a bare host */
-    }
-    return isTestPlatformHost(host.split('/')[0].split(':')[0]) ? TEST_PLATFORM_AUDIENCE : PLATFORM_AUDIENCE;
-}
+const PLATFORM_AUDIENCE = DEFAULT_AUDIENCE;
 
 const STORE_KEY = 'privasys.platform-token';
 
@@ -116,13 +93,19 @@ export async function isDriveHost(host: string): Promise<boolean> {
  * the platform key everywhere else (the control plane, connectors).
  */
 export async function tokenForHost(host: string): Promise<string> {
-    const audience = audienceFor(host);
+    const audience = await audienceFor(host);
     return (await isDriveHost(host)) ? getPlatformToken(audience, DRIVE_CLIENT_ID) : getPlatformToken(audience);
 }
 
-/** tokenForHost without minting, so without a prompt. */
+/** tokenForHost without minting, so without a prompt. Null too when the
+ *  host's platform cannot be told yet. */
 export async function cachedTokenForHost(host: string): Promise<string | null> {
-    const audience = audienceFor(host);
+    let audience: string;
+    try {
+        audience = await audienceFor(host);
+    } catch {
+        return null;
+    }
     return (await isDriveHost(host))
         ? getCachedPlatformToken(audience, DRIVE_CLIENT_ID)
         : getCachedPlatformToken(audience);
@@ -130,7 +113,7 @@ export async function cachedTokenForHost(host: string): Promise<string | null> {
 
 /** Drive's own key, for calls to the Drive enclave at `host`. */
 export async function getDriveToken(host: string): Promise<string> {
-    return getPlatformToken(audienceFor(host), DRIVE_CLIENT_ID);
+    return getPlatformToken(await audienceFor(host), DRIVE_CLIENT_ID);
 }
 
 /**
@@ -219,7 +202,7 @@ export async function getCachedPlatformToken(audience = PLATFORM_AUDIENCE, clien
 
 /** Drop the cached platform token (e.g. on sign-out). */
 export async function clearPlatformToken(): Promise<void> {
-    const keys = [PLATFORM_AUDIENCE, TEST_PLATFORM_AUDIENCE].flatMap((a) => [
+    const keys = (await knownAudiences()).flatMap((a) => [
         storeKeyFor(undefined, a),
         storeKeyFor(DRIVE_CLIENT_ID, a),
     ]);
@@ -336,14 +319,27 @@ export async function dropPlatformToken(
  * made once more. In the background nothing prompts: the call resolves null
  * without a usable token, and the next thing the holder does mints one.
  *
+ * `target` is where the call goes when that is not privasys.id (a URL or a
+ * host): the key is then one for that host's platform.
+ *
  * Resolves with the response and the token it was made with, or null when
- * there is no token to use. Throws only what minting throws.
+ * there is no token to use. Throws only what minting throws, and, when
+ * interactive, a `target` whose platform cannot be told yet.
  */
 export async function callWithPlatformToken(
     call: (token: string) => Promise<Response>,
-    opts: { interactive: boolean; audience?: string; clientId?: string },
+    opts: { interactive: boolean; target?: string; clientId?: string },
 ): Promise<{ res: Response; token: string } | null> {
-    const { interactive, audience = PLATFORM_AUDIENCE, clientId } = opts;
+    const { interactive, target, clientId } = opts;
+    let audience = PLATFORM_AUDIENCE;
+    if (target) {
+        try {
+            audience = await audienceFor(target);
+        } catch (e) {
+            if (interactive) throw e;
+            return null;
+        }
+    }
     const token = interactive ? await getPlatformToken(audience, clientId) : await getCachedPlatformToken(audience, clientId);
     if (!token) return null;
     const res = await call(token);

@@ -1348,6 +1348,8 @@
     "explainKeyDelete": "Isto elimina a chave dos seus cofres de forma definitiva. O que ela protege deixa de poder ser aberto com ela. Aprove apenas se o pediu.",
     "vaultsUnpublished": "Estes cofres não executam uma versão publicada do cofre Privasys, pelo que isto não pode ser aprovado. Recuse. A compilação deles:",
     "newKeyRules": "Novas regras",
+    "batchDeleteOld": "Eliminada assim que a alteração for bem-sucedida",
+    "batchReleaseUnreachable": "Não foi possível verificar a versão do cofre, pelo que isto ainda não pode ser aprovado. Abra este pedido novamente para tentar outra vez.",
     "approvePolicy": "Aprovar a política da app",
     "explainPolicy": "Autorize esta política para a app: que apps a podem chamar, a partir de que máquinas e que apps ela pode chamar. Aprove apenas uma política que tenha definido.",
     "policyDocument": "Documento da política",

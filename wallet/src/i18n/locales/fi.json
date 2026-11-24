@@ -1324,6 +1324,8 @@
     "explainKeyDelete": "Tämä poistaa avaimen holveistaan pysyvästi. Sen suojaamaa sisältöä ei voi enää avata sillä. Hyväksy vain, jos pyysit tätä itse.",
     "vaultsUnpublished": "Nämä holvit eivät käytä julkaistua Privasysin holviversiota, joten tätä ei voi hyväksyä. Hylkää se. Niiden koontiversio:",
     "newKeyRules": "Uudet säännöt",
+    "batchDeleteOld": "Poistetaan, kun muutos on onnistunut",
+    "batchReleaseUnreachable": "Holviversiota ei voitu tarkistaa, joten tätä ei voi vielä hyväksyä. Avaa tämä pyyntö uudelleen yrittääksesi uudelleen.",
     "approvePolicy": "Hyväksy sovelluksen käytäntö",
     "explainPolicy": "Hyväksy tämä käytäntö sovellukselle: mitkä sovellukset voivat kutsua sitä, miltä koneilta ja mitä sovelluksia se voi itse kutsua. Hyväksy vain käytäntö, jonka olet itse asettanut.",
     "policyDocument": "Käytäntöasiakirja",

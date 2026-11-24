@@ -1348,6 +1348,8 @@
     "explainKeyDelete": "Questo elimina definitivamente la chiave dai suoi caveau. Ciò che protegge non potrà più essere aperto con essa. Approva solo se l’hai chiesto tu.",
     "vaultsUnpublished": "Questi caveau non eseguono una versione pubblicata del caveau Privasys, quindi non è possibile approvare. Rifiuta. La loro build:",
     "newKeyRules": "Nuove regole",
+    "batchDeleteOld": "Eliminata quando la modifica è riuscita",
+    "batchReleaseUnreachable": "Non è stato possibile verificare la versione del caveau, quindi non è ancora possibile approvare. Riapri questa richiesta per riprovare.",
     "approvePolicy": "Approva la policy dell'app",
     "explainPolicy": "Autorizza questa policy per l'app: quali app possono chiamarla, da quali macchine e quali app può chiamare. Approva solo una policy che hai impostato tu.",
     "policyDocument": "Documento della policy",

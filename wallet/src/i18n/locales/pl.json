@@ -1372,6 +1372,8 @@
     "explainKeyDelete": "To trwale usuwa klucz z jego sejfów. Tego, co chroni, nie będzie już można nim otworzyć. Zatwierdź tylko wtedy, gdy to na Twoją prośbę.",
     "vaultsUnpublished": "Te sejfy nie działają na opublikowanym wydaniu sejfu Privasys, więc nie można tego zatwierdzić. Odrzuć. Ich kompilacja:",
     "newKeyRules": "Nowe reguły",
+    "batchDeleteOld": "Usuwany, gdy zmiana się powiedzie",
+    "batchReleaseUnreachable": "Nie udało się sprawdzić wydania sejfu, więc nie można tego jeszcze zatwierdzić. Otwórz to żądanie ponownie, aby spróbować jeszcze raz.",
     "approvePolicy": "Zatwierdź zasady aplikacji",
     "explainPolicy": "Zatwierdź te zasady dla aplikacji: które aplikacje mogą ją wywoływać, z jakich maszyn i które aplikacje może wywoływać ona. Zatwierdzaj tylko zasady ustawione przez siebie.",
     "policyDocument": "Dokument zasad",

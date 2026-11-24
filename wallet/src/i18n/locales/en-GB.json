@@ -1335,6 +1335,8 @@
     "explainKeyDelete": "This deletes the key from its vaults for good. What it protects can no longer be opened with it. Approve only if you asked for this.",
     "vaultsUnpublished": "These vaults do not run a published Privasys vault release, so this cannot be approved. Decline it. Their build:",
     "newKeyRules": "New rules",
+    "batchDeleteOld": "Deleted once the change has succeeded",
+    "batchReleaseUnreachable": "The vault release could not be checked, so this cannot be approved yet. Open this request again to retry.",
     "approvePolicy": "Approve app policy",
     "explainPolicy": "Authorise this policy for the app: which apps may call it, from which machines, and which apps it may call. Only approve a policy you set yourself.",
     "policyDocument": "Policy document",

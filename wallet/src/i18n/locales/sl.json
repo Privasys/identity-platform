@@ -1383,6 +1383,8 @@
     "explainKeyDelete": "To ključ trajno izbriše iz njegovih trezorjev. Tega, kar varuje, z njim ne bo več mogoče odpreti. Odobrite le, če ste to zahtevali vi.",
     "vaultsUnpublished": "Ti trezorji ne poganjajo objavljene izdaje trezorja Privasys, zato tega ni mogoče odobriti. Zavrnite. Njihova različica:",
     "newKeyRules": "Nova pravila",
+    "batchDeleteOld": "Izbriše se, ko sprememba uspe",
+    "batchReleaseUnreachable": "Izdaje trezorja ni bilo mogoče preveriti, zato tega še ni mogoče odobriti. Za ponovni poskus znova odprite to zahtevo.",
     "approvePolicy": "Odobri pravilnik aplikacije",
     "explainPolicy": "Odobrite ta pravilnik za aplikacijo: katere aplikacije jo smejo klicati, s katerih naprav in katere aplikacije sme klicati ona. Odobrite le pravilnik, ki ste ga nastavili sami.",
     "policyDocument": "Dokument pravilnika",

@@ -1348,6 +1348,8 @@
     "explainKeyDelete": "Tím se klíč natrvalo smaže z jeho trezorů. To, co chrání, už s ním nepůjde otevřít. Schvalte jen tehdy, pokud jste o to požádali.",
     "vaultsUnpublished": "Tyto trezory neběží na zveřejněném vydání trezoru Privasys, takže to nelze schválit. Odmítněte to. Jejich sestavení:",
     "newKeyRules": "Nová pravidla",
+    "batchDeleteOld": "Smaže se, jakmile se změna podaří",
+    "batchReleaseUnreachable": "Vydání trezoru se nepodařilo ověřit, takže to zatím nelze schválit. Otevřete žádost znovu a zkuste to ještě jednou.",
     "approvePolicy": "Schválit zásady aplikace",
     "explainPolicy": "Povolte tyto zásady pro aplikaci: které aplikace ji mohou volat, z jakých počítačů a které aplikace může volat ona. Schvalujte jen zásady, které jste nastavili sami.",
     "policyDocument": "Dokument zásad",

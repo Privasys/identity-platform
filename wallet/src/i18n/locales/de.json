@@ -1324,6 +1324,8 @@
     "explainKeyDelete": "Dies löscht den Schlüssel endgültig aus seinen Tresoren. Was er schützt, lässt sich damit nicht mehr öffnen. Genehmigen Sie nur, wenn Sie dies angefordert haben.",
     "vaultsUnpublished": "Diese Tresore laufen nicht mit einer veröffentlichten Privasys-Tresorversion, daher kann dies nicht genehmigt werden. Lehnen Sie es ab. Ihr Build:",
     "newKeyRules": "Neue Regeln",
+    "batchDeleteOld": "Wird gelöscht, sobald die Änderung gelungen ist",
+    "batchReleaseUnreachable": "Die Tresorversion konnte nicht geprüft werden, daher kann dies noch nicht genehmigt werden. Öffnen Sie diese Anfrage erneut, um es noch einmal zu versuchen.",
     "approvePolicy": "App-Richtlinie freigeben",
     "explainPolicy": "Geben Sie diese Richtlinie für die App frei: welche Apps sie aufrufen dürfen, von welchen Maschinen aus und welche Apps sie aufrufen darf. Geben Sie nur eine Richtlinie frei, die Sie selbst festgelegt haben.",
     "policyDocument": "Richtliniendokument",

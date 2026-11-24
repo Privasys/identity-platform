@@ -1407,6 +1407,8 @@
     "explainKeyDelete": "Dan iħassar iċ-ċavetta mill-kaxxaforti tagħha għal dejjem. Dak li tipproteġi ma jkunx jista’ jinfetaħ biha aktar. Approva biss jekk int tlabt dan.",
     "vaultsUnpublished": "Dawn il-kaxxaforti ma jħaddmux verżjoni ppubblikata tal-kaxxaforti ta’ Privasys, għalhekk dan ma jistax jiġi approvat. Irrifjutah. Il-bini tagħhom:",
     "newKeyRules": "Regoli ġodda",
+    "batchDeleteOld": "Titħassar ladarba l-bidla tirnexxi",
+    "batchReleaseUnreachable": "Il-verżjoni tal-kaxxaforti ma setgħetx tiġi ċċekkjata, għalhekk dan għadu ma jistax jiġi approvat. Erġa’ iftaħ din it-talba biex terġa’ tipprova.",
     "approvePolicy": "Approva l-politika tal-app",
     "explainPolicy": "Awtorizza din il-politika għall-app: liema apps jistgħu jsejħulha, minn liema magni, u liema apps tista' ssejjaħ hi. Approva biss politika li waqqaft int stess.",
     "policyDocument": "Dokument tal-politika",

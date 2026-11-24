@@ -1431,6 +1431,8 @@
     "explainKeyDelete": "Mae hyn yn dileu’r allwedd o’i chelloedd am byth. Ni ellir agor yr hyn y mae’n ei ddiogelu â hi mwyach. Cymeradwywch dim ond os mai chi ofynnodd am hyn.",
     "vaultsUnpublished": "Nid yw’r celloedd hyn yn rhedeg fersiwn gyhoeddedig o gell Privasys, felly ni ellir cymeradwyo hyn. Gwrthodwch ef. Eu hadeiladwaith:",
     "newKeyRules": "Rheolau newydd",
+    "batchDeleteOld": "Caiff ei dileu unwaith y bydd y newid wedi llwyddo",
+    "batchReleaseUnreachable": "Nid oedd modd gwirio fersiwn y gell, felly ni ellir cymeradwyo hyn eto. Agorwch y cais hwn eto i roi cynnig arall arni.",
     "approvePolicy": "Cymeradwyo polisi'r ap",
     "explainPolicy": "Awdurdodwch y polisi hwn ar gyfer yr ap: pa apiau all ei alw, o ba beiriannau, a pha apiau y gall ef eu galw. Cymeradwywch bolisi rydych chi wedi'i osod eich hun yn unig.",
     "policyDocument": "Dogfen y polisi",

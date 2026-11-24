@@ -1324,6 +1324,8 @@
     "explainKeyDelete": "Detta raderar nyckeln från dess valv för gott. Det den skyddar kan inte längre öppnas med den. Godkänn bara om du själv bad om detta.",
     "vaultsUnpublished": "De här valven kör inte en publicerad Privasys-valvversion, så detta kan inte godkännas. Avböj det. Deras bygge:",
     "newKeyRules": "Nya regler",
+    "batchDeleteOld": "Raderas när ändringen har lyckats",
+    "batchReleaseUnreachable": "Valvversionen kunde inte kontrolleras, så detta kan inte godkännas än. Öppna den här förfrågan igen för att försöka på nytt.",
     "approvePolicy": "Godkänn appens policy",
     "explainPolicy": "Godkänn den här policyn för appen: vilka appar som får anropa den, från vilka maskiner och vilka appar den får anropa. Godkänn bara en policy som du själv har satt.",
     "policyDocument": "Policydokument",

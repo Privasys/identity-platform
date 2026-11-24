@@ -1348,6 +1348,8 @@
     "explainKeyDelete": "Cela supprime définitivement la clé de ses coffres. Ce qu’elle protège ne pourra plus être ouvert avec elle. N’approuvez que si vous l’avez demandé.",
     "vaultsUnpublished": "Ces coffres n’exécutent pas une version publiée du coffre Privasys, cela ne peut donc pas être approuvé. Refusez. Leur build :",
     "newKeyRules": "Nouvelles règles",
+    "batchDeleteOld": "Supprimée une fois le changement réussi",
+    "batchReleaseUnreachable": "La version du coffre n’a pas pu être vérifiée, cela ne peut donc pas encore être approuvé. Rouvrez cette demande pour réessayer.",
     "approvePolicy": "Approuver la politique de l'application",
     "explainPolicy": "Autorisez cette politique pour l'application : quelles applications peuvent l'appeler, depuis quelles machines, et quelles applications elle peut appeler. N'approuvez qu'une politique que vous avez définie vous-même.",
     "policyDocument": "Document de politique",

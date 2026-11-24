@@ -1359,6 +1359,8 @@
     "explainKeyDelete": "Aceasta șterge definitiv cheia din seifurile ei. Ceea ce protejează nu va mai putea fi deschis cu ea. Aprobați numai dacă dumneavoastră ați cerut acest lucru.",
     "vaultsUnpublished": "Aceste seifuri nu rulează o versiune publicată a seifului Privasys, așa că aceasta nu poate fi aprobată. Refuzați. Versiunea lor:",
     "newKeyRules": "Reguli noi",
+    "batchDeleteOld": "Se șterge după ce modificarea reușește",
+    "batchReleaseUnreachable": "Versiunea seifului nu a putut fi verificată, așa că aceasta nu poate fi aprobată încă. Deschideți din nou această solicitare pentru a reîncerca.",
     "approvePolicy": "Aprobă politica aplicației",
     "explainPolicy": "Autorizează această politică pentru aplicație: ce aplicații o pot apela, de pe ce mașini și ce aplicații poate apela ea. Aprobă doar o politică stabilită de tine.",
     "policyDocument": "Documentul politicii",

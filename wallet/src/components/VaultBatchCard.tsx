@@ -58,6 +58,7 @@ import {
     type VaultBatchKeyKind,
     type VerifiedVaultBatch,
 } from '@/services/vault-approval-batch';
+import { vaultReleaseFor, type VaultRelease } from '@/services/vault-reshare';
 import { notify } from '@/stores/notice';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
@@ -99,10 +100,42 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
     // control plane's answers, shown when they come and never waited for.
     const [hosts, setHosts] = useState<Record<string, VaultBatchHost | null>>({});
     const [versions, setVersions] = useState<Record<string, string | null>>({});
+    // A v2 batch names its vaults: their build, as a published Enclave Vault
+    // release, before Approve is offered. Absent for a batch that names none.
+    const [release, setRelease] = useState<
+        { kind: 'checking' } | { kind: 'ok'; release: VaultRelease } | { kind: 'unpublished' } | { kind: 'unreachable' } | null
+    >(null);
     const [readToEnd, setReadToEnd] = useState(false);
     const [busy, setBusy] = useState(false);
     const [now, setNow] = useState(() => Date.now());
     const layout = useRef({ offsetY: 0, viewportHeight: 0, contentHeight: 0 });
+
+    const builds = phase.kind === 'ready' ? phase.batch.builds : undefined;
+    const buildsKey = builds ? builds.join(',') : null;
+    useEffect(() => {
+        if (buildsKey === null) {
+            setRelease(null);
+            return;
+        }
+        const list = buildsKey === '' ? [] : buildsKey.split(',');
+        if (list.length !== 1) {
+            setRelease({ kind: 'unpublished' });
+            return;
+        }
+        let cancelled = false;
+        setRelease({ kind: 'checking' });
+        vaultReleaseFor(list[0]).then(
+            (r) => {
+                if (!cancelled) setRelease(r ? { kind: 'ok', release: r } : { kind: 'unpublished' });
+            },
+            () => {
+                if (!cancelled) setRelease({ kind: 'unreachable' });
+            },
+        );
+        return () => {
+            cancelled = true;
+        };
+    }, [buildsKey]);
 
     const load = useCallback(async () => {
         setPhase({ kind: 'loading' });
@@ -287,7 +320,8 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
         // Not while a name is still being looked up: what is approved is shown
         // in full first. A name that could not be confirmed is flagged instead.
         const named = groups.every((g) => g.subject !== 'app' || !g.id || g.id in names);
-        const canApprove = readToEnd && named && !expired && !busy;
+        const releaseOk = release === null || release.kind === 'ok';
+        const canApprove = readToEnd && named && releaseOk && !expired && !busy;
         return (
             <>
                 <RNView style={styles.from}>
@@ -318,6 +352,25 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
                         ))}
                     </RNView>
                     <RNView style={styles.divider} />
+                    {release?.kind === 'ok' || release?.kind === 'checking' ? (
+                        <RNView style={styles.metaRow} testID="vault-batch-release">
+                            <Ionicons name="shield-checkmark-outline" size={16} color={p.textSecondary} />
+                            <Text style={styles.meta}>
+                                {release.kind === 'ok'
+                                    ? t('vaultApprovals.vaultReleaseName', { version: release.release.version })
+                                    : t('vaultApprovals.vaultRelease')}
+                            </Text>
+                        </RNView>
+                    ) : release ? (
+                        <RNView style={styles.metaRow} testID="vault-batch-release-refused">
+                            <Ionicons name="warning-outline" size={16} color={p.danger} />
+                            <Text style={[styles.meta, { color: p.danger }]}>
+                                {release.kind === 'unpublished'
+                                    ? t('vaultApprovals.vaultsUnpublished')
+                                    : t('vaultApprovals.batchReleaseUnreachable')}
+                            </Text>
+                        </RNView>
+                    ) : null}
                     <RNView style={styles.metaRow}>
                         <Ionicons name="finger-print-outline" size={16} color={p.textSecondary} />
                         <Text style={styles.meta}>{t('approval.assurance.device')}</Text>
@@ -448,7 +501,13 @@ function GroupBlock({
                 return (
                     <RNView key={`${entry.operation} ${entry.handle}`} style={extra.op} testID="vault-batch-entry">
                         <Text style={styles.lineLabel}>{t(KIND_KEY[kind])}</Text>
-                        <Text style={styles.lineLabel}>{`${digestLabel} ${shortDigest(entry.measurementDigest)}`}</Text>
+                        <Text style={styles.lineLabel}>
+                            {entry.operation === 'delete_after'
+                                ? t('vaultApprovals.batchDeleteOld')
+                                : entry.operation === 'update_policy'
+                                  ? `${t('vaultApprovals.newKeyRules')} ${shortDigest(entry.measurementDigest)}`
+                                  : `${digestLabel} ${shortDigest(entry.measurementDigest)}`}
+                        </Text>
                     </RNView>
                 );
             })}

@@ -1324,6 +1324,8 @@
     "explainKeyDelete": "Dit verwijdert de sleutel voorgoed uit zijn kluizen. Wat hij beschermt, kan er niet meer mee worden geopend. Keur alleen goed als u hier zelf om hebt gevraagd.",
     "vaultsUnpublished": "Deze kluizen draaien geen gepubliceerde Privasys-kluisversie, dus dit kan niet worden goedgekeurd. Wijs het af. Hun build:",
     "newKeyRules": "Nieuwe regels",
+    "batchDeleteOld": "Wordt verwijderd zodra de wijziging is gelukt",
+    "batchReleaseUnreachable": "De kluisversie kon niet worden gecontroleerd, dus dit kan nog niet worden goedgekeurd. Open dit verzoek opnieuw om het nogmaals te proberen.",
     "approvePolicy": "Appbeleid goedkeuren",
     "explainPolicy": "Keur dit beleid voor de app goed: welke apps hem mogen aanroepen, vanaf welke machines, en welke apps hij mag aanroepen. Keur alleen beleid goed dat je zelf hebt ingesteld.",
     "policyDocument": "Beleidsdocument",

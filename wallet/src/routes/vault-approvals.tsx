@@ -15,7 +15,7 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -41,6 +41,7 @@ import {
     resolveApprovalCredential,
     type VaultApprovalRequest,
 } from '@/services/vault-approval-api';
+import { checkReshare, forgetPublishedReleases, vaultReleaseFor, type VaultRelease } from '@/services/vault-reshare';
 import { notify } from '@/stores/notice';
 import { freshBiometric } from '@/services/approval-answer';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
@@ -83,6 +84,33 @@ function ReleaseLinkRow({
         </Pressable>
     );
 }
+/**
+ * A key renewal (reshare), checked: the target vault build is approvable only
+ * once its fields recompute to the bound measurement AND it is a published
+ * Enclave Vault release.
+ */
+type ReshareCheck =
+    | { kind: 'checking' }
+    | { kind: 'ok'; release: VaultRelease; vaults: number; threshold: number }
+    /** The fields do not recompute to what the approval binds. */
+    | { kind: 'mismatch' }
+    /** The build is no published release. */
+    | { kind: 'unpublished'; mrenclave: string }
+    /** GitHub could not be reached for a build not pinned in this wallet. */
+    | { kind: 'unreachable' };
+
+async function checkReshareRequest(req: VaultApprovalRequest): Promise<ReshareCheck> {
+    const checked = checkReshare(req.summary);
+    if (!checked) return { kind: 'mismatch' };
+    try {
+        const release = await vaultReleaseFor(checked.mrenclave);
+        if (!release) return { kind: 'unpublished', mrenclave: checked.mrenclave };
+        return { kind: 'ok', release, vaults: checked.vaults.length, threshold: checked.threshold };
+    } catch {
+        return { kind: 'unreachable' };
+    }
+}
+
 /** Human countdown to expiry (expires_at is epoch seconds). */
 function formatRemaining(expiresAtSec: number, nowMs: number, t: TFunction): string {
     const secs = Math.max(0, Math.round(expiresAtSec - nowMs / 1000));
@@ -152,6 +180,32 @@ function VaultApprovalsScreen() {
         };
     }, [pending, provenance]);
 
+    // Key renewals, checked before Approve is offered (services/vault-reshare).
+    // Each is checked once; a pull to refresh checks again the ones that could
+    // not be approved (GitHub unreachable, or a release published since).
+    const [reshares, setReshares] = useState<Record<string, ReshareCheck>>({});
+    const reshareStarted = useRef(new Set<string>());
+    const [recheck, setRecheck] = useState(0);
+    useEffect(() => {
+        for (const req of pending) {
+            if (req.summary.operation !== 'reshare' || reshareStarted.current.has(req.vault_op)) continue;
+            reshareStarted.current.add(req.vault_op);
+            void checkReshareRequest(req).then((c) => setReshares((prev) => ({ ...prev, [req.vault_op]: c })));
+        }
+    }, [pending, recheck]);
+    const recheckReshares = useCallback(() => {
+        forgetPublishedReleases();
+        setReshares((prev) => {
+            const kept: Record<string, ReshareCheck> = {};
+            for (const [op, c] of Object.entries(prev)) {
+                if (c.kind === 'ok' || c.kind === 'mismatch') kept[op] = c;
+                else reshareStarted.current.delete(op);
+            }
+            return kept;
+        });
+        setRecheck((n) => n + 1);
+    }, []);
+
     // Arriving via a push deep-link: register that capability. Then ALWAYS ask
     // the IdP what else is pending for this identity — opening this screen is
     // the user saying "show me my approvals", and a request whose push never
@@ -171,9 +225,10 @@ function VaultApprovalsScreen() {
     // pull down to find the request.
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
+        recheckReshares();
         await discover();
         setRefreshing(false);
-    }, [discover]);
+    }, [discover, recheckReshares]);
 
     const approve = useCallback(
         async (req: VaultApprovalRequest) => {
@@ -281,6 +336,12 @@ function VaultApprovalsScreen() {
                         // An app's own policy: its handle is a namespace, not a
                         // key, and its digest is the document's, not a measurement.
                         const isPolicy = s.operation === 'app-policy';
+                        // A key renewal is approvable only once checked: its
+                        // target build is a published release and is what the
+                        // approval binds.
+                        const isReshare = s.operation === 'reshare';
+                        const reshare = isReshare ? reshares[req.vault_op] ?? { kind: 'checking' as const } : undefined;
+                        const canApprove = !busy && (!reshare || reshare.kind === 'ok');
                         return (
                             <RNView key={req.vault_op} style={[styles.card, highlighted && styles.cardHighlighted]}>
                                 <RNView style={styles.cardHeader}>
@@ -295,7 +356,9 @@ function VaultApprovalsScreen() {
                                                   ? t('vaultApprovals.approveKeyExport')
                                                   : isPolicy
                                                     ? t('vaultApprovals.approvePolicy')
-                                                    : t('vaultApprovals.approveOperation')}
+                                                    : isReshare
+                                                      ? t('vaultApprovals.approveReshare')
+                                                      : t('vaultApprovals.approveOperation')}
                                         </Text>
                                     </RNView>
                                     <RNView style={[styles.ttlPill, urgent && styles.ttlPillUrgent]}>
@@ -322,8 +385,53 @@ function VaultApprovalsScreen() {
                                           ? t('vaultApprovals.explainExport')
                                           : isPolicy
                                             ? t('vaultApprovals.explainPolicy')
-                                            : t('vaultApprovals.explainOther')}
+                                            : isReshare
+                                              ? t('vaultApprovals.explainReshare')
+                                              : t('vaultApprovals.explainOther')}
                                 </Text>
+
+                                {/* The target vault build, as its published
+                                    release; anything else is said plainly and
+                                    leaves only Decline. */}
+                                {reshare?.kind === 'ok' ? (
+                                    <>
+                                        <ReleaseLinkRow
+                                            icon="shield-checkmark-outline"
+                                            label={t('vaultApprovals.vaultRelease')}
+                                            value={t('vaultApprovals.vaultReleaseName', { version: reshare.release.version })}
+                                            url={reshare.release.url}
+                                        />
+                                        <RNView style={styles.row}>
+                                            <Text style={styles.label}>{t('vaultApprovals.newVaults')}</Text>
+                                            <Text style={styles.value}>
+                                                {t('vaultApprovals.reshareQuorum', {
+                                                    threshold: reshare.threshold,
+                                                    vaults: reshare.vaults,
+                                                })}
+                                            </Text>
+                                        </RNView>
+                                    </>
+                                ) :reshare?.kind === 'checking' ? (
+                                    <RNView style={styles.row}>
+                                        <Text style={styles.label}>{t('vaultApprovals.vaultRelease')}</Text>
+                                        <ActivityIndicator size="small" color={p.infoText} />
+                                    </RNView>
+                                ) : reshare ? (
+                                    <RNView style={styles.warnBox} testID="vault-reshare-refused">
+                                        <Text style={styles.warnText}>
+                                            {reshare.kind === 'mismatch'
+                                                ? t('vaultApprovals.reshareMismatch')
+                                                : reshare.kind === 'unpublished'
+                                                  ? t('vaultApprovals.reshareUnpublished')
+                                                  : t('vaultApprovals.reshareUnreachable')}
+                                        </Text>
+                                        {reshare.kind === 'unpublished' ? (
+                                            <Text style={styles.warnMono} selectable>
+                                                {reshare.mrenclave}
+                                            </Text>
+                                        ) : null}
+                                    </RNView>
+                                ) : null}
 
                                 {s.summary ? (
                                     <RNView style={styles.summaryBox}>
@@ -395,7 +503,10 @@ function VaultApprovalsScreen() {
                                         <Text style={styles.value}>{s.policy_version}</Text>
                                     </RNView>
                                 ) : null}
-                                {s.measurement ? (
+                                {/* A renewal's digest is its resharing context, not
+                                    a measurement: the release row above says
+                                    what it binds. */}
+                                {s.measurement && !isReshare ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>
                                             {isPolicy ? t('vaultApprovals.policyDocument') : t('vaultApprovals.newMeasurement')}
@@ -417,10 +528,14 @@ function VaultApprovalsScreen() {
                                         <Text style={task.declineButtonText}>{t('appForm.action.decline')}</Text>
                                     </Pressable>
                                     <Pressable
-                                        style={[task.affirmButton, styles.affirmRow, busy && task.buttonIdle]}
-                                        disabled={busy}
-                                        onPress={() => approve(req)}
+                                        style={[task.affirmButton, styles.affirmRow, !canApprove && task.buttonIdle]}
+                                        disabled={!canApprove}
+                                        onPress={() => {
+                                            if (canApprove) void approve(req);
+                                        }}
                                         accessibilityRole="button"
+                                        accessibilityState={{ disabled: !canApprove }}
+                                        testID="vault-approval-approve"
                                     >
                                         {busy ? (
                                             <ActivityIndicator color={p.onGreen} />
@@ -522,5 +637,8 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     summaryLabel: { fontSize: 12, fontWeight: '600', color: p.infoText },
     summaryText: { fontSize: 14, color: p.textPrimary, lineHeight: 20 },
     cardActions: { marginTop: 8 },
+    warnBox: { backgroundColor: p.dangerBg, borderRadius: 10, padding: 12, marginBottom: 12, gap: 6 },
+    warnText: { fontSize: 14, lineHeight: 20, color: p.dangerText, fontWeight: '600' },
+    warnMono: { fontSize: 11, color: p.dangerText, fontFamily: 'monospace' },
     affirmRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
 });

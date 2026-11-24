@@ -58,6 +58,13 @@ export interface VaultApprovalSummary {
     // published release + old→new code diff for the promote target).
     app_id?: string;
     version_id?: string;
+    // Reshare (renewing a threshold key): the resharing context's inputs, which
+    // the wallet recomputes the measurement from (services/vault-reshare).
+    target_mrenclave?: string;
+    target_vaults?: string;
+    threshold?: string;
+    helpers?: string;
+    public_key?: string;
 }
 
 export interface VaultApprovalRequest {

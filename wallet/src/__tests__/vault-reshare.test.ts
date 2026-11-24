@@ -1,7 +1,21 @@
 // Copyright (c) Privasys. All rights reserved.
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { checkReshare, reshareDigest, vaultReleaseFor, forgetPublishedReleases } from '@/services/vault-reshare';
+jest.mock('@/utils/storage', () => {
+    const mockStore: Record<string, string> = {};
+    return {
+        mockStore,
+        getItemAsync: jest.fn(async (k: string) => mockStore[k] ?? null),
+        setItemAsync: jest.fn(async (k: string, v: string) => {
+            mockStore[k] = v;
+        }),
+        deleteItemAsync: jest.fn(async (k: string) => {
+            delete mockStore[k];
+        }),
+    };
+});
+
+import { checkReshare, reshareDigest, vaultReleaseFor, forgetPublishedReleases, forgetVaultReleases } from '@/services/vault-reshare';
 
 // The vault's own vector (enclave-os-vault reshare_context; the Go client and
 // an independent script agree).
@@ -60,8 +74,9 @@ describe('reshare digest', () => {
 
 describe('vault release lookup', () => {
     const fetchMock = jest.fn();
-    beforeEach(() => {
+    beforeEach(async () => {
         forgetPublishedReleases();
+        await forgetVaultReleases();
         fetchMock.mockReset();
         (global as any).fetch = fetchMock;
     });
@@ -96,6 +111,54 @@ describe('vault release lookup', () => {
         expect((await vaultReleaseFor('aa'.repeat(32)))?.version).toBe('v0.40.0');
         expect(await vaultReleaseFor('bb'.repeat(32))).toBeNull();
         expect(await vaultReleaseFor('cc'.repeat(32))).toBeNull();
+    });
+
+    const dlOf = (tag: string) => `https://github.com/Privasys/enclave-vaults/releases/download/${tag}/mrenclave.txt`;
+
+    it('checks a hinted release first, in one lookup, and keeps the answer', async () => {
+        fetchMock.mockImplementation(async (url: string) => {
+            if (url === 'https://api.github.com/repos/Privasys/enclave-vaults/releases/tags/vault-v0.50.0') {
+                return { ok: true, json: async () => ({ tag_name: 'vault-v0.50.0', assets: [{ name: 'mrenclave.txt', browser_download_url: dlOf('vault-v0.50.0') }] }) };
+            }
+            if (url === dlOf('vault-v0.50.0')) return { ok: true, text: async () => 'ee'.repeat(32) + '\n' };
+            return { ok: false, status: 404 };
+        });
+        expect((await vaultReleaseFor('ee'.repeat(32), 'vault-v0.50.0'))?.version).toBe('v0.50.0');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        // Known from then on, with no hint and no request.
+        forgetPublishedReleases();
+        fetchMock.mockClear();
+        expect((await vaultReleaseFor('ee'.repeat(32)))?.version).toBe('v0.50.0');
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('never lets a hint make a build pass', async () => {
+        const answer = (over: Record<string, unknown>, body = 'ee'.repeat(32)) =>
+            fetchMock.mockImplementation(async (url: string) => {
+                if (url.includes('/releases/tags/')) {
+                    return { ok: true, json: async () => ({ tag_name: 'vault-v0.50.0', assets: [{ name: 'mrenclave.txt', browser_download_url: dlOf('vault-v0.50.0') }], ...over }) };
+                }
+                if (url === dlOf('vault-v0.50.0')) return { ok: true, text: async () => body };
+                // The full list knows no such build either.
+                if (url.includes('/releases?')) return { ok: true, json: async () => [] };
+                return { ok: false, status: 404 };
+            });
+        const build = 'ee'.repeat(32);
+        // The release is another build, a draft, a prerelease, or its file is elsewhere.
+        answer({}, 'dd'.repeat(32));
+        expect(await vaultReleaseFor(build, 'vault-v0.50.0')).toBeNull();
+        for (const over of [{ draft: true }, { prerelease: true }, { tag_name: 'vault-v0.51.0' },
+            { assets: [{ name: 'mrenclave.txt', browser_download_url: 'https://example.com/mrenclave.txt' }] }]) {
+            forgetPublishedReleases();
+            answer(over);
+            expect(await vaultReleaseFor(build, 'vault-v0.50.0')).toBeNull();
+        }
+        // A hint that is not a release tag is not looked up at all.
+        forgetPublishedReleases();
+        fetchMock.mockReset();
+        fetchMock.mockImplementation(async (url: string) => (url.includes('/releases?') ? { ok: true, json: async () => [] } : { ok: false, status: 404 }));
+        expect(await vaultReleaseFor(build, '../../../evil')).toBeNull();
+        expect(fetchMock.mock.calls.every((c) => !String(c[0]).includes('/tags/'))).toBe(true);
     });
 
     it('throws when GitHub cannot be reached for a build not pinned', async () => {

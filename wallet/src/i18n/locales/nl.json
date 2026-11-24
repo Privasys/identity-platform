@@ -1332,6 +1332,7 @@
     "approveOldKeyDelete": "Verwijderen van een oude sleutel goedkeuren",
     "explainOldKeyDelete": "Dit verwijdert de oude sleutel voorgoed, zodra de sleutel bestaat die hem vervangt. Keur alleen goed als u deze wijziging zelf hebt gestart.",
     "replacedBy": "Vervangen door",
+    "rulesFingerprint": "Vingerafdruk van de nieuwe regels",
     "approvePolicy": "Appbeleid goedkeuren",
     "explainPolicy": "Keur dit beleid voor de app goed: welke apps hem mogen aanroepen, vanaf welke machines, en welke apps hij mag aanroepen. Keur alleen beleid goed dat je zelf hebt ingesteld.",
     "policyDocument": "Beleidsdocument",

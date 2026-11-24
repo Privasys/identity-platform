@@ -1439,6 +1439,7 @@
     "approveOldKeyDelete": "Cymeradwyo dileu hen allwedd",
     "explainOldKeyDelete": "Mae hyn yn dileu’r hen allwedd am byth, unwaith y bydd yr allwedd sy’n cymryd ei lle yn bodoli. Cymeradwywch dim ond os mai chi ddechreuodd y newid hwn.",
     "replacedBy": "Yn cael ei disodli gan",
+    "rulesFingerprint": "Ôl bys y rheolau newydd",
     "approvePolicy": "Cymeradwyo polisi'r ap",
     "explainPolicy": "Awdurdodwch y polisi hwn ar gyfer yr ap: pa apiau all ei alw, o ba beiriannau, a pha apiau y gall ef eu galw. Cymeradwywch bolisi rydych chi wedi'i osod eich hun yn unig.",
     "policyDocument": "Dogfen y polisi",

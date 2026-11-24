@@ -51,6 +51,8 @@ export interface V2Summary {
     new_policy?: unknown;
     /** A delete_after for a created successor: the key the old one waits for. */
     successor_handle?: string;
+    /** The vaults' release tag, as a hint for the lookup. Bound by nothing. */
+    vault_release?: string;
 }
 
 export interface CheckedV2 {
@@ -187,11 +189,15 @@ export type V2Release =
     /** GitHub could not be reached. */
     | { kind: 'unreachable' };
 
-/** Name the vaults' build as a published Enclave Vault release. */
-export async function checkV2Release(checked: CheckedV2): Promise<V2Release> {
+/**
+ * Name the vaults' build as a published Enclave Vault release. `hint` is a
+ * release tag relayed with the request: it says where to look first, and
+ * GitHub's answer is what counts.
+ */
+export async function checkV2Release(checked: CheckedV2, hint?: string): Promise<V2Release> {
     if (checked.builds.length !== 1) return { kind: 'unpublished', build: checked.builds.join(', ') };
     try {
-        const release = await vaultReleaseFor(checked.builds[0]);
+        const release = await vaultReleaseFor(checked.builds[0], hint);
         return release ? { kind: 'ok', release } : { kind: 'unpublished', build: checked.builds[0] };
     } catch {
         return { kind: 'unreachable' };

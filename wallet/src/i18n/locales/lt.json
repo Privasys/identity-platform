@@ -1367,6 +1367,7 @@
     "approveOldKeyDelete": "Patvirtinti seno rakto ištrynimą",
     "explainOldKeyDelete": "Tai visam laikui ištrina seną raktą, kai jau yra jį pakeičiantis raktas. Patvirtinkite tik tuo atveju, jei patys pradėjote šį pakeitimą.",
     "replacedBy": "Pakeičia",
+    "rulesFingerprint": "Naujų taisyklių atspaudas",
     "approvePolicy": "Patvirtinti programėlės politiką",
     "explainPolicy": "Patvirtinkite šią programėlės politiką: kurios programėlės gali ją kviesti, iš kurių įrenginių ir kurias programėles ji gali kviesti. Tvirtinkite tik politiką, kurią nustatėte patys.",
     "policyDocument": "Politikos dokumentas",

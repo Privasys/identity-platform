@@ -1415,6 +1415,7 @@
     "approveOldKeyDelete": "Ceadaigh scriosadh seaneochrach",
     "explainOldKeyDelete": "Scriosann sé seo an tseaneochair go buan, a luaithe atá an eochair a thagann ina háit ann. Ná ceadaigh ach amháin má chuir tú féin tús leis an athrú seo.",
     "replacedBy": "Ina háit",
+    "rulesFingerprint": "Méarlorg na rialacha nua",
     "approvePolicy": "Ceadaigh polasaí na haipe",
     "explainPolicy": "Údaraigh an polasaí seo don aip: cé na haipeanna ar féidir leo glaoch uirthi, ó cé na meaisíní, agus cé na haipeanna ar féidir léi glaoch orthu. Ná ceadaigh ach polasaí a shocraigh tú féin.",
     "policyDocument": "Doiciméad an pholasaí",

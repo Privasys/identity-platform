@@ -32,6 +32,8 @@
 
 import { sha256 } from '@noble/hashes/sha2.js';
 
+import * as SecureStore from '@/utils/storage';
+
 const DOMAIN = 'privasys-vault-frost-reshare-v1';
 const RELEASES_API = 'https://api.github.com/repos/Privasys/enclave-vaults/releases?per_page=30';
 const RELEASE_TAG = /^vault-v\d+\.\d+\.\d+$/;
@@ -68,6 +70,9 @@ export interface VaultRelease {
  * with each (checked 2026-11-24). Newer ones are read from GitHub.
  */
 const PINNED: Record<string, VaultRelease> = {
+    '28b01b4b2de825bf19ed6a8622af95ecf61d3f759bf5ed0d8e6c8415acc6fa4b': release('vault-v0.42.0'),
+    '434ca8138643088ffb8af3ac575e2ec76f6fcc65fbf6ef19c8435ff4d995c554': release('vault-v0.41.0'),
+    '47c67a77fba9ac0f2092b49588abcbefb3ec4daf36637dce6f46e7d046665902': release('vault-v0.40.0'),
     '6b516eab16067c519627e6fe26b636da861ccf5722f20ea37ef6559b8925b435': release('vault-v0.39.0'),
     '9ee403a6e3c42a16c3e6e940fdbfd77086aae505580ca35b8aaa20893b24171f': release('vault-v0.38.0'),
 };
@@ -183,41 +188,119 @@ export function checkReshare(s: ReshareSummaryFields): CheckedReshare | null {
     return { mrenclave, vaults, threshold, helpers: helpers as number[] };
 }
 
-let published: Promise<Record<string, VaultRelease>> | null = null;
+const RELEASE_BY_TAG = 'https://api.github.com/repos/Privasys/enclave-vaults/releases/tags/';
+const DOWNLOAD_PREFIX = 'https://github.com/Privasys/enclave-vaults/releases/download/';
+/** Where releases GitHub confirmed are kept, so each is looked up once. */
+const STORE_KEY = 'privasys.vault-releases';
 
-/** The published releases' MRENCLAVEs, read once per launch from GitHub. */
+interface GitHubRelease {
+    tag_name?: string;
+    draft?: boolean;
+    prerelease?: boolean;
+    assets?: Array<{ name?: string; browser_download_url?: string }>;
+}
+
+/** The MRENCLAVE a published release states, or null when it states none. */
+async function mrenclaveOf(r: GitHubRelease): Promise<string | null> {
+    if (!r.tag_name || !RELEASE_TAG.test(r.tag_name) || r.draft || r.prerelease) return null;
+    const asset = r.assets?.find((a) => a.name === 'mrenclave.txt')?.browser_download_url;
+    // Only this release's own file, in this repository.
+    if (asset !== `${DOWNLOAD_PREFIX}${r.tag_name}/mrenclave.txt`) return null;
+    try {
+        const res = await fetch(asset);
+        if (!res.ok) return null;
+        const m = (await res.text()).trim().toLowerCase();
+        return HEX32.test(m) ? m : null;
+    } catch {
+        return null;
+    }
+}
+
+let published: Promise<Record<string, VaultRelease>> | null = null;
+/** Releases GitHub confirmed, this launch and earlier ones (MRENCLAVE to release). */
+let confirmed: Record<string, VaultRelease> | null = null;
+
+async function loadConfirmed(): Promise<Record<string, VaultRelease>> {
+    if (confirmed) return confirmed;
+    const out: Record<string, VaultRelease> = {};
+    try {
+        const raw = await SecureStore.getItemAsync(STORE_KEY);
+        const tags = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+        for (const [m, tag] of Object.entries(tags)) {
+            if (HEX32.test(m) && typeof tag === 'string' && RELEASE_TAG.test(tag)) out[m] = release(tag);
+        }
+    } catch {
+        /* nothing kept, or storage unavailable */
+    }
+    confirmed = out;
+    return out;
+}
+
+async function remember(found: Record<string, VaultRelease>): Promise<void> {
+    const all = { ...(await loadConfirmed()), ...found };
+    confirmed = all;
+    const tags: Record<string, string> = {};
+    for (const [m, r] of Object.entries(all)) tags[m] = `vault-${r.version}`;
+    await SecureStore.setItemAsync(STORE_KEY, JSON.stringify(tags)).catch(() => {});
+}
+
+/** The published releases' MRENCLAVEs, read from GitHub, all files at once. */
 async function publishedReleases(): Promise<Record<string, VaultRelease>> {
     const res = await fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } });
     if (!res.ok) throw new Error(`GitHub releases (${res.status})`);
-    const list = (await res.json()) as Array<{
-        tag_name?: string;
-        draft?: boolean;
-        prerelease?: boolean;
-        assets?: Array<{ name?: string; browser_download_url?: string }>;
-    }>;
+    const list = (await res.json()) as GitHubRelease[];
+    const releases = Array.isArray(list) ? list : [];
+    const stated = await Promise.all(releases.map(mrenclaveOf));
     const out: Record<string, VaultRelease> = {};
-    for (const r of Array.isArray(list) ? list : []) {
-        if (!r.tag_name || !RELEASE_TAG.test(r.tag_name) || r.draft || r.prerelease) continue;
-        const asset = r.assets?.find((a) => a.name === 'mrenclave.txt')?.browser_download_url;
-        if (!asset?.startsWith('https://github.com/Privasys/enclave-vaults/releases/download/')) continue;
-        try {
-            const m = (await (await fetch(asset)).text()).trim().toLowerCase();
-            if (HEX32.test(m) && !out[m]) out[m] = release(r.tag_name);
-        } catch {
-            // One unreadable asset leaves the others.
-        }
-    }
+    releases.forEach((r, i) => {
+        const m = stated[i];
+        // The list is newest first: a build two releases share is named by the newer.
+        if (m && !out[m]) out[m] = release(r.tag_name as string);
+    });
+    await remember(out);
     return out;
+}
+
+/**
+ * Check one release named as a hint: whether the release `tag` is published
+ * and built as `mrenclave`. The hint only says where to look. A draft, a
+ * prerelease, a missing file or another build is no match, and a hint that is
+ * not a release tag is never sent anywhere.
+ */
+async function releaseByHint(tag: string, mrenclave: string): Promise<VaultRelease | null> {
+    if (!RELEASE_TAG.test(tag)) return null;
+    try {
+        const res = await fetch(`${RELEASE_BY_TAG}${tag}`, { headers: { Accept: 'application/vnd.github+json' } });
+        if (!res.ok) return null;
+        const r = (await res.json()) as GitHubRelease;
+        if (r.tag_name !== tag || (await mrenclaveOf(r)) !== mrenclave) return null;
+        const found = release(tag);
+        await remember({ [mrenclave]: found });
+        return found;
+    } catch {
+        return null;
+    }
 }
 
 /**
  * The published Enclave Vault release built as `mrenclave`, or null when no
  * release is. Throws when GitHub cannot be reached and the build is not one
- * pinned here, so the card can say it could not check rather than "unknown".
+ * known here, so the card can say it could not check rather than "unknown".
+ *
+ * Known without asking: the releases pinned in this wallet, and those GitHub
+ * confirmed before. `hint` is a release tag from whoever relays the request:
+ * that one release is checked first, which is one lookup where the whole list
+ * is many. It cannot make anything pass: the answer is GitHub's.
  */
-export async function vaultReleaseFor(mrenclave: string): Promise<VaultRelease | null> {
+export async function vaultReleaseFor(mrenclave: string, hint?: string): Promise<VaultRelease | null> {
     const m = mrenclave.toLowerCase();
     if (PINNED[m]) return PINNED[m];
+    const kept = (await loadConfirmed())[m];
+    if (kept) return kept;
+    if (hint) {
+        const hinted = await releaseByHint(hint, m);
+        if (hinted) return hinted;
+    }
     if (!published) {
         published = publishedReleases().catch((e) => {
             published = null;
@@ -227,7 +310,14 @@ export async function vaultReleaseFor(mrenclave: string): Promise<VaultRelease |
     return (await published)[m] ?? null;
 }
 
-/** Forget what GitHub said, so a pull to refresh reads it again. */
+/** Forget what GitHub said this launch, so a pull to refresh reads it again. */
 export function forgetPublishedReleases(): void {
     published = null;
+}
+
+/** Forget everything kept, on disk too (tests). */
+export async function forgetVaultReleases(): Promise<void> {
+    published = null;
+    confirmed = null;
+    await SecureStore.deleteItemAsync(STORE_KEY).catch(() => {});
 }

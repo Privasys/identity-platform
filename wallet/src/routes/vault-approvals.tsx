@@ -62,6 +62,12 @@ function shortHex(hex: string, t: TFunction): string {
     return hex.length > 20 ? `${hex.slice(0, 10)}…${hex.slice(-6)}` : hex;
 }
 
+/** A key's own name within its app: its kind and generation, e.g. "storage-kek/v2". */
+function shortKeyName(handle: string): string {
+    const parts = handle.split('/').filter(Boolean);
+    return parts.length >= 2 ? parts.slice(-2).join('/') : handle;
+}
+
 /** A tappable row that opens a release / compare URL in the browser. */
 function ReleaseLinkRow({
     icon,
@@ -131,7 +137,7 @@ type V2Check =
 async function checkV2Request(req: VaultApprovalRequest): Promise<V2Check> {
     const checked = checkV2(req.vault_op, req.summary, Math.floor(Date.now() / 1000));
     if (!checked) return { kind: 'mismatch' };
-    const release = await checkV2Release(checked);
+    const release = await checkV2Release(checked, typeof req.summary.vault_release === 'string' ? req.summary.vault_release : undefined);
     if (release.kind === 'ok') {
         const sha256Hex = (text: string) =>
             Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
@@ -558,9 +564,7 @@ function VaultApprovalsScreen() {
                                 {v2?.kind === 'ok' && v2.successor ? (
                                     <RNView style={styles.row} testID="vault-v2-successor">
                                         <Text style={styles.label}>{t('vaultApprovals.replacedBy')}</Text>
-                                        <Text style={styles.mono} selectable>
-                                            {v2.successor}
-                                        </Text>
+                                        <Text style={styles.value}>{shortKeyName(v2.successor)}</Text>
                                     </RNView>
                                 ) : null}
 
@@ -650,10 +654,16 @@ function VaultApprovalsScreen() {
                                 {/* A renewal's digest is its resharing context, not
                                     a measurement: the release row above says
                                     what it binds. */}
-                                {s.measurement && !isReshare ? (
+                                {/* The delete of an old key binds the key that
+                                    replaces it, which the row above names. */}
+                                {s.measurement && !isReshare && !isOldKeyDelete ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>
-                                            {isPolicy ? t('vaultApprovals.policyDocument') : t('vaultApprovals.newMeasurement')}
+                                            {isPolicy
+                                                ? t('vaultApprovals.policyDocument')
+                                                : isKeyRules
+                                                  ? t('vaultApprovals.rulesFingerprint')
+                                                  : t('vaultApprovals.newMeasurement')}
                                         </Text>
                                         <Text style={styles.mono}>{shortHex(s.measurement, t)}</Text>
                                     </RNView>

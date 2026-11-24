@@ -1,6 +1,20 @@
 // Copyright (c) Privasys. All rights reserved.
 // SPDX-License-Identifier: AGPL-3.0-only
 
+jest.mock('@/utils/storage', () => {
+    const mockStore: Record<string, string> = {};
+    return {
+        mockStore,
+        getItemAsync: jest.fn(async (k: string) => mockStore[k] ?? null),
+        setItemAsync: jest.fn(async (k: string, v: string) => {
+            mockStore[k] = v;
+        }),
+        deleteItemAsync: jest.fn(async (k: string) => {
+            delete mockStore[k];
+        }),
+    };
+});
+
 import { createHash } from 'crypto';
 
 import { checkV2, checkV2Release, isV2, type V2Summary } from '@/services/vault-approval-v2';

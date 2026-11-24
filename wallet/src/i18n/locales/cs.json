@@ -1356,6 +1356,7 @@
     "approveOldKeyDelete": "Schválit smazání starého klíče",
     "explainOldKeyDelete": "Tím se starý klíč natrvalo smaže, jakmile existuje klíč, který ho nahrazuje. Schvalte jen tehdy, pokud jste tuto změnu zahájili vy.",
     "replacedBy": "Nahrazuje jej",
+    "rulesFingerprint": "Otisk nových pravidel",
     "approvePolicy": "Schválit zásady aplikace",
     "explainPolicy": "Povolte tyto zásady pro aplikaci: které aplikace ji mohou volat, z jakých počítačů a které aplikace může volat ona. Schvalujte jen zásady, které jste nastavili sami.",
     "policyDocument": "Dokument zásad",

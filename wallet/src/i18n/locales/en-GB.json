@@ -1343,6 +1343,7 @@
     "approveOldKeyDelete": "Approve deleting an old key",
     "explainOldKeyDelete": "This deletes the old key for good, once the key that replaces it exists. Approve only if you started this change.",
     "replacedBy": "Replaced by",
+    "rulesFingerprint": "Fingerprint of the new rules",
     "approvePolicy": "Approve app policy",
     "explainPolicy": "Authorise this policy for the app: which apps may call it, from which machines, and which apps it may call. Only approve a policy you set yourself.",
     "policyDocument": "Policy document",

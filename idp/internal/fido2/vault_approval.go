@@ -291,6 +291,10 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				// (published release + code-diff) from mgmt itself.
 				AppID     string `json:"app_id"`
 				VersionID string `json:"version_id"`
+				// VaultRelease is the vaults' release tag (e.g.
+				// "vault-v0.41.0"), a hint for the wallet's own lookup. The
+				// wallet verifies that release itself.
+				VaultRelease string `json:"vault_release"`
 				// Reshare only: the inputs of the resharing context, so the
 				// wallet can recompute measurement_digest and show the target
 				// vault build as its published release. Display only: a value
@@ -521,7 +525,7 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		}.withReshare(req.Operation, req.Context.TargetMrenclave, req.Context.TargetVaults,
 			req.Context.Threshold, req.Context.Helpers, req.Context.PublicKey).
 			withBindingV2(v2Binding, req.MemberIdentities, req.NewPolicy).withV1Binding(v2, nonce, exp).
-			withSuccessor(v2, req.SuccessorHandle), pendingExp)
+			withSuccessor(v2, req.SuccessorHandle).withVaultRelease(req.Context.VaultRelease), pendingExp)
 		// Log the REQUEST as well as the completion. Only /complete used to
 		// log ("vault-approval issued"), which reads like a request being
 		// created — so an operator watching the log could not tell an

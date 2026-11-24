@@ -1332,6 +1332,7 @@
     "approveOldKeyDelete": "Godkend sletning af en gammel nøgle",
     "explainOldKeyDelete": "Dette sletter den gamle nøgle for altid, når den nøgle, der erstatter den, findes. Godkend kun, hvis du selv startede denne ændring.",
     "replacedBy": "Erstattes af",
+    "rulesFingerprint": "Fingeraftryk af de nye regler",
     "approvePolicy": "Godkend appens politik",
     "explainPolicy": "Godkend denne politik for appen: hvilke apps der må kalde den, fra hvilke maskiner, og hvilke apps den må kalde. Godkend kun en politik, du selv har sat.",
     "policyDocument": "Politikdokument",

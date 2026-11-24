@@ -261,6 +261,9 @@ describe('wipe coverage', () => {
         // The platforms privasys.id publishes (audience and domains). The same
         // for every holder, no personal data.
         'src/services/platforms.ts',
+        // The published Enclave Vault releases GitHub confirmed (build to
+        // release tag). Public, the same for every holder.
+        'src/services/vault-reshare.ts',
         // The generic SecureStore/localStorage shim itself.
         'src/utils/storage.ts',
     ]);

@@ -21,6 +21,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -84,6 +85,21 @@ type vaultApprovalSummary struct {
 	// A delete_after for a created successor: the key the old one waits for.
 	// The wallet recomputes the binding's target from it.
 	SuccessorHandle string `json:"successor_handle,omitempty"`
+	// The vaults' release tag, a hint for the wallet's lookup. Bound by
+	// nothing; the wallet verifies the release on GitHub itself.
+	VaultRelease string `json:"vault_release,omitempty"`
+}
+
+// vaultReleaseTag is the only shape a vault release hint may have.
+var vaultReleaseTag = regexp.MustCompile(`^vault-v\d{1,4}\.\d{1,4}\.\d{1,4}$`)
+
+// withVaultRelease passes on the vaults' release tag as a hint for the
+// wallet's lookup. Anything that is not a release tag is dropped.
+func (s vaultApprovalSummary) withVaultRelease(tag string) vaultApprovalSummary {
+	if vaultReleaseTag.MatchString(tag) {
+		s.VaultRelease = tag
+	}
+	return s
 }
 
 // withSuccessor names the created successor of a delete_after.

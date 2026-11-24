@@ -1367,6 +1367,7 @@
     "approveOldKeyDelete": "Schváliť vymazanie starého kľúča",
     "explainOldKeyDelete": "Tým sa starý kľúč natrvalo vymaže, len čo existuje kľúč, ktorý ho nahrádza. Schváľte len vtedy, ak ste túto zmenu začali vy.",
     "replacedBy": "Nahrádza ho",
+    "rulesFingerprint": "Odtlačok nových pravidiel",
     "approvePolicy": "Schváliť pravidlá aplikácie",
     "explainPolicy": "Povoľte tieto pravidlá pre aplikáciu: ktoré aplikácie ju môžu volať, z ktorých počítačov a ktoré aplikácie môže volať ona. Schvaľujte len pravidlá, ktoré ste nastavili sami.",
     "policyDocument": "Dokument pravidiel",

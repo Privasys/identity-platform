@@ -79,6 +79,9 @@ export interface VaultApprovalSummary {
     new_policy?: unknown;
     // A delete_after for a created successor: the key the old one waits for.
     successor_handle?: string;
+    // The vaults' release tag (e.g. "vault-v0.41.0"), a hint for the wallet's
+    // own lookup on GitHub. Bound by nothing and believed for nothing.
+    vault_release?: string;
 }
 
 export interface VaultApprovalRequest {

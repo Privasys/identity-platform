@@ -1367,6 +1367,7 @@
     "approveOldKeyDelete": "Odobri brisanje starog ključa",
     "explainOldKeyDelete": "Ovo trajno briše stari ključ nakon što ključ koji ga zamjenjuje postoji. Odobrite samo ako ste vi pokrenuli ovu promjenu.",
     "replacedBy": "Zamjenjuje ga",
+    "rulesFingerprint": "Otisak novih pravila",
     "approvePolicy": "Odobri pravila aplikacije",
     "explainPolicy": "Odobrite ova pravila za aplikaciju: koje je aplikacije smiju pozivati, s kojih računala i koje aplikacije ona smije pozivati. Odobrite samo pravila koja ste sami postavili.",
     "policyDocument": "Dokument pravila",

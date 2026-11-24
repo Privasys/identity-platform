@@ -249,9 +249,24 @@ func (h *Handler) sendVaultApprovalPush(userID, pushToken, vaultOp string, summa
 	}
 }
 
-// shortHandle renders the app-id segment of a vault handle for a push body.
+// shortHandle names a vault handle for a push body when the initiator gave no
+// name. The push travels through third-party push infrastructure, so it uses
+// only the owner-given key name, never the key vault's id or a user's subject:
+// vaults/<keyvault-id>/<name>[/v<N>] is "key <name>", users/<sub>/<name> is
+// "secret <name>", and an app's handle is "app <id prefix>".
 func shortHandle(handle string) string {
 	parts := strings.Split(handle, "/")
+	if len(parts) >= 3 && parts[2] != "" {
+		switch parts[0] {
+		case "vaults":
+			return "key " + clipName(parts[2])
+		case "users":
+			return "secret " + clipName(parts[2])
+		}
+	}
+	if parts[0] == "vaults" || parts[0] == "users" {
+		return "your key"
+	}
 	if len(parts) >= 2 {
 		id := parts[1]
 		if len(id) > 8 {
@@ -260,6 +275,16 @@ func shortHandle(handle string) string {
 		return "app " + id
 	}
 	return "your app"
+}
+
+// maxPushNameRunes bounds a key name in a push body.
+const maxPushNameRunes = 48
+
+func clipName(s string) string {
+	if r := []rune(s); len(r) > maxPushNameRunes {
+		return string(r[:maxPushNameRunes-1]) + "…"
+	}
+	return s
 }
 
 // VaultApprovalPending handles GET /fido2/vault-approval/pending.

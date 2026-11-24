@@ -56,7 +56,7 @@ env:
   BUN_VERSION: '1.3.11'
   # Auth for the @privasys scoped registry (wallet/.npmrc), as in build-wallet.
   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  RATLS_VERSION: v0.15.1
+  RATLS_VERSION: v0.15.2
   MAESTRO_VERSION: '1.39.13'
   # The iOS driver (an XCTest runner) can take minutes to start on a cold
   # simulator; its default wait gave up on the iPad.

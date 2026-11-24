@@ -155,7 +155,10 @@ env:
   # carry the body inside a JSON string). Also brings v0.10-v0.14: platform
   # identity read from the quote, an optional platform allow-list on the
   # policy, a failed re-attestation closing the connection.
-  RATLS_VERSION: v0.15.0
+  # v0.15.2 is the same code built for iOS 16 and later: before it the
+  # library's C and assembly were built for the SDK's own iOS version, newer
+  # than the wallet's deployment target.
+  RATLS_VERSION: v0.15.2
 
 jobs:
   # ─── Type-check & lint (runs on all PRs) ──────────────────────────

@@ -34,6 +34,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 
 	"github.com/Privasys/idp/internal/tokens"
+	"github.com/Privasys/idp/internal/vaultbinding"
 )
 
 // vaultApprovalPage is the browser ceremony page the CLI opens: it reads the
@@ -264,6 +265,15 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			MeasurementDigest string `json:"measurement_digest"`
 			PolicyVersion     uint64 `json:"policy_version"`
 			TTLSeconds        int64  `json:"ttl_seconds"`
+			// Binding v2 (vault_approval_v2.go), switched on by
+			// binding_version 2: the approval names the vaults it is for and
+			// binds its target, which replaces measurement_digest.
+			BindingVersion   int                          `json:"binding_version"`
+			Target           string                       `json:"target"`
+			Members          []string                     `json:"members"`
+			MemberIdentities []vaultbinding.VaultIdentity `json:"member_identities"`
+			IssuerIndex      uint32                       `json:"issuer_index"`
+			NewPolicy        json.RawMessage              `json:"new_policy"`
 			// Advisory display context for the approver's wallet. Not part of the
 			// vault_op binding — the vault enforces only the operation tuple.
 			Context struct {
@@ -290,7 +300,7 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				PublicKey       string `json:"public_key"`
 			} `json:"context"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Handle == "" {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil || req.Handle == "" {
 			errorJSON(w, http.StatusBadRequest, "handle required")
 			return
 		}
@@ -299,78 +309,107 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			errorJSON(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		switch req.Operation {
-		case "export":
-			// Export binds the empty measurement slot; a measurement_digest is
-			// neither required nor honoured (force it empty so a caller cannot
-			// smuggle a non-empty binding that would collide with promote).
-			req.MeasurementDigest = ""
-		case "policy-update":
-			// A key-policy update (vault UpdatePolicy — e.g. arming the
-			// acceptable-TCB set, retiring a measurement under step-up). The
-			// vault's UpdatePolicy step-up condition is amr-only (non-bound),
-			// so like export this binds the empty measurement slot; the value
-			// of this operation type is the HONEST approval card — before it
-			// existed, policy updates had to ride an "export"-labelled
-			// ceremony (2026-08-17).
-			req.MeasurementDigest = ""
-		case "reshare":
-			// Resharing a threshold key: its old vaults deal their shares to
-			// new ones (a renewal, or a move to another constellation). The
-			// measurement slot carries the vault's resharing context (the key,
-			// the helpers, the new vaults, the threshold and the new vaults'
-			// build), so an approval moves the key to exactly those vaults.
-			if len(req.MeasurementDigest) != 64 {
-				errorJSON(w, http.StatusBadRequest, "measurement_digest (the 32-byte resharing context, hex) required for reshare")
+		if req.BindingVersion != 0 && req.BindingVersion != 1 && req.BindingVersion != 2 {
+			errorJSON(w, http.StatusBadRequest, "unknown binding_version")
+			return
+		}
+		v2 := req.BindingVersion == 2
+		v2Fields := vaultV2Fields{
+			Operation: req.Operation, Handle: req.Handle, Target: req.Target, PolicyVersion: req.PolicyVersion,
+			Members: req.Members, IssuerIndex: req.IssuerIndex, NewPolicy: req.NewPolicy,
+		}
+		var v2Target string
+		if v2 {
+			if v2Target, err = checkVaultV2Fields(v2Fields, false); err == nil {
+				err = checkVaultMemberIdentities(req.Members, req.MemberIdentities)
+			}
+			if err != nil {
+				errorJSON(w, http.StatusBadRequest, err.Error())
 				return
 			}
-			c := req.Context
-			if !reshareContextFits(c.TargetMrenclave, c.TargetVaults, c.Threshold, c.Helpers, c.PublicKey) {
+			// What the wallet shows as the bound value.
+			req.MeasurementDigest = v2Target
+			if c := req.Context; req.Operation == "reshare" &&
+				!reshareContextFits(c.TargetMrenclave, c.TargetVaults, c.Threshold, c.Helpers, c.PublicKey) {
 				errorJSON(w, http.StatusBadRequest, "reshare context field too long")
 				return
 			}
-		case "", "promote":
-			req.Operation = "promote"
-			if req.MeasurementDigest == "" {
-				errorJSON(w, http.StatusBadRequest, "measurement_digest required for promote")
+		}
+		// v1 operations and what each binds. A v2 request was checked above.
+		if !v2 {
+			switch req.Operation {
+			case "export":
+				// Export binds the empty measurement slot; a measurement_digest is
+				// neither required nor honoured (force it empty so a caller cannot
+				// smuggle a non-empty binding that would collide with promote).
+				req.MeasurementDigest = ""
+			case "policy-update":
+				// A key-policy update (vault UpdatePolicy — e.g. arming the
+				// acceptable-TCB set, retiring a measurement under step-up). The
+				// vault's UpdatePolicy step-up condition is amr-only (non-bound),
+				// so like export this binds the empty measurement slot; the value
+				// of this operation type is the HONEST approval card — before it
+				// existed, policy updates had to ride an "export"-labelled
+				// ceremony (2026-08-17).
+				req.MeasurementDigest = ""
+			case "reshare":
+				// Resharing a threshold key: its old vaults deal their shares to
+				// new ones (a renewal, or a move to another constellation). The
+				// measurement slot carries the vault's resharing context (the key,
+				// the helpers, the new vaults, the threshold and the new vaults'
+				// build), so an approval moves the key to exactly those vaults.
+				if len(req.MeasurementDigest) != 64 {
+					errorJSON(w, http.StatusBadRequest, "measurement_digest (the 32-byte resharing context, hex) required for reshare")
+					return
+				}
+				c := req.Context
+				if !reshareContextFits(c.TargetMrenclave, c.TargetVaults, c.Threshold, c.Helpers, c.PublicKey) {
+					errorJSON(w, http.StatusBadRequest, "reshare context field too long")
+					return
+				}
+			case "", "promote":
+				req.Operation = "promote"
+				if req.MeasurementDigest == "" {
+					errorJSON(w, http.StatusBadRequest, "measurement_digest required for promote")
+					return
+				}
+			case "app-policy":
+				// An app's owner approving its policy document: who owns the app,
+				// which peers it may call and who may call it. The runtime
+				// recomputes this binding from the document in front of it, as the
+				// vault does for promote, so an approval installs one document and
+				// no other. handle is "app:<app-id>:policy", measurement_digest
+				// the SHA-256 of the document bytes, policy_version its seq.
+				if req.MeasurementDigest == "" {
+					errorJSON(w, http.StatusBadRequest, "measurement_digest (the policy document digest) required for app-policy")
+					return
+				}
+				if !strings.HasPrefix(req.Handle, "app:") || !strings.HasSuffix(req.Handle, ":policy") {
+					errorJSON(w, http.StatusBadRequest, "app-policy handle must be app:<app-id>:policy")
+					return
+				}
+			case "app-recovery":
+				// An app-defined recovery approval (e.g. Privasys Drive
+				// recover_tenant): the app computes a digest over its recovery
+				// tuple and the approver's assertion binds it. handle carries the
+				// app-scoped operation URI (e.g. "app:<app-id>:recover:<rid>"),
+				// measurement_digest the recovery digest (hex). The verifying app
+				// recomputes the binding from its own record plus the token's
+				// nonce/exp, exactly as the vault does for promote. Cannot collide
+				// with promote/export: the handle namespace is disjoint from vault
+				// key handles.
+				if req.MeasurementDigest == "" {
+					errorJSON(w, http.StatusBadRequest, "measurement_digest (the recovery digest) required for app-recovery")
+					return
+				}
+				if !strings.HasPrefix(req.Handle, "app:") {
+					errorJSON(w, http.StatusBadRequest, "app-recovery handle must be an app: URI")
+					return
+				}
+			default:
+				errorJSON(w, http.StatusBadRequest, "unknown operation")
 				return
 			}
-		case "app-policy":
-			// An app's owner approving its policy document: who owns the app,
-			// which peers it may call and who may call it. The runtime
-			// recomputes this binding from the document in front of it, as the
-			// vault does for promote, so an approval installs one document and
-			// no other. handle is "app:<app-id>:policy", measurement_digest
-			// the SHA-256 of the document bytes, policy_version its seq.
-			if req.MeasurementDigest == "" {
-				errorJSON(w, http.StatusBadRequest, "measurement_digest (the policy document digest) required for app-policy")
-				return
-			}
-			if !strings.HasPrefix(req.Handle, "app:") || !strings.HasSuffix(req.Handle, ":policy") {
-				errorJSON(w, http.StatusBadRequest, "app-policy handle must be app:<app-id>:policy")
-				return
-			}
-		case "app-recovery":
-			// An app-defined recovery approval (e.g. Privasys Drive
-			// recover_tenant): the app computes a digest over its recovery
-			// tuple and the approver's assertion binds it. handle carries the
-			// app-scoped operation URI (e.g. "app:<app-id>:recover:<rid>"),
-			// measurement_digest the recovery digest (hex). The verifying app
-			// recomputes the binding from its own record plus the token's
-			// nonce/exp, exactly as the vault does for promote. Cannot collide
-			// with promote/export: the handle namespace is disjoint from vault
-			// key handles.
-			if req.MeasurementDigest == "" {
-				errorJSON(w, http.StatusBadRequest, "measurement_digest (the recovery digest) required for app-recovery")
-				return
-			}
-			if !strings.HasPrefix(req.Handle, "app:") {
-				errorJSON(w, http.StatusBadRequest, "app-recovery handle must be an app: URI")
-				return
-			}
-		default:
-			errorJSON(w, http.StatusBadRequest, "unknown operation")
-			return
 		}
 		// Clamp, don't collapse: an over-long request used to fall back to
 		// the 120s default, so asking for MORE time silently gave you LESS
@@ -394,8 +433,20 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		}
 		nonce := base64.RawURLEncoding.EncodeToString(nb)
 
-		binding := computeVaultApprovalBinding(req.Handle, req.MeasurementDigest, req.PolicyVersion, nonce, exp)
-		vaultOp := base64.RawURLEncoding.EncodeToString(binding[:])
+		var binding [32]byte
+		var vaultOp string
+		var v2Binding *vaultBindingFields
+		if v2 {
+			fields, sum, op, err := bindVaultV2(sub, v2Fields, v2Target, nonce, exp)
+			if err != nil {
+				errorJSON(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			binding, vaultOp, v2Binding = sum, op, &fields
+		} else {
+			binding = computeVaultApprovalBinding(req.Handle, req.MeasurementDigest, req.PolicyVersion, nonce, exp)
+			vaultOp = base64.RawURLEncoding.EncodeToString(binding[:])
+		}
 
 		creds, err := h.loadCredentials(sub)
 		if err != nil || len(creds) == 0 {
@@ -445,7 +496,8 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			AppID:         req.Context.AppID,
 			VersionID:     req.Context.VersionID,
 		}.withReshare(req.Operation, req.Context.TargetMrenclave, req.Context.TargetVaults,
-			req.Context.Threshold, req.Context.Helpers, req.Context.PublicKey), exp)
+			req.Context.Threshold, req.Context.Helpers, req.Context.PublicKey).
+			withBindingV2(v2Binding, req.MemberIdentities, req.NewPolicy), exp)
 		// Log the REQUEST as well as the completion. Only /complete used to
 		// log ("vault-approval issued"), which reads like a request being
 		// created — so an operator watching the log could not tell an
@@ -458,6 +510,9 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		// browser page) keep working; the extra keys are additive.
 		out := map[string]interface{}{"publicKey": options.Response, "vault_op": vaultOp,
 			"push_registered": pushRegistered, "approval_deeplink": walletDeepLink(vaultOp)}
+		if v2Binding != nil {
+			out["binding"] = v2Binding
+		}
 		writeJSON(w, out)
 	}
 }

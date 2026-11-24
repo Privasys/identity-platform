@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/Privasys/idp/internal/tokens"
+	"github.com/Privasys/idp/internal/vaultbinding"
 )
 
 // vaultApprovalSummary is the human-facing description of a pending approval,
@@ -66,6 +67,28 @@ type vaultApprovalSummary struct {
 	Threshold       string `json:"threshold,omitempty"`
 	Helpers         string `json:"helpers,omitempty"`
 	PublicKey       string `json:"public_key,omitempty"`
+
+	// Binding v2 only: every field of the text the approval binds, so the
+	// wallet rebuilds it; the vaults' own identities, which the wallet
+	// verifies before it shows the constellation; and, for update_policy, the
+	// new policy, whose digest is the target. Served with the pending
+	// approval, never carried in a push.
+	Binding          *vaultBindingFields          `json:"binding,omitempty"`
+	MemberIdentities []vaultbinding.VaultIdentity `json:"member_identities,omitempty"`
+	NewPolicy        json.RawMessage              `json:"new_policy,omitempty"`
+}
+
+// withBindingV2 adds what a v2 approval carries for the wallet. A v1 summary
+// (b nil) is unchanged.
+func (s vaultApprovalSummary) withBindingV2(b *vaultBindingFields, ids []vaultbinding.VaultIdentity, newPolicy json.RawMessage) vaultApprovalSummary {
+	if b == nil {
+		return s
+	}
+	s.Binding, s.MemberIdentities = b, ids
+	if len(newPolicy) > 0 && string(newPolicy) != "null" {
+		s.NewPolicy = newPolicy
+	}
+	return s
 }
 
 // maxReshareFieldBytes bounds one reshare context field. Never clipped: a

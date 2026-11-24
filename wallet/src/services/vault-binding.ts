@@ -45,6 +45,7 @@ export const VAULT_OPS = [
     'reshare',
     'revoke_pending',
     'delete_after',
+    'update_policy_from',
 ] as const;
 export type VaultOp = (typeof VAULT_OPS)[number];
 
@@ -114,5 +115,18 @@ export function bindingVaultOp(b: VaultBinding): string {
  */
 export function deleteAfterTarget(successorHandle: string, successorTarget: string): string {
     const text = `privasys-delete-after-v1\n${successorHandle}\n${successorTarget === '' ? '-' : successorTarget}`;
+    return Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * The target of an update_policy_from: the rules in force and the new ones,
+ * bound together. hex SHA-256 of "privasys-update-policy-from-v1\n"
+ * PD(current) "\n" PD(new), each PD 64 lowercase hex digits.
+ */
+export function updatePolicyFromTarget(currentPd: string, newPd: string): string {
+    if (!/^[0-9a-f]{64}$/.test(currentPd) || !/^[0-9a-f]{64}$/.test(newPd)) {
+        throw new Error('vault binding: a policy digest is not 64 lowercase hex digits');
+    }
+    const text = `privasys-update-policy-from-v1\n${currentPd}\n${newPd}`;
     return Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
 }

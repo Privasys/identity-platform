@@ -86,9 +86,10 @@ func checkVaultV2Fields(f vaultV2Fields, inBatch bool) (string, error) {
 		target = ""
 	}
 	hasPolicy := len(f.NewPolicy) > 0 && string(f.NewPolicy) != "null"
-	policyOp := f.Operation == string(vaultbinding.BindUpdatePolicy) || f.Operation == string(vaultbinding.BindUpdatePolicyFrom)
+	policyOp := f.Operation == string(vaultbinding.BindUpdatePolicy) || f.Operation == string(vaultbinding.BindUpdatePolicyFrom) ||
+		f.Operation == string(vaultbinding.BindCreate)
 	if hasPolicy && !policyOp {
-		return "", errors.New("new_policy is for update_policy and update_policy_from only")
+		return "", errors.New("new_policy is for create, update_policy and update_policy_from only")
 	}
 	hasCurrent := len(f.CurrentPolicy) > 0 && string(f.CurrentPolicy) != "null"
 	if hasCurrent && f.Operation != string(vaultbinding.BindUpdatePolicyFrom) {
@@ -107,6 +108,25 @@ func checkVaultV2Fields(f vaultV2Fields, inBatch bool) (string, error) {
 		// wallet copy; until then export goes to the caller and binds nothing.
 		if target != "" {
 			return "", fmt.Errorf("%s takes no target", f.Operation)
+		}
+	case vaultbinding.BindCreate:
+		// A key created under an owner's approval: bound to the policy it is
+		// born with. One approval each, and it has no version yet.
+		if inBatch {
+			return "", errors.New("create is one approval each")
+		}
+		if f.PolicyVersion != 0 {
+			return "", errors.New("policy_version must be 0 for create")
+		}
+		if !hasPolicy || len(f.NewPolicy) > vaultV2MaxPolicyBytes {
+			return "", errors.New("new_policy required for create")
+		}
+		pd, err := vaultbinding.PolicyDigestJSON(f.NewPolicy)
+		if err != nil {
+			return "", fmt.Errorf("new_policy: %v", err)
+		}
+		if pd != target {
+			return "", errors.New("target is not the digest of new_policy")
 		}
 	case vaultbinding.BindUpdatePolicy:
 		if !hasPolicy || len(f.NewPolicy) > vaultV2MaxPolicyBytes {

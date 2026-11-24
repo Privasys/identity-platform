@@ -23,7 +23,7 @@
  * build as a published Enclave Vault release, from GitHub.
  */
 
-import { bindingVaultOp, deleteAfterTarget, VAULT_OPS, type VaultBinding, type VaultOp } from './vault-binding';
+import { bindingVaultOp, deleteAfterTarget, updatePolicyFromTarget, VAULT_OPS, type VaultBinding, type VaultOp } from './vault-binding';
 import { checkMembers, policyDigest, type VaultIdentity } from './vault-identity';
 import { vaultReleaseFor, type VaultRelease } from './vault-reshare';
 
@@ -49,6 +49,8 @@ export interface V2Summary {
     binding?: BindingFields;
     member_identities?: VaultIdentity[];
     new_policy?: unknown;
+    /** update_policy_from: the rules in force, as the vault returns them. */
+    current_policy?: unknown;
     /** A delete_after for a created successor: the key the old one waits for. */
     successor_handle?: string;
     /** The vaults' release tag, as a hint for the lookup. Bound by nothing. */
@@ -65,8 +67,10 @@ export interface CheckedV2 {
     billingIds: string[];
     /** Unix seconds: the approval is good until then. */
     exp: number;
-    /** The new policy, for a policy update. */
+    /** The new policy, for a policy update or a creation. */
     newPolicy?: unknown;
+    /** The rules in force, when the approval binds them too: what changes can then be shown. */
+    currentPolicy?: unknown;
     /** For the delete of an old key: the key that replaces it. */
     successor?: string;
 }
@@ -145,14 +149,27 @@ export function checkV2(vaultOp: string, summary: V2Summary, nowSeconds: number)
     if (!members) return null;
 
     const hasPolicy = summary.new_policy !== undefined && summary.new_policy !== null;
-    if (b.op === 'update_policy') {
-        if (!hasPolicy) return null;
+    const hasCurrent = summary.current_policy !== undefined && summary.current_policy !== null;
+    if (b.op === 'update_policy' || b.op === 'create') {
+        // Bound to the policy it installs. A key being created has no version yet.
+        if (!hasPolicy || hasCurrent) return null;
+        if (b.op === 'create' && b.policy_version !== 0) return null;
         try {
             if (policyDigest(summary.new_policy) !== b.target) return null;
         } catch {
             return null;
         }
-    } else if (hasPolicy) {
+    } else if (b.op === 'update_policy_from') {
+        // Bound to the rules in force and the new ones together, so the
+        // change between the two is what is signed.
+        if (!hasPolicy || !hasCurrent) return null;
+        try {
+            const want = updatePolicyFromTarget(policyDigest(summary.current_policy), policyDigest(summary.new_policy));
+            if (want !== b.target) return null;
+        } catch {
+            return null;
+        }
+    } else if (hasPolicy || hasCurrent) {
         return null;
     }
     // The delete of an old key waits for the key that replaces it: the
@@ -177,6 +194,7 @@ export function checkV2(vaultOp: string, summary: V2Summary, nowSeconds: number)
         billingIds: members.billingIds,
         exp: b.exp,
         newPolicy: hasPolicy ? summary.new_policy : undefined,
+        ...(hasCurrent ? { currentPolicy: summary.current_policy } : {}),
         ...(successor ? { successor } : {}),
     };
 }

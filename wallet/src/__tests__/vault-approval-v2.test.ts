@@ -209,3 +209,38 @@ describe('a request that leaves its binding out', () => {
         expect(checkV2(promote.vaultOp, promote.summary, NOW)).toBeNull();
     });
 });
+
+describe('rules bound with the rules they replace, and a key created under approval', () => {
+    const { updatePolicyFromTarget } = require('@/services/vault-binding');
+    const vector = require('../../../idp/internal/vaultbinding/testdata/v2_vectors.json');
+
+    it('computes the vault\'s target for update_policy_from', () => {
+        const v = vector.binding_v2_update_policy_from;
+        expect(policyDigest(JSON.parse(v.current_policy_as_get_policy_returns_it))).toBe(v.current_pd);
+        expect(updatePolicyFromTarget(v.current_pd, v.new_pd)).toBe(v.target);
+    });
+
+    it('accepts a change bound to both sets of rules, and gives both to the card', () => {
+        const current = { operations: [], version: 1 };
+        const next = { operations: [], version: 2 };
+        const target = updatePolicyFromTarget(policyDigest(current), policyDigest(next));
+        const good = approval({ op: 'update_policy_from', target }, { new_policy: next, current_policy: current });
+        const got = checkV2(good.vaultOp, good.summary, NOW);
+        expect(got?.currentPolicy).toEqual(current);
+        expect(got?.newPolicy).toEqual(next);
+        // Other rules in force than the ones bound, none, or the plain form with a current policy.
+        expect(checkV2(good.vaultOp, { ...good.summary, current_policy: { operations: [], version: 9 } }, NOW)).toBeNull();
+        expect(checkV2(good.vaultOp, { ...good.summary, current_policy: undefined }, NOW)).toBeNull();
+        const plain = approval({ op: 'update_policy', target: policyDigest(next) }, { new_policy: next, current_policy: current });
+        expect(checkV2(plain.vaultOp, plain.summary, NOW)).toBeNull();
+    });
+
+    it('accepts a creation bound to the rules the key is born with, at version 0', () => {
+        const rules = { operations: [], version: 1 };
+        const good = approval({ op: 'create', target: policyDigest(rules), policy_version: 0 }, { new_policy: rules });
+        expect(checkV2(good.vaultOp, good.summary, NOW)?.op).toBe('create');
+        const versioned = approval({ op: 'create', target: policyDigest(rules), policy_version: 1 }, { new_policy: rules });
+        expect(checkV2(versioned.vaultOp, versioned.summary, NOW)).toBeNull();
+        expect(checkV2(good.vaultOp, { ...good.summary, new_policy: { operations: [], version: 2 } }, NOW)).toBeNull();
+    });
+});

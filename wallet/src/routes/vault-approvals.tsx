@@ -45,6 +45,7 @@ import { checkReshare, forgetPublishedReleases, vaultReleaseFor, type VaultRelea
 import { checkV1, checkV2, checkV2Release, isV2, requiresV2 } from '@/services/vault-approval-v2';
 import { computeVaultOp } from '@/services/vault-approval-batch';
 import { billingPlatform, type BillingPlatform } from '@/services/platforms';
+import { PERSON_OPS, policyDiff, policyFacts, type Gate, type PersonOp } from '@/services/vault-policy-view';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { notify } from '@/stores/notice';
 import { freshBiometric } from '@/services/approval-answer';
@@ -60,6 +61,110 @@ function shortHandle(handle: string): string {
 function shortHex(hex: string, t: TFunction): string {
     if (!hex) return t('common.none');
     return hex.length > 20 ? `${hex.slice(0, 10)}…${hex.slice(-6)}` : hex;
+}
+
+const OP_LABEL: Record<PersonOp, string> = {
+    PromoteProfile: 'vaultApprovals.policyOpPromote',
+    UpdatePolicy: 'vaultApprovals.policyOpUpdate',
+    DeleteKey: 'vaultApprovals.policyOpDelete',
+    ExportKey: 'vaultApprovals.policyOpExport',
+};
+
+function gateText(gate: Gate, t: TFunction): string {
+    return t(
+        gate === 'approval'
+            ? 'vaultApprovals.policyGateApproval'
+            : gate === 'open'
+              ? 'vaultApprovals.policyGateOpen'
+              : 'vaultApprovals.policyGateNone',
+    );
+}
+
+type CardStyles = ReturnType<typeof makeStyles>;
+
+/**
+ * A key's rules as facts: who owns it, who else may approve, which builds
+ * can use it, and what needs the owner's approval. The rules were tied to
+ * what the approval signs before this is shown.
+ */
+function PolicyFactRows({ policy, t, styles }: { policy: unknown; t: TFunction; styles: CardStyles }) {
+    let facts;
+    try {
+        facts = policyFacts(policy);
+    } catch {
+        return null;
+    }
+    const row = (key: string, label: string, value: string) => (
+        <RNView key={key} style={styles.row}>
+            <Text style={styles.label}>{label}</Text>
+            <Text style={styles.value}>{value}</Text>
+        </RNView>
+    );
+    return (
+        <RNView testID="vault-policy-facts">
+            {facts.owner ? row('owner', t('vaultApprovals.policyOwner'), facts.owner) : null}
+            {facts.approvers.length > 0 ? row('approvers', t('vaultApprovals.policyApprovers'), facts.approvers.join(', ')) : null}
+            {row('builds', t('vaultApprovals.policyBuilds'), facts.builds.length > 0 ? facts.builds.join(', ') : t('common.none'))}
+            {PERSON_OPS.map((op) => row(op, t(OP_LABEL[op]), gateText(facts.gates[op], t)))}
+            {row('updates', t('vaultApprovals.policyFollowsUpdates'), t(facts.followsUpdates ? 'common.yes' : 'common.no'))}
+        </RNView>
+    );
+}
+
+/**
+ * What changes between the rules in force and the new ones, fact by fact.
+ * Shown only when the approval binds both, so the change is what is signed.
+ */
+function PolicyChangeRows({ current, next, t, styles }: { current: unknown; next: unknown; t: TFunction; styles: CardStyles }) {
+    let diff;
+    try {
+        diff = policyDiff(current, next);
+    } catch {
+        return null;
+    }
+    const none = t('common.none');
+    const row = (key: string, label: string, value: string) => (
+        <RNView key={key} style={styles.row}>
+            <Text style={styles.label}>{label}</Text>
+            <Text style={styles.value}>{value}</Text>
+        </RNView>
+    );
+    const yesNo = (v: boolean) => t(v ? 'common.yes' : 'common.no');
+    return (
+        <RNView style={styles.summaryBox} testID="vault-policy-changes">
+            <Text style={styles.summaryLabel}>{t('vaultApprovals.batchWhatChanges')}</Text>
+            {diff.changes.map((c) => {
+                switch (c.kind) {
+                    case 'owner':
+                        return row('owner', t('vaultApprovals.policyOwner'), `${c.before ?? none} → ${c.after ?? none}`);
+                    case 'approvers':
+                        return row(
+                            'approvers',
+                            t('vaultApprovals.policyApprovers'),
+                            `${c.before.join(', ') || none} → ${c.after.join(', ') || none}`,
+                        );
+                    case 'builds':
+                        return (
+                            <RNView key="builds">
+                                {c.added.length > 0
+                                    ? row('added', t('vaultApprovals.policyBuilds'), t('vaultApprovals.policyBuildAdded', { builds: c.added.join(', ') }))
+                                    : null}
+                                {c.removed.length > 0
+                                    ? row('removed', t('vaultApprovals.policyBuilds'), t('vaultApprovals.policyBuildRemoved', { builds: c.removed.join(', ') }))
+                                    : null}
+                            </RNView>
+                        );
+                    case 'gate':
+                        return row(c.op, t(OP_LABEL[c.op]), `${gateText(c.before, t)} → ${gateText(c.after, t)}`);
+                    case 'followsUpdates':
+                        return row('updates', t('vaultApprovals.policyFollowsUpdates'), `${yesNo(c.before)} → ${yesNo(c.after)}`);
+                }
+            })}
+            <Text style={styles.summaryText}>
+                {t(diff.other ? 'vaultApprovals.policyOtherChanges' : 'vaultApprovals.policyNothingElse')}
+            </Text>
+        </RNView>
+    );
 }
 
 /** A key's own name within its app: its kind and generation, e.g. "storage-kek/v2". */
@@ -129,7 +234,16 @@ async function checkReshareRequest(req: VaultApprovalRequest): Promise<ReshareCh
  */
 type V2Check =
     | { kind: 'checking' }
-    | { kind: 'ok'; release: VaultRelease; vaults: number; platform: BillingPlatform; successor?: string }
+    | {
+          kind: 'ok';
+          release: VaultRelease;
+          vaults: number;
+          platform: BillingPlatform;
+          successor?: string;
+          /** The rules the approval installs, and the ones in force when it binds them too. */
+          newPolicy?: unknown;
+          currentPolicy?: unknown;
+      }
     | { kind: 'mismatch' }
     | { kind: 'unpublished'; build: string }
     | { kind: 'unreachable' };
@@ -142,7 +256,15 @@ async function checkV2Request(req: VaultApprovalRequest): Promise<V2Check> {
         const sha256Hex = (text: string) =>
             Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
         const platform = await billingPlatform(checked.billingIds, sha256Hex);
-        return { kind: 'ok', release: release.release, vaults: checked.members.length, platform, successor: checked.successor };
+        return {
+            kind: 'ok',
+            release: release.release,
+            vaults: checked.members.length,
+            platform,
+            successor: checked.successor,
+            newPolicy: checked.newPolicy,
+            currentPolicy: checked.currentPolicy,
+        };
     }
     return release;
 }
@@ -406,7 +528,8 @@ function VaultApprovalsScreen() {
                             : requiresV2(s.operation) || !checkV1(req.vault_op, s, computeVaultOp)
                               ? { kind: 'mismatch' as const }
                               : undefined;
-                        const isKeyRules = s.operation === 'update_policy';
+                        const isKeyRules = s.operation === 'update_policy' || s.operation === 'update_policy_from';
+                        const isKeyCreate = s.operation === 'create';
                         const isKeyDelete = s.operation === 'delete';
                         const isOldKeyDelete = s.operation === 'delete_after';
                         const canApprove = !busy && (!reshare || reshare.kind === 'ok') && (!v2 || v2.kind === 'ok');
@@ -428,6 +551,8 @@ function VaultApprovalsScreen() {
                                                       ? t('vaultApprovals.approveReshare')
                                                       : isKeyRules
                                                         ? t('vaultApprovals.approveKeyRules')
+                                                        : isKeyCreate
+                                                          ? t('vaultApprovals.approveKeyCreate')
                                                         : isKeyDelete
                                                           ? t('vaultApprovals.approveKeyDelete')
                                                           : isOldKeyDelete
@@ -463,6 +588,8 @@ function VaultApprovalsScreen() {
                                               ? t('vaultApprovals.explainReshare')
                                               : isKeyRules
                                                 ? t('vaultApprovals.explainKeyRules')
+                                                : isKeyCreate
+                                                  ? t('vaultApprovals.explainKeyCreate')
                                                 : isKeyDelete
                                                   ? t('vaultApprovals.explainKeyDelete')
                                                   : isOldKeyDelete
@@ -570,12 +697,21 @@ function VaultApprovalsScreen() {
 
                                 {/* A change to a key's rules: the rules it
                                     installs, which are what the approval binds. */}
-                                {isKeyRules && v2?.kind === 'ok' && s.new_policy ? (
+                                {/* What changes, when the approval binds the
+                                    rules in force too; then what the new rules
+                                    say, in plain facts. */}
+                                {v2?.kind === 'ok' && v2.newPolicy !== undefined && v2.currentPolicy !== undefined ? (
+                                    <PolicyChangeRows current={v2.currentPolicy} next={v2.newPolicy} t={t} styles={styles} />
+                                ) : null}
+                                {v2?.kind === 'ok' && v2.newPolicy !== undefined ? (
+                                    <PolicyFactRows policy={v2.newPolicy} t={t} styles={styles} />
+                                ) : null}
+                                {(isKeyRules || isKeyCreate) && v2?.kind === 'ok' && v2.newPolicy !== undefined ? (
                                     <RNView style={styles.summaryBox}>
-                                        <Text style={styles.summaryLabel}>{t('vaultApprovals.newKeyRules')}</Text>
+                                        <Text style={styles.summaryLabel}>{t('vaultApprovals.fullRules')}</Text>
                                         <ScrollView style={styles.rulesScroll} nestedScrollEnabled>
                                             <Text style={styles.rulesText} selectable>
-                                                {JSON.stringify(s.new_policy, null, 2)}
+                                                {JSON.stringify(v2.newPolicy, null, 2)}
                                             </Text>
                                         </ScrollView>
                                     </RNView>

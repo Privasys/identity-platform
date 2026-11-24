@@ -84,6 +84,7 @@ func TestCheckVaultV2Fields(t *testing.T) {
 		{"export, dash", with(func(f *vaultV2Fields) { f.Operation, f.Target = "export", "-" }), false, ""},
 		{"delete", with(func(f *vaultV2Fields) { f.Operation = "delete" }), false, ""},
 		{"update_policy", with(func(f *vaultV2Fields) { f.Operation, f.Target, f.NewPolicy = "update_policy", pd, policy }), false, pd},
+		{"create", with(func(f *vaultV2Fields) { f.Operation, f.Target, f.NewPolicy = "create", pd, policy }), false, pd},
 		{"delete_after in a batch", with(func(f *vaultV2Fields) { f.Operation, f.Target, f.TTLSeconds = "delete_after", hex, 7200 }), true, hex},
 	}
 	for _, c := range ok {
@@ -112,7 +113,11 @@ func TestCheckVaultV2Fields(t *testing.T) {
 		{"delete_after beyond a day", with(func(f *vaultV2Fields) { f.Operation, f.Target, f.TTLSeconds = "delete_after", hex, 86401 }), true},
 		{"a ttl on a promote", with(func(f *vaultV2Fields) { f.Operation, f.Target, f.TTLSeconds = "promote", hex, 60 }), true},
 		{"a v1 operation name", with(func(f *vaultV2Fields) { f.Operation = "policy-update" }), false},
-		{"create, not offered yet", with(func(f *vaultV2Fields) { f.Operation, f.Target = "create", hex }), false},
+		{"create without its policy", with(func(f *vaultV2Fields) { f.Operation, f.Target = "create", hex }), false},
+		{"create at a version", with(func(f *vaultV2Fields) {
+			f.Operation, f.Target, f.NewPolicy, f.PolicyVersion = "create", pd, policy, 1
+		}), false},
+		{"create in a batch", with(func(f *vaultV2Fields) { f.Operation, f.Target, f.NewPolicy = "create", pd, policy }), true},
 	}
 	for _, c := range bad {
 		if _, err := checkVaultV2Fields(c.f, c.inBatch); err == nil {

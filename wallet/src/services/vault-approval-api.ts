@@ -77,6 +77,8 @@ export interface VaultApprovalSummary {
     exp?: number;
     member_identities?: VaultIdentity[];
     new_policy?: unknown;
+    // update_policy_from: the rules in force, bound with the new ones.
+    current_policy?: unknown;
     // A delete_after for a created successor: the key the old one waits for.
     successor_handle?: string;
     // The vaults' release tag (e.g. "vault-v0.41.0"), a hint for the wallet's

@@ -46,6 +46,7 @@ import (
 
 	"github.com/Privasys/idp/internal/push"
 	"github.com/Privasys/idp/internal/tokens"
+	"github.com/Privasys/idp/internal/vaultbinding"
 )
 
 // vaultBatchDomain separates a batch binding from every other WebAuthn
@@ -86,7 +87,37 @@ type vaultBatchEntry struct {
 	Nonce             string            `json:"nonce,omitempty"`
 	VaultOp           string            `json:"vault_op,omitempty"`
 	Context           vaultBatchContext `json:"context,omitempty"`
+
+	// Binding v2 entries (vault_approval_batch_v2.go). Target replaces
+	// measurement_digest; ttl_seconds is for a delete_after only. Binding is
+	// set by the IdP: every field of the entry's binding, its own expiry
+	// included.
+	Target      string              `json:"target,omitempty"`
+	Members     []string            `json:"members,omitempty"`
+	IssuerIndex uint32              `json:"issuer_index,omitempty"`
+	NewPolicy   json.RawMessage     `json:"new_policy,omitempty"`
+	TTLSeconds  int64               `json:"ttl_seconds,omitempty"`
+	Binding     *vaultBindingFields `json:"binding,omitempty"`
 }
+
+// v2Fields is the entry as one v2 operation.
+func (e vaultBatchEntry) v2Fields() vaultV2Fields {
+	return vaultV2Fields{
+		Operation: e.Operation, Handle: e.Handle, Target: e.Target, PolicyVersion: e.PolicyVersion,
+		Members: e.Members, IssuerIndex: e.IssuerIndex, NewPolicy: e.NewPolicy, TTLSeconds: e.TTLSeconds,
+	}
+}
+
+// tokenExp is when the entry's token expires: the batch's expiry, or a v2
+// entry's own (a delete_after outlives its batch).
+func (e vaultBatchEntry) tokenExp(batchExp int64) int64 {
+	if e.Binding != nil {
+		return e.Binding.Exp
+	}
+	return batchExp
+}
+
+func bindingID(sum [32]byte) string { return base64.RawURLEncoding.EncodeToString(sum[:]) }
 
 // vaultBatchMeta is what /complete needs to issue the tokens.
 type vaultBatchMeta struct {
@@ -115,19 +146,8 @@ func vaultBatchHiddenRune(r rune) bool {
 // key-policy update or a recovery releases or changes control of a key, and
 // stays one approval each.
 func validateVaultBatch(label string, entries []vaultBatchEntry) ([]vaultBatchEntry, error) {
-	if strings.TrimSpace(label) == "" || label != strings.TrimSpace(label) {
-		return nil, errors.New("label required, with no surrounding space")
-	}
-	if !utf8.ValidString(label) || utf8.RuneCountInString(label) > vaultBatchMaxLabelRunes {
-		return nil, fmt.Errorf("label must be valid text of at most %d characters", vaultBatchMaxLabelRunes)
-	}
-	for _, r := range label {
-		if vaultBatchHiddenRune(r) {
-			return nil, errors.New("label must not contain control, format or bidirectional characters")
-		}
-	}
-	if len(entries) == 0 || len(entries) > vaultBatchMaxEntries {
-		return nil, fmt.Errorf("a batch holds 1 to %d entries", vaultBatchMaxEntries)
+	if err := validateVaultBatchLabel(label, len(entries)); err != nil {
+		return nil, err
 	}
 	out := make([]vaultBatchEntry, len(entries))
 	copy(out, entries)
@@ -172,6 +192,25 @@ func validateVaultBatch(label string, entries []vaultBatchEntry) ([]vaultBatchEn
 		return out[a].Operation < out[b].Operation
 	})
 	return out, nil
+}
+
+// validateVaultBatchLabel checks a batch's label and size.
+func validateVaultBatchLabel(label string, entries int) error {
+	if strings.TrimSpace(label) == "" || label != strings.TrimSpace(label) {
+		return errors.New("label required, with no surrounding space")
+	}
+	if !utf8.ValidString(label) || utf8.RuneCountInString(label) > vaultBatchMaxLabelRunes {
+		return fmt.Errorf("label must be valid text of at most %d characters", vaultBatchMaxLabelRunes)
+	}
+	for _, r := range label {
+		if vaultBatchHiddenRune(r) {
+			return errors.New("label must not contain control, format or bidirectional characters")
+		}
+	}
+	if entries == 0 || entries > vaultBatchMaxEntries {
+		return fmt.Errorf("a batch holds 1 to %d entries", vaultBatchMaxEntries)
+	}
+	return nil
 }
 
 // computeVaultBatchBinding hashes the canonical newline-joined batch. Every
@@ -234,6 +273,9 @@ type vaultBatchPending struct {
 	optionsJS json.RawMessage
 	entries   []vaultBatchEntry
 	expiresAt time.Time
+	// memberIdentities are the vaults' identities relayed with a v2 batch,
+	// for the wallet to verify.
+	memberIdentities []vaultbinding.VaultIdentity
 }
 
 type vaultBatchResult struct {
@@ -368,12 +410,26 @@ func (h *Handler) VaultApprovalBatchBegin(iss *tokens.Issuer) http.HandlerFunc {
 			// Audience of the tokens (see VaultApprovalBegin). One batch goes
 			// to vaults of one audience.
 			Audience string `json:"audience"`
+			// Binding v2: every entry is a v2 operation, and the identities
+			// of every vault any entry names are relayed once for the batch.
+			BindingVersion   int                          `json:"binding_version"`
+			MemberIdentities []vaultbinding.VaultIdentity `json:"member_identities"`
 		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10)).Decode(&req); err != nil {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2<<20)).Decode(&req); err != nil {
 			errorJSON(w, http.StatusBadRequest, "invalid body")
 			return
 		}
-		entries, err := validateVaultBatch(req.Label, req.Entries)
+		if req.BindingVersion != 0 && req.BindingVersion != 1 && req.BindingVersion != 2 {
+			errorJSON(w, http.StatusBadRequest, "unknown binding_version")
+			return
+		}
+		v2 := req.BindingVersion == 2
+		var entries []vaultBatchEntry
+		if v2 {
+			entries, err = validateVaultBatchV2(req.Label, req.Entries, req.MemberIdentities)
+		} else {
+			entries, err = validateVaultBatch(req.Label, req.Entries)
+		}
 		if err != nil {
 			errorJSON(w, http.StatusBadRequest, err.Error())
 			return
@@ -392,9 +448,15 @@ func (h *Handler) VaultApprovalBatchBegin(iss *tokens.Issuer) http.HandlerFunc {
 		}
 		now := time.Now().Unix()
 		exp := now + ttl
-		batchID, binding, err := bindVaultBatch(req.Label, exp, entries, newVaultNonce)
+		var batchID string
+		var binding [32]byte
+		if v2 {
+			batchID, binding, err = bindVaultBatchV2(sub, req.Label, now, exp, entries, newVaultNonce)
+		} else {
+			batchID, binding, err = bindVaultBatch(req.Label, exp, entries, newVaultNonce)
+		}
 		if err != nil {
-			errorJSON(w, http.StatusInternalServerError, "nonce generation failed")
+			errorJSON(w, http.StatusInternalServerError, "binding failed")
 			return
 		}
 
@@ -423,6 +485,7 @@ func (h *Handler) VaultApprovalBatchBegin(iss *tokens.Issuer) http.HandlerFunc {
 		optionsJS, _ := json.Marshal(options)
 		if replaced := h.vaultBatches.put(batchID, &vaultBatchPending{
 			sub: sub, label: req.Label, optionsJS: optionsJS, entries: entries, expiresAt: time.Unix(exp, 0),
+			memberIdentities: req.MemberIdentities,
 		}); replaced != "" {
 			h.challenges.pop(replaced)
 		}
@@ -478,14 +541,18 @@ func (h *Handler) VaultApprovalBatchPending() http.HandlerFunc {
 			errorJSON(w, http.StatusNotFound, "no pending batch for this challenge")
 			return
 		}
-		writeJSON(w, map[string]interface{}{
+		out := map[string]interface{}{
 			"batch_id":   batchID,
 			"label":      p.label,
 			"exp":        p.expiresAt.Unix(),
 			"options":    p.optionsJS,
 			"entries":    p.entries,
 			"expires_at": p.expiresAt.Unix(),
-		})
+		}
+		if len(p.memberIdentities) > 0 {
+			out["member_identities"] = p.memberIdentities
+		}
+		writeJSON(w, out)
 	}
 }
 
@@ -513,7 +580,7 @@ func (h *Handler) VaultApprovalBatchComplete(iss *tokens.Issuer, audience string
 			if aud == "" {
 				aud = audience
 			}
-			tok, err := iss.IssueVaultApprovalToken(m.sub, aud, e.VaultOp, e.Nonce, m.iat, m.exp)
+			tok, err := iss.IssueVaultApprovalToken(m.sub, aud, e.VaultOp, e.Nonce, m.iat, e.tokenExp(m.exp))
 			if err != nil {
 				log.Printf("fido2/vault-approval/batch/complete: issue: %v", err)
 				errorJSON(w, http.StatusInternalServerError, "token issuance failed")

@@ -56,6 +56,39 @@ type vaultApprovalSummary struct {
 	// published release + old→new code diff) itself. Not display text.
 	AppID     string `json:"app_id,omitempty"`
 	VersionID string `json:"version_id,omitempty"`
+
+	// Reshare only: the inputs of the resharing context the wallet recomputes
+	// measurement_digest from (target vault build, new vaults in index order,
+	// new threshold, dealing helpers, the unchanged public key). Advisory like
+	// the rest; the recomputation is what makes them count.
+	TargetMrenclave string `json:"target_mrenclave,omitempty"`
+	TargetVaults    string `json:"target_vaults,omitempty"`
+	Threshold       string `json:"threshold,omitempty"`
+	Helpers         string `json:"helpers,omitempty"`
+	PublicKey       string `json:"public_key,omitempty"`
+}
+
+// maxReshareFieldBytes bounds one reshare context field. Never clipped: a
+// clipped value could not recompute the digest, so a longer one is refused.
+const maxReshareFieldBytes = 4096
+
+func reshareContextFits(fields ...string) bool {
+	for _, f := range fields {
+		if len(f) > maxReshareFieldBytes {
+			return false
+		}
+	}
+	return true
+}
+
+// withReshare carries the resharing-context inputs on a reshare approval and
+// drops them on any other operation.
+func (s vaultApprovalSummary) withReshare(op, mrenclave, vaults, threshold, helpers, publicKey string) vaultApprovalSummary {
+	if op != "reshare" {
+		return s
+	}
+	s.TargetMrenclave, s.TargetVaults, s.Threshold, s.Helpers, s.PublicKey = mrenclave, vaults, threshold, helpers, publicKey
+	return s
 }
 
 // vaultPendingStore holds pending wallet approvals keyed by vault_op: the

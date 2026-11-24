@@ -275,6 +275,15 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				// (published release + code-diff) from mgmt itself.
 				AppID     string `json:"app_id"`
 				VersionID string `json:"version_id"`
+				// Reshare only: the inputs of the resharing context, so the
+				// wallet can recompute measurement_digest and show the target
+				// vault build as its published release. Display only: a value
+				// that does not match the digest fails the wallet's check.
+				TargetMrenclave string `json:"target_mrenclave"`
+				TargetVaults    string `json:"target_vaults"`
+				Threshold       string `json:"threshold"`
+				Helpers         string `json:"helpers"`
+				PublicKey       string `json:"public_key"`
 			} `json:"context"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Handle == "" {
@@ -304,6 +313,11 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			// build), so an approval moves the key to exactly those vaults.
 			if len(req.MeasurementDigest) != 64 {
 				errorJSON(w, http.StatusBadRequest, "measurement_digest (the 32-byte resharing context, hex) required for reshare")
+				return
+			}
+			c := req.Context
+			if !reshareContextFits(c.TargetMrenclave, c.TargetVaults, c.Threshold, c.Helpers, c.PublicKey) {
+				errorJSON(w, http.StatusBadRequest, "reshare context field too long")
 				return
 			}
 		case "", "promote":
@@ -420,7 +434,8 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			Summary:       clipSummary(req.Context.Summary),
 			AppID:         req.Context.AppID,
 			VersionID:     req.Context.VersionID,
-		}, exp)
+		}.withReshare(req.Operation, req.Context.TargetMrenclave, req.Context.TargetVaults,
+			req.Context.Threshold, req.Context.Helpers, req.Context.PublicKey), exp)
 		// Log the REQUEST as well as the completion. Only /complete used to
 		// log ("vault-approval issued"), which reads like a request being
 		// created — so an operator watching the log could not tell an

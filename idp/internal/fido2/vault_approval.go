@@ -274,6 +274,9 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			MemberIdentities []vaultbinding.VaultIdentity `json:"member_identities"`
 			IssuerIndex      uint32                       `json:"issuer_index"`
 			NewPolicy        json.RawMessage              `json:"new_policy"`
+			// update_policy_from only: the policy being replaced, as the
+			// vault's GetPolicy returns it.
+			CurrentPolicy json.RawMessage `json:"current_policy"`
 			// delete_after only: the created successor the old key waits for.
 			SuccessorHandle string `json:"successor_handle"`
 			// Advisory display context for the approver's wallet. Not part of the
@@ -323,7 +326,7 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		v2Fields := vaultV2Fields{
 			Operation: req.Operation, Handle: req.Handle, Target: req.Target, PolicyVersion: req.PolicyVersion,
 			Members: req.Members, IssuerIndex: req.IssuerIndex, NewPolicy: req.NewPolicy,
-			SuccessorHandle: req.SuccessorHandle,
+			SuccessorHandle: req.SuccessorHandle, CurrentPolicy: req.CurrentPolicy,
 		}
 		deleteAfter := req.BindingVersion == 2 && req.Operation == string(vaultbinding.BindDeleteAfter)
 		if deleteAfter {
@@ -524,7 +527,7 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 			VersionID:     req.Context.VersionID,
 		}.withReshare(req.Operation, req.Context.TargetMrenclave, req.Context.TargetVaults,
 			req.Context.Threshold, req.Context.Helpers, req.Context.PublicKey).
-			withBindingV2(v2Binding, req.MemberIdentities, req.NewPolicy).withV1Binding(v2, nonce, exp).
+			withBindingV2(v2Binding, req.MemberIdentities, req.NewPolicy).withCurrentPolicy(v2, req.CurrentPolicy).withV1Binding(v2, nonce, exp).
 			withSuccessor(v2, req.SuccessorHandle).withVaultRelease(req.Context.VaultRelease), pendingExp)
 		// Log the REQUEST as well as the completion. Only /complete used to
 		// log ("vault-approval issued"), which reads like a request being

@@ -84,6 +84,25 @@ func TestV2VectorsFromTheVault(t *testing.T) {
 	if op, _ := b.VaultOp(); op != v.Binding.VaultOp {
 		t.Errorf("vault_op %s, want %s", op, v.Binding.VaultOp)
 	}
+	// update_policy_from: the target binds the replaced policy as well.
+	var from struct {
+		V struct {
+			CurrentPD     string `json:"current_pd"`
+			CurrentPolicy string `json:"current_policy_as_get_policy_returns_it"`
+			NewPD         string `json:"new_pd"`
+			Target        string `json:"target"`
+		} `json:"binding_v2_update_policy_from"`
+	}
+	if err := json.Unmarshal(raw, &from); err != nil {
+		t.Fatal(err)
+	}
+	if pd, err := PolicyDigestJSON([]byte(from.V.CurrentPolicy)); err != nil || pd != from.V.CurrentPD {
+		t.Errorf("PD of the current policy %s (%v), want %s", pd, err, from.V.CurrentPD)
+	}
+	if got, err := UpdatePolicyFromTarget(from.V.CurrentPD, from.V.NewPD); err != nil || got != from.V.Target {
+		t.Errorf("update_policy_from target %s (%v), want %s", got, err, from.V.Target)
+	}
+
 	if v.Binding.Target != v.Policy.PD {
 		t.Error("the vector's binding is not over the vector's policy")
 	}

@@ -98,16 +98,36 @@ const (
 	// BindDeleteAfter deletes the old key of a migration or upgrade, approved
 	// in the same tap as its successor's promote or creation (DeleteAfterTarget).
 	BindDeleteAfter BindingOp = "delete_after"
+	// BindUpdatePolicyFrom is update_policy that also binds the policy it
+	// replaces (UpdatePolicyFromTarget), so what changes can be shown and
+	// trusted. For vaults that list the capability update-policy-from-v1.
+	BindUpdatePolicyFrom BindingOp = "update_policy_from"
 )
 
 func (o BindingOp) valid() bool {
 	switch o {
 	case BindCreate, BindPromote, BindExport, BindExportAssembled, BindIssuerCreate,
 		BindIssuerUpdate, BindIssuerDelete, BindUpdatePolicy, BindDelete, BindReshare, BindRevokePending,
-		BindDeleteAfter:
+		BindDeleteAfter, BindUpdatePolicyFrom:
 		return true
 	}
 	return false
+}
+
+// UpdatePolicyFromTarget is the target of an update_policy_from: hex
+// H("privasys-update-policy-from-v1\n" PD(current) "\n" PD(new)). PD(current)
+// is the digest of the current policy as the vault's GetPolicy returns it.
+func UpdatePolicyFromTarget(currentPD, newPD string) (string, error) {
+	for _, pd := range []string{currentPD, newPD} {
+		if len(pd) != 64 || strings.ToLower(pd) != pd {
+			return "", errors.New("update_policy_from: both policy digests must be 64 lowercase hex digits")
+		}
+		if _, err := hex.DecodeString(pd); err != nil {
+			return "", errors.New("update_policy_from: both policy digests must be 64 lowercase hex digits")
+		}
+	}
+	sum := sha256.Sum256([]byte("privasys-update-policy-from-v1\n" + currentPD + "\n" + newPD))
+	return hex.EncodeToString(sum[:]), nil
 }
 
 // MemberID is a vault's id in a constellation: hex SHA-256 of

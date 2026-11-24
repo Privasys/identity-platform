@@ -164,3 +164,63 @@ func TestCheckVaultV2DeleteAfterCreatedSuccessor(t *testing.T) {
 		}
 	}
 }
+
+// update_policy_from binds the policy it replaces: the target is computed here
+// from the two policies, as the vault's vector has it.
+func TestCheckVaultV2UpdatePolicyFrom(t *testing.T) {
+	raw, err := os.ReadFile("../vaultbinding/testdata/v2_vectors.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var v struct {
+		From struct {
+			Current string `json:"current_policy_as_get_policy_returns_it"`
+			Target  string `json:"target"`
+			VaultOp string `json:"vault_op"`
+		} `json:"binding_v2_update_policy_from"`
+		With struct {
+			Approver, Handle, Nonce string
+			Exp                     int64
+			Members                 []string
+			PolicyVersion           uint64 `json:"policy_version"`
+		} `json:"binding_v2_update_policy_with_pd"`
+		Policy struct {
+			PolicyAsSent string `json:"policy_as_sent"`
+		} `json:"policy_digest"`
+	}
+	if err := json.Unmarshal(raw, &v); err != nil {
+		t.Fatal(err)
+	}
+	f := vaultV2Fields{
+		Operation: "update_policy_from", Handle: v.With.Handle, PolicyVersion: v.With.PolicyVersion, Members: v.With.Members,
+		NewPolicy: json.RawMessage(v.Policy.PolicyAsSent), CurrentPolicy: json.RawMessage(v.From.Current),
+	}
+	target, err := checkVaultV2Fields(f, false)
+	if err != nil || target != v.From.Target {
+		t.Fatalf("target %q (%v), want %q", target, err, v.From.Target)
+	}
+	sub := strings.TrimPrefix(v.With.Approver, "oidc:0:")
+	if _, _, vaultOp, err := bindVaultV2(sub, f, target, v.With.Nonce, v.With.Exp); err != nil || vaultOp != v.From.VaultOp {
+		t.Fatalf("vault_op %q (%v), want %q", vaultOp, err, v.From.VaultOp)
+	}
+	bad := map[string]func(*vaultV2Fields){
+		"no current policy":       func(f *vaultV2Fields) { f.CurrentPolicy = nil },
+		"no new policy":           func(f *vaultV2Fields) { f.NewPolicy = nil },
+		"a target for other ones": func(f *vaultV2Fields) { f.Target = strings.Repeat("ab", 32) },
+	}
+	for name, edit := range bad {
+		g := f
+		edit(&g)
+		if _, err := checkVaultV2Fields(g, false); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	if _, err := checkVaultV2Fields(f, true); err == nil {
+		t.Error("in a batch: accepted")
+	}
+	plain := f
+	plain.Operation = "update_policy"
+	if _, err := checkVaultV2Fields(plain, false); err == nil {
+		t.Error("a current policy on a plain update_policy: accepted")
+	}
+}

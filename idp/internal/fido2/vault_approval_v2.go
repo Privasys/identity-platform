@@ -42,12 +42,15 @@ var vaultHex64 = regexp.MustCompile(`^[0-9a-f]{64}$`)
 type vaultV2Fields struct {
 	Operation     string
 	Handle        string
-	Target        string // "-" or "" when the operation binds nothing more
+	Target        string // "-" or "" when the operation binds nothing more, or it is computed here
 	PolicyVersion uint64
 	Members       []string
 	IssuerIndex   uint32
-	NewPolicy     json.RawMessage // update_policy only
-	TTLSeconds    int64           // delete_after only
+	NewPolicy     json.RawMessage // update_policy and update_policy_from
+	// CurrentPolicy, on an update_policy_from, is the policy being replaced,
+	// as the vault's GetPolicy returns it.
+	CurrentPolicy json.RawMessage
+	TTLSeconds    int64 // delete_after only
 	// SuccessorHandle, on a delete_after, names a successor that is created
 	// (a migration or a rotation), not promoted. The target is then computed
 	// here, and the delete needs no promote beside it.
@@ -83,8 +86,13 @@ func checkVaultV2Fields(f vaultV2Fields, inBatch bool) (string, error) {
 		target = ""
 	}
 	hasPolicy := len(f.NewPolicy) > 0 && string(f.NewPolicy) != "null"
-	if hasPolicy && f.Operation != string(vaultbinding.BindUpdatePolicy) {
-		return "", errors.New("new_policy is for update_policy only")
+	policyOp := f.Operation == string(vaultbinding.BindUpdatePolicy) || f.Operation == string(vaultbinding.BindUpdatePolicyFrom)
+	if hasPolicy && !policyOp {
+		return "", errors.New("new_policy is for update_policy and update_policy_from only")
+	}
+	hasCurrent := len(f.CurrentPolicy) > 0 && string(f.CurrentPolicy) != "null"
+	if hasCurrent && f.Operation != string(vaultbinding.BindUpdatePolicyFrom) {
+		return "", errors.New("current_policy is for update_policy_from only")
 	}
 	if f.TTLSeconds != 0 && f.Operation != string(vaultbinding.BindDeleteAfter) {
 		return "", errors.New("ttl_seconds on an entry is for delete_after only")
@@ -111,6 +119,31 @@ func checkVaultV2Fields(f vaultV2Fields, inBatch bool) (string, error) {
 		if pd != target {
 			return "", errors.New("target is not the digest of new_policy")
 		}
+	case vaultbinding.BindUpdatePolicyFrom:
+		// One approval each: what changes is shown against the policy it
+		// replaces, and that is read one key at a time.
+		if inBatch {
+			return "", errors.New("update_policy_from is one approval each")
+		}
+		if !hasPolicy || len(f.NewPolicy) > vaultV2MaxPolicyBytes || !hasCurrent || len(f.CurrentPolicy) > vaultV2MaxPolicyBytes {
+			return "", errors.New("new_policy and current_policy required for update_policy_from")
+		}
+		newPD, err := vaultbinding.PolicyDigestJSON(f.NewPolicy)
+		if err != nil {
+			return "", fmt.Errorf("new_policy: %v", err)
+		}
+		currentPD, err := vaultbinding.PolicyDigestJSON(f.CurrentPolicy)
+		if err != nil {
+			return "", fmt.Errorf("current_policy: %v", err)
+		}
+		want, err := vaultbinding.UpdatePolicyFromTarget(currentPD, newPD)
+		if err != nil {
+			return "", err
+		}
+		if target != "" && target != want {
+			return "", errors.New("target is not the update_policy_from target of the two policies")
+		}
+		return want, nil
 	case vaultbinding.BindDeleteAfter:
 		if f.TTLSeconds < 0 || f.TTLSeconds > vaultbinding.DeleteAfterMaxTTLSeconds {
 			return "", errors.New("ttl_seconds out of range for delete_after")

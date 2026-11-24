@@ -82,6 +82,9 @@ type vaultApprovalSummary struct {
 	Binding          *vaultBindingFields          `json:"binding,omitempty"`
 	MemberIdentities []vaultbinding.VaultIdentity `json:"member_identities,omitempty"`
 	NewPolicy        json.RawMessage              `json:"new_policy,omitempty"`
+	// update_policy_from: the policy being replaced. Its digest is bound with
+	// the new one's, so the wallet can show what changes and trust it.
+	CurrentPolicy json.RawMessage `json:"current_policy,omitempty"`
 	// A delete_after for a created successor: the key the old one waits for.
 	// The wallet recomputes the binding's target from it.
 	SuccessorHandle string `json:"successor_handle,omitempty"`
@@ -98,6 +101,14 @@ var vaultReleaseTag = regexp.MustCompile(`^vault-v\d{1,4}\.\d{1,4}\.\d{1,4}$`)
 func (s vaultApprovalSummary) withVaultRelease(tag string) vaultApprovalSummary {
 	if vaultReleaseTag.MatchString(tag) {
 		s.VaultRelease = tag
+	}
+	return s
+}
+
+// withCurrentPolicy carries the policy an update_policy_from replaces.
+func (s vaultApprovalSummary) withCurrentPolicy(v2 bool, current json.RawMessage) vaultApprovalSummary {
+	if v2 && len(current) > 0 && string(current) != "null" {
+		s.CurrentPolicy = current
 	}
 	return s
 }

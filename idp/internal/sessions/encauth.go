@@ -104,6 +104,28 @@ func (s *Store) subjectForClient(userID, clientID string, issuer *tokens.Issuer)
 	return issuer.SubjectFor(userID, s.sectorOf(clientID)), nil
 }
 
+// ErrToolNeedsApp refuses a tool client's voucher step that names no app:
+// its subject is the one the person has at that app.
+var ErrToolNeedsApp = errors.New("this client reaches apps one at a time: app_id is required")
+
+// voucherSubject is the subject a session's voucher carries for an app, the
+// one the enclave asserts as X-Privasys-Sub, and the client a relationship
+// row for it belongs to. For a tool client it is the subject the app knows
+// the person by (clients.Registry.AppSubjectSector); for any other client,
+// the subject that client sees. tool reports which it was.
+func (s *Store) voucherSubject(userID, clientID, appID string, issuer *tokens.Issuer) (subject, holderClient string, tool bool, err error) {
+	if s.toolApp != nil {
+		if sector, holder, ok := s.toolApp(clientID, appID); ok {
+			if strings.TrimSpace(appID) == "" {
+				return "", "", true, ErrToolNeedsApp
+			}
+			return issuer.SubjectFor(userID, sector), holder, true, nil
+		}
+	}
+	sub, err := s.subjectForClient(userID, clientID, issuer)
+	return sub, clientID, false, err
+}
+
 // appStandsFor reports whether the attested app is one the client stands for.
 func (s *Store) appStandsFor(clientID, appID string) (bool, error) {
 	if s.appsOf == nil {
@@ -209,14 +231,16 @@ func (s *Store) PutEncAuth(userID, appID string, payloadBytes, hwSig []byte, hos
 	// Anything else would hand an app an identifier other apps share. The
 	// wallet signed what the allocate step told it; this is the same
 	// answer, computed again.
-	want, err := s.subjectForClient(userID, sess.ClientID, issuer)
+	// A tool client's voucher is for one app, in the subject that app knows
+	// the person by: the app is the one this voucher's enclave attested as.
+	want, _, tool, err := s.voucherSubject(userID, sess.ClientID, appID, issuer)
 	if err != nil {
 		return nil, err
 	}
 	if p.Sub != want {
 		return nil, errors.New("encauth sub is not the subject this session's client sees")
 	}
-	if want != userID {
+	if want != userID && !tool {
 		ok, err := s.appStandsFor(sess.ClientID, appID)
 		if err != nil {
 			return nil, err
@@ -539,15 +563,22 @@ func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 		}
 		// The subject this client sees is what the wallet signs into the
 		// voucher: it learns it here, from the IdP, never by guessing.
-		subject, err := s.subjectForClient(userID, req.ClientID, issuer)
+		// A tool client learns the subject of the app it is reaching, so the
+		// wallet names the app here as well as on the voucher itself.
+		subject, holderClient, _, err := s.voucherSubject(userID, req.ClientID, req.AppID, issuer)
+		if errors.Is(err, ErrToolNeedsApp) {
+			httpErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		// The relationship row: the one way from that subject back to the
-		// account, written forward here (internal/sessions/holders.go).
-		if err := s.RecordHolder(subject, req.ClientID, userID); err != nil {
-			log.Printf("sessions/encauth: record holder for %s: %v", req.ClientID, err)
+		// account, written forward here (internal/sessions/holders.go). A
+		// tool's subject at an app belongs to that app's own client.
+		if err := s.RecordHolder(subject, holderClient, userID); err != nil {
+			log.Printf("sessions/encauth: record holder for %s: %v", holderClient, err)
 		}
 		out := map[string]any{"sid": sess.SID, "subject": subject}
 		if req.Payload != "" && req.HwSig != "" {

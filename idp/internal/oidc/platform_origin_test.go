@@ -78,3 +78,22 @@ func TestARefreshNeverCrossesToAnotherPlatform(t *testing.T) {
 		}
 	}
 }
+
+func TestAToolsRefreshNeverMintsForAnotherApp(t *testing.T) {
+	const a, b = "audience:app:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "audience:app:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	cases := []struct {
+		granted, asked string
+		ok             bool
+	}{
+		{a + " openid offline_access", a + " openid", true},
+		{a + " openid offline_access", b + " openid", false},
+		{"openid offline_access", b + " openid", false},
+		{a + " openid offline_access", "audience:attestation-server openid", true},
+		{a + " openid offline_access", "openid", true},
+	}
+	for _, c := range cases {
+		if got := refreshStaysOnApp(c.granted, c.asked); got != c.ok {
+			t.Errorf("refreshStaysOnApp(%q, %q) = %t, want %t", c.granted, c.asked, got, c.ok)
+		}
+	}
+}

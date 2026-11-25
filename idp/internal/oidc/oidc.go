@@ -1309,12 +1309,23 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	audience := audienceFromScope(ac.Scope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
 	platformClient := client != nil && client.Platform
+	accessSubject, accessHolder := subject, ac.ClientID
 	if sector != "" && !platformClient {
 		// A client with its own subjects is a relying party, not the
 		// platform: its token is for itself alone, and carries none of the
 		// account's roles. The platform audience stays with first-party
 		// control-plane clients (Client.Platform) and legacy clients.
-		audience = ownClientAudience(audience, ac.ClientID, reg.AppIDsOf(ac.ClientID))
+		// A tool client reaching one app gets a token for that app, in the
+		// subject the app knows the person by, naming itself as azp.
+		if appSub, holder, ok := toolAppSubject(reg, issuer, ac.ClientID, ac.UserID, audience); ok {
+			accessSubject, accessHolder = appSub, holder
+			if filteredAttrs == nil {
+				filteredAttrs = map[string]string{}
+			}
+			filteredAttrs["azp"] = ac.ClientID
+		} else {
+			audience = ownClientAudience(audience, ac.ClientID, reg.AppIDsOf(ac.ClientID))
+		}
 		roles = nil
 	} else if tokens.IsPlatformAudience(audience) {
 		// The platform keys accounts by this, never by an app's subject.
@@ -1348,6 +1359,13 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 			// holder keeps the app (internal/sessions/holders.go).
 			if err := sess.RecordHolder(subject, ac.ClientID, ac.UserID); err != nil {
 				log.Printf("token: record holder for %s: %v", ac.ClientID, err)
+			}
+			// A tool's token is in the subject the app knows the person by,
+			// which belongs to the app's own client.
+			if accessSubject != subject {
+				if err := sess.RecordHolder(accessSubject, accessHolder, ac.UserID); err != nil {
+					log.Printf("token: record holder for %s: %v", accessHolder, err)
+				}
 			}
 		}
 	}
@@ -1426,7 +1444,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	// Access token aud is the resource-server trust domain, selected from
 	// the scope (audience:<X>, defaulting to privasys-platform).
 	// ID token aud = client_id (per OIDC spec: ID tokens are for the client).
-	accessToken, err := issuer.IssueAccessTokenWithSID(subject, audience, sid, roles, filteredAttrs)
+	accessToken, err := issuer.IssueAccessTokenWithSID(accessSubject, audience, sid, roles, filteredAttrs)
 	if err != nil {
 		log.Printf("token: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -1555,6 +1573,13 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 				"the requested audience is not the platform this sign-in was made for")
 			return
 		}
+		// A tool client's grant is for the one app the person connected to;
+		// a refresh never mints for another.
+		if reg.AnyAppAudience(clientID) && !refreshStaysOnApp(scope, requested) {
+			errorResponse(w, http.StatusBadRequest, "invalid_scope",
+				"the requested audience is not the app this sign-in was made for")
+			return
+		}
 		effectiveScope = requested
 	}
 
@@ -1563,8 +1588,17 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	allRoles, _ := db.GetRoles(userID)
 	audience := audienceFromScope(effectiveScope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
+	subject := issuer.SubjectFor(userID, reg.SectorOf(clientID))
 	if reg.SectorOf(clientID) != "" && !reg.IsPlatform(clientID) {
-		audience = ownClientAudience(audience, clientID, reg.AppIDsOf(clientID))
+		if appSub, _, ok := toolAppSubject(reg, issuer, clientID, userID, audience); ok {
+			subject = appSub
+			if filteredRefreshAttrs == nil {
+				filteredRefreshAttrs = map[string]string{}
+			}
+			filteredRefreshAttrs["azp"] = clientID
+		} else {
+			audience = ownClientAudience(audience, clientID, reg.AppIDsOf(clientID))
+		}
 		roles = nil
 	} else if tokens.IsPlatformAudience(audience) {
 		if filteredRefreshAttrs == nil {
@@ -1574,7 +1608,6 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Issue new access token (with current roles and available profile).
-	subject := issuer.SubjectFor(userID, reg.SectorOf(clientID))
 	accessToken, err := issuer.IssueAccessTokenWithSID(subject, audience, sid, roles, filteredRefreshAttrs)
 	if err != nil {
 		log.Printf("refresh: access token issuance failed: %v", err)
@@ -1878,6 +1911,30 @@ func refreshStaysOnPlatform(granted, asked string) bool {
 	}
 	had := audienceFromScope(granted, tokens.PlatformAudience)
 	return had == want
+}
+
+// toolAppSubject is, for a tool client (clients.Registry.AnyAppAudience) asked
+// for "app:<id>", the subject the app knows the person by and the client that
+// subject belongs to. ok=false for any other client or audience: the token is
+// then the client's own, as for every relying party.
+func toolAppSubject(reg *clients.Registry, issuer *tokens.Issuer, clientID, userID, audience string) (subject, holderClient string, ok bool) {
+	id, isApp := strings.CutPrefix(audience, "app:")
+	if !isApp || clients.NormaliseAppID(id) == "" || id != clients.NormaliseAppID(id) || !reg.AnyAppAudience(clientID) {
+		return "", "", false
+	}
+	sector, holder := reg.AppSubjectSector(id, clientID)
+	return issuer.SubjectFor(userID, sector), holder, true
+}
+
+// refreshStaysOnApp says whether a tool client's refresh keeps to the app
+// its grant was made for: an app audience other than the granted one is
+// never minted by refresh.
+func refreshStaysOnApp(granted, asked string) bool {
+	want := audienceFromScope(asked, "")
+	if !strings.HasPrefix(want, "app:") {
+		return true
+	}
+	return want == audienceFromScope(granted, "")
 }
 
 // audienceFromScope extracts the explicit `audience:<X>` token from an OIDC

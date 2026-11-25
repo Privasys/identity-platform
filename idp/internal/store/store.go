@@ -361,6 +361,11 @@ func migrate(db *sql.DB) error {
 		// the social start path, so a page cannot widen it.
 		{"social_providers", "ALTER TABLE clients ADD COLUMN social_providers TEXT NOT NULL DEFAULT '[]'"},
 		{"federation", "ALTER TABLE clients ADD COLUMN federation TEXT NOT NULL DEFAULT ''"},
+		// A tool client (the explorer, the portal's deploy sessions) that a
+		// person uses to reach ANY attested app: it may be issued a token
+		// and a voucher addressed to the one app the person connects to, in
+		// the subject that app knows them by. Set by an operator only.
+		{"any_app_audience", "ALTER TABLE clients ADD COLUMN any_app_audience INTEGER NOT NULL DEFAULT 0"},
 	} {
 		if !clientCols[add.col] {
 			if _, err = db.Exec(add.ddl); err != nil {

@@ -141,6 +141,13 @@ func main() {
 	sessionsStore.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	sessionsStore.SetSectorResolver(clientReg.SectorOf)
 	sessionsStore.SetAppsResolver(clientReg.AppIDsOf)
+	sessionsStore.SetToolAppResolver(func(clientID, appID string) (string, string, bool) {
+		if !clientReg.AnyAppAudience(clientID) {
+			return "", "", false
+		}
+		sector, holder := clientReg.AppSubjectSector(appID, clientID)
+		return sector, holder, true
+	})
 	sessionsStore.SetPasskeysResolver(fido2Handler.UserKeys)
 	issuer.SetAccountResolver(sessionsStore.ActiveAccount)
 	// Relationship rows for every live (account, client) pair that predates
@@ -330,6 +337,8 @@ func main() {
 	// The attested apps a client with its own subjects stands for.
 	mux.HandleFunc("POST /clients/{id}/apps", clients.HandleSetAppIDs(clientReg, cfg.AdminToken))
 	mux.HandleFunc("POST /clients/{id}/origins", clients.HandleSetAllowedOrigins(clientReg, cfg.AdminToken))
+	// A tool client a person uses to reach any attested app (the explorer).
+	mux.HandleFunc("POST /clients/{id}/any-app", clients.HandleSetAnyAppAudience(clientReg, cfg.AdminToken))
 	// Where an attested app is served, reported by its control plane: the
 	// client standing for the app accepts sign-ins from those pages.
 	mux.HandleFunc("POST /admin/apps/{app_id}/origins", clients.HandleSetAppOrigins(clientReg, cfg.AdminToken))

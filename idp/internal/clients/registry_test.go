@@ -317,3 +317,50 @@ func TestAcceptsOrigin(t *testing.T) {
 		}
 	}
 }
+
+// A tool client is an own-subject, non-platform client an operator marks;
+// for an app it uses the sector of the app's own client, else one of the
+// tool and the app together.
+func TestToolClientsAndTheSubjectTheyUseAtAnApp(t *testing.T) {
+	reg := newTestRegistry(t)
+	for _, id := range []string{"tool", "site", "platform-client", "legacy"} {
+		if _, err := reg.RegisterWithID(id, id, nil, "", []string{"email"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const app = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	_ = reg.SetSector("tool", "tool")
+	_ = reg.SetSector("site", "site")
+	_ = reg.SetSector("platform-client", "platform-client")
+	_ = reg.SetPlatform("platform-client", true)
+	if err := reg.SetAppIDs("site", []string{app}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := reg.SetAnyAppAudience("platform-client", true); err == nil {
+		t.Fatal("a platform client was made a tool client")
+	}
+	if err := reg.SetAnyAppAudience("legacy", true); err == nil {
+		t.Fatal("a shared-subject client was made a tool client")
+	}
+	if reg.AnyAppAudience("tool") {
+		t.Fatal("a client is a tool client before an operator says so")
+	}
+	if err := reg.SetAnyAppAudience("tool", true); err != nil || !reg.AnyAppAudience("tool") {
+		t.Fatalf("marking a tool client: %v", err)
+	}
+	// Moved to the shared subject later, it stops being one.
+	_ = reg.SetSector("tool", "")
+	if reg.AnyAppAudience("tool") {
+		t.Fatal("a shared-subject client still counts as a tool client")
+	}
+	_ = reg.SetSector("tool", "tool")
+
+	if sector, holder := reg.AppSubjectSector(app, "tool"); sector != "site" || holder != "site" {
+		t.Fatalf("a claimed app: sector %q holder %q", sector, holder)
+	}
+	const other = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	if sector, holder := reg.AppSubjectSector(other, "tool"); sector != "tool-app\x00tool\x00"+other || holder != "tool" {
+		t.Fatalf("an unclaimed app: sector %q holder %q", sector, holder)
+	}
+}

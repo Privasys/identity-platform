@@ -331,6 +331,55 @@ func (reg *Registry) SetPlatform(clientID string, platform bool) error {
 	return nil
 }
 
+// AnyAppAudience reports whether a client is a tool client: one with its own
+// subjects, not a platform client, that an operator allowed to address any
+// attested app (see AppSubjectSector).
+func (reg *Registry) AnyAppAudience(clientID string) bool {
+	var anyApp, platform int
+	var sector string
+	if err := reg.db.QueryRow("SELECT any_app_audience, platform, sector FROM clients WHERE client_id = ?", clientID).Scan(&anyApp, &platform, &sector); err != nil {
+		return false
+	}
+	return anyApp != 0 && platform == 0 && sector != ""
+}
+
+// SetAnyAppAudience marks or unmarks a tool client. Only a client with its
+// own subjects that is not a platform client may be one: a platform token
+// or a shared subject must never reach an app through it.
+func (reg *Registry) SetAnyAppAudience(clientID string, on bool) error {
+	var platform int
+	var sector string
+	if err := reg.db.QueryRow("SELECT platform, sector FROM clients WHERE client_id = ?", clientID).Scan(&platform, &sector); err != nil {
+		return fmt.Errorf("client not found")
+	}
+	if on && (platform != 0 || sector == "") {
+		return fmt.Errorf("a tool client must have its own subjects and not be a platform client")
+	}
+	v := 0
+	if on {
+		v = 1
+	}
+	_, err := reg.db.Exec("UPDATE clients SET any_app_audience = ? WHERE client_id = ?", v, clientID)
+	return err
+}
+
+// AppSubjectSector is the subject sector a tool client uses for a person at
+// an attested app, and the client a relationship row for that subject
+// belongs to. The app sees the person as its own sign-in does: the sector of
+// the client that stands for the app (the account id when that client is in
+// the shared sector). When no client claims the app, the subject is one of
+// the tool and the app together, which no other app or client shares.
+//
+// The tool is never the sector, so an app cannot link a person by the tool
+// they came through; the token's azp says which tool it was.
+func (reg *Registry) AppSubjectSector(appID, toolClientID string) (sector, holderClient string) {
+	id := NormaliseAppID(appID)
+	if owner := reg.ClientOfApp(id); owner != "" {
+		return reg.SectorOf(owner), owner
+	}
+	return "tool-app\x00" + toolClientID + "\x00" + id, toolClientID
+}
+
 // AppIDsOf returns the attested app ids (OID 4.1, lowercase hex, no dashes)
 // a client stands for. A client with its own subjects hands its subject only
 // to these apps' enclaves, so another app cannot claim the client's id to
@@ -571,6 +620,32 @@ func HandleSetAppIDs(reg *Registry, adminToken string) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"client_id": clientID, "app_ids": reg.AppIDsOf(clientID)})
+	}
+}
+
+// HandleSetAnyAppAudience marks or unmarks a tool client (AnyAppAudience).
+//
+//	POST /clients/{id}/any-app  {"enabled": true}   (admin token)
+func HandleSetAnyAppAudience(reg *Registry, adminToken string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminToken == "" || r.Header.Get("Authorization") != "Bearer "+adminToken {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		var req struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4*1024)).Decode(&req); err != nil || req.Enabled == nil {
+			http.Error(w, `{"error":"body must be {\"enabled\": true|false}"}`, http.StatusBadRequest)
+			return
+		}
+		clientID := r.PathValue("id")
+		if err := reg.SetAnyAppAudience(clientID, *req.Enabled); err != nil {
+			http.Error(w, `{"error":"`+strings.ReplaceAll(err.Error(), `"`, "'")+`"}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"client_id": clientID, "any_app_audience": reg.AnyAppAudience(clientID)})
 	}
 }
 

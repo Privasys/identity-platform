@@ -1264,6 +1264,9 @@
 
   "settings": {
     "title": "Nastavení",
+    "iconBadgeTitle": "Oznámení",
+    "iconBadgeLabel": "Číslo na ikoně aplikace",
+    "iconBadgeHint": "Ukazuje, kolik žádostí na vás čeká. Když to vypnete, na toto zařízení se žádné číslo neposílá.",
     "gracePeriodTitle": "Biometrická odkladná doba",
     "gracePeriodDescription": "Po jednom ověření přeskočit biometrickou výzvu u dalších požadavků v tomto časovém okně.",
     "gracePeriodAlways": "Vždy",

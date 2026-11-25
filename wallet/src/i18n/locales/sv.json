@@ -1245,6 +1245,9 @@
 
   "settings": {
     "title": "Inställningar",
+    "iconBadgeTitle": "Aviseringar",
+    "iconBadgeLabel": "Siffra på appikonen",
+    "iconBadgeHint": "Visar hur många förfrågningar som väntar på dig. Stäng av det så skickas ingen siffra till den här enheten.",
     "gracePeriodTitle": "Biometrisk respitperiod",
     "gracePeriodDescription": "Efter att du autentiserat dig en gång, hoppa över den biometriska frågan för efterföljande begäranden inom det här fönstret.",
     "gracePeriodAlways": "Alltid",

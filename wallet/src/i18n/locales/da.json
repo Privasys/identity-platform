@@ -1245,6 +1245,9 @@
 
   "settings": {
     "title": "Indstillinger",
+    "iconBadgeTitle": "Notifikationer",
+    "iconBadgeLabel": "Tal på appikonet",
+    "iconBadgeHint": "Viser, hvor mange anmodninger der venter på dig. Slå det fra, så sendes der intet tal til denne enhed.",
     "gracePeriodTitle": "Biometrisk henstandsperiode",
     "gracePeriodDescription": "Når du har godkendt dig én gang, springes den biometriske prompt over for efterfølgende anmodninger inden for dette vindue.",
     "gracePeriodAlways": "Altid",

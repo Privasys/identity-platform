@@ -1283,6 +1283,9 @@
 
   "settings": {
     "title": "Ustawienia",
+    "iconBadgeTitle": "Powiadomienia",
+    "iconBadgeLabel": "Liczba na ikonie aplikacji",
+    "iconBadgeHint": "Pokazuje, ile próśb na Ciebie czeka. Po wyłączeniu żadna liczba nie jest wysyłana na to urządzenie.",
     "gracePeriodTitle": "Okres tolerancji biometrii",
     "gracePeriodDescription": "Po jednorazowym uwierzytelnieniu pomijaj monit biometryczny dla kolejnych żądań w tym oknie czasu.",
     "gracePeriodAlways": "Zawsze",

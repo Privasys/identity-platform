@@ -1316,6 +1316,9 @@
   },
   "settings": {
     "title": "Socruithe",
+    "iconBadgeTitle": "Fógraí",
+    "iconBadgeLabel": "Uimhir ar dheilbhín na haipe",
+    "iconBadgeHint": "Taispeánann sé cé mhéad iarratas atá ag fanacht ort. Múch é agus ní sheoltar aon uimhir chuig an ngléas seo.",
     "gracePeriodTitle": "Tréimhse chairde bhithmhéadrach",
     "gracePeriodDescription": "Tar éis fíordheimhniú amháin, scipeáil an leid bhithmhéadrach d'iarratais ina dhiaidh sin laistigh den fhuinneog seo.",
     "gracePeriodAlways": "I gcónaí",

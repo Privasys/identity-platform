@@ -1245,6 +1245,9 @@
 
   "settings": {
     "title": "Asetukset",
+    "iconBadgeTitle": "Ilmoitukset",
+    "iconBadgeLabel": "Numero sovelluksen kuvakkeessa",
+    "iconBadgeHint": "Näyttää, kuinka monta pyyntöä odottaa sinua. Jos poistat tämän käytöstä, tähän laitteeseen ei lähetetä numeroa.",
     "gracePeriodTitle": "Biometrinen armonaika",
     "gracePeriodDescription": "Kun olet tunnistautunut kerran, ohita biometrinen kysely seuraavissa pyynnöissä tämän ajan sisällä.",
     "gracePeriodAlways": "Aina",

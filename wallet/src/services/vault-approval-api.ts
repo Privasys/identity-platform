@@ -330,6 +330,12 @@ export async function lookupVaultBatchVersion(appIdHex: string, versionId: strin
  * session, so every pairwise identity that owns vault keys can be pushed —
  * without the IdP learning any pairwise linkage it doesn't already have.
  */
+/** Whether this device wants its icon's number sent with its pushes. Unknown
+ *  until the settings are read: privasys.id then keeps what it last heard. */
+let iconBadge: boolean | null = null;
+export function setWantsIconBadge(on: boolean): void {
+    iconBadge = on;
+}
 export async function registerPushTokenWithIdp(
     walletSessionToken: string,
     expoPushToken: string,
@@ -365,7 +371,7 @@ export async function registerPushTokenWithIdp(
         // IdP seals app-notification payloads to it (empty keeps any
         // previously registered key).
         // device_tag keeps one target per phone of the holder; every phone is notified.
-        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub, ...(deviceTag ? { device_tag: deviceTag } : {}), ...proof }),
+        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub, ...(deviceTag ? { device_tag: deviceTag } : {}), ...proof, ...(iconBadge === null ? {} : { badge: iconBadge }) }),
     });
     if (!res.ok) {
         throw new Error(`register push token failed (${res.status})`);

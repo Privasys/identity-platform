@@ -1335,6 +1335,9 @@
   },
   "settings": {
     "title": "Gosodiadau",
+    "iconBadgeTitle": "Hysbysiadau",
+    "iconBadgeLabel": "Rhif ar eicon yr ap",
+    "iconBadgeHint": "Mae’n dangos faint o geisiadau sy’n aros amdanoch. Diffoddwch ef ac ni anfonir rhif i’r ddyfais hon.",
     "gracePeriodTitle": "Cyfnod gras biometrig",
     "gracePeriodDescription": "Ar ôl dilysu unwaith, hepgorwch yr anogwr biometrig ar gyfer ceisiadau dilynol o fewn y ffenestr hon.",
     "gracePeriodAlways": "Bob amser",

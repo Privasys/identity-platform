@@ -1278,6 +1278,9 @@
   },
   "settings": {
     "title": "Postavke",
+    "iconBadgeTitle": "Obavijesti",
+    "iconBadgeLabel": "Broj na ikoni aplikacije",
+    "iconBadgeHint": "Pokazuje koliko vas zahtjeva čeka. Ako to isključite, na ovaj se uređaj ne šalje nikakav broj.",
     "gracePeriodTitle": "Razdoblje odgode biometrije",
     "gracePeriodDescription": "Nakon jedne autentifikacije preskoči biometrijski upit za daljnje zahtjeve unutar ovog razdoblja.",
     "gracePeriodAlways": "Uvijek",

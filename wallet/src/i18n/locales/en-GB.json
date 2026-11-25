@@ -1259,6 +1259,9 @@
   },
   "settings": {
     "title": "Settings",
+    "iconBadgeTitle": "Notifications",
+    "iconBadgeLabel": "Number on the app icon",
+    "iconBadgeHint": "Shows how many requests are waiting for you. Turn it off and no number is sent to this device.",
     "gracePeriodTitle": "Biometric Grace Period",
     "gracePeriodDescription": "After authenticating once, skip the biometric prompt for subsequent requests within this window.",
     "gracePeriodAlways": "Always",

@@ -1297,6 +1297,9 @@
   },
   "settings": {
     "title": "Nastavitve",
+    "iconBadgeTitle": "Obvestila",
+    "iconBadgeLabel": "Številka na ikoni aplikacije",
+    "iconBadgeHint": "Kaže, koliko zahtev vas čaka. Če to izklopite, se tej napravi ne pošlje nobena številka.",
     "gracePeriodTitle": "Odlog za biometrijo",
     "gracePeriodDescription": "Po enkratnem overjanju preskoči biometrični poziv pri nadaljnjih zahtevah v tem obdobju.",
     "gracePeriodAlways": "Vedno",

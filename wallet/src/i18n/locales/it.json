@@ -1264,6 +1264,9 @@
 
   "settings": {
     "title": "Impostazioni",
+    "iconBadgeTitle": "Notifiche",
+    "iconBadgeLabel": "Numero sull’icona dell’app",
+    "iconBadgeHint": "Mostra quante richieste ti aspettano. Se lo disattivi, nessun numero viene inviato a questo dispositivo.",
     "gracePeriodTitle": "Periodo di tolleranza biometrico",
     "gracePeriodDescription": "Dopo una prima autenticazione, salta la richiesta biometrica per le richieste successive entro questo intervallo.",
     "gracePeriodAlways": "Sempre",

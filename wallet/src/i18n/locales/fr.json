@@ -1264,6 +1264,9 @@
 
   "settings": {
     "title": "Réglages",
+    "iconBadgeTitle": "Notifications",
+    "iconBadgeLabel": "Nombre sur l’icône de l’application",
+    "iconBadgeHint": "Indique combien de demandes vous attendent. Si vous le désactivez, aucun nombre n’est envoyé à cet appareil.",
     "gracePeriodTitle": "Délai de grâce biométrique",
     "gracePeriodDescription": "Après une première authentification, ignorer l'invite biométrique pour les demandes suivantes pendant ce délai.",
     "gracePeriodAlways": "Toujours",

@@ -1278,6 +1278,9 @@
   },
   "settings": {
     "title": "Nustatymai",
+    "iconBadgeTitle": "Pranešimai",
+    "iconBadgeLabel": "Skaičius ant programėlės piktogramos",
+    "iconBadgeHint": "Rodo, kiek užklausų jūsų laukia. Išjungus, į šį įrenginį skaičius nesiunčiamas.",
     "gracePeriodTitle": "Biometrijos lengvatinis laikotarpis",
     "gracePeriodDescription": "Kartą autentifikavus, praleisti biometrijos raginimą tolesniems prašymams per šį laikotarpį.",
     "gracePeriodAlways": "Visada",

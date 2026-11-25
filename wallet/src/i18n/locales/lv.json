@@ -1278,6 +1278,9 @@
   },
   "settings": {
     "title": "Iestatījumi",
+    "iconBadgeTitle": "Paziņojumi",
+    "iconBadgeLabel": "Skaitlis uz lietotnes ikonas",
+    "iconBadgeHint": "Rāda, cik pieprasījumu jūs gaida. Ja to izslēdzat, uz šo ierīci skaitlis netiek sūtīts.",
     "gracePeriodTitle": "Biometrijas atvieglojuma periods",
     "gracePeriodDescription": "Pēc vienreizējas autentifikācijas izlaist biometrijas uzvedni turpmākajiem pieprasījumiem šajā periodā.",
     "gracePeriodAlways": "Vienmēr",

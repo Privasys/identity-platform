@@ -1278,6 +1278,9 @@
   },
   "settings": {
     "title": "Setări",
+    "iconBadgeTitle": "Notificări",
+    "iconBadgeLabel": "Număr pe pictograma aplicației",
+    "iconBadgeHint": "Arată câte solicitări vă așteaptă. Dacă îl dezactivați, niciun număr nu este trimis către acest dispozitiv.",
     "gracePeriodTitle": "Perioadă de grație biometrică",
     "gracePeriodDescription": "După o autentificare, omite solicitarea biometrică pentru cererile ulterioare din acest interval.",
     "gracePeriodAlways": "Întotdeauna",

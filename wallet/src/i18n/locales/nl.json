@@ -1245,6 +1245,9 @@
 
   "settings": {
     "title": "Instellingen",
+    "iconBadgeTitle": "Meldingen",
+    "iconBadgeLabel": "Getal op het app-pictogram",
+    "iconBadgeHint": "Toont hoeveel verzoeken op u wachten. Als u dit uitzet, wordt er geen getal naar dit apparaat gestuurd.",
     "gracePeriodTitle": "Biometrische respijtperiode",
     "gracePeriodDescription": "Nadat je je eenmaal hebt geauthenticeerd, de biometrische vraag overslaan voor volgende verzoeken binnen deze periode.",
     "gracePeriodAlways": "Altijd",

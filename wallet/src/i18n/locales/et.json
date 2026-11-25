@@ -1259,6 +1259,9 @@
   },
   "settings": {
     "title": "Sätted",
+    "iconBadgeTitle": "Teavitused",
+    "iconBadgeLabel": "Number rakenduse ikoonil",
+    "iconBadgeHint": "Näitab, mitu taotlust teid ootab. Kui selle välja lülitate, ei saadeta sellesse seadmesse ühtegi numbrit.",
     "gracePeriodTitle": "Biomeetria ajapikendus",
     "gracePeriodDescription": "Pärast ühte autentimist jäta biomeetriline küsimus järgnevate päringute puhul selle akna jooksul vahele.",
     "gracePeriodAlways": "Alati",

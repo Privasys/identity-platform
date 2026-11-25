@@ -41,6 +41,9 @@ export interface SettingsState {
     appLockSec: AppLockSeconds | null;
     /** Whether the holder has answered the one-time question about the lock. */
     appLockAsked: boolean;
+    /** Whether the app's icon shows how many requests wait on the holder. On
+     *  unless turned off; off, privasys.id sends this device no number. */
+    iconBadge: boolean;
 
     setGracePeriod: (seconds: number) => void;
     setVerificationMode: (mode: VerificationMode) => void;
@@ -48,6 +51,7 @@ export interface SettingsState {
     setSeenFirstConnect: (seen: boolean) => void;
     setAppLock: (seconds: AppLockSeconds | null) => void;
     setAppLockAsked: () => void;
+    setIconBadge: (on: boolean) => void;
     /**
      * Reset to first-run defaults, EXCEPT the explicit app-language override.
      * Everything else here is state the wallet inferred or the user set while
@@ -76,6 +80,7 @@ function persist(get: () => SettingsState) {
             seenFirstConnect: s.seenFirstConnect,
             appLockSec: s.appLockSec,
             appLockAsked: s.appLockAsked,
+            iconBadge: s.iconBadge,
         })
     ).catch(console.error);
 }
@@ -87,6 +92,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     seenFirstConnect: false,
     appLockSec: null,
     appLockAsked: false,
+    iconBadge: true,
 
     setGracePeriod: (seconds) => {
         set({ gracePeriodSec: seconds });
@@ -118,9 +124,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         persist(get);
     },
 
+    setIconBadge: (on) => {
+        set({ iconBadge: on });
+        persist(get);
+    },
+
     clearAll: () => {
         // A wiped wallet asks again once it is set up anew.
-        set({ gracePeriodSec: 30, verificationMode: 'deterministic', seenFirstConnect: false, appLockSec: null, appLockAsked: false });
+        set({ gracePeriodSec: 30, verificationMode: 'deterministic', seenFirstConnect: false, appLockSec: null, appLockAsked: false, iconBadge: true });
         persist(get);
     },
 
@@ -146,6 +157,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             }
             if (typeof data.appLockAsked === 'boolean') {
                 set({ appLockAsked: data.appLockAsked });
+            }
+            if (typeof data.iconBadge === 'boolean') {
+                set({ iconBadge: data.iconBadge });
             }
         } catch {
             // Corrupted — use defaults

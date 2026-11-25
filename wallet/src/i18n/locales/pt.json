@@ -1264,6 +1264,9 @@
 
   "settings": {
     "title": "Definições",
+    "iconBadgeTitle": "Notificações",
+    "iconBadgeLabel": "Número no ícone da aplicação",
+    "iconBadgeHint": "Mostra quantos pedidos estão à sua espera. Se desativar, nenhum número é enviado para este dispositivo.",
     "gracePeriodTitle": "Período de tolerância biométrico",
     "gracePeriodDescription": "Depois de se autenticar uma vez, ignorar o pedido biométrico nos pedidos seguintes dentro deste intervalo.",
     "gracePeriodAlways": "Sempre",

@@ -555,6 +555,12 @@ function parseHostList(v: unknown): string[] | undefined {
 
 let ambientPushToken: string | null = null;
 
+/** Tell privasys.id again what this device wants (the number on its icon),
+ *  when the wallet holds a live session. Otherwise the next sign-in does. */
+export async function registerPushTokenAgain(): Promise<void> {
+    if (ambientPushToken) await maybeRegisterPushToken(ambientPushToken);
+}
+
 /** Get the current push token without a hook (for non-component code). */
 export function getAmbientPushToken(): string | null {
     return ambientPushToken;

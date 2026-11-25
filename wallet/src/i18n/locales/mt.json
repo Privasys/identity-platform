@@ -1316,6 +1316,9 @@
   },
   "settings": {
     "title": "Issettjar",
+    "iconBadgeTitle": "Notifiki",
+    "iconBadgeLabel": "Numru fuq l-ikona tal-app",
+    "iconBadgeHint": "Juri kemm hemm talbiet jistennewk. Itfih u ma jintbagħat l-ebda numru lil dan l-apparat.",
     "gracePeriodTitle": "Perjodu ta' grazzja bijometriku",
     "gracePeriodDescription": "Wara awtentikazzjoni waħda, aqbeż il-prompt bijometriku għat-talbiet ta' wara f'din il-perjodu.",
     "gracePeriodAlways": "Dejjem",

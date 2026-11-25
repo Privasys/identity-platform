@@ -1278,6 +1278,9 @@
   },
   "settings": {
     "title": "Nastavenia",
+    "iconBadgeTitle": "Oznámenia",
+    "iconBadgeLabel": "Číslo na ikone aplikácie",
+    "iconBadgeHint": "Ukazuje, koľko žiadostí na vás čaká. Keď to vypnete, na toto zariadenie sa žiadne číslo neposiela.",
     "gracePeriodTitle": "Odkladová lehota biometrie",
     "gracePeriodDescription": "Po jednom overení preskočiť biometrickú výzvu pri ďalších žiadostiach v rámci tohto intervalu.",
     "gracePeriodAlways": "Vždy",

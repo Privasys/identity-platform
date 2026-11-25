@@ -1245,6 +1245,9 @@
 
   "settings": {
     "title": "Beállítások",
+    "iconBadgeTitle": "Értesítések",
+    "iconBadgeLabel": "Szám az alkalmazás ikonján",
+    "iconBadgeHint": "Megmutatja, hány kérés vár Önre. Ha kikapcsolja, erre az eszközre nem küldünk számot.",
     "gracePeriodTitle": "Biometrikus türelmi idő",
     "gracePeriodDescription": "Az egyszeri hitelesítés után a további kéréseknél ezen az időablakon belül kihagyjuk a biometrikus kérdést.",
     "gracePeriodAlways": "Mindig",

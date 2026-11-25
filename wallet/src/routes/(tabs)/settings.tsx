@@ -20,7 +20,8 @@ import { ExternalLink } from '@/components/ExternalLink';
 import { LanguagePicker } from '@/components/LanguagePicker';
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
-import { useExpoPushToken } from '@/hooks/useExpoPushToken';
+import { registerPushTokenAgain, useExpoPushToken } from '@/hooks/useExpoPushToken';
+import { setWantsIconBadge } from '@/services/vault-approval-api';
 import { APP_LOCK_DEFAULT, APP_LOCK_OPTIONS, type AppLockSeconds } from '@/services/app-lock';
 import { AccountDeletionBanner } from '@/components/AccountDeletionBanner';
 import { useRemoveThisDevice } from '@/hooks/useRemoveThisDevice';
@@ -54,6 +55,14 @@ export default function SettingsScreen() {
         },
         [t],
     );
+    const iconBadge = useSettingsStore((s) => s.iconBadge);
+    // The icon follows at once; privasys.id is told so that it stops, or
+    // starts, sending this device its number.
+    const chooseIconBadge = useCallback((on: boolean) => {
+        useSettingsStore.getState().setIconBadge(on);
+        setWantsIconBadge(on);
+        void registerPushTokenAgain();
+    }, []);
     const pushToken = useExpoPushToken();
     // Devices shows from the first phone: it is where the phone is named.
     const [phones, setPhones] = useState(0);
@@ -111,6 +120,27 @@ export default function SettingsScreen() {
                                 ))}
                             </View>
                         )}
+                    </>
+                )}
+
+                {/* The number on the app's icon. */}
+                {isDemo() ? null : (
+                    <>
+                        <Text style={styles.sectionTitle}>{t('settings.iconBadgeTitle')}</Text>
+                        <RNView style={styles.toggleRow}>
+                            <RNView style={styles.toggleText}>
+                                <Text style={styles.toggleLabel}>{t('settings.iconBadgeLabel')}</Text>
+                                <Text style={styles.toggleHint}>{t('settings.iconBadgeHint')}</Text>
+                            </RNView>
+                            <Switch
+                                value={iconBadge}
+                                onValueChange={chooseIconBadge}
+                                trackColor={{ false: p.border, true: p.green }}
+                                thumbColor="#FFFFFF"
+                                accessibilityLabel={t('settings.iconBadgeLabel')}
+                                testID="settings-icon-badge"
+                            />
+                        </RNView>
                     </>
                 )}
 

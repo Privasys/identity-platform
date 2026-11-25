@@ -1245,6 +1245,9 @@
 
   "settings": {
     "title": "Einstellungen",
+    "iconBadgeTitle": "Benachrichtigungen",
+    "iconBadgeLabel": "Zahl auf dem App-Symbol",
+    "iconBadgeHint": "Zeigt, wie viele Anfragen auf Sie warten. Wenn Sie dies ausschalten, wird keine Zahl an dieses Gerät gesendet.",
     "gracePeriodTitle": "Biometrische Kulanzzeit",
     "gracePeriodDescription": "Nach einer einmaligen Authentifizierung wird die biometrische Abfrage für weitere Anfragen innerhalb dieses Zeitraums übersprungen.",
     "gracePeriodAlways": "Immer",

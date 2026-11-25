@@ -64,6 +64,22 @@ func migrateDevices(db *sql.DB) error {
 			return err
 		}
 	}
+	// push_token_keys: the key each token's device proved itself with.
+	// bind_pub, bound on a registration: the key it came with, and whether it
+	// was signed by the token's proven key (recovery/pushbind.go).
+	if _, err := db.Exec("CREATE TABLE IF NOT EXISTS push_token_keys (push_token TEXT PRIMARY KEY, bind_pub TEXT NOT NULL)"); err != nil {
+		return err
+	}
+	if !hasColumn(db, "push_tokens", "bind_pub") {
+		for _, q := range []string{
+			"ALTER TABLE push_tokens ADD COLUMN bind_pub TEXT NOT NULL DEFAULT ''",
+			"ALTER TABLE push_tokens ADD COLUMN bound INTEGER NOT NULL DEFAULT 0",
+		} {
+			if _, err := db.Exec(q); err != nil {
+				return err
+			}
+		}
+	}
 	// badge_off: a device that asked for no number on its icon (push/badge.go).
 	if !hasColumn(db, "push_tokens", "badge_off") {
 		if _, err := db.Exec("ALTER TABLE push_tokens ADD COLUMN badge_off INTEGER NOT NULL DEFAULT 0"); err != nil {
@@ -122,6 +138,45 @@ func (db *DB) GetPushTargets(userID string) []PushTarget {
 	return out
 }
 
+// SetPushBinding records the binding key a registration came with and whether
+// the row is bound to it.
+func (db *DB) SetPushBinding(userID, pushToken, bindPub string, bound bool) error {
+	b := 0
+	if bound {
+		b = 1
+	}
+	_, err := db.Exec("UPDATE push_tokens SET bind_pub = ?, bound = ? WHERE user_id = ? AND push_token = ?", bindPub, b, userID, pushToken)
+	return err
+}
+
+// PushTokenBindKey is the key a token's device proved itself with, or "" when
+// none has.
+func (db *DB) PushTokenBindKey(pushToken string) string {
+	var k string
+	db.QueryRow("SELECT bind_pub FROM push_token_keys WHERE push_token = ?", pushToken).Scan(&k)
+	return k
+}
+
+// BindPushToken records the key a token's device answered a challenge with.
+// It binds no registration by itself: each identity is bound by its own
+// signature under this key. A registration made under an earlier key no
+// longer is.
+func (db *DB) BindPushToken(pushToken, bindPub string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`INSERT INTO push_token_keys (push_token, bind_pub) VALUES (?, ?)
+		ON CONFLICT(push_token) DO UPDATE SET bind_pub = excluded.bind_pub`, pushToken, bindPub); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("UPDATE push_tokens SET bound = 0 WHERE push_token = ? AND bind_pub <> ?", pushToken, bindPub); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // SetPushBadge records whether a device takes a number on its icon. The
 // choice is the device's, so it is set on every registration of its token.
 func (db *DB) SetPushBadge(pushToken string, on bool) error {
@@ -133,9 +188,10 @@ func (db *DB) SetPushBadge(pushToken string, on bool) error {
 	return err
 }
 
-// BadgeTokens lists a user's push tokens that take a number on their icon.
+// BadgeTokens lists a user's push tokens that take a number on their icon:
+// bound to their device, and not switched off there.
 func (db *DB) BadgeTokens(userID string) []string {
-	rows, err := db.Query("SELECT push_token FROM push_tokens WHERE user_id = ? AND badge_off = 0 AND push_token <> ''", userID)
+	rows, err := db.Query("SELECT push_token FROM push_tokens WHERE user_id = ? AND badge_off = 0 AND bound = 1 AND push_token <> ''", userID)
 	if err != nil {
 		return nil
 	}
@@ -150,10 +206,10 @@ func (db *DB) BadgeTokens(userID string) []string {
 	return out
 }
 
-// PushTokenUsers lists the users a push token is registered for: the
-// identities one phone holds. Read when a count is needed and kept nowhere.
+// PushTokenUsers lists the users a push token is bound for: the identities
+// one phone holds. Read when a count is needed and kept nowhere.
 func (db *DB) PushTokenUsers(pushToken string) []string {
-	rows, err := db.Query("SELECT DISTINCT user_id FROM push_tokens WHERE push_token = ?", pushToken)
+	rows, err := db.Query("SELECT DISTINCT user_id FROM push_tokens WHERE push_token = ? AND bound = 1", pushToken)
 	if err != nil {
 		return nil
 	}
@@ -459,11 +515,13 @@ type PushPeer struct {
 }
 
 // GetPushPeers returns the other phones registered for any user that token is
-// registered for, each token once, never the token itself.
+// registered for, each token once, never the token itself. Bound rows only on
+// both sides: a token someone merely claimed is nobody's other phone.
 func (db *DB) GetPushPeers(token string) []PushPeer {
 	rows, err := db.Query(`SELECT p2.user_id, p2.push_token FROM push_tokens p1
 		JOIN push_tokens p2 ON p2.user_id = p1.user_id
-		WHERE p1.push_token = ? AND p2.push_token <> ? ORDER BY p2.updated_at DESC`, token, token)
+		WHERE p1.push_token = ? AND p2.push_token <> ? AND p1.bound = 1 AND p2.bound = 1
+		ORDER BY p2.updated_at DESC`, token, token)
 	if err != nil {
 		return nil
 	}

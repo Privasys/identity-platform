@@ -746,6 +746,13 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 		// on its holder sent with its pushes. Absent means yes, and a wallet
 		// that does not know the field keeps what the device last said.
 		Badge *bool `json:"badge"`
+		// BindPub is the key this device proves itself with, BindSig its
+		// signature adding this identity to a token already bound to it, made
+		// at IssuedAt (pushbind.go). A wallet that sends none registers as
+		// before, unbound.
+		BindPub  string `json:"bind_pub"`
+		BindSig  string `json:"bind_sig"`
+		IssuedAt int64  `json:"issued_at"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PushToken == "" {
 		http.Error(w, `{"error":"push_token is required"}`, http.StatusBadRequest)
@@ -761,14 +768,21 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
-	if req.Badge != nil {
+	bound := h.bindRegistration(userID, req.PushToken, req.BindPub, req.BindSig, req.IssuedAt)
+	// The device's own choice, so only a device that has shown the token is
+	// its own may set it.
+	if req.Badge != nil && bound {
 		if err := h.db.SetPushBadge(req.PushToken, *req.Badge); err != nil {
 			log.Printf("[push-token] badge setting: %v", err)
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"status":"ok"}`))
+	if bound {
+		w.Write([]byte(`{"status":"ok","bound":true}`))
+		return
+	}
+	w.Write([]byte(`{"status":"ok","bound":false}`))
 }
 
 // --- Helpers ---

@@ -30,6 +30,18 @@ func TestPushBadgeSetting(t *testing.T) {
 		}
 	}
 	sorted := func(s []string) []string { sort.Strings(s); return s }
+	// A registration nobody has shown to be the device's own counts nowhere.
+	if got := db.PushTokenUsers("phone"); len(got) != 0 {
+		t.Fatalf("unbound identities of the phone = %v", got)
+	}
+	if got := db.BadgeTokens("alice-a"); len(got) != 0 {
+		t.Fatalf("unbound badge tokens = %v", got)
+	}
+	for _, r := range [][2]string{{"alice-a", "phone"}, {"alice-b", "phone"}, {"alice-a", "tablet"}} {
+		if err := db.SetPushBinding(r[0], r[1], "key-"+r[1], true); err != nil {
+			t.Fatalf("bind: %v", err)
+		}
+	}
 	if got := sorted(db.PushTokenUsers("phone")); len(got) != 2 || got[0] != "alice-a" || got[1] != "alice-b" {
 		t.Fatalf("identities of the phone = %v", got)
 	}

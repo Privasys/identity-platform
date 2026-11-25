@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -58,7 +59,27 @@ func dismissMux(t *testing.T) (*http.ServeMux, func(user, tag, token string)) {
 		if err := db.UpsertDevicePushTarget(user, tag, token, ""); err != nil {
 			t.Fatal(err)
 		}
+		// A token named "claimed…" stays as a registration nobody proved.
+		if strings.HasPrefix(token, "claimed") {
+			return
+		}
+		if err := db.SetPushBinding(user, token, "key-"+token, true); err != nil {
+			t.Fatal(err)
+		}
 	}
+}
+
+// A token someone attached to the holder's identity without proving it is
+// theirs is nobody's other phone: it is sent nothing, and can clear nothing.
+func TestDismissIgnoresUnboundRegistrations(t *testing.T) {
+	mux, register := dismissMux(t)
+	register("alice-drive", tagA, "tokA")
+	register("alice-drive", tagB, "claimedB")
+	wait := captureDismiss(t)
+
+	call(mux, "POST", "/push/dismiss", `{"push_token":"tokA","key":"`+testDismissKey+`"}`, "")
+	call(mux, "POST", "/push/dismiss", `{"push_token":"claimedB","key":"`+testDismissKey+`"}`, "")
+	wait(0)
 }
 
 func TestDismissReachesTheHoldersOtherPhonesOnly(t *testing.T) {

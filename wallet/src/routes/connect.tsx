@@ -18,6 +18,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     StyleSheet,
@@ -383,15 +384,48 @@ async function patchSessionAttributes(
             if (proof) body = { ...body, email_proof: proof };
         }
     }
+    // Bounded: on a slow link an unanswered request must not be left open for
+    // minutes (fetch has no timeout of its own).
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), SESSION_PATCH_TIMEOUT_MS);
     try {
         await fetch(`https://${payload.origin}/session/complete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ session_id: payload.sessionId, attributes: body }),
+            signal: abort.signal,
         });
     } catch (e: any) {
         console.warn('[CONNECT] session attribute patch failed:', e?.message);
+    } finally {
+        clearTimeout(timer);
     }
+}
+
+/**
+ * How long the attribute patch may take before it is given up. Generous: it no
+ * longer holds a screen, and in the device flow it is the only way the
+ * holder's details reach the tokens.
+ */
+const SESSION_PATCH_TIMEOUT_MS = 60_000;
+
+/**
+ * Send the attribute patch without holding the sign-in screen for it.
+ *
+ * By the time this runs the browser already has the sign-in: the relay is
+ * done. Waiting here kept the holder on "Sending to browser" for as long as a
+ * slow link took to answer, with the browser long since signed in, and the
+ * screen then finished whenever the answer came, wherever the holder had gone
+ * meanwhile (2026-11-25). The patch never throws.
+ */
+function patchSessionAttributesInBackground(
+    payload: QRPayload,
+    attributes: Record<string, string> | undefined,
+    sub?: string,
+): void {
+    void patchSessionAttributes(payload, attributes, sub).catch((e: any) =>
+        console.warn('[CONNECT] session attribute patch failed:', e?.message ?? e),
+    );
 }
 
 /**
@@ -911,13 +945,21 @@ function ConnectFlow() {
     // State
     const [step, setStep] = useState<FlowStep>('verifying');
 
-    // Signed in: no page to say so. Home, with the message strip.
+    // Signed in: no page to say so. Home, with the message strip. Only while
+    // this screen is the one in front: a notification may have opened another
+    // screen over it (an approval), and replacing the route then would take
+    // the holder off what they are looking at. It goes home when they return.
+    const focused = useIsFocused();
+    const announcedRef = useRef(false);
     useEffect(() => {
         if (step !== 'done') return;
-        notify(t('connect.connected'), t('connect.connectedBody'));
-        router.replace('/(tabs)');
+        if (!announcedRef.current) {
+            announcedRef.current = true;
+            notify(t('connect.connected'), t('connect.connectedBody'));
+        }
+        if (focused) router.replace('/(tabs)');
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [step]);
+    }, [step, focused]);
     const [error, setError] = useState<string | null>(null);
     const [reportOpen, setReportOpen] = useState(false);
     const [attestation, setAttestation] = useState<AttestationResult | null>(null);
@@ -2444,7 +2486,7 @@ function ConnectFlow() {
             // (including paid gov proofs the RP was already charged for) never
             // reach the issued tokens. The IdP's patch branch is idempotent,
             // so double delivery via the SDK path is harmless.
-            await patchSessionAttributes(payload, attributes, result.subject || result.userHandle);
+            patchSessionAttributesInBackground(payload, attributes, result.subject || result.userHandle);
             warmWalletAttestation();
 
             // Relay succeeded — now persist locally.
@@ -2618,7 +2660,7 @@ function ConnectFlow() {
             );
 
             // Device-flow attribute delivery (see patchSessionAttributes).
-            await patchSessionAttributes(payload, attributes, result.subject);
+            patchSessionAttributesInBackground(payload, attributes, result.subject);
             warmWalletAttestation();
 
             // Keep the IdP's push target fresh for this pairwise identity
@@ -2858,7 +2900,7 @@ function ConnectFlow() {
             );
 
             // Device-flow attribute delivery (see patchSessionAttributes).
-            await patchSessionAttributes(pending.payload, attributes, pending.credential?.userHandle);
+            patchSessionAttributesInBackground(pending.payload, attributes, pending.credential?.userHandle);
             warmWalletAttestation();
 
             // For registration, persist the credential now

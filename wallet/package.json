@@ -1,6 +1,6 @@
 {
   "name": "privasys-wallet",
-  "version": "1.4.88",
+  "version": "1.5.0",
   "private": true,
   "main": "./entry.ts",
   "scripts": {

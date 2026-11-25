@@ -122,3 +122,25 @@ func TestAToolsRefreshNeverMintsForAnotherApp(t *testing.T) {
 		}
 	}
 }
+
+// Only a refresh that crosses platforms through the temporary allowance
+// counts as using it: that is the line that says when it can be removed.
+func TestOnlyACrossingCountsAsUsingTheAllowance(t *testing.T) {
+	withTestPlatform(t)
+	def := tokens.PlatformAudience
+	for _, c := range []struct {
+		granted, asked string
+		uses           bool
+	}{
+		{"openid offline_access", "audience:aud-test openid", true},
+		{"audience:" + def + " openid", "audience:aud-test openid", true},
+		{"openid offline_access", "audience:" + def + " openid", false},
+		{"audience:aud-test openid", "audience:aud-test openid", false},
+		{"openid offline_access", "audience:attestation-server openid", false},
+		{"openid offline_access", "openid", false},
+	} {
+		if got := refreshUsesAllowance(c.granted, c.asked); got != c.uses {
+			t.Errorf("refreshUsesAllowance(%q, %q) = %t, want %t", c.granted, c.asked, got, c.uses)
+		}
+	}
+}

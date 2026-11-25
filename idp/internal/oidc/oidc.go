@@ -1585,6 +1585,9 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 				"the requested audience is not the app this sign-in was made for")
 			return
 		}
+		if refreshUsesAllowance(scope, requested) {
+			log.Printf("token: refresh used the temporary platform allowance client=%s asked=%s", clientID, audienceFromScope(requested, ""))
+		}
 		effectiveScope = requested
 	}
 
@@ -1924,6 +1927,18 @@ func refreshStaysOnPlatform(granted, asked string) bool {
 	// still mint the one other published platform, for the CLI's single
 	// sign-in. Never the other way, never from an app or resource grant.
 	return had == want || tokens.DefaultMayMintOther(had, want)
+}
+
+// refreshUsesAllowance says whether an accepted refresh crossed platforms
+// through the TEMPORARY allowance (tokens.DefaultMayMintOther). Each such
+// refresh is logged: when none are left, the allowance can be removed.
+func refreshUsesAllowance(granted, asked string) bool {
+	want := audienceFromScope(asked, "")
+	if want == "" || !tokens.IsPlatformAudience(want) {
+		return false
+	}
+	had := audienceFromScope(granted, tokens.PlatformAudience)
+	return had != want && tokens.DefaultMayMintOther(had, want)
 }
 
 // accessTokenTTL is the lifetime of an access token from a sign-in or a

@@ -682,6 +682,25 @@ func (db *DB) ConsumeRefreshTokenWithSID(tokenHash string) (string, string, stri
 	return userID, clientID, scope, sid, nil
 }
 
+// PeekRefreshToken reads a live refresh token without consuming it, so a
+// request the identity provider refuses (a scope the grant does not cover)
+// leaves the sign-in intact. ConsumeRefreshTokenWithSID still does the
+// single-use rotation once the request is accepted.
+func (db *DB) PeekRefreshToken(tokenHash string) (userID, clientID, scope, sid string, err error) {
+	var expiresAt time.Time
+	err = db.QueryRow(
+		"SELECT user_id, client_id, scope, COALESCE(sid, ''), expires_at FROM refresh_tokens WHERE token_hash = ?",
+		tokenHash,
+	).Scan(&userID, &clientID, &scope, &sid, &expiresAt)
+	if err != nil {
+		return "", "", "", "", fmt.Errorf("refresh token not found: %w", err)
+	}
+	if time.Now().After(expiresAt) {
+		return "", "", "", "", fmt.Errorf("refresh token expired")
+	}
+	return userID, clientID, scope, sid, nil
+}
+
 // CleanupExpiredRefreshTokens removes expired refresh tokens.
 func (db *DB) CleanupExpiredRefreshTokens() {
 	db.Exec("DELETE FROM refresh_tokens WHERE expires_at < ?", time.Now())

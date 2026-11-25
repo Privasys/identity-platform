@@ -1501,28 +1501,38 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	// Consume the refresh token (rotation: old token is invalidated).
+	// Every refusal is logged: a client that keeps being refused is
+	// otherwise invisible here.
+	refuse := func(status int, code, desc string) {
+		log.Printf("token: refresh refused for client=%s: %s: %s", clientID, code, desc)
+		errorResponse(w, status, code, desc)
+	}
+
+	// Read the refresh token WITHOUT consuming it: a request refused below
+	// for what it asks must leave the sign-in usable. It is consumed (single
+	// use, rotation) only once the request is accepted, or when the token
+	// itself is no good to anyone (another client's, a revoked session's).
 	tokenHash := hashRefreshToken(refreshToken)
-	userID, storedClientID, scope, sid, err := db.ConsumeRefreshTokenWithSID(tokenHash)
+	userID, storedClientID, scope, sid, err := db.PeekRefreshToken(tokenHash)
 	if err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid_grant", "Invalid or expired refresh token")
+		refuse(http.StatusBadRequest, "invalid_grant", "Invalid or expired refresh token")
 		return
 	}
 
-	// Ensure the client_id matches.
+	// A refresh token presented by another client is spent: whoever holds
+	// it is not its client.
 	if storedClientID != clientID {
-		errorResponse(w, http.StatusBadRequest, "invalid_grant", "client_id mismatch")
+		_, _, _, _, _ = db.ConsumeRefreshTokenWithSID(tokenHash)
+		refuse(http.StatusBadRequest, "invalid_grant", "client_id mismatch")
 		return
 	}
 
 	// Reject refreshes for revoked sessions. Legacy tokens (sid == "")
 	// pre-date the unified session model and are accepted unconditionally.
-	if sess != nil && sid != "" {
-		if !sess.IsActive(sid) {
-			errorResponse(w, http.StatusBadRequest, "invalid_grant", "Session revoked")
-			return
-		}
-		_ = sess.Touch(sid, refreshTokenTTL)
+	if sess != nil && sid != "" && !sess.IsActive(sid) {
+		_, _, _, _, _ = db.ConsumeRefreshTokenWithSID(tokenHash)
+		refuse(http.StatusBadRequest, "invalid_grant", "Session revoked")
+		return
 	}
 
 	// No user profile is stored server-side — refresh tokens only carry roles.
@@ -1556,7 +1566,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 				continue
 			}
 			if !stored[s] {
-				errorResponse(w, http.StatusBadRequest, "invalid_scope",
+				refuse(http.StatusBadRequest, "invalid_scope",
 					"requested scope "+s+" not present in granted scope")
 				return
 			}
@@ -1564,18 +1574,28 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 		// The scope check above lets any audience through; a platform's
 		// audience is only the platform's the grant was made for.
 		if !refreshStaysOnPlatform(scope, requested) {
-			errorResponse(w, http.StatusBadRequest, "invalid_scope",
+			refuse(http.StatusBadRequest, "invalid_scope",
 				"the requested audience is not the platform this sign-in was made for")
 			return
 		}
 		// A tool client's grant is for the one app the person connected to;
 		// a refresh never mints for another.
 		if reg.AnyAppAudience(clientID) && !refreshStaysOnApp(scope, requested) {
-			errorResponse(w, http.StatusBadRequest, "invalid_scope",
+			refuse(http.StatusBadRequest, "invalid_scope",
 				"the requested audience is not the app this sign-in was made for")
 			return
 		}
 		effectiveScope = requested
+	}
+
+	// Accepted: now the refresh token is spent (rotation). Another request
+	// may have spent it in the meantime; then this one has nothing to rotate.
+	if u, c, sc, sd, err := db.ConsumeRefreshTokenWithSID(tokenHash); err != nil || u != userID || c != clientID || sc != scope || sd != sid {
+		refuse(http.StatusBadRequest, "invalid_grant", "Invalid or expired refresh token")
+		return
+	}
+	if sess != nil && sid != "" {
+		_ = sess.Touch(sid, refreshTokenTTL)
 	}
 
 	// Get current roles, filtered to the audience namespace carried by the

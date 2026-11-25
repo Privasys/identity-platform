@@ -18,6 +18,15 @@
  * Nothing here is trusted input made safe: it reads rules the wallet has
  * already tied to what it signs. A shape it does not know yields fewer facts,
  * never a wrong one.
+ *
+ * The same rules reach the wallet written two ways. A vault returns them with
+ * every default written out (`"requires": []`, `"auditors": []`,
+ * `"pinned_spki_sha256_hex": null`); a caller may leave those out. The
+ * approval binds each as it was sent, and that is checked elsewhere. Here the
+ * two are compared by what they say: an absent field, a null, an empty list
+ * and an empty object are one and the same, so rules that say the same thing
+ * never show as a change (they did, on the first cards: every build that
+ * stayed was listed as removed and added again, 2026-11-25).
  */
 
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -38,6 +47,8 @@ export interface PolicyFacts {
     approvers: string[];
     /** The builds that can use the key, each by a short fingerprint. */
     builds: string[];
+    /** For each build above: the digest of everything its entry says. */
+    buildDetails: Record<string, string>;
     /** For each act: needs an approval, open to a person with none, or allowed to no person. */
     gates: Record<PersonOp, Gate>;
     /** Whether the key follows platform runtime updates by itself. */
@@ -49,9 +60,30 @@ export interface PolicyFacts {
 }
 
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
-const digest = (v: unknown) => hex(sha256(new TextEncoder().encode(JSON.stringify(v ?? null))));
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Says nothing: absent, null, an empty list or an empty object. */
+const isEmpty = (v: unknown) =>
+    v === undefined || v === null || (Array.isArray(v) && v.length === 0) || (isObject(v) && Object.keys(v).length === 0);
+
+/**
+ * The value as what it says: fields that say nothing are dropped, at every
+ * depth, and an object's fields are put in one order. Lists keep their order,
+ * which carries meaning (a rule names a manager by its place).
+ */
+export function normalise(v: unknown): unknown {
+    if (Array.isArray(v)) return v.map(normalise);
+    if (!isObject(v)) return v;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(v).sort()) {
+        const n = normalise(v[k]);
+        if (!isEmpty(n)) out[k] = n;
+    }
+    return out;
+}
+
+const digest = (v: unknown) => hex(sha256(new TextEncoder().encode(JSON.stringify(normalise(v) ?? null))));
 
 function shorten(s: string): string {
     return s.length > 14 ? `${s.slice(0, 8)}…` : s;
@@ -81,11 +113,28 @@ function person(p: unknown): string | undefined {
     return undefined;
 }
 
-/** A build that can use the key: its name when it has one, and a fingerprint of its profile. */
-function build(tee: unknown): string {
+/** The certificate field that carries the digest of the code a build runs. */
+const WORKLOAD_OID = '1.3.6.1.4.1.65230.4.2';
+
+/**
+ * A build that can use the key, as a short label: the code it runs (the start
+ * of its workload digest, the value a release is published under) and the
+ * machine image it runs on (a fingerprint of its measurements). The label is
+ * what identifies the build; `details` is the digest of everything its entry
+ * says, so an entry that keeps its code and measurements but changes anything
+ * else (which patch levels it accepts, where it is attested) is not passed
+ * off as unchanged.
+ */
+function build(tee: unknown): { label: string; details: string } {
     const profile = isObject(tee) && isObject(tee.Tee) ? tee.Tee : tee;
-    const name = isObject(profile) && typeof profile.name === 'string' && profile.name !== '' ? `${profile.name} ` : '';
-    return `${name}${digest(profile).slice(0, 8)}`;
+    const p = isObject(profile) ? profile : {};
+    const oids = Array.isArray(p.required_oids) ? p.required_oids : [];
+    const workload = oids.find((o) => isObject(o) && o.oid === WORKLOAD_OID);
+    const code = isObject(workload) && typeof workload.value === 'string' && workload.value !== '' ? workload.value.slice(0, 8) : '';
+    const machine = digest(p.measurements).slice(0, 8);
+    const name = typeof p.name === 'string' && p.name !== '' ? p.name : '';
+    const label = code !== '' ? `${code} · ${machine}` : name !== '' ? `${name} ${machine}` : machine;
+    return { label, details: digest(profile) };
 }
 
 /** Whether a rule's principal list names a person (the owner or a manager). */
@@ -139,10 +188,15 @@ export function policyFacts(policy: unknown): PolicyFacts {
         operations: operations.filter((rule) => !(isObject(rule) && namesPerson(rule.principals))),
     };
 
+    const builds = tees.map(build);
+    const buildDetails: Record<string, string> = {};
+    for (const b of builds) buildDetails[b.label] = b.details;
+
     return {
         owner: person(principals.owner),
         approvers: managers.map((m) => person(m) ?? digest(m).slice(0, 8)),
-        builds: tees.map(build),
+        builds: builds.map((b) => b.label),
+        buildDetails,
         gates,
         conditions,
         followsUpdates: lifecycle.auto_migrate_to_next_attestation_profile === true,
@@ -176,6 +230,9 @@ export function policyDiff(current: unknown, next: unknown): PolicyDiff {
     const added = b.builds.filter((x) => !a.builds.includes(x));
     const removed = a.builds.filter((x) => !b.builds.includes(x));
     if (added.length > 0 || removed.length > 0) changes.push({ kind: 'builds', added, removed });
+    // A build that stays but whose entry says something else now (the patch
+    // levels it accepts, where it is attested): a change the facts do not show.
+    const buildChanged = a.builds.some((x) => b.builds.includes(x) && a.buildDetails[x] !== b.buildDetails[x]);
     // A gate that reads the same but whose exact conditions differ is a change
     // the facts do not show: it counts as "other".
     let conditionsOnly = false;
@@ -186,5 +243,5 @@ export function policyDiff(current: unknown, next: unknown): PolicyDiff {
     if (a.followsUpdates !== b.followsUpdates) {
         changes.push({ kind: 'followsUpdates', before: a.followsUpdates, after: b.followsUpdates });
     }
-    return { changes, other: conditionsOnly || a.uncovered !== b.uncovered };
+    return { changes, other: conditionsOnly || buildChanged || a.uncovered !== b.uncovered };
 }

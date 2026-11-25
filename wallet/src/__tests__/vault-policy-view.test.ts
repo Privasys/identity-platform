@@ -108,3 +108,49 @@ describe('what changes between two sets of rules', () => {
         expect(kinds).toEqual(['owner', 'approvers']);
     });
 });
+
+describe('the same rules written two ways', () => {
+    // A real key's rules as its vaults return them (every default written
+    // out) and as the control plane writes its proposal (defaults left out),
+    // for a retire of one of two builds.
+    const { stored, typed } = require('./fixtures/policy-forms.json');
+    const { normalise } = require('@/services/vault-policy-view');
+
+    it('show only what really changes: one build removed, nothing added', () => {
+        const d = policyDiff(stored, typed);
+        expect(d.changes).toEqual([{ kind: 'builds', added: [], removed: [expect.stringMatching(/^90227e2e · [0-9a-f]{8}$/)] }]);
+        expect(d.other).toBe(false);
+    });
+
+    it('show nothing when the two say the same', () => {
+        const same = clone(stored);
+        // The typed form of the very same rules: defaults dropped.
+        const dropped = normalise(same);
+        expect(JSON.stringify(dropped)).not.toEqual(JSON.stringify(same));
+        expect(policyDiff(same, dropped)).toEqual({ changes: [], other: false });
+        expect(policyDiff(dropped, same)).toEqual({ changes: [], other: false });
+    });
+
+    it('name a build by the code it runs and the machine image under it', () => {
+        expect(policyFacts(typed).builds).toEqual([expect.stringMatching(/^237a912e · [0-9a-f]{8}$/)]);
+        // The build that stays carries one label in both forms.
+        expect(policyFacts(stored).builds).toContain(policyFacts(typed).builds[0]);
+    });
+
+    it('do not pass off a build whose entry says something else as unchanged', () => {
+        const next = clone(stored);
+        next.principals.tees[0].Tee.acceptable_tcb_statuses = [];
+        const d = policyDiff(stored, next);
+        expect(d.changes).toEqual([]);
+        expect(d.other).toBe(true);
+    });
+
+    it('still see a default that is given a value', () => {
+        const next = clone(stored);
+        next.principals.tees[0].Tee.attestation_servers[0].pinned_spki_sha256_hex = 'ab'.repeat(32);
+        expect(policyDiff(stored, next).other).toBe(true);
+        const withAuditor = clone(stored);
+        withAuditor.principals.auditors = [{ Oidc: { issuer: 'https://privasys.id', sub: 'someone' } }];
+        expect(policyDiff(stored, withAuditor).other).toBe(true);
+    });
+});

@@ -1,0 +1,339 @@
+{
+  "stored": {
+    "version": 1,
+    "principals": {
+      "owner": {
+        "Oidc": {
+          "issuer": "https://privasys.id",
+          "sub": "owner-subject-000000000000000000000000000",
+          "required_roles": []
+        }
+      },
+      "managers": [
+        {
+          "Oidc": {
+            "issuer": "https://privasys.id",
+            "sub": "",
+            "required_roles": [
+              "privasys-platform-test:app:385a71c27c7b42c5b9c1837105d6ae41:approver"
+            ]
+          }
+        }
+      ],
+      "auditors": [],
+      "tees": [
+        {
+          "Tee": {
+            "name": "app:v2-from-test / TDX",
+            "measurements": [
+              {
+                "Tdx": {
+                  "mrtd": "f21e6b48743fe14c2d090078ca1197f09ae4c99438677f2c79901ef80e2aeefe2f9a7eb6e3eb3b5047c4f1511731e5d3",
+                  "rtmr1": "b0e6662ae704a64d9fe37d29bc78db9d4e413574e4337dc17e841657f4d00177882082264ecf147a241743ffc292e62d",
+                  "rtmr2": "7b6a7b938c931dbc50a6483f045224582065fd1351992361a722a007e89d68cc631d090124167669312681b8adb3caf9"
+                }
+              }
+            ],
+            "attestation_servers": [
+              {
+                "url": "https://as.privasys.org/verify",
+                "pinned_spki_sha256_hex": null
+              }
+            ],
+            "required_oids": [
+              {
+                "oid": "1.3.6.1.4.1.65230.4.2",
+                "value": "90227e2e0565a3900faf50831d94bbbd6ce3b8382471ea5e804f7356c397f795"
+              },
+              {
+                "oid": "1.3.6.1.4.1.65230.4.1",
+                "value": "385a71c27c7b42c5b9c1837105d6ae41"
+              }
+            ],
+            "acceptable_tcb_statuses": [
+              "ConfigurationAndSWHardeningNeeded"
+            ]
+          }
+        },
+        {
+          "Tee": {
+            "name": "app:v2-from-test / TDX",
+            "measurements": [
+              {
+                "Tdx": {
+                  "mrtd": "f21e6b48743fe14c2d090078ca1197f09ae4c99438677f2c79901ef80e2aeefe2f9a7eb6e3eb3b5047c4f1511731e5d3",
+                  "rtmr1": "b0e6662ae704a64d9fe37d29bc78db9d4e413574e4337dc17e841657f4d00177882082264ecf147a241743ffc292e62d",
+                  "rtmr2": "7b6a7b938c931dbc50a6483f045224582065fd1351992361a722a007e89d68cc631d090124167669312681b8adb3caf9"
+                }
+              }
+            ],
+            "attestation_servers": [
+              {
+                "url": "https://as.privasys.org/verify",
+                "pinned_spki_sha256_hex": null
+              }
+            ],
+            "required_oids": [
+              {
+                "oid": "1.3.6.1.4.1.65230.4.2",
+                "value": "237a912e68476ade85c63b893d04a1cca3595b954376acdad5d82a0fec7d9679"
+              },
+              {
+                "oid": "1.3.6.1.4.1.65230.4.1",
+                "value": "385a71c27c7b42c5b9c1837105d6ae41"
+              }
+            ],
+            "acceptable_tcb_statuses": [
+              "ConfigurationAndSWHardeningNeeded"
+            ]
+          }
+        }
+      ]
+    },
+    "operations": [
+      {
+        "ops": [
+          "ExportKey"
+        ],
+        "principals": [
+          "AnyTee"
+        ],
+        "requires": []
+      },
+      {
+        "ops": [
+          "PromoteProfile"
+        ],
+        "principals": [
+          "Owner",
+          {
+            "Manager": 0
+          }
+        ],
+        "requires": [
+          {
+            "OidcStepUp": {
+              "required_amr": [
+                "webauthn"
+              ],
+              "operation_bound": true,
+              "fresh_for_seconds": 300,
+              "binding": 2
+            }
+          }
+        ]
+      },
+      {
+        "ops": [
+          "UpdatePolicy",
+          "DeleteKey"
+        ],
+        "principals": [
+          "Owner",
+          {
+            "Manager": 0
+          }
+        ],
+        "requires": [
+          {
+            "OidcStepUp": {
+              "required_amr": [
+                "webauthn"
+              ],
+              "operation_bound": true,
+              "fresh_for_seconds": 300,
+              "binding": 2
+            }
+          }
+        ]
+      },
+      {
+        "ops": [
+          "ExportKey"
+        ],
+        "principals": [
+          "Owner"
+        ],
+        "requires": [
+          {
+            "OidcStepUp": {
+              "required_amr": [
+                "webauthn"
+              ],
+              "operation_bound": true,
+              "fresh_for_seconds": 300,
+              "binding": 2
+            }
+          }
+        ]
+      }
+    ],
+    "mutability": {
+      "owner_can": [
+        "Tees",
+        "PendingProfiles",
+        "Lifecycle"
+      ],
+      "manager_can": [
+        "PendingProfiles"
+      ],
+      "immutable": [
+        "Owner"
+      ]
+    },
+    "lifecycle": {
+      "ttl_seconds": 7776000,
+      "auto_migrate_to_next_attestation_profile": true
+    }
+  },
+  "typed": {
+    "version": 1,
+    "principals": {
+      "owner": {
+        "Oidc": {
+          "issuer": "https://privasys.id",
+          "sub": "owner-subject-000000000000000000000000000"
+        }
+      },
+      "managers": [
+        {
+          "Oidc": {
+            "issuer": "https://privasys.id",
+            "sub": "",
+            "required_roles": [
+              "privasys-platform-test:app:385a71c27c7b42c5b9c1837105d6ae41:approver"
+            ]
+          }
+        }
+      ],
+      "tees": [
+        {
+          "Tee": {
+            "name": "app:v2-from-test / TDX",
+            "measurements": [
+              {
+                "Tdx": {
+                  "mrtd": "f21e6b48743fe14c2d090078ca1197f09ae4c99438677f2c79901ef80e2aeefe2f9a7eb6e3eb3b5047c4f1511731e5d3",
+                  "rtmr1": "b0e6662ae704a64d9fe37d29bc78db9d4e413574e4337dc17e841657f4d00177882082264ecf147a241743ffc292e62d",
+                  "rtmr2": "7b6a7b938c931dbc50a6483f045224582065fd1351992361a722a007e89d68cc631d090124167669312681b8adb3caf9"
+                }
+              }
+            ],
+            "attestation_servers": [
+              {
+                "url": "https://as.privasys.org/verify"
+              }
+            ],
+            "required_oids": [
+              {
+                "oid": "1.3.6.1.4.1.65230.4.2",
+                "value": "237a912e68476ade85c63b893d04a1cca3595b954376acdad5d82a0fec7d9679"
+              },
+              {
+                "oid": "1.3.6.1.4.1.65230.4.1",
+                "value": "385a71c27c7b42c5b9c1837105d6ae41"
+              }
+            ],
+            "acceptable_tcb_statuses": [
+              "ConfigurationAndSWHardeningNeeded"
+            ]
+          }
+        }
+      ]
+    },
+    "operations": [
+      {
+        "ops": [
+          "ExportKey"
+        ],
+        "principals": [
+          "AnyTee"
+        ]
+      },
+      {
+        "ops": [
+          "PromoteProfile"
+        ],
+        "principals": [
+          "Owner",
+          {
+            "Manager": 0
+          }
+        ],
+        "requires": [
+          {
+            "OidcStepUp": {
+              "required_amr": [
+                "webauthn"
+              ],
+              "operation_bound": true,
+              "fresh_for_seconds": 300,
+              "binding": 2
+            }
+          }
+        ]
+      },
+      {
+        "ops": [
+          "UpdatePolicy",
+          "DeleteKey"
+        ],
+        "principals": [
+          "Owner",
+          {
+            "Manager": 0
+          }
+        ],
+        "requires": [
+          {
+            "OidcStepUp": {
+              "required_amr": [
+                "webauthn"
+              ],
+              "operation_bound": true,
+              "fresh_for_seconds": 300,
+              "binding": 2
+            }
+          }
+        ]
+      },
+      {
+        "ops": [
+          "ExportKey"
+        ],
+        "principals": [
+          "Owner"
+        ],
+        "requires": [
+          {
+            "OidcStepUp": {
+              "required_amr": [
+                "webauthn"
+              ],
+              "operation_bound": true,
+              "fresh_for_seconds": 300,
+              "binding": 2
+            }
+          }
+        ]
+      }
+    ],
+    "mutability": {
+      "owner_can": [
+        "Tees",
+        "PendingProfiles",
+        "Lifecycle"
+      ],
+      "manager_can": [
+        "PendingProfiles"
+      ],
+      "immutable": [
+        "Owner"
+      ]
+    },
+    "lifecycle": {
+      "ttl_seconds": 7776000,
+      "auto_migrate_to_next_attestation_profile": true
+    }
+  }
+}

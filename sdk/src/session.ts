@@ -47,6 +47,41 @@ export function deviceLabel(d: Pick<DeviceHint, 'label' | 'addedAt' | 'updatedAt
 type SessionListener = (sessions: AuthSession[]) => void;
 
 /**
+ * The platform a page belongs to, with what is needed to place a session
+ * stored before sessions recorded theirs.
+ */
+export interface PlatformScope {
+    /** The platform audience of the page. */
+    platform: string;
+    /** The platform that claims every host no other one does. */
+    defaultPlatform: string;
+    /** Every platform audience the identity provider lists. */
+    platforms: readonly string[];
+}
+
+/** The `aud` claims of a JWT, or none when unreadable. */
+function tokenAudiences(token: string): string[] {
+    try {
+        const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const aud = JSON.parse(atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '='))).aud;
+        return Array.isArray(aud) ? aud.filter((a): a is string => typeof a === 'string') : typeof aud === 'string' ? [aud] : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * The platform of a stored session: the one it recorded, else the listed
+ * platform its token was issued for, else the default (a session from before
+ * any platform but the default existed).
+ */
+export function sessionPlatform(s: AuthSession, scope: PlatformScope): string {
+    if (s.platform) return s.platform;
+    const listed = tokenAudiences(s.token ?? '').find((a) => scope.platforms.includes(a));
+    return listed ?? scope.defaultPlatform;
+}
+
+/**
  * Manages authenticated sessions in localStorage.
  * Tracks sessions per rpId so a returning user can skip QR scanning.
  */
@@ -66,15 +101,41 @@ export class SessionManager {
         this.clientId = clientId || null;
     }
 
+    // The platform every lookup is for, once set (forPlatform). `null` is a
+    // platform that could not be told: nothing matches it.
+    private platform: PlatformScope | null | undefined = undefined;
+
+    /**
+     * Limit lookups to one platform's sessions. Sessions are kept per
+     * platform as well as per rpId and client: pages of every platform under
+     * one registrable domain share this storage, and a page of one platform
+     * must never be given, see, replace or remove another platform's session.
+     * `null` (the platform could not be told) matches no session at all.
+     * Never set, lookups ignore platforms, as before.
+     */
+    forPlatform(scope: PlatformScope | null): void {
+        this.platform = scope;
+    }
+
+    private onPlatform(s: AuthSession): boolean {
+        if (this.platform === undefined) return true;
+        if (this.platform === null) return false;
+        return sessionPlatform(s, this.platform) === this.platform.platform;
+    }
+
     private mine(s: AuthSession, rpId: string): boolean {
-        return s.rpId === rpId && (this.clientId === null || s.clientId === this.clientId);
+        return s.rpId === rpId && (this.clientId === null || s.clientId === this.clientId) && this.onPlatform(s);
     }
 
     /** Store a new session after successful authentication. */
     store(session: AuthSession): void {
+        if (this.platform === null) return;
+        if (this.platform) session = { ...session, platform: this.platform.platform };
         const sessions = this.getAll();
-        // Replace the existing session for the same rpId and client
-        const idx = sessions.findIndex((s) => s.rpId === session.rpId && (s.clientId ?? '') === (session.clientId ?? ''));
+        // Replace the existing session for the same rpId, client and platform
+        const idx = sessions.findIndex((s) => s.rpId === session.rpId
+            && (s.clientId ?? '') === (session.clientId ?? '')
+            && this.onPlatform(s));
         if (idx >= 0) sessions[idx] = session;
         else sessions.push(session);
         this.persist(sessions);

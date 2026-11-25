@@ -21,11 +21,15 @@ import { sanitiseDisplayNames, sanitiseIcons, sanitiseOwn, sanitiseProviders, se
 import { sanitiseChoice, type GateState } from './gate-headless';
 import { sanitiseTheme } from './theme';
 import type { AuthUIConfig, SignInResult } from './ui';
-import { SessionManager, SESSIONS_STORAGE_KEY, cleanDeviceLabel, deviceLabel, type DeviceHint } from './session';
+import { SessionManager, SESSIONS_STORAGE_KEY, cleanDeviceLabel, deviceLabel, type DeviceHint, type PlatformScope } from './session';
 import type { AuthSession } from './types';
 import { PrivasysSession, type EncAuthEnvelope, type SealedWebSocket } from './enclave-session';
+import { parsePlatforms, platformScopeOf, type PlatformEntry } from './platforms';
 
 const sessions = new SessionManager();
+// No session is anyone's until the page's platform is known (see the message
+// handler).
+sessions.forPlatform(null);
 
 let activeUI: AuthUI | null = null;
 
@@ -641,6 +645,36 @@ async function pageIsClients(clientId: string, pageOrigin: string): Promise<bool
     }
 }
 
+// ── The page's platform ──────────────────────────────────────────────────
+//
+// Every page under one registrable domain shares this frame's storage, and
+// pages of more than one platform can live under one domain (a production
+// platform and a test platform, say). The identity provider publishes which
+// domains belong to which platform (platforms.ts places a page).
+
+const PLATFORM_LIST_TTL_MS = 5 * 60_000;
+let platformList: { at: number; list: PlatformEntry[] } | null = null;
+
+/** The identity provider's platform list, or null when it cannot be read. */
+async function loadPlatforms(): Promise<PlatformEntry[] | null> {
+    if (platformList && Date.now() - platformList.at < PLATFORM_LIST_TTL_MS) return platformList.list;
+    try {
+        const resp = await fetch(new URL('/wallet/platforms', globalThis.location.origin).toString(), { cache: 'no-store' });
+        if (resp.ok) {
+            const list = parsePlatforms(await resp.json().catch(() => null));
+            if (list) {
+                platformList = { at: Date.now(), list };
+                return list;
+            }
+        }
+    } catch { /* unreadable: the last good list, if any */ }
+    return platformList?.list ?? null;
+}
+
+/** The platform of the page this frame serves, set from each of its
+ *  messages; null when the platform list could not be read. */
+let pagePlatform: PlatformScope | null = null;
+
 /**
  * The stored session this page may use, or undefined. A session belongs to a
  * client, and only that client's own pages are given it: every page under one
@@ -1152,6 +1186,15 @@ window.addEventListener('message', async (e: MessageEvent) => {
     // (SessionManager.forClient). One frame serves one AuthFrame, so one client.
     const named = data.type === 'privasys:init' ? data.config?.clientId : data.clientId;
     if (typeof named === 'string' && named) sessions.forClient(named);
+    // The page's platform, from the origin the browser reports for it and
+    // never from anything the page says. Only the page this frame serves sets
+    // it: a window of this origin talking to the frame (the device popup) is
+    // not that page. A platform that cannot be told matches no session.
+    if (e.source === window.parent) {
+        const list = await loadPlatforms();
+        pagePlatform = list ? platformScopeOf(list, e.origin) : null;
+        sessions.forPlatform(pagePlatform);
+    }
 
     if (data.type === 'privasys:init') {
         const config: AuthUIConfig & {
@@ -1249,6 +1292,21 @@ window.addEventListener('message', async (e: MessageEvent) => {
             delete config.billingGrant;
             delete config.attributes;
             delete config.audience;
+        }
+        // A page gets its own platform's tokens and never another platform's.
+        // Without the platform list there is no telling which is which, so
+        // there is no sign-in.
+        if (!pagePlatform) {
+            window.parent.postMessage({ type: 'privasys:error', error: 'Sign-in is unavailable right now. Try again in a moment.' }, parentOrigin);
+            return;
+        }
+        if (!device && !linkNonce) {
+            const asked = sanitiseAudience(config.audience);
+            if (asked && pagePlatform.platforms.includes(asked) && asked !== pagePlatform.platform) {
+                window.parent.postMessage({ type: 'privasys:error', error: `audience ${asked} is not for a page on this platform` }, parentOrigin);
+                return;
+            }
+            if (!asked && pagePlatform.platform !== pagePlatform.defaultPlatform) config.audience = pagePlatform.platform;
         }
         const onContentHeight = contentHeightReporter(parentOrigin);
 
@@ -2195,6 +2253,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const audience = String(data.audience || '').trim();
         if (!audience) {
             reply({ error: 'audience required' });
+            return;
+        }
+        // Another platform's audience is never minted for this page.
+        if (!pagePlatform || (pagePlatform.platforms.includes(audience) && audience !== pagePlatform.platform)) {
+            reply({ error: `audience ${audience} is not for a page on this platform` });
             return;
         }
         // The first token already made for this audience is still good: it is

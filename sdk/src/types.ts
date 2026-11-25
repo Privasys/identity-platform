@@ -128,6 +128,13 @@ export interface AuthSession {
      *  carried. A scope token added since widens the reachable attribute set
      *  the same way a named key does. */
     scope?: string;
+    /**
+     * The platform audience of the page this session was signed in from, as
+     * the identity provider's published platform list placed that page. Pages
+     * of one platform never see another's session. Absent on a session stored
+     * before it; see {@link SessionManager.forPlatform}.
+     */
+    platform?: string;
 }
 
 /** Events emitted by the auth client. */

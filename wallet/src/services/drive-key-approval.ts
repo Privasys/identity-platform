@@ -35,7 +35,13 @@ const POLL_MS = 2000;
 
 /** The only changes a Drive may ask the holder to approve: to the rules of
  *  the holder's own key there. Never a deletion, an export or a new key. */
-const OPERATIONS = new Set(['policy-update', 'update_policy', 'update_policy_from']);
+const OPERATIONS = new Set(['update_policy', 'update_policy_from']);
+
+/** The older kind of rules change, on a key whose rules ask for it. Its card
+ *  cannot show the change: it lets the Drive change the key's rules once,
+ *  whatever the change. Until the card says exactly that, the wallet does not
+ *  ask for one from here. */
+const UNNAMED_CHANGE = 'policy-update';
 
 /** What Drive answers when the owner's approval is needed. Only the fields
  *  requestBody keeps are ever sent on. */
@@ -125,6 +131,7 @@ const hex = (id: string) => id.toLowerCase().replace(/-/g, '');
  * attestation, and `audience` the platform that Drive's host belongs to.
  */
 export function refusalFor(approval: DriveKeyApproval, appId: string, audience: string): string | null {
+    if (approval.operation === UNNAMED_CHANGE) return 'this key uses the older kind of approval, which this version of the wallet does not ask for';
     if (!OPERATIONS.has(approval.operation)) return `it asks for "${approval.operation}", which a Drive may not ask for`;
     const app = hex(appId);
     if (!/^[0-9a-f]{32}$/.test(app)) return 'the Drive could not be identified';

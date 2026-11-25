@@ -70,7 +70,10 @@ describe('an approval the wallet will ask for', () => {
     it("is a change to the rules of the holder's key at that Drive", () => {
         expect(refusalFor(approval(), APP, 'privasys-platform-test')).toBeNull();
         expect(refusalFor(approval({ operation: 'update_policy' }), APP, 'privasys-platform-test')).toBeNull();
-        expect(refusalFor(approval({ operation: 'policy-update', binding_version: undefined }), APP, 'privasys-platform-test')).toBeNull();
+    });
+
+    it('is not, yet, the older kind of change, whose card cannot show what changes', () => {
+        expect(refusalFor(approval({ operation: 'policy-update', binding_version: undefined }), APP, 'privasys-platform-test')).toMatch(/older kind of approval/);
         // The app id as the control plane writes it, with dashes.
         expect(refusalFor(approval(), '02104572-ca2f-41e8-ae2d-24c0294e6f5e', 'privasys-platform-test')).toBeNull();
     });

@@ -133,7 +133,7 @@ func (s *Store) HandleCreateAPIKey(issuer *tokens.Issuer, defaultAudience string
 			return
 		}
 		subject := userID
-		var claims map[string]string
+		var asserted tokens.Asserted
 		if c := strings.TrimSpace(body.ClientID); c != "" && s.sectorOf != nil {
 			if sector := s.sectorOf(c); sector != "" {
 				subject = issuer.SubjectFor(userID, sector)
@@ -142,9 +142,9 @@ func (s *Store) HandleCreateAPIKey(issuer *tokens.Issuer, defaultAudience string
 		}
 		if subject == userID && tokens.IsPlatformAudience(aud) {
 			// The platform keys accounts by this whatever subject is used.
-			claims = map[string]string{"privasys_account": userID}
+			asserted.Account = userID
 		}
-		token, err := issuer.IssueAccessTokenWithTTL(subject, aud, sid, nil, claims, APIKeyTTL)
+		token, err := issuer.IssueAccessTokenAsserted(subject, aud, sid, nil, nil, asserted, APIKeyTTL)
 		if err != nil {
 			_ = s.Revoke(sid) // never leave a session with no usable key
 			httpErr(w, http.StatusInternalServerError, err.Error())
@@ -211,7 +211,8 @@ func (s *Store) appKey(w http.ResponseWriter, r *http.Request, issuer *tokens.Is
 		httpErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	token, err := issuer.IssueAccessTokenWithTTL(subject, aud, sid, nil, map[string]string{"azp": WalletToolClientID, tokens.ClaimActor: WalletToolClientID}, AppKeyTTL)
+	token, err := issuer.IssueAccessTokenAsserted(subject, aud, sid, nil, nil,
+		tokens.Asserted{AuthorizedParty: WalletToolClientID, Actor: WalletToolClientID}, AppKeyTTL)
 	if err != nil {
 		_ = s.Revoke(sid)
 		httpErr(w, http.StatusInternalServerError, err.Error())

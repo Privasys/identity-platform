@@ -216,6 +216,33 @@ func (iss *Issuer) IssueAccessTokenWithSID(subject, audience, sid string, roles 
 // lifetime, used for long-lived infrastructure service-account tokens
 // (e.g. the vault constellation's attestation-server bearer).
 func (iss *Issuer) IssueAccessTokenWithTTL(subject, audience, sid string, roles []string, attributes map[string]string, ttl time.Duration) (string, error) {
+	return iss.IssueAccessTokenAsserted(subject, audience, sid, roles, attributes, Asserted{}, ttl)
+}
+
+// Asserted is what the identity provider itself states on an access token,
+// beside the person's attributes: which client the token was issued to
+// (azp), which client acted for the person (act), and, on a platform token,
+// the account. A verifier and an app's runtime rely on each of them, so none
+// is ever taken from an attribute.
+type Asserted struct {
+	AuthorizedParty string // azp
+	Actor           string // act: {"client_id": Actor}
+	Account         string // privasys_account
+}
+
+// protectedClaims are the claims a verifier or a runtime relies on. An
+// attribute never writes one, whatever its name: the identity provider sets
+// them itself, from what it checked.
+var protectedClaims = map[string]bool{
+	"iss": true, "sub": true, "aud": true, "iat": true, "exp": true, "nbf": true, "typ": true,
+	"sid": true, "roles": true, "jti": true,
+	ClaimActor: true, "azp": true, ClaimPrivasysAccount: true,
+	"vault_op": true, "nonce": true, "amr": true, "acr": true, "cnf": true, "auth_time": true,
+}
+
+// IssueAccessTokenAsserted is IssueAccessTokenWithTTL with the claims the
+// identity provider asserts itself (Asserted).
+func (iss *Issuer) IssueAccessTokenAsserted(subject, audience, sid string, roles []string, attributes map[string]string, asserted Asserted, ttl time.Duration) (string, error) {
 	now := time.Now()
 	c := jwt.MapClaims{
 		"iss": iss.issuerURL,
@@ -235,12 +262,22 @@ func (iss *Issuer) IssueAccessTokenWithTTL(subject, audience, sid string, roles 
 		if v == "" {
 			continue
 		}
-		// An attribute never replaces what the token is: who it is for,
-		// who it names, when, and its session.
-		if _, core := c[k]; core || k == "roles" || k == "sid" {
+		// An attribute never writes what the token is: who it is for, who
+		// it names, when, its session, who acted, or how the person proved
+		// who they are.
+		if protectedClaims[k] {
 			continue
 		}
 		c[k] = claimValue(k, v)
+	}
+	if asserted.AuthorizedParty != "" {
+		c["azp"] = asserted.AuthorizedParty
+	}
+	if asserted.Actor != "" {
+		c[ClaimActor] = map[string]interface{}{"client_id": asserted.Actor}
+	}
+	if asserted.Account != "" {
+		c[ClaimPrivasysAccount] = asserted.Account
 	}
 	return iss.sign(c)
 }
@@ -1021,9 +1058,6 @@ func (iss *Issuer) IssueOpApproval(c OpApprovalClaims) (string, error) {
 // JSON and emitted as the object OIDC Core 5.1.1 defines. Anything that is
 // not a JSON object stays the string it arrived as.
 func claimValue(key, v string) interface{} {
-	if key == ClaimActor {
-		return map[string]interface{}{"client_id": v}
-	}
 	if key != "address" || !strings.HasPrefix(strings.TrimSpace(v), "{") {
 		return v
 	}

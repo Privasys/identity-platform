@@ -57,7 +57,7 @@ func TestSectorSubjectsAreOneWay(t *testing.T) {
 
 	// A platform-audience token with no session names its account directly;
 	// a shared-sector token with neither is its own account.
-	platform, _ := iss.IssueAccessTokenWithSID(a, "privasys-platform", "", nil, map[string]string{ClaimPrivasysAccount: "acct-1"})
+	platform, _ := iss.IssueAccessTokenAsserted(a, "privasys-platform", "", nil, nil, Asserted{Account: "acct-1"}, 15*60*1e9)
 	if c, err := iss.VerifyAccessToken(platform); err != nil || c["sub"] != "acct-1" {
 		t.Fatalf("platform token: %v %v", c["sub"], err)
 	}

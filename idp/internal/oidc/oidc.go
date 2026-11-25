@@ -1310,30 +1310,24 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	roles := filterRolesByAudience(allRoles, audience)
 	platformClient := client != nil && client.Platform
 	accessSubject, accessHolder := subject, ac.ClientID
+	var asserted tokens.Asserted
 	if sector != "" && !platformClient {
 		// A client with its own subjects is a relying party, not the
 		// platform: its token is for itself alone, and carries none of the
 		// account's roles. The platform audience stays with first-party
 		// control-plane clients (Client.Platform) and legacy clients.
 		// A tool client reaching one app gets a token for that app, in the
-		// subject the app knows the person by, naming itself as azp.
+		// subject the app knows the person by, naming itself as azp and act.
 		if appSub, holder, ok := toolAppSubject(reg, issuer, ac.ClientID, ac.UserID, audience); ok {
 			accessSubject, accessHolder = appSub, holder
-			if filteredAttrs == nil {
-				filteredAttrs = map[string]string{}
-			}
-			filteredAttrs["azp"] = ac.ClientID
-			filteredAttrs[tokens.ClaimActor] = ac.ClientID
+			asserted.AuthorizedParty, asserted.Actor = ac.ClientID, ac.ClientID
 		} else {
 			audience = ownClientAudience(audience, ac.ClientID, reg.AppIDsOf(ac.ClientID))
 		}
 		roles = nil
 	} else if tokens.IsPlatformAudience(audience) {
 		// The platform keys accounts by this, never by an app's subject.
-		if filteredAttrs == nil {
-			filteredAttrs = map[string]string{}
-		}
-		filteredAttrs[tokens.ClaimPrivasysAccount] = ac.UserID
+		asserted.Account = ac.UserID
 	}
 
 	// Issue ID token.
@@ -1445,7 +1439,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 	// Access token aud is the resource-server trust domain, selected from
 	// the scope (audience:<X>, defaulting to privasys-platform).
 	// ID token aud = client_id (per OIDC spec: ID tokens are for the client).
-	accessToken, err := issuer.IssueAccessTokenWithSID(accessSubject, audience, sid, roles, filteredAttrs)
+	accessToken, err := issuer.IssueAccessTokenAsserted(accessSubject, audience, sid, roles, filteredAttrs, asserted, accessTokenTTL)
 	if err != nil {
 		log.Printf("token: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -1590,27 +1584,21 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 	audience := audienceFromScope(effectiveScope, "privasys-platform")
 	roles := filterRolesByAudience(allRoles, audience)
 	subject := issuer.SubjectFor(userID, reg.SectorOf(clientID))
+	var asserted tokens.Asserted
 	if reg.SectorOf(clientID) != "" && !reg.IsPlatform(clientID) {
 		if appSub, _, ok := toolAppSubject(reg, issuer, clientID, userID, audience); ok {
 			subject = appSub
-			if filteredRefreshAttrs == nil {
-				filteredRefreshAttrs = map[string]string{}
-			}
-			filteredRefreshAttrs["azp"] = clientID
-			filteredRefreshAttrs[tokens.ClaimActor] = clientID
+			asserted.AuthorizedParty, asserted.Actor = clientID, clientID
 		} else {
 			audience = ownClientAudience(audience, clientID, reg.AppIDsOf(clientID))
 		}
 		roles = nil
 	} else if tokens.IsPlatformAudience(audience) {
-		if filteredRefreshAttrs == nil {
-			filteredRefreshAttrs = map[string]string{}
-		}
-		filteredRefreshAttrs[tokens.ClaimPrivasysAccount] = userID
+		asserted.Account = userID
 	}
 
 	// Issue new access token (with current roles and available profile).
-	accessToken, err := issuer.IssueAccessTokenWithSID(subject, audience, sid, roles, filteredRefreshAttrs)
+	accessToken, err := issuer.IssueAccessTokenAsserted(subject, audience, sid, roles, filteredRefreshAttrs, asserted, accessTokenTTL)
 	if err != nil {
 		log.Printf("refresh: access token issuance failed: %v", err)
 		errorResponse(w, http.StatusInternalServerError, "server_error", "Token issuance failed")
@@ -1914,6 +1902,10 @@ func refreshStaysOnPlatform(granted, asked string) bool {
 	had := audienceFromScope(granted, tokens.PlatformAudience)
 	return had == want
 }
+
+// accessTokenTTL is the lifetime of an access token from a sign-in or a
+// refresh, as IssueAccessTokenWithSID sets it.
+const accessTokenTTL = 15 * time.Minute
 
 // toolAppSubject is, for a tool client (clients.Registry.AnyAppAudience) asked
 // for "app:<id>", the subject the app knows the person by and the client that

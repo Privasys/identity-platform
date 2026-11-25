@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -534,8 +535,17 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		// created — so an operator watching the log could not tell an
 		// approval that had succeeded from one that never arrived, and
 		// mistook successful approvals for failures (2026-08-01).
-		log.Printf("fido2: vault-approval requested by %s (op %s, vault_op %s…, ttl %ds, push_registered=%t)",
-			sub, req.Operation, vaultOp[:12], ttl, pushRegistered)
+		// Who asked, and for what, in full: an approval somebody tapped has to
+		// be traceable to the session that requested it from this line alone.
+		// It was not: with several tools able to ask one owner at once, an
+		// approval taken for a different, expected one could only be traced
+		// by reading around it (2026-11-25).
+		op := req.Operation
+		if op == "" {
+			op = "promote"
+		}
+		log.Printf("fido2: vault-approval requested by %s (op %s, handle %q, binding %d, aud %s, vault_op %s, ttl %ds, push_registered=%t) from %s",
+			sub, op, logField(req.Handle), req.BindingVersion, aud, vaultOp, ttl, pushRegistered, vaultRequester(r, iss))
 		// Return the WebAuthn options plus how the owner can actually approve.
 		// `publicKey` stays at the top level so existing clients (the CLI and the
 		// browser page) keep working; the extra keys are additive.
@@ -606,6 +616,50 @@ func vaultApprovalAudience(requested, def string) (string, error) {
 
 // bearerSubject verifies an `Authorization: Bearer` access token (signed by this
 // IdP) and returns its `sub`.
+// vaultRequester says who sent a vault-approval request, for the log: the
+// client and session its bearer names, and where it came from. It reads the
+// bearer the handler has already accepted, and none of it is trusted for a
+// decision. The address is the last hop of X-Forwarded-For, the one our own
+// reverse proxy wrote. No token material is included.
+func vaultRequester(r *http.Request, iss *tokens.Issuer) string {
+	client, sid := "", ""
+	if claims, err := iss.VerifyPlatformAccessToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")); err == nil {
+		for _, k := range []string{"azp", "client_id"} {
+			if v, _ := claims[k].(string); v != "" {
+				client = v
+				break
+			}
+		}
+		sid, _ = claims["sid"].(string)
+	}
+	ip := r.RemoteAddr
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		ip = host
+	}
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		parts := strings.Split(fwd, ",")
+		if last := strings.TrimSpace(parts[len(parts)-1]); last != "" {
+			ip = last
+		}
+	}
+	return fmt.Sprintf("client=%q sid=%q ip=%s ua=%q", logField(client), logField(sid), logField(ip), logField(r.UserAgent()))
+}
+
+// logField makes a caller-supplied value safe to put on one log line: no
+// control characters, and no more than a line's worth.
+func logField(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, s)
+	if len(s) > 160 {
+		s = s[:160] + "…"
+	}
+	return s
+}
+
 func bearerSubject(r *http.Request, iss *tokens.Issuer) (string, error) {
 	auth := r.Header.Get("Authorization")
 	if !strings.HasPrefix(auth, "Bearer ") {

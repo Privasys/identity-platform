@@ -493,8 +493,13 @@ func (h *Handler) VaultApprovalBatchBegin(iss *tokens.Issuer) http.HandlerFunc {
 			h.challenges.pop(replaced)
 		}
 		pushRegistered := h.pushVaultBatch(sub, batchID, len(entries))
-		log.Printf("fido2: vault-approval batch requested by %s (%d entries, batch %s…, ttl %ds, push_registered=%t)",
-			sub, len(entries), batchID[:12], ttl, pushRegistered)
+		// Who asked, and for what, in full (see VaultApprovalBegin).
+		handles := make([]string, 0, len(entries))
+		for _, e := range entries {
+			handles = append(handles, e.Operation+" "+logField(e.Handle))
+		}
+		log.Printf("fido2: vault-approval batch requested by %s (%d entries [%s], binding %d, batch %s, ttl %ds, push_registered=%t) from %s",
+			sub, len(entries), strings.Join(handles, "; "), req.BindingVersion, batchID, ttl, pushRegistered, vaultRequester(r, iss))
 		writeJSON(w, map[string]interface{}{
 			"batch_id":          batchID,
 			"publicKey":         options.Response,

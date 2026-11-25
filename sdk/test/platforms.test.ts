@@ -88,6 +88,19 @@ test('a session stored before platforms were recorded is placed by its token', (
     assert.ok(prod.get('privasys.id')); // an app audience reads as the default
 });
 
+test('a renewal reads and removes its own chain, whichever client was named last', () => {
+    store.clear();
+    const m = scoped('https://portal.example.org');
+    m.store(session('aud-prod'));
+    m.forClient('client-b');
+    m.store(session('aud-prod', { clientId: 'client-b' }));
+    // The page last named client-b; a timer armed for client-a still finds client-a.
+    assert.equal(m.getFor('privasys.id', 'client-a')?.clientId, 'client-a');
+    m.removeFor('privasys.id', 'client-a');
+    assert.equal(m.getFor('privasys.id', 'client-a'), undefined);
+    assert.equal(m.get('privasys.id')?.clientId, 'client-b');
+});
+
 test('with no platform known, nothing matches and nothing is stored', () => {
     store.clear();
     new SessionManager().store(session('aud-prod'));

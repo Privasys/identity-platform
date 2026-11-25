@@ -143,7 +143,8 @@ function makeGetEncAuth(rpId: string, host: string): () => Promise<EncAuthEnvelo
         // no good reason. Renew first (under the cross-document lock; a
         // no-op when another document already did).
         if (session.refreshToken && session.clientId && needsRenewal(session.token)) {
-            session = await renewIfNeeded(rpId, renewalParents.get(rpId) ?? '', false) ?? session;
+            const chain = chainOf(session);
+            session = await renewIfNeeded(chain, renewalParents.get(chainKey(chain))?.parentOrigin ?? '', false) ?? session;
             if (!session?.token) return null;
         }
         const sid = jwtClaim(session.token, 'sid');
@@ -575,21 +576,33 @@ const RENEW_HEARTBEAT_MS = 60_000;
  */
 const STEP_UP_APPROVAL_WINDOW_MS = 90_000;
 
+// A refresh chain is one session: one rpId and one client. Everything this
+// document renews is kept per chain, never per rpId alone, so two clients
+// sharing an rpId (privasys.id for every first-party front) keep their own
+// timers, retries and notifications. A timer outlives the message that armed
+// it, so it names its client instead of reading whichever was named last.
+type Chain = { rpId: string; clientId: string | null };
+const chainKey = (c: Chain): string => `${c.clientId ?? ''}|${c.rpId}`;
+/** The chain of a session, or of an rpId for the client the page named. */
+const chainOf = (s: Pick<AuthSession, 'rpId' | 'clientId'>): Chain => ({ rpId: s.rpId, clientId: s.clientId ?? null });
+const chainFor = (rpId: string): Chain => ({ rpId, clientId: sessions.namedClient });
+
 const renewalTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const renewalRetryCount = new Map<string, number>();
-/** rpIds this document renews, with the parent origin to notify. */
-const renewalParents = new Map<string, string>();
-/** Last access token seen per rpId; dedupes storage-event notifications. */
+/** Chains this document renews, with the parent origin to notify. */
+const renewalParents = new Map<string, { chain: Chain; parentOrigin: string }>();
+/** Last access token seen per chain; dedupes storage-event notifications. */
 const lastSeenTokens = new Map<string, string>();
 
-function cancelRenewal(rpId: string): void {
-    const timer = renewalTimers.get(rpId);
+function cancelRenewal(chain: Chain): void {
+    const key = chainKey(chain);
+    const timer = renewalTimers.get(key);
     if (timer) {
         clearTimeout(timer);
-        renewalTimers.delete(rpId);
+        renewalTimers.delete(key);
     }
-    renewalRetryCount.delete(rpId);
-    renewalParents.delete(rpId);
+    renewalRetryCount.delete(key);
+    renewalParents.delete(key);
 }
 
 /**
@@ -837,12 +850,14 @@ function needsRenewal(token: string): boolean {
 }
 
 function scheduleRenewal(session: AuthSession, parentOrigin: string): void {
-    cancelRenewal(session.rpId);
+    const chain = chainOf(session);
+    const key = chainKey(chain);
+    cancelRenewal(chain);
 
     if (!session.refreshToken || !session.clientId) return;
 
-    renewalParents.set(session.rpId, parentOrigin);
-    lastSeenTokens.set(session.rpId, session.token);
+    renewalParents.set(key, { chain, parentOrigin });
+    lastSeenTokens.set(key, session.token);
 
     // Schedule from the token's actual exp; a flat delay drifts apart
     // from the token lifetime whenever the iframe is (re)created after
@@ -853,24 +868,25 @@ function scheduleRenewal(session: AuthSession, parentOrigin: string): void {
     const delay = Math.max(1_000, base + jitter);
 
     const timer = setTimeout(() => {
-        renewalTimers.delete(session.rpId);
-        void renewIfNeeded(session.rpId, parentOrigin);
+        renewalTimers.delete(key);
+        void renewIfNeeded(chain, parentOrigin);
     }, delay);
 
-    renewalTimers.set(session.rpId, timer);
+    renewalTimers.set(key, timer);
 }
 
-function scheduleRenewalRetry(rpId: string, parentOrigin: string): void {
-    const attempt = renewalRetryCount.get(rpId) ?? 0;
-    renewalRetryCount.set(rpId, attempt + 1);
+function scheduleRenewalRetry(chain: Chain, parentOrigin: string): void {
+    const key = chainKey(chain);
+    const attempt = renewalRetryCount.get(key) ?? 0;
+    renewalRetryCount.set(key, attempt + 1);
     const delay = RENEW_RETRY_MS[Math.min(attempt, RENEW_RETRY_MS.length - 1)];
-    const prev = renewalTimers.get(rpId);
+    const prev = renewalTimers.get(key);
     if (prev) clearTimeout(prev);
     const timer = setTimeout(() => {
-        renewalTimers.delete(rpId);
-        void renewIfNeeded(rpId, parentOrigin);
+        renewalTimers.delete(key);
+        void renewIfNeeded(chain, parentOrigin);
     }, delay);
-    renewalTimers.set(rpId, timer);
+    renewalTimers.set(key, timer);
 }
 
 /**
@@ -884,26 +900,27 @@ function scheduleRenewalRetry(rpId: string, parentOrigin: string): void {
  * chain is dead and the session has been removed.
  */
 async function renewIfNeeded(
-    rpId: string,
+    chain: Chain,
     parentOrigin: string,
     notify = true,
 ): Promise<AuthSession | undefined> {
-    const current = sessions.get(rpId);
+    const key = chainKey(chain);
+    const current = sessions.getFor(chain.rpId, chain.clientId);
     if (!current?.refreshToken || !current?.clientId) return current;
     if (!needsRenewal(current.token)) {
         // Not due yet (timer fired early relative to a token another
         // document already rotated) — just re-arm from the fresh exp.
-        if (!renewalTimers.has(rpId)) scheduleRenewal(current, parentOrigin);
+        if (!renewalTimers.has(key)) scheduleRenewal(current, parentOrigin);
         return current;
     }
 
-    return withRefreshLock(rpId, current.clientId, async () => {
+    return withRefreshLock(chain.rpId, current.clientId, async () => {
         // Re-read under the lock: another document may have renewed
         // while we waited.
-        const fresh = sessions.get(rpId);
+        const fresh = sessions.getFor(chain.rpId, current.clientId!);
         if (!fresh?.refreshToken || !fresh?.clientId) return fresh;
         if (!needsRenewal(fresh.token)) {
-            renewalRetryCount.delete(rpId);
+            renewalRetryCount.delete(key);
             scheduleRenewal(fresh, parentOrigin);
             return fresh;
         }
@@ -954,7 +971,7 @@ async function renewSessionLocked(
     } catch (err) {
         signalRenewal('end');
         console.warn('[frame-host] renewal fetch failed, will retry:', err);
-        scheduleRenewalRetry(session.rpId, parentOrigin);
+        scheduleRenewalRetry(chainOf(session), parentOrigin);
         return session;
     }
     // The rotated token is persisted synchronously below; nothing after
@@ -978,7 +995,7 @@ async function renewSessionLocked(
             refreshToken: tokens.refresh_token,
             authenticatedAt: Date.now(),
         };
-        renewalRetryCount.delete(session.rpId);
+        renewalRetryCount.delete(chainKey(chainOf(session)));
         scheduleRenewal(updated, parentOrigin);
 
         // Notify parent — skipped during check-session inline renewal to
@@ -1004,15 +1021,16 @@ async function renewSessionLocked(
         // The token we used is gone server-side. If storage now holds a
         // different refresh token, another (non-locking) party rotated
         // it — adopt theirs rather than killing the session.
-        const stored = sessions.get(session.rpId);
+        const chain = chainOf(session);
+        const stored = sessions.getFor(chain.rpId, chain.clientId);
         if (stored?.refreshToken && stored.refreshToken !== usedRefreshToken) {
-            renewalRetryCount.delete(session.rpId);
+            renewalRetryCount.delete(chainKey(chain));
             scheduleRenewal(stored, parentOrigin);
             return stored;
         }
         console.warn('[frame-host] refresh-token chain dead, expiring session:', body);
-        cancelRenewal(session.rpId);
-        sessions.remove(session.rpId);
+        cancelRenewal(chain);
+        sessions.removeFor(chain.rpId, chain.clientId);
         // During check-session inline renewal (notify=false) the caller
         // reports the dead session as `session: null` itself; posting
         // session-expired too would race the parent's response handler.
@@ -1027,7 +1045,7 @@ async function renewSessionLocked(
 
     // 5xx / unexpected 4xx: transient until proven otherwise.
     console.warn(`[frame-host] renewal failed (${resp.status}), will retry:`, body);
-    scheduleRenewalRetry(session.rpId, parentOrigin);
+    scheduleRenewalRetry(chainOf(session), parentOrigin);
     return session;
 }
 
@@ -1037,16 +1055,16 @@ async function renewSessionLocked(
 // (`storage` fires in every same-origin document except the writer.)
 window.addEventListener('storage', (ev) => {
     if (ev.key !== SESSIONS_STORAGE_KEY) return;
-    for (const [rpId, parentOrigin] of renewalParents) {
-        const current = sessions.get(rpId);
+    for (const [key, { chain, parentOrigin }] of renewalParents) {
+        const current = sessions.getFor(chain.rpId, chain.clientId);
         if (!current?.refreshToken || !current?.clientId) continue;
-        if (lastSeenTokens.get(rpId) === current.token) continue;
-        lastSeenTokens.set(rpId, current.token);
+        if (lastSeenTokens.get(key) === current.token) continue;
+        lastSeenTokens.set(key, current.token);
         scheduleRenewal(current, parentOrigin);
         window.parent.postMessage(
             {
                 type: 'privasys:session-renewed',
-                rpId,
+                rpId: chain.rpId,
                 accessToken: current.token,
             },
             parentOrigin,
@@ -1060,10 +1078,10 @@ window.addEventListener('storage', (ev) => {
 // the margin; the lock + in-lock re-read make overlapping heartbeats
 // across documents harmless no-ops.
 setInterval(() => {
-    for (const [rpId, parentOrigin] of renewalParents) {
-        const current = sessions.get(rpId);
+    for (const { chain, parentOrigin } of renewalParents.values()) {
+        const current = sessions.getFor(chain.rpId, chain.clientId);
         if (!current?.refreshToken || !current?.clientId) continue;
-        if (needsRenewal(current.token)) void renewIfNeeded(rpId, parentOrigin);
+        if (needsRenewal(current.token)) void renewIfNeeded(chain, parentOrigin);
     }
 }, RENEW_HEARTBEAT_MS);
 
@@ -2205,11 +2223,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // before returning so the parent gets a fresh token. A dead
         // chain comes back as undefined → parent triggers sign-in.
         if (session?.token && session?.refreshToken && session?.clientId && needsRenewal(session.token)) {
-            session = await renewIfNeeded(data.rpId, e.origin, false);
+            session = await renewIfNeeded(chainOf(session), e.origin, false);
         }
 
         // Ensure renewal is running for active sessions
-        if (session?.refreshToken && session?.clientId && !renewalTimers.has(session.rpId)) {
+        if (session?.refreshToken && session?.clientId && !renewalTimers.has(chainKey(chainOf(session)))) {
             scheduleRenewal(session, e.origin);
         }
 
@@ -2224,7 +2242,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
     if (data.type === 'privasys:clear-session') {
         // Signing out ends the session. The remembered wallets stay: each is
         // forgotten by itself, from the gate.
-        cancelRenewal(data.rpId);
+        cancelRenewal(chainFor(data.rpId));
         sessions.remove(data.rpId);
         window.parent.postMessage(
             { type: 'privasys:session-cleared' },

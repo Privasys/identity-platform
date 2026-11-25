@@ -722,7 +722,7 @@ export class AuthFrame {
     }
 
     private frameKey(): string {
-        return `${this.authOrigin}|${this.rpId}|${this.config.sessionRelay?.appHost ?? ''}`;
+        return `${this.authOrigin}|${this.rpId}|${this.config.clientId ?? ''}|${this.config.sessionRelay?.appHost ?? ''}`;
     }
 
     private setSealedState(state: SealedSessionState): void {
@@ -2179,5 +2179,5 @@ export class AuthFrame {
     }
 }
 
-/** Live AuthFrame instances per (auth origin, rpId); see the constructor. */
+/** Live AuthFrame instances per (auth origin, rpId, client, app host); see the constructor. */
 const liveFrames = new Map<string, number>();

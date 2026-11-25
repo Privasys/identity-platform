@@ -123,8 +123,30 @@ export class SessionManager {
         return sessionPlatform(s, this.platform) === this.platform.platform;
     }
 
-    private mine(s: AuthSession, rpId: string): boolean {
-        return s.rpId === rpId && (this.clientId === null || s.clientId === this.clientId) && this.onPlatform(s);
+    /** The client lookups are for, or null when no page has named one. */
+    get namedClient(): string | null {
+        return this.clientId;
+    }
+
+    private mine(s: AuthSession, rpId: string, clientId: string | null = this.clientId): boolean {
+        return s.rpId === rpId && (clientId === null || s.clientId === clientId) && this.onPlatform(s);
+    }
+
+    /**
+     * The session of one (rpId, client), whichever client was named last: for
+     * work that outlives the message that started it, such as a renewal timer.
+     */
+    getFor(rpId: string, clientId: string | null): AuthSession | undefined {
+        return this.getAll()
+            .filter((s) => this.mine(s, rpId, clientId))
+            .sort((a, b) => b.authenticatedAt - a.authenticatedAt)[0];
+    }
+
+    /** Remove the session of one (rpId, client); see {@link getFor}. */
+    removeFor(rpId: string, clientId: string | null): void {
+        const sessions = this.getAll().filter((s) => !this.mine(s, rpId, clientId));
+        this.persist(sessions);
+        this.notify(sessions);
     }
 
     /** Store a new session after successful authentication. */
@@ -144,9 +166,7 @@ export class SessionManager {
 
     /** Get the session for a specific RP (and the named client), or undefined if none. */
     get(rpId: string): AuthSession | undefined {
-        return this.getAll()
-            .filter((s) => this.mine(s, rpId))
-            .sort((a, b) => b.authenticatedAt - a.authenticatedAt)[0];
+        return this.getFor(rpId, this.clientId);
     }
 
     /** Get all stored sessions. */

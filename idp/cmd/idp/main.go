@@ -35,9 +35,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Privasys/idp/internal/accountdeletion"
 	"github.com/Privasys/idp/internal/admin"
 	"github.com/Privasys/idp/internal/appmessages"
-	"github.com/Privasys/idp/internal/accountdeletion"
 	"github.com/Privasys/idp/internal/apps"
 	"github.com/Privasys/idp/internal/attributes"
 	"github.com/Privasys/idp/internal/capasks"
@@ -141,6 +141,14 @@ func main() {
 	sessionsStore.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	sessionsStore.SetSectorResolver(clientReg.SectorOf)
 	sessionsStore.SetAppsResolver(clientReg.AppIDsOf)
+	sessionsStore.SetAppSubjectResolver(func(appID, toolClientID string) (string, string, string, error) {
+		id := clients.NormaliseAppID(appID)
+		if id == "" {
+			return "", "", "", errors.New("app_id is not an app id")
+		}
+		sector, holder, err := clientReg.AppSubjectSector(id, toolClientID)
+		return id, sector, holder, err
+	})
 	sessionsStore.SetToolAppResolver(func(clientID, appID string) (string, string, bool, error) {
 		if !clientReg.AnyAppAudience(clientID) {
 			return "", "", false, nil

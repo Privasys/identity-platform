@@ -72,6 +72,10 @@ type Store struct {
 	// for it belongs to; ok=false when the client is no tool client, and an
 	// error when the app has no one subject (claimed by several clients).
 	toolApp func(clientID, appID string) (sector, holderClient string, ok bool, err error)
+	// appSubject names, for an attested app reached through a tool, the
+	// app's id in its one written form, the subject sector the app's own
+	// sign-in uses, and the client a relationship row belongs to.
+	appSubject func(appID, toolClientID string) (id, sector, holderClient string, err error)
 }
 
 // SetToolAppResolver wires the client registry's tool-client lookup
@@ -82,6 +86,12 @@ func (s *Store) SetToolAppResolver(f func(clientID, appID string) (string, strin
 
 // SetPasskeysResolver wires the lookup of an identity's passkey keys.
 func (s *Store) SetPasskeysResolver(f func(userID string) ([][]byte, error)) { s.passkeysOf = f }
+
+// SetAppSubjectResolver wires the client registry's lookup of the subject an
+// app knows a person by, for keys addressed to one app (apikeys.go).
+func (s *Store) SetAppSubjectResolver(f func(appID, toolClientID string) (string, string, string, error)) {
+	s.appSubject = f
+}
 
 // SetSectorResolver wires the client registry's sector lookup.
 func (s *Store) SetSectorResolver(f func(clientID string) string) { s.sectorOf = f }

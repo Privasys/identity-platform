@@ -24,6 +24,19 @@ const (
 	// APIKeyTTL is a minted API key's lifetime. Long, but revocable via the
 	// session's sid.
 	APIKeyTTL = 365 * 24 * time.Hour
+
+	// AppKeyClientID marks the session row behind a key addressed to one
+	// app. Kept apart from API keys so a person's list of API keys is not
+	// filled with the short keys their wallet makes.
+	AppKeyClientID = "app-key"
+	// AppKeyTTL is the lifetime of a key addressed to one app. Short: the
+	// key reaches the app's own code, and the wallet makes another with one
+	// biometric.
+	AppKeyTTL = time.Hour
+	// WalletToolClientID names the wallet as the tool an app key came
+	// through: the token's azp, and the tool half of the subject when no
+	// client stands for the app.
+	WalletToolClientID = "privasys-wallet"
 )
 
 // ListAPIKeysByUser returns the user's non-revoked API-key sessions,
@@ -94,6 +107,9 @@ func (s *Store) HandleCreateAPIKey(issuer *tokens.Issuer, defaultAudience string
 			// wallet calls Drive with one, so Drive sees the identifier its own
 			// sign-in gives. Unknown or legacy clients get the account, as before.
 			ClientID string `json:"client_id"`
+			// AppID asks for a key addressed to that one app and nothing
+			// else: see appKey.
+			AppID string `json:"app_id"`
 		}
 		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body)
 		label := strings.TrimSpace(body.Label)
@@ -102,6 +118,10 @@ func (s *Store) HandleCreateAPIKey(issuer *tokens.Issuer, defaultAudience string
 		}
 		if len(label) > 128 {
 			label = label[:128]
+		}
+		if strings.TrimSpace(body.AppID) != "" {
+			s.appKey(w, r, issuer, userID, label, body.AppID, body.Audience, body.ClientID)
+			return
 		}
 		aud := strings.TrimSpace(body.Audience)
 		if aud == "" {
@@ -137,6 +157,73 @@ func (s *Store) HandleCreateAPIKey(issuer *tokens.Issuer, defaultAudience string
 			"expires_at": time.Now().Add(APIKeyTTL).Unix(),
 		})
 	}
+}
+
+// appKey mints a key for the wallet to present to ONE attested app, a
+// resource service the holder is granting or reviewing access at.
+//
+// The wallet used to present its platform key there: an account-wide bearer
+// the control plane accepts, good for a year, handed to whatever app was
+// registered as a resource service. This key is the opposite on each count.
+// Its audience is that app alone ("app:<id>"), so no other service accepts
+// it. Its subject is the one the app's own sign-in gives the person, so the
+// app learns nothing it could link them by. It names no account and carries
+// no role, lives an hour, and says in azp that it came through the wallet.
+//
+// Only a wallet session may ask for one. An access token cannot: a relying
+// party holding a person's token must not be able to turn it into a key for
+// another app.
+func (s *Store) appKey(w http.ResponseWriter, r *http.Request, issuer *tokens.Issuer, userID, label, appID, audience, clientID string) {
+	if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer wallet:") {
+		httpErr(w, http.StatusForbidden, "an app key is made from a wallet session")
+		return
+	}
+	if strings.TrimSpace(clientID) != "" {
+		httpErr(w, http.StatusBadRequest, "client_id cannot be given with app_id")
+		return
+	}
+	if s.appSubject == nil {
+		httpErr(w, http.StatusNotImplemented, "app keys are not available")
+		return
+	}
+	id, sector, holderClient, err := s.appSubject(appID, WalletToolClientID)
+	if err != nil {
+		httpErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	aud := "app:" + id
+	// The audience is the app's and no other: a platform audience, or any
+	// audience but this one, is refused when the key is for an app.
+	if a := strings.TrimSpace(audience); a != "" && a != aud {
+		httpErr(w, http.StatusBadRequest, "the audience of an app key is the app's own")
+		return
+	}
+	subject := issuer.SubjectFor(userID, sector)
+	sid := NewSID()
+	if _, err := s.Create(sid, userID, AppKeyClientID, label, AppKeyTTL); err != nil {
+		httpErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// The row that lets the platform find the account behind this subject
+	// (who pays, who to notify), as a sign-in to the app would have left it.
+	if err := s.RecordHolder(subject, holderClient, userID); err != nil {
+		_ = s.Revoke(sid)
+		httpErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	token, err := issuer.IssueAccessTokenWithTTL(subject, aud, sid, nil, map[string]string{"azp": WalletToolClientID}, AppKeyTTL)
+	if err != nil {
+		_ = s.Revoke(sid)
+		httpErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"sid":        sid,
+		"label":      label,
+		"token":      token,
+		"audience":   aud,
+		"expires_at": time.Now().Add(AppKeyTTL).Unix(),
+	})
 }
 
 // HandleListAPIKeys lists the authenticated user's API keys (metadata only;

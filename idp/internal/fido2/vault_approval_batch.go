@@ -603,8 +603,8 @@ func (h *Handler) VaultApprovalBatchComplete(iss *tokens.Issuer, audience string
 			issued = append(issued, vaultBatchToken{Operation: e.Operation, Handle: e.Handle, VaultOp: e.VaultOp, AccessToken: tok})
 		}
 		h.vaultBatches.finish(m.batchID, m.sub, issued, m.exp)
-		log.Printf("fido2: vault-approval batch APPROVED by %s (%d tokens, label %q; %s)",
-			m.sub, len(issued), logField(m.label), m.asked)
+		log.Printf("fido2: vault-approval batch APPROVED by %s (%d tokens, label %q; %s) completed from %s",
+			m.sub, len(issued), logField(m.label), m.asked, vaultPeer(r))
 		writeJSON(w, map[string]interface{}{"status": "approved", "count": len(issued)})
 	}
 }
@@ -663,7 +663,7 @@ func (h *Handler) VaultApprovalDecline() http.HandlerFunc {
 		m := entry.vaultApproval
 		h.vaultPending.remove(vaultOp)
 		h.vaultResults.decline(vaultOp, m.sub, time.Unix(m.exp, 0))
-		log.Printf("fido2: vault-approval DECLINED by the owner's wallet (sub %s; %s)", m.sub, m.asked)
+		log.Printf("fido2: vault-approval DECLINED by the owner's wallet (sub %s; %s) completed from %s", m.sub, m.asked, vaultPeer(r))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -680,7 +680,7 @@ func (h *Handler) VaultApprovalBatchDecline() http.HandlerFunc {
 			return
 		}
 		sub, asked, _ := h.vaultBatches.decline(batchID)
-		log.Printf("fido2: vault-approval batch DECLINED by the owner's wallet (sub %s; %s)", sub, asked)
+		log.Printf("fido2: vault-approval batch DECLINED by the owner's wallet (sub %s; %s) completed from %s", sub, asked, vaultPeer(r))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

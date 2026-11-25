@@ -592,7 +592,7 @@ func (h *Handler) VaultApprovalComplete(iss *tokens.Issuer, audience string) htt
 		h.vaultPending.remove(m.vaultOp)
 		// "approved" — this fires only after a verified assertion, so it is
 		// the success line, and reads as one next to the /begin request log.
-		log.Printf("fido2: vault-approval APPROVED by %s (%s) — token stashed", m.sub, m.asked)
+		log.Printf("fido2: vault-approval APPROVED by %s (%s) completed from %s — token stashed", m.sub, m.asked, vaultPeer(r))
 		writeJSON(w, map[string]interface{}{"access_token": tok, "expires_at": m.exp})
 	}
 }
@@ -638,6 +638,14 @@ func vaultRequester(r *http.Request, iss *tokens.Issuer) string {
 		}
 		sid, _ = claims["sid"].(string)
 	}
+	return fmt.Sprintf("client=%q sid=%q %s", logField(client), logField(sid), vaultPeer(r))
+}
+
+// vaultPeer says where a request came from, for the log: the last hop of
+// X-Forwarded-For, the one our own reverse proxy wrote (else the peer), and
+// the user agent. On the line that records an approval's outcome it shows
+// whether the answer came from the owner's phone or from somewhere else.
+func vaultPeer(r *http.Request) string {
 	ip := r.RemoteAddr
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		ip = host
@@ -648,7 +656,7 @@ func vaultRequester(r *http.Request, iss *tokens.Issuer) string {
 			ip = last
 		}
 	}
-	return fmt.Sprintf("client=%q sid=%q ip=%s ua=%q", logField(client), logField(sid), logField(ip), logField(r.UserAgent()))
+	return fmt.Sprintf("ip=%s ua=%q", logField(ip), logField(r.UserAgent()))
 }
 
 // logField makes a caller-supplied value safe to put on one log line: no

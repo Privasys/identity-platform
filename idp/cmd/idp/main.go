@@ -725,6 +725,12 @@ func main() {
 
 	// The number on the wallet's icon: what waits on its holder, sent with a
 	// request's own push and corrected when one is answered or lapses.
+	if t := strings.TrimSpace(os.Getenv("IDP_EXPO_ACCESS_TOKEN")); t != "" {
+		push.SetAccessToken(t)
+		log.Printf("push: sends are authenticated to Expo")
+	} else {
+		log.Printf("push: no Expo access token configured; sends are unauthenticated")
+	}
 	badges := push.NewBadges(db, push.For(db))
 	push.SetBadges(badges)
 	go badges.Run(context.Background(), time.Second)

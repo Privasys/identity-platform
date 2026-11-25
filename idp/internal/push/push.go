@@ -172,6 +172,7 @@ func (s *Sender) post(ctx context.Context, msg map[string]any) (string, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	authorise(req)
 
 	resp, err := s.client().Do(req)
 	if err != nil {
@@ -245,6 +246,7 @@ func (s *Sender) Receipts(ctx context.Context, ticketIDs []string, tokenFor map[
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	authorise(req)
 
 	resp, err := s.client().Do(req)
 	if err != nil {
@@ -296,6 +298,23 @@ func snippet(b []byte) string {
 		return string(b[:max])
 	}
 	return string(b)
+}
+
+// accessToken authenticates this server to Expo. With Expo's enhanced push
+// security switched on for the project, a send without it is refused, so a
+// push token alone no longer lets anyone else reach the device it names.
+// Empty until configured: Expo then accepts sends from anyone holding a token,
+// as it does by default.
+var accessToken string
+
+// SetAccessToken installs the Expo access token every send and receipt
+// lookup presents.
+func SetAccessToken(t string) { accessToken = t }
+
+func authorise(req *http.Request) {
+	if accessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+	}
 }
 
 // --- The surface every call site should use -------------------------------

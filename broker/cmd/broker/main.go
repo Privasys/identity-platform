@@ -49,8 +49,13 @@ func main() {
 	mux.HandleFunc("/connect/", descStore.HandleConnect)
 
 	// Push notification trigger
+	if cfg.ExpoAccessToken != "" {
+		log.Printf("push: sends are authenticated to Expo")
+	} else {
+		log.Printf("push: no Expo access token configured; sends are unauthenticated")
+	}
 	notifyHandler := func(w http.ResponseWriter, r *http.Request) {
-		relay.HandleNotify(w, r, cfg.ExpoPushURL)
+		relay.HandleNotify(w, r, cfg.ExpoPushURL, cfg.ExpoAccessToken)
 	}
 	mux.HandleFunc("POST /notify", notifyHandler)
 	mux.HandleFunc("OPTIONS /notify", notifyHandler)

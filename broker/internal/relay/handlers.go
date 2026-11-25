@@ -113,7 +113,7 @@ type notifyRequest struct {
 }
 
 // HandleNotify sends a push notification to the wallet via Expo push service.
-func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
+func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL, expoAccessToken string) {
 	origin := r.Header.Get("Origin")
 	if origin != "" && allowedOrigin(origin) {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -231,6 +231,10 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 
 	pushReq.Header.Set("Content-Type", "application/json")
 	pushReq.Header.Set("Accept", "application/json")
+	// Sent only to the push service, never echoed or logged.
+	if expoAccessToken != "" {
+		pushReq.Header.Set("Authorization", "Bearer "+expoAccessToken)
+	}
 
 	resp, err := http.DefaultClient.Do(pushReq)
 	if err != nil {
@@ -242,6 +246,8 @@ func HandleNotify(w http.ResponseWriter, r *http.Request, expoPushURL string) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if resp.StatusCode >= 400 {
+		// The status only: the answer may quote the request.
+		log.Printf("expo push refused: status %d", resp.StatusCode)
 		w.WriteHeader(http.StatusBadGateway)
 		w.Write([]byte(`{"error":"push service error"}`))
 		return

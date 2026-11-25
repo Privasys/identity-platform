@@ -7,18 +7,22 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
-	Port          int
-	ExpoPushURL   string
-	SigningKey    string // EC P-256 private key PEM for JWT signing (ES256)
-	IssuerURL     string // Public URL of this broker (JWT "iss")
-	ASAudience    string // Attestation server audience claim
-	ASRole        string // Attestation server role claim
-	AppleTeamID   string // Apple Developer Team ID
-	AppleBundleID string // App bundle identifier
-	Production    bool   // App Store (true) vs TestFlight/dev (false)
+	Port        int
+	ExpoPushURL string
+	// ExpoAccessToken authenticates sends to the push service, which refuses
+	// unauthenticated ones once the project's enhanced push security is on.
+	ExpoAccessToken string
+	SigningKey      string // EC P-256 private key PEM for JWT signing (ES256)
+	IssuerURL       string // Public URL of this broker (JWT "iss")
+	ASAudience      string // Attestation server audience claim
+	ASRole          string // Attestation server role claim
+	AppleTeamID     string // Apple Developer Team ID
+	AppleBundleID   string // App bundle identifier
+	Production      bool   // App Store (true) vs TestFlight/dev (false)
 }
 
 func Load() *Config {
@@ -56,15 +60,16 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:          port,
-		ExpoPushURL:   expoPush,
-		SigningKey:    signingKey,
-		IssuerURL:     os.Getenv("ISSUER_URL"),
-		ASAudience:    asAudience,
-		ASRole:        asRole,
-		AppleTeamID:   os.Getenv("APPLE_TEAM_ID"),
-		AppleBundleID: os.Getenv("APPLE_BUNDLE_ID"),
-		Production:    os.Getenv("PRODUCTION") == "true",
+		Port:            port,
+		ExpoPushURL:     expoPush,
+		ExpoAccessToken: strings.TrimSpace(os.Getenv("EXPO_ACCESS_TOKEN")),
+		SigningKey:      signingKey,
+		IssuerURL:       os.Getenv("ISSUER_URL"),
+		ASAudience:      asAudience,
+		ASRole:          asRole,
+		AppleTeamID:     os.Getenv("APPLE_TEAM_ID"),
+		AppleBundleID:   os.Getenv("APPLE_BUNDLE_ID"),
+		Production:      os.Getenv("PRODUCTION") == "true",
 	}
 }
 

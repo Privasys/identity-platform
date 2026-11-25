@@ -409,23 +409,38 @@ async function patchSessionAttributes(
  */
 const SESSION_PATCH_TIMEOUT_MS = 60_000;
 
+/** How long the relay waits for the attribute patch before it goes ahead. */
+const SESSION_PATCH_GRACE_MS = 8_000;
+
 /**
- * Send the attribute patch without holding the sign-in screen for it.
+ * Send the attribute patch ahead of the relay, without letting it hold the
+ * sign-in for long.
  *
- * By the time this runs the browser already has the sign-in: the relay is
- * done. Waiting here kept the holder on "Sending to browser" for as long as a
- * slow link took to answer, with the browser long since signed in, and the
- * screen then finished whenever the answer came, wherever the holder had gone
- * meanwhile (2026-11-25). The patch never throws.
+ * The patch goes first because in the device flow it is the only way the
+ * holder's details reach the tokens, and a request started after the relay can
+ * be suspended once the holder leaves the app. It is given a short while to
+ * land; after that the relay goes ahead and the patch carries on by itself, up
+ * to its own bound. The ceremony is already complete at privasys.id by now, so
+ * the patch is accepted before the relay as well as after it.
+ *
+ * It used to be awaited after the relay with no bound, which kept the holder
+ * on "Sending to browser" for as long as a slow link took to answer, with the
+ * browser long since signed in (2026-11-25). Never throws.
  */
-function patchSessionAttributesInBackground(
+async function patchSessionAttributesFirst(
     payload: QRPayload,
     attributes: Record<string, string> | undefined,
     sub?: string,
-): void {
-    void patchSessionAttributes(payload, attributes, sub).catch((e: any) =>
+): Promise<void> {
+    const patch = patchSessionAttributes(payload, attributes, sub).catch((e: any) =>
         console.warn('[CONNECT] session attribute patch failed:', e?.message ?? e),
     );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const grace = new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, SESSION_PATCH_GRACE_MS);
+    });
+    await Promise.race([patch, grace]);
+    if (timer) clearTimeout(timer);
 }
 
 /**
@@ -2469,6 +2484,9 @@ function ConnectFlow() {
             // inside the keystore's biometric grace where supported.
             await issueVoucherBeforeRelay(payload, keyAlias, result, sessionRelayArg);
 
+            // Device-flow attribute delivery, ahead of the relay.
+            await patchSessionAttributesFirst(payload, attributes, result.subject || result.userHandle);
+
             await relaySessionToken(
                 payload.brokerUrl,
                 payload.sessionId,
@@ -2478,15 +2496,6 @@ function ConnectFlow() {
                 result.sessionRelay,
                 await deviceLabel(),
             );
-
-            // IdP-brokered flows: ALSO patch the attributes onto the auth code
-            // directly. In the SDK (iframe) flow the frame-host relays them to
-            // /session/complete for us, but in the DEVICE flow nobody listens
-            // on the relay — without this call the ceremony's disclosures
-            // (including paid gov proofs the RP was already charged for) never
-            // reach the issued tokens. The IdP's patch branch is idempotent,
-            // so double delivery via the SDK path is harmless.
-            patchSessionAttributesInBackground(payload, attributes, result.subject || result.userHandle);
             warmWalletAttestation();
 
             // Relay succeeded — now persist locally.
@@ -2649,6 +2658,9 @@ function ConnectFlow() {
             // inside the keystore's biometric grace where supported.
             await issueVoucherBeforeRelay(payload, keyAlias, result, sessionRelayArg);
 
+            // Device-flow attribute delivery, ahead of the relay.
+            await patchSessionAttributesFirst(payload, attributes, result.subject);
+
             await relaySessionToken(
                 payload.brokerUrl,
                 payload.sessionId,
@@ -2659,8 +2671,6 @@ function ConnectFlow() {
                 await deviceLabel(),
             );
 
-            // Device-flow attribute delivery (see patchSessionAttributes).
-            patchSessionAttributesInBackground(payload, attributes, result.subject);
             warmWalletAttestation();
 
             // Keep the IdP's push target fresh for this pairwise identity
@@ -2889,6 +2899,9 @@ function ConnectFlow() {
             // normally already settled and asks for no second Face ID.
             await withinVoucherWait(pending.voucher);
 
+            // Device-flow attribute delivery, ahead of the relay.
+            await patchSessionAttributesFirst(pending.payload, attributes, pending.credential?.userHandle);
+
             await relaySessionToken(
                 pending.payload.brokerUrl,
                 pending.payload.sessionId,
@@ -2899,8 +2912,6 @@ function ConnectFlow() {
                 await deviceLabel(),
             );
 
-            // Device-flow attribute delivery (see patchSessionAttributes).
-            patchSessionAttributesInBackground(pending.payload, attributes, pending.credential?.userHandle);
             warmWalletAttestation();
 
             // For registration, persist the credential now

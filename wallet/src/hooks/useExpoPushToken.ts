@@ -22,7 +22,14 @@ import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 import { vaultBatchRouteName } from '../services/vault-approval-batch';
 import { isRouteActive } from '../utils/active-route';
 import { DELETION_PUSH_TYPES, handleDeletionPush } from '../services/account-deletion-events';
-import { dismissElsewhere, dismissHere, dismissStale, DISMISS_TYPE } from '../services/notification-dismiss';
+import {
+    dismissClosed,
+    dismissElsewhere,
+    dismissHere,
+    dismissStale,
+    DISMISS_TYPE,
+    setOwnPushToken,
+} from '../services/notification-dismiss';
 
 let _notificationsSetup = false;
 
@@ -433,13 +440,16 @@ async function sweepPresentedApprovals(): Promise<void> {
         const Notifications = await getNotifications();
         const presented = await Notifications.getPresentedNotificationsAsync();
         const store = useVaultApprovalsStore.getState();
+        let approvals = false;
         for (const n of presented) {
             const data = n.request.content.data as Record<string, unknown> | undefined;
             if (data?.type === 'vault-approval' && data.vault_op) {
                 store.remember(String(data.vault_op));
+                approvals = true;
             }
             if (data?.type === 'vault-approval-batch' && data.batch_id) {
                 store.rememberBatch(String(data.batch_id));
+                approvals = true;
             }
             // A guardian's recovery request: Access shows it as waiting even
             // when the wallet was opened from its icon rather than the push.
@@ -453,6 +463,22 @@ async function sweepPresentedApprovals(): Promise<void> {
             if (data?.type === 'share-request' || data?.type === 'share-decision') {
                 void fileDriveNotification(data);
             }
+        }
+        // An approval answered on another of the holder's phones, or expired,
+        // leaves its notification here: the silent push that would clear it is
+        // rationed by Apple and never reaches a wallet that was swiped away.
+        // So ask privasys.id which are still open, and take the others off.
+        if (approvals) {
+            await store.refresh();
+            await store.refreshBatches();
+            const live = useVaultApprovalsStore.getState();
+            await dismissClosed({
+                // Known less the ones privasys.id reports gone: a request it could
+                // not be asked about just now stays, so a lost connection never
+                // takes a live notification away.
+                'vault-approval': new Set(live.knownOps),
+                'vault-approval-batch': new Set(live.batchIds),
+            });
         }
     } catch (e) {
         console.warn('[notifications] sweep presented approvals failed', e);
@@ -557,6 +583,7 @@ let coldStartHandled = false;
 
 function publishToken(t: string | null): void {
     ambientPushToken = t;
+    setOwnPushToken(t);
     for (const fn of tokenSubscribers) fn(t);
 }
 

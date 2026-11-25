@@ -797,7 +797,7 @@ function VaultApprovalsScreen() {
                                         <Text style={styles.label}>
                                             {isPolicy
                                                 ? t('vaultApprovals.policyDocument')
-                                                : isKeyRules
+                                                : isKeyRules || isKeyCreate
                                                   ? t('vaultApprovals.rulesFingerprint')
                                                   : t('vaultApprovals.newMeasurement')}
                                         </Text>

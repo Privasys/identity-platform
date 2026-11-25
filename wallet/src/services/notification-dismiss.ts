@@ -54,6 +54,13 @@ export const STALE_AFTER_MS = 15 * 60 * 1000;
 
 type Data = Record<string, unknown> | undefined | null;
 
+/** The notifications module, loaded when first needed: never on the web, and
+ *  not while the wallet is only starting up. */
+function notifications(): typeof import('expo-notifications') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-notifications');
+}
+
 /** The key both phones derive for one notification, or null for one that
  *  names no request (it is then left to the phone it is on). */
 export function notificationKey(data: Data): string | null {
@@ -78,7 +85,7 @@ function millis(date: number): number {
 /** Remove this phone's delivered notifications with `key`. */
 export async function dismissHere(key: string): Promise<number> {
     if (Platform.OS === 'web' || !key) return 0;
-    const Notifications = await import('expo-notifications');
+    const Notifications = notifications();
     const presented = await Notifications.getPresentedNotificationsAsync();
     let n = 0;
     for (const p of presented) {
@@ -93,7 +100,7 @@ export async function dismissHere(key: string): Promise<number> {
 /** Remove this phone's delivered notifications that can no longer be answered. */
 export async function dismissStale(now = Date.now()): Promise<number> {
     if (Platform.OS === 'web') return 0;
-    const Notifications = await import('expo-notifications');
+    const Notifications = notifications();
     const presented = await Notifications.getPresentedNotificationsAsync();
     let n = 0;
     for (const p of presented) {
@@ -121,6 +128,71 @@ export async function dismissElsewhere(data: Data, pushToken: string | null): Pr
         if (!res.ok) console.warn(`[notifications] dismiss elsewhere: ${res.status}`);
     } catch (e) {
         console.warn('[notifications] dismiss elsewhere failed', e);
+    }
+}
+
+/** This phone's push token, once the wallet knows it: what names the holder's
+ *  other phones to privasys.id. Set by the push hook. */
+let ownPushToken: string | null = null;
+export function setOwnPushToken(token: string | null): void {
+    ownPushToken = token;
+}
+
+/**
+ * A request was answered in the wallet itself, approved or declined: take its
+ * notification off this phone and off the holder's others.
+ *
+ * Tapping a notification already does this. But a request is often answered
+ * without its notification ever being tapped (the wallet was open, or was
+ * opened from its icon), and its notification then stayed on every device
+ * until it expired.
+ */
+export function requestAnswered(type: string, id: string): void {
+    const field = REQUEST_ID[type];
+    if (!field || !id) return;
+    void dismissElsewhere({ type, [field]: id }, ownPushToken).catch(() => undefined);
+    // With no token yet there is nobody to tell, but this phone's copy still goes.
+    if (!ownPushToken) {
+        const key = notificationKey({ type, [field]: id });
+        if (key) void dismissHere(key).catch(() => 0);
+    }
+}
+
+/**
+ * Remove this phone's delivered notifications for requests that are no longer
+ * open, as privasys.id reports them. `open` holds the ids still pending, by
+ * notification type; a type it does not list is left alone.
+ */
+export async function dismissClosed(open: Record<string, Set<string>>): Promise<number> {
+    if (Platform.OS === 'web') return 0;
+    const Notifications = notifications();
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    let n = 0;
+    for (const p of presented) {
+        const data = p.request.content.data as Data;
+        const type = typeof data?.type === 'string' ? data.type : '';
+        const ids = open[type];
+        const field = REQUEST_ID[type];
+        const id = field ? data?.[field] : undefined;
+        if (!ids || typeof id !== 'string' || !id || ids.has(id)) continue;
+        await Notifications.dismissNotificationAsync(p.request.identifier);
+        n++;
+    }
+    return n;
+}
+
+/**
+ * The number on the app's icon: how many things are waiting on the holder.
+ * Set whenever the wallet knows the count, so the icon is right from the
+ * moment the wallet has been open; zero clears it.
+ */
+export async function setAppBadge(count: number): Promise<void> {
+    if (Platform.OS === 'web') return;
+    try {
+        const Notifications = notifications();
+        await Notifications.setBadgeCountAsync(Math.max(0, Math.min(99, Math.floor(count))));
+    } catch (e) {
+        console.warn('[notifications] badge not set', e);
     }
 }
 

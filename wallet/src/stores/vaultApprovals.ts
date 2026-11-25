@@ -42,6 +42,7 @@ import {
     listVaultApprovals,
     type VaultApprovalRequest,
 } from '@/services/vault-approval-api';
+import { requestAnswered } from '@/services/notification-dismiss';
 import { getPrivasysAccount } from '@/services/privasys-id';
 
 interface VaultApprovalsState {
@@ -97,6 +98,7 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
             pending: s.pending.filter((r) => r.vault_op !== vaultOp),
         }));
         void declineVaultApproval(vaultOp);
+        requestAnswered('vault-approval', vaultOp);
     },
 
     declineBatch: (batchId) => {
@@ -106,6 +108,7 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
             batchIds: s.batchIds.filter((b) => b !== batchId),
         }));
         void declineVaultBatch(batchId);
+        requestAnswered('vault-approval-batch', batchId);
     },
 
     rememberBatch: (batchId) => {
@@ -117,6 +120,8 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
 
     forgetBatch: (batchId) => {
         set((s) => ({ batchIds: s.batchIds.filter((b) => b !== batchId) }));
+        // Answered or gone: its notification has nothing left to ask.
+        requestAnswered('vault-approval-batch', batchId);
     },
 
     refreshBatches: async () => {
@@ -144,6 +149,9 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
             knownOps: s.knownOps.filter((o) => o !== vaultOp),
             pending: s.pending.filter((r) => r.vault_op !== vaultOp),
         }));
+        // Approved here: its notification has nothing left to ask, on this
+        // phone or on the holder's others.
+        requestAnswered('vault-approval', vaultOp);
     },
 
     clearAll: () => {

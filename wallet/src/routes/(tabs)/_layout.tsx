@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePalette } from '@/components/Themed';
 import { useSidebarLayout, useWaitingCount } from '@/components/WideFrame';
+import { setAppBadge } from '@/services/notification-dismiss';
 import { columnGutter, useLargeScreen } from '@/hooks/useLargeScreen';
 import { useAppMessagesStore } from '@/stores/app-messages';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
@@ -25,6 +26,12 @@ export default function TabLayout() {
     const large = useLargeScreen();
     const gutter = large && !wide ? columnGutter(width) : 0;
     const waiting = useWaitingCount();
+    // The number on the app's icon follows what is waiting: someone who looks
+    // at their home screen sees that the wallet expects something of them, and
+    // it goes when they have answered or the request has lapsed.
+    useEffect(() => {
+        void setAppBadge(waiting);
+    }, [waiting]);
     // Look for open access requests whenever the wallet comes to the front,
     // not only when Access is open: the badge is how the holder learns of one
     // whose push they swiped away, from whichever tab they are on.

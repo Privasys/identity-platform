@@ -214,6 +214,10 @@ export type V2Release =
  * (`update_policy_from`): v0.42.0 and every release after it. The version is
  * that of a release the vaults' own quotes were matched to, so it is not a
  * claim of whoever relays the request.
+ *
+ * vault-v0.42.0 is the first release that carries it: it builds enclave-os-mini
+ * 0b67549, which contains 1508ec0 (update_policy_from); vault-v0.41.0 builds
+ * 463f005, which does not.
  */
 export function bindsReplacedRules(version: string): boolean {
     const m = /^v(\d+)\.(\d+)\.(\d+)$/.exec(version);

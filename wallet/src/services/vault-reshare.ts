@@ -70,6 +70,7 @@ export interface VaultRelease {
  * with each (checked 2026-11-25). Newer ones are read from GitHub.
  */
 const PINNED: Record<string, VaultRelease> = {
+    'e23a75f11a7964b9cb073ad3c4e97e61232e5c1fe33c29e2dd9a76a40c0e8ed2': release('vault-v0.44.0'),
     '1f038cf275208d0146535ae268d6cbffe89ed39cb2dfd7e1c719d8f678b04f26': release('vault-v0.43.0'),
     '28b01b4b2de825bf19ed6a8622af95ecf61d3f759bf5ed0d8e6c8415acc6fa4b': release('vault-v0.42.0'),
     '434ca8138643088ffb8af3ac575e2ec76f6fcc65fbf6ef19c8435ff4d995c554': release('vault-v0.41.0'),

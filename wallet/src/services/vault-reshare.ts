@@ -67,9 +67,10 @@ export interface VaultRelease {
 
 /**
  * Releases known when this wallet was built, from the mrenclave.txt published
- * with each (checked 2026-11-24). Newer ones are read from GitHub.
+ * with each (checked 2026-11-25). Newer ones are read from GitHub.
  */
 const PINNED: Record<string, VaultRelease> = {
+    '1f038cf275208d0146535ae268d6cbffe89ed39cb2dfd7e1c719d8f678b04f26': release('vault-v0.43.0'),
     '28b01b4b2de825bf19ed6a8622af95ecf61d3f759bf5ed0d8e6c8415acc6fa4b': release('vault-v0.42.0'),
     '434ca8138643088ffb8af3ac575e2ec76f6fcc65fbf6ef19c8435ff4d995c554': release('vault-v0.41.0'),
     '47c67a77fba9ac0f2092b49588abcbefb3ec4daf36637dce6f46e7d046665902': release('vault-v0.40.0'),

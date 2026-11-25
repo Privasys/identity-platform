@@ -34,6 +34,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/protocol"
 
+	"github.com/Privasys/idp/internal/push"
 	"github.com/Privasys/idp/internal/tokens"
 	"github.com/Privasys/idp/internal/vaultbinding"
 )
@@ -592,6 +593,7 @@ func (h *Handler) VaultApprovalComplete(iss *tokens.Issuer, audience string) htt
 		h.vaultPending.remove(m.vaultOp)
 		// "approved" — this fires only after a verified assertion, so it is
 		// the success line, and reads as one next to the /begin request log.
+		push.CloseRequest(m.sub, vaultBadgeRequest(m.vaultOp))
 		log.Printf("fido2: vault-approval APPROVED by %s (%s) completed from %s — token stashed", m.sub, m.asked, vaultPeer(r))
 		writeJSON(w, map[string]interface{}{"access_token": tok, "expires_at": m.exp})
 	}
@@ -614,6 +616,19 @@ func vaultApprovalAudience(requested, def string) (string, error) {
 
 // bearerSubject verifies an `Authorization: Bearer` access token (signed by this
 // IdP) and returns its `sub`.
+// vaultBadgeRequest names a vault approval to the icon's count (push/badge.go):
+// held in memory only, never sent.
+func vaultBadgeRequest(vaultOp string) string { return "vault-approval:" + vaultOp }
+
+// vaultBadgeExpiry is when a vault approval stops counting: its own expiry,
+// or the longest a request lives when it names none.
+func vaultBadgeExpiry(exp int64) time.Time {
+	if exp > 0 {
+		return time.Unix(exp, 0)
+	}
+	return time.Now().Add(5 * time.Minute)
+}
+
 // vaultOpName is the operation as the log names it: an empty one is a promote.
 func vaultOpName(op string) string {
 	if op == "" {

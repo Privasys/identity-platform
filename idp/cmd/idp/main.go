@@ -723,6 +723,12 @@ func main() {
 		}
 	}()
 
+	// The number on the wallet's icon: what waits on its holder, sent with a
+	// request's own push and corrected when one is answered or lapses.
+	badges := push.NewBadges(db, push.For(db))
+	push.SetBadges(badges)
+	go badges.Run(context.Background(), time.Second)
+
 	// Periodic cleanup of expired refresh tokens, recovery records, and invitations.
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)

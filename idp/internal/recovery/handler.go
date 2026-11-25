@@ -742,6 +742,10 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 		// DeviceTag names this phone for this identity; with it, each phone
 		// of a holder keeps its own target and all of them are notified.
 		DeviceTag string `json:"device_tag"`
+		// Badge says whether this device wants the number of things waiting
+		// on its holder sent with its pushes. Absent means yes, and a wallet
+		// that does not know the field keeps what the device last said.
+		Badge *bool `json:"badge"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PushToken == "" {
 		http.Error(w, `{"error":"push_token is required"}`, http.StatusBadRequest)
@@ -756,6 +760,11 @@ func (h *Handler) HandleRegisterPushToken(w http.ResponseWriter, r *http.Request
 		log.Printf("[push-token] upsert failed for %s: %v", userID, err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
+	}
+	if req.Badge != nil {
+		if err := h.db.SetPushBadge(req.PushToken, *req.Badge); err != nil {
+			log.Printf("[push-token] badge setting: %v", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

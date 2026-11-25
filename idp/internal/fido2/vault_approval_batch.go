@@ -503,7 +503,7 @@ func (h *Handler) VaultApprovalBatchBegin(iss *tokens.Issuer) http.HandlerFunc {
 		}); replaced != "" {
 			h.challenges.pop(replaced)
 		}
-		pushRegistered := h.pushVaultBatch(sub, batchID, len(entries))
+		pushRegistered := h.pushVaultBatch(sub, batchID, len(entries), time.Unix(exp, 0))
 		log.Printf("fido2: vault-approval batch requested by %s (%s, binding %d, ttl %ds, push_registered=%t)",
 			sub, asked, req.BindingVersion, ttl, pushRegistered)
 		writeJSON(w, map[string]interface{}{
@@ -526,7 +526,7 @@ func vaultBatchPushBody(count int) string {
 
 // pushVaultBatch nudges the owner's wallets. Only the routing type and the
 // capability travel through the push service.
-func (h *Handler) pushVaultBatch(sub, batchID string, count int) bool {
+func (h *Handler) pushVaultBatch(sub, batchID string, count int, expires time.Time) bool {
 	pushTokens := h.db.GetPushTokens(sub)
 	for _, pushToken := range pushTokens {
 		go func(token string) {
@@ -535,6 +535,9 @@ func (h *Handler) pushVaultBatch(sub, batchID string, count int) bool {
 				Title: "Vault approval",
 				Body:  vaultBatchPushBody(count),
 				Data:  map[string]string{"type": "vault-approval-batch", "batch_id": batchID},
+				// One thing waiting, however many keys it covers.
+				Request: "vault-approval-batch:" + batchID,
+				Expires: expires,
 			}); err != nil {
 				log.Printf("fido2/vault-approval/batch: push send: %v", err)
 			}
@@ -603,6 +606,7 @@ func (h *Handler) VaultApprovalBatchComplete(iss *tokens.Issuer, audience string
 			issued = append(issued, vaultBatchToken{Operation: e.Operation, Handle: e.Handle, VaultOp: e.VaultOp, AccessToken: tok})
 		}
 		h.vaultBatches.finish(m.batchID, m.sub, issued, m.exp)
+		push.CloseRequest(m.sub, "vault-approval-batch:"+m.batchID)
 		log.Printf("fido2: vault-approval batch APPROVED by %s (%d tokens, label %q; %s) completed from %s",
 			m.sub, len(issued), logField(m.label), m.asked, vaultPeer(r))
 		writeJSON(w, map[string]interface{}{"status": "approved", "count": len(issued)})
@@ -663,6 +667,7 @@ func (h *Handler) VaultApprovalDecline() http.HandlerFunc {
 		m := entry.vaultApproval
 		h.vaultPending.remove(vaultOp)
 		h.vaultResults.decline(vaultOp, m.sub, time.Unix(m.exp, 0))
+		push.CloseRequest(m.sub, vaultBadgeRequest(vaultOp))
 		log.Printf("fido2: vault-approval DECLINED by the owner's wallet (sub %s; %s) completed from %s", m.sub, m.asked, vaultPeer(r))
 		w.WriteHeader(http.StatusNoContent)
 	}
@@ -680,6 +685,7 @@ func (h *Handler) VaultApprovalBatchDecline() http.HandlerFunc {
 			return
 		}
 		sub, asked, _ := h.vaultBatches.decline(batchID)
+		push.CloseRequest(sub, "vault-approval-batch:"+batchID)
 		log.Printf("fido2: vault-approval batch DECLINED by the owner's wallet (sub %s; %s) completed from %s", sub, asked, vaultPeer(r))
 		w.WriteHeader(http.StatusNoContent)
 	}

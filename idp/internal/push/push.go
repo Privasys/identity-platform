@@ -57,6 +57,14 @@ type Message struct {
 	// fetch something (an update from another phone of the holder): no
 	// title, no sound, normal priority, as Apple asks for background pushes.
 	Background bool
+	// Request names what this push asks of the holder, when it asks
+	// something that can be answered or lapse: the number on the wallet's
+	// icon counts it until Expires or until it is closed (badge.go). Held in
+	// memory only, never sent.
+	Request string
+	Expires time.Time
+	// Badge is the number for the device's icon, set by Notify.
+	Badge int
 }
 
 // Sender posts to Expo and inspects the answer.
@@ -122,7 +130,7 @@ func (s *Sender) Send(ctx context.Context, m Message) (string, error) {
 			"_contentAvailable": true,
 		})
 	}
-	return s.post(ctx, map[string]any{
+	msg := map[string]any{
 		"to":    m.Token,
 		"sound": "default",
 		// APNs priority 10, not the 5 Expo defaults to.
@@ -142,7 +150,11 @@ func (s *Sender) Send(ctx context.Context, m Message) (string, error) {
 		"title":    m.Title,
 		"body":     m.Body,
 		"data":     m.Data,
-	})
+	}
+	if m.Badge > 0 {
+		msg["badge"] = m.Badge
+	}
+	return s.post(ctx, msg)
 }
 
 // post sends one Expo message and returns its ticket id.
@@ -329,6 +341,12 @@ func For(db Store) *Sender {
 // not the same as delivered; that answer comes from the sweep.
 func Notify(ctx context.Context, db Store, userID string, m Message) error {
 	s := For(db)
+	if badges != nil && m.Request != "" && !m.Background {
+		badges.Open(userID, m.Request, m.Expires)
+		if badges.Takes(userID, m.Token) {
+			m.Badge = badges.CountFor(m.Token)
+		}
+	}
 	ticketID, err := s.Send(ctx, m)
 	if err != nil {
 		return err

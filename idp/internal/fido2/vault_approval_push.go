@@ -319,6 +319,8 @@ func (h *Handler) sendVaultApprovalPush(userID, pushToken, vaultOp string, summa
 			"type":     "vault-approval",
 			"vault_op": vaultOp,
 		},
+		Request: vaultBadgeRequest(vaultOp),
+		Expires: vaultBadgeExpiry(summary.Exp),
 	}); err != nil {
 		log.Printf("fido2/vault-approval: push send: %v", err)
 	}

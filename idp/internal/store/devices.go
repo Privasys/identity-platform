@@ -64,6 +64,12 @@ func migrateDevices(db *sql.DB) error {
 			return err
 		}
 	}
+	// badge_off: a device that asked for no number on its icon (push/badge.go).
+	if !hasColumn(db, "push_tokens", "badge_off") {
+		if _, err := db.Exec("ALTER TABLE push_tokens ADD COLUMN badge_off INTEGER NOT NULL DEFAULT 0"); err != nil {
+			return err
+		}
+	}
 	for _, t := range []string{"sovereign_backups", "identity_indexes"} {
 		if !hasColumn(db, t, "version") {
 			if _, err := db.Exec("ALTER TABLE " + t + " ADD COLUMN version INTEGER NOT NULL DEFAULT 1"); err != nil {
@@ -111,6 +117,52 @@ func (db *DB) GetPushTargets(userID string) []PushTarget {
 		var t PushTarget
 		if rows.Scan(&t.Token, &t.EncPub) == nil && t.Token != "" {
 			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// SetPushBadge records whether a device takes a number on its icon. The
+// choice is the device's, so it is set on every registration of its token.
+func (db *DB) SetPushBadge(pushToken string, on bool) error {
+	off := 1
+	if on {
+		off = 0
+	}
+	_, err := db.Exec("UPDATE push_tokens SET badge_off = ? WHERE push_token = ?", off, pushToken)
+	return err
+}
+
+// BadgeTokens lists a user's push tokens that take a number on their icon.
+func (db *DB) BadgeTokens(userID string) []string {
+	rows, err := db.Query("SELECT push_token FROM push_tokens WHERE user_id = ? AND badge_off = 0 AND push_token <> ''", userID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var t string
+		if rows.Scan(&t) == nil {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// PushTokenUsers lists the users a push token is registered for: the
+// identities one phone holds. Read when a count is needed and kept nowhere.
+func (db *DB) PushTokenUsers(pushToken string) []string {
+	rows, err := db.Query("SELECT DISTINCT user_id FROM push_tokens WHERE push_token = ?", pushToken)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var u string
+		if rows.Scan(&u) == nil {
+			out = append(out, u)
 		}
 	}
 	return out

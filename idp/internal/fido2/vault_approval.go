@@ -74,6 +74,10 @@ type vaultResultStore struct {
 type vaultOutcome struct {
 	declined  bool
 	expiresAt time.Time
+	// collectedBy is the subject that took the token, once it has been taken:
+	// a token is handed out once, and the one it was handed to is told so if
+	// it asks again, instead of being told to keep waiting.
+	collectedBy string
 }
 
 type vaultResultEntry struct {
@@ -143,7 +147,21 @@ func (s *vaultResultStore) take(vaultOp, sub string) (vaultResultEntry, bool) {
 		return vaultResultEntry{}, false
 	}
 	delete(s.results, vaultOp)
+	if o, known := s.outcomes[vaultOp]; known && !e.declined {
+		o.collectedBy = sub
+		s.outcomes[vaultOp] = o
+	}
 	return e, true
+}
+
+// collected reports whether sub has already taken the token for vaultOp. Only
+// the subject that took it learns this: to anyone else the request is, as
+// before, simply not theirs to see.
+func (s *vaultResultStore) collected(vaultOp, sub string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	o, ok := s.outcomes[vaultOp]
+	return ok && sub != "" && o.collectedBy == sub && !time.Now().After(o.expiresAt)
 }
 
 func (s *vaultResultStore) cleanup() {
@@ -181,6 +199,15 @@ func (h *Handler) VaultApprovalToken(iss *tokens.Issuer) http.HandlerFunc {
 		}
 		res, ok := h.vaultResults.take(vaultOp, sub)
 		if !ok {
+			// Handed out already, to this same subject: say so. "pending" here
+			// told a caller that had lost the token to wait for one that would
+			// never come.
+			if h.vaultResults.collected(vaultOp, sub) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusGone)
+				_, _ = w.Write([]byte(`{"status":"collected"}`))
+				return
+			}
 			// Not yet completed (or expired / not this owner's): tell the CLI to
 			// keep polling.
 			w.WriteHeader(http.StatusAccepted)
@@ -191,6 +218,9 @@ func (h *Handler) VaultApprovalToken(iss *tokens.Issuer) http.HandlerFunc {
 			writeDeclined(w)
 			return
 		}
+		// When a token leaves, and to whom: the approval line says it was
+		// stashed, and without this one nothing says it was ever collected.
+		log.Printf("fido2: vault-approval token COLLECTED by %s (vault_op %s) from %s", sub, logField(vaultOp), vaultPeer(r))
 		writeJSON(w, map[string]string{"access_token": res.token})
 	}
 }

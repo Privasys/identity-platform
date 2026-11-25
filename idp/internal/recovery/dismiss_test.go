@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -51,6 +52,41 @@ func captureDismiss(t *testing.T) func(n int) []push.Message {
 	}
 }
 
+// The binding key of each test phone, by its push token.
+var dismissKeys = map[string]bindKey{}
+
+// dismissBody is a dismissal signed by the phone's binding key, when it has one.
+func dismissBody(token string) string {
+	at := time.Now().Unix()
+	sig := ""
+	if k, ok := dismissKeys[token]; ok {
+		sig = k.sign(pushDismissText(token, testDismissKey, at))
+	}
+	return `{"push_token":"` + token + `","key":"` + testDismissKey + `","issued_at":` + strconv.FormatInt(at, 10) + `,"sig":"` + sig + `"}`
+}
+
+// A push token is not a secret: without the phone's signature a dismissal
+// reaches nobody, and neither does one signed for another key or long ago.
+func TestDismissNeedsThePhonesSignature(t *testing.T) {
+	mux, register := dismissMux(t)
+	register("alice-drive", tagA, "tokA")
+	register("alice-drive", tagB, "tokB")
+	wait := captureDismiss(t)
+	k := dismissKeys["tokA"]
+	now, old := time.Now().Unix(), time.Now().Add(-time.Hour).Unix()
+	for _, body := range []string{
+		`{"push_token":"tokA","key":"` + testDismissKey + `"}`,
+		`{"push_token":"tokA","key":"` + testDismissKey + `","issued_at":` + strconv.FormatInt(now, 10) + `,"sig":"` + dismissKeys["tokB"].sign(pushDismissText("tokA", testDismissKey, now)) + `"}`,
+		`{"push_token":"tokA","key":"` + testDismissKey + `","issued_at":` + strconv.FormatInt(now, 10) + `,"sig":"` + k.sign(pushDismissText("tokA", "AnotherKeyOfTheSameLen", now)) + `"}`,
+		`{"push_token":"tokA","key":"` + testDismissKey + `","issued_at":` + strconv.FormatInt(old, 10) + `,"sig":"` + k.sign(pushDismissText("tokA", testDismissKey, old)) + `"}`,
+	} {
+		if rec := call(mux, "POST", "/push/dismiss", body, ""); rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d", body, rec.Code)
+		}
+	}
+	wait(0)
+}
+
 func dismissMux(t *testing.T) (*http.ServeMux, func(user, tag, token string)) {
 	t.Helper()
 	h, db, mux := identityTestHandler(t)
@@ -63,7 +99,15 @@ func dismissMux(t *testing.T) (*http.ServeMux, func(user, tag, token string)) {
 		if strings.HasPrefix(token, "claimed") {
 			return
 		}
-		if err := db.SetPushBinding(user, token, "key-"+token, true); err != nil {
+		k, ok := dismissKeys[token]
+		if !ok {
+			k = newBindKey(t)
+			dismissKeys[token] = k
+		}
+		if err := db.BindPushToken(token, k.pub); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.SetPushBinding(user, token, k.pub, true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -77,8 +121,8 @@ func TestDismissIgnoresUnboundRegistrations(t *testing.T) {
 	register("alice-drive", tagB, "claimedB")
 	wait := captureDismiss(t)
 
-	call(mux, "POST", "/push/dismiss", `{"push_token":"tokA","key":"`+testDismissKey+`"}`, "")
-	call(mux, "POST", "/push/dismiss", `{"push_token":"claimedB","key":"`+testDismissKey+`"}`, "")
+	call(mux, "POST", "/push/dismiss", dismissBody("tokA"), "")
+	call(mux, "POST", "/push/dismiss", dismissBody("claimedB"), "")
 	wait(0)
 }
 
@@ -89,7 +133,7 @@ func TestDismissReachesTheHoldersOtherPhonesOnly(t *testing.T) {
 	register("bob", tagB, "tokBob")
 	wait := captureDismiss(t)
 
-	rec := call(mux, "POST", "/push/dismiss", `{"push_token":"tokA","key":"`+testDismissKey+`"}`, "")
+	rec := call(mux, "POST", "/push/dismiss", dismissBody("tokA"), "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
 	}
@@ -109,7 +153,7 @@ func TestDismissReachesEachPhoneOnceAcrossIdentities(t *testing.T) {
 	register("alice-ai", tagB, "tokB")
 	wait := captureDismiss(t)
 
-	call(mux, "POST", "/push/dismiss", `{"push_token":"tokA","key":"`+testDismissKey+`"}`, "")
+	call(mux, "POST", "/push/dismiss", dismissBody("tokA"), "")
 	var tokens []string
 	for _, m := range wait(1) {
 		tokens = append(tokens, m.Token)
@@ -125,7 +169,7 @@ func TestDismissFromAnUnknownTokenSendsNothingAndSaysTheSame(t *testing.T) {
 	register("alice-drive", tagA, "tokA")
 	wait := captureDismiss(t)
 
-	rec := call(mux, "POST", "/push/dismiss", `{"push_token":"nobody","key":"`+testDismissKey+`"}`, "")
+	rec := call(mux, "POST", "/push/dismiss", dismissBody("nobody"), "")
 	if rec.Code != http.StatusOK || rec.Body.String() != `{"status":"ok"}`+"\n" && rec.Body.String() != `{"status":"ok"}` {
 		t.Fatalf("unknown token: %d %q", rec.Code, rec.Body)
 	}

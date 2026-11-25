@@ -211,7 +211,7 @@ func (s *Store) appKey(w http.ResponseWriter, r *http.Request, issuer *tokens.Is
 		httpErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	token, err := issuer.IssueAccessTokenWithTTL(subject, aud, sid, nil, map[string]string{"azp": WalletToolClientID}, AppKeyTTL)
+	token, err := issuer.IssueAccessTokenWithTTL(subject, aud, sid, nil, map[string]string{"azp": WalletToolClientID, tokens.ClaimActor: WalletToolClientID}, AppKeyTTL)
 	if err != nil {
 		_ = s.Revoke(sid)
 		httpErr(w, http.StatusInternalServerError, err.Error())

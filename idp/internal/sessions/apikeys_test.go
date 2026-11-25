@@ -161,6 +161,9 @@ func TestAppKey(t *testing.T) {
 	if claims["azp"] != WalletToolClientID || claims["sid"] != out.SID {
 		t.Fatalf("azp, sid = %v, %v", claims["azp"], claims["sid"])
 	}
+	if act, _ := claims[tokens.ClaimActor].(map[string]any); act["client_id"] != WalletToolClientID {
+		t.Fatalf("act = %v", claims[tokens.ClaimActor])
+	}
 	for _, c := range []string{"roles", "privasys_account"} {
 		if _, has := claims[c]; has {
 			t.Fatalf("an app key carries %s: %v", c, claims[c])

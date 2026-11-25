@@ -22,7 +22,12 @@ jest.mock('../services/platform-token', () => ({
     }),
 }));
 
-import { approvalNeeded, obtainApproval, refusalFor } from '../services/drive-key-approval';
+let mockExpiresAt: number | null = null;
+jest.mock('../services/vault-approval-api', () => ({
+    fetchVaultApproval: jest.fn(async () => (mockExpiresAt === null ? null : { expires_at: mockExpiresAt })),
+}));
+
+import { approvalNeeded, obtainApproval, refusalFor, requestBody } from '../services/drive-key-approval';
 
 const APP = '02104572ca2f41e8ae2d24c0294e6f5e';
 const HANDLE = `apps.privasys.org/${APP}/data/c5144d4b012d351cc3538d2fcda87f88/mek/v15`;
@@ -41,6 +46,7 @@ beforeEach(() => {
     mockRemember.mockClear();
     mockCalls.length = 0;
     mockAnswers = [];
+    mockExpiresAt = null;
     (global as any).fetch = jest.fn(async (url: string, init: any) => {
         mockCalls.push({ url, init, interactive: false });
         const a = mockAnswers.shift() ?? { status: 500 };
@@ -90,7 +96,8 @@ describe('an approval the wallet will ask for', () => {
     });
 
     it('is addressed to the platform the Drive belongs to', () => {
-        expect(refusalFor(approval({ audience: 'privasys-platform' }), APP, 'privasys-platform-test')).toMatch(/another platform/);
+        expect(refusalFor(approval({ audience: 'privasys-platform' }), APP, 'privasys-platform-test')).toMatch(/not addressed to this platform/);
+        expect(refusalFor(approval({ audience: undefined }), APP, 'privasys-platform-test')).toMatch(/not addressed to this platform/);
     });
 });
 
@@ -106,7 +113,9 @@ describe('asking privasys.id', () => {
 
         expect(mockCalls[0].url).toMatch(/\/fido2\/vault-approval\/begin$/);
         expect(mockCalls[0].init.method).toBe('POST');
-        expect(JSON.parse(mockCalls[0].init.body!)).toEqual(a);
+        // What an approval of this kind has, and not how long Drive wanted it to live.
+        const { ttl_seconds: _ttl, ...kept } = a;
+        expect(JSON.parse(mockCalls[0].init.body!)).toEqual(kept);
         expect(mockCalls[0].init.headers.Authorization).toBe('Bearer wallet-platform-key');
         expect(mockCalls[0].interactive).toBe(true);
         expect(mockCalls[0].target).toBe('https://api.developer.test.privasys.org');
@@ -127,10 +136,48 @@ describe('asking privasys.id', () => {
         await expect(obtainApproval(approval(), 'x', noWait)).rejects.toThrow(/declined or has lapsed/);
     });
 
-    it('does not wait past the life of the approval', async () => {
+    it('waits as long as privasys.id says the request lives, whatever Drive said', async () => {
         mockAnswers = [{ status: 200, body: { vault_op: 'op-3' } }, ...Array.from({ length: 10 }, () => ({ status: 202 }))];
-        await expect(obtainApproval(approval({ ttl_seconds: 6 }), 'x', noWait)).rejects.toThrow(/not given in time/);
+        mockExpiresAt = Math.floor(Date.now() / 1000) + 6;
+        await expect(obtainApproval(approval({ ttl_seconds: 86400 }), 'x', noWait)).rejects.toThrow(/not given in time/);
         // One request to open it, then three looks two seconds apart.
         expect(mockCalls).toHaveLength(4);
+    });
+});
+
+describe('what is sent to privasys.id', () => {
+    it('is only what an approval of this kind has', () => {
+        const body = requestBody(
+            approval({
+                target: 't',
+                policy_version: 3,
+                members: ['a', 'b'],
+                member_identities: ['x', 'y'],
+                issuer_index: 0,
+                current_policy: '{"a":1}',
+                context: { app_name: 'Privasys Drive', summary: 's'.repeat(500), key_type: 'data', extra: 'no', app_id: 7 },
+                // None of these is a field of a rules change.
+                ttl_seconds: 86400,
+                delete_after: 'apps.privasys.org/x/y',
+                batch: [{ handle: 'other' }],
+                cosign: true,
+                redirect: 'https://elsewhere.example',
+            }),
+        );
+        expect(Object.keys(body).sort()).toEqual(
+            ['audience', 'binding_version', 'context', 'current_policy', 'handle', 'issuer_index', 'member_identities', 'members', 'new_policy', 'operation', 'policy_version', 'target'].sort(),
+        );
+        expect(body.context).toEqual({ app_name: 'Privasys Drive', summary: 's'.repeat(200), key_type: 'data' });
+    });
+
+    it('names no build for a v1 rules change', () => {
+        const body = requestBody(approval({ operation: 'policy-update', binding_version: undefined, measurement_digest: 'abc' }));
+        expect(body.measurement_digest).toBe('');
+    });
+
+    it('is nothing at all when a field is not what it should be', () => {
+        expect(() => requestBody(approval({ members: 'a,b' }))).toThrow(/not well formed \(members\)/);
+        expect(() => requestBody(approval({ policy_version: '3' }))).toThrow(/not well formed/);
+        expect(() => requestBody(approval({ new_policy: { rules: [] } }))).toThrow(/not well formed/);
     });
 });

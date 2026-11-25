@@ -16,12 +16,15 @@
  * What Drive describes is checked before it is asked for. A Drive speaks only
  * for the holder's key at that Drive: a request naming any other key, another
  * kind of operation, or another platform is refused here and never becomes a
- * card. What the card then shows is read back from privasys.id and checked by
- * the approvals screen, as for every vault approval.
+ * card. What is sent to privasys.id is rebuilt from the fields an approval of
+ * this kind has: nothing else Drive wrote travels, and how long the approval
+ * lives is privasys.id's to set. What the card then shows is read back from
+ * privasys.id and checked by the approvals screen, as for every vault approval.
  */
 
 import { callWithPlatformToken } from './platform-token';
 import { audienceFor } from './platforms';
+import { fetchVaultApproval } from './vault-approval-api';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
@@ -34,14 +37,67 @@ const POLL_MS = 2000;
  *  the holder's own key there. Never a deletion, an export or a new key. */
 const OPERATIONS = new Set(['policy-update', 'update_policy', 'update_policy_from']);
 
-/** What Drive answers when the owner's approval is needed, passed on to
- *  privasys.id as it stands. */
+/** What Drive answers when the owner's approval is needed. Only the fields
+ *  requestBody keeps are ever sent on. */
 export interface DriveKeyApproval {
     operation: string;
     handle: string;
     audience?: string;
-    ttl_seconds?: number;
     [field: string]: unknown;
+}
+
+/** The fields of an approval that are passed on, with the type each must have. */
+const FIELDS: Record<string, 'string' | 'number' | 'strings'> = {
+    operation: 'string',
+    handle: 'string',
+    audience: 'string',
+    binding_version: 'number',
+    target: 'string',
+    policy_version: 'number',
+    members: 'strings',
+    member_identities: 'strings',
+    issuer_index: 'number',
+    new_policy: 'string',
+    current_policy: 'string',
+    measurement_digest: 'string',
+};
+
+/** What the card may be told about the request, as short text. */
+const CONTEXT = ['app_name', 'app_id', 'key_type', 'summary'];
+const CONTEXT_MAX = 200;
+
+/**
+ * What is sent to privasys.id: the fields above, each of its own type, and a
+ * short context. Anything else Drive wrote is left behind, how long the
+ * approval lives among it. A field of the wrong type is a request the wallet
+ * does not understand, and nothing is sent.
+ */
+export function requestBody(approval: DriveKeyApproval): Record<string, unknown> {
+    const body: Record<string, unknown> = {};
+    for (const [name, type] of Object.entries(FIELDS)) {
+        const v = approval[name];
+        if (v === undefined || v === null) continue;
+        const ok =
+            type === 'strings'
+                ? Array.isArray(v) && v.every((x) => typeof x === 'string')
+                : type === 'number'
+                  ? typeof v === 'number' && Number.isInteger(v) && v >= 0
+                  : typeof v === 'string';
+        if (!ok) throw new Error(`the approval Drive described is not well formed (${name})`);
+        body[name] = v;
+    }
+    // A v1 rules change names no build: the vault is asked for none.
+    if (body.operation === 'policy-update') body.measurement_digest = '';
+    const given = approval.context;
+    if (given && typeof given === 'object' && !Array.isArray(given)) {
+        const context: Record<string, string> = {};
+        for (const name of CONTEXT) {
+            const v = (given as Record<string, unknown>)[name];
+            if (typeof v === 'string' && v) context[name] = v.slice(0, CONTEXT_MAX);
+        }
+        if (Object.keys(context).length) body.context = context;
+    }
+    return body;
 }
 
 /** The approval Drive asks for, from a refused re-arm, or null when the
@@ -75,7 +131,8 @@ export function refusalFor(approval: DriveKeyApproval, appId: string, audience: 
     // A holder's key at a Drive: <domain>/<the Drive's app id>/data/<tenant>/mek/v<n>.
     const m = /^[a-z0-9.-]+\/([0-9a-f]{32})\/data\/[0-9a-f]+\/mek\/v\d+$/.exec(approval.handle);
     if (!m || m[1] !== app) return 'it names a key that is not your key at this Drive';
-    if (approval.audience !== undefined && approval.audience !== audience) return 'it is addressed to another platform';
+    // Always named: an approval that says no platform is not assumed to be this one.
+    if (approval.audience !== audience) return 'it is not addressed to this platform';
     return null;
 }
 
@@ -100,7 +157,7 @@ export async function obtainApproval(
             fetch(`${IDP_BASE}/fido2/vault-approval/begin`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify(approval),
+                body: JSON.stringify(requestBody(approval)),
             }),
         { interactive: true, target },
     );
@@ -115,7 +172,16 @@ export async function obtainApproval(
     // it like any other. This phone is the one asking, so it needs no push.
     useVaultApprovalsStore.getState().remember(vaultOp);
 
-    const seconds = Math.min(MAX_WAIT_SECONDS, typeof approval.ttl_seconds === 'number' && approval.ttl_seconds > 0 ? approval.ttl_seconds : MAX_WAIT_SECONDS);
+    // How long to wait is what privasys.id says the request lives, never what
+    // Drive said; unknown, it is the longest a request lives.
+    let seconds = MAX_WAIT_SECONDS;
+    try {
+        const opened = await fetchVaultApproval(vaultOp);
+        const left = opened ? opened.expires_at - Math.floor(Date.now() / 1000) : 0;
+        if (left > 0) seconds = Math.min(MAX_WAIT_SECONDS, left);
+    } catch {
+        /* the longest wait stands */
+    }
     const tries = Math.ceil((seconds * 1000) / POLL_MS);
     for (let i = 0; i < tries; i++) {
         await wait(POLL_MS);

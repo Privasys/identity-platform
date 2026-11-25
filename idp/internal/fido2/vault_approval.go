@@ -238,6 +238,11 @@ func computeVaultApprovalBinding(handle, measurementHex string, policyVersion ui
 	return sha256.Sum256([]byte(input))
 }
 
+// vaultPolicyUpdateSlot is what a v1 "policy-update" approval binds in the
+// measurement slot: its own name, so that it cannot stand for an export (the
+// empty slot) or a promote (a digest).
+const vaultPolicyUpdateSlot = "policy-update"
+
 // VaultApprovalBegin handles POST /fido2/vault-approval/begin.
 //
 // Auth: Authorization: Bearer <owner access token>. Body:
@@ -367,11 +372,16 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				// A key-policy update (vault UpdatePolicy — e.g. arming the
 				// acceptable-TCB set, retiring a measurement under step-up). The
 				// vault's UpdatePolicy step-up condition is amr-only (non-bound),
-				// so like export this binds the empty measurement slot; the value
-				// of this operation type is the HONEST approval card — before it
-				// existed, policy updates had to ride an "export"-labelled
-				// ceremony (2026-08-17).
-				req.MeasurementDigest = ""
+				// so the vault reads no binding from this token.
+				//
+				// The slot is NOT left empty. An empty slot is what "export"
+				// binds, so a token issued for a rules change would also be a
+				// valid export approval for the same key at the same policy
+				// version: a card that says "rules" yielding a token that can
+				// export. The slot carries the operation's own name instead,
+				// which no other operation binds (promote binds a 64-hex digest,
+				// export the empty string), so the token fits nothing else.
+				req.MeasurementDigest = vaultPolicyUpdateSlot
 			case "reshare":
 				// Resharing a threshold key: its old vaults deal their shares to
 				// new ones (a renewal, or a move to another constellation). The

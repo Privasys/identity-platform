@@ -145,6 +145,38 @@ describe('the same rules written two ways', () => {
         expect(d.other).toBe(true);
     });
 
+    it('never read a strict patch-level check and no check at all as one', () => {
+        // null or absent: no check. An empty list: the strictest there is.
+        const none = clone(stored);
+        none.principals.tees[0].Tee.acceptable_tcb_statuses = null;
+        const absent = clone(stored);
+        delete absent.principals.tees[0].Tee.acceptable_tcb_statuses;
+        const strict = clone(stored);
+        strict.principals.tees[0].Tee.acceptable_tcb_statuses = [];
+        expect(policyDiff(none, strict).other).toBe(true);
+        expect(policyDiff(strict, none).other).toBe(true);
+        expect(policyDiff(strict, absent).other).toBe(true);
+        // null and absent are the same thing said two ways.
+        expect(policyDiff(none, absent)).toEqual({ changes: [], other: false });
+    });
+
+    it('keep an empty value that is not on the list as it was sent', () => {
+        const a = clone(stored);
+        a.lifecycle.extra = [];
+        expect(policyDiff(stored, a).other).toBe(true);
+        expect(normalise({ requires: [], other: [], n: null, pinned_spki_sha256_hex: null })).toEqual({ other: [], n: null });
+    });
+
+    it('take two builds for two when only their labels agree', () => {
+        // Same first eight characters of the code digest, same machine image.
+        const next = clone(stored);
+        const oid = next.principals.tees[0].Tee.required_oids[0];
+        oid.value = oid.value.slice(0, 8) + 'f'.repeat(oid.value.length - 8);
+        expect(policyFacts(next).builds[0]).toBe(policyFacts(stored).builds[0]);
+        const d = policyDiff(stored, next);
+        expect(d.changes).toEqual([{ kind: 'builds', added: [policyFacts(next).builds[0]], removed: [policyFacts(stored).builds[0]] }]);
+    });
+
     it('still see a default that is given a value', () => {
         const next = clone(stored);
         next.principals.tees[0].Tee.attestation_servers[0].pinned_spki_sha256_hex = 'ab'.repeat(32);

@@ -41,6 +41,28 @@ func TestPlatformsListTheDefaultThenEachWithDomains(t *testing.T) {
 	}
 }
 
+func TestPlatformOfHostMatchesAtADotAndTheLongestDomainWins(t *testing.T) {
+	defer SetPlatformAudiences(nil)
+	defer SetPlatformDomains(nil)
+	SetPlatformAudiences([]string{"aud-b", "aud-c"})
+	SetPlatformDomains([]string{"aud-b=b.example.org", "aud-c=deep.b.example.org", "aud-c=c.example.net"})
+	for host, want := range map[string]string{
+		"b.example.org":          "aud-b",
+		"App.B.Example.org.":     "aud-b",
+		"x.deep.b.example.org":   "aud-c",
+		"deep.b.example.org":     "aud-c",
+		"c.example.net":          "aud-c",
+		"notb.example.org":       PlatformAudience, // no dot boundary
+		"b.example.org.evil.com": PlatformAudience,
+		"example.org":            PlatformAudience,
+		"":                       PlatformAudience,
+	} {
+		if got := PlatformOfHost(host); got != want {
+			t.Errorf("PlatformOfHost(%q) = %q, want %q", host, got, want)
+		}
+	}
+}
+
 func TestPlatformsWithNothingSetIsTheDefaultOnly(t *testing.T) {
 	SetPlatformDomains(nil)
 	if got := Platforms(); len(got) != 1 || got[0].Audience != PlatformAudience || got[0].Domains != nil {

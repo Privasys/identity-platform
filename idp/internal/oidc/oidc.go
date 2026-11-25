@@ -807,6 +807,20 @@ func HandleAuthorize(reg *clients.Registry, sessionStore *SessionStore, issuerUR
 			return
 		}
 
+		// The platform the page belongs to decides which platform's token it
+		// may get, so a page on one platform is never given a token another
+		// platform accepts.
+		pageOrigin := signInOrigin(r, issuerURL)
+		if redirectURI != "" {
+			pageOrigin = redirectURI
+		}
+		var platformErr error
+		scope, platformErr = scopeForPlatform(scope, pageOrigin)
+		if platformErr != nil {
+			errorResponse(w, http.StatusBadRequest, "invalid_scope", platformErr.Error())
+			return
+		}
+
 		// PKCE is required.
 		if codeChallenge == "" {
 			errorResponse(w, http.StatusBadRequest, "invalid_request",
@@ -1534,6 +1548,13 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 				return
 			}
 		}
+		// The scope check above lets any audience through; a platform's
+		// audience is only the platform's the grant was made for.
+		if !refreshStaysOnPlatform(scope, requested) {
+			errorResponse(w, http.StatusBadRequest, "invalid_scope",
+				"the requested audience is not the platform this sign-in was made for")
+			return
+		}
 		effectiveScope = requested
 	}
 
@@ -1814,6 +1835,49 @@ func ownClientAudience(requested, clientID string, appIDs []string) string {
 		}
 	}
 	return clientID
+}
+
+// platformOfOrigin names the platform of the page at origin (any URL; its host
+// is what counts), the default for anything without a host.
+func platformOfOrigin(origin string) string {
+	u, err := url.Parse(strings.TrimSpace(origin))
+	if err != nil {
+		return tokens.PlatformAudience
+	}
+	return tokens.PlatformOfHost(u.Hostname())
+}
+
+// scopeForPlatform fits a sign-in's scope to the platform of the page running
+// it. With no audience named, a page outside the default platform gets its
+// own platform's audience, never the default. A platform audience other than
+// the page's own is refused. Any other audience (an app's, a resource's) is
+// the page's to ask for, as before.
+func scopeForPlatform(scope, pageOrigin string) (string, error) {
+	platform := platformOfOrigin(pageOrigin)
+	asked := audienceFromScope(scope, "")
+	switch {
+	case asked == "":
+		if platform != tokens.PlatformAudience {
+			return strings.TrimSpace("audience:" + platform + " " + scope), nil
+		}
+	case tokens.IsPlatformAudience(asked) && asked != platform:
+		return "", fmt.Errorf("audience %s is not for a page on this platform", asked)
+	}
+	return scope, nil
+}
+
+// refreshStaysOnPlatform says whether a refresh asking for scope `asked` keeps
+// to the platform the grant was made for. The grant's platform is its platform
+// audience, or the default when it named none. A grant made for another
+// audience (an app's, a resource's) mints no platform token by refresh: the
+// page that holds it signed in for that audience, not for a platform.
+func refreshStaysOnPlatform(granted, asked string) bool {
+	want := audienceFromScope(asked, "")
+	if want == "" || !tokens.IsPlatformAudience(want) {
+		return true
+	}
+	had := audienceFromScope(granted, tokens.PlatformAudience)
+	return had == want
 }
 
 // audienceFromScope extracts the explicit `audience:<X>` token from an OIDC

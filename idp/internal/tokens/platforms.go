@@ -66,6 +66,25 @@ func Platforms() []Platform {
 	return out
 }
 
+// PlatformOfHost names the platform a host belongs to: the platform listing
+// the host itself or the longest domain the host ends in at a dot, else the
+// default. The wallet matches the same way on the list HandlePlatforms serves.
+func PlatformOfHost(host string) string {
+	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	best, bestLen := PlatformAudience, 0
+	if host == "" {
+		return best
+	}
+	for _, p := range Platforms() {
+		for _, d := range p.Domains {
+			if (host == d || strings.HasSuffix(host, "."+d)) && len(d) > bestLen {
+				best, bestLen = p.Audience, len(d)
+			}
+		}
+	}
+	return best
+}
+
 // HandlePlatforms serves the platforms, so a wallet can ask for a key for
 // the platform a host belongs to without knowing any platform by name. It is
 // public: it says nothing about any holder.

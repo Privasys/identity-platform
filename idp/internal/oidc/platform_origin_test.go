@@ -1,0 +1,80 @@
+// Copyright (c) Privasys. All rights reserved.
+// SPDX-License-Identifier: AGPL-3.0-only
+
+package oidc
+
+import (
+	"testing"
+
+	"github.com/Privasys/idp/internal/tokens"
+)
+
+func withTestPlatform(t *testing.T) {
+	t.Helper()
+	tokens.SetPlatformAudiences([]string{"aud-test"})
+	tokens.SetPlatformDomains([]string{"aud-test=test.example.org"})
+	t.Cleanup(func() {
+		tokens.SetPlatformDomains(nil)
+		tokens.SetPlatformAudiences(nil)
+	})
+}
+
+func TestASignInGetsThePlatformOfItsPage(t *testing.T) {
+	withTestPlatform(t)
+	cases := []struct {
+		scope, origin, want string
+		refused             bool
+	}{
+		// No audience named: the page's platform decides.
+		{"openid offline_access", "https://app.test.example.org", "audience:aud-test openid offline_access", false},
+		{"openid offline_access", "https://test.example.org/cb?x=1", "audience:aud-test openid offline_access", false},
+		{"openid", "https://www.example.org", "openid", false},
+		{"openid", "", "openid", false},
+		// The page's own platform, named.
+		{"audience:aud-test openid", "https://app.test.example.org", "audience:aud-test openid", false},
+		{"audience:" + tokens.PlatformAudience + " openid", "https://www.example.org", "audience:" + tokens.PlatformAudience + " openid", false},
+		// Another platform's audience: refused, both ways.
+		{"audience:" + tokens.PlatformAudience + " openid", "https://app.test.example.org", "", true},
+		{"audience:aud-test openid", "https://www.example.org", "", true},
+		// An app's or a resource's audience is the page's to ask for.
+		{"audience:app:0123 openid", "https://app.test.example.org", "audience:app:0123 openid", false},
+		{"audience:attestation-server openid", "https://www.example.org", "audience:attestation-server openid", false},
+		// No dot boundary: not the test platform.
+		{"openid", "https://nottest.example.org", "openid", false},
+	}
+	for _, c := range cases {
+		got, err := scopeForPlatform(c.scope, c.origin)
+		if c.refused {
+			if err == nil {
+				t.Errorf("scopeForPlatform(%q, %q) = %q, want refused", c.scope, c.origin, got)
+			}
+			continue
+		}
+		if err != nil || got != c.want {
+			t.Errorf("scopeForPlatform(%q, %q) = %q, %v; want %q", c.scope, c.origin, got, err, c.want)
+		}
+	}
+}
+
+func TestARefreshNeverCrossesToAnotherPlatform(t *testing.T) {
+	withTestPlatform(t)
+	def := tokens.PlatformAudience
+	cases := []struct {
+		granted, asked string
+		ok             bool
+	}{
+		{"openid offline_access", "audience:attestation-server openid", true},
+		{"openid offline_access", "audience:" + def + " openid", true},
+		{"openid offline_access", "audience:aud-test openid", false},
+		{"audience:aud-test openid offline_access", "audience:aud-test openid", true},
+		{"audience:aud-test openid offline_access", "audience:" + def + " openid", false},
+		{"audience:aud-test openid offline_access", "audience:app:0123 openid", true},
+		{"audience:app:0123 openid offline_access", "audience:" + def + " openid", false},
+		{"audience:app:0123 openid offline_access", "openid", true},
+	}
+	for _, c := range cases {
+		if got := refreshStaysOnPlatform(c.granted, c.asked); got != c.ok {
+			t.Errorf("refreshStaysOnPlatform(%q, %q) = %t, want %t", c.granted, c.asked, got, c.ok)
+		}
+	}
+}

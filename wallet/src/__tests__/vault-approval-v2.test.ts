@@ -17,7 +17,7 @@ jest.mock('@/utils/storage', () => {
 
 import { createHash } from 'crypto';
 
-import { checkV2, checkV2Release, isV2, type V2Summary } from '@/services/vault-approval-v2';
+import { bindsReplacedRules, checkV2, checkV2Release, isV2, type V2Summary } from '@/services/vault-approval-v2';
 import { bindingVaultOp } from '@/services/vault-binding';
 import { policyDigest, type VaultIdentity } from '@/services/vault-identity';
 import { forgetPublishedReleases } from '@/services/vault-reshare';
@@ -158,6 +158,22 @@ describe('the vaults\' release', () => {
         const { vaultOp, summary } = approval();
         const got = await checkV2Release(checkV2(vaultOp, summary, NOW)!);
         expect(got).toEqual({ kind: 'ok', release: expect.objectContaining({ version: 'v0.39.0' }) });
+    });
+
+    it('refuses a rule change without the rules it replaces, where the vaults can bind them', async () => {
+        const build = '28b01b4b2de825bf19ed6a8622af95ecf61d3f759bf5ed0d8e6c8415acc6fa4b'; // vault-v0.42.0
+        const on = (op: 'update_policy' | 'update_policy_from' | 'promote', b: string) =>
+            checkV2Release({ op, members: [], builds: [b], billingIds: [], exp: NOW });
+        expect((await on('update_policy', build)).kind).toBe('mismatch');
+        expect((await on('update_policy_from', build)).kind).toBe('ok');
+        expect((await on('promote', build)).kind).toBe('ok');
+        // A release from before the vaults could bind them keeps the plain form.
+        expect((await on('update_policy', PUBLISHED)).kind).toBe('ok');
+    });
+
+    it('knows which releases bind the rules being replaced', () => {
+        expect(['v0.39.0', 'v0.41.0', 'v0.41.9', 'main', ''].map(bindsReplacedRules)).toEqual([false, false, false, false, false]);
+        expect(['v0.42.0', 'v0.42.1', 'v0.100.0', 'v1.0.0'].map(bindsReplacedRules)).toEqual([true, true, true, true]);
     });
 
     it('is not, when the vaults differ or GitHub cannot say', async () => {

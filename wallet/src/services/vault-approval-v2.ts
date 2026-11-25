@@ -205,7 +205,22 @@ export type V2Release =
     /** The vaults do not all claim one build, or it is no published release. */
     | { kind: 'unpublished'; build: string }
     /** GitHub could not be reached. */
-    | { kind: 'unreachable' };
+    | { kind: 'unreachable' }
+    /** A rule change that leaves out the rules it replaces, on vaults that can bind them. */
+    | { kind: 'mismatch' };
+
+/**
+ * Whether a release binds a rule change to the rules it replaces
+ * (`update_policy_from`): v0.42.0 and every release after it. The version is
+ * that of a release the vaults' own quotes were matched to, so it is not a
+ * claim of whoever relays the request.
+ */
+export function bindsReplacedRules(version: string): boolean {
+    const m = /^v(\d+)\.(\d+)\.(\d+)$/.exec(version);
+    if (!m) return false;
+    const [major, minor] = [Number(m[1]), Number(m[2])];
+    return major > 0 || minor >= 42;
+}
 
 /**
  * Name the vaults' build as a published Enclave Vault release. `hint` is a
@@ -216,7 +231,11 @@ export async function checkV2Release(checked: CheckedV2, hint?: string): Promise
     if (checked.builds.length !== 1) return { kind: 'unpublished', build: checked.builds.join(', ') };
     try {
         const release = await vaultReleaseFor(checked.builds[0], hint);
-        return release ? { kind: 'ok', release } : { kind: 'unpublished', build: checked.builds[0] };
+        if (!release) return { kind: 'unpublished', build: checked.builds[0] };
+        // On vaults that can bind the rules being replaced, a rule change that
+        // leaves them out is not signed: the card could not show what changes.
+        if (checked.op === 'update_policy' && bindsReplacedRules(release.version)) return { kind: 'mismatch' };
+        return { kind: 'ok', release };
     } catch {
         return { kind: 'unreachable' };
     }

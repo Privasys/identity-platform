@@ -1323,6 +1323,7 @@ func issueTokensForCode(w http.ResponseWriter, ac *AuthCode,
 				filteredAttrs = map[string]string{}
 			}
 			filteredAttrs["azp"] = ac.ClientID
+			filteredAttrs[tokens.ClaimActor] = ac.ClientID
 		} else {
 			audience = ownClientAudience(audience, ac.ClientID, reg.AppIDsOf(ac.ClientID))
 		}
@@ -1596,6 +1597,7 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request,
 				filteredRefreshAttrs = map[string]string{}
 			}
 			filteredRefreshAttrs["azp"] = clientID
+			filteredRefreshAttrs[tokens.ClaimActor] = clientID
 		} else {
 			audience = ownClientAudience(audience, clientID, reg.AppIDsOf(clientID))
 		}
@@ -1922,7 +1924,13 @@ func toolAppSubject(reg *clients.Registry, issuer *tokens.Issuer, clientID, user
 	if !isApp || clients.NormaliseAppID(id) == "" || id != clients.NormaliseAppID(id) || !reg.AnyAppAudience(clientID) {
 		return "", "", false
 	}
-	sector, holder := reg.AppSubjectSector(id, clientID)
+	sector, holder, err := reg.AppSubjectSector(id, clientID)
+	if err != nil {
+		// No single subject at that app: no token for it. The client gets
+		// its own token, as for any audience it may not have.
+		log.Printf("token: tool client %s, app %s: %v", clientID, id, err)
+		return "", "", false
+	}
 	return issuer.SubjectFor(userID, sector), holder, true
 }
 

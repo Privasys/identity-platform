@@ -69,13 +69,14 @@ type Store struct {
 	passkeysOf func(userID string) ([][]byte, error)
 	// toolApp names, for a tool client and an attested app, the subject
 	// sector the person has at that app and the client a relationship row
-	// for it belongs to; ok=false when the client is no tool client.
-	toolApp func(clientID, appID string) (sector, holderClient string, ok bool)
+	// for it belongs to; ok=false when the client is no tool client, and an
+	// error when the app has no one subject (claimed by several clients).
+	toolApp func(clientID, appID string) (sector, holderClient string, ok bool, err error)
 }
 
 // SetToolAppResolver wires the client registry's tool-client lookup
 // (clients.Registry.AppSubjectSector, for clients with AnyAppAudience).
-func (s *Store) SetToolAppResolver(f func(clientID, appID string) (string, string, bool)) {
+func (s *Store) SetToolAppResolver(f func(clientID, appID string) (string, string, bool, error)) {
 	s.toolApp = f
 }
 

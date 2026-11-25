@@ -356,11 +356,23 @@ func TestToolClientsAndTheSubjectTheyUseAtAnApp(t *testing.T) {
 	}
 	_ = reg.SetSector("tool", "tool")
 
-	if sector, holder := reg.AppSubjectSector(app, "tool"); sector != "site" || holder != "site" {
-		t.Fatalf("a claimed app: sector %q holder %q", sector, holder)
+	if sector, holder, err := reg.AppSubjectSector(app, "tool"); err != nil || sector != "site" || holder != "site" {
+		t.Fatalf("a claimed app: sector %q holder %q err %v", sector, holder, err)
 	}
 	const other = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	if sector, holder := reg.AppSubjectSector(other, "tool"); sector != "tool-app\x00tool\x00"+other || holder != "tool" {
-		t.Fatalf("an unclaimed app: sector %q holder %q", sector, holder)
+	if sector, holder, err := reg.AppSubjectSector(other, "tool"); err != nil || sector != "tool-app\x00tool\x00"+other || holder != "tool" {
+		t.Fatalf("an unclaimed app: sector %q holder %q err %v", sector, holder, err)
+	}
+	// An app two clients claim has no single subject: refused, never picked.
+	if err := reg.SetAppIDs("legacy", []string{app}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if sector, holder, err := reg.AppSubjectSector(app, "tool"); err == nil {
+			t.Fatalf("an app claimed twice gave sector %q holder %q", sector, holder)
+		}
+	}
+	if _, _, err := reg.AppSubjectSector("not-an-app", "tool"); err == nil {
+		t.Fatal("a malformed app id was given a subject")
 	}
 }

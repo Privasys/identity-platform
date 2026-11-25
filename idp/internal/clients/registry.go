@@ -372,12 +372,49 @@ func (reg *Registry) SetAnyAppAudience(clientID string, on bool) error {
 //
 // The tool is never the sector, so an app cannot link a person by the tool
 // they came through; the token's azp says which tool it was.
-func (reg *Registry) AppSubjectSector(appID, toolClientID string) (sector, holderClient string) {
+//
+// An app claimed by more than one client is refused: which subject the app
+// sees must never depend on the order the registry answers in.
+func (reg *Registry) AppSubjectSector(appID, toolClientID string) (sector, holderClient string, err error) {
 	id := NormaliseAppID(appID)
-	if owner := reg.ClientOfApp(id); owner != "" {
-		return reg.SectorOf(owner), owner
+	if id == "" {
+		return "", "", fmt.Errorf("app id %q is not 32 hex characters", appID)
 	}
-	return "tool-app\x00" + toolClientID + "\x00" + id, toolClientID
+	owners, err := reg.clientsOfApp(id)
+	if err != nil {
+		return "", "", err
+	}
+	switch len(owners) {
+	case 0:
+		return "tool-app\x00" + toolClientID + "\x00" + id, toolClientID, nil
+	case 1:
+		return reg.SectorOf(owners[0]), owners[0], nil
+	default:
+		return "", "", fmt.Errorf("app %s is claimed by more than one client (%s)", id, strings.Join(owners, ", "))
+	}
+}
+
+// clientsOfApp lists every client whose app_ids name the app.
+func (reg *Registry) clientsOfApp(id string) ([]string, error) {
+	rows, err := reg.db.Query("SELECT client_id, app_ids FROM clients WHERE app_ids LIKE ?", "%"+id+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var clientID, raw string
+		if err := rows.Scan(&clientID, &raw); err != nil {
+			return nil, err
+		}
+		for _, cand := range strings.Split(raw, ",") {
+			if NormaliseAppID(cand) == id {
+				out = append(out, clientID)
+				break
+			}
+		}
+	}
+	return out, rows.Err()
 }
 
 // AppIDsOf returns the attested app ids (OID 4.1, lowercase hex, no dashes)

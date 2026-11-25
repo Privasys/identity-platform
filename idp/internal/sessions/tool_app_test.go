@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -56,14 +57,21 @@ func TestAToolsVoucherCarriesTheAppsOwnSubject(t *testing.T) {
 		return nil
 	})
 	// "site" stands for the app; "tool" may reach any app.
-	s.SetToolAppResolver(func(c, appID string) (string, string, bool) {
+	// "cccc…" is claimed by two clients: no single subject.
+	const claimedTwice = "cccccccccccccccccccccccccccccccc"
+	s.SetToolAppResolver(func(c, appID string) (string, string, bool, error) {
 		if c != "tool" {
-			return "", "", false
+			return "", "", false, nil
 		}
-		if appID == app {
-			return "site", "site", true
+		switch appID {
+		case "":
+			return "", "", true, nil
+		case app:
+			return "site", "site", true, nil
+		case claimedTwice:
+			return "", "", true, errors.New("claimed by more than one client")
 		}
-		return "tool-app\x00tool\x00" + appID, "tool", true
+		return "tool-app\x00tool\x00" + appID, "tool", true, nil
 	})
 	s.SetWalletSessionResolver(func(token string) (string, bool) { return "acct-1", token == "tok" })
 	hw, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -105,6 +113,10 @@ func TestAToolsVoucherCarriesTheAppsOwnSubject(t *testing.T) {
 	// No app: refused, the subject depends on it.
 	if rec, _, _ := allocate(""); rec.Code != http.StatusBadRequest {
 		t.Fatalf("allocate without an app: %d %s", rec.Code, rec.Body.String())
+	}
+	// An app with no single subject: refused, never picked.
+	if rec, _, sub := allocate(claimedTwice); rec.Code != http.StatusBadRequest || sub != "" {
+		t.Fatalf("allocate for an app claimed twice: %d %s", rec.Code, rec.Body.String())
 	}
 
 	// An app a client stands for: the subject that client gives the person.

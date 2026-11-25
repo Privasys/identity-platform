@@ -141,12 +141,15 @@ func main() {
 	sessionsStore.SetWalletSessionResolver(fido2Handler.WalletSessionResolver())
 	sessionsStore.SetSectorResolver(clientReg.SectorOf)
 	sessionsStore.SetAppsResolver(clientReg.AppIDsOf)
-	sessionsStore.SetToolAppResolver(func(clientID, appID string) (string, string, bool) {
+	sessionsStore.SetToolAppResolver(func(clientID, appID string) (string, string, bool, error) {
 		if !clientReg.AnyAppAudience(clientID) {
-			return "", "", false
+			return "", "", false, nil
 		}
-		sector, holder := clientReg.AppSubjectSector(appID, clientID)
-		return sector, holder, true
+		if strings.TrimSpace(appID) == "" {
+			return "", "", true, nil
+		}
+		sector, holder, err := clientReg.AppSubjectSector(appID, clientID)
+		return sector, holder, true, err
 	})
 	sessionsStore.SetPasskeysResolver(fido2Handler.UserKeys)
 	issuer.SetAccountResolver(sessionsStore.ActiveAccount)

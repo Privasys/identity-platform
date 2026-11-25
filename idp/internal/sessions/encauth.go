@@ -108,6 +108,10 @@ func (s *Store) subjectForClient(userID, clientID string, issuer *tokens.Issuer)
 // its subject is the one the person has at that app.
 var ErrToolNeedsApp = errors.New("this client reaches apps one at a time: app_id is required")
 
+// ErrNoAppSubject refuses a tool client's voucher for an app with no single
+// subject to give the person (claimed by more than one client).
+var ErrNoAppSubject = errors.New("this app has no single subject for a tool to use")
+
 // voucherSubject is the subject a session's voucher carries for an app, the
 // one the enclave asserts as X-Privasys-Sub, and the client a relationship
 // row for it belongs to. For a tool client it is the subject the app knows
@@ -115,9 +119,13 @@ var ErrToolNeedsApp = errors.New("this client reaches apps one at a time: app_id
 // the subject that client sees. tool reports which it was.
 func (s *Store) voucherSubject(userID, clientID, appID string, issuer *tokens.Issuer) (subject, holderClient string, tool bool, err error) {
 	if s.toolApp != nil {
-		if sector, holder, ok := s.toolApp(clientID, appID); ok {
+		sector, holder, ok, err := s.toolApp(clientID, appID)
+		if ok {
 			if strings.TrimSpace(appID) == "" {
 				return "", "", true, ErrToolNeedsApp
+			}
+			if err != nil {
+				return "", "", true, fmt.Errorf("%w: %v", ErrNoAppSubject, err)
 			}
 			return issuer.SubjectFor(userID, sector), holder, true, nil
 		}
@@ -566,7 +574,7 @@ func (s *Store) HandlePostEncAuth(issuer *tokens.Issuer) http.HandlerFunc {
 		// A tool client learns the subject of the app it is reaching, so the
 		// wallet names the app here as well as on the voucher itself.
 		subject, holderClient, _, err := s.voucherSubject(userID, req.ClientID, req.AppID, issuer)
-		if errors.Is(err, ErrToolNeedsApp) {
+		if errors.Is(err, ErrToolNeedsApp) || errors.Is(err, ErrNoAppSubject) {
 			httpErr(w, http.StatusBadRequest, err.Error())
 			return
 		}

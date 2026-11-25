@@ -232,12 +232,24 @@ func (iss *Issuer) IssueAccessTokenWithTTL(subject, audience, sid string, roles 
 		c["roles"] = roles
 	}
 	for k, v := range attributes {
-		if v != "" {
-			c[k] = claimValue(k, v)
+		if v == "" {
+			continue
 		}
+		// An attribute never replaces what the token is: who it is for,
+		// who it names, when, and its session.
+		if _, core := c[k]; core || k == "roles" || k == "sid" {
+			continue
+		}
+		c[k] = claimValue(k, v)
 	}
 	return iss.sign(c)
 }
+
+// ClaimActor names the client that acted for the person (RFC 8693 `act`),
+// on a token a tool client was issued for an app the person reached through
+// it. Set only by the identity provider's tool path; an app's runtime tells a
+// tool's token from the app's own sign-in by it.
+const ClaimActor = "act"
 
 // IssueVaultApprovalToken issues a short-lived, operation-bound access token
 // for the Enclave Vault promote step-up (the vault promote-step-up design). The caller
@@ -1009,6 +1021,9 @@ func (iss *Issuer) IssueOpApproval(c OpApprovalClaims) (string, error) {
 // JSON and emitted as the object OIDC Core 5.1.1 defines. Anything that is
 // not a JSON object stays the string it arrived as.
 func claimValue(key, v string) interface{} {
+	if key == ClaimActor {
+		return map[string]interface{}{"client_id": v}
+	}
 	if key != "address" || !strings.HasPrefix(strings.TrimSpace(v), "{") {
 		return v
 	}

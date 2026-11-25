@@ -130,6 +130,8 @@ type vaultBatchMeta struct {
 	iat     int64
 	exp     int64
 	entries []vaultBatchEntry
+	// asked says what was requested and by whom (see vaultApprovalMeta).
+	asked string
 	// audience is the aud of every token the batch yields
 	// (vaultApprovalAudience).
 	audience string
@@ -279,6 +281,8 @@ type vaultBatchPending struct {
 	// memberIdentities are the vaults' identities relayed with a v2 batch,
 	// for the wallet to verify.
 	memberIdentities []vaultbinding.VaultIdentity
+	// asked says what was requested and by whom (see vaultApprovalMeta).
+	asked string
 }
 
 type vaultBatchResult struct {
@@ -348,19 +352,19 @@ func (s *vaultBatchStore) finish(batchID, sub string, tokens []vaultBatchToken, 
 }
 
 // decline closes an open batch the owner refused, so the initiator's poll ends.
-func (s *vaultBatchStore) decline(batchID string) (sub string, ok bool) {
+func (s *vaultBatchStore) decline(batchID string) (sub, asked string, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p, ok := s.pending[batchID]
 	if !ok || time.Now().After(p.expiresAt) {
-		return "", false
+		return "", "", false
 	}
 	delete(s.pending, batchID)
 	if s.open[p.sub] == batchID {
 		delete(s.open, p.sub)
 	}
 	s.results[batchID] = vaultBatchResult{sub: p.sub, declined: true, expiresAt: p.expiresAt}
-	return p.sub, true
+	return p.sub, p.asked, true
 }
 
 // take returns a batch's result to its owner, once: the tokens, or a refusal.
@@ -477,29 +481,31 @@ func (h *Handler) VaultApprovalBatchBegin(iss *tokens.Issuer) http.HandlerFunc {
 		}
 		options.Response.Challenge = protocol.URLEncodedBase64(binding[:])
 		sessionData.Challenge = batchID
+		// What was asked and by whom, for the request's log line and for the
+		// line that records its outcome (see VaultApprovalBegin).
+		handles := make([]string, 0, len(entries))
+		for _, e := range entries {
+			handles = append(handles, vaultOpName(e.Operation)+" "+logField(e.Handle))
+		}
+		asked := fmt.Sprintf("%d entries [%s], batch %s; asked from %s", len(entries), strings.Join(handles, "; "), batchID, vaultRequester(r, iss))
 		h.challenges.put(batchID, &challengeEntry{
 			sessionData: sessionData,
 			user:        user,
 			expiresAt:   time.Unix(exp, 0),
 			vaultBatch: &vaultBatchMeta{
-				sub: sub, batchID: batchID, label: req.Label, iat: now, exp: exp, entries: entries, audience: aud,
+				sub: sub, batchID: batchID, label: req.Label, iat: now, exp: exp, entries: entries, audience: aud, asked: asked,
 			},
 		})
 		optionsJS, _ := json.Marshal(options)
 		if replaced := h.vaultBatches.put(batchID, &vaultBatchPending{
 			sub: sub, label: req.Label, optionsJS: optionsJS, entries: entries, expiresAt: time.Unix(exp, 0),
-			memberIdentities: req.MemberIdentities,
+			memberIdentities: req.MemberIdentities, asked: asked,
 		}); replaced != "" {
 			h.challenges.pop(replaced)
 		}
 		pushRegistered := h.pushVaultBatch(sub, batchID, len(entries))
-		// Who asked, and for what, in full (see VaultApprovalBegin).
-		handles := make([]string, 0, len(entries))
-		for _, e := range entries {
-			handles = append(handles, e.Operation+" "+logField(e.Handle))
-		}
-		log.Printf("fido2: vault-approval batch requested by %s (%d entries [%s], binding %d, batch %s, ttl %ds, push_registered=%t) from %s",
-			sub, len(entries), strings.Join(handles, "; "), req.BindingVersion, batchID, ttl, pushRegistered, vaultRequester(r, iss))
+		log.Printf("fido2: vault-approval batch requested by %s (%s, binding %d, ttl %ds, push_registered=%t)",
+			sub, asked, req.BindingVersion, ttl, pushRegistered)
 		writeJSON(w, map[string]interface{}{
 			"batch_id":          batchID,
 			"publicKey":         options.Response,
@@ -597,8 +603,8 @@ func (h *Handler) VaultApprovalBatchComplete(iss *tokens.Issuer, audience string
 			issued = append(issued, vaultBatchToken{Operation: e.Operation, Handle: e.Handle, VaultOp: e.VaultOp, AccessToken: tok})
 		}
 		h.vaultBatches.finish(m.batchID, m.sub, issued, m.exp)
-		log.Printf("fido2: vault-approval batch APPROVED by %s (%d entries, batch %s…, label %q)",
-			m.sub, len(issued), m.batchID[:12], m.label)
+		log.Printf("fido2: vault-approval batch APPROVED by %s (%d tokens, label %q; %s)",
+			m.sub, len(issued), logField(m.label), m.asked)
 		writeJSON(w, map[string]interface{}{"status": "approved", "count": len(issued)})
 	}
 }
@@ -657,7 +663,7 @@ func (h *Handler) VaultApprovalDecline() http.HandlerFunc {
 		m := entry.vaultApproval
 		h.vaultPending.remove(vaultOp)
 		h.vaultResults.decline(vaultOp, m.sub, time.Unix(m.exp, 0))
-		log.Printf("fido2: vault-approval DECLINED by the owner's wallet (sub %s, vault_op %s…)", m.sub, vaultOp[:min(12, len(vaultOp))])
+		log.Printf("fido2: vault-approval DECLINED by the owner's wallet (sub %s; %s)", m.sub, m.asked)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -673,8 +679,8 @@ func (h *Handler) VaultApprovalBatchDecline() http.HandlerFunc {
 			errorJSON(w, http.StatusNotFound, "no pending batch for this challenge")
 			return
 		}
-		sub, _ := h.vaultBatches.decline(batchID)
-		log.Printf("fido2: vault-approval batch DECLINED by the owner's wallet (sub %s, batch %s…)", sub, batchID[:min(12, len(batchID))])
+		sub, asked, _ := h.vaultBatches.decline(batchID)
+		log.Printf("fido2: vault-approval batch DECLINED by the owner's wallet (sub %s; %s)", sub, asked)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

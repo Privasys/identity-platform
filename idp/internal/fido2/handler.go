@@ -314,6 +314,9 @@ type vaultApprovalMeta struct {
 	// audience is the aud of the token /complete issues: the audience of
 	// the vaults the operation goes to (vaultApprovalAudience).
 	audience string
+	// asked says what was requested and by whom, as the request's own log
+	// line did, so the line that records its outcome says the same.
+	asked string
 }
 
 type challengeStore struct {

@@ -507,6 +507,8 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 				iat:      now,
 				exp:      exp,
 				audience: aud,
+				asked: fmt.Sprintf("op %s, handle %q, vault_op %s; asked from %s",
+					vaultOpName(req.Operation), logField(req.Handle), vaultOp, vaultRequester(r, iss)),
 			},
 		})
 		// Record the pending approval + push the owner's wallet, so the ceremony
@@ -540,12 +542,8 @@ func (h *Handler) VaultApprovalBegin(iss *tokens.Issuer, audience string) http.H
 		// It was not: with several tools able to ask one owner at once, an
 		// approval taken for a different, expected one could only be traced
 		// by reading around it (2026-11-25).
-		op := req.Operation
-		if op == "" {
-			op = "promote"
-		}
 		log.Printf("fido2: vault-approval requested by %s (op %s, handle %q, binding %d, aud %s, vault_op %s, ttl %ds, push_registered=%t) from %s",
-			sub, op, logField(req.Handle), req.BindingVersion, aud, vaultOp, ttl, pushRegistered, vaultRequester(r, iss))
+			sub, vaultOpName(req.Operation), logField(req.Handle), req.BindingVersion, aud, vaultOp, ttl, pushRegistered, vaultRequester(r, iss))
 		// Return the WebAuthn options plus how the owner can actually approve.
 		// `publicKey` stays at the top level so existing clients (the CLI and the
 		// browser page) keep working; the extra keys are additive.
@@ -594,7 +592,7 @@ func (h *Handler) VaultApprovalComplete(iss *tokens.Issuer, audience string) htt
 		h.vaultPending.remove(m.vaultOp)
 		// "approved" — this fires only after a verified assertion, so it is
 		// the success line, and reads as one next to the /begin request log.
-		log.Printf("fido2: vault-approval APPROVED by %s (vault_op %s…) — token stashed", m.sub, m.vaultOp[:12])
+		log.Printf("fido2: vault-approval APPROVED by %s (%s) — token stashed", m.sub, m.asked)
 		writeJSON(w, map[string]interface{}{"access_token": tok, "expires_at": m.exp})
 	}
 }
@@ -616,6 +614,14 @@ func vaultApprovalAudience(requested, def string) (string, error) {
 
 // bearerSubject verifies an `Authorization: Bearer` access token (signed by this
 // IdP) and returns its `sub`.
+// vaultOpName is the operation as the log names it: an empty one is a promote.
+func vaultOpName(op string) string {
+	if op == "" {
+		return "promote"
+	}
+	return op
+}
+
 // vaultRequester says who sent a vault-approval request, for the log: the
 // client and session its bearer names, and where it came from. It reads the
 // bearer the handler has already accepted, and none of it is trusted for a

@@ -120,10 +120,14 @@ export async function dismissElsewhere(data: Data, pushToken: string | null): Pr
     // Any other copy on this phone too (the tapped one iOS has already removed).
     await dismissHere(key).catch(() => 0);
     try {
+        // Signed by this phone's binding key: a push token alone is not a secret.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { dismissProof } = require('./push-bind') as typeof import('./push-bind');
+        const proof = await dismissProof(pushToken, key);
         const res = await fetch(`${IDP_BASE}/push/dismiss`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ push_token: pushToken, key }),
+            body: JSON.stringify({ push_token: pushToken, key, ...proof }),
         });
         if (!res.ok) console.warn(`[notifications] dismiss elsewhere: ${res.status}`);
     } catch (e) {

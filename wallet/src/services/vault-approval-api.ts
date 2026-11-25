@@ -34,6 +34,7 @@ import {
 import { useAuthStore, type Credential } from '../stores/auth';
 import type { BindingFields } from './vault-approval-v2';
 import type { VaultIdentity } from './vault-identity';
+import { registrationProof, repeatWhenBound } from './push-bind';
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 const IDP_ORIGIN = new URL(IDP_BASE).hostname;
@@ -335,6 +336,8 @@ export async function registerPushTokenWithIdp(
     encPub = '',
     /** The IdP user id the session is for: names this phone's target on it. */
     userId?: string,
+    /** Set on the repeat made after a challenge, which is not repeated again. */
+    repeating = false,
 ): Promise<void> {
     let deviceTag = '';
     if (userId) {
@@ -343,6 +346,14 @@ export async function registerPushTokenWithIdp(
         } catch {
             /* registers untagged, as before */
         }
+    }
+    // The proof that this token is this phone's (services/push-bind). Without
+    // it the registration still stands, unbound, as before.
+    let proof: Awaited<ReturnType<typeof registrationProof>> | Record<string, never> = {};
+    try {
+        proof = await registrationProof(expoPushToken, userId);
+    } catch {
+        /* registers unbound */
     }
     const res = await fetch(`${IDP_BASE}/push-token`, {
         method: 'POST',
@@ -354,10 +365,21 @@ export async function registerPushTokenWithIdp(
         // IdP seals app-notification payloads to it (empty keeps any
         // previously registered key).
         // device_tag keeps one target per phone of the holder; every phone is notified.
-        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub, ...(deviceTag ? { device_tag: deviceTag } : {}) }),
+        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub, ...(deviceTag ? { device_tag: deviceTag } : {}), ...proof }),
     });
     if (!res.ok) {
         throw new Error(`register push token failed (${res.status})`);
+    }
+    // Unbound: privasys.id is sending this phone a challenge, or has one out.
+    // Once it is answered the registration is made again, signed.
+    if (userId && !repeating) {
+        const bound = await res
+            .json()
+            .then((b: { bound?: boolean }) => b?.bound === true)
+            .catch(() => false);
+        if (!bound) {
+            repeatWhenBound(userId, () => registerPushTokenWithIdp(walletSessionToken, expoPushToken, encPub, userId, true));
+        }
     }
 }
 

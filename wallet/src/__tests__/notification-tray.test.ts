@@ -16,6 +16,10 @@ jest.mock('expo-notifications', () => ({
     setBadgeCountAsync: (n: number) => mockBadge(n),
 }));
 
+jest.mock('../services/devices', () => ({
+    ensureDevice: jest.fn(async () => ({ id: 'device', secret: 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc' })),
+}));
+
 import { dismissClosed, requestAnswered, setAppBadge, setOwnPushToken } from '../services/notification-dismiss';
 
 const shown = (identifier: string, data: Record<string, unknown>) => ({
@@ -71,6 +75,9 @@ describe('a request answered in the wallet', () => {
         expect(call[0]).toMatch(/\/push\/dismiss$/);
         const body = JSON.parse(call[1].body);
         expect(body.push_token).toBe('ExponentPushToken[me]');
+        // Signed by this phone: a push token alone is not a secret.
+        expect(body.sig).toMatch(/^[A-Za-z0-9_-]{86}$/);
+        expect(body.issued_at).toBeGreaterThan(0);
         // The request's id does not travel: only the key derived from it.
         expect(JSON.stringify(body)).not.toContain('op-1');
     });

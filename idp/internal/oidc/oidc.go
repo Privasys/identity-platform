@@ -1920,7 +1920,10 @@ func refreshStaysOnPlatform(granted, asked string) bool {
 		return true
 	}
 	had := audienceFromScope(granted, tokens.PlatformAudience)
-	return had == want
+	// TEMPORARY (tokens.DefaultMayMintOther): a default-platform grant may
+	// still mint the one other published platform, for the CLI's single
+	// sign-in. Never the other way, never from an app or resource grant.
+	return had == want || tokens.DefaultMayMintOther(had, want)
 }
 
 // accessTokenTTL is the lifetime of an access token from a sign-in or a

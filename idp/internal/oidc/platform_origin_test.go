@@ -11,7 +11,7 @@ import (
 
 func withTestPlatform(t *testing.T) {
 	t.Helper()
-	tokens.SetPlatformAudiences([]string{"aud-test"})
+	tokens.SetPlatformAudiences([]string{"aud-test", "aud-unlisted"})
 	tokens.SetPlatformDomains([]string{"aud-test=test.example.org"})
 	t.Cleanup(func() {
 		tokens.SetPlatformDomains(nil)
@@ -64,17 +64,42 @@ func TestARefreshNeverCrossesToAnotherPlatform(t *testing.T) {
 		ok             bool
 	}{
 		{"openid offline_access", "audience:attestation-server openid", true},
+		// default -> default, test -> test.
 		{"openid offline_access", "audience:" + def + " openid", true},
-		{"openid offline_access", "audience:aud-test openid", false},
 		{"audience:aud-test openid offline_access", "audience:aud-test openid", true},
+		// default -> the one other published platform: TEMPORARY allowance.
+		{"openid offline_access", "audience:aud-test openid", true},
+		{"audience:" + def + " openid offline_access", "audience:aud-test openid", true},
+		// test -> default: never.
 		{"audience:aud-test openid offline_access", "audience:" + def + " openid", false},
+		// a platform the list does not publish (no domains): never.
+		{"openid offline_access", "audience:aud-unlisted openid", false},
+		{"audience:aud-test openid offline_access", "audience:aud-unlisted openid", false},
 		{"audience:aud-test openid offline_access", "audience:app:0123 openid", true},
+		// an app grant mints no platform at all.
 		{"audience:app:0123 openid offline_access", "audience:" + def + " openid", false},
+		{"audience:app:0123 openid offline_access", "audience:aud-test openid", false},
 		{"audience:app:0123 openid offline_access", "openid", true},
 	}
 	for _, c := range cases {
 		if got := refreshStaysOnPlatform(c.granted, c.asked); got != c.ok {
 			t.Errorf("refreshStaysOnPlatform(%q, %q) = %t, want %t", c.granted, c.asked, got, c.ok)
+		}
+	}
+}
+
+// With a third platform published, the default reaches neither other one:
+// the allowance is for exactly one other platform.
+func TestTheAllowanceEndsWithAThirdPlatform(t *testing.T) {
+	tokens.SetPlatformAudiences([]string{"aud-test", "aud-third"})
+	tokens.SetPlatformDomains([]string{"aud-test=test.example.org", "aud-third=third.example.org"})
+	t.Cleanup(func() {
+		tokens.SetPlatformDomains(nil)
+		tokens.SetPlatformAudiences(nil)
+	})
+	for _, asked := range []string{"aud-test", "aud-third"} {
+		if refreshStaysOnPlatform("openid offline_access", "audience:"+asked+" openid") {
+			t.Errorf("with three platforms, the default minted %s", asked)
 		}
 	}
 }

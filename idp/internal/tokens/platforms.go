@@ -66,6 +66,29 @@ func Platforms() []Platform {
 	return out
 }
 
+// DefaultMayMintOther says whether a refresh of a grant made on the default
+// platform may mint `asked`: only when the published list has exactly one
+// other platform and `asked` is it. Never the other way, never a platform
+// the list does not publish, and with a third platform listed, never at all.
+//
+// TEMPORARY: the CLI holds one sign-in, made on the default platform, and
+// mints the other platform's token by refresh. A default-platform sign-in
+// minting a token the default platform does not accept gives that other
+// platform nothing usable against the default one. Remove once the CLI holds
+// one sign-in per platform.
+func DefaultMayMintOther(granted, asked string) bool {
+	if granted != PlatformAudience || asked == PlatformAudience {
+		return false
+	}
+	var others []string
+	for _, p := range Platforms() {
+		if p.Audience != PlatformAudience {
+			others = append(others, p.Audience)
+		}
+	}
+	return len(others) == 1 && others[0] == asked
+}
+
 // PlatformOfHost names the platform a host belongs to: the platform listing
 // the host itself or the longest domain the host ends in at a dot, else the
 // default. The wallet matches the same way on the list HandlePlatforms serves.

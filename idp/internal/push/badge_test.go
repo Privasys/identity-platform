@@ -27,6 +27,7 @@ func newTestBadges(st fakeBadgeStore, now *time.Time) (*Badges, *[]sent) {
 	b := &Badges{
 		open:  map[string]map[string]time.Time{},
 		dirty: map[string]bool{},
+		last:  map[string]int{},
 		db:    st,
 		send: func(_ context.Context, token string, n int) error {
 			out = append(out, sent{token, n})
@@ -151,5 +152,53 @@ func TestBadgeRespectsTheDeviceAndTheCap(t *testing.T) {
 	none.Tick(context.Background())
 	if none.CountFor("t") != 0 || none.Takes("x", "t") {
 		t.Fatal("nil counter")
+	}
+}
+
+// What privasys.id keeps for the wallet to list is counted from where it is
+// kept, and leaves the number however it ends, without anyone saying so.
+func TestBadgeCountsKeptRequests(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	st := fakeBadgeStore{
+		users:  map[string][]string{"phone": {"alice-a", "alice-b"}},
+		tokens: map[string][]string{"alice-a": {"phone"}, "alice-b": {"phone"}},
+	}
+	b, out := newTestBadges(st, &now)
+	kept := map[string]int{"alice-a": 2, "alice-b": 1}
+	b.AddSource(func(u string) int { return kept[u] })
+	b.Open("alice-a", "vault-approval:1", now.Add(5*time.Minute))
+	if got := b.CountFor("phone"); got != 4 {
+		t.Fatalf("phone = %d, want 4", got)
+	}
+	// The push that announced the last of them carried the number.
+	b.sent("phone", 4)
+	b.Tick(context.Background())
+	if len(*out) != 0 {
+		t.Fatalf("a device already showing its number was sent %v", *out)
+	}
+	// One is answered in the app; nothing tells the counter.
+	kept["alice-a"] = 1
+	now = now.Add(recheckEvery)
+	b.Tick(context.Background())
+	if len(*out) != 1 || (*out)[0] != (sent{"phone", 3}) {
+		t.Fatalf("after one was answered: %v", *out)
+	}
+	// Unchanged: nothing more is sent, however often it is counted.
+	now = now.Add(recheckEvery)
+	b.Tick(context.Background())
+	if len(*out) != 1 {
+		t.Fatalf("an unchanged number was sent again: %v", *out)
+	}
+	// All gone: the icon is cleared once, and the device is not counted again.
+	kept["alice-a"], kept["alice-b"] = 0, 0
+	b.Close("alice-a", "vault-approval:1")
+	b.Tick(context.Background())
+	if len(*out) != 2 || (*out)[1] != (sent{"phone", 0}) {
+		t.Fatalf("after all were answered: %v", *out)
+	}
+	now = now.Add(recheckEvery)
+	b.Tick(context.Background())
+	if len(*out) != 2 {
+		t.Fatalf("a cleared device was sent again: %v", *out)
 	}
 }

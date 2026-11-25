@@ -19,8 +19,14 @@ import (
 //
 // What travels is one integer per device and nothing else: the push that
 // corrects a count carries no data, no title and no type. A count is still
-// about a person, so it is never logged, never stored, and a device that asks
-// for no badge gets none.
+// about a person, so it is never logged, never written to disk, and a device
+// that asks for no badge gets none.
+//
+// Two kinds of thing are counted. A request that lives only as long as its
+// push (a vault approval, a request for more data) is opened here and closed
+// when answered. What an app sent and privasys.id keeps for the wallet to list
+// (a request, an approval, a form, a capability ask) is counted from where it
+// is kept (AddSource), so it leaves the number however it ends.
 //
 // The count is per DEVICE. A phone holds several identities under one push
 // token, and its icon has one number. The sum is taken from the existing push
@@ -38,6 +44,13 @@ type BadgeStore interface {
 	BadgeTokens(userID string) []string
 }
 
+// Waiting reports how many kept things wait on an identity.
+type Waiting func(userID string) int
+
+// recheckEvery is how often a device showing a number has it counted again:
+// what catches a kept request that was answered, dismissed or lapsed.
+const recheckEvery = 15 * time.Second
+
 // Badges counts the open requests of each identity, in memory. Lost on a
 // restart, as the requests themselves are: the next count may then be low,
 // and the wallet corrects it the moment it runs.
@@ -45,9 +58,14 @@ type Badges struct {
 	mu    sync.Mutex
 	open  map[string]map[string]time.Time // identity -> request -> when it lapses
 	dirty map[string]bool                 // tokens whose number may have changed
-	db    BadgeStore
-	send  func(ctx context.Context, token string, n int) error
-	now   func() time.Time
+	// last is the number each device was last sent, while it is not zero:
+	// which devices to count again, and what makes a correction worth sending.
+	last      map[string]int
+	rechecked time.Time
+	sources   []Waiting
+	db        BadgeStore
+	send      func(ctx context.Context, token string, n int) error
+	now       func() time.Time
 }
 
 // NewBadges returns a counter that sends its corrections through s.
@@ -55,10 +73,29 @@ func NewBadges(db BadgeStore, s *Sender) *Badges {
 	return &Badges{
 		open:  map[string]map[string]time.Time{},
 		dirty: map[string]bool{},
+		last:  map[string]int{},
 		db:    db,
 		send:  s.badge,
 		now:   time.Now,
 	}
+}
+
+// AddSource adds a place where things waiting on an identity are kept.
+func (b *Badges) AddSource(w Waiting) {
+	b.mu.Lock()
+	b.sources = append(b.sources, w)
+	b.mu.Unlock()
+}
+
+// sent records the number a device was just told.
+func (b *Badges) sent(token string, n int) {
+	b.mu.Lock()
+	if n > 0 {
+		b.last[token] = n
+	} else {
+		delete(b.last, token)
+	}
+	b.mu.Unlock()
 }
 
 // Open records a request waiting on userID until expires.
@@ -124,13 +161,20 @@ func (b *Badges) CountFor(token string) int {
 	users := b.db.PushTokenUsers(token)
 	now := b.now()
 	b.mu.Lock()
-	defer b.mu.Unlock()
+	sources := b.sources
 	n := 0
 	for _, u := range users {
 		for _, exp := range b.open[u] {
 			if exp.IsZero() || exp.After(now) {
 				n++
 			}
+		}
+	}
+	b.mu.Unlock()
+	// Outside the lock: a source reads its own store.
+	for _, u := range users {
+		for _, waiting := range sources {
+			n += waiting(u)
 		}
 	}
 	if n > maxBadge {
@@ -170,18 +214,38 @@ func (b *Badges) Tick(ctx context.Context) {
 	}
 
 	b.mu.Lock()
-	tokens := make([]string, 0, len(b.dirty))
+	// Every so often, each device showing a number is counted again.
+	if now.Sub(b.rechecked) >= recheckEvery {
+		b.rechecked = now
+		for t := range b.last {
+			b.dirty[t] = true
+		}
+	}
+	type due struct {
+		token string
+		was   int
+		known bool
+	}
+	tokens := make([]due, 0, len(b.dirty))
 	for t := range b.dirty {
-		tokens = append(tokens, t)
+		was, known := b.last[t]
+		tokens = append(tokens, due{t, was, known})
 	}
 	b.dirty = map[string]bool{}
 	b.mu.Unlock()
 
 	failed := 0
-	for _, t := range tokens {
-		if err := b.send(ctx, t, b.CountFor(t)); err != nil {
-			failed++
+	for _, d := range tokens {
+		n := b.CountFor(d.token)
+		// Nothing to say to a device already showing this number.
+		if d.known && n == d.was {
+			continue
 		}
+		if err := b.send(ctx, d.token, n); err != nil {
+			failed++
+			continue
+		}
+		b.sent(d.token, n)
 	}
 	if failed > 0 {
 		// How many, never whose or what number: a count is about a person.
@@ -214,6 +278,14 @@ var badges *Badges
 
 // SetBadges installs the counter. Without one no push carries a number.
 func SetBadges(b *Badges) { badges = b }
+
+// AddWaiting adds a place where things waiting on an identity are kept, when
+// there is a counter.
+func AddWaiting(w Waiting) {
+	if badges != nil {
+		badges.AddSource(w)
+	}
+}
 
 // CloseRequest records that a request was answered or declined.
 func CloseRequest(userID, request string) { badges.Close(userID, request) }

@@ -213,7 +213,7 @@ func (h *Handler) AttributeApprovalPusher() func(sub string, session *oidc.AuthS
 			expiresAt: session.ExpiresAt,
 		})
 		for _, pushToken := range pushTokens {
-			go h.sendAttributeApprovalPush(string(user.ID), pushToken, capability, len(added))
+			go h.sendAttributeApprovalPush(string(user.ID), pushToken, capability, len(added), session.ExpiresAt)
 		}
 		log.Printf("fido2: attribute-approval pushed to holder of client %s (session %s…, +%d keys)",
 			session.ClientID, session.SessionID[:8], len(added))
@@ -226,7 +226,7 @@ func (h *Handler) AttributeApprovalPusher() func(sub string, session *oidc.AuthS
 // capability — the wallet fetches the delta and descriptor from /pending
 // over TLS, so no request material transits third-party push infrastructure.
 // Values in data must be strings (Expo constraint).
-func (h *Handler) sendAttributeApprovalPush(userID, pushToken, capability string, addedCount int) {
+func (h *Handler) sendAttributeApprovalPush(userID, pushToken, capability string, addedCount int, expires time.Time) {
 	body := "An app you use is asking to receive more of your data — tap to review"
 	if addedCount == 1 {
 		body = "An app you use is asking to receive one more piece of your data — tap to review"
@@ -239,6 +239,9 @@ func (h *Handler) sendAttributeApprovalPush(userID, pushToken, capability string
 			"type":     "attribute-approval",
 			"approval": capability,
 		},
+		// Counted on the icon until answered or until the sign-in lapses.
+		Request: attributeBadgeRequest(capability),
+		Expires: expires,
 	}); err != nil {
 		log.Printf("fido2/attribute-approval: push send: %v", err)
 	}
@@ -298,6 +301,8 @@ func (h *Handler) AttributeApprovalComplete(codes *oidc.CodeStore, sessionStore 
 			errorJSON(w, http.StatusBadRequest, "challenge expired or not found")
 			return
 		}
+		// Spent whatever follows: it no longer waits on the holder.
+		push.CloseRequest(entry.sub, attributeBadgeRequest(capability))
 		var body struct {
 			Assertion  json.RawMessage   `json:"assertion"`
 			Attributes map[string]string `json:"attributes"`
@@ -359,3 +364,7 @@ func (h *Handler) AttributeApprovalComplete(codes *oidc.CodeStore, sessionStore 
 		writeJSON(w, map[string]interface{}{"status": "approved"})
 	}
 }
+
+// attributeBadgeRequest names a request for more data to the icon's count
+// (push/badge.go): held in memory only, never sent.
+func attributeBadgeRequest(capability string) string { return "attribute-approval:" + capability }

@@ -734,6 +734,10 @@ func main() {
 	}
 	badges := push.NewBadges(db, push.For(db))
 	push.SetBadges(badges)
+	// What apps sent and privasys.id keeps for the wallet to list counts too,
+	// from where it is kept, so it leaves the number however it ends.
+	badges.AddSource(func(userID string) int { return len(capabilityAsks.ListFor(userID)) })
+	badges.AddSource(func(userID string) int { return len(appMessages.ListFor(userID)) })
 	go badges.Run(context.Background(), time.Second)
 
 	// Periodic cleanup of expired refresh tokens, recovery records, and invitations.

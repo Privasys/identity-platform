@@ -360,15 +360,24 @@ func For(db Store) *Sender {
 // not the same as delivered; that answer comes from the sweep.
 func Notify(ctx context.Context, db Store, userID string, m Message) error {
 	s := For(db)
-	if badges != nil && m.Request != "" && !m.Background {
-		badges.Open(userID, m.Request, m.Expires)
+	// Every push the holder sees carries the device's current number, so the
+	// icon is right the moment the banner shows.
+	counted := false
+	if badges != nil && !m.Background {
+		if m.Request != "" {
+			badges.Open(userID, m.Request, m.Expires)
+		}
 		if badges.Takes(userID, m.Token) {
 			m.Badge = badges.CountFor(m.Token)
+			counted = true
 		}
 	}
 	ticketID, err := s.Send(ctx, m)
 	if err != nil {
 		return err
+	}
+	if counted && m.Badge > 0 {
+		badges.sent(m.Token, m.Badge)
 	}
 	if err := db.RecordPushTicket(ticketID, userID, m.Token); err != nil {
 		// The push went out; only the follow-up is lost. Not worth failing the

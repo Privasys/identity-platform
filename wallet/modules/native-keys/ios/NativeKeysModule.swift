@@ -7,14 +7,14 @@ import Security
 import LocalAuthentication
 
 /// The passkey root handed to setPasskeyRoot was not 32 bytes of base64url.
-internal final class InvalidPasskeyRootException: Exception {
+internal final class InvalidPasskeyRootException: Exception, @unchecked Sendable {
     override var reason: String {
         "the passkey root must be 32 bytes, base64url"
     }
 }
 
 /// importWebsitePasskeys was given something other than a JSON array.
-internal final class InvalidPasskeyListException: Exception {
+internal final class InvalidPasskeyListException: Exception, @unchecked Sendable {
     override var reason: String {
         "the website passkey list must be a JSON array"
     }

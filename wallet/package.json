@@ -77,7 +77,7 @@
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.14",
-    "@types/react-dom": "~19.1.7",
+    "@types/react-dom": "~19.2.0",
     "babel-jest": "^30.3.0",
     "babel-preset-expo": "^55.0.15",
     "dotenv": "^17.3.1",
@@ -98,7 +98,10 @@
   "expo": {
     "install": {
       "exclude": [
-        "@react-navigation/native"
+        "@react-navigation/native",
+        "jest",
+        "@types/jest",
+        "react-native-gesture-handler"
       ]
     }
   }

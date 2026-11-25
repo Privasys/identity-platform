@@ -55,8 +55,10 @@ public class NativeEmrtdModule: Module {
             // enclave to prove the chip is genuine and not a clone.
             let optionalTags: [DataGroupId] = [.COM, .SOD, .DG1, .DG2, .DG11, .DG15]
             let minimumTags: [DataGroupId] = [.COM, .SOD, .DG1, .DG2]
-            Task { [weak self] in
-                guard let self = self else { return }
+            // The reader is taken here, not self inside the task: the read then
+            // ends and answers the promise whatever becomes of the module.
+            let reader = self.passportReader
+            Task {
                 func resolveError(_ error: Error) {
                     let reason = NativeEmrtdModule.escape(error.localizedDescription)
                     // The exact enum case (e.g. ResponseError carries SW1/SW2 APDU
@@ -74,7 +76,7 @@ public class NativeEmrtdModule: Module {
                     )
                 }
                 do {
-                    let passport = try await self.passportReader.readPassport(mrzKey: mrzKey, tags: optionalTags)
+                    let passport = try await reader.readPassport(mrzKey: mrzKey, tags: optionalTags)
                     promise.resolve(NativeEmrtdModule.toJson(passport))
                 } catch {
                     // A document without DG11 (or with it access-protected) answers
@@ -84,7 +86,7 @@ public class NativeEmrtdModule: Module {
                     // or a minimum read that also fails — is surfaced to the caller.
                     if NativeEmrtdModule.isReferencedDataNotFound(error) {
                         do {
-                            let passport = try await self.passportReader.readPassport(mrzKey: mrzKey, tags: minimumTags)
+                            let passport = try await reader.readPassport(mrzKey: mrzKey, tags: minimumTags)
                             promise.resolve(NativeEmrtdModule.toJson(passport))
                         } catch {
                             resolveError(error)

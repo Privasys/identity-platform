@@ -335,7 +335,11 @@ export async function signAndUploadEncAuth(args: {
     payload: Omit<EncAuthPayload, 'sid' | 'sub'>;
 }): Promise<{ sid: string; envelope: EncAuthEnvelope }> {
     // Step 1: allocate (or reuse) a sid for (user, client_id, device), and
-    // learn the subject this client sees, which the voucher must name.
+    // learn the subject the voucher must name. The app goes with the request:
+    // a tool that reaches many apps (the portal, the explorer) has no one
+    // subject for a person, only the one each app knows them by, so the
+    // identity provider cannot name it without the app. Other clients are
+    // answered as before.
     const allocUrl = `${IDP_BASE_URL}/sessions/encauth`;
     const allocResp = await fetch(allocUrl, {
         method: 'POST',
@@ -343,7 +347,7 @@ export async function signAndUploadEncAuth(args: {
             'Content-Type': 'application/json',
             Authorization: `Bearer wallet:${args.walletSessionToken}`,
         },
-        body: JSON.stringify({ client_id: args.clientId, device_id: args.deviceId ?? '' }),
+        body: JSON.stringify({ client_id: args.clientId, device_id: args.deviceId ?? '', app_id: args.appId }),
     });
     if (!allocResp.ok) {
         const detail = await allocResp.text().catch(() => '');

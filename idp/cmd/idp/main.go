@@ -462,7 +462,8 @@ func main() {
 	// bundle their own copy. Referenced from canonical-attributes.json valuesUrl.
 	mux.HandleFunc("GET /referential/{file}", func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimSuffix(r.PathValue("file"), ".json")
-		body, ok := attributes.ReferentialFile(name)
+		// ?lang=<tag> serves the same values with labels in that language.
+		body, ok := attributes.ReferentialFileLang(name, r.URL.Query().Get("lang"))
 		if !ok {
 			http.Error(w, "not found", http.StatusNotFound)
 			return

@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 )
 
@@ -277,6 +278,28 @@ func ReferentialFile(name string) ([]byte, bool) {
 		return nil, false
 	}
 	return b, true
+}
+
+// referentialLang is the shape of a language tag accepted by
+// ReferentialFileLang: a 2-3 letter language, optionally a region or script
+// subtag. Anything else falls back to the base file.
+var referentialLang = regexp.MustCompile(`^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$`)
+
+// ReferentialFileLang returns a value set with its labels in the holder's
+// language: referential/i18n/<name>/<lang>.json, then the language without its
+// region (pt-BR → pt), then the base file. The values are the same codes in
+// every copy; only the labels are translated (generated from CLDR by
+// shared/scripts/referential-i18n.mjs).
+func ReferentialFileLang(name, lang string) ([]byte, bool) {
+	lang = strings.ToLower(strings.TrimSpace(lang))
+	if referentialLang.MatchString(lang) && !strings.ContainsAny(name, "/\\.") {
+		for _, tag := range []string{lang, strings.SplitN(lang, "-", 2)[0]} {
+			if b, err := referentialFS.ReadFile("referential/i18n/" + name + "/" + tag + ".json"); err == nil {
+				return b, true
+			}
+		}
+	}
+	return ReferentialFile(name)
 }
 
 // ValueSet parses and returns the enumerated values for an attribute (e.g.

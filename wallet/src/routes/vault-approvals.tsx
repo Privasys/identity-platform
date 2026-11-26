@@ -792,7 +792,8 @@ function VaultApprovalsScreen() {
                                     what it binds. */}
                                 {/* The delete of an old key binds the key that
                                     replaces it, which the row above names. */}
-                                {s.measurement && !isReshare && !isOldKeyDelete ? (
+                                {/* A v1 rules change binds its own name there, not a build. */}
+                                {s.measurement && !isReshare && !isOldKeyDelete && s.operation !== 'policy-update' ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>
                                             {isPolicy

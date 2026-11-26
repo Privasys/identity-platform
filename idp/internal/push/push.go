@@ -349,6 +349,34 @@ func For(db Store) *Sender {
 	}}
 }
 
+// bindChallenge gives the binding challenge to carry in a visible push to a
+// token, when there is one. Set once at start-up.
+var bindChallenge func(userID, token string) (nonce, bindPub string)
+
+// SetBindChallenge installs the source of binding challenges.
+func SetBindChallenge(f func(userID, token string) (nonce, bindPub string)) { bindChallenge = f }
+
+// withBindChallenge adds, to a push the holder sees, the challenge that lets a
+// device prove the token is its own, while it has yet to (recovery/pushbind.go).
+// In the data only, never in what is shown, and on a copy: the caller's map is
+// not ours to change.
+func withBindChallenge(userID string, m Message) Message {
+	if bindChallenge == nil || m.Background || m.Token == "" {
+		return m
+	}
+	nonce, bindPub := bindChallenge(userID, m.Token)
+	if nonce == "" {
+		return m
+	}
+	data := make(map[string]string, len(m.Data)+2)
+	for k, v := range m.Data {
+		data[k] = v
+	}
+	data["bind_nonce"], data["bind_pub"] = nonce, bindPub
+	m.Data = data
+	return m
+}
+
 // Notify sends one message and records its ticket for the receipt sweep.
 //
 // This is the whole public surface for a call site: one line, with the status
@@ -360,6 +388,7 @@ func For(db Store) *Sender {
 // not the same as delivered; that answer comes from the sweep.
 func Notify(ctx context.Context, db Store, userID string, m Message) error {
 	s := For(db)
+	m = withBindChallenge(userID, m)
 	// Every push the holder sees carries the device's current number, so the
 	// icon is right the moment the banner shows.
 	counted := false

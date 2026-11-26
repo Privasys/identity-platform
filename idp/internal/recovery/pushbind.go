@@ -4,7 +4,6 @@
 package recovery
 
 import (
-	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/subtle"
@@ -15,8 +14,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
-	"github.com/Privasys/idp/internal/push"
 )
 
 // A push token is bound to the device that receives its pushes.
@@ -28,10 +25,16 @@ import (
 // itself, because whoever registers first would choose the key.
 //
 // What only the real device can do is receive a push sent to the token. So a
-// token is bound by a challenge sent through the push channel: privasys.id
-// pushes a nonce to the token, and the wallet returns it signed with a key it
-// made for the purpose (bind_pub). That key is then the token's, and a
-// different key is only taken after a new challenge.
+// token is bound by a challenge that travels with a push: a nonce the wallet
+// returns signed with a key it made for the purpose (bind_pub). That key is
+// then the token's, and a different key is only taken after a new challenge.
+//
+// The nonce rides in the data of the VISIBLE pushes privasys.id sends anyway (a
+// sign-in request, an approval), never in a push of its own. A silent push
+// sent only to carry it did not reach the wallet's code on iOS, which decides
+// for itself whether to wake an app for one; a notification the holder sees
+// does. It also means nobody can cause a push to a device by registering its
+// token: no push is ever sent for the binding's sake.
 //
 // The answer binds no registration by itself. Each identity on the phone is
 // bound by registering the token with a signature, under that key, over its
@@ -43,10 +46,9 @@ import (
 // a notification on the holder's other phones) uses bound rows only.
 
 const (
-	pushBindType       = "push-bind"
-	pushBindTTL        = 5 * time.Minute
-	pushBindPerMinute  = 1
-	pushBindPerDay     = 20
+	// pushBindTTL is how long a challenge can be answered: the longest a
+	// request lives, since the holder may open its notification late.
+	pushBindTTL        = 15 * time.Minute
 	pushRegisterWindow = 5 * time.Minute
 )
 
@@ -55,58 +57,24 @@ type pushBindChallenge struct {
 	expires time.Time
 }
 
-// pushBindState holds the open challenges and how often each token was sent
-// one. In memory: a challenge is worthless after five minutes, and a restart
-// only makes a wallet ask again.
+// pushBindState holds the open challenges. In memory: a challenge is
+// worthless once it has lapsed, and a restart only means the next visible
+// push carries a new one.
 type pushBindState struct {
 	mu         sync.Mutex
 	challenges map[string]pushBindChallenge // token + "\x00" + bind_pub
-	sent       map[string][]time.Time       // token -> challenges sent in the last day
 	now        func() time.Time
-	send       func(ctx context.Context, db push.Store, userID string, m push.Message) error
 }
 
 var pushBinds = &pushBindState{
 	challenges: map[string]pushBindChallenge{},
-	sent:       map[string][]time.Time{},
 	now:        time.Now,
-	send:       push.Notify,
 }
 
-// allow reports whether one more challenge may go to token, and records it.
-// Anyone who knows a token could otherwise use registration to send that
-// device silent pushes without end.
-func (s *pushBindState) allow(token string) bool {
-	now := s.now()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	kept := s.sent[token][:0]
-	for _, t := range s.sent[token] {
-		if now.Sub(t) < 24*time.Hour {
-			kept = append(kept, t)
-		}
-	}
-	recent := 0
-	for _, t := range kept {
-		if now.Sub(t) < time.Minute {
-			recent++
-		}
-	}
-	if recent >= pushBindPerMinute || len(kept) >= pushBindPerDay {
-		s.sent[token] = kept
-		return false
-	}
-	s.sent[token] = append(kept, now)
-	return true
-}
-
-// open makes a challenge for (token, bindPub) and returns its nonce.
+// open returns the challenge for (token, bindPub): the one already open, so
+// that every push sent while it lives carries the same nonce and any of them
+// can be answered, or a new one.
 func (s *pushBindState) open(token, bindPub string) (string, error) {
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
-	}
-	nonce := base64.RawURLEncoding.EncodeToString(raw)
 	now := s.now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -115,7 +83,16 @@ func (s *pushBindState) open(token, bindPub string) (string, error) {
 			delete(s.challenges, k)
 		}
 	}
-	s.challenges[token+"\x00"+bindPub] = pushBindChallenge{nonce: nonce, expires: now.Add(pushBindTTL)}
+	key := token + "\x00" + bindPub
+	if c, ok := s.challenges[key]; ok {
+		return c.nonce, nil
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	nonce := base64.RawURLEncoding.EncodeToString(raw)
+	s.challenges[key] = pushBindChallenge{nonce: nonce, expires: now.Add(pushBindTTL)}
 	return nonce, nil
 }
 
@@ -194,41 +171,47 @@ func (h *Handler) bindRegistration(userID, token, bindPub, sig string, issuedAt 
 		}
 		return bound
 	}
-	// Not this token's key yet: the row waits, and the device is challenged.
+	// Not this token's key yet: the row waits. The challenge travels with the
+	// next push the holder sees (BindChallengeFor); none is sent from here.
 	if err := h.db.SetPushBinding(userID, token, bindPub, false); err != nil {
 		log.Printf("[push-bind] recording a pending binding: %v", err)
-		return false
 	}
-	if !pushBinds.allow(token) {
-		log.Printf("[push-bind] challenge rate limit reached for a token")
-		return false
+	return false
+}
+
+// BindChallengeFor is the challenge to carry in a visible push that is about
+// to be sent to token for userID, or "" when there is none to carry.
+//
+// One is carried only while that identity's registration of the token names a
+// binding key that is not yet the token's proven key. A registration that
+// names no key (an older wallet) carries none, and neither does one whose key
+// is already proven: what it lacks then is its own signature, which a push
+// cannot supply.
+func (h *Handler) BindChallengeFor(userID, token string) (nonce, bindPub string) {
+	if userID == "" || token == "" {
+		return "", ""
+	}
+	bindPub, bound := h.db.PushBinding(userID, token)
+	if bound || bindPub == "" || h.db.PushTokenBindKey(token) == bindPub {
+		return "", ""
+	}
+	if _, ok := pushBindKey(bindPub); !ok {
+		return "", ""
 	}
 	nonce, err := pushBinds.open(token, bindPub)
 	if err != nil {
 		log.Printf("[push-bind] challenge: %v", err)
-		return false
+		return "", ""
 	}
-	go func() {
-		if err := pushBinds.send(context.Background(), h.db, userID, push.Message{
-			Token:      token,
-			Background: true,
-			Data:       map[string]string{"type": pushBindType, "nonce": nonce, "bind_pub": bindPub},
-		}); err != nil {
-			log.Printf("[push-bind] sending a challenge: %v", err)
-			return
-		}
-		// Accepted by the push service, which is not yet delivered to the device.
-		log.Printf("[push-bind] a challenge was sent")
-	}()
-	return false
+	return nonce, bindPub
 }
 
 // HandleBindPushToken takes a wallet's answer to a binding challenge.
 //
 // POST /push-token/bind {"push_token", "bind_pub", "nonce", "sig"}
 //
-// No bearer: the nonce reached only the device that receives the token's
-// pushes, and the signature shows the answer comes from the holder of the key
+// No bearer: the nonce travelled only in pushes to the token, so it reached
+// only the device that receives them, and the signature shows the answer comes from the holder of the key
 // the challenge was opened for. Together they are the proof. The answer makes
 // that key the token's; the wallet then registers each identity again, signed.
 func (h *Handler) HandleBindPushToken(w http.ResponseWriter, r *http.Request) {

@@ -149,6 +149,16 @@ func (db *DB) SetPushBinding(userID, pushToken, bindPub string, bound bool) erro
 	return err
 }
 
+// PushBinding is the binding key one identity's registration of a token came
+// with, and whether that registration is bound.
+func (db *DB) PushBinding(userID, pushToken string) (bindPub string, bound bool) {
+	var b int
+	if db.QueryRow("SELECT bind_pub, bound FROM push_tokens WHERE user_id = ? AND push_token = ? LIMIT 1", userID, pushToken).Scan(&bindPub, &b) != nil {
+		return "", false
+	}
+	return bindPub, b != 0
+}
+
 // PushTokenBindKey is the key a token's device proved itself with, or "" when
 // none has.
 func (db *DB) PushTokenBindKey(pushToken string) string {

@@ -5,7 +5,6 @@ package recovery
 
 import (
 	"bytes"
-	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
@@ -16,16 +15,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Privasys/idp/internal/push"
 	"github.com/Privasys/idp/internal/store"
 )
 
 type bindRig struct {
-	t    *testing.T
-	h    *Handler
-	db   *store.DB
-	now  time.Time
-	sent chan push.Message
+	t   *testing.T
+	h   *Handler
+	db  *store.DB
+	now time.Time
 }
 
 func newBindRig(t *testing.T) *bindRig {
@@ -40,17 +37,12 @@ func newBindRig(t *testing.T) *bindRig {
 			t.Fatal(err)
 		}
 	}
-	r := &bindRig{t: t, db: db, now: time.Unix(1_800_000_000, 0), sent: make(chan push.Message, 16)}
+	r := &bindRig{t: t, db: db, now: time.Unix(1_800_000_000, 0)}
 	r.h = &Handler{db: db, walletSession: func(tok string) (string, bool) { return tok, tok != "" }}
 	old := pushBinds
 	pushBinds = &pushBindState{
 		challenges: map[string]pushBindChallenge{},
-		sent:       map[string][]time.Time{},
 		now:        func() time.Time { return r.now },
-		send: func(_ context.Context, _ push.Store, _ string, m push.Message) error {
-			r.sent <- m
-			return nil
-		},
 	}
 	t.Cleanup(func() { pushBinds = old })
 	return r
@@ -99,16 +91,6 @@ func (r *bindRig) signed(user, token string, k bindKey) bool {
 	})
 }
 
-// challenge waits for the challenge push, or reports that none was sent.
-func (r *bindRig) challenge() (push.Message, bool) {
-	select {
-	case m := <-r.sent:
-		return m, true
-	case <-time.After(200 * time.Millisecond):
-		return push.Message{}, false
-	}
-}
-
 func (r *bindRig) answer(token, bindPub, nonce, sig string) int {
 	raw, _ := json.Marshal(map[string]string{"push_token": token, "bind_pub": bindPub, "nonce": nonce, "sig": sig})
 	w := httptest.NewRecorder()
@@ -116,20 +98,19 @@ func (r *bindRig) answer(token, bindPub, nonce, sig string) int {
 	return w.Code
 }
 
-// bind takes a device through the whole exchange for one identity.
+// bind takes a device through the whole exchange for one identity: it
+// registers, a push the holder sees carries the challenge, the wallet answers,
+// and it registers again, signed.
 func (r *bindRig) bind(user, token string, k bindKey) {
 	r.t.Helper()
 	if r.register(user, token, map[string]any{"bind_pub": k.pub}) {
 		r.t.Fatal("bound before any challenge was answered")
 	}
-	m, ok := r.challenge()
-	if !ok {
-		r.t.Fatal("no challenge was sent")
+	nonce, pub := r.h.BindChallengeFor(user, token)
+	if nonce == "" || pub != k.pub {
+		r.t.Fatalf("no challenge to carry: nonce %q, key %q", nonce, pub)
 	}
-	if m.Token != token || !m.Background || m.Data["type"] != "push-bind" || m.Data["bind_pub"] != k.pub {
-		r.t.Fatalf("challenge push: %+v", m)
-	}
-	if code := r.answer(token, k.pub, m.Data["nonce"], k.sign(pushBindText(token, m.Data["nonce"]))); code != http.StatusOK {
+	if code := r.answer(token, k.pub, nonce, k.sign(pushBindText(token, nonce))); code != http.StatusOK {
 		r.t.Fatalf("answer: %d", code)
 	}
 	if !r.signed(user, token, k) {
@@ -153,12 +134,70 @@ func TestPushBindWholeExchange(t *testing.T) {
 	if !has(r.db.BadgeTokens("alice"), "tok-phone") || !has(r.db.PushTokenUsers("tok-phone"), "alice") {
 		t.Fatal("the bound device is not counted")
 	}
-	// A second identity on the same phone needs no new challenge.
+	// Proven and bound: no push carries a challenge any more.
+	if nonce, _ := r.h.BindChallengeFor("alice", "tok-phone"); nonce != "" {
+		t.Fatal("a challenge is carried for a registration already bound")
+	}
+	// A second identity on the same phone is bound by its signature alone.
 	if !r.signed("alice-2", "tok-phone", k) {
 		t.Fatal("second identity not bound by its signature")
 	}
-	if _, sent := r.challenge(); sent {
-		t.Fatal("a challenge was sent for a key already proven")
+}
+
+// What a push carries, and when.
+func TestPushBindChallengeIsCarriedOnlyWhenNeeded(t *testing.T) {
+	r := newBindRig(t)
+	k := newBindKey(t)
+
+	// Nothing registered, and a wallet that named no key: nothing to carry.
+	if nonce, _ := r.h.BindChallengeFor("alice", "tok"); nonce != "" {
+		t.Fatal("a challenge for a token nobody registered")
+	}
+	r.register("alice", "tok", map[string]any{})
+	if nonce, _ := r.h.BindChallengeFor("alice", "tok"); nonce != "" {
+		t.Fatal("a challenge for a registration that named no key")
+	}
+	if nonce, _ := r.h.BindChallengeFor("", "tok"); nonce != "" {
+		t.Fatal("a challenge for no identity")
+	}
+
+	// A key named, not proven: every push carries the SAME nonce while it lives.
+	r.register("alice", "tok", map[string]any{"bind_pub": k.pub})
+	first, pub := r.h.BindChallengeFor("alice", "tok")
+	if first == "" || pub != k.pub {
+		t.Fatalf("nothing to carry: %q %q", first, pub)
+	}
+	r.now = r.now.Add(5 * time.Minute)
+	if again, _ := r.h.BindChallengeFor("alice", "tok"); again != first {
+		t.Fatal("a second push carried a different nonce while the first was open")
+	}
+	// Another identity's push to the same token carries nothing of Alice's.
+	if nonce, _ := r.h.BindChallengeFor("bob", "tok"); nonce != "" {
+		t.Fatal("a challenge carried in a push for an identity that did not register the token")
+	}
+
+	// Lapsed: the next push carries a new one, and the old one is refused.
+	r.now = r.now.Add(pushBindTTL)
+	fresh, _ := r.h.BindChallengeFor("alice", "tok")
+	if fresh == "" || fresh == first {
+		t.Fatalf("after expiry: %q (was %q)", fresh, first)
+	}
+	if code := r.answer("tok", k.pub, first, k.sign(pushBindText("tok", first))); code != http.StatusForbidden {
+		t.Fatalf("an expired nonce: %d", code)
+	}
+	// That wrong answer spent the open challenge; the next push opens another.
+	fresh, _ = r.h.BindChallengeFor("alice", "tok")
+	if code := r.answer("tok", k.pub, fresh, k.sign(pushBindText("tok", fresh))); code != http.StatusOK {
+		t.Fatalf("a fresh nonce: %d", code)
+	}
+	// Used once.
+	if code := r.answer("tok", k.pub, fresh, k.sign(pushBindText("tok", fresh))); code != http.StatusForbidden {
+		t.Fatalf("a second use: %d", code)
+	}
+	// The key is proven: what the registration lacks now is its signature,
+	// which no push can supply, so nothing is carried.
+	if nonce, _ := r.h.BindChallengeFor("alice", "tok"); nonce != "" {
+		t.Fatal("a challenge carried for a key already proven")
 	}
 }
 
@@ -166,9 +205,6 @@ func TestPushBindOldWalletStaysUnbound(t *testing.T) {
 	r := newBindRig(t)
 	if r.register("alice", "tok-phone", map[string]any{}) {
 		t.Fatal("a registration without a key came back bound")
-	}
-	if _, sent := r.challenge(); sent {
-		t.Fatal("a challenge was sent to a wallet that offered no key")
 	}
 	if len(r.db.BadgeTokens("alice")) != 0 || len(r.db.PushTokenUsers("tok-phone")) != 0 {
 		t.Fatal("an unbound token is counted")
@@ -185,12 +221,12 @@ func TestPushBindClaimingAnotherDevice(t *testing.T) {
 	alice := newBindKey(t)
 	r.bind("alice", "tok-alice", alice)
 
-	// Naming Alice's key, without her signature: unbound, and no push to her.
+	// Naming Alice's key, without her signature: unbound, and nothing to carry.
 	if r.register("mallory", "tok-alice", map[string]any{"bind_pub": alice.pub}) {
 		t.Fatal("bound by naming another device's key")
 	}
-	if _, sent := r.challenge(); sent {
-		t.Fatal("naming a proven key sent its device a push")
+	if nonce, _ := r.h.BindChallengeFor("mallory", "tok-alice"); nonce != "" {
+		t.Fatal("naming a proven key opened a challenge")
 	}
 	// A signature Alice made for her own subject does not serve Mallory.
 	at := r.now.Unix()
@@ -199,21 +235,25 @@ func TestPushBindClaimingAnotherDevice(t *testing.T) {
 	}) {
 		t.Fatal("bound with a signature over another subject")
 	}
-	// Her own key: Alice's device is challenged, and Mallory never sees the
-	// nonce. A made-up one, properly signed, is refused and spends the challenge.
+	// Her own key: the challenge rides only in pushes for Mallory's identity
+	// to Alice's device, which Mallory never sees and Alice's wallet ignores,
+	// since the key named is not its own. A made-up nonce, properly signed, is
+	// refused and spends the challenge.
 	mal := newBindKey(t)
-	r.now = r.now.Add(2 * time.Minute)
 	if r.register("mallory", "tok-alice", map[string]any{"bind_pub": mal.pub}) {
 		t.Fatal("bound with an unproven key")
 	}
-	m, sent := r.challenge()
-	if !sent {
+	nonce, pub := r.h.BindChallengeFor("mallory", "tok-alice")
+	if nonce == "" || pub != mal.pub {
 		t.Fatal("no challenge for a new key")
+	}
+	if n, _ := r.h.BindChallengeFor("alice", "tok-alice"); n != "" {
+		t.Fatal("Alice's own pushes carry Mallory's challenge")
 	}
 	if code := r.answer("tok-alice", mal.pub, "guess", mal.sign(pushBindText("tok-alice", "guess"))); code != http.StatusForbidden {
 		t.Fatalf("a guessed nonce: %d", code)
 	}
-	if code := r.answer("tok-alice", mal.pub, m.Data["nonce"], mal.sign(pushBindText("tok-alice", m.Data["nonce"]))); code != http.StatusForbidden {
+	if code := r.answer("tok-alice", mal.pub, nonce, mal.sign(pushBindText("tok-alice", nonce))); code != http.StatusForbidden {
 		t.Fatalf("the challenge survived a wrong answer: %d", code)
 	}
 	if has(r.db.PushTokenUsers("tok-alice"), "mallory") || !has(r.db.PushTokenUsers("tok-alice"), "alice") {
@@ -228,19 +268,10 @@ func TestPushBindAnswerChecks(t *testing.T) {
 	r := newBindRig(t)
 	k, other := newBindKey(t), newBindKey(t)
 	r.register("alice", "tok", map[string]any{"bind_pub": k.pub})
-	m, _ := r.challenge()
-	nonce := m.Data["nonce"]
+	nonce, _ := r.h.BindChallengeFor("alice", "tok")
 	// Signed by a key the challenge was not opened for.
 	if code := r.answer("tok", k.pub, nonce, other.sign(pushBindText("tok", nonce))); code != http.StatusForbidden {
 		t.Fatalf("wrong signer: %d", code)
-	}
-	// Expired.
-	r.now = r.now.Add(2 * time.Minute)
-	r.register("alice", "tok", map[string]any{"bind_pub": k.pub})
-	m, _ = r.challenge()
-	r.now = r.now.Add(pushBindTTL + time.Second)
-	if code := r.answer("tok", k.pub, m.Data["nonce"], k.sign(pushBindText("tok", m.Data["nonce"]))); code != http.StatusForbidden {
-		t.Fatalf("expired: %d", code)
 	}
 	if r.db.PushTokenBindKey("tok") != "" {
 		t.Fatal("a refused answer recorded a key")
@@ -255,37 +286,12 @@ func TestPushBindAnswerChecks(t *testing.T) {
 	}
 }
 
-func TestPushBindRateLimit(t *testing.T) {
-	r := newBindRig(t)
-	k := newBindKey(t)
-	r.register("alice", "tok", map[string]any{"bind_pub": k.pub})
-	if _, sent := r.challenge(); !sent {
-		t.Fatal("first challenge not sent")
-	}
-	r.register("alice", "tok", map[string]any{"bind_pub": k.pub})
-	if _, sent := r.challenge(); sent {
-		t.Fatal("a second challenge within the minute")
-	}
-	sentToday := 1
-	for i := 0; i < 30; i++ {
-		r.now = r.now.Add(61 * time.Second)
-		r.register("alice", "tok", map[string]any{"bind_pub": k.pub})
-		if _, sent := r.challenge(); sent {
-			sentToday++
-		}
-	}
-	if sentToday != pushBindPerDay {
-		t.Fatalf("challenges in a day: %d", sentToday)
-	}
-}
-
 // A new key for a bound token is taken only after its own challenge, and the
 // registrations under the old key stop counting.
 func TestPushBindRebind(t *testing.T) {
 	r := newBindRig(t)
 	old, fresh := newBindKey(t), newBindKey(t)
 	r.bind("alice", "tok", old)
-	r.now = r.now.Add(2 * time.Minute)
 	r.bind("alice", "tok", fresh)
 	if r.db.PushTokenBindKey("tok") != fresh.pub {
 		t.Fatal("the new key was not recorded")

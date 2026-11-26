@@ -202,3 +202,39 @@ func TestBadgeCountsKeptRequests(t *testing.T) {
 		t.Fatalf("a cleared device was sent again: %v", *out)
 	}
 }
+
+// A push the holder sees carries the binding challenge, in its data only and
+// on a copy; a silent push carries none.
+func TestNotifyCarriesTheBindChallenge(t *testing.T) {
+	old := bindChallenge
+	t.Cleanup(func() { bindChallenge = old })
+	asked := 0
+	SetBindChallenge(func(userID, token string) (string, string) {
+		asked++
+		if userID == "alice" && token == "tok" {
+			return "nonce-1", "key-1"
+		}
+		return "", ""
+	})
+	given := map[string]string{"type": "vault-approval"}
+	m := Message{Token: "tok", Title: "t", Body: "b", Data: given}
+	out := withBindChallenge("alice", m)
+	if out.Data["bind_nonce"] != "nonce-1" || out.Data["bind_pub"] != "key-1" || out.Data["type"] != "vault-approval" {
+		t.Fatalf("data: %v", out.Data)
+	}
+	if out.Title != "t" || out.Body != "b" {
+		t.Fatal("what is shown changed")
+	}
+	if _, touched := given["bind_nonce"]; touched {
+		t.Fatal("the caller's map was changed")
+	}
+	// Nothing to carry: the message is untouched.
+	if out := withBindChallenge("bob", Message{Token: "tok", Data: given}); len(out.Data) != 1 {
+		t.Fatalf("carried for another identity: %v", out.Data)
+	}
+	// A silent push is never asked about.
+	before := asked
+	if out := withBindChallenge("alice", Message{Token: "tok", Background: true, Data: given}); len(out.Data) != 1 || asked != before {
+		t.Fatalf("a silent push: %v, asked %d times", out.Data, asked-before)
+	}
+}

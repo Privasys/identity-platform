@@ -684,6 +684,8 @@ func main() {
 	mux.HandleFunc("GET /guardians/qr", recoveryHandler.HandleGetGuardianQR)
 	mux.HandleFunc("POST /push-token", recoveryHandler.HandleRegisterPushToken)
 	mux.HandleFunc("POST /push-token/bind", recoveryHandler.HandleBindPushToken)
+	// The binding challenge rides in the pushes the holder sees.
+	push.SetBindChallenge(recoveryHandler.BindChallengeFor)
 	// A notification answered on one phone leaves the holder's other phones.
 	mux.HandleFunc("POST /push/dismiss", recoveryHandler.HandleDismissNotification)
 	mux.HandleFunc("GET /devices", recoveryHandler.HandleListDevices)

@@ -42,6 +42,8 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
       if (u.pathname === '/authorize') return r.fulfill({ contentType: 'application/json', body: JSON.stringify({
         session_id: 'sess1', poll_url: 'https://idp.test/session/status?session_id=sess1',
         qr_payload: 'https://idp.test/qr?p=abc', requested_attributes: [] }) });
+      // The frame serves a page only once it knows the page's platform.
+      if (u.pathname === '/wallet/platforms') return r.fulfill({ contentType: 'application/json', body: '{"platforms":[{"audience":"privasys-platform"}]}' });
       if (u.pathname === '/auth/social/providers') return r.fulfill({ contentType: 'application/json', body: '{"providers":[]}' });
       return r.fulfill({ contentType: 'application/json', body: '{}' });
     }

@@ -179,9 +179,7 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
     // Any notification may carry privasys.id's request that this phone show its
     // push token is its own. Answered beside whatever the notification is
     // about, never in its place.
-    if (carriesBindChallenge(data)) {
-        void answerBindChallenge(data, ambientPushToken).catch((e) => console.warn('[notifications] push binding failed', e));
-    }
+    if (carriesBindChallenge(data)) answerChallengeCarriedBy(data);
     if (typeof data?.type === 'string' && DELETION_PUSH_TYPES.has(data.type)) {
         // An account deletion: the banner, a cancel from elsewhere, or the end.
         // Each push carries only its type; what it means is read from
@@ -602,8 +600,27 @@ let tokenRegistrationStarted = false;
 let listenersRegistered = false;
 let coldStartHandled = false;
 
+/** A challenge that arrived before this phone knew its push token. A wallet
+ *  opened by a tap on a notification handles that notification first and
+ *  learns its token after, so the answer waits for the token. The latest one
+ *  only: an older nonce has been replaced or has run out. */
+let challengeHeld: Record<string, unknown> | null = null;
+
+function answerChallengeCarriedBy(data: Record<string, unknown>): void {
+    if (!ambientPushToken) {
+        challengeHeld = data;
+        return;
+    }
+    void answerBindChallenge(data, ambientPushToken).catch((e) => console.warn('[notifications] push binding failed', e));
+}
+
 function publishToken(t: string | null): void {
     ambientPushToken = t;
+    if (t && challengeHeld) {
+        const held = challengeHeld;
+        challengeHeld = null;
+        answerChallengeCarriedBy(held);
+    }
     setOwnPushToken(t);
     for (const fn of tokenSubscribers) fn(t);
 }

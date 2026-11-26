@@ -368,6 +368,9 @@ func withBindChallenge(userID string, m Message) Message {
 	if nonce == "" {
 		return m
 	}
+	// Says only that one went out, so a binding that never completes can be
+	// told apart from a challenge that was never sent.
+	log.Printf("[push-bind] a challenge was carried by a notification")
 	data := make(map[string]string, len(m.Data)+2)
 	for k, v := range m.Data {
 		data[k] = v

@@ -1925,6 +1925,53 @@ export class AuthFrame {
     }
 
     /**
+     * Renew the session now and return the new access token. Use it when
+     * what the person may do has just changed, for example after they join
+     * an account or switch to another one: a renewal carries their current
+     * roles, where the background renewal would bring them only shortly
+     * before the token expires.
+     *
+     * It is the background renewal run early: the same refresh, under the
+     * same lock, and `onSessionRenewed` is called with the new token. Calls
+     * made while a renewal runs share it.
+     *
+     * Rejects when there is no session, when the session has ended (after
+     * `onSessionExpired`), or when the renewal could not run (it is then
+     * retried in the background, as usual).
+     */
+    async renewSession(): Promise<string> {
+        if (!this.sessionIframe?.contentWindow) await this.getSession();
+        return new Promise((resolve, reject) => {
+            if (!this.sessionIframe?.contentWindow) {
+                reject(new Error('no active session'));
+                return;
+            }
+            const id = `renew-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const target = this.sessionIframe.contentWindow;
+            const handler = (e: MessageEvent) => {
+                if (e.origin !== this.authOrigin) return;
+                if (e.source !== target) return;
+                const data = e.data;
+                if (!data || data.type !== 'privasys:renew-session:response' || data.id !== id) return;
+                window.removeEventListener('message', handler);
+                clearTimeout(timer);
+                if (typeof data.error === 'string') reject(new Error(data.error));
+                else if (typeof data.accessToken === 'string' && data.accessToken) resolve(data.accessToken);
+                else reject(new Error('malformed response from auth frame'));
+            };
+            const timer = setTimeout(() => {
+                window.removeEventListener('message', handler);
+                reject(new Error('timeout renewing the session'));
+            }, 15_000);
+            window.addEventListener('message', handler);
+            target.postMessage(
+                { type: 'privasys:renew-session', id, rpId: this.rpId, clientId: this.config.clientId },
+                this.authOrigin,
+            );
+        });
+    }
+
+    /**
      * Mint a per-audience access token (challenge mode) without rotating
      * the user's primary session. Used to call services that demand a
      * specific `aud` claim — most notably `aud=attestation-server` for

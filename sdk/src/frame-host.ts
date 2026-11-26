@@ -928,6 +928,41 @@ async function renewIfNeeded(
     });
 }
 
+// Renewals a page asked for now, per chain: calls made while one runs share
+// it, and a chain renews this way at most once per RENEW_NOW_MIN_MS.
+const RENEW_NOW_MIN_MS = 10_000;
+const renewalsNow = new Map<string, Promise<AuthSession | undefined>>();
+const lastRenewNow = new Map<string, number>();
+
+/**
+ * Renew the session now, whatever its token's expiry: what the person may do
+ * has changed (a role was granted, an account switched), and a renewal reads
+ * it afresh. Same lock, same re-read and same notification as a due renewal.
+ * Calls for one chain made while a renewal runs share that renewal. Within
+ * RENEW_NOW_MIN_MS of the last one, the stored session is returned and no
+ * grant is made, so a page asking in a loop costs the IdP nothing.
+ *
+ * `session` is the renewed one, or the stored one when no renewal was made
+ * (`renewed` false), or undefined when the chain is dead. A renewal that
+ * could not run leaves the session unchanged; it is retried as usual.
+ */
+function renewNow(chain: Chain, parentOrigin: string): Promise<{ session: AuthSession | undefined; renewed: boolean }> {
+    const key = chainKey(chain);
+    const stored = () => ({ session: sessions.getFor(chain.rpId, chain.clientId), renewed: false });
+    const running = renewalsNow.get(key);
+    if (running) return running.then((session) => ({ session, renewed: true }));
+    if (!chain.clientId) return Promise.resolve(stored());
+    if (Date.now() - (lastRenewNow.get(key) ?? 0) < RENEW_NOW_MIN_MS) return Promise.resolve(stored());
+    lastRenewNow.set(key, Date.now());
+    const run = withRefreshLock(chain.rpId, chain.clientId, async () => {
+        const fresh = sessions.getFor(chain.rpId, chain.clientId);
+        if (!fresh?.refreshToken || !fresh?.clientId) return fresh;
+        return renewSessionLocked(fresh, parentOrigin, true);
+    }).finally(() => renewalsNow.delete(key));
+    renewalsNow.set(key, run);
+    return run.then((session) => ({ session, renewed: true }));
+}
+
 /**
  * Run one refresh_token grant. Must be called with the refresh lock
  * held. Failure handling is deliberately non-destructive:
@@ -2237,6 +2272,27 @@ window.addEventListener('message', async (e: MessageEvent) => {
             { type: 'privasys:session', session: session ? { ...session, refreshToken: undefined } : null },
             e.origin,
         );
+    }
+
+    // Renew now, for a page that knows what the person may do has changed.
+    // Only the page this frame serves may ask, for its own session.
+    if (data.type === 'privasys:renew-session') {
+        if (e.source !== window.parent) return;
+        const id = data.id;
+        const reply = (payload: Record<string, unknown>) =>
+            window.parent.postMessage({ type: 'privasys:renew-session:response', id, ...payload }, e.origin);
+        const session = await sessionForPage(data.rpId, e.origin);
+        // The caller's own chain only: one rpId may hold sessions of several clients.
+        if (!session?.refreshToken || !session?.clientId || typeof data.clientId !== 'string' || session.clientId !== data.clientId) {
+            reply({ error: 'no session to renew' });
+            return;
+        }
+        const before = session.token;
+        const { session: after, renewed } = await renewNow(chainOf(session), e.origin);
+        if (!after) reply({ error: 'session expired' });
+        else if (renewed && after.token === before) reply({ error: 'renewal failed; it will be retried' });
+        else reply({ accessToken: after.token });
+        return;
     }
 
     if (data.type === 'privasys:clear-session') {

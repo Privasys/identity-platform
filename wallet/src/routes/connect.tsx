@@ -111,6 +111,7 @@ import { useSessionsStore } from '@/stores/sessions';
 import { notify } from '@/stores/notice';
 import { useSettingsStore } from '@/stores/settings';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
+import { trustAfterSignIn } from '@/services/trust-after-sign-in';
 
 import type { AttestationResult } from '../../modules/native-ratls/src/NativeRaTls.types';
 import { AttestationView, type AttestationVerificationLevel, type VerificationState } from '@/components/AttestationView';
@@ -1015,6 +1016,10 @@ function ConnectFlow() {
     // The host actually attested, so the "Challenge this enclave" button can
     // re-verify the same target in challenge mode.
     const attestationTargetRef = useRef<string | null>(null);
+    // Whether attestationRef holds what the attestation service verified in
+    // this flow, as opposed to a certificate that was only inspected (the
+    // cached fast path, or a verification that was unreachable or invalid).
+    const attestationVerifiedRef = useRef(false);
     const hasStarted = useRef(false);
 
     // Attribute acquisition state — holds FIDO2 result while user provides missing profile data
@@ -1368,6 +1373,7 @@ function ConnectFlow() {
                         );
                         setAttestation(inspectResult);
                         attestationRef.current = inspectResult;
+                        attestationVerifiedRef.current = false;
                         setVerificationLevel(null);
                         setVerification({
                             status: outcome.status,
@@ -1402,6 +1408,7 @@ function ConnectFlow() {
 
                 setAttestation(result);
                 attestationRef.current = result;
+                attestationVerifiedRef.current = level === 'fresh-as-verified';
                 setVerificationLevel(level);
 
                 // After a fresh AS verify, refresh the trusted-apps record's
@@ -1507,6 +1514,7 @@ function ConnectFlow() {
             if (outcome.status === 'verified' && outcome.result) {
                 setAttestation(outcome.result);
                 attestationRef.current = outcome.result;
+                attestationVerifiedRef.current = true;
                 setVerificationLevel('fresh-as-verified');
                 setVerification({ status: 'verified', mode: 'challenge', challenged: true });
             } else if (outcome.status === 'error') {
@@ -2705,23 +2713,18 @@ function ConnectFlow() {
                 // way here. Recording only the time left the old measurements
                 // in place after an approved change, so every later sign-in
                 // showed the same "measurement has changed" warning again.
-                const att = attestationTargetRef.current === trustKey ? attestationRef.current : null;
-                addTrustedApp({
-                    ...existingTrust,
-                    ...(att
-                        ? {
-                              mrenclave: att.mrenclave,
-                              mrtd: att.mrtd,
-                              rtmr1: att.rtmr1,
-                              rtmr2: att.rtmr2,
-                              codeHash: att.workload_code_hash,
-                              configRoot: att.workload_config_merkle_root,
-                              teeType: att.tee_type || existingTrust.teeType,
-                          }
-                        : {}),
-                    appName: payload.appName ?? existingTrust.appName,
-                    lastVerified: Math.floor(Date.now() / 1000),
-                });
+                // Only what the attestation service verified in this flow: a
+                // flow continued past an unreachable or invalid verification
+                // records no measurement (see trustAfterSignIn).
+                addTrustedApp(
+                    trustAfterSignIn(existingTrust, {
+                        attested: attestationRef.current,
+                        verified: attestationVerifiedRef.current,
+                        sameHost: attestationTargetRef.current === trustKey,
+                        appName: payload.appName,
+                        nowSeconds: Math.floor(Date.now() / 1000),
+                    }),
+                );
             }
 
             // Phase E: when the SDK opted into the sealed session-relay

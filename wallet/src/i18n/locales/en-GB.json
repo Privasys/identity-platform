@@ -984,7 +984,9 @@
     "method": "Method",
     "verifiedByMail": "Verified by email code",
     "verifiedByProvider": "Verified by {{provider}}",
-    "fromProviderAccount": "From your {{provider}} account"
+    "fromProviderAccount": "From your {{provider}} account",
+    "noMatch": "Nothing matches “{{query}}”.",
+    "listUnavailable": "The list could not be loaded. Check your connection and try again."
   },
 
   "verifyEmail": {

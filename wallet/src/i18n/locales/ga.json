@@ -1020,7 +1020,9 @@
     "method": "Modh",
     "verifiedByMail": "Fíoraithe le cód ríomhphoist",
     "verifiedByProvider": "Fíoraithe ag {{provider}}",
-    "fromProviderAccount": "Ó do chuntas {{provider}}"
+    "fromProviderAccount": "Ó do chuntas {{provider}}",
+    "noMatch": "Níl aon rud ag teacht le “{{query}}”.",
+    "listUnavailable": "Níorbh fhéidir an liosta a lódáil. Seiceáil do nasc agus bain triail eile as."
   },
 
   "verifyEmail": {

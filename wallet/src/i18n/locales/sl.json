@@ -1008,7 +1008,9 @@
     "method": "Metoda",
     "verifiedByMail": "Preverjeno s kodo po e-pošti",
     "verifiedByProvider": "Preverjeno s storitvijo {{provider}}",
-    "fromProviderAccount": "Iz vašega računa {{provider}}"
+    "fromProviderAccount": "Iz vašega računa {{provider}}",
+    "noMatch": "Ni zadetkov za »{{query}}«.",
+    "listUnavailable": "Seznama ni bilo mogoče naložiti. Preverite povezavo in poskusite znova."
   },
 
   "verifyEmail": {

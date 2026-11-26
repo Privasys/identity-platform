@@ -962,7 +962,9 @@
     "method": "Μέθοδος",
     "verifiedByMail": "Επαληθευμένο με κωδικό email",
     "verifiedByProvider": "Επαληθευμένο από {{provider}}",
-    "fromProviderAccount": "Από τον λογαριασμό σας {{provider}}"
+    "fromProviderAccount": "Από τον λογαριασμό σας {{provider}}",
+    "noMatch": "Δεν βρέθηκε αποτέλεσμα για «{{query}}».",
+    "listUnavailable": "Δεν ήταν δυνατή η φόρτωση της λίστας. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά."
   },
 
   "verifyEmail": {

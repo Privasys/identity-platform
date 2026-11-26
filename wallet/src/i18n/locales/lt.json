@@ -996,7 +996,9 @@
     "method": "Metodas",
     "verifiedByMail": "Patikrinta el. pašto kodu",
     "verifiedByProvider": "Patikrino {{provider}}",
-    "fromProviderAccount": "Iš jūsų {{provider}} paskyros"
+    "fromProviderAccount": "Iš jūsų {{provider}} paskyros",
+    "noMatch": "Nėra atitikmenų „{{query}}“.",
+    "listUnavailable": "Nepavyko įkelti sąrašo. Patikrinkite ryšį ir bandykite dar kartą."
   },
 
   "verifyEmail": {

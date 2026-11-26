@@ -974,7 +974,9 @@
     "method": "Metoda",
     "verifiedByMail": "Ověřeno kódem z e-mailu",
     "verifiedByProvider": "Ověřeno službou {{provider}}",
-    "fromProviderAccount": "Z vašeho účtu {{provider}}"
+    "fromProviderAccount": "Z vašeho účtu {{provider}}",
+    "noMatch": "Nic neodpovídá „{{query}}“.",
+    "listUnavailable": "Seznam se nepodařilo načíst. Zkontrolujte připojení a zkuste to znovu."
   },
 
   "verifyEmail": {

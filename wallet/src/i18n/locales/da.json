@@ -962,7 +962,9 @@
     "method": "Metode",
     "verifiedByMail": "Verificeret med e-mailkode",
     "verifiedByProvider": "Verificeret af {{provider}}",
-    "fromProviderAccount": "Fra din {{provider}}-konto"
+    "fromProviderAccount": "Fra din {{provider}}-konto",
+    "noMatch": "Intet matcher “{{query}}”.",
+    "listUnavailable": "Listen kunne ikke indlæses. Tjek din forbindelse, og prøv igen."
   },
 
   "verifyEmail": {

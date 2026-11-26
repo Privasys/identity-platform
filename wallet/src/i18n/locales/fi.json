@@ -962,7 +962,9 @@
     "method": "Menetelmä",
     "verifiedByMail": "Vahvistettu sähköpostikoodilla",
     "verifiedByProvider": "Vahvistanut {{provider}}",
-    "fromProviderAccount": "{{provider}}-tililtäsi"
+    "fromProviderAccount": "{{provider}}-tililtäsi",
+    "noMatch": "Ei tuloksia haulle ”{{query}}”.",
+    "listUnavailable": "Luetteloa ei voitu ladata. Tarkista yhteys ja yritä uudelleen."
   },
 
   "verifyEmail": {

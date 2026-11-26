@@ -996,7 +996,9 @@
     "method": "Metoda",
     "verifiedByMail": "Provjereno kodom iz e-pošte",
     "verifiedByProvider": "Provjereno uslugom {{provider}}",
-    "fromProviderAccount": "Iz vašeg računa {{provider}}"
+    "fromProviderAccount": "Iz vašeg računa {{provider}}",
+    "noMatch": "Nema rezultata za „{{query}}”.",
+    "listUnavailable": "Popis nije moguće učitati. Provjerite vezu i pokušajte ponovno."
   },
 
   "verifyEmail": {

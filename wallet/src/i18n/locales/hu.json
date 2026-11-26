@@ -962,7 +962,9 @@
     "method": "Módszer",
     "verifiedByMail": "E-mailes kóddal ellenőrzött",
     "verifiedByProvider": "Ellenőrizte: {{provider}}",
-    "fromProviderAccount": "{{provider}}-fiókjából"
+    "fromProviderAccount": "{{provider}}-fiókjából",
+    "noMatch": "Nincs találat erre: „{{query}}”.",
+    "listUnavailable": "A listát nem sikerült betölteni. Ellenőrizze a kapcsolatot, és próbálja újra."
   },
 
   "verifyEmail": {

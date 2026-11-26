@@ -1020,7 +1020,9 @@
     "method": "Metodu",
     "verifiedByMail": "Ivverifikat b'kodiċi bl-email",
     "verifiedByProvider": "Ivverifikat minn {{provider}}",
-    "fromProviderAccount": "Mill-kont {{provider}} tiegħek"
+    "fromProviderAccount": "Mill-kont {{provider}} tiegħek",
+    "noMatch": "Xejn ma jaqbel ma' “{{query}}”.",
+    "listUnavailable": "Il-lista ma setgħetx titgħabba. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
   },
 
   "verifyEmail": {

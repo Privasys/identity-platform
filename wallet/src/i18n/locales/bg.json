@@ -984,7 +984,9 @@
     "method": "Метод",
     "verifiedByMail": "Проверено с код по имейл",
     "verifiedByProvider": "Проверено от {{provider}}",
-    "fromProviderAccount": "От профила ви в {{provider}}"
+    "fromProviderAccount": "От профила ви в {{provider}}",
+    "noMatch": "Няма съвпадения за „{{query}}“.",
+    "listUnavailable": "Списъкът не можа да се зареди. Проверете връзката си и опитайте отново."
   },
 
   "verifyEmail": {

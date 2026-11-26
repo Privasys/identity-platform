@@ -974,7 +974,9 @@
     "method": "Méthode",
     "verifiedByMail": "Vérifié par code e-mail",
     "verifiedByProvider": "Vérifié par {{provider}}",
-    "fromProviderAccount": "Depuis votre compte {{provider}}"
+    "fromProviderAccount": "Depuis votre compte {{provider}}",
+    "noMatch": "Aucun résultat pour « {{query}} ».",
+    "listUnavailable": "Impossible de charger la liste. Vérifiez votre connexion et réessayez."
   },
 
   "verifyEmail": {

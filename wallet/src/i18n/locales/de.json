@@ -962,7 +962,9 @@
     "method": "Methode",
     "verifiedByMail": "Geprüft per E-Mail-Code",
     "verifiedByProvider": "Geprüft durch {{provider}}",
-    "fromProviderAccount": "Aus Ihrem {{provider}}-Konto"
+    "fromProviderAccount": "Aus Ihrem {{provider}}-Konto",
+    "noMatch": "Keine Treffer für „{{query}}“.",
+    "listUnavailable": "Die Liste konnte nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
   },
 
   "verifyEmail": {

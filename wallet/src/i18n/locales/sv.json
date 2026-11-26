@@ -962,7 +962,9 @@
     "method": "Metod",
     "verifiedByMail": "Verifierat med e-postkod",
     "verifiedByProvider": "Verifierat av {{provider}}",
-    "fromProviderAccount": "Från ditt {{provider}}-konto"
+    "fromProviderAccount": "Från ditt {{provider}}-konto",
+    "noMatch": "Inga träffar för ”{{query}}”.",
+    "listUnavailable": "Listan kunde inte läsas in. Kontrollera anslutningen och försök igen."
   },
 
   "verifyEmail": {

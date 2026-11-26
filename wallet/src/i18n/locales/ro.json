@@ -996,7 +996,9 @@
     "method": "Metodă",
     "verifiedByMail": "Verificat prin cod pe e-mail",
     "verifiedByProvider": "Verificat de {{provider}}",
-    "fromProviderAccount": "Din contul tău {{provider}}"
+    "fromProviderAccount": "Din contul tău {{provider}}",
+    "noMatch": "Niciun rezultat pentru „{{query}}”.",
+    "listUnavailable": "Lista nu a putut fi încărcată. Verifică conexiunea și încearcă din nou."
   },
 
   "verifyEmail": {

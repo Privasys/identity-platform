@@ -986,7 +986,9 @@
     "method": "Metoda",
     "verifiedByMail": "Zweryfikowane kodem z e-maila",
     "verifiedByProvider": "Zweryfikowane przez {{provider}}",
-    "fromProviderAccount": "Z Twojego konta {{provider}}"
+    "fromProviderAccount": "Z Twojego konta {{provider}}",
+    "noMatch": "Brak wyników dla „{{query}}”.",
+    "listUnavailable": "Nie udało się wczytać listy. Sprawdź połączenie i spróbuj ponownie."
   },
 
   "verifyEmail": {

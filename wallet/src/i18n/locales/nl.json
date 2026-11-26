@@ -962,7 +962,9 @@
     "method": "Methode",
     "verifiedByMail": "Geverifieerd met e-mailcode",
     "verifiedByProvider": "Geverifieerd door {{provider}}",
-    "fromProviderAccount": "Uit je {{provider}}-account"
+    "fromProviderAccount": "Uit je {{provider}}-account",
+    "noMatch": "Geen resultaten voor ‘{{query}}’.",
+    "listUnavailable": "De lijst kon niet worden geladen. Controleer je verbinding en probeer het opnieuw."
   },
 
   "verifyEmail": {

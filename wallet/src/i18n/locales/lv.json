@@ -996,7 +996,9 @@
     "method": "Metode",
     "verifiedByMail": "Pārbaudīts ar e-pasta kodu",
     "verifiedByProvider": "Pārbaudījis {{provider}}",
-    "fromProviderAccount": "No jūsu {{provider}} konta"
+    "fromProviderAccount": "No jūsu {{provider}} konta",
+    "noMatch": "Nekas neatbilst “{{query}}”.",
+    "listUnavailable": "Sarakstu neizdevās ielādēt. Pārbaudiet savienojumu un mēģiniet vēlreiz."
   },
 
   "verifyEmail": {

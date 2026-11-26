@@ -996,7 +996,9 @@
     "method": "Metóda",
     "verifiedByMail": "Overené kódom z e-mailu",
     "verifiedByProvider": "Overené službou {{provider}}",
-    "fromProviderAccount": "Z vášho účtu {{provider}}"
+    "fromProviderAccount": "Z vášho účtu {{provider}}",
+    "noMatch": "Nič nezodpovedá „{{query}}“.",
+    "listUnavailable": "Zoznam sa nepodarilo načítať. Skontrolujte pripojenie a skúste to znova."
   },
 
   "verifyEmail": {

@@ -67,6 +67,39 @@ const SAMPLE_LINES: Record<DocType, string[]> = {
 const DOC_PAGE_RATIO = 1.42;
 // An ID card (TD1) is 85.6×54 mm.
 const ID_CARD_RATIO = 1.586;
+// The machine readable zone spans about 89% of the document's width on both
+// a passport page and an ID card (ICAO 9303: 44 or 30 characters at 2.54 mm).
+const MRZ_WIDTH_OF_DOC = 0.89;
+// In landscape the page is framed to fill this much of the screen height.
+const LANDSCAPE_DOC_HEIGHT = 0.9;
+// A monospace character is about this wide, as a fraction of the font size.
+const MONO_CHAR_EM = 0.62;
+
+/**
+ * Where the sample slot goes in landscape. Held on its side, the phone frames
+ * the photo page by its height, so the lines sit at the bottom of the screen
+ * and span about half its width. The slot takes that place and size, and its
+ * sample text is scaled to fill it, so the holder brings the page to the
+ * distance where the real lines line up with it. Null in portrait, where the
+ * slot keeps its sample-sized shape.
+ */
+function landscapeSlot(doc: DocType, winW: number, winH: number, bottomInset: number) {
+    if (winW <= winH) return null;
+    const ratio = doc === 'id-card' ? ID_CARD_RATIO : DOC_PAGE_RATIO;
+    const docH = winH * LANDSCAPE_DOC_HEIGHT;
+    const width = Math.min(winW * 0.9, docH * ratio * MRZ_WIDTH_OF_DOC);
+    const lines = SAMPLE_LINES[doc];
+    const chars = Math.max(...lines.map((l) => l.length));
+    // 20: horizontal padding, 4: the border.
+    const fontSize = Math.max(11, Math.min(24, (width - 24) / (chars * MONO_CHAR_EM)));
+    const lineHeight = Math.round(fontSize * 1.4);
+    // The lines are at the foot of the page, which ends just above the bottom
+    // of the screen.
+    const bottom = Math.max(bottomInset + 12, winH * (1 - LANDSCAPE_DOC_HEIGHT) / 2 + docH * 0.04);
+    const height = lines.length * lineHeight + 16 + 4;
+    return { width, fontSize, lineHeight, bottom, height };
+}
+
 // How long the camera may show a zone the phone cannot fully read before the
 // frame is sent to the enclave regardless.
 const UNREAD_BEFORE_SENDING_MS = 2500;
@@ -252,6 +285,7 @@ export default function KycCaptureScreen() {
     const [showExplainer, setShowExplainer] = useState(false);
 
     const { width: winW, height: winH } = useWindowDimensions();
+    const wideSlot = landscapeSlot(docType, winW, winH, insets.bottom);
 
     useEffect(() => {
         Emrtd.isSupported().then(setSupport).catch(() => setSupport({ supported: false }));
@@ -1014,9 +1048,23 @@ export default function KycCaptureScreen() {
                             ]}
                         />
                     ) : (
-                        <NativeView pointerEvents="none" style={styles.linesSlot}>
+                        <NativeView
+                            pointerEvents="none"
+                            style={[
+                                styles.linesSlot,
+                                wideSlot && { top: undefined, bottom: wideSlot.bottom, width: wideSlot.width, maxWidth: undefined },
+                            ]}
+                        >
                             {SAMPLE_LINES[docType].map((line) => (
-                                <Text key={line} allowFontScaling={false} numberOfLines={1} style={styles.linesSample}>
+                                <Text
+                                    key={line}
+                                    allowFontScaling={false}
+                                    numberOfLines={1}
+                                    style={[
+                                        styles.linesSample,
+                                        wideSlot && { fontSize: wideSlot.fontSize, lineHeight: wideSlot.lineHeight, textAlign: 'center' },
+                                    ]}
+                                >
                                     {line}
                                 </Text>
                             ))}
@@ -1029,7 +1077,15 @@ export default function KycCaptureScreen() {
                                 : t('kyc.camHold')}
                         </Text>
                     </NativeView>
-                    <NativeView style={[styles.capturePill, { bottom: insets.bottom + 14 }]} pointerEvents="none">
+                    {/* In landscape the lines sit at the foot of the screen, so
+                        the status goes just above them instead of on top. */}
+                    <NativeView
+                        style={[
+                            styles.capturePill,
+                            { bottom: wideSlot ? wideSlot.bottom + wideSlot.height + 10 : insets.bottom + 14 },
+                        ]}
+                        pointerEvents="none"
+                    >
                         {captureState === 'captured' ? (
                             <Ionicons name="checkmark-circle" size={20} color="#34C759" />
                         ) : (
@@ -1355,9 +1411,10 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     // Round the lines themselves, wherever they are in view.
     linesBox: { position: 'absolute', borderWidth: 3, borderRadius: 10, borderColor: '#FFFFFF' },
     linesBoxRead: { borderColor: '#34C759', backgroundColor: 'rgba(52,199,89,0.16)' },
-    // Where to put them, with a sample of what they look like. As wide as the
-    // sample and no wider, so the slot has the shape of the lines; a little
-    // below the middle, where they fall when the page fills the width.
+    // Where to put them, with a sample of what they look like. In portrait:
+    // as wide as the sample and no wider, so the slot has the shape of the
+    // lines; a little below the middle, where they fall when the page fills
+    // the width. In landscape, landscapeSlot() overrides the place and size.
     linesSlot: {
         position: 'absolute', alignSelf: 'center', top: '56%', maxWidth: '94%',
         paddingVertical: 8, paddingHorizontal: 10,

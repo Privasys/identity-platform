@@ -41,6 +41,15 @@ import { useCardAddressCheck } from '@/hooks/useCardAddressCheck';
 import { provedBy } from '@/services/attribute-proofs';
 import { currentLocale } from '@/i18n';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
+import { attributeInputProps } from '@/utils/attribute-input';
+import { BirthdateField } from '@/components/BirthdateField';
+import { calendarDate } from '@/services/calendar-date';
+import { isCodedAttribute, useValueLabel } from '@/services/value-sets';
+
+/** Values that are calendar days (`YYYY-MM-DD`), shown as a long date. */
+const DATE_KEYS = new Set(['birthdate', 'birthdate_id', 'doc_expiry']);
+/** Of those, the ones chosen on the calendar when added or changed here. */
+const CALENDAR_KEYS = new Set(['birthdate', 'birthdate_id']);
 
 export default function PersonalDataScreen() {
     const { t } = useTranslation();
@@ -92,6 +101,12 @@ export default function PersonalDataScreen() {
         // the library instead of the text field.
         if (key === 'picture') {
             chooseAvatar();
+            return;
+        }
+        // A country or a language is picked from the list, by its name in the
+        // holder's language; the code is what gets stored.
+        if (isCodedAttribute(key)) {
+            router.push({ pathname: '/attribute-value', params: { key } } as never);
             return;
         }
         setAddingAttribute(key);
@@ -247,16 +262,19 @@ export default function PersonalDataScreen() {
                         <Text style={styles.addAttrLabel}>
                             {CANONICAL_ATTRIBUTES.find((a) => a.key === addingAttribute)?.label}
                         </Text>
-                        <TextInput
-                            style={styles.addAttrInput}
-                            value={newAttrValue}
-                            onChangeText={setNewAttrValue}
-                            placeholder={t('personalData.enterValue')}
-                            placeholderTextColor={p.textMuted}
-                            autoFocus
-                            autoCapitalize={addingAttribute === 'email' ? 'none' : 'words'}
-                            keyboardType={addingAttribute === 'email' ? 'email-address' : addingAttribute === 'phone_number' ? 'phone-pad' : 'default'}
-                        />
+                        {CALENDAR_KEYS.has(addingAttribute) ? (
+                            <BirthdateField value={newAttrValue} onChange={setNewAttrValue} />
+                        ) : (
+                            <TextInput
+                                style={styles.addAttrInput}
+                                value={newAttrValue}
+                                onChangeText={setNewAttrValue}
+                                placeholder={t('personalData.enterValue')}
+                                placeholderTextColor={p.textMuted}
+                                autoFocus
+                                {...attributeInputProps(addingAttribute)}
+                            />
+                        )}
                         <RNView style={styles.addAttrActions}>
                             <Pressable onPress={() => setAddingAttribute(null)}>
                                 <Text style={styles.addAttrCancel}>{t('common.cancel')}</Text>
@@ -328,6 +346,7 @@ function AttributeCard({
     onVerify?: () => void;
 }) {
     const { t } = useTranslation();
+    const router = useRouter();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const [expanded, setExpanded] = useState(false);
@@ -369,6 +388,19 @@ function AttributeCard({
     // picture, not editable text.
     const isImage = attr.key === 'picture' || attr.key === 'picture_id';
 
+    // A coded value (a country, a language) is changed by picking from the
+    // list, on its own screen; everything else in place.
+    const coded = isCodedAttribute(attr.key);
+    const valueLabel = useValueLabel(attr.key, attr.value);
+    const beginEdit = () => {
+        if (coded) {
+            router.push({ pathname: '/attribute-value', params: { key: attr.key, value: attr.value } } as never);
+            return;
+        }
+        setEditing(true);
+        setEditValue(attr.value);
+    };
+
     const handleStartEdit = () => {
         if (isImage) return;
         if (attr.verified) {
@@ -377,12 +409,11 @@ function AttributeCard({
                 t('personalData.editVerifiedBody'),
                 [
                     { text: t('common.cancel'), style: 'cancel' },
-                    { text: t('personalData.editAnyway'), onPress: () => { setEditing(true); setEditValue(attr.value); } },
+                    { text: t('personalData.editAnyway'), onPress: beginEdit },
                 ],
             );
         } else {
-            setEditing(true);
-            setEditValue(attr.value);
+            beginEdit();
         }
     };
 
@@ -440,16 +471,21 @@ function AttributeCard({
 
                         {editing ? (
                             <RNView style={styles.inlineEditRow}>
-                                <TextInput
-                                    style={styles.inlineEditInput}
-                                    value={editValue}
-                                    onChangeText={setEditValue}
-                                    autoFocus
-                                    autoCapitalize={attr.key === 'email' ? 'none' : 'words'}
-                                    keyboardType={attr.key === 'email' ? 'email-address' : attr.key === 'phone_number' ? 'phone-pad' : 'default'}
-                                    onSubmitEditing={handleSaveEdit}
-                                    returnKeyType="done"
-                                />
+                                {CALENDAR_KEYS.has(attr.key) ? (
+                                    <RNView style={{ flex: 1 }}>
+                                        <BirthdateField value={editValue} onChange={setEditValue} />
+                                    </RNView>
+                                ) : (
+                                    <TextInput
+                                        style={styles.inlineEditInput}
+                                        value={editValue}
+                                        onChangeText={setEditValue}
+                                        autoFocus
+                                        {...attributeInputProps(attr.key)}
+                                        onSubmitEditing={handleSaveEdit}
+                                        returnKeyType="done"
+                                    />
+                                )}
                                 <Pressable onPress={handleSaveEdit}>
                                     <Ionicons name="checkmark-circle" size={24} color={p.green} />
                                 </Pressable>
@@ -476,8 +512,10 @@ function AttributeCard({
                                     {attr.key === 'address'
                                         ? formatAddress(attr.value)
                                         : attr.key === 'billing_country'
-                                          ? `${countryFlag(attr.value)} ${attr.value}`
-                                          : attr.value}
+                                          ? `${countryFlag(attr.value)} ${valueLabel}`
+                                          : DATE_KEYS.has(attr.key) && calendarDate(attr.value)
+                                            ? t('kyc.reviewDate', { when: calendarDate(attr.value) })
+                                            : valueLabel}
                                 </Text>
                                 {!isImage && (
                                     <Pressable onPress={handleStartEdit} hitSlop={8}>

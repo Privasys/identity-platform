@@ -91,7 +91,10 @@ import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
 import { selfAssertedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, profileName, govValueKey, isDerived, isEmailVerified, setProfileValue } from '@/services/attributes';
 import { discloseAttribute, provePresence, voucherForAttribute } from '@/services/kyc';
 import { disclosureRpId } from '@/services/voucher-rp';
-import { getAttributeValues, type ValueOption } from '@/services/value-sets';
+import { isCodedAttribute } from '@/services/value-sets';
+import { ValueList } from '@/components/ValueList';
+import { BirthdateField } from '@/components/BirthdateField';
+import { attributeInputProps } from '@/utils/attribute-input';
 import { getDeviceAttribute } from '@/services/device-attributes';
 import { snapshotDisclosed } from '@/services/consent';
 import { useAuthStore } from '@/stores/auth';
@@ -3562,17 +3565,11 @@ function AttributeAcquisitionView({
     const [mode, setMode] = useState<'choose' | 'manual'>('choose');
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
     const [manualValues, setManualValues] = useState<Record<string, string>>({});
-    const [localePickerOpen, setLocalePickerOpen] = useState(false);
-    const [localeOptions, setLocaleOptions] = useState<ValueOption[]>([]);
+    // The coded attribute (language, nationality, billing country) whose list
+    // is open, and the long name of each value picked, shown in its field.
+    const [pickerFor, setPickerFor] = useState<string | null>(null);
+    const [pickedLabels, setPickedLabels] = useState<Record<string, string>>({});
     const profileCreated = useRef(false);
-
-    // Lazily fetch the locale value set (from the IdP referential) when manual
-    // entry needs it, so the wallet doesn't bundle its own copy.
-    useEffect(() => {
-        if (mode === 'manual' && localeOptions.length === 0) {
-            getAttributeValues('locale').then(setLocaleOptions).catch(() => {});
-        }
-    }, [mode, localeOptions.length]);
 
     // Auto-create a bare profile if one doesn't exist yet
     useEffect(() => {
@@ -3943,23 +3940,38 @@ function AttributeAcquisitionView({
                                         </RNView>
                                     );
                                 }
-                                // locale must be a standard BCP-47 tag — offer a
-                                // constrained picker instead of free text.
-                                if (attr === 'locale') {
-                                    const selected = manualValues.locale;
+                                // A coded value (BCP 47 language, ISO 3166 country)
+                                // is picked from the list by its long name in the
+                                // holder's language, never typed as a code.
+                                if (isCodedAttribute(attr)) {
+                                    const selected = manualValues[attr];
                                     return (
                                         <RNView key={attr} style={acqStyles.inputContainer}>
                                             <Text style={acqStyles.inputLabel}>{label}</Text>
                                             <Pressable
                                                 style={acqStyles.input}
-                                                onPress={() => setLocalePickerOpen(true)}
+                                                onPress={() => setPickerFor(attr)}
                                             >
                                                 <Text style={selected ? acqStyles.pickerValue : acqStyles.pickerPlaceholder}>
                                                     {selected
-                                                        ? (localeOptions.find((o) => o.value === selected)?.label ?? selected)
-                                                        : t('connect.selectLanguage')}
+                                                        ? (pickedLabels[attr] ?? selected)
+                                                        : attr === 'locale'
+                                                          ? t('connect.selectLanguage')
+                                                          : t('connect.attributePlaceholder', { label: label.toLowerCase() })}
                                                 </Text>
                                             </Pressable>
+                                        </RNView>
+                                    );
+                                }
+                                if (attr === 'birthdate') {
+                                    return (
+                                        <RNView key={attr} style={acqStyles.inputContainer}>
+                                            <Text style={acqStyles.inputLabel}>{label}</Text>
+                                            <BirthdateField
+                                                value={manualValues[attr] ?? ''}
+                                                onChange={(v) => setManualValues((prev) => ({ ...prev, [attr]: v }))}
+                                                placeholder={t('connect.attributePlaceholder', { label: label.toLowerCase() })}
+                                            />
                                         </RNView>
                                     );
                                 }
@@ -3976,9 +3988,7 @@ function AttributeAcquisitionView({
                                                     : t('connect.attributePlaceholder', { label: label.toLowerCase() })
                                             }
                                             placeholderTextColor={p.textMuted}
-                                            keyboardType={attr === 'email' ? 'email-address' : 'default'}
-                                            autoCapitalize={attr === 'email' ? 'none' : 'words'}
-                                            autoComplete={attr === 'email' ? 'email' : attr === 'name' ? 'name' : 'off'}
+                                            {...attributeInputProps(attr)}
                                         />
                                     </RNView>
                                 );
@@ -4002,34 +4012,32 @@ function AttributeAcquisitionView({
                     )}
                 </ScrollView>
 
-                {/* Locale picker modal (BCP-47 tags) */}
+                {/* The list for a coded attribute: codes stored, names shown. */}
                 <Modal
-                    visible={localePickerOpen}
+                    visible={pickerFor !== null}
                     animationType="slide"
                     transparent
-                    onRequestClose={() => setLocalePickerOpen(false)}
+                    onRequestClose={() => setPickerFor(null)}
                 >
-                    <Pressable style={acqStyles.pickerBackdrop} onPress={() => setLocalePickerOpen(false)}>
-                        <RNView style={acqStyles.pickerSheet}>
-                            <Text style={acqStyles.pickerTitle}>{t('connect.selectLanguage')}</Text>
-                            <ScrollView>
-                                {localeOptions.map((opt) => (
-                                    <Pressable
-                                        key={opt.value}
-                                        style={acqStyles.pickerRow}
-                                        onPress={() => {
-                                            setManualValues((prev) => ({ ...prev, locale: opt.value }));
-                                            setLocalePickerOpen(false);
-                                        }}
-                                    >
-                                        <Text style={acqStyles.pickerRowText}>{opt.label}</Text>
-                                        {manualValues.locale === opt.value && (
-                                            <Ionicons name="checkmark" size={20} color={p.action} />
-                                        )}
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
-                        </RNView>
+                    <Pressable style={acqStyles.pickerBackdrop} onPress={() => setPickerFor(null)}>
+                        {/* The sheet swallows its own taps, so only the dim area closes it. */}
+                        <Pressable style={acqStyles.pickerSheet} onPress={() => {}}>
+                            <Text style={acqStyles.pickerTitle}>
+                                {pickerFor === 'locale' ? t('connect.selectLanguage') : pickerFor ? attributeLabel(pickerFor) : ''}
+                            </Text>
+                            {pickerFor ? (
+                                <ValueList
+                                    attrKey={pickerFor}
+                                    selected={manualValues[pickerFor]}
+                                    bottomInset={insets.bottom}
+                                    onSelect={(opt) => {
+                                        setManualValues((prev) => ({ ...prev, [pickerFor]: opt.value }));
+                                        setPickedLabels((prev) => ({ ...prev, [pickerFor]: opt.label }));
+                                        setPickerFor(null);
+                                    }}
+                                />
+                            ) : null}
+                        </Pressable>
                     </Pressable>
                 </Modal>
 
@@ -4058,7 +4066,9 @@ const makeAcqStyles = (p: Palette) => StyleSheet.create({
     pickerValue: { fontSize: 16, color: p.textPrimary },
     pickerPlaceholder: { fontSize: 16, color: p.textMuted },
     pickerBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-    pickerSheet: { backgroundColor: p.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 16, paddingBottom: 32, maxHeight: '70%' },
+    // The list inside is cards on the screen background, as on its full-screen
+    // form (routes/attribute-value.tsx), and a fixed height lets it scroll.
+    pickerSheet: { backgroundColor: p.screenBg, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 16, paddingHorizontal: 16, height: '75%' },
     pickerTitle: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginBottom: 12, color: p.textPrimary },
     pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 24, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border },
     pickerRowText: { fontSize: 16, color: p.textPrimary },

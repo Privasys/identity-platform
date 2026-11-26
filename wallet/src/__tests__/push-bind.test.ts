@@ -108,3 +108,23 @@ describe('clearing a notification on the other phones', () => {
         expect(verifies(p.sig, `privasys-push-dismiss/v1\ntok\nAbCdEfGhIjKlMnOpQrStUv\n${p.issued_at}`, bind_pub)).toBe(true);
     });
 });
+
+describe('a challenge carried by a notification', () => {
+    it('is answered from its bind_nonce, beside whatever the notification is about, and once', async () => {
+        const { bind_pub } = await registrationProof('tok');
+        const data = { type: 'vault-approval', vault_op: 'op-1', bind_nonce: 'n-visible', bind_pub };
+        expect(await answerBindChallenge(data, 'tok')).toBe(true);
+        const b = fetched[0].body as { nonce: string; sig: string };
+        expect(b.nonce).toBe('n-visible');
+        expect(verifies(b.sig, 'privasys-push-bind/v1\ntok\nn-visible', bind_pub)).toBe(true);
+        // Shown, then opened, then found in the tray: the same nonce is not sent again.
+        expect(await answerBindChallenge(data, 'tok')).toBe(false);
+        expect(fetched).toHaveLength(1);
+    });
+
+    it("is ignored when it names another key, as someone else's registration of this token would", async () => {
+        const stranger = bytesToBase64url(ed25519.getPublicKey(new Uint8Array(32).fill(9)));
+        expect(await answerBindChallenge({ type: 'auth-request', bind_nonce: 'n', bind_pub: stranger }, 'tok')).toBe(false);
+        expect(fetched).toHaveLength(0);
+    });
+});

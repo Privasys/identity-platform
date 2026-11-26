@@ -8,9 +8,12 @@
  * word that the token belonged to the phone making it. Now the phone holds a
  * signing key for the purpose and proves the token in two steps:
  *
- *  1. privasys.id pushes a nonce to the token. Only the phone that receives
- *     the token's pushes sees it. The phone returns it signed
- *     (POST /push-token/bind), and its key becomes the token's.
+ *  1. privasys.id puts a nonce in the notifications it sends to the token (a
+ *     sign-in request, an approval). Only the phone that receives the token's
+ *     pushes sees it. The phone returns it signed (POST /push-token/bind), and
+ *     its key becomes the token's. The nonce rides in notifications the holder
+ *     sees because a silent push sent only to carry it did not reach this code
+ *     on iOS, which decides for itself whether to wake an app for one.
  *  2. Each identity on the phone registers the token with a signature, under
  *     that key, over its own subject. That is what binds an identity: the
  *     phone never signs for a subject it does not hold.
@@ -29,8 +32,13 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 import { base64urlToBytes, bytesToBase64url } from '../utils/encoding';
 
-/** The silent push that carries a challenge. */
+/** The silent push that once carried a challenge on its own. privasys.id no
+ *  longer sends it; one that arrives is still answered. */
 export const BIND_TYPE = 'push-bind';
+
+/** Nonces already answered, so a notification seen twice (shown, then opened,
+ *  then found in the tray) is answered once. */
+const answered = new Set<string>();
 
 const IDP_BASE = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
 const KEY_INFO = 'privasys-push-bind-key/v1';
@@ -102,10 +110,16 @@ export function repeatWhenBound(subject: string, register: () => Promise<unknown
  * this phone's token, and signing it would hand them the token.
  */
 export async function answerBindChallenge(data: Record<string, unknown> | null | undefined, pushToken: string | null): Promise<boolean> {
-    const nonce = data?.nonce;
+    // In a notification's data the nonce is `bind_nonce`, beside whatever the
+    // notification is about; in the silent push of old it was `nonce`.
+    const nonce = typeof data?.bind_nonce === 'string' ? data.bind_nonce : data?.nonce;
     if (!pushToken || typeof nonce !== 'string' || !nonce || typeof data?.bind_pub !== 'string') return false;
+    if (answered.has(nonce)) return false;
     const key = await bindKey();
     if (data.bind_pub !== key.pub) return false;
+    // Marked before the call: the nonce is single use at privasys.id, so a
+    // second try could only be refused.
+    answered.add(nonce);
     const res = await fetch(`${IDP_BASE}/push-token/bind`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,4 +142,26 @@ export async function answerBindChallenge(data: Record<string, unknown> | null |
 export function resetPushBind(): void {
     cached = null;
     waiting.clear();
+    answered.clear();
+}
+
+/** Whether a notification's data carries a challenge at all. */
+export function carriesBindChallenge(data: Record<string, unknown> | null | undefined): boolean {
+    return typeof data?.bind_nonce === 'string' && !!data.bind_nonce && typeof data?.bind_pub === 'string';
+}
+
+/**
+ * Answer the challenge carried by any notification still in the tray. A
+ * notification the holder never tapped (the wallet was opened from its icon)
+ * would otherwise leave the challenge unanswered until the next one.
+ */
+export async function answerFromTray(pushToken: string | null): Promise<void> {
+    if (!pushToken) return;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Notifications = require('expo-notifications') as typeof import('expo-notifications');
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    for (const n of presented) {
+        const data = n.request?.content?.data as Record<string, unknown> | undefined;
+        if (carriesBindChallenge(data) && (await answerBindChallenge(data, pushToken).catch(() => false))) return;
+    }
 }

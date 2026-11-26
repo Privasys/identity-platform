@@ -30,7 +30,7 @@ import {
     DISMISS_TYPE,
     setOwnPushToken,
 } from '../services/notification-dismiss';
-import { answerBindChallenge, BIND_TYPE } from '../services/push-bind';
+import { answerBindChallenge, answerFromTray, BIND_TYPE, carriesBindChallenge } from '../services/push-bind';
 
 let _notificationsSetup = false;
 
@@ -176,6 +176,12 @@ async function fileDriveNotification(data: Record<string, unknown>): Promise<boo
  *  into the drive-notifications store and open the requests screen; everything
  *  else runs through the auth/voucher connect flow. */
 async function dispatchPush(data: Record<string, unknown>, router: Router): Promise<void> {
+    // Any notification may carry privasys.id's request that this phone show its
+    // push token is its own. Answered beside whatever the notification is
+    // about, never in its place.
+    if (carriesBindChallenge(data)) {
+        void answerBindChallenge(data, ambientPushToken).catch((e) => console.warn('[notifications] push binding failed', e));
+    }
     if (typeof data?.type === 'string' && DELETION_PUSH_TYPES.has(data.type)) {
         // An account deletion: the banner, a cancel from elsewhere, or the end.
         // Each push carries only its type; what it means is read from
@@ -514,6 +520,9 @@ async function answeredHere(data: Record<string, unknown>): Promise<void> {
 
 /** Clear notifications that can no longer be answered, then file the rest. */
 async function sweepTray(): Promise<void> {
+    // Before anything is cleared: a notification still in the tray may carry
+    // the challenge.
+    await answerFromTray(ambientPushToken).catch((e) => console.warn('[notifications] push binding from the tray failed', e));
     await dismissStale().catch((e) => console.warn('[notifications] stale sweep failed', e));
     await sweepPresentedApprovals();
 }

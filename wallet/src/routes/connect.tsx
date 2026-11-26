@@ -2700,8 +2700,25 @@ function ConnectFlow() {
                     : payload.rpId;
             const existingTrust = getApp(trustKey);
             if (existingTrust) {
+                // What was just attested is what the holder now trusts: either
+                // it matched the record, or they approved the change on the
+                // way here. Recording only the time left the old measurements
+                // in place after an approved change, so every later sign-in
+                // showed the same "measurement has changed" warning again.
+                const att = attestationTargetRef.current === trustKey ? attestationRef.current : null;
                 addTrustedApp({
                     ...existingTrust,
+                    ...(att
+                        ? {
+                              mrenclave: att.mrenclave,
+                              mrtd: att.mrtd,
+                              rtmr1: att.rtmr1,
+                              rtmr2: att.rtmr2,
+                              codeHash: att.workload_code_hash,
+                              configRoot: att.workload_config_merkle_root,
+                              teeType: att.tee_type || existingTrust.teeType,
+                          }
+                        : {}),
                     appName: payload.appName ?? existingTrust.appName,
                     lastVerified: Math.floor(Date.now() / 1000),
                 });

@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Cancelar",
+    "testPlatform": "Teste",
     "close": "Fechar",
     "confirm": "Confirmar",
     "continue": "Continuar",
@@ -525,6 +526,7 @@
 
   "drive": {
     "subtitle": "Os seus ficheiros confidenciais",
+    "keyWaitsForOperator": "O Drive não consegue abrir os seus ficheiros até o operador atualizar a sua chave. Os seus ficheiros não foram alterados. Tente novamente mais tarde.",
     "shareRequests": "Pedidos de partilha",
     "folder": "Pasta",
     "file": "Ficheiro",

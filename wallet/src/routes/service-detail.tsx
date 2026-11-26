@@ -50,6 +50,7 @@ import type { TFunction } from 'i18next';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
 import { useBandless } from '@/components/pane';
 import { SubPageHeader } from '@/components/SubPageHeader';
+import { onOtherPlatform } from '@/services/platforms';
 
 function appName(rpId: string): string {
     const dot = rpId.indexOf('.');
@@ -154,6 +155,18 @@ export default function ServiceDetailScreen() {
 
     const name = latest?.displayName ?? app?.appName ?? appName(serviceKey);
     const primaryHost = latest?.appHost ?? latest?.rpId ?? app?.rpId ?? serviceKey;
+    // A service on another platform than the default one (a test platform)
+    // says so: two services can carry the same name on each.
+    const [otherPlatform, setOtherPlatform] = useState(false);
+    useEffect(() => {
+        let live = true;
+        void onOtherPlatform(primaryHost).then((other) => {
+            if (live) setOtherPlatform(other);
+        });
+        return () => {
+            live = false;
+        };
+    }, [primaryHost]);
 
     const [removing, setRemoving] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
@@ -500,6 +513,11 @@ export default function ServiceDetailScreen() {
                         </RNView>
                         <Text style={styles.serviceName}>{name}</Text>
                         <Text style={styles.serviceOrigin}>{primaryHost}</Text>
+                        {otherPlatform ? (
+                            <RNView style={styles.platformTag} testID="service-platform-tag">
+                                <Text style={styles.platformTagText}>{t('common.testPlatform')}</Text>
+                            </RNView>
+                        ) : null}
                         <Text style={styles.serviceMeta}>{headerMeta}</Text>
                     </RNView>
 
@@ -944,6 +962,16 @@ const makeStyles = (p: Palette) => StyleSheet.create({
         marginBottom: 4
     },
     serviceMeta: { fontSize: 13, color: p.textSecondary },
+    platformTag: {
+        alignSelf: 'center',
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: p.warnText,
+        paddingHorizontal: 10,
+        paddingVertical: 2,
+        marginBottom: 6,
+    },
+    platformTagText: { fontSize: 11, fontWeight: '600', color: p.warnText, letterSpacing: 0.5, textTransform: 'uppercase' },
     card: {
         backgroundColor: p.card,
         borderRadius: 16,

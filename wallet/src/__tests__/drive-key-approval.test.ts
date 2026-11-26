@@ -27,7 +27,7 @@ jest.mock('../services/vault-approval-api', () => ({
     fetchVaultApproval: jest.fn(async () => (mockExpiresAt === null ? null : { expires_at: mockExpiresAt })),
 }));
 
-import { approvalNeeded, obtainApproval, refusalFor, requestBody } from '../services/drive-key-approval';
+import { approvalNeeded, obtainApproval, refusalFor, requestBody, waitsForOperator } from '../services/drive-key-approval';
 
 const APP = '02104572ca2f41e8ae2d24c0294e6f5e';
 const HANDLE = `apps.privasys.org/${APP}/data/c5144d4b012d351cc3538d2fcda87f88/mek/v15`;
@@ -145,6 +145,18 @@ describe('asking privasys.id', () => {
         await expect(obtainApproval(approval({ ttl_seconds: 86400 }), 'x', noWait)).rejects.toThrow(/not given in time/);
         // One request to open it, then three looks two seconds apart.
         expect(mockCalls).toHaveLength(4);
+    });
+});
+
+describe('a key that waits on the operator', () => {
+    it('is told from every other refusal by its first word', () => {
+        expect(waitsForOperator('approval_not_accepted_yet: Drive does not accept key approvals yet; your key will be updated by the operator')).toBe(true);
+        expect(waitsForOperator('move_needed: this key must be moved onto a key with bound approvals by the operator')).toBe(true);
+        expect(waitsForOperator('restage_needed: this key\'s policy is not on record')).toBe(true);
+        expect(waitsForOperator('measurement_approval_required: no grant')).toBe(false);
+        expect(waitsForOperator('{"error":"owner_approval_required: x"}')).toBe(false);
+        expect(waitsForOperator('the file says move_needed: no')).toBe(false);
+        expect(waitsForOperator('')).toBe(false);
     });
 });
 

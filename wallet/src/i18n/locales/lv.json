@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Atcelt",
+    "testPlatform": "Tests",
     "close": "Aizvērt",
     "confirm": "Apstiprināt",
     "continue": "Turpināt",
@@ -557,6 +558,7 @@
   },
   "drive": {
     "subtitle": "Jūsu konfidenciālie faili",
+    "keyWaitsForOperator": "Drive nevar atvērt jūsu failus, kamēr tā operators nav atjauninājis jūsu atslēgu. Jūsu faili nav mainīti. Mēģiniet vēlāk vēlreiz.",
     "shareRequests": "Kopīgošanas pieprasījumi",
     "folder": "Mape",
     "file": "Fails",

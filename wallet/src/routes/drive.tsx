@@ -50,6 +50,7 @@ import {
 } from '@/services/drive-files';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useTrustedAppsStore } from '@/stores/trusted-apps';
+import { waitsForOperator } from '@/services/drive-key-approval';
 
 type Section = 'mine' | 'shared';
 
@@ -204,7 +205,13 @@ export default function DriveScreen() {
                 setItems(list);
                 return list;
             } catch (e) {
-                setError(e instanceof Error ? e.message : t('drive.openFailed'));
+                setError(
+                    e instanceof Error
+                        ? waitsForOperator(e.message)
+                            ? t('drive.keyWaitsForOperator')
+                            : e.message
+                        : t('drive.openFailed'),
+                );
                 setItems(null);
                 return null;
             } finally {

@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Peruuta",
+    "testPlatform": "Testi",
     "close": "Sulje",
     "confirm": "Vahvista",
     "continue": "Jatka",
@@ -523,6 +524,7 @@
 
   "drive": {
     "subtitle": "Luottamukselliset tiedostosi",
+    "keyWaitsForOperator": "Drive ei voi avata tiedostojasi ennen kuin sen ylläpitäjä on päivittänyt avaimesi. Tiedostojasi ei ole muutettu. Yritä myöhemmin uudelleen.",
     "shareRequests": "Jakopyynnöt",
     "folder": "Kansio",
     "file": "Tiedosto",

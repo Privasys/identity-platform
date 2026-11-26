@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Tühista",
+    "testPlatform": "Test",
     "close": "Sulge",
     "confirm": "Kinnita",
     "continue": "Jätka",
@@ -555,6 +556,7 @@
   },
   "drive": {
     "subtitle": "Teie konfidentsiaalsed failid",
+    "keyWaitsForOperator": "Drive ei saa teie faile avada enne, kui selle haldaja on teie võtme uuendanud. Teie faile ei ole muudetud. Proovige hiljem uuesti.",
     "shareRequests": "Jagamistaotlused",
     "folder": "Kaust",
     "file": "Fail",

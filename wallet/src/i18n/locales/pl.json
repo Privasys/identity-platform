@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Anuluj",
+    "testPlatform": "Test",
     "close": "Zamknij",
     "confirm": "Potwierdź",
     "continue": "Kontynuuj",
@@ -527,6 +528,7 @@
 
   "drive": {
     "subtitle": "Twoje poufne pliki",
+    "keyWaitsForOperator": "Drive nie może otworzyć Twoich plików, dopóki jego operator nie zaktualizuje Twojego klucza. Twoje pliki nie zostały zmienione. Spróbuj ponownie później.",
     "shareRequests": "Prośby o udostępnienie",
     "folder": "Folder",
     "file": "Plik",

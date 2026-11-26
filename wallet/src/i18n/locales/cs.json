@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Zrušit",
+    "testPlatform": "Test",
     "close": "Zavřít",
     "confirm": "Potvrdit",
     "continue": "Pokračovat",
@@ -525,6 +526,7 @@
 
   "drive": {
     "subtitle": "Vaše důvěrné soubory",
+    "keyWaitsForOperator": "Drive nemůže otevřít vaše soubory, dokud jeho provozovatel neaktualizuje váš klíč. Vaše soubory nebyly změněny. Zkuste to později.",
     "shareRequests": "Žádosti o sdílení",
     "folder": "Složka",
     "file": "Soubor",

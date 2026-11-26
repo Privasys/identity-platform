@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Prekliči",
+    "testPlatform": "Test",
     "close": "Zapri",
     "confirm": "Potrdi",
     "continue": "Nadaljuj",
@@ -559,6 +560,7 @@
   },
   "drive": {
     "subtitle": "Vaše zaupne datoteke",
+    "keyWaitsForOperator": "Drive ne more odpreti vaših datotek, dokler njegov upravljavec ne posodobi vašega ključa. Vaše datoteke niso bile spremenjene. Poskusite znova pozneje.",
     "shareRequests": "Zahteve za deljenje",
     "folder": "Mapa",
     "file": "Datoteka",

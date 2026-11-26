@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Cealaigh",
+    "testPlatform": "Tástáil",
     "close": "Dún",
     "confirm": "Deimhnigh",
     "continue": "Lean ar aghaidh",
@@ -561,6 +562,7 @@
   },
   "drive": {
     "subtitle": "Do chomhaid faoi rún",
+    "keyWaitsForOperator": "Ní féidir le Drive do chomhaid a oscailt go dtí go mbeidh d’eochair nuashonraithe ag a oibreoir. Níor athraíodh do chomhaid. Bain triail eile as ar ball.",
     "shareRequests": "Iarratais roinnte",
     "folder": "Fillteán",
     "file": "Comhad",

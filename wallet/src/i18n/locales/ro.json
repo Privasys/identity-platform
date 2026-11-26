@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Anulează",
+    "testPlatform": "Test",
     "close": "Închide",
     "confirm": "Confirmă",
     "continue": "Continuă",
@@ -557,6 +558,7 @@
   },
   "drive": {
     "subtitle": "Fișierele tale confidențiale",
+    "keyWaitsForOperator": "Drive nu îți poate deschide fișierele până când operatorul său nu îți actualizează cheia. Fișierele tale nu au fost modificate. Încearcă din nou mai târziu.",
     "shareRequests": "Cereri de partajare",
     "folder": "Folder",
     "file": "Fișier",

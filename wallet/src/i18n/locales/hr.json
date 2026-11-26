@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Odustani",
+    "testPlatform": "Test",
     "close": "Zatvori",
     "confirm": "Potvrdi",
     "continue": "Nastavi",
@@ -557,6 +558,7 @@
   },
   "drive": {
     "subtitle": "Vaše povjerljive datoteke",
+    "keyWaitsForOperator": "Drive ne može otvoriti vaše datoteke dok njegov operater ne ažurira vaš ključ. Vaše datoteke nisu promijenjene. Pokušajte ponovno kasnije.",
     "shareRequests": "Zahtjevi za dijeljenje",
     "folder": "Mapa",
     "file": "Datoteka",

@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Abbrechen",
+    "testPlatform": "Test",
     "close": "Schließen",
     "confirm": "Bestätigen",
     "continue": "Weiter",
@@ -523,6 +524,7 @@
 
   "drive": {
     "subtitle": "Ihre vertraulichen Dateien",
+    "keyWaitsForOperator": "Drive kann Ihre Dateien erst öffnen, wenn der Betreiber Ihren Schlüssel aktualisiert hat. Ihre Dateien wurden nicht verändert. Versuchen Sie es später erneut.",
     "shareRequests": "Freigabeanfragen",
     "folder": "Ordner",
     "file": "Datei",

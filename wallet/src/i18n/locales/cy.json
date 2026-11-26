@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Canslo",
+    "testPlatform": "Prawf",
     "close": "Cau",
     "confirm": "Cadarnhau",
     "continue": "Parhau",
@@ -563,6 +564,7 @@
   },
   "drive": {
     "subtitle": "Eich ffeiliau cyfrinachol",
+    "keyWaitsForOperator": "Ni all Drive agor eich ffeiliau nes bod ei weithredwr wedi diweddaru eich allwedd. Nid yw eich ffeiliau wedi’u newid. Rhowch gynnig arall arni yn nes ymlaen.",
     "shareRequests": "Ceisiadau rhannu",
     "folder": "Ffolder",
     "file": "Ffeil",

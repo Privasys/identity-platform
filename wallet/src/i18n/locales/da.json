@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Annuller",
+    "testPlatform": "Test",
     "close": "Luk",
     "confirm": "Bekræft",
     "continue": "Fortsæt",
@@ -523,6 +524,7 @@
 
   "drive": {
     "subtitle": "Dine fortrolige filer",
+    "keyWaitsForOperator": "Drive kan ikke åbne dine filer, før operatøren har opdateret din nøgle. Dine filer er ikke blevet ændret. Prøv igen senere.",
     "shareRequests": "Delingsanmodninger",
     "folder": "Mappe",
     "file": "Fil",

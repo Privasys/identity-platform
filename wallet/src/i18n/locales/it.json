@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Annulla",
+    "testPlatform": "Test",
     "close": "Chiudi",
     "confirm": "Conferma",
     "continue": "Continua",
@@ -525,6 +526,7 @@
 
   "drive": {
     "subtitle": "I tuoi file riservati",
+    "keyWaitsForOperator": "Drive non può aprire i tuoi file finché il suo operatore non ha aggiornato la tua chiave. I tuoi file non sono stati modificati. Riprova più tardi.",
     "shareRequests": "Richieste di condivisione",
     "folder": "Cartella",
     "file": "File",

@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Annuler",
+    "testPlatform": "Test",
     "close": "Fermer",
     "confirm": "Confirmer",
     "continue": "Continuer",
@@ -525,6 +526,7 @@
 
   "drive": {
     "subtitle": "Vos fichiers confidentiels",
+    "keyWaitsForOperator": "Drive ne peut pas ouvrir vos fichiers tant que son opérateur n’a pas mis à jour votre clé. Vos fichiers n’ont pas été modifiés. Réessayez plus tard.",
     "shareRequests": "Demandes de partage",
     "folder": "Dossier",
     "file": "Fichier",

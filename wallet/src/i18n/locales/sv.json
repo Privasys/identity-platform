@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Avbryt",
+    "testPlatform": "Test",
     "close": "Stäng",
     "confirm": "Bekräfta",
     "continue": "Fortsätt",
@@ -523,6 +524,7 @@
 
   "drive": {
     "subtitle": "Dina konfidentiella filer",
+    "keyWaitsForOperator": "Drive kan inte öppna dina filer förrän dess operatör har uppdaterat din nyckel. Dina filer har inte ändrats. Försök igen senare.",
     "shareRequests": "Delningsförfrågningar",
     "folder": "Mapp",
     "file": "Fil",

@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Annuleren",
+    "testPlatform": "Test",
     "close": "Sluiten",
     "confirm": "Bevestigen",
     "continue": "Doorgaan",
@@ -523,6 +524,7 @@
 
   "drive": {
     "subtitle": "Je vertrouwelijke bestanden",
+    "keyWaitsForOperator": "Drive kan je bestanden pas openen als de beheerder je sleutel heeft bijgewerkt. Je bestanden zijn niet gewijzigd. Probeer het later opnieuw.",
     "shareRequests": "Deelverzoeken",
     "folder": "Map",
     "file": "Bestand",

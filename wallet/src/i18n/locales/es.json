@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Cancelar",
+    "testPlatform": "Pruebas",
     "close": "Cerrar",
     "confirm": "Confirmar",
     "continue": "Continuar",
@@ -525,6 +526,7 @@
 
   "drive": {
     "subtitle": "Tus archivos confidenciales",
+    "keyWaitsForOperator": "Drive no puede abrir tus archivos hasta que su operador actualice tu clave. Tus archivos no se han modificado. Inténtalo de nuevo más tarde.",
     "shareRequests": "Solicitudes de acceso",
     "folder": "Carpeta",
     "file": "Archivo",

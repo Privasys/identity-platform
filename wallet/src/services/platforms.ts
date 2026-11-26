@@ -104,6 +104,19 @@ export async function audienceFor(target: string): Promise<string> {
     return best?.audience ?? DEFAULT_AUDIENCE;
 }
 
+/**
+ * Whether `target` belongs to a platform other than the default one. False
+ * when the platforms cannot be told: a tag that guesses is worse than none.
+ */
+export async function onOtherPlatform(target: string): Promise<boolean> {
+    if (!target) return false;
+    try {
+        return (await audienceFor(target)) !== DEFAULT_AUDIENCE;
+    } catch {
+        return false;
+    }
+}
+
 /** Every audience a key may be cached under: for clearing them all. */
 export async function knownAudiences(): Promise<string[]> {
     const extra = await platforms().then(

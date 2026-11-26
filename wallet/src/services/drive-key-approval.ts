@@ -122,6 +122,16 @@ export function approvalNeeded(status: number, body: string): DriveKeyApproval |
     return a;
 }
 
+/**
+ * Whether a refusal from Drive means the holder's key waits on the service's
+ * operator: Drive does not take approvals yet, the key must first be moved onto
+ * one with bound approvals, or its rules are not on record. There is nothing
+ * for the holder to approve, and no card is shown.
+ */
+export function waitsForOperator(message: string): boolean {
+    return /^\s*(approval_not_accepted_yet|move_needed|restage_needed)\s*:/.test(message);
+}
+
 const hex = (id: string) => id.toLowerCase().replace(/-/g, '');
 
 /**

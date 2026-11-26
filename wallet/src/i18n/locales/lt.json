@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Atšaukti",
+    "testPlatform": "Testas",
     "close": "Uždaryti",
     "confirm": "Patvirtinti",
     "continue": "Tęsti",
@@ -557,6 +558,7 @@
   },
   "drive": {
     "subtitle": "Jūsų konfidencialūs failai",
+    "keyWaitsForOperator": "Drive negali atverti jūsų failų, kol jo operatorius neatnaujins jūsų rakto. Jūsų failai nepakeisti. Bandykite vėliau.",
     "shareRequests": "Dalijimosi prašymai",
     "folder": "Aplankas",
     "file": "Failas",

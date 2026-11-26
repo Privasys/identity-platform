@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Cancel",
+    "testPlatform": "Test",
     "close": "Close",
     "confirm": "Confirm",
     "continue": "Continue",
@@ -555,6 +556,7 @@
   },
   "drive": {
     "subtitle": "Your confidential files",
+    "keyWaitsForOperator": "Drive cannot open your files until its operator has updated your key. Your files have not been changed. Try again later.",
     "shareRequests": "Share requests",
     "folder": "Folder",
     "file": "File",

@@ -233,6 +233,7 @@
   },
   "common": {
     "cancel": "Zrušiť",
+    "testPlatform": "Test",
     "close": "Zavrieť",
     "confirm": "Potvrdiť",
     "continue": "Pokračovať",
@@ -557,6 +558,7 @@
   },
   "drive": {
     "subtitle": "Vaše dôverné súbory",
+    "keyWaitsForOperator": "Drive nemôže otvoriť vaše súbory, kým jeho prevádzkovateľ neaktualizuje váš kľúč. Vaše súbory neboli zmenené. Skúste to neskôr.",
     "shareRequests": "Žiadosti o zdieľanie",
     "folder": "Priečinok",
     "file": "Súbor",

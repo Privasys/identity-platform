@@ -196,6 +196,7 @@
 
   "common": {
     "cancel": "Mégse",
+    "testPlatform": "Teszt",
     "close": "Bezárás",
     "confirm": "Megerősítés",
     "continue": "Folytatás",
@@ -523,6 +524,7 @@
 
   "drive": {
     "subtitle": "Bizalmas fájljai",
+    "keyWaitsForOperator": "A Drive addig nem tudja megnyitni a fájljait, amíg az üzemeltetője nem frissíti a kulcsát. A fájljai nem változtak. Próbálja újra később.",
     "shareRequests": "Megosztási kérelmek",
     "folder": "Mappa",
     "file": "Fájl",

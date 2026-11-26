@@ -120,14 +120,23 @@ func (s *pushBindState) open(token, bindPub string) (string, error) {
 }
 
 // take spends the challenge for (token, bindPub) when nonce is the one sent.
-// Single use: a wrong answer spends it too.
-func (s *pushBindState) take(token, bindPub, nonce string) bool {
+// Single use: a wrong answer spends it too. The second result says why it was
+// refused, for the log only: the caller is told the same thing in every case.
+func (s *pushBindState) take(token, bindPub, nonce string) (bool, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := token + "\x00" + bindPub
 	c, ok := s.challenges[key]
 	delete(s.challenges, key)
-	return ok && !s.now().After(c.expires) && subtle.ConstantTimeCompare([]byte(c.nonce), []byte(nonce)) == 1
+	switch {
+	case !ok:
+		return false, "no challenge is open for this device and key"
+	case s.now().After(c.expires):
+		return false, "the challenge had expired"
+	case subtle.ConstantTimeCompare([]byte(c.nonce), []byte(nonce)) != 1:
+		return false, "the nonce is not the one sent"
+	}
+	return true, ""
 }
 
 // pushBindKey decodes a wallet's binding key: 32 bytes, base64url.
@@ -173,6 +182,12 @@ func (h *Handler) bindRegistration(userID, token, bindPub, sig string, issuedAt 
 		age := pushBinds.now().Sub(time.Unix(issuedAt, 0))
 		bound := okSig && age > -pushRegisterWindow && age < pushRegisterWindow &&
 			ed25519.Verify(key, pushRegisterText(token, userID, issuedAt), raw)
+		// Neither the device nor the identity is named: only what happened.
+		if bound {
+			log.Printf("[push-bind] a registration was bound by its signature")
+		} else {
+			log.Printf("[push-bind] a registration under a proven key was not bound (signature present=%t, in window=%t)", okSig, age > -pushRegisterWindow && age < pushRegisterWindow)
+		}
 		if err := h.db.SetPushBinding(userID, token, bindPub, bound); err != nil {
 			log.Printf("[push-bind] recording a binding: %v", err)
 			return false
@@ -200,7 +215,10 @@ func (h *Handler) bindRegistration(userID, token, bindPub, sig string, issuedAt 
 			Data:       map[string]string{"type": pushBindType, "nonce": nonce, "bind_pub": bindPub},
 		}); err != nil {
 			log.Printf("[push-bind] sending a challenge: %v", err)
+			return
 		}
+		// Accepted by the push service, which is not yet delivered to the device.
+		log.Printf("[push-bind] a challenge was sent")
 	}()
 	return false
 }
@@ -233,8 +251,13 @@ func (h *Handler) HandleBindPushToken(w http.ResponseWriter, r *http.Request) {
 	}
 	// The same answer whether the challenge was unknown, spent, expired or the
 	// signature wrong: nothing here tells a guesser which.
-	if !pushBinds.take(req.PushToken, req.BindPub, req.Nonce) ||
-		!ed25519.Verify(key, pushBindText(req.PushToken, req.Nonce), sig) {
+	taken, why := pushBinds.take(req.PushToken, req.BindPub, req.Nonce)
+	if taken && !ed25519.Verify(key, pushBindText(req.PushToken, req.Nonce), sig) {
+		taken, why = false, "the signature is not by the key the challenge was opened for"
+	}
+	if !taken {
+		// The reason stays here; the caller learns nothing from it.
+		log.Printf("[push-bind] an answer was refused: %s", why)
 		writeJSONStatus(w, http.StatusForbidden, map[string]string{"error": "not bound"})
 		return
 	}
@@ -243,5 +266,6 @@ func (h *Handler) HandleBindPushToken(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
+	log.Printf("[push-bind] an answer was accepted: the device's key is proven")
 	writeJSONStatus(w, http.StatusOK, map[string]string{"status": "bound"})
 }

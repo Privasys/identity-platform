@@ -78,6 +78,7 @@ import {
     syncIdentityIndex,
 } from '@/services/identities';
 import { identitySealPub } from '@/services/notify-seal';
+import { shownVerified } from '@/services/shown-verified';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
@@ -383,9 +384,13 @@ async function patchSessionAttributes(
         // The Attribute Verifier's proof, disclosed afresh to this app only:
         // what makes a provider-verified address verified for it. Inside the
         // sign-in's biometric grace, so no extra prompt; best effort.
+        // `sub` is the app's pairwise subject, the one the disclosure names;
+        // never the holder's account-wide id, which every app would share.
         if (sub) {
             const proof = await disclosureFor('email', attributes.email, payload.clientId, sub, payload.sessionId);
             if (proof) body = { ...body, email_proof: proof };
+        } else {
+            console.warn('[connect] no app subject: the email is sent without its proof, so unverified');
         }
     }
     // Bounded: on a slow link an unanswered request must not be left open for
@@ -2496,7 +2501,7 @@ function ConnectFlow() {
             await issueVoucherBeforeRelay(payload, keyAlias, result, sessionRelayArg);
 
             // Device-flow attribute delivery, ahead of the relay.
-            await patchSessionAttributesFirst(payload, attributes, result.subject || result.userHandle);
+            await patchSessionAttributesFirst(payload, attributes, result.subject);
 
             await relaySessionToken(
                 payload.brokerUrl,
@@ -2923,7 +2928,7 @@ function ConnectFlow() {
             await withinVoucherWait(pending.voucher);
 
             // Device-flow attribute delivery, ahead of the relay.
-            await patchSessionAttributesFirst(pending.payload, attributes, pending.credential?.userHandle);
+            await patchSessionAttributesFirst(pending.payload, attributes, pending.subject);
 
             await relaySessionToken(
                 pending.payload.brokerUrl,
@@ -3654,7 +3659,7 @@ function AttributeAcquisitionView({
     // until it is proved, so without this the screen would ask someone who has
     // an address to type it again and stay exactly as stuck.
     const unverifiedEmail = stillMissing.includes('email')
-        ? profile?.attributes.find((a) => a.key === 'email' && !a.verified && a.value)?.value
+        ? profile?.attributes.find((a) => a.key === 'email' && !shownVerified(a) && a.value)?.value
         : undefined;
 
     // Launch the KYC capture flow (NFC chip read + selfie → verifier enclave →

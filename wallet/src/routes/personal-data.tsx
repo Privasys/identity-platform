@@ -39,6 +39,7 @@ import { isFresh, useNoticeStore } from '@/stores/notice';
 import { cardBankSource, countryFlag, formatAddress } from '@/services/card-check';
 import { useCardAddressCheck } from '@/hooks/useCardAddressCheck';
 import { provedBy } from '@/services/attribute-proofs';
+import { shownVerified } from '@/services/shown-verified';
 import { currentLocale } from '@/i18n';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { attributeInputProps } from '@/utils/attribute-input';
@@ -233,7 +234,7 @@ export default function PersonalDataScreen() {
                             onRemove={() => handleRemoveAttribute(attr)}
                             onChangePicture={attr.key === 'picture' ? chooseAvatar : undefined}
                             onVerify={
-                                attr.key === 'email' && !attr.verified
+                                attr.key === 'email' && !shownVerified(attr)
                                     ? () => verifyEmail(attr.value)
                                     : undefined
                             }
@@ -403,7 +404,7 @@ function AttributeCard({
 
     const handleStartEdit = () => {
         if (isImage) return;
-        if (attr.verified) {
+        if (shownVerified(attr)) {
             Alert.alert(
                 t('personalData.editVerifiedTitle'),
                 t('personalData.editVerifiedBody'),
@@ -525,7 +526,7 @@ function AttributeCard({
                             </RNView>
                         )}
                         <RNView style={styles.attributeMeta}>
-                            {attr.verified ? (
+                            {shownVerified(attr) ? (
                                 <RNView style={styles.verifiedBadge}>
                                     <Ionicons name="checkmark-circle" size={12} color={p.green} />
                                     <Text style={styles.verifiedText}>{t('personalData.verified')}</Text>

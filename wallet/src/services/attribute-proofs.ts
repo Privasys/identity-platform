@@ -22,6 +22,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 import { attest, disclose, type AttestKind, type AttributeProof } from '@/services/attribute-verifier';
 import { useProfileStore, type ProfileAttribute, type VerificationRecord } from '@/stores/profile';
+import { isDisclosableProof } from '@/services/shown-verified';
 import { base64urlToBytes, bytesToBase64url } from '@/utils/encoding';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -112,7 +113,7 @@ export async function attachLinkProofs(
 export function proofRecordFor(key: string, value: string): VerificationRecord | undefined {
     const profile = useProfileStore.getState().profile;
     const attr = profile?.attributes.find((a) => a.key === key && a.value.toLowerCase() === value.toLowerCase());
-    return attr?.verifications?.find((v) => v.proof && v.assurance === 'provider');
+    return attr?.verifications?.find(isDisclosableProof);
 }
 
 /**

@@ -55,6 +55,25 @@ jobs:
         working-directory: sdk
         run: npm run build:iife
 
+      - name: Build the hosted frame and the frame client
+        working-directory: sdk
+        run: npm run build:frame-host && npm run build:frame-client
+
+      - name: Unit tests
+        working-directory: sdk
+        run: npm test
+
+      # The built bundles in a real browser against a mocked identity
+      # provider: who may drive the frame, renewal, gate outcomes, tabs, and
+      # the device popup with storage partitioning on.
+      - name: Install Chromium for the browser tests
+        working-directory: sdk
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        working-directory: sdk
+        run: npm run test:e2e
+
       - name: Verify output
         working-directory: sdk
         run: |

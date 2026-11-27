@@ -46,7 +46,7 @@ async function renderGate(page: Page, config: GateConfig): Promise<void> {
             ...cfg,
         }).signIn().catch(() => undefined);
     }, config);
-    await expect(page.locator('[data-privasys-auth]').getByRole('button', { name: /microsoft/i })).toBeVisible();
+    await expect(page.locator('[data-privasys-auth]').getByRole('button', { name: /microsoft/i }).first()).toBeVisible();
     await page.waitForTimeout(250); // the host's fade-in
 }
 
@@ -102,7 +102,7 @@ test('legal: false hides the terms inline and on a page, never in a modal', asyn
 
 test('every button shows a visible focus state', async ({ page }) => {
     await renderGate(page, { presentation: 'inline' });
-    const button = page.locator('[data-privasys-auth]').getByRole('button', { name: /microsoft/i });
+    const button = page.locator('[data-privasys-auth]').getByRole('button', { name: /microsoft/i }).first();
     await button.focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');

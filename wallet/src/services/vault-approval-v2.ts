@@ -5,26 +5,15 @@
  * A vault approval on binding v2, checked before it is shown.
  *
  * The request arrives through privasys.id with the fields of the binding, the
- * identities of the vaults it names and, for a policy update, the new policy.
- * Nothing in it is believed as sent. The wallet:
- *
- *   1. rebuilds the binding's text from those fields and checks its digest is
- *      the challenge the passkey would sign (so what is shown is what is
- *      signed);
- *   2. checks the card's own fields (operation, key, bound value, policy
- *      version) are the binding's;
- *   3. checks every vault named has an identity that agrees with itself
- *      (services/vault-identity);
- *   4. for a policy update, checks the binding's target is the digest of the
- *      policy it would show;
- *   5. refuses a binding that has expired.
- *
- * `checkV2` is the synchronous part. `checkV2Release` then names the vaults'
+ * identities of the vaults it names and, for a policy change, the policies.
+ * `checkV2` runs the check every bound approval gets (services/vault-bound-check)
+ * and refuses one that has expired. `checkV2Release` then names the vaults'
  * build as a published Enclave Vault release, from GitHub.
  */
 
-import { bindingVaultOp, deleteAfterTarget, updatePolicyFromTarget, VAULT_OPS, type VaultBinding, type VaultOp } from './vault-binding';
-import { checkMembers, policyDigest, type VaultIdentity } from './vault-identity';
+import { APPROVAL_MAX_SECONDS, CLOCK_MARGIN_SECONDS, verifyBoundEntry, type BoundApproval } from './vault-bound-check';
+import { VAULT_OPS } from './vault-binding';
+import type { VaultIdentity } from './vault-identity';
 import { vaultReleaseFor, type VaultRelease } from './vault-reshare';
 
 /** The binding's fields, as privasys.id relays them. */
@@ -57,25 +46,7 @@ export interface V2Summary {
     vault_release?: string;
 }
 
-export interface CheckedV2 {
-    op: VaultOp;
-    /** The vaults the approval is for, sorted member ids. */
-    members: string[];
-    /** The builds those vaults claim (one, unless they differ). */
-    builds: string[];
-    /** Their billing ids (one, unless they differ): which platform they are on. */
-    billingIds: string[];
-    /** Unix seconds: the approval is good until then. */
-    exp: number;
-    /** The new policy, for a policy update or a creation. */
-    newPolicy?: unknown;
-    /** The rules in force, when the approval binds them too: what changes can then be shown. */
-    currentPolicy?: unknown;
-    /** For the delete of an old key: the key that replaces it. */
-    successor?: string;
-}
 
-const dash = (s: string | undefined) => (s === undefined || s === '' ? '-' : s);
 
 /** Whether a pending approval is a v2 one. */
 export function isV2(summary: { binding?: unknown }): boolean {
@@ -109,94 +80,33 @@ export function checkV1(
     return v1Binding(summary.handle, summary.measurement ?? '', summary.policy_version ?? 0, summary.nonce, summary.exp as number) === vaultOp;
 }
 
+
 /**
- * Check a v2 approval against the challenge it would sign. Null when anything
- * is missing or disagrees: the card then offers only Decline.
+ * Check a single v2 approval against the challenge it would sign. Null when
+ * anything is missing or disagrees: the card then offers only Decline.
  */
-export function checkV2(vaultOp: string, summary: V2Summary, nowSeconds: number): CheckedV2 | null {
-    const b = summary.binding;
-    if (!b || typeof b !== 'object') return null;
-    if (!(VAULT_OPS as readonly string[]).includes(b.op)) return null;
-    if (!Number.isSafeInteger(b.exp) || b.exp <= nowSeconds) return null;
-    // An issuer approval: a holder head belongs to a pinned key, which this
-    // card does not sign for.
-    if (dash(b.holder_head) !== '-' || !/^oidc:\d+:.+$/.test(String(b.approver))) return null;
-
-    const binding: VaultBinding = {
-        members: b.members,
-        op: b.op as VaultOp,
-        handle: b.handle,
-        target: dash(b.target) === '-' ? undefined : b.target,
-        policyVersion: b.policy_version,
-        approver: b.approver,
-        nonce: b.nonce,
-        exp: b.exp,
-    };
-    let rebuilt: string;
-    try {
-        rebuilt = bindingVaultOp(binding);
-    } catch {
-        return null;
+export function checkV2(vaultOp: string, summary: V2Summary, nowSeconds: number): BoundApproval | null {
+    const checked = verifyBoundEntry(vaultOp, {
+        operation: summary.operation,
+        handle: summary.handle,
+        measurement: summary.measurement,
+        policyVersion: summary.policy_version ?? 0,
+        binding: summary.binding,
+        memberIdentities: summary.member_identities,
+        newPolicy: summary.new_policy,
+        currentPolicy: summary.current_policy,
+        successorHandle: summary.successor_handle,
+    });
+    if ('refused' in checked) return null;
+    if (checked.exp <= nowSeconds) return null;
+    if (checked.op === 'delete_after') {
+        // Alone, the delete of an old key names the created key that replaces
+        // it. That key exists already, so the approval waits for nothing and
+        // lives no longer than any other.
+        if (!checked.successor) return null;
+        if (checked.exp > nowSeconds + APPROVAL_MAX_SECONDS + CLOCK_MARGIN_SECONDS) return null;
     }
-    if (rebuilt !== vaultOp) return null;
-
-    // The card's own fields are the binding's.
-    if (summary.operation !== b.op || summary.handle !== b.handle) return null;
-    if (dash(summary.measurement) !== dash(b.target)) return null;
-    if ((summary.policy_version ?? 0) !== b.policy_version) return null;
-
-    const members = checkMembers(b.members, summary.member_identities);
-    if (!members) return null;
-
-    const hasPolicy = summary.new_policy !== undefined && summary.new_policy !== null;
-    const hasCurrent = summary.current_policy !== undefined && summary.current_policy !== null;
-    if (b.op === 'update_policy' || b.op === 'create') {
-        // Bound to the policy it installs. A key being created has no version yet.
-        if (!hasPolicy || hasCurrent) return null;
-        if (b.op === 'create' && b.policy_version !== 0) return null;
-        try {
-            if (policyDigest(summary.new_policy) !== b.target) return null;
-        } catch {
-            return null;
-        }
-    } else if (b.op === 'update_policy_from') {
-        // Bound to the rules in force and the new ones together, so the
-        // change between the two is what is signed.
-        if (!hasPolicy || !hasCurrent) return null;
-        try {
-            const want = updatePolicyFromTarget(policyDigest(summary.current_policy), policyDigest(summary.new_policy));
-            if (want !== b.target) return null;
-        } catch {
-            return null;
-        }
-    } else if (hasPolicy || hasCurrent) {
-        return null;
-    }
-    // The delete of an old key waits for the key that replaces it: the
-    // binding's target must be that of the successor the card names.
-    let successor: string | undefined;
-    if (b.op === 'delete_after') {
-        const s = summary.successor_handle;
-        if (typeof s !== 'string' || s === '' || s === b.handle || /[\n\r]/.test(s)) return null;
-        if (deleteAfterTarget(s, '') !== b.target) return null;
-        // That key exists already, so this approval waits for nothing: it
-        // lives no longer than any other (the vault's limit, with a margin
-        // for clocks).
-        if (b.exp > nowSeconds + 600 + 60) return null;
-        successor = s;
-    } else if (summary.successor_handle) {
-        return null;
-    }
-    return {
-        op: b.op as VaultOp,
-        members: members.members,
-        builds: members.builds,
-        billingIds: members.billingIds,
-        exp: b.exp,
-        newPolicy: hasPolicy ? summary.new_policy : undefined,
-        ...(hasCurrent ? { currentPolicy: summary.current_policy } : {}),
-        ...(successor ? { successor } : {}),
-    };
+    return checked;
 }
 
 export type V2Release =
@@ -241,7 +151,7 @@ export function refusedOnRelease(op: string, version: string): boolean {
  * release tag relayed with the request: it says where to look first, and
  * GitHub's answer is what counts.
  */
-export async function checkV2Release(checked: CheckedV2, hint?: string): Promise<V2Release> {
+export async function checkV2Release(checked: BoundApproval, hint?: string): Promise<V2Release> {
     if (checked.builds.length !== 1) return { kind: 'unpublished', build: checked.builds.join(', ') };
     try {
         const release = await vaultReleaseFor(checked.builds[0], hint);

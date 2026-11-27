@@ -27,8 +27,8 @@
 
 import { sha256 } from '@noble/hashes/sha2.js';
 
-import { bindingVaultOp, deleteAfterTarget, type VaultOp } from './vault-binding';
-import { checkMembers, policyDigest, type VaultIdentity } from './vault-identity';
+import { deleteAfterTarget } from './vault-binding';
+import { APPROVAL_MAX_SECONDS, verifyBoundEntry } from './vault-bound-check';
 
 const BATCH_DOMAIN = 'privasys-vault-approval-batch-v1';
 const SINGLE_DOMAIN = 'privasys-vault-approval/v1';
@@ -48,9 +48,6 @@ const BATCHABLE_V2 = new Set(['promote', 'update_policy', 'revoke_pending', 'del
 /** A delete_after beside its successor's promote may outlive its batch by this
  *  much at most: it waits for the migrate or upgrade to succeed. */
 const DELETE_AFTER_MAX_SECONDS = 86400;
-/** One that names a created successor waits for nothing (that key exists
- *  already), so it gets no more than an ordinary approval's lifetime. */
-const DELETE_AFTER_CREATED_MAX_SECONDS = 600;
 
 const DIGEST_HEX = /^[0-9a-f]{64}$/;
 const BATCH_ID = /^[A-Za-z0-9_-]{43}$/;
@@ -203,10 +200,10 @@ export function isVaultBatchId(id: string): boolean {
 }
 
 /**
- * One binding v2 entry: its binding rebuilt from its fields must be its
- * vault_op, its own fields must be the binding's, every vault it names must
- * have an identity that agrees with itself, and a policy update must be bound
- * to the policy it carries.
+ * One binding v2 entry: the one check of a bound approval (verifyBoundEntry),
+ * then what a batch adds. Only some operations may share an approval, every
+ * entry binds a digest, and every entry expires with the batch except the old
+ * key's delete, which is held until the migrate or upgrade has succeeded.
  */
 function verifyV2Entry(
     e: Record<string, unknown>,
@@ -214,97 +211,52 @@ function verifyV2Entry(
     identities: unknown,
 ): { entry: VerifiedVaultBatchEntry; builds: string[]; billingIds: string[] } {
     if (typeof e.operation !== 'string' || !BATCHABLE_V2.has(e.operation)) throw new VaultBatchRefused('operation');
-    const b = (e.binding ?? {}) as Record<string, unknown>;
     const { handle, vault_op: vaultOp } = e;
-    const target = b.target === '-' ? '' : b.target;
+    const measurement = e.measurement_digest ?? '';
     if (
         !validHandle(handle) ||
         typeof vaultOp !== 'string' ||
-        typeof target !== 'string' ||
-        !DIGEST_HEX.test(target) ||
-        !Number.isSafeInteger(b.policy_version) ||
-        (b.policy_version as number) < 0 ||
-        !Number.isSafeInteger(b.exp) ||
-        typeof b.nonce !== 'string' ||
-        typeof b.approver !== 'string' ||
-        !/^oidc:\d+:.+$/.test(b.approver) ||
-        b.holder_head !== '-' ||
-        !Array.isArray(b.members)
+        typeof measurement !== 'string' ||
+        !DIGEST_HEX.test(measurement) ||
+        typeof e.policy_version !== 'number' ||
+        typeof e.nonce !== 'string' ||
+        (e.successor_handle !== undefined && e.successor_handle !== null && e.successor_handle !== '' && !validHandle(e.successor_handle))
     ) {
         throw new VaultBatchRefused('malformed');
     }
-    // The entry's own fields are the binding's.
-    if (
-        b.op !== e.operation ||
-        b.handle !== handle ||
-        e.policy_version !== b.policy_version ||
-        e.nonce !== b.nonce ||
-        (e.measurement_digest ?? '') !== target
-    ) {
+    const checked = verifyBoundEntry(vaultOp, {
+        operation: e.operation,
+        handle,
+        measurement,
+        policyVersion: e.policy_version,
+        nonce: e.nonce,
+        binding: e.binding,
+        memberIdentities: identities,
+        newPolicy: e.new_policy,
+        currentPolicy: e.current_policy,
+        successorHandle: e.successor_handle,
+    });
+    if ('refused' in checked) throw new VaultBatchRefused(checked.refused);
+
+    if (checked.op === 'delete_after') {
+        const most = checked.successor ? APPROVAL_MAX_SECONDS : DELETE_AFTER_MAX_SECONDS;
+        if (checked.exp < batchExp || checked.exp > batchExp + most) throw new VaultBatchRefused('entry');
+    } else if (checked.exp !== batchExp) {
         throw new VaultBatchRefused('entry');
     }
-    // Every entry expires with the batch, except the old key's delete, which
-    // is held until the migrate or upgrade has succeeded.
-    const entryExp = b.exp as number;
-    const namesSuccessor = e.successor_handle !== undefined && e.successor_handle !== null && e.successor_handle !== '';
-    if (e.operation === 'delete_after') {
-        const most = namesSuccessor ? DELETE_AFTER_CREATED_MAX_SECONDS : DELETE_AFTER_MAX_SECONDS;
-        if (entryExp < batchExp || entryExp > batchExp + most) throw new VaultBatchRefused('entry');
-    } else if (entryExp !== batchExp) {
-        throw new VaultBatchRefused('entry');
-    }
-    let rebuilt: string;
-    try {
-        rebuilt = bindingVaultOp({
-            members: b.members as string[],
-            op: e.operation as VaultOp,
-            handle,
-            target,
-            policyVersion: b.policy_version as number,
-            approver: b.approver,
-            nonce: b.nonce,
-            exp: entryExp,
-        });
-    } catch {
-        throw new VaultBatchRefused('malformed');
-    }
-    if (rebuilt !== vaultOp) throw new VaultBatchRefused('entry');
-
-    const members = checkMembers(b.members as string[], identities as VaultIdentity[] | undefined);
-    if (!members) throw new VaultBatchRefused('entry');
-
-    const hasPolicy = e.new_policy !== undefined && e.new_policy !== null;
-    if (e.operation === 'update_policy') {
-        let pd: string;
-        try {
-            pd = policyDigest(e.new_policy);
-        } catch {
-            throw new VaultBatchRefused('malformed');
-        }
-        if (pd !== target) throw new VaultBatchRefused('entry');
-    } else if (hasPolicy) {
-        throw new VaultBatchRefused('malformed');
-    }
-    // The delete of an old key may name a created successor instead of
-    // standing beside a promote: its target must be that successor's.
-    let successor: string | undefined;
-    const named = e.successor_handle;
-    if (namesSuccessor) {
-        if (e.operation !== 'delete_after' || !validHandle(named) || named === handle) throw new VaultBatchRefused('malformed');
-        if (deleteAfterTarget(named, '') !== target) throw new VaultBatchRefused('entry');
-        successor = named;
-    }
+    const hasPolicy = checked.newPolicy !== undefined;
+    const successor = checked.successor;
     const hint = ((e.context ?? {}) as Record<string, unknown>).version_id;
     return {
-        builds: members.builds,
-        billingIds: members.billingIds,
+        builds: checked.builds,
+        billingIds: checked.billingIds,
         entry: {
             operation: e.operation as VerifiedVaultBatchEntry['operation'],
             handle,
-            measurementDigest: target,
-            policyVersion: b.policy_version as number,
+            measurementDigest: measurement,
+            policyVersion: e.policy_version,
             vaultOp,
-            v2: { exp: entryExp, ...(hasPolicy ? { newPolicy: e.new_policy } : {}), ...(successor ? { successor } : {}) },
+            v2: { exp: checked.exp, ...(hasPolicy ? { newPolicy: checked.newPolicy } : {}), ...(successor ? { successor } : {}) },
             ...(e.operation === 'promote' && typeof hint === 'string' && VERSION_ID.test(hint)
                 ? { versionIdHint: hint.toLowerCase() }
                 : {}),

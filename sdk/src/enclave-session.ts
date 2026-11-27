@@ -65,47 +65,6 @@ const DIR_WS_S2C_LABEL = 'privasys-dir/ws-s2c';
 const SEALED_WS_SUBPROTOCOL = 'privasys.sealed.v1';
 const INIT_PATH = '/__privasys/session-bootstrap';
 
-/** Provider-shaped object the wallet returns after attestation. */
-export interface WalletAttestationResult {
-    /** Opaque session id (>=16 bytes) from the enclave's init endpoint. */
-    sessionId: string; // base64url
-    /** Enclave's ephemeral P-256 public key (SEC1 uncompressed, base64url). */
-    encPub: string;
-    /** Wallet-signed envelope binding sdk_pub, enc_pub, quote_hash, session_id. */
-    walletSignature: string; // base64url, optional verification done by caller
-    /** Optional opaque blob the wallet wants the SDK to forward unchanged. */
-    appEnvelope?: string;
-    /** Optional expiry in epoch milliseconds. */
-    expiresAt?: number;
-}
-
-export interface SessionInitOptions {
-    /**
-     * Wallet attestation function. Receives `sdk_pub` (base64url, 65 bytes)
-     * and the enclave hostname; must perform end-to-end RA-TLS attestation
-     * and return the keys/IDs the enclave issued.
-     */
-    attestWithWallet: (params: {
-        sdkPub: string;
-        host: string;
-    }) => Promise<WalletAttestationResult>;
-    /** Hostname (without scheme) of the enclave app, e.g. "myapp.apps.privasys.org". */
-    host: string;
-    /** Override the global fetch (useful for tests / SSR). */
-    fetchImpl?: typeof fetch;
-    /**
-     * Optional EncAuth fetcher. When set, the session can silently
-     * rebind to the enclave on AEAD-401 errors without bouncing back
-     * through the wallet (Phase D / silent-rebind).
-     *
-     * The callback should fetch a fresh wallet-signed voucher from the
-     * IdP at `GET /sessions/{sid}/encauth` and return the parsed JSON
-     * envelope. Return null/undefined to skip rebind for this attempt;
-     * the caller will then receive the original 401 response.
-     */
-    getEncAuth?: () => Promise<EncAuthEnvelope | null | undefined>;
-}
-
 /**
  * EncAuthEnvelope is the wallet-signed silent-rebind voucher returned
  * by `GET /sessions/{sid}/encauth`. The SDK forwards it verbatim to
@@ -161,8 +120,7 @@ export interface EncAuthEnvelope {
  *    needs the holder (one tap in the wallet). `reason` says why:
  *    `workload-changed` (the app was updated), `enc-changed` (the hosting
  *    platform changed), `voucher-expired`, `voucher-invalid`, or
- *    `no-voucher`. Call `AuthFrame.connect()` again: it runs the one-tap
- *    approval on the same frame and the session object keeps working.
+ *    `no-voucher`. `AuthFrame.app()` asks the wallet for a new approval.
  *  - `signed-out`: the Privasys ID session itself ended (the refresh-token
  *    chain is dead), so nothing can be resumed silently; `connect()` runs a
  *    sign-in.
@@ -212,10 +170,9 @@ export class PrivasysSession {
     private c2sCtr = 0n;
     private s2cCtr = 0n;
     private getEncAuth?: () => Promise<EncAuthEnvelope | null | undefined>;
-    /** The voucher-backed bootstrap in flight, an identify or a rebind.
-     *  Both replace this session's id and keys, so one runs at a time and
-     *  every caller of the same kind shares it (see shareBootstrap). */
-    private bootstrapInFlight: { kind: 'identify' | 'rebind'; done: Promise<boolean> } | null = null;
+    /** The voucher-backed rebind in flight: it replaces this session's id
+     *  and keys, so one runs at a time and every caller shares it. */
+    private rebindInFlight: Promise<boolean> | null = null;
     /** Set once the enclave has refused this session's voucher (or there is
      *  none): no later request may try again. Only a fresh wallet ceremony,
      *  which makes a new session, recovers; retrying would spend the
@@ -223,13 +180,6 @@ export class PrivasysSession {
      *  the page with nothing to show. */
     private rebindRefused = false;
     private rebindUnavailableWaitsMs = REBIND_UNAVAILABLE_WAITS_MS;
-    /** The session came from the wallet's own bootstrap, which tells the
-     *  enclave nothing about who the caller is: the app sees no subject
-     *  until the session is re-established from the wallet's voucher
-     *  (see {@link identify}). */
-    private anonymous = false;
-    /** The enclave refused the voucher: identifying cannot succeed. */
-    private identifyRefused = false;
     private lastState: SealedSessionState = { status: 'ok' };
     /** Liveness listener (see {@link SealedSessionState}); the frame host
      *  forwards it to the adopter page. */
@@ -240,34 +190,6 @@ export class PrivasysSession {
         this.sessionId = sessionId;
         this.keys = keys;
         this.fetchImpl = fetchImpl;
-    }
-
-    /** Establishes a fresh session. */
-    static async create(opts: SessionInitOptions): Promise<PrivasysSession> {
-        const fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
-
-        const sdkKeyPair = (await crypto.subtle.generateKey(
-            { name: 'ECDH', namedCurve: 'P-256' },
-            false,
-            ['deriveBits'],
-        )) as CryptoKeyPair;
-        const sdkPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', sdkKeyPair.publicKey));
-        if (sdkPubRaw.byteLength !== 65 || sdkPubRaw[0] !== 0x04) {
-            throw new Error('PrivasysSession: unexpected SEC1 encoding');
-        }
-        const sdkPubB64 = base64UrlEncode(sdkPubRaw);
-
-        const att = await opts.attestWithWallet({ sdkPub: sdkPubB64, host: opts.host });
-
-        const session = await PrivasysSession.fromHandshake({
-            host: opts.host,
-            sessionId: att.sessionId,
-            sdkPrivateKey: sdkKeyPair.privateKey,
-            encPub: att.encPub,
-            fetchImpl,
-        });
-        if (opts.getEncAuth) session.getEncAuth = opts.getEncAuth;
-        return session;
     }
 
     /**
@@ -324,11 +246,9 @@ export class PrivasysSession {
         sdkPrivateKey: CryptoKey;
         encPub: string;
         fetchImpl?: typeof fetch;
-        /** Optional EncAuth fetcher enabling silent rebind (see {@link SessionInitOptions.getEncAuth}). */
+        /** Fetches a fresh voucher, so the session can rebind silently when
+         *  the enclave forgets it. */
         getEncAuth?: () => Promise<EncAuthEnvelope | null | undefined>;
-        /** The handshake is the wallet's own bootstrap, which carries no
-         *  caller identity (see {@link PrivasysSession.identify}). */
-        anonymous?: boolean;
     }): Promise<PrivasysSession> {
         const fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
 
@@ -385,65 +305,7 @@ export class PrivasysSession {
             fetchImpl,
         );
         if (opts.getEncAuth) session.getEncAuth = opts.getEncAuth;
-        if (opts.anonymous) session.anonymous = true;
         return session;
-    }
-
-    /** True while the app sees no caller identity on this session. */
-    get isAnonymous(): boolean {
-        return this.anonymous;
-    }
-
-    /**
-     * Re-establish an anonymous session from the wallet's voucher, in place,
-     * so the enclave tells the app who the caller is (X-Privasys-Sub). The
-     * wallet uploads the voucher around the end of its ceremony, and it can
-     * land after the session was installed; until then the session keeps
-     * working, anonymously. Resolves true once the session is identified.
-     * A missing voucher is not a failure here: the caller tries again later.
-     */
-    identify(): Promise<boolean> {
-        if (!this.anonymous) return Promise.resolve(true);
-        if (this.identifyRefused || !this.getEncAuth) return Promise.resolve(false);
-        return this.shareBootstrap('identify', () => this.identifyOnce());
-    }
-
-    /**
-     * Run a voucher-backed bootstrap of `kind`, or join the one in flight.
-     * A bootstrap of the other kind in flight is waited for first: when it
-     * succeeds the session is already re-established from the voucher (and
-     * so identified), and this one is not needed.
-     */
-    private shareBootstrap(kind: 'identify' | 'rebind', run: () => Promise<boolean>): Promise<boolean> {
-        const current = this.bootstrapInFlight;
-        if (current?.kind === kind) return current.done;
-        if (current) return current.done.then((ok) => ok || this.shareBootstrap(kind, run));
-        const done: Promise<boolean> = run().finally(() => {
-            if (this.bootstrapInFlight?.done === done) this.bootstrapInFlight = null;
-        });
-        this.bootstrapInFlight = { kind, done };
-        return done;
-    }
-
-    private async identifyOnce(): Promise<boolean> {
-        let env: EncAuthEnvelope | null | undefined;
-        try {
-            env = await this.getEncAuth!();
-        } catch {
-            return false;
-        }
-        if (!env) return false;
-        const handshake = await bootstrapWithEncAuth(this.host, env, this.fetchImpl);
-        if (!handshake.ok) {
-            if (handshake.error === 'rejected') this.identifyRefused = true;
-            return false;
-        }
-        try {
-            await this.adoptHandshake(handshake);
-        } catch {
-            return false;
-        }
-        return true;
     }
 
     /** Take over the keys and id of a voucher-backed bootstrap, in place.
@@ -460,8 +322,6 @@ export class PrivasysSession {
         this.keys = reborn.keys;
         this.c2sCtr = 0n;
         this.s2cCtr = 0n;
-        // A voucher-backed bootstrap always names the caller.
-        this.anonymous = false;
     }
 
     /**
@@ -471,14 +331,7 @@ export class PrivasysSession {
      */
     async request(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedResponse> {
         const sentOn = this.sessionId;
-        const sentAnonymous = this.anonymous;
         const r = await this.requestOnce(method, path, body, init);
-        // The app refused an anonymous caller: identify the session from the
-        // wallet's voucher and send the request once more. The app answered
-        // 401, so it did not act on the first one.
-        if (r.status === 401 && r.sealed && sentAnonymous && await this.identify()) {
-            return this.requestOnce(method, path, body, init);
-        }
         // Silent-rebind: when the enclave rejected our session (expired
         // or evicted) and the caller wired a getEncAuth fetcher, ask
         // the IdP for a fresh voucher and re-bootstrap without going
@@ -611,7 +464,13 @@ export class PrivasysSession {
         // enclave's per-session rebind budget (six a minute), so one rebind
         // per burst is the difference between a silent recovery and a
         // rate-limited failure the app can only surface as a sign-out.
-        return this.shareBootstrap('rebind', () => this.rebindOnce());
+        if (!this.rebindInFlight) {
+            const done = this.rebindOnce().finally(() => {
+                if (this.rebindInFlight === done) this.rebindInFlight = null;
+            });
+            this.rebindInFlight = done;
+        }
+        return this.rebindInFlight;
     }
 
     private setState(state: SealedSessionState): void {
@@ -755,13 +614,7 @@ export class PrivasysSession {
      */
     async stream(method: string, path: string, body?: unknown, init?: RequestInit): Promise<SealedStreamResponse> {
         const sentOn = this.sessionId;
-        const sentAnonymous = this.anonymous;
         const r = await this.streamOnce(method, path, body, init);
-        // As in request(): an app's 401 to an anonymous session.
-        if (r.status === 401 && r.sealed && sentAnonymous && await this.identify()) {
-            try { await r.body.cancel(); } catch { /* tearing down */ }
-            return this.streamOnce(method, path, body, init);
-        }
         // Silent-rebind for the streaming path, mirroring request(): when
         // the enclave no longer recognises our session it answers with an
         // UNSEALED 401 (same shape the gateway returns when there's no

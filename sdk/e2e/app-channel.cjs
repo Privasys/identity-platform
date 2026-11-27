@@ -159,6 +159,18 @@ const CORS = {
   assert.equal(notified.at(-1).appHost, 'enc2.test', 'the wallet is asked for that host');
   assert.equal(refused.error, 'rejected:enc-changed', 'still refused after the new approval: ' + refused.error);
 
+  // ── Silent: no approval, and the wallet is not asked ──
+  const pushesBeforeSilent = notified.length;
+  const silent = await page.evaluate(async () => {
+    const approvals = [];
+    const error = await window.sealed.app('enc3.test', { silent: true, onApproval: (r) => approvals.push(r) })
+      .then(() => 'opened', (e) => e.message);
+    return { approvals, error };
+  });
+  assert.match(silent.error, /^approval-required/, 'a silent app() without an approval is refused: ' + silent.error);
+  assert.deepEqual(silent.approvals, [], 'and does not wait for an approval');
+  assert.equal(notified.length, pushesBeforeSilent, 'and asks the wallet for nothing');
+
   // ── A wallet session that the app asks to reach directly ──
   const pushesBefore = notified.length;
   const forced = await page.evaluate(async () => {

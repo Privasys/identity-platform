@@ -101,6 +101,8 @@ export class AuthFrame {
      *   they join the frame's `attributes`, and a session without them runs
      *   the gate, which asks the wallet for the difference.
      * @param opts.billingGrant a billing grant for this ceremony only.
+     * @param opts.apps enclave hosts this ceremony also approves, for a page
+     *   that learns them after the frame is made.
      * @param opts.methods the sign-in methods this ceremony offers, when it
      *   needs fewer than the configuration's (only the wallet can share
      *   certified attributes, for example).
@@ -110,6 +112,7 @@ export class AuthFrame {
         attributes?: readonly string[];
         billingGrant?: string;
         methods?: AuthFrameConfig['methods'];
+        apps?: readonly string[];
     }): Promise<Session> {
         this.alive();
         if (opts?.container) this.container = opts.container;
@@ -123,6 +126,7 @@ export class AuthFrame {
         const result = await this.ceremony({
             ...(opts?.billingGrant ? { billingGrant: opts.billingGrant } : {}),
             ...(opts?.methods?.length ? { methods: [...opts.methods] } : {}),
+            ...(opts?.apps?.length ? { apps: [...new Set([...(this.config.apps ?? []), ...opts.apps])] } : {}),
         });
         if (!result.accessToken) throw new ConnectError('failed', 'The sign-in returned no session');
         for (const host of result.apps?.hosts ?? []) this.approvedAtSignIn.set(host, result.apps!.waitMs);
@@ -196,11 +200,16 @@ export class AuthFrame {
      *
      * `transport: 'direct'` reaches the app over HTTPS whatever the sign-in
      * method, for an app served on a name that only takes direct calls.
+     *
+     * `silent: true` never asks the wallet: without an approval for the
+     * host, app() rejects with `approval-required` (and the reason after a
+     * change), for channels a page sets up in the background.
      */
     async app(host: string, opts?: {
         audience?: string;
         onApproval?: (reason: string | null) => void;
         transport?: 'direct';
+        silent?: boolean;
     }): Promise<AppChannel> {
         this.alive();
         const name = appHost(host);
@@ -212,7 +221,7 @@ export class AuthFrame {
         if (opts?.audience) channel.audience = opts.audience;
         const session = await this.signedIn();
         if (session.method === 'wallet' && opts?.transport !== 'direct') {
-            if (!channel.live('sealed')) await this.openSealed(channel, opts?.onApproval);
+            if (!channel.live('sealed')) await this.openSealed(channel, opts?.onApproval, opts?.silent === true);
             return channel;
         }
         const audience = channel.audience;
@@ -326,7 +335,9 @@ export class AuthFrame {
     private async ceremony(extra: Record<string, unknown>, modal = false): Promise<GateResult> {
         if (this.gate) throw new ConnectError('failed', 'AuthFrame: a sign-in is already in progress');
         const c = this.config;
-        const container = modal ? null : this.container;
+        // A container the page has since removed draws nothing: fall back to
+        // the configured presentation without it.
+        const container = modal || !this.container?.isConnected ? null : this.container;
         const run = openGate({
             authOrigin: this.authOrigin,
             container,
@@ -368,15 +379,15 @@ export class AuthFrame {
     }
 
     /** Establish the sealed channel of a host, once at a time. */
-    private openSealed(channel: Channel, onApproval?: (reason: string | null) => void): Promise<void> {
+    private openSealed(channel: Channel, onApproval?: (reason: string | null) => void, silent = false): Promise<void> {
         const pending = this.opening.get(channel.host);
         if (pending) return pending;
-        const p = this.establishSealed(channel, onApproval).finally(() => this.opening.delete(channel.host));
+        const p = this.establishSealed(channel, onApproval, silent).finally(() => this.opening.delete(channel.host));
         this.opening.set(channel.host, p);
         return p;
     }
 
-    private async establishSealed(channel: Channel, onApproval?: (reason: string | null) => void): Promise<void> {
+    private async establishSealed(channel: Channel, onApproval: ((reason: string | null) => void) | undefined, silent: boolean): Promise<void> {
         const host = channel.host;
         const waitMs = this.approvedAtSignIn.get(host) ?? 0;
         this.approvedAtSignIn.delete(host);
@@ -389,6 +400,7 @@ export class AuthFrame {
         if (r.error) {
             const reason = approvalReason(r.error, r.reason);
             if (reason === undefined) throw new Error(r.reason ? `${r.error}:${r.reason}` : r.error);
+            if (silent) throw new Error(reason ? `approval-required:${reason}` : 'approval-required');
             onApproval?.(reason);
             const v = await this.frame.call(
                 { type: 'privasys:voucher-request', clientId: this.config.clientId, host, appName: this.config.appName },

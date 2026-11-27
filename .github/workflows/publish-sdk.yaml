@@ -43,7 +43,7 @@ jobs:
         run: |
           test -f dist/index.js
           test -f dist/index.d.ts
-          test -f dist/privasys-auth.iife.js
+          test -f dist/idp.js
           test -f dist/privasys-auth-frame.iife.js
           test -f dist/privasys-auth-client.iife.js
 

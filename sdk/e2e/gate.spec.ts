@@ -1,15 +1,22 @@
 /**
- * The themed gate, rendered from the built bundle on a static page, checked
+ * The themed gate, bundled from the source on a static page, checked
  * for accessibility and against reference screenshots. The shadow root is
  * closed in production; the page opens it here so axe can read inside.
- * Run after `npm run build`: `npm run test:gate`.
+ * Run: `npm run test:gate`.
  */
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { buildSync } from 'esbuild';
 
-const bundle = readFileSync(join(process.cwd(), 'dist', 'privasys-auth.iife.js'), 'utf8');
+const bundle = buildSync({
+    entryPoints: [join(process.cwd(), 'e2e', 'gate-ui.ts')],
+    bundle: true,
+    format: 'iife',
+    globalName: 'Privasys',
+    target: 'es2020',
+    write: false,
+}).outputFiles[0].text;
 
 const VIEWPORTS = [
     { name: 'phone', width: 390, height: 844 },

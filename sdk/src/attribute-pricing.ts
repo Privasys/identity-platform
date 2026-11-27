@@ -63,9 +63,9 @@ export function disclosureCost(
 }
 
 /**
- * Read the marketplace catalogue's prices. `apiBase` is the control plane (the
- * same base the auth config already names); `token` is the signed-in user's own
- * access token, since the catalogue sits behind authentication.
+ * Read the marketplace catalogue's prices. `apiBase` is the control plane's
+ * API origin; `token` is the signed-in user's own access token, since the
+ * catalogue sits behind authentication.
  */
 export async function fetchAttributePrices(
     apiBase: string,

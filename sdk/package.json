@@ -1,7 +1,7 @@
 {
     "name": "@privasys/auth",
     "version": "0.18.0",
-    "description": "Browser SDK for Privasys Wallet authentication — QR code, push notification, and session management.",
+    "description": "Browser SDK for Privasys ID sign-in: sessions, and sealed or direct channels to enclave apps.",
     "license": "AGPL-3.0-only",
     "type": "module",
     "main": "dist/index.js",
@@ -31,17 +31,11 @@
             "types": "./dist/react.d.ts",
             "import": "./dist/react.js"
         },
-        "./iife": "./dist/privasys-auth.iife.js",
-        "./frame": {
-            "types": "./dist/frame-client.d.ts",
-            "import": "./dist/frame-client.js"
-        },
         "./frame-client": "./dist/privasys-auth-client.iife.js"
     },
     "scripts": {
         "sync-shared": "cp ../shared/canonical-attributes.json src/shared/canonical-attributes.json",
-        "build": "npm run sync-shared && tsc && npm run build:iife && npm run build:frame-host && npm run build:frame-client",
-        "build:iife": "esbuild src/iife.ts --bundle --format=iife --global-name=Privasys --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth.iife.js",
+        "build": "npm run sync-shared && tsc && npm run build:frame-host && npm run build:frame-client",
         "build:frame-host": "esbuild src/frame-host/index.ts --bundle --format=iife --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth-frame.iife.js",
         "build:frame-client": "esbuild src/frame-client.ts --bundle --format=iife --global-name=Privasys --minify --sourcemap --target=es2020 --outfile=dist/privasys-auth-client.iife.js",
         "dev": "tsc --watch",

@@ -2,28 +2,20 @@
 // Licensed under the GNU Affero General Public License v3.0.
 
 /**
- * The canonical attribute referential, as the SDK's integration surface.
+ * The canonical attribute referential: what a relying party can ask for, at
+ * which assurance, and which disclosures the marketplace prices.
  *
- * Every front end that wanted to know what a relying party can ask for used to
- * fetch https://privasys.id/referential/canonical-attributes.json and fold it
- * into a local shape of its own: the developer portal's registration form, the
- * Drive share picker, and anything an integrator wrote. Three folders of the
- * same document, three interpretations of what "gov" means, and three places for
- * a new attribute to be forgotten. The list ships here instead, and the IdP keeps
- * serving the raw document for consumers that are not on this SDK.
- *
- * The bundled copy is generated from auth/shared/canonical-attributes.json by
- * `npm run sync-shared`, and CI re-runs that and fails on a diff — the same
- * guard the wallet's copy has, for the same reason: a copy nobody regenerates
- * goes stale silently, and the IdP's once did so by eleven attributes.
+ * The bundled copy is generated from shared/canonical-attributes.json by
+ * `npm run sync-shared`, and CI fails when it differs. The identity provider
+ * serves the same document for consumers that are not on this SDK.
  */
 
 import canonicalDoc from './shared/canonical-attributes.json';
 
 /** Registry assurance vocabulary (the `assurance` column of the marketplace's
  *  `attributes` table), not the none/provider/gov ladder used inside tokens. */
-export const SELF_ASSERTED = 'self_asserted';
-export const GOV_VERIFIED = 'gov_verified';
+const SELF_ASSERTED = 'self_asserted';
+const GOV_VERIFIED = 'gov_verified';
 
 /**
  * The registry-facing half of an attribute. `key` is the `<namespace>:<name>`
@@ -87,10 +79,6 @@ export const ATTRIBUTE_MAP: Record<string, CanonicalAttribute> = Object.fromEntr
     CANONICAL_ATTRIBUTES.map((a) => [a.key, a]),
 );
 
-/** Every canonical key, for validating what an integrator asks for before the
- *  IdP silently drops it. */
-export const CANONICAL_KEYS: ReadonlySet<string> = new Set(CANONICAL_ATTRIBUTES.map((a) => a.key));
-
 /**
  * This key's assurance in the registry's vocabulary.
  *
@@ -129,34 +117,11 @@ export function marketplaceKeyOf(attr: CanonicalAttribute | string | undefined):
 }
 
 /**
- * The pairs a relying party actually chooses between.
- *
- * `given_name` and `given_name_id` are the same fact at two trust levels and two
- * prices, and a picker that lists them as unrelated rows makes the choice look
- * like a duplicate rather than a decision. Returns the self-asserted key with
- * its government-backed twin, for the pairs where both exist.
- */
-export function attributePairs(): { self: CanonicalAttribute; gov: CanonicalAttribute }[] {
-    const out: { self: CanonicalAttribute; gov: CanonicalAttribute }[] = [];
-    for (const a of CANONICAL_ATTRIBUTES) {
-        const gov = a.govKey ? ATTRIBUTE_MAP[a.govKey] : undefined;
-        if (gov) out.push({ self: a, gov });
-    }
-    return out;
-}
-
-/**
  * The attributes worth offering an integrator, newest spelling only.
  *
  * A key marked `supersededBy` still resolves and must never be removed, but
  * putting both spellings in a picker asks a developer to choose between two
  * names for one disclosure. They are hidden here and remain reachable by key.
- *
- * No key carries the marker today. `birthdate` and `nationality` did, as the two
- * that predated the `_id` convention, until they were split into pairs: a pair is
- * a CHOICE a picker should show (a birth date the holder typed is cheaper than
- * one a passport certifies), where a supersession is a spelling nobody should
- * have to pick between.
  */
 export function requestableAttributes(
     all: CanonicalAttribute[] = CANONICAL_ATTRIBUTES,

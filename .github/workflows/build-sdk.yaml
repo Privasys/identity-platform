@@ -51,10 +51,6 @@ jobs:
         working-directory: sdk
         run: npx tsc
 
-      - name: Build IIFE bundle
-        working-directory: sdk
-        run: npm run build:iife
-
       - name: Build the hosted frame and the frame client
         working-directory: sdk
         run: npm run build:frame-host && npm run build:frame-client
@@ -79,18 +75,21 @@ jobs:
         run: |
           test -f dist/index.js || (echo "Missing dist/index.js" && exit 1)
           test -f dist/index.d.ts || (echo "Missing dist/index.d.ts" && exit 1)
-          test -f dist/privasys-auth.iife.js || (echo "Missing IIFE bundle" && exit 1)
+          test -f dist/idp.js || (echo "Missing dist/idp.js" && exit 1)
+          test -f dist/privasys-auth-client.iife.js || (echo "Missing the client bundle" && exit 1)
           echo "SDK build output:"
           ls -lh dist/
           echo ""
-          echo "IIFE bundle size: $(wc -c < dist/privasys-auth.iife.js) bytes"
+          echo "Client bundle size: $(wc -c < dist/privasys-auth-client.iife.js) bytes"
 
-      - name: Upload IIFE bundle
+      - name: Upload the hosted bundles
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v7
         with:
-          name: privasys-auth-iife
+          name: privasys-auth-bundles
           path: |
-            sdk/dist/privasys-auth.iife.js
-            sdk/dist/privasys-auth.iife.js.map
+            sdk/dist/privasys-auth-client.iife.js
+            sdk/dist/privasys-auth-client.iife.js.map
+            sdk/dist/privasys-auth-frame.iife.js
+            sdk/dist/privasys-auth-frame.iife.js.map
           retention-days: 90

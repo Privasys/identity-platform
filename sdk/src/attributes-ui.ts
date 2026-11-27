@@ -2,8 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.0.
 
 /**
- * Reusable attribute UI: a picker for a relying party choosing what to request,
- * and a badge for showing what a value is worth.
+ * Reusable attribute UI: a picker for a relying party choosing what to request.
  *
  * The trust cue is the reason this ships here rather than being left to each
  * integrator. "First Name" and "First Name, from a government ID" are different
@@ -23,7 +22,6 @@ import {
     CANONICAL_ATTRIBUTES,
     assuranceOf,
     isBillable,
-    isGovVerified,
     requestableAttributes,
     type CanonicalAttribute,
 } from './attributes';
@@ -166,52 +164,6 @@ const ATTRIBUTES_CSS = /* css */ `
     .badge.paid { color: #FDBA74; background: rgba(249,115,22,0.14); }
 }
 `;
-
-/** What a badge asserts about a value. */
-export type AttributeAssuranceBadge = 'gov' | 'self';
-
-/**
- * A badge element for one attribute: government-verified or self-asserted, plus
- * an optional "Paid" marker for a disclosure the relying party is charged for.
- *
- * Returns a detached element with its own shadow root, so it can be dropped into
- * any layout without inheriting the host page's typography. Pass a
- * CanonicalAttribute when the list came from `fetchAttributeReferential`; a bare
- * key resolves against the bundled one.
- */
-export function attributeBadge(
-    attr: CanonicalAttribute | string,
-    opts: { showPaid?: boolean } = {},
-): HTMLElement {
-    const host = document.createElement('span');
-    host.setAttribute('data-privasys-attribute-badge', '');
-    host.style.display = 'inline-flex';
-    host.style.gap = '4px';
-    const shadow = host.attachShadow({ mode: 'closed' });
-    const style = document.createElement('style');
-    style.textContent = ATTRIBUTES_CSS;
-    shadow.appendChild(style);
-
-    const gov = isGovVerified(attr);
-    const badge = document.createElement('span');
-    badge.className = `badge ${gov ? 'gov' : 'self'}`;
-    badge.innerHTML = `${gov ? SHIELD : PERSON}<span>${gov ? 'Government ID' : 'Self-asserted'}</span>`;
-    // The label is redundant to a sighted user next to the icon, but the icon is
-    // the whole message for a screen reader that skips the decorative svg.
-    badge.setAttribute('title', gov
-        ? 'Read from a government document and certified inside an enclave.'
-        : 'Provided by the holder or their identity provider, not checked against a document.');
-    shadow.appendChild(badge);
-
-    if (opts.showPaid && isBillable(attr)) {
-        const paid = document.createElement('span');
-        paid.className = 'badge paid';
-        paid.textContent = 'Paid';
-        paid.setAttribute('title', 'Requesting this disclosure costs the relying party credits.');
-        shadow.appendChild(paid);
-    }
-    return host;
-}
 
 /** Section wording a host can replace: what each group is, and why it matters. */
 export interface AttributeSectionCopy {

@@ -13,12 +13,9 @@ A monorepo for Privasys authentication: the **Privasys Wallet** mobile app, the 
 
 ### SDK Features
 
-- **`PrivasysAuth`** — QR-based wallet relay flow (Tier 1: highest assurance)
-- **`WebAuthnClient`** — Browser-native WebAuthn passkeys (Tier 2: platform authenticators)
-- **`SessionManager`** — Session persistence and restore via `getSession()` / `clearSession()`
-- **`AuthFrame`** — Hidden iframe on `privasys.id` for cross-origin session management
-  - `methods` picks the sign-in methods (`wallet`, `passkey`, `social`); `providers` narrows the social list, so `methods: ['social'], providers: ['microsoft']` shows a single "Sign in with Microsoft" button and no chooser
-- **IIFE bundle** — `privasys-auth.iife.js` (~9KB) for vanilla JS embedding via `window.Privasys`
+- **`AuthFrame`**: one per page. `connect()` restores the person's session or runs the sign-in gate (the Privasys ID wallet by QR code or notification, passkeys, external identity providers), presented as a page, a modal, inline or headless, with the site's theme. `app(host)` opens the channel to an enclave app: sealed for a wallet session, direct with an audience token otherwise. `token()`, `renew()`, `signOut()` and `onSessionChange()` keep every tab of the site in step.
+- **`IdpGate`** (`@privasys/auth/idp`): the gate of the identity provider's own pages, which approve a device's sign-in or an operation.
+- **Hosted bundle**: `https://privasys.id/auth/privasys-auth-client.iife.js` gives `window.Privasys.AuthFrame` and `Privasys.IdpGate` without a build step.
 
 ### Wallet Features
 

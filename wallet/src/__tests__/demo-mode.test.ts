@@ -119,7 +119,8 @@ describe('the seed', () => {
             expect(a.verifications?.[0].assurance).toBe('gov');
         }
         const email = profile.attributes.find((a) => a.key === 'email')!;
-        expect(email.verifications?.[0]).toMatchObject({ verifier: 'privasys.id', assurance: 'provider' });
+        expect(email.verifications?.[0]).toMatchObject({ verifier: 'privasys_mail', assurance: 'provider' });
+        expect(isVerified(email)).toBe(true);
         expect(profile.attributes.some((a) => a.key === 'phone_number')).toBe(true);
         expect(profile.attributes.find((a) => a.key === 'picture_id')?.value).toMatch(/^data:image\/png;base64,/);
     });

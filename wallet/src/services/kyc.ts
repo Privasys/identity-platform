@@ -645,14 +645,13 @@ export async function verifyIdentity(
 // wallet has already certified.
 const govStoreKey = (field: string): string => ATTRIBUTE_MAP[field]?.govKey ?? field;
 
-function govRecord(record: KycRecord, evidence: string): VerificationRecord {
+function govRecord(record: KycRecord): VerificationRecord {
     return {
         verifier: 'privasys-kyc',
         verifierDisplayName: VERIFIER_DISPLAY,
         method: 'kyc_enclave',
         assurance: 'gov',
         verifiedAt: record.verifiedAt,
-        evidence
     };
 }
 
@@ -700,11 +699,8 @@ export function applyGovAttributes(
     const filled: string[] = [];
     for (const attr of govAttributeCandidates(record, portraitBase64)) {
         if (!selected.has(attr.key)) continue;
-        const evidence = attr.key.startsWith('age_over_')
-            ? `ivr:${record.jti}#${attr.key}`
-            : `ivr:${record.jti}`;
         setProfileValue(store, attr.key, attr.value, 'document', {
-            verifications: [govRecord(record, evidence)]
+            verifications: [govRecord(record)]
         });
         filled.push(attr.key);
     }

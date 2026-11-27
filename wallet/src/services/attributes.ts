@@ -555,7 +555,6 @@ export function exportAttributesForAudit(profile: UserProfile): {
                 verifierDisplayName: v.verifierDisplayName,
                 method: v.method,
                 verifiedAt: new Date(v.verifiedAt * 1000).toISOString(),
-                evidence: v.evidence,
             })),
         })),
         linkedProviders: profile.linkedProviders.map((p) => ({

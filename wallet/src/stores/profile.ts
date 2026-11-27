@@ -41,12 +41,6 @@ export interface VerificationRecord {
     /** Epoch seconds when the verification was performed. */
     verifiedAt: number;
     /**
-     * Raw evidence from the verifier — e.g. the `email_verified` claim value,
-     * NFC certificate chain hash, or verification code receipt ID.
-     * Stored for audit trail, never shown to other apps.
-     */
-    evidence?: string;
-    /**
      * The Privasys Attribute Verifier's signed proof of this value (a JWS),
      * bound to one device of the holder (services/attribute-proofs). Syncs to
      * the holder's other devices, each of which has it rebound to itself the
@@ -57,11 +51,8 @@ export interface VerificationRecord {
     proofDevice?: string;
     /** The salt of the holder commitment the proof was made under (base64url). */
     proofSalt?: string;
-    /**
-     * The raw evidence the proof was made from (a provider's ID token, a card
-     * check), kept so the verifier can re-attest it. Never shown or shared.
-     */
-    proofMaterial?: { kind: string; data: Record<string, unknown> };
+    /** A card check: the card's brand and country, as the bank gave them, to name who confirmed it. */
+    cardLabel?: { brand?: string | null; country?: string | null };
 }
 
 /**

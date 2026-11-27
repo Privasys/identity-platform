@@ -3,8 +3,8 @@
 
 /**
  * Attribute proofs: what the Privasys Attribute Verifier signed about the
- * holder's attributes, kept on the attribute's verification record with the raw
- * evidence it was made from (stores/profile VerificationRecord).
+ * holder's attributes, kept on the attribute's verification record
+ * (stores/profile VerificationRecord).
  *
  * - At import, the provider's raw token goes to the verifier, and each proof it
  *   returns is attached to the attribute with the same key and value.
@@ -50,16 +50,16 @@ function sameValue(proofValue: unknown, value: string): boolean {
 
 /**
  * The material a provider link returns, as the verifier takes it: the signed ID
- * token for an OIDC provider (kept, so it can be re-attested), GitHub's access
- * token (one-shot: used once, never kept). Null when there is nothing to check.
+ * token for an OIDC provider, GitHub's access token. Used once, for the proof,
+ * and never kept. Null when there is nothing to check.
  */
 export function linkMaterial(
     provider: string,
     idToken?: string,
     accessToken?: string,
-): { kind: AttestKind; data: Record<string, unknown>; keep: boolean } | null {
-    if (OIDC_PROVIDERS.has(provider) && idToken) return { kind: 'oidc_id_token', data: { provider, id_token: idToken }, keep: true };
-    if (provider === 'github' && accessToken) return { kind: 'github', data: { access_token: accessToken }, keep: false };
+): { kind: AttestKind; data: Record<string, unknown> } | null {
+    if (OIDC_PROVIDERS.has(provider) && idToken) return { kind: 'oidc_id_token', data: { provider, id_token: idToken } };
+    if (provider === 'github' && accessToken) return { kind: 'github', data: { access_token: accessToken } };
     return null;
 }
 
@@ -70,7 +70,7 @@ export function linkMaterial(
  */
 export async function attachLinkProofs(
     attributes: ProfileAttribute[],
-    material: { kind: AttestKind; data: Record<string, unknown>; keep: boolean },
+    material: { kind: AttestKind; data: Record<string, unknown> },
     salt: string,
     displayName: string,
 ): Promise<number> {
@@ -95,11 +95,9 @@ export async function attachLinkProofs(
             // a provider's API said, unsigned) is shown to the holder only.
             assurance: p.method === 'proven' ? 'provider' : 'none',
             verifiedAt: now,
-            evidence: `verifier:${p.source}:${p.method}`,
             proof: p.proof,
             proofDevice: device,
             proofSalt: salt,
-            ...(material.keep ? { proofMaterial: { kind: material.kind, data: material.data } } : {}),
         };
         // The proof replaces the provider's bare claim for the same verifier.
         attr.verifications = [...(attr.verifications ?? []).filter((v) => v.verifier !== p.source || v.proof), record];
@@ -182,21 +180,19 @@ function sourceName(source: string): string {
 
 /**
  * Who proved a value, for the line under it: the proof's source when it has
- * one ("Verified by Google", "Verified by email code", the card's bank), or
- * privasys.id's own mail-code receipt from before the verifier. Undefined when
- * nothing proved it, so the screen falls back to where the value came from.
- * The card's bank, which needs the proof's label, is the caller's.
+ * one ("Verified by Google", "Verified by email code", the card's bank).
+ * Undefined when nothing proved it, so the screen falls back to where the
+ * value came from. The card's bank, which needs the card's label, is the
+ * caller's.
  */
 export function provedBy(
     attr: ProfileAttribute,
     t: (key: string, opts?: Record<string, unknown>) => string,
 ): { kind: 'card' } | { kind: 'text'; text: string } | undefined {
-    const rec =
-        attr.verifications?.find((v) => v.proof) ??
-        attr.verifications?.find((v) => v.verifier === 'privasys.id' && v.method === 'email_code');
+    const rec = attr.verifications?.find((v) => v.proof);
     if (!rec) return undefined;
     if (rec.verifier === 'card_bank') return { kind: 'card' };
-    if (rec.verifier === 'privasys_mail' || rec.verifier === 'privasys.id') return { kind: 'text', text: t('personalData.verifiedByMail') };
+    if (rec.verifier === 'privasys_mail') return { kind: 'text', text: t('personalData.verifiedByMail') };
     if (rec.assurance !== 'provider') return { kind: 'text', text: t('personalData.fromProviderAccount', { provider: sourceName(rec.verifier) }) };
     return { kind: 'text', text: t('personalData.verifiedByProvider', { provider: sourceName(rec.verifier) }) };
 }

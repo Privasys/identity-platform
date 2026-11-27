@@ -174,11 +174,10 @@ export async function checkAddressWithCard(): Promise<AttributeProof> {
                     method: 'card_check',
                     assurance: p.method === 'proven' ? 'provider' : 'none',
                     verifiedAt: now,
-                    evidence: `verifier:${p.source}:${p.method}`,
                     proof: p.proof,
                     proofDevice: device,
                     proofSalt: salt,
-                    proofMaterial: { kind: 'card_check', data: { ...material, label: p.label } },
+                    ...(p.label ? { cardLabel: { brand: p.label.brand ?? null, country: p.label.country ?? null } } : {}),
                 },
             ],
         };
@@ -242,9 +241,7 @@ export function cardBankSource(
     t: (key: string, opts?: Record<string, unknown>) => string,
     locale: string,
 ): string {
-    const label = attr.verifications?.find((v) => v.proofMaterial?.kind === 'card_check')?.proofMaterial?.data?.label as
-        | { brand?: string | null; country?: string | null }
-        | undefined;
+    const label = attr.verifications?.find((v) => v.method === 'card_check')?.cardLabel;
     const brand = label?.brand ? BRANDS[label.brand.toLowerCase()] ?? label.brand : null;
     const country = label?.country ? countryFlag(label.country) : null;
     // The billing country is its own statement, shared without the address.

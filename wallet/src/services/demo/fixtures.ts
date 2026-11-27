@@ -132,14 +132,13 @@ export function trustedAppFor(app: DemoApp, now: number, credentialId = ''): Tru
 
 const HOLDER_ID = fakeHex('holder/id', 16);
 
-function govVerification(now: number, key: string): VerificationRecord {
+function govVerification(now: number): VerificationRecord {
     return {
         verifier: 'privasys-kyc',
         verifierDisplayName: 'Privasys identity verifier',
         method: 'kyc_enclave',
         assurance: 'gov',
         verifiedAt: now - 21 * DAY,
-        evidence: key.startsWith('age_over_') ? `ivr:demo-ivr#${key}` : 'ivr:demo-ivr',
     };
 }
 
@@ -153,7 +152,7 @@ function fromPassport(now: number, key: string, value: string): ProfileAttribute
         sources: [{ source: 'document', displayName: 'Passport', addedAt: at }],
         acquiredAt: at,
         updatedAt: at,
-        verifications: [govVerification(now, key)],
+        verifications: [govVerification(now)],
     };
 }
 
@@ -197,12 +196,12 @@ export function holderProfile(now: number): UserProfile {
                 updatedAt: emailAt,
                 verifications: [
                     {
-                        verifier: 'privasys.id',
+                        verifier: 'privasys_mail',
                         verifierDisplayName: 'Privasys',
                         method: 'email_code',
                         assurance: 'provider',
                         verifiedAt: emailAt,
-                        evidence: 'demo-email-receipt',
+                        proof: 'demo-email-proof',
                     },
                 ],
             },

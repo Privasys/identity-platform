@@ -126,7 +126,6 @@ export default function VerifyEmailScreen() {
                         method: 'email_code',
                         assurance: 'provider',
                         verifiedAt: result.verifiedAt,
-                        evidence: `verifier:${result.proof.source}:${result.proof.method}`,
                         proof: result.proof.proof,
                         proofDevice: device,
                         proofSalt: result.salt,

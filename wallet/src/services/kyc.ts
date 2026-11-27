@@ -375,8 +375,7 @@ interface ManifestTool {
 }
 
 /** Endpoint path -> { field name -> fill marker }, derived once per session
- *  from the app's own manifest. Empty when the app serves none (older image),
- *  which selects the legacy hard-coded behaviour below. */
+ *  from the app's own manifest. */
 let fillPlanCache: Record<string, Record<string, string>> | null = null;
 
 async function loadFillPlan(host: string, port: number): Promise<Record<string, Record<string, string>>> {
@@ -399,11 +398,11 @@ async function loadFillPlan(host: string, port: number): Promise<Record<string, 
                 }
                 if (Object.keys(fields).length > 0) plan[tool.endpoint] = fields;
             }
+            fillPlanCache = plan;
         }
     } catch {
-        // Older enclave or transport hiccup: fall through to the legacy set.
+        // Not cached: the next call reads the manifest again.
     }
-    fillPlanCache = plan;
     return plan;
 }
 
@@ -435,21 +434,7 @@ async function fillCredentialFields(
     path: string,
     body: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-    const plan = await loadFillPlan(host, port);
-    // Legacy fallback: the endpoints that were gated before x-privasys.fill
-    // existed. Only used when the app declares no fill markers at all.
-    const fields: Record<string, string> =
-        plan[path] ??
-        (Object.keys(plan).length === 0 &&
-        (path === '/read-mrz' || path === '/verify-identity' || path.startsWith('/prove/'))
-            ? {
-                  wia: 'wallet_instance_attestation',
-                  // holder_pub too: the enclave binds the WIA's cnf.jwk to it,
-                  // so a WIA without it is refused. The call sites that set it
-                  // themselves are skipped by the not-empty check above.
-                  holder_pub: 'holder_public_key'
-              }
-            : {});
+    const fields = (await loadFillPlan(host, port))[path] ?? {};
 
     const out = { ...body };
     // The WIA is minted FIRST, whatever order the manifest lists the fields in.
@@ -843,9 +828,8 @@ function ivrBinding(ivr: string): string | undefined {
  * The IVR, bound to this device. Device sync copies an IVR to the holder's
  * other devices, where the key it is bound to does not exist. The Identity
  * Verifier re-issues it for this device when the holder key opens its
- * commitment (nothing is re-checked). An IVR from before holder commitments is
- * upgraded once, on the device it is bound to, which signs as the legacy key;
- * elsewhere it cannot be rebound and the ID has to be checked again there.
+ * commitment (nothing is re-checked). An IVR without a holder commitment
+ * cannot be rebound: the ID is checked again.
  *
  * Runs only when a disclosure is about to be made, inside its biometric grace,
  * so it adds no prompt of its own.
@@ -854,10 +838,10 @@ async function ivrForThisDevice(record: KycRecord): Promise<KycRecord> {
     const mine = await getHolderPublicKey();
     const mineBinding = b64uBytes(sha256(b64uToBytes(mine)));
     const boundHere = record.boundHolderPub ? record.boundHolderPub === mine : ivrBinding(record.ivr) === mineBinding;
-    if (boundHere && record.holderSalt) return record;
-    if (!boundHere && !record.holderSalt) {
-        throw new Error('This ID check was made on another device before it could move between devices. Open Privasys Wallet on that device once, or check your ID again here.');
+    if (!record.holderSalt) {
+        throw new Error('This ID check is from an older version of the wallet. Check your ID again.');
     }
+    if (boundHere) return record;
 
     const { challenge } = await postToVerifier<{ challenge: string }>('/rebind-challenge', {});
     const msg = new TextEncoder().encode(canonicalJson({ challenge, ivr: record.jti, op: 'rebind' }));
@@ -869,9 +853,6 @@ async function ivrForThisDevice(record: KycRecord): Promise<KycRecord> {
         holder_pub: mine,
         holder_sig: deviceSig,
         holder: holder.block,
-        // Upgrading an IVR from before holder commitments: the device it is
-        // bound to (this one) signs once more.
-        ...(record.holderSalt ? {} : { legacy: { holder_pub: mine, holder_sig: deviceSig } }),
     });
     const jti = JSON.parse(new TextDecoder().decode(b64uToBytes(resp.ivr.split('.')[1] ?? ''))).jti as string;
     const rebound: KycRecord = { ...record, jti, ivr: resp.ivr, holderSalt: holder.salt, boundHolderPub: mine };

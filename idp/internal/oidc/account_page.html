@@ -578,41 +578,46 @@
   function makeAuth() {
     if (!window.Privasys || !Privasys.AuthFrame) throw new Error("Sign-in unavailable. Please reload the page.");
     return new Privasys.AuthFrame({
-      apiBase: API,
       appName: "Privasys ID",
-      // Same relying party as the developer portal, Drive and chat: the
-      // wallet derives the pairwise subject per rpId, so this is what makes
-      // the account here the same account as everywhere else on the platform.
-      rpId: "privasys.id",
       clientId: "privasys-platform",
       authOrigin: IDP,
       scope: ["openid", "offline_access"]
     });
   }
 
+  // Take a session: the first one loads the account.
+  function adopt(s) {
+    if (!s || token === s.token) return;
+    var fresh = !token;
+    token = s.token;
+    if (!fresh) return;
+    if (location.search) history.replaceState(null, "", location.pathname);
+    load();
+  }
+
   async function connect(errEl) {
     if (errEl) errEl.textContent = "";
     try {
       auth = auth || makeAuth();
-      var res = await auth.signIn();
-      if (!res || !res.accessToken) throw new Error("Sign-in did not return a token.");
-      token = res.accessToken;
-      if (location.search) history.replaceState(null, "", location.pathname);
-      await load();
+      adopt(await auth.connect());
     } catch (e) {
-      if (errEl) errEl.textContent = e.message || "Sign-in failed.";
+      if (errEl && e.code !== "cancelled") errEl.textContent = e.message || "Sign-in failed.";
     }
   }
 
-  async function restore() {
+  // The session as the frame reports it: restored, renewed, or ended in
+  // another tab. The first report says whether there is one at all.
+  function restore() {
     var wantsConnect = /(^|[?&])connect(=|&|$)/.test(location.search);
-    try {
-      auth = makeAuth();
-      var s = await auth.getSession();
-      var t = s && (s.token || s.accessToken);
-      if (t) { token = t; if (location.search) history.replaceState(null, "", location.pathname); await load(); return; }
-    } catch (e) { /* no session: show the connect prompt */ }
-    if (wantsConnect) connect($("connectErr"));
+    var first = true;
+    try { auth = makeAuth(); } catch (e) { return; }
+    auth.onSessionChange(function (s) {
+      var wasFirst = first;
+      first = false;
+      if (s) { adopt(s); return; }
+      if (token) { token = null; location.replace(location.pathname); return; }
+      if (wasFirst && wantsConnect) connect($("connectErr"));
+    });
   }
 
   $("connectBtn").addEventListener("click", function () { connect($("connectErr")); });
@@ -631,7 +636,7 @@
   $("signoutBtn").addEventListener("click", async function () {
     closeMenu();
     token = null;
-    try { if (auth) await auth.clearSession(); } catch (e) { /* best effort */ }
+    try { if (auth) await auth.signOut(); } catch (e) { /* best effort */ }
     location.replace(location.pathname);
   });
 

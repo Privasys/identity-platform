@@ -228,12 +228,10 @@ function vaultOpOf(p) {
 
 function openGate() {
   const vaultOp = vaultOpOf(payload);
-  if (!vaultOp || !walletLink || !window.Privasys || !Privasys.AuthFrame) return false;
+  if (!vaultOp || !walletLink || !window.Privasys || !Privasys.IdpGate) return false;
   try {
-    gate = new Privasys.AuthFrame({
-      apiBase: "https://api.developer.privasys.org",
+    gate = new Privasys.IdpGate({
       appName: "Privasys CLI",
-      rpId: "privasys.id",
       presentation: "page",
       container: gateEl,
       pitch: {
@@ -258,16 +256,12 @@ function openGate() {
   cardEl.hidden = true;
   gateEl.hidden = false;
   const mine = gate;
-  mine.signIn().then(function (res) {
-    if (gate !== mine) return;
+  mine.run().then(function () {
     // The gate shows the outcome itself and stays.
-    if (res && (res.approved || res.outcome)) return;
-    showCard();
   }).catch(function (e) {
     if (gate !== mine) return;
     showCard();
-    const msg = e && e.message;
-    if (msg && msg !== "Authentication cancelled") fail(msg);
+    if (e && e.code !== "cancelled" && e.message) fail(e.message);
   });
   return true;
 }

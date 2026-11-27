@@ -545,7 +545,7 @@ var PrivasysQR = (function () {
   }
 
   function openGate(d) {
-    if (!window.Privasys || !Privasys.AuthFrame || !d.qr_payload) return false;
+    if (!window.Privasys || !Privasys.IdpGate || !d.qr_payload) return false;
     var name = d.client_name || "An application";
     var shown = userCode.length === 8 ? userCode.slice(0, 4) + "-" + userCode.slice(4) : userCode;
     var bullets = ["The code on your device is " + shown + ". Continue only if it matches."];
@@ -556,10 +556,8 @@ var PrivasysQR = (function () {
         "”. Approving lets it act as you until you revoke it in your wallet.");
     }
     try {
-      gate = new Privasys.AuthFrame({
-        apiBase: "https://api.developer.privasys.org",
+      gate = new Privasys.IdpGate({
         appName: name,
-        rpId: "privasys.id",
         deviceRequest: { userCode: userCode },
         presentation: "page",
         container: $("gate"),
@@ -573,24 +571,18 @@ var PrivasysQR = (function () {
     $("card").classList.add("hidden");
     $("gate").classList.remove("hidden");
     var mine = gate;
-    mine.signIn().then(function (res) {
+    mine.run().then(function () {
       if (gate !== mine || done) return;
-      if (res && (res.approved || res.outcome)) {
-        // The gate shows the outcome itself and stays.
-        done = true;
-        if (pollTimer) clearInterval(pollTimer);
-      } else {
-        closeGate();
-        renderConsent(d);
-      }
+      // The gate shows the outcome itself and stays.
+      done = true;
+      if (pollTimer) clearInterval(pollTimer);
     }).catch(function (e) {
       if (gate !== mine || done) return;
       closeGate();
       renderConsent(d);
-      var msg = (e && e.message) || "";
-      if (msg && msg !== "Authentication cancelled") {
+      if (e && e.code !== "cancelled" && e.message) {
         $("status").className = "status err";
-        $("status").textContent = msg;
+        $("status").textContent = e.message;
       }
     });
     return true;
@@ -688,8 +680,8 @@ var PrivasysQR = (function () {
   });
 
   // Without the wallet's QR code: sign in through the gate (passkey or
-  // another way), then approve the device with the resulting IdP access
-  // token. This signs in to privasys.id, so it carries no consent to the
+  // another way), and that sign-in approves the device; its token stays in
+  // the gate. This signs in to privasys.id, so it carries no consent to the
   // app's attributes; the wallet's QR code is the path that does.
   var gateOpen = false;
   async function approveThroughGate() {
@@ -698,27 +690,16 @@ var PrivasysQR = (function () {
     $("status").className = "status";
     $("status").innerHTML = '<span class="spin"></span> Opening sign-in…';
     try {
-      if (!window.Privasys || !Privasys.AuthFrame) throw new Error("Sign-in unavailable. Try the wallet.");
-      var auth = new Privasys.AuthFrame({
-        apiBase: "https://api.developer.privasys.org",
+      if (!window.Privasys || !Privasys.IdpGate) throw new Error("Sign-in unavailable. Try the wallet.");
+      var res = await new Privasys.IdpGate({
         appName: "Privasys CLI",
-        clientId: "privasys-cli",
-        // The identity is the holder's privasys.id one. Left out, it would
-        // default to the app name, which no wallet holds an identity for.
-        rpId: "privasys.id"
-      });
-      var res = await auth.signIn();
-      if (!res || !res.accessToken) throw new Error("Sign-in did not return a token.");
-      var r = await fetch("/device/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + res.accessToken },
-        body: JSON.stringify({ user_code: userCode })
-      });
-      if (!r.ok) throw new Error("Approval failed.");
+        deviceSignIn: { userCode: userCode, clientId: "privasys-cli" }
+      }).run();
+      if (!res.approved) throw new Error("Approval failed.");
       finish(true, "Approved ✓", "You can return to your terminal. This page can be closed.");
     } catch (e) {
       $("status").className = "status err";
-      $("status").textContent = e.message || "Sign-in failed.";
+      $("status").textContent = (e && e.code === "cancelled") ? "" : (e.message || "Sign-in failed.");
     } finally {
       gateOpen = false;
     }

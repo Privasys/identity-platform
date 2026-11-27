@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { parsePlatforms, platformScopeOf } from '../src/platforms';
-import { SessionManager, sessionPlatform } from '../src/session';
+import { SessionManager, sessionKeyId, type SessionKey } from '../src/session';
 import type { AuthSession } from '../src/types';
 
 const LIST = { platforms: [{ audience: 'aud-prod' }, { audience: 'aud-test', domains: ['test.example.org'] }, { audience: 'aud-deep', domains: ['deep.test.example.org'] }] };
@@ -43,71 +43,42 @@ const store = new Map<string, string>();
     length: 0,
 };
 
-const jwt = (aud: string) => `x.${Buffer.from(JSON.stringify({ aud })).toString('base64url')}.y`;
-const session = (aud: string, extra: Partial<AuthSession> = {}): AuthSession => ({
-    token: jwt(aud), rpId: 'privasys.id', origin: '', authenticatedAt: Date.now(), clientId: 'client-a', ...extra,
+const session = (extra: Partial<AuthSession> = {}): AuthSession => ({
+    token: 't', rpId: 'privasys.id', origin: '', authenticatedAt: Date.now(), clientId: 'client-a', scope: 'openid', ...extra,
 });
 
-function scoped(origin: string) {
-    const m = new SessionManager();
-    m.forClient('client-a');
-    m.forPlatform(platformScopeOf(parsePlatforms(LIST)!, origin));
-    return m;
+/** The key a page at `origin` reaches for a client. */
+function keyAt(origin: string, clientId = 'client-a'): SessionKey {
+    return { platform: platformScopeOf(parsePlatforms(LIST)!, origin)!.platform, rpId: 'privasys.id', clientId };
 }
 
-test("a test page never sees, replaces or removes the production session", () => {
+test('a test page never sees, replaces or removes the production session', () => {
     store.clear();
-    const prod = scoped('https://portal.example.org');
-    const dev = scoped('https://portal.test.example.org');
-    prod.store(session('aud-prod'));
-    assert.equal(dev.get('privasys.id'), undefined);
-
-    dev.store(session('aud-test'));
-    assert.equal(sessionPlatform(prod.get('privasys.id')!, platformScopeOf(parsePlatforms(LIST)!, 'https://a.example.org')!), 'aud-prod');
-    assert.equal(prod.get('privasys.id')!.platform, 'aud-prod');
-    assert.equal(dev.get('privasys.id')!.platform, 'aud-test');
-    assert.equal(prod.getAll().length, 2);
-
-    dev.remove('privasys.id');
-    assert.ok(prod.get('privasys.id'));
-    assert.equal(dev.get('privasys.id'), undefined);
-});
-
-test('a session stored before platforms were recorded is placed by its token', () => {
-    store.clear();
-    const legacy = new SessionManager();
-    legacy.store(session('aud-prod'));
-    legacy.store(session('aud-test', { clientId: 'client-b' }));
-    legacy.store(session('app:0123', { clientId: 'client-c' }));
-    const dev = scoped('https://portal.test.example.org');
-    assert.equal(dev.get('privasys.id'), undefined); // client-a's token is production's
-    dev.forClient('client-b');
-    assert.ok(dev.get('privasys.id'));
-    const prod = scoped('https://portal.example.org');
-    prod.forClient('client-c');
-    assert.ok(prod.get('privasys.id')); // an app audience reads as the default
-});
-
-test('a renewal reads and removes its own chain, whichever client was named last', () => {
-    store.clear();
-    const m = scoped('https://portal.example.org');
-    m.store(session('aud-prod'));
-    m.forClient('client-b');
-    m.store(session('aud-prod', { clientId: 'client-b' }));
-    // The page last named client-b; a timer armed for client-a still finds client-a.
-    assert.equal(m.getFor('privasys.id', 'client-a')?.clientId, 'client-a');
-    m.removeFor('privasys.id', 'client-a');
-    assert.equal(m.getFor('privasys.id', 'client-a'), undefined);
-    assert.equal(m.get('privasys.id')?.clientId, 'client-b');
-});
-
-test('with no platform known, nothing matches and nothing is stored', () => {
-    store.clear();
-    new SessionManager().store(session('aud-prod'));
     const m = new SessionManager();
-    m.forClient('client-a');
-    m.forPlatform(null);
-    assert.equal(m.get('privasys.id'), undefined);
-    m.store(session('aud-prod'));
-    assert.equal(new SessionManager().getAll().length, 1);
+    const prod = keyAt('https://portal.example.org');
+    const dev = keyAt('https://portal.test.example.org');
+    m.store(prod, session({ token: 'prod' }));
+    assert.equal(m.get(dev), undefined);
+
+    m.store(dev, session({ token: 'dev' }));
+    assert.equal(m.get(prod)!.platform, 'aud-prod');
+    assert.equal(m.get(dev)!.platform, 'aud-test');
+    assert.equal(m.getAll().length, 2);
+
+    m.remove(dev);
+    assert.equal(m.get(prod)?.token, 'prod');
+    assert.equal(m.get(dev), undefined);
+});
+
+test('a session that recorded no platform is given to no page', () => {
+    store.clear();
+    localStorage.setItem('privasys_sessions', JSON.stringify([session()]));
+    assert.equal(new SessionManager().get(keyAt('https://portal.example.org')), undefined);
+});
+
+test('the same client on two platforms renews under two names', () => {
+    const prod = keyAt('https://portal.example.org');
+    const dev = keyAt('https://portal.test.example.org');
+    assert.notEqual(sessionKeyId(prod), sessionKeyId(dev));
+    assert.notEqual(sessionKeyId(prod), sessionKeyId({ ...prod, clientId: 'client-b' }));
 });

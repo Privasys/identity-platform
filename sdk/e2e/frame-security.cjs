@@ -58,7 +58,7 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   }));
   const seedFrame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/'));
   await seedFrame.evaluate((t) => localStorage.setItem('privasys_sessions', JSON.stringify([
-    { token: t, rpId: 'app', origin: 'https://site-a.test', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0' },
+    { token: t, rpId: 'app', origin: 'https://site-a.test', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0', scope: 'openid offline_access', platform: 'privasys-platform' },
   ])), jwt(0));
   await page.evaluate(() => window.__seed.remove());
 

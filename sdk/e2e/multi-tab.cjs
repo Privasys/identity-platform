@@ -40,7 +40,7 @@ const n = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()
     return r.fulfill({ status: 404, body: '' });
   });
 
-  const session = (t) => [{ token: t, rpId: 'app', origin: 'https://site-a.test', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0' }];
+  const session = (t) => [{ token: t, rpId: 'app', origin: 'https://site-a.test', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0', scope: 'openid offline_access', platform: 'privasys-platform' }];
   const seed = async (page, value) => {
     await page.evaluate(() => new Promise((resolve) => {
       const f = document.createElement('iframe');

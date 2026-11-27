@@ -21,15 +21,12 @@ import { sanitiseDisplayNames, sanitiseIcons, sanitiseOwn, sanitiseProviders, se
 import { sanitiseChoice, type GateState } from './gate-headless';
 import { sanitiseTheme } from './theme';
 import type { AuthUIConfig, SignInResult } from './ui';
-import { SessionManager, SESSIONS_STORAGE_KEY, cleanDeviceLabel, deviceLabel, type DeviceHint, type PlatformScope } from './session';
+import { SessionManager, SESSIONS_STORAGE_KEY, cleanDeviceLabel, deviceLabel, sessionKeyId, type DeviceHint, type PlatformScope, type SessionKey } from './session';
 import type { AuthSession } from './types';
 import { PrivasysSession, type EncAuthEnvelope, type SealedWebSocket } from './enclave-session';
 import { parsePlatforms, platformScopeOf, type PlatformEntry } from './platforms';
 
 const sessions = new SessionManager();
-// No session is anyone's until the page's platform is known (see the message
-// handler).
-sessions.forPlatform(null);
 
 let activeUI: AuthUI | null = null;
 
@@ -44,9 +41,9 @@ let activeUI: AuthUI | null = null;
 
 interface PendingHandshake {
     appHost: string;
-    /** rpId of the OIDC session this sealed handshake belongs to; used to
-     *  look up the bearer token for EncAuth voucher fetches. */
-    rpId: string;
+    /** The session this sealed handshake belongs to; its bearer token
+     *  fetches the EncAuth vouchers. */
+    key: SessionKey;
     sdkKeyPair: CryptoKeyPair;
     sdkPubB64: string;
 }
@@ -111,8 +108,8 @@ function jwtClaim(token: string, claim: string): string | null {
  * missing consent, and refusing a silent resume on a transport hiccup would
  * cost the holder their session to answer a question they already answered.
  */
-async function hasSpendConsent(rpId: string, appHost: string): Promise<boolean> {
-    const session = sessions.get(rpId);
+async function hasSpendConsent(key: SessionKey, appHost: string): Promise<boolean> {
+    const session = sessions.get(key);
     if (!session?.token) return true;
     try {
         const resp = await fetch(`${globalThis.location.origin}/spend/consents`, {
@@ -132,24 +129,22 @@ async function hasSpendConsent(rpId: string, appHost: string): Promise<boolean> 
 
 /**
  * Build the EncAuth voucher fetcher for silent rebind / cold resume.
- * Reads the freshest bearer token for `rpId` from this origin's session
- * store at call time (renewal may have rotated it since install) and
+ * Reads the freshest bearer token of the session `key` names at call time (renewal may have rotated it since install) and
  * fetches the wallet-signed envelope from the IdP. Returns null when
  * there is no session, no `sid` claim, or no stored voucher — the
  * caller then falls back to a wallet ceremony.
  */
-function makeGetEncAuth(rpId: string, host: string): () => Promise<EncAuthEnvelope | null> {
+function makeGetEncAuth(key: SessionKey, host: string): () => Promise<EncAuthEnvelope | null> {
     return async () => {
-        let session = sessions.get(rpId);
+        let session = sessions.get(key);
         if (!session?.token) return null;
         // A tab that wakes from a long sleep rebinds BEFORE its renewal
         // heartbeat has run: the stored access token is already expired, the
         // IdP would refuse the voucher fetch, and the rebind would fail for
         // no good reason. Renew first (under the cross-document lock; a
         // no-op when another document already did).
-        if (session.refreshToken && session.clientId && needsRenewal(session.token)) {
-            const chain = chainOf(session);
-            session = await renewIfNeeded(chain, renewalParents.get(chainKey(chain))?.parentOrigin ?? '', false) ?? session;
+        if (session.refreshToken && needsRenewal(session.token)) {
+            session = await renewIfNeeded(key, renewalParents.get(sessionKeyId(key))?.parentOrigin ?? '', false) ?? session;
             if (!session?.token) return null;
         }
         const sid = jwtClaim(session.token, 'sid');
@@ -209,10 +204,10 @@ const CEREMONY_VOUCHER_WINDOW_MS = 20_000;
  */
 async function resumeVoucherSession(
     appHost: string,
-    rpId: string,
+    key: SessionKey,
     windowMs: number,
 ): Promise<PrivasysSession | null> {
-    const getEncAuth = makeGetEncAuth(rpId, appHost);
+    const getEncAuth = makeGetEncAuth(key, appHost);
     const deadline = Date.now() + windowMs;
     let backoff = 1_000;
     while (Date.now() < deadline) {
@@ -447,12 +442,11 @@ function sanitisePresentation(raw: unknown): AuthUIConfig['presentation'] {
 // 'no-push', 'timeout' or a transport message. Shared by the parent-facing
 // `privasys:voucher-request` RPC and the connect-mode approve flow.
 async function requestVoucherPush(opts: {
-    rpId: string;
+    key: SessionKey;
     appName: string;
     appHost: string;
-    clientId?: string;
 }): Promise<void> {
-    const session = sessions.get(opts.rpId);
+    const session = sessions.get(opts.key);
     if (!session?.token) throw new Error('no-session');
     if (!session.pushToken || !session.brokerUrl) throw new Error('no-push');
     const sid = jwtClaim(session.token, 'sid');
@@ -499,8 +493,8 @@ async function requestVoucherPush(opts: {
             // The broker requires a sessionId; the voucher flow has no WS
             // relay, so this is just a correlation id.
             sessionId: `voucher-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            rpId: opts.rpId,
-            appName: opts.appName || opts.rpId,
+            rpId: opts.key.rpId,
+            appName: opts.appName || opts.key.rpId,
             // Bare host, NOT the full origin: the wallet uses this value
             // directly as the FIDO2 fetch host and separately prefixes
             // `https://` for clientDataJSON. Sending the scheme-prefixed
@@ -514,7 +508,7 @@ async function requestVoucherPush(opts: {
             // The exact IdP session the voucher must land on (the one this
             // poll reads) so the wallet writes to the same row.
             sid,
-            ...(opts.clientId ? { clientId: opts.clientId } : {}),
+            clientId: opts.key.clientId,
         }),
     });
     if (!notifyResp.ok) throw new Error(`push failed: ${notifyResp.status}`);
@@ -554,8 +548,7 @@ async function generateSdkKeyPair(): Promise<{ keyPair: CryptoKeyPair; sdkPubB64
 // for session-relay, and one of each per additional tab. The IdP
 // rotates refresh tokens with strict single-use semantics (the old
 // token is deleted before the new one is issued), so exactly one
-// document may run a refresh grant for a given (clientId, rpId) chain
-// at a time. Every grant goes through refreshGrant, which holds a Web
+// document may run a refresh grant for a given session at a time. Every grant goes through refreshGrant, which holds a Web
 // Locks API lock (origin-scoped across documents and tabs) for it.
 //
 // Renewal is scheduled from the access token's `exp` claim (not a flat
@@ -579,33 +572,25 @@ const RENEW_HEARTBEAT_MS = 60_000;
  */
 const STEP_UP_APPROVAL_WINDOW_MS = 90_000;
 
-// A refresh chain is one session: one rpId and one client. Everything this
-// document renews is kept per chain, never per rpId alone, so two clients
-// sharing an rpId (privasys.id for every first-party front) keep their own
-// timers, retries and notifications. A timer outlives the message that armed
-// it, so it names its client instead of reading whichever was named last.
-type Chain = { rpId: string; clientId: string | null };
-const chainKey = (c: Chain): string => `${c.clientId ?? ''}|${c.rpId}`;
-/** The chain of a session, or of an rpId for the client the page named. */
-const chainOf = (s: Pick<AuthSession, 'rpId' | 'clientId'>): Chain => ({ rpId: s.rpId, clientId: s.clientId ?? null });
-const chainFor = (rpId: string): Chain => ({ rpId, clientId: sessions.namedClient });
-
+// Everything this document renews is kept per session key, so two clients
+// sharing an rpId keep their own timers, retries and notifications. A timer
+// outlives the message that armed it, so it holds its key.
 const renewalTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const renewalRetryCount = new Map<string, number>();
-/** Chains this document renews, with the parent origin to notify. */
-const renewalParents = new Map<string, { chain: Chain; parentOrigin: string }>();
-/** Last access token seen per chain; dedupes storage-event notifications. */
+/** Sessions this document renews, with the parent origin to notify. */
+const renewalParents = new Map<string, { key: SessionKey; parentOrigin: string }>();
+/** Last access token seen per session; dedupes storage-event notifications. */
 const lastSeenTokens = new Map<string, string>();
 
-function cancelRenewal(chain: Chain): void {
-    const key = chainKey(chain);
-    const timer = renewalTimers.get(key);
+function cancelRenewal(key: SessionKey): void {
+    const id = sessionKeyId(key);
+    const timer = renewalTimers.get(id);
     if (timer) {
         clearTimeout(timer);
-        renewalTimers.delete(key);
+        renewalTimers.delete(id);
     }
-    renewalRetryCount.delete(key);
-    renewalParents.delete(key);
+    renewalRetryCount.delete(id);
+    renewalParents.delete(id);
 }
 
 /**
@@ -613,10 +598,10 @@ function cancelRenewal(chain: Chain): void {
  * (iframes and tabs). Falls back to running unlocked when the Web Locks
  * API is unavailable — best effort, matching pre-lock behaviour.
  */
-async function withRefreshLock<T>(rpId: string, clientId: string, fn: () => Promise<T>): Promise<T> {
+async function withRefreshLock<T>(key: SessionKey, fn: () => Promise<T>): Promise<T> {
     const locks = (navigator as Navigator & { locks?: LockManager }).locks;
     if (locks?.request) {
-        return locks.request(`privasys-refresh:${clientId}:${rpId}`, fn) as Promise<T>;
+        return locks.request(`privasys-refresh:${sessionKeyId(key)}`, fn) as Promise<T>;
     }
     return fn();
 }
@@ -687,9 +672,18 @@ async function loadPlatforms(): Promise<PlatformEntry[] | null> {
     return platformList?.list ?? null;
 }
 
-/** The platform of the page this frame serves, set from each of its
- *  messages; null when the platform list could not be read. */
-let pagePlatform: PlatformScope | null = null;
+/**
+ * The session key a message names: the page's platform, from the origin the
+ * browser reports for it and never from anything the page says, and the
+ * rpId and client the message names. Null when the platform cannot be told
+ * or the message names no client: such a message reaches no session.
+ */
+function messageKey(scope: PlatformScope | null, data: { rpId?: unknown; clientId?: unknown }): SessionKey | null {
+    if (!scope) return null;
+    if (typeof data.clientId !== 'string' || !data.clientId) return null;
+    if (typeof data.rpId !== 'string' || !data.rpId) return null;
+    return { platform: scope.platform, rpId: data.rpId, clientId: data.clientId };
+}
 
 /**
  * The stored session this page may use, or undefined. A session belongs to a
@@ -697,10 +691,10 @@ let pagePlatform: PlatformScope | null = null;
  * registrable domain shares this frame's storage, so without this a page
  * could take another app's session by naming its rpId.
  */
-async function sessionForPage(rpId: string, pageOrigin: string): Promise<AuthSession | undefined> {
-    const session = sessions.get(rpId);
-    if (!session?.clientId) return undefined;
-    return (await pageIsClients(session.clientId, pageOrigin)) ? session : undefined;
+async function sessionForPage(key: SessionKey | null, pageOrigin: string): Promise<AuthSession | undefined> {
+    const session = key ? sessions.get(key) : undefined;
+    if (!session) return undefined;
+    return (await pageIsClients(key!.clientId, pageOrigin)) ? session : undefined;
 }
 
 // ── The device popup ─────────────────────────────────────────────────────
@@ -851,15 +845,14 @@ function needsRenewal(token: string): boolean {
     return isTokenExpired(token, RENEW_MARGIN_MS);
 }
 
-function scheduleRenewal(session: AuthSession, parentOrigin: string): void {
-    const chain = chainOf(session);
-    const key = chainKey(chain);
-    cancelRenewal(chain);
+function scheduleRenewal(key: SessionKey, session: AuthSession, parentOrigin: string): void {
+    const id = sessionKeyId(key);
+    cancelRenewal(key);
 
-    if (!session.refreshToken || !session.clientId) return;
+    if (!session.refreshToken) return;
 
-    renewalParents.set(key, { chain, parentOrigin });
-    lastSeenTokens.set(key, session.token);
+    renewalParents.set(id, { key, parentOrigin });
+    lastSeenTokens.set(id, session.token);
 
     // Schedule from the token's actual exp; a flat delay drifts apart
     // from the token lifetime whenever the iframe is (re)created after
@@ -870,25 +863,25 @@ function scheduleRenewal(session: AuthSession, parentOrigin: string): void {
     const delay = Math.max(1_000, base + jitter);
 
     const timer = setTimeout(() => {
-        renewalTimers.delete(key);
-        void renewIfNeeded(chain, parentOrigin);
+        renewalTimers.delete(id);
+        void renewIfNeeded(key, parentOrigin);
     }, delay);
 
-    renewalTimers.set(key, timer);
+    renewalTimers.set(id, timer);
 }
 
-function scheduleRenewalRetry(chain: Chain, parentOrigin: string): void {
-    const key = chainKey(chain);
-    const attempt = renewalRetryCount.get(key) ?? 0;
-    renewalRetryCount.set(key, attempt + 1);
+function scheduleRenewalRetry(key: SessionKey, parentOrigin: string): void {
+    const id = sessionKeyId(key);
+    const attempt = renewalRetryCount.get(id) ?? 0;
+    renewalRetryCount.set(id, attempt + 1);
     const delay = RENEW_RETRY_MS[Math.min(attempt, RENEW_RETRY_MS.length - 1)];
-    const prev = renewalTimers.get(key);
+    const prev = renewalTimers.get(id);
     if (prev) clearTimeout(prev);
     const timer = setTimeout(() => {
-        renewalTimers.delete(key);
-        void renewIfNeeded(chain, parentOrigin);
+        renewalTimers.delete(id);
+        void renewIfNeeded(key, parentOrigin);
     }, delay);
-    renewalTimers.set(key, timer);
+    renewalTimers.set(id, timer);
 }
 
 /**
@@ -909,7 +902,7 @@ type GrantResult =
     | { kind: 'dead' | 'none' };
 
 /**
- * Run one refresh_token grant for a chain: the only place this frame spends a
+ * Run one refresh_token grant for a session: the only place this frame spends a
  * refresh token. Under the cross-document lock it re-reads the session
  * (another document may have renewed it while this one waited), tells the page
  * a grant is in flight, and stores what comes back before the page may tear
@@ -922,14 +915,12 @@ type GrantResult =
  * not need it. A dead chain is removed, and the page told when `notify` is set.
  */
 async function refreshGrant(
-    chain: Chain,
+    key: SessionKey,
     opts: { parentOrigin: string; notify: boolean; scope?: string; due?: (s: AuthSession) => boolean },
 ): Promise<GrantResult> {
-    const clientId = chain.clientId;
-    if (!clientId) return { kind: 'none' };
-    return withRefreshLock(chain.rpId, clientId, async (): Promise<GrantResult> => {
-        const session = sessions.getFor(chain.rpId, clientId);
-        if (!session?.refreshToken || !session.clientId) return { kind: 'none' };
+    return withRefreshLock(key, async (): Promise<GrantResult> => {
+        const session = sessions.get(key);
+        if (!session?.refreshToken) return { kind: 'none' };
         if (opts.due && !opts.due(session)) return { kind: 'current', session };
         const usedRefreshToken = session.refreshToken;
 
@@ -951,7 +942,7 @@ async function refreshGrant(
                 body: new URLSearchParams({
                     grant_type: 'refresh_token',
                     refresh_token: usedRefreshToken,
-                    client_id: session.clientId,
+                    client_id: key.clientId,
                     ...(opts.scope ? { scope: opts.scope } : {}),
                 }),
             });
@@ -964,7 +955,7 @@ async function refreshGrant(
             const updated: AuthSession = opts.scope
                 ? { ...session, refreshToken: body.refresh_token }
                 : { ...session, token: body.access_token, refreshToken: body.refresh_token, authenticatedAt: Date.now() };
-            sessions.store(updated);
+            sessions.store(key, updated);
             signal('end');
             const expiresIn = typeof body.expires_in === 'number' ? body.expires_in : 0;
             return { kind: 'granted', session: updated, accessToken: body.access_token, expiresIn };
@@ -973,13 +964,13 @@ async function refreshGrant(
 
         const errCode = typeof body?.error === 'string' ? body.error : '';
         if (resp.status === 400 && errCode === 'invalid_grant') {
-            const stored = sessions.getFor(chain.rpId, clientId);
+            const stored = sessions.get(key);
             if (stored?.refreshToken && stored.refreshToken !== usedRefreshToken) {
                 return { kind: 'adopted', session: stored };
             }
             console.warn('[frame-host] refresh-token chain dead, expiring session:', body);
-            cancelRenewal(chain);
-            sessions.removeFor(chain.rpId, clientId);
+            cancelRenewal(key);
+            sessions.remove(key);
             if (opts.notify && opts.parentOrigin) {
                 window.parent.postMessage({ type: 'privasys:session-expired', rpId: session.rpId }, opts.parentOrigin);
             }
@@ -992,7 +983,7 @@ async function refreshGrant(
 }
 
 /**
- * Renew a chain's session and keep its renewal going: re-arm the timer from
+ * Renew a session and keep its renewal going: re-arm the timer from
  * the fresh token, retry a failure with backoff, and tell the page about the
  * new token when `notify` is set (a check-session that renews inline answers
  * with the session itself instead).
@@ -1000,21 +991,21 @@ async function refreshGrant(
  * Returns the freshest session (renewed or not), or undefined when the chain
  * is dead and the session has been removed.
  */
-async function renewChain(
-    chain: Chain,
+async function renewSession(
+    key: SessionKey,
     parentOrigin: string,
     notify: boolean,
     due?: (s: AuthSession) => boolean,
 ): Promise<AuthSession | undefined> {
-    const r = await refreshGrant(chain, { parentOrigin, notify, due });
+    const r = await refreshGrant(key, { parentOrigin, notify, due });
     switch (r.kind) {
         case 'none':
-            return sessions.getFor(chain.rpId, chain.clientId);
+            return sessions.get(key);
         case 'dead':
             return undefined;
         case 'failed':
             console.warn('[frame-host] renewal failed, will retry:', r.error);
-            scheduleRenewalRetry(chain, parentOrigin);
+            scheduleRenewalRetry(key, parentOrigin);
             return r.session;
         default:
             if (r.kind === 'granted' && notify) {
@@ -1023,8 +1014,8 @@ async function renewChain(
                     parentOrigin,
                 );
             }
-            renewalRetryCount.delete(chainKey(chain));
-            scheduleRenewal(r.session, parentOrigin);
+            renewalRetryCount.delete(sessionKeyId(key));
+            scheduleRenewal(key, r.session, parentOrigin);
             return r.session;
     }
 }
@@ -1035,21 +1026,21 @@ async function renewChain(
  * the timer from the fresh expiry.
  */
 async function renewIfNeeded(
-    chain: Chain,
+    key: SessionKey,
     parentOrigin: string,
     notify = true,
 ): Promise<AuthSession | undefined> {
-    const current = sessions.getFor(chain.rpId, chain.clientId);
-    if (!current?.refreshToken || !current.clientId) return current;
+    const current = sessions.get(key);
+    if (!current?.refreshToken) return current;
     if (!needsRenewal(current.token)) {
-        if (!renewalTimers.has(chainKey(chain))) scheduleRenewal(current, parentOrigin);
+        if (!renewalTimers.has(sessionKeyId(key))) scheduleRenewal(key, current, parentOrigin);
         return current;
     }
-    return renewChain(chain, parentOrigin, notify, (s) => needsRenewal(s.token));
+    return renewSession(key, parentOrigin, notify, (s) => needsRenewal(s.token));
 }
 
-// Renewals a page asked for now, per chain: calls made while one waits or
-// runs share it, and a chain renews this way at most once per
+// Renewals a page asked for now, per session: calls made while one waits or
+// runs share it, and a session renews this way at most once per
 // RENEW_NOW_MIN_MS.
 const RENEW_NOW_MIN_MS = 10_000;
 const renewalsNow = new Map<string, Promise<AuthSession | undefined>>();
@@ -1064,18 +1055,18 @@ const lastRenewNow = new Map<string, number>();
  * Resolves with the renewed session, the unchanged one when the renewal
  * could not run (it is retried as usual), or undefined when the chain is dead.
  */
-function renewNow(chain: Chain, parentOrigin: string): Promise<AuthSession | undefined> {
-    const key = chainKey(chain);
-    const pending = renewalsNow.get(key);
+function renewNow(key: SessionKey, parentOrigin: string): Promise<AuthSession | undefined> {
+    const id = sessionKeyId(key);
+    const pending = renewalsNow.get(id);
     if (pending) return pending;
-    const wait = Math.max(0, (lastRenewNow.get(key) ?? 0) + RENEW_NOW_MIN_MS - Date.now());
+    const wait = Math.max(0, (lastRenewNow.get(id) ?? 0) + RENEW_NOW_MIN_MS - Date.now());
     const run = new Promise<void>((r) => setTimeout(r, wait))
         .then(() => {
-            lastRenewNow.set(key, Date.now());
-            return renewChain(chain, parentOrigin, true);
+            lastRenewNow.set(id, Date.now());
+            return renewSession(key, parentOrigin, true);
         })
-        .finally(() => renewalsNow.delete(key));
-    renewalsNow.set(key, run);
+        .finally(() => renewalsNow.delete(id));
+    renewalsNow.set(id, run);
     return run;
 }
 
@@ -1085,16 +1076,16 @@ function renewNow(chain: Chain, parentOrigin: string): Promise<AuthSession | und
 // (`storage` fires in every same-origin document except the writer.)
 window.addEventListener('storage', (ev) => {
     if (ev.key !== SESSIONS_STORAGE_KEY) return;
-    for (const [key, { chain, parentOrigin }] of renewalParents) {
-        const current = sessions.getFor(chain.rpId, chain.clientId);
-        if (!current?.refreshToken || !current?.clientId) continue;
-        if (lastSeenTokens.get(key) === current.token) continue;
-        lastSeenTokens.set(key, current.token);
-        scheduleRenewal(current, parentOrigin);
+    for (const [id, { key, parentOrigin }] of renewalParents) {
+        const current = sessions.get(key);
+        if (!current?.refreshToken) continue;
+        if (lastSeenTokens.get(id) === current.token) continue;
+        lastSeenTokens.set(id, current.token);
+        scheduleRenewal(key, current, parentOrigin);
         window.parent.postMessage(
             {
                 type: 'privasys:session-renewed',
-                rpId: chain.rpId,
+                rpId: key.rpId,
                 accessToken: current.token,
             },
             parentOrigin,
@@ -1108,10 +1099,10 @@ window.addEventListener('storage', (ev) => {
 // the margin; the lock + in-lock re-read make overlapping heartbeats
 // across documents harmless no-ops.
 setInterval(() => {
-    for (const { chain, parentOrigin } of renewalParents.values()) {
-        const current = sessions.getFor(chain.rpId, chain.clientId);
-        if (!current?.refreshToken || !current?.clientId) continue;
-        if (needsRenewal(current.token)) void renewIfNeeded(chain, parentOrigin);
+    for (const { key, parentOrigin } of renewalParents.values()) {
+        const current = sessions.get(key);
+        if (!current?.refreshToken) continue;
+        if (needsRenewal(current.token)) void renewIfNeeded(key, parentOrigin);
     }
 }, RENEW_HEARTBEAT_MS);
 
@@ -1255,16 +1246,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
     const data = e.data;
     if (!data || typeof data.type !== 'string' || !data.type.startsWith('privasys:')) return;
     if (!fromServedPage(e)) return;
-    // The client this page speaks for: every session lookup below is for it
-    // (SessionManager.forClient). One frame serves one AuthFrame, so one client.
-    const named = data.type === 'privasys:init' ? data.config?.clientId : data.clientId;
-    if (typeof named === 'string' && named) sessions.forClient(named);
-    // The page's platform, from the origin the browser reports for it and
-    // never from anything the page says. A platform that cannot be told
-    // matches no session.
+    // The page's platform, from the origin the browser reports for it. A
+    // platform that cannot be told matches no session.
     const list = await loadPlatforms();
-    pagePlatform = list ? platformScopeOf(list, e.origin) : null;
-    sessions.forPlatform(pagePlatform);
+    const pageScope = list ? platformScopeOf(list, e.origin) : null;
+    // The session this message is about; an init names its client in its
+    // config and builds its own below.
+    const key = messageKey(pageScope, data);
 
     if (data.type === 'privasys:init') {
         const config: AuthUIConfig & {
@@ -1374,17 +1362,17 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // A page gets its own platform's tokens and never another platform's.
         // Without the platform list there is no telling which is which, so
         // there is no sign-in.
-        if (!pagePlatform) {
+        if (!pageScope) {
             window.parent.postMessage({ type: 'privasys:error', error: 'Sign-in is unavailable right now. Try again in a moment.' }, parentOrigin);
             return;
         }
         if (!device && !linkNonce) {
             const asked = sanitiseAudience(config.audience);
-            if (asked && pagePlatform.platforms.includes(asked) && asked !== pagePlatform.platform) {
+            if (asked && pageScope.platforms.includes(asked) && asked !== pageScope.platform) {
                 window.parent.postMessage({ type: 'privasys:error', error: `audience ${asked} is not for a page on this platform` }, parentOrigin);
                 return;
             }
-            if (!asked && pagePlatform.platform !== pagePlatform.defaultPlatform) config.audience = pagePlatform.platform;
+            if (!asked && pageScope.platform !== pageScope.defaultPlatform) config.audience = pageScope.platform;
         }
         const onContentHeight = contentHeightReporter(parentOrigin);
 
@@ -1505,11 +1493,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
             }
             return;
         }
+        // The session this sign-in is for.
+        const rpId = config.rpId || config.appName;
+        const initKey: SessionKey = { platform: pageScope.platform, rpId, clientId: config.clientId! };
         if (config.connect?.mode === 'approve' && config.sessionRelay?.appHost
             && config.connect.reason !== 'attributes-widened') {
-            const rpId = config.rpId || config.appName;
             const appHost = config.sessionRelay.appHost;
-            const session = sessions.get(rpId);
+            const session = sessions.get(initKey);
             if (session?.token && session.pushToken && session.brokerUrl) {
                 const appLabel = (config.appName || rpId)
                     .replace(/[-_]/g, ' ')
@@ -1530,15 +1520,14 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         reason: config.connect.reason ?? null,
                         run: async () => {
                             await requestVoucherPush({
-                                rpId,
+                                key: initKey,
                                 appName: config.appName,
                                 appHost,
-                                clientId: config.clientId,
                             });
                             // Resume the sealed session from the fresh
                             // voucher and adopt it as this iframe's active
                             // sealed transport.
-                            const getEncAuth = makeGetEncAuth(rpId, appHost);
+                            const getEncAuth = makeGetEncAuth(initKey, appHost);
                             const result = await PrivasysSession.resume({ host: appHost, getEncAuth });
                             if ('error' in result) {
                                 throw new Error(result.reason
@@ -1600,7 +1589,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             const { keyPair, sdkPubB64 } = await generateSdkKeyPair();
             pendingHandshake = {
                 appHost: config.sessionRelay.appHost,
-                rpId: config.rpId || config.appName,
+                key: initKey,
                 sdkKeyPair: keyPair,
                 sdkPubB64,
             };
@@ -1667,7 +1656,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             // apps: their sealed binding needs the full wallet ceremony,
             // so a push approval would ring the holder's phone for a flow
             // the browser cannot use.
-            const priorSession = sessions.get(config.rpId || config.appName);
+            const priorSession = sessions.get(initKey);
             const stepUpEligible = !linkNonce && !device && !!(priorSession?.token
                 && priorSession.clientId === clientId
                 && !isTokenExpired(priorSession.token)
@@ -2091,7 +2080,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
             // against them to detect a widened request. A step-up push
             // completion has no ceremony result, so the wallet push
             // binding carries over from the prior session.
-            const rpId = config.rpId || config.appName;
             const session: AuthSession = {
                 token: tokens.access_token,
                 rpId,
@@ -2109,7 +2097,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 requestedAttributes: [...(config.attributes ?? [])],
                 scope: scopeStr,
             };
-            sessions.store(session);
+            sessions.store(initKey, session);
             if (session.pushToken && session.brokerUrl) {
                 if (uiResult?.trustDevice || deviceTrusted) {
                     // A wallet found through the popup keeps the name it has there.
@@ -2118,7 +2106,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                         uiResult?.deviceLabel ?? deviceLabels.get(session.pushToken));
                 }
             }
-            scheduleRenewal(session, parentOrigin);
+            scheduleRenewal(initKey, session, parentOrigin);
 
             // Install the sealed session so the parent's `frame.session()`
             // RPC works once the auth result lands.
@@ -2138,7 +2126,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 const appHost = config.sessionRelay!.appHost;
                 const session = await resumeVoucherSession(
                     appHost,
-                    rpId,
+                    initKey,
                     uiResult.completedViaPoll ? SAME_DEVICE_VOUCHER_WINDOW_MS : CEREMONY_VOUCHER_WINDOW_MS,
                 );
                 if (session) {
@@ -2211,19 +2199,19 @@ window.addEventListener('message', async (e: MessageEvent) => {
     }
 
     if (data.type === 'privasys:check-session') {
-        let session = await sessionForPage(data.rpId, e.origin);
+        let session = await sessionForPage(key, e.origin);
 
         // If the access token is inside the renewal margin and we have a
         // refresh token, renew inline (under the cross-document lock)
         // before returning so the parent gets a fresh token. A dead
         // chain comes back as undefined → parent triggers sign-in.
-        if (session?.token && session?.refreshToken && session?.clientId && needsRenewal(session.token)) {
-            session = await renewIfNeeded(chainOf(session), e.origin, false);
+        if (key && session?.refreshToken && needsRenewal(session.token)) {
+            session = await renewIfNeeded(key, e.origin, false);
         }
 
         // Ensure renewal is running for active sessions
-        if (session?.refreshToken && session?.clientId && !renewalTimers.has(chainKey(chainOf(session)))) {
-            scheduleRenewal(session, e.origin);
+        if (key && session?.refreshToken && !renewalTimers.has(sessionKeyId(key))) {
+            scheduleRenewal(key, session, e.origin);
         }
 
         // The refresh token stays here: the page has no use for it, and this
@@ -2240,14 +2228,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const id = data.id;
         const reply = (payload: Record<string, unknown>) =>
             window.parent.postMessage({ type: 'privasys:renew-session:response', id, ...payload }, e.origin);
-        const session = await sessionForPage(data.rpId, e.origin);
-        // The caller's own chain only: one rpId may hold sessions of several clients.
-        if (!session?.refreshToken || !session?.clientId || typeof data.clientId !== 'string' || session.clientId !== data.clientId) {
+        const session = await sessionForPage(key, e.origin);
+        if (!key || !session?.refreshToken) {
             reply({ error: 'no session to renew' });
             return;
         }
         const before = session.token;
-        const after = await renewNow(chainOf(session), e.origin);
+        const after = await renewNow(key, e.origin);
         if (!after) reply({ error: 'session expired' });
         else if (after.token === before) reply({ error: 'renewal failed; it will be retried' });
         else reply({ accessToken: after.token });
@@ -2257,8 +2244,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
     if (data.type === 'privasys:clear-session') {
         // Signing out ends the session. The remembered wallets stay: each is
         // forgotten by itself, from the gate.
-        cancelRenewal(chainFor(data.rpId));
-        sessions.remove(data.rpId);
+        if (key) {
+            cancelRenewal(key);
+            sessions.remove(key);
+        }
         window.parent.postMessage(
             { type: 'privasys:session-cleared' },
             e.origin,
@@ -2278,8 +2267,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 { type: 'privasys:token-for-audience:response', id, ...payload },
                 e.origin,
             );
-        const session = await sessionForPage(data.rpId, e.origin);
-        if (!session?.refreshToken || !session?.clientId) {
+        const session = await sessionForPage(key, e.origin);
+        if (!key || !session?.refreshToken) {
             reply({ error: 'no refresh token in session' });
             return;
         }
@@ -2289,7 +2278,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             return;
         }
         // Another platform's audience is never minted for this page.
-        if (!pagePlatform || (pagePlatform.platforms.includes(audience) && audience !== pagePlatform.platform)) {
+        if (!pageScope || (pageScope.platforms.includes(audience) && audience !== pageScope.platform)) {
             reply({ error: `audience ${audience} is not for a page on this platform` });
             return;
         }
@@ -2302,11 +2291,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
             return;
         }
         const scope = `audience:${audience} ${session.scope || 'openid email profile offline_access'}`;
-        const chain = chainOf(session);
-        let r = await refreshGrant(chain, { parentOrigin: e.origin, notify: false, scope });
+        let r = await refreshGrant(key, { parentOrigin: e.origin, notify: false, scope });
         // Another document rotated the token while this grant was in flight:
         // mint again from the one it stored.
-        if (r.kind === 'adopted') r = await refreshGrant(chain, { parentOrigin: e.origin, notify: false, scope });
+        if (r.kind === 'adopted') r = await refreshGrant(key, { parentOrigin: e.origin, notify: false, scope });
         if (r.kind === 'granted') {
             reply({ accessToken: r.accessToken, expiresIn: r.expiresIn });
         } else if (r.kind === 'dead') {
@@ -2333,12 +2321,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 e.origin,
             );
         try {
-            if (!(await sessionForPage(String(data.rpId || ''), e.origin))) throw new Error('no-session');
+            if (!key || !(await sessionForPage(key, e.origin))) throw new Error('no-session');
             await requestVoucherPush({
-                rpId: String(data.rpId || ''),
-                appName: String(data.appName || data.rpId || ''),
+                key,
+                appName: String(data.appName || key.rpId),
                 appHost: String(data.appHost || ''),
-                clientId: data.clientId ? String(data.clientId) : undefined,
             });
             reply({ ok: true });
         } catch (err) {
@@ -2393,12 +2380,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
         const reply = (payload: Record<string, unknown>) =>
             window.parent.postMessage({ type: 'privasys:session:resume:response', id, ...payload }, e.origin);
         const appHost = String(data.appHost || '');
-        const rpId = String(data.rpId || '');
-        if (!appHost || !rpId) {
+        if (!appHost || typeof data.rpId !== 'string' || !data.rpId) {
             reply({ error: 'appHost and rpId required' });
             return;
         }
-        if (!(await sessionForPage(rpId, e.origin))) {
+        if (!key || !(await sessionForPage(key, e.origin))) {
             reply({ error: 'no-session' });
             return;
         }
@@ -2417,11 +2403,11 @@ window.addEventListener('message', async (e: MessageEvent) => {
         //
         // Fails OPEN: a consent lookup that cannot be made must never cost
         // someone their own session.
-        if (data.spend && !(await hasSpendConsent(rpId, appHost))) {
+        if (data.spend && !(await hasSpendConsent(key, appHost))) {
             reply({ error: 'rejected', reason: 'spend-consent-required' });
             return;
         }
-        const getEncAuth = makeGetEncAuth(rpId, appHost);
+        const getEncAuth = makeGetEncAuth(key, appHost);
         const result = await PrivasysSession.resume({ host: appHost, getEncAuth });
         if ('error' in result) {
             // 'no-voucher'    → user never completed a sealed sign-in here
@@ -2580,7 +2566,7 @@ async function installSessionRelay(
         console.warn('[frame-host] sessionRelay returned without pending handshake — ignoring');
         return;
     }
-    const { sdkKeyPair, appHost, rpId } = pendingHandshake;
+    const { sdkKeyPair, appHost, key } = pendingHandshake;
     pendingHandshake = null;
     const expiresAtMs = normalizeEpochMs(binding.expiresAt);
     try {
@@ -2593,7 +2579,7 @@ async function installSessionRelay(
             // TTL, restart with the same identity) the next request's
             // unsealed 401 triggers a voucher-based re-bootstrap with no
             // wallet involvement.
-            getEncAuth: makeGetEncAuth(rpId, appHost),
+            getEncAuth: makeGetEncAuth(key, appHost),
             // The wallet's own bootstrap: the enclave does not know who
             // the caller is until the session is rebuilt from the voucher.
             anonymous: true,

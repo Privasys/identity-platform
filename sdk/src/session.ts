@@ -46,10 +46,7 @@ export function deviceLabel(d: Pick<DeviceHint, 'label' | 'addedAt' | 'updatedAt
 
 type SessionListener = (sessions: AuthSession[]) => void;
 
-/**
- * The platform a page belongs to, with what is needed to place a session
- * stored before sessions recorded theirs.
- */
+/** The platform a page belongs to, as the identity provider's list places it. */
 export interface PlatformScope {
     /** The platform audience of the page. */
     platform: string;
@@ -59,114 +56,59 @@ export interface PlatformScope {
     platforms: readonly string[];
 }
 
-/** The `aud` claims of a JWT, or none when unreadable. */
-function tokenAudiences(token: string): string[] {
-    try {
-        const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        const aud = JSON.parse(atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '='))).aud;
-        return Array.isArray(aud) ? aud.filter((a): a is string => typeof a === 'string') : typeof aud === 'string' ? [aud] : [];
-    } catch {
-        return [];
-    }
-}
-
 /**
- * The platform of a stored session: the one it recorded, else the listed
- * platform its token was issued for, else the default (a session from before
- * any platform but the default existed).
+ * Which stored session a lookup is for: one client's session on one platform.
+ * Pages of every platform under one registrable domain share this storage,
+ * and two clients may share an rpId, so all three are needed to tell sessions
+ * apart. The frame builds it from the page's origin and the client it names.
  */
-export function sessionPlatform(s: AuthSession, scope: PlatformScope): string {
-    if (s.platform) return s.platform;
-    const listed = tokenAudiences(s.token ?? '').find((a) => scope.platforms.includes(a));
-    return listed ?? scope.defaultPlatform;
+export interface SessionKey {
+    platform: string;
+    rpId: string;
+    clientId: string;
+}
+
+/** A string naming a session key, for maps and lock names. */
+export function sessionKeyId(k: SessionKey): string {
+    return `${k.platform}|${k.clientId}|${k.rpId}`;
+}
+
+function matches(s: AuthSession, k: SessionKey): boolean {
+    return s.platform === k.platform && s.rpId === k.rpId && s.clientId === k.clientId;
 }
 
 /**
- * Manages authenticated sessions in localStorage.
- * Tracks sessions per rpId so a returning user can skip QR scanning.
+ * The sessions this origin holds, in localStorage, one per {@link SessionKey}.
  */
 export class SessionManager {
     private listeners = new Set<SessionListener>();
-    // The client every lookup is for, once a page has named one (forClient).
-    private clientId: string | null = null;
 
-    /**
-     * Limit lookups to one client's sessions. Sessions are kept per rpId AND
-     * client: two apps that share an rpId each have their own, and a page
-     * speaking for one client is never given, and never replaces, a session
-     * minted for another. A page that names no client (an older client
-     * script) gets the most recent session for the rpId, as before.
-     */
-    forClient(clientId: string | null): void {
-        this.clientId = clientId || null;
-    }
-
-    // The platform every lookup is for, once set (forPlatform). `null` is a
-    // platform that could not be told: nothing matches it.
-    private platform: PlatformScope | null | undefined = undefined;
-
-    /**
-     * Limit lookups to one platform's sessions. Sessions are kept per
-     * platform as well as per rpId and client: pages of every platform under
-     * one registrable domain share this storage, and a page of one platform
-     * must never be given, see, replace or remove another platform's session.
-     * `null` (the platform could not be told) matches no session at all.
-     * Never set, lookups ignore platforms, as before.
-     */
-    forPlatform(scope: PlatformScope | null): void {
-        this.platform = scope;
-    }
-
-    private onPlatform(s: AuthSession): boolean {
-        if (this.platform === undefined) return true;
-        if (this.platform === null) return false;
-        return sessionPlatform(s, this.platform) === this.platform.platform;
-    }
-
-    /** The client lookups are for, or null when no page has named one. */
-    get namedClient(): string | null {
-        return this.clientId;
-    }
-
-    private mine(s: AuthSession, rpId: string, clientId: string | null = this.clientId): boolean {
-        return s.rpId === rpId && (clientId === null || s.clientId === clientId) && this.onPlatform(s);
-    }
-
-    /**
-     * The session of one (rpId, client), whichever client was named last: for
-     * work that outlives the message that started it, such as a renewal timer.
-     */
-    getFor(rpId: string, clientId: string | null): AuthSession | undefined {
+    /** The session of a key, or undefined. */
+    get(key: SessionKey): AuthSession | undefined {
         return this.getAll()
-            .filter((s) => this.mine(s, rpId, clientId))
+            .filter((s) => matches(s, key))
             .sort((a, b) => b.authenticatedAt - a.authenticatedAt)[0];
     }
 
-    /** Remove the session of one (rpId, client); see {@link getFor}. */
-    removeFor(rpId: string, clientId: string | null): void {
-        const sessions = this.getAll().filter((s) => !this.mine(s, rpId, clientId));
+    /** Store the session of a key, replacing the one it had. Throws when the
+     *  key names no platform or client: a session nobody can find again would
+     *  lose its refresh token. */
+    store(key: SessionKey, session: AuthSession): void {
+        if (!key.platform || !key.clientId || !key.rpId) {
+            throw new Error('a session is stored for a platform, a client and an rpId');
+        }
+        const stored: AuthSession = { ...session, platform: key.platform, clientId: key.clientId, rpId: key.rpId };
+        const sessions = this.getAll().filter((s) => !matches(s, key));
+        sessions.push(stored);
         this.persist(sessions);
         this.notify(sessions);
     }
 
-    /** Store a new session after successful authentication. */
-    store(session: AuthSession): void {
-        if (this.platform === null) return;
-        if (this.platform) session = { ...session, platform: this.platform.platform };
-        const sessions = this.getAll();
-        // Replace the existing session for the same rpId, client and platform
-        const idx = sessions.findIndex((s) => s.rpId === session.rpId
-            && (s.clientId ?? '') === (session.clientId ?? '')
-            && this.onPlatform(s));
-        if (idx >= 0) sessions[idx] = session;
-        else sessions.push(session);
+    /** Remove the session of a key (remembered wallets are kept). */
+    remove(key: SessionKey): void {
+        const sessions = this.getAll().filter((s) => !matches(s, key));
         this.persist(sessions);
         this.notify(sessions);
-    }
-
-    /** Get the session for a specific RP (and the named client), or undefined if none. */
-    get(rpId: string): AuthSession | undefined {
-        return this.getFor(rpId, this.clientId);
     }
 
     /** Get all stored sessions. */
@@ -180,15 +122,10 @@ export class SessionManager {
         }
     }
 
-    /** Check if a session exists for an RP. */
-    has(rpId: string): boolean {
-        return this.get(rpId) !== undefined;
-    }
-
     /**
      * Find a push token from any stored session, falling back to the
      * persisted device hint. The push token is device-global, so a
-     * token from any rpId can notify the wallet for a different rpId.
+     * token from any session can notify the wallet for another.
      */
     findPushToken(): string | undefined {
         const sessions = this.getAll()
@@ -196,13 +133,6 @@ export class SessionManager {
             .sort((a, b) => b.authenticatedAt - a.authenticatedAt);
         if (sessions[0]?.pushToken) return sessions[0].pushToken;
         return this.getDeviceHint()?.pushToken;
-    }
-
-    /** Remove a session by rpId (device hint is kept). */
-    remove(rpId: string): void {
-        const sessions = this.getAll().filter((s) => !this.mine(s, rpId));
-        this.persist(sessions);
-        this.notify(sessions);
     }
 
     /** Remove all sessions. */

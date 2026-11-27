@@ -56,7 +56,7 @@ const jwt = (n) => jwtFor('privasys-platform', n);
   // Seed the frame's storage (partitioned under site-a) with a session that is not due.
   const page = await ctx.newPage();
   await page.goto('https://site-a.test/');
-  const seed = [{ token: jwt(0), rpId: 'app', origin: 'https://site-a.test', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0' }];
+  const seed = [{ token: jwt(0), rpId: 'app', origin: 'https://site-a.test', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0', scope: 'openid offline_access', platform: 'privasys-platform' }];
   await page.evaluate((s) => new Promise((resolve) => {
     const f = document.createElement('iframe');
     f.src = 'https://idp.test/auth/';

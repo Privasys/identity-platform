@@ -860,7 +860,7 @@ export async function onInit({ e, data, pageScope }: MessageContext): Promise<vo
             || !!uiResult?.sessionRelay || !!uiResult?.completedViaPoll;
         const method: AuthSession['method'] = !uiResult
             ? (priorSession?.method ?? (viaWallet ? 'wallet' : 'passkey'))
-            : viaWallet ? 'wallet' : uiResult.method === 'passkey' ? 'passkey' : 'social';
+            : uiResult.method;
         const session: AuthSession = {
             token: tokens.access_token,
             rpId,

@@ -51,7 +51,14 @@ export class AuthUI {
     private deviceLabel: string | undefined;
     private attributes: Record<string, string> | undefined;
     private sessionRelay: SessionRelayBinding | undefined;
-    private method: 'wallet' | 'passkey' = 'wallet';
+    private method: 'wallet' | 'passkey' | 'social' = 'wallet';
+    // The provider's name, once the person chose a social sign-in.
+    private socialName = '';
+
+    /** How the gate names the method on its outcome. */
+    private methodLabel(): string {
+        return this.method === 'wallet' ? 'Privasys ID' : this.method === 'passkey' ? 'Passkey' : this.socialName;
+    }
     private qrPayload = '';
     // True when signIn() skipped idle and went straight into a flow — the
     // ceremony's FIRST screen is then `autoFirstScreen` and Back has
@@ -439,7 +446,8 @@ export class AuthUI {
         const flowHeading = (inline || isPage) && !isIdle && this.state !== 'success' && this.state !== 'error'
             && this.state !== 'profile-required'
             ? (this.cfg.operationApproval ? 'Approve in your Privasys Wallet'
-                : this.method === 'passkey' ? 'Sign in with a passkey' : 'Connecting you to Privasys ID')
+                : this.method === 'passkey' ? 'Sign in with a passkey'
+                    : this.method === 'social' ? `Signing in with ${this.socialName}` : 'Connecting you to Privasys ID')
             : null;
 
         // Left panel content: the adopter's pitch (page mode — that panel is
@@ -995,7 +1003,7 @@ export class AuthUI {
     /** Renders progress steps in the left brand panel based on current state + method. */
     private renderBrandProgress(): HTMLElement {
         const isSuccess = this.state === 'success';
-        const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
+        const methodLabel = this.methodLabel();
 
         // Approve-only flow: its own 3-step shape (no QR/notification steps).
         if (this.cfg.approveFlow) {
@@ -1100,7 +1108,7 @@ export class AuthUI {
         // (QR) on an untrusted device earns the prompt.
         const showTrust = !this.finished
             && !!this.pushToken && (!this.cfg.deviceTrusted || this.addingDevice) && !this.cfg.pushToken;
-        const methodLabel = this.method === 'wallet' ? 'Privasys ID' : 'Passkey';
+        const methodLabel = this.methodLabel();
 
         return el('div', null,
             // The outcome as a single tile (the progress steps are hidden
@@ -1360,11 +1368,14 @@ export class AuthUI {
     private async startSocial(provider: string, own = false, chooseAccount = this.chooseAccount): Promise<void> {
         if (!this.cfg.onSocialAuth) return;
         this.chooseAccount = false;
+        this.method = 'social';
+        this.socialName = this.cfg.socialDisplayNames?.[provider]
+            ?? (own ? this.cfg.socialOwn?.find((o) => o.provider === provider)?.displayName : undefined)
+            ?? providerName(provider);
         this.state = 'authenticating';
         this.render();
         try {
             await this.cfg.onSocialAuth(provider, own, chooseAccount && hasAccountPicker(provider));
-            this.method = 'wallet';
             this.sessionToken = '';
             this.sessionId = this.cfg.sessionId ?? '';
             this.complete();

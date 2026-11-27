@@ -206,8 +206,8 @@ export interface AuthUIConfig {
 export interface SignInResult {
     /** Opaque session token issued by the enclave. */
     sessionToken: string;
-    /** Method used: "wallet" or "passkey". */
-    method: 'wallet' | 'passkey';
+    /** How the person signed in. */
+    method: 'wallet' | 'passkey' | 'social';
     /** Attestation info (wallet only). */
     attestation?: AttestationInfo;
     /** Session ID. */

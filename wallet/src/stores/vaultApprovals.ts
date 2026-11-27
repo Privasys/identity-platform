@@ -26,10 +26,10 @@
  * and from discovery.
  *
  * Deliberately NOT persisted: pendings expire server-side in minutes, so a
- * persisted op would almost always be dead. `refresh()` fetches each known op
- * and prunes the ones the IdP has dropped (approved or expired), so `pending`
- * is always the live set — which the Home banner and the approvals screen both
- * render reactively.
+ * persisted op would almost always be dead. `refresh()` keeps what discovery
+ * just listed, fetches each other known op and prunes the ones the IdP has
+ * dropped (approved or expired), so `pending` is always the live set, which
+ * the Home banner and the approvals screen both render reactively.
  */
 
 import { create } from 'zustand';
@@ -57,8 +57,8 @@ interface VaultApprovalsState {
     forget: (vaultOp: string) => void;
     /** Forget every capability. Part of the wallet wipe — see services/wipe.ts. */
     clearAll: () => void;
-    /** Re-fetch every known op; prune the dead; update `pending`. */
-    refresh: () => Promise<void>;
+    /** Fetch every known op not in `listed`; prune the dead; update `pending`. */
+    refresh: (listed?: VaultApprovalRequest[]) => Promise<void>;
     /**
      * Ask the IdP for everything pending for this wallet's privasys.id identity,
      * then refresh. This is what makes an approval findable when its push never
@@ -158,7 +158,7 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
         set({ knownOps: [], pending: [], loading: false, batchIds: [], declined: [] });
     },
 
-    refresh: async () => {
+    refresh: async (listed = []) => {
         void get().refreshBatches();
         const ops = get().knownOps;
         if (ops.length === 0) {
@@ -166,10 +166,11 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
             return;
         }
         set({ loading: true });
-        const found: VaultApprovalRequest[] = [];
+        // What discovery listed a moment ago is live: only the rest is fetched.
+        const found: VaultApprovalRequest[] = listed.filter((r) => ops.includes(r.vault_op));
         const dead: string[] = [];
         await Promise.all(
-            ops.map(async (op) => {
+            ops.filter((op) => !found.some((r) => r.vault_op === op)).map(async (op) => {
                 try {
                     const req = await fetchVaultApproval(op);
                     if (req) found.push(req);
@@ -193,8 +194,9 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
         // A stored-but-expired session just 401s; the next sign-in refreshes it.
         if (!account?.sessionToken) return;
         if (!account.sessionExpiresAt || Date.now() >= account.sessionExpiresAt) return;
+        let live: VaultApprovalRequest[] = [];
         try {
-            const live = await listVaultApprovals(account.sessionToken);
+            live = await listVaultApprovals(account.sessionToken);
             if (live.length > 0) {
                 set((s) => ({
                     knownOps: Array.from(
@@ -210,6 +212,6 @@ export const useVaultApprovalsStore = create<VaultApprovalsState>((set, get) => 
             // still show whatever the pushes told us about.
             console.warn('[vault-approvals] discover failed', e);
         }
-        await get().refresh();
+        await get().refresh(live);
     },
 }));

@@ -13,7 +13,7 @@
 
 import { APPROVAL_MAX_SECONDS, CLOCK_MARGIN_SECONDS, verifyBoundEntry, type BoundApproval } from './vault-bound-check';
 import { VAULT_OPS } from './vault-binding';
-import type { VaultIdentity } from './vault-identity';
+import type { VaultApprovalSummary } from './vault-approval-api';
 import { billingPlatform, type BillingPlatform } from './platforms';
 import { vaultReleaseFor, type VaultRelease } from './vault-reshare';
 
@@ -30,22 +30,20 @@ export interface BindingFields {
     exp: number;
 }
 
-/** What a v2 approval carries, beside the v1 summary fields. */
-export interface V2Summary {
-    operation: string;
-    handle: string;
-    measurement: string;
-    policy_version?: number;
-    binding?: BindingFields;
-    member_identities?: VaultIdentity[];
-    new_policy?: unknown;
-    /** update_policy_from: the rules in force, as the vault returns them. */
-    current_policy?: unknown;
-    /** A delete_after for a created successor: the key the old one waits for. */
-    successor_handle?: string;
-    /** The vaults' release tag, as a hint for the lookup. Bound by nothing. */
-    vault_release?: string;
-}
+/** The fields of a request's summary a v2 approval is checked on. */
+export type V2Summary = Pick<
+    VaultApprovalSummary,
+    | 'operation'
+    | 'handle'
+    | 'measurement'
+    | 'policy_version'
+    | 'binding'
+    | 'member_identities'
+    | 'new_policy'
+    | 'current_policy'
+    | 'successor_handle'
+    | 'vault_release'
+>;
 
 
 

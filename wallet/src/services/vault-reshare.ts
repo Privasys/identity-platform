@@ -33,22 +33,18 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 
 import * as SecureStore from '@/utils/storage';
+import type { VaultApprovalSummary } from './vault-approval-api';
 
 const DOMAIN = 'privasys-vault-frost-reshare-v1';
 const RELEASES_API = 'https://api.github.com/repos/Privasys/enclave-vaults/releases?per_page=30';
 const RELEASE_TAG = /^vault-v\d+\.\d+\.\d+$/;
 const HEX32 = /^[0-9a-f]{64}$/;
 
-/** What a reshare approval carries, as the IdP passes it on. */
-export interface ReshareSummaryFields {
-    handle: string;
-    measurement: string;
-    target_mrenclave?: string;
-    target_vaults?: string;
-    threshold?: string;
-    helpers?: string;
-    public_key?: string;
-}
+/** The fields of a request's summary a key renewal is checked on. */
+export type ReshareSummaryFields = Pick<
+    VaultApprovalSummary,
+    'handle' | 'measurement' | 'target_mrenclave' | 'target_vaults' | 'threshold' | 'helpers' | 'public_key'
+>;
 
 /** A reshare whose display fields recompute to the bound measurement. */
 export interface CheckedReshare {

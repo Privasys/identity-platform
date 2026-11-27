@@ -26,10 +26,8 @@ import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-n
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PaneProvider } from '@/components/PaneProvider';
-
-export { PaneProvider };
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { READABLE_WIDTH, TWO_PANE_MIN_WIDTH, useWideLayout } from '@/hooks/useLargeScreen';
+import { columnGutter, READABLE_WIDTH, TWO_PANE_MIN_WIDTH, useWideLayout } from '@/hooks/useLargeScreen';
 import ProfileScreen from '@/routes/(tabs)/index';
 import AccessScreen from '@/routes/(tabs)/access';
 import SettingsScreen from '@/routes/(tabs)/settings';
@@ -97,14 +95,9 @@ const SHEET_MAX_HEIGHT = 820;
 
 const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
 
-/** The side padding that centres a column of readable width in a pane this wide. */
-export function readableGutter(width: number): number {
-    return Math.max(0, Math.floor((width - READABLE_WIDTH) / 2));
-}
-
 /** The first column with an item of Profile, Access or Settings open beside
  *  it: half the room, never narrower than a list needs. */
-export function openListWidth(rest: number): number {
+function openListWidth(rest: number): number {
     return Math.max(LIST_WIDTH, Math.min(Math.floor(rest / 2), emptyListWidth(rest)));
 }
 
@@ -226,7 +219,7 @@ export function WideFrame({ routeName, children }: { routeName: string; children
     // A screen of its own (anything opened without a section beside it, or
     // any screen in a window too narrow for two columns): one column of
     // readable width. A long page scrolls; it never spills into a second.
-    const gutter = readableGutter(rest);
+    const gutter = columnGutter(rest);
     return (
         <View style={styles.row}>
             {side}

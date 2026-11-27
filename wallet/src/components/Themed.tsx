@@ -1,12 +1,14 @@
+// Copyright (c) Privasys. All rights reserved.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /**
- * Learn more about Light and Dark modes:
- * https://docs.expo.io/guides/color-schemes/
+ * Text and View drawn in the current colour scheme's palette.
  */
 
 import { Image as DefaultImage } from 'expo-image';
-import { Text as DefaultText, View as DefaultView, Button as DefaultButton } from 'react-native';
+import { Text as DefaultText, View as DefaultView } from 'react-native';
 
-import Colors, { lightPalette, darkPalette, type Palette } from '@/constants/colors';
+import { lightPalette, darkPalette, type Palette } from '@/constants/colors';
 
 import { useColorScheme } from './useColorScheme';
 
@@ -23,46 +25,16 @@ export function usePalette(): Palette {
 
 export type { Palette };
 
-type ThemeProps = { lightColor?: string; darkColor?: string };
-
-export type TextProps = ThemeProps & DefaultText['props'];
-export type ViewProps = ThemeProps & DefaultView['props'];
-export type ButtonProps = ThemeProps & DefaultButton['props'];
-
-export function useThemeColor(
-    props: { light?: string; dark?: string },
-    colorName: keyof typeof Colors.light & keyof typeof Colors.dark
-) {
-    const raw = useColorScheme();
-    const theme = raw === 'dark' ? 'dark' : 'light';
-    const colorFromProps = props[theme];
-
-    if (colorFromProps) {
-        return colorFromProps;
-    } else {
-        return Colors[theme][colorName];
-    }
-}
-
-export function Text(props: TextProps) {
-    const { style, lightColor, darkColor, ...otherProps } = props;
-    const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
-
+export function Text(props: DefaultText['props']) {
+    const { style, ...otherProps } = props;
+    const color = usePalette().textPrimary;
     return <DefaultText style={[{ color }, style]} {...otherProps} />;
 }
 
-export function View(props: ViewProps) {
-    const { style, lightColor, darkColor, ...otherProps } = props;
-    const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, 'background');
-
+export function View(props: DefaultView['props']) {
+    const { style, ...otherProps } = props;
+    const backgroundColor = usePalette().screenBg;
     return <DefaultView style={[{ backgroundColor }, style]} {...otherProps} />;
-}
-
-export function Button(props: ButtonProps) {
-    const { lightColor, darkColor, ...otherProps } = props;
-    const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, 'background');
-
-    return <DefaultButton color={backgroundColor} {...otherProps} />;
 }
 
 export const Image = DefaultImage;

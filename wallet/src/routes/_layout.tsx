@@ -78,7 +78,8 @@ export {
 } from 'expo-router';
 
 export const unstable_settings = {
-    // Ensure that reloading on `/modal` keeps a back button present.
+    // A screen opened directly (a link, a reload) has the tabs beneath it to
+    // go back to.
     initialRouteName: '(tabs)'
 };
 
@@ -273,9 +274,8 @@ function RootLayoutNav({ hasProfile, ready }: { hasProfile: boolean; ready: bool
                         };
                     }}
                 >
-                    {/* The tabs make their own column (routes/(tabs)/_layout):
-                        the tab navigator clips its scenes, so a column made
-                        here would also clip each tab's header band. */}
+                    {/* The tabs make their own column (routes/(tabs)/_layout),
+                        so that the tab bar runs edge to edge around it. */}
                     <Stack.Screen
                         name="(tabs)"
                         options={{ contentStyle: large && !wide ? { backgroundColor: palette.screenBg } : undefined }}

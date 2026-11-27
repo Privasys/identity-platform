@@ -73,9 +73,7 @@ export default function TabLayout() {
                     ...(wide ? { display: 'none' as const } : {}),
                 },
                 // The column for each tab. Made here, not by the stack around
-                // the tabs: the navigator clips its scenes to its own bounds,
-                // so each header band (components/HeaderBleed) can reach the
-                // screen edges only if those bounds are the whole screen.
+                // the tabs, so the tab bar above can run edge to edge.
                 sceneStyle: gutter ? { paddingHorizontal: gutter, backgroundColor: p.screenBg } : undefined,
                 tabBarLabelStyle: {
                     fontSize: 11,

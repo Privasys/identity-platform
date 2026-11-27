@@ -6,9 +6,11 @@
  * and in any window narrower than WIDE_MIN_WIDTH, there is no pane and screens
  * draw as they always have: the green header, a back button, the tab bar.
  *
- *   list    a section's list, beside the sidebar (Access, Drive, Settings)
- *   detail  the item opened from that list, beside it
- *   page    a screen of its own beside the sidebar (Profile and what it opens)
+ *   list    a section's own screen beside the sidebar (Profile, Drive, Access,
+ *           Settings)
+ *   detail  an item open beside its section's screen, in a window wide enough
+ *           for two columns (Drive draws its own)
+ *   page    any other screen, in one column of readable width
  *   task    a task in a centred sheet (sign-in, approvals, the ID check...)
  */
 

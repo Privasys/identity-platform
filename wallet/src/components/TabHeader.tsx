@@ -11,7 +11,6 @@ import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HeaderBleed } from '@/components/HeaderBleed';
 import { useBandless } from '@/components/pane';
 import { Text, usePalette, type Palette } from '@/components/Themed';
 
@@ -30,7 +29,6 @@ export function TabHeader({ title }: { title: string }) {
     }
     return (
         <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-            <HeaderBleed />
             <Text style={styles.headerTitle} accessibilityRole="header">
                 {title}
             </Text>

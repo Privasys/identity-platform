@@ -126,27 +126,4 @@ const dark: Palette = {
     ...brand,
 };
 
-/**
- * Legacy shape consumed by Themed.tsx (text/background/tint + tab icons),
- * extended with the full semantic palette per scheme.
- */
-export default {
-    light: {
-        text: light.textPrimary,
-        background: light.screenBg,
-        tint: brand.action,
-        tabIconDefault: light.textMuted,
-        tabIconSelected: brand.action,
-        ...light,
-    },
-    dark: {
-        text: dark.textPrimary,
-        background: dark.screenBg,
-        tint: brand.green,
-        tabIconDefault: dark.textMuted,
-        tabIconSelected: brand.green,
-        ...dark,
-    },
-};
-
 export { light as lightPalette, dark as darkPalette };

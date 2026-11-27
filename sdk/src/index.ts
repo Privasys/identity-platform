@@ -23,3 +23,6 @@ export {
     requestableAttributes,
 } from './attributes';
 export { CREDITS_PER_GBP, disclosureCost, formatCredits } from './attribute-pricing';
+export type { CanonicalAttribute } from './attributes';
+export type { AttributeSectionId } from './attribute-pricing';
+export type { AttributeSectionCopy } from './attributes-ui';

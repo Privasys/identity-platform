@@ -32,7 +32,7 @@ const DEFAULT_AUTH_ORIGIN = 'https://privasys.id';
 
 export class AuthFrame {
     private readonly authOrigin: string;
-    private readonly config: Omit<AuthFrameConfig, 'container' | 'headless' | 'authOrigin'>;
+    private config: Omit<AuthFrameConfig, 'container' | 'headless' | 'authOrigin'>;
     private container: HTMLElement | null;
     private readonly headless: HeadlessGate | null;
     private readonly frame: SessionFrame;
@@ -97,14 +97,22 @@ export class AuthFrame {
      *
      * @param opts.container where to render the gate this time, for a page
      *   that mounted a new container since.
+     * @param opts.attributes attributes this sign-in also needs (a step-up):
+     *   they join the frame's `attributes`, and a session without them runs
+     *   the gate, which asks the wallet for the difference.
+     * @param opts.billingGrant a billing grant for this ceremony only.
      */
-    async connect(opts?: { container?: HTMLElement }): Promise<Session> {
+    async connect(opts?: { container?: HTMLElement; attributes?: readonly string[]; billingGrant?: string }): Promise<Session> {
         this.alive();
         if (opts?.container) this.container = opts.container;
+        if (opts?.attributes?.length) {
+            const merged = new Set([...(this.config.attributes ?? []), ...opts.attributes]);
+            this.config = { ...this.config, attributes: [...merged] };
+        }
         const view = await this.load().catch(() => null);
         if (view && !widenedBy(this.config, view)) return this.current!;
 
-        const result = await this.ceremony({});
+        const result = await this.ceremony(opts?.billingGrant ? { billingGrant: opts.billingGrant } : {});
         if (!result.accessToken) throw new ConnectError('failed', 'The sign-in returned no session');
         for (const host of result.apps?.hosts ?? []) this.approvedAtSignIn.set(host, result.apps!.waitMs);
         this.apply({

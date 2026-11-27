@@ -675,7 +675,8 @@ const MODAL_CSS = /* css */ `
     font-size: inherit;
     font-family: inherit;
     cursor: pointer;
-    padding: 0;
+    padding: 2px 0;
+    min-height: 24px;
 }
 .link-btn:hover { text-decoration: underline; }
 
@@ -2023,6 +2024,7 @@ export class AuthUI {
                 this.errorMsg = (err as Error)?.message ?? 'The approval was not completed.';
                 this.finished = true;
                 this.render();
+                this.settleOnScreen('approval-failed');
             },
         );
     }
@@ -2248,6 +2250,7 @@ export class AuthUI {
                 this.finished = true;
                 this.state = 'error';
                 this.errorMsg = decline.message;
+                this.settleOnScreen('declined');
             },
             (err: unknown) => {
                 // Usually the request was answered or expired meanwhile.
@@ -2255,6 +2258,7 @@ export class AuthUI {
                 this.state = 'error';
                 this.finished = true;
                 this.errorMsg = `Could not decline: ${(err as Error)?.message || 'the request is no longer open'}`;
+                this.settleOnScreen('decline-failed');
             },
         ).finally(() => {
             this.declining = false;
@@ -2507,6 +2511,14 @@ export class AuthUI {
             this.close();
         }
         this.resolve?.(result);
+        this.resolve = null;
+        this.reject = null;
+    }
+
+    /** End the flow with an outcome that stays on screen: the caller's
+     *  promise rejects with `code`, and the gate keeps showing why. */
+    private settleOnScreen(code: string): void {
+        this.reject?.(new Error(code));
         this.resolve = null;
         this.reject = null;
     }

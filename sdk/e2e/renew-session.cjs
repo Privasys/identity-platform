@@ -1,7 +1,7 @@
 // AuthFrame.renewSession(), end to end against a mocked identity provider:
 // a page renews a session that is not due, gets the new token, sees it in
 // onSessionRenewed and getSession(); two calls at once make one refresh; a
-// call within 10 s makes none; a message for no client or another client
+// call within 10 s waits for the interval, then renews; a message for no client or another client
 // renews nothing; a page with no session is refused. Run after `npm run build`:
 // `node e2e/renew-session.cjs`.
 const fs = require('fs');
@@ -69,8 +69,11 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
     const before = await auth.getSession();
     const [a, b] = await Promise.all([auth.renewSession(), auth.renewSession()]);
     const after = await auth.getSession();
-    // Within 10 s of the last renewal: the current token, and no refresh.
+    // Within 10 s of the last renewal: the call waits for the interval to
+    // end, then renews, so a role granted meanwhile still arrives.
+    const t0 = Date.now();
     const soon = await auth.renewSession();
+    const soonWaitedMs = Date.now() - t0;
     // A message naming no client, or another client, renews nothing.
     const raw = (msg) => new Promise((resolve) => {
       const win = auth.sessionIframe.contentWindow;
@@ -85,9 +88,7 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
     });
     const noClient = await raw({});
     const otherClient = await raw({ clientId: 'c2' });
-    await new Promise((r) => setTimeout(r, 10_500));
-    const third = await auth.renewSession();
-    return { before: before && before.token, a, b, after: after && after.token, soon, noClient, otherClient, third, renewed };
+    return { before: before && before.token, a, b, after: after && after.token, soon, noClient, otherClient, soonWaitedMs, renewed };
   });
   const n = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()).n;
 
@@ -95,12 +96,12 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   assert.equal(n(out.a), 1, 'renewSession returns the renewed token');
   assert.equal(out.a, out.b, 'two calls at once share one renewal');
   assert.equal(out.after, out.a, 'getSession gives the renewed token');
-  assert.equal(out.soon, out.a, 'a call within 10 s returns the current token');
+  assert.equal(n(out.soon), 2, 'a call within 10 s renews once the interval ends');
+  assert.ok(out.soonWaitedMs > 8_000, 'it waited for the interval: ' + out.soonWaitedMs + ' ms');
   assert.equal(out.noClient, 'no session to renew', 'a message naming no client is refused');
   assert.equal(out.otherClient, 'no session to renew', "another client's message is refused");
-  assert.equal(n(out.third), 2, 'a call after 10 s renews again');
   assert.deepEqual(usedRefreshTokens, ['rt-0', 'rt-1'], 'each refresh token is spent once, in order');
-  assert.ok(out.renewed.includes(out.a) && out.renewed.includes(out.third), 'onSessionRenewed carries each new token');
+  assert.ok(out.renewed.includes(out.a) && out.renewed.includes(out.soon), 'onSessionRenewed carries each new token');
 
   // Another site, which the client does not accept, gets no session to renew.
   const other = await ctx.newPage();

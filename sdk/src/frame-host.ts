@@ -61,6 +61,11 @@ interface ActiveSession {
 let pendingHandshake: PendingHandshake | null = null;
 let activeSession: ActiveSession | null = null;
 
+// Readers of the sealed streams in flight, by the page's request id, so the
+// page can stop one; and the ids it stopped before their response started.
+const streamReaders = new Map<string, ReadableStreamDefaultReader<Uint8Array>>();
+const cancelledStreams = new Set<string>();
+
 /**
  * Make `session` this iframe's active sealed transport and forward its
  * liveness to the parent page (`privasys:session:state`), so the app can
@@ -927,9 +932,9 @@ async function renewIfNeeded(
         return renewSessionLocked(fresh, parentOrigin, notify);
     });
 }
-
-// Renewals a page asked for now, per chain: calls made while one runs share
-// it, and a chain renews this way at most once per RENEW_NOW_MIN_MS.
+// Renewals a page asked for now, per chain: calls made while one waits or
+// runs share it, and a chain renews this way at most once per
+// RENEW_NOW_MIN_MS.
 const RENEW_NOW_MIN_MS = 10_000;
 const renewalsNow = new Map<string, Promise<AuthSession | undefined>>();
 const lastRenewNow = new Map<string, number>();
@@ -938,29 +943,31 @@ const lastRenewNow = new Map<string, number>();
  * Renew the session now, whatever its token's expiry: what the person may do
  * has changed (a role was granted, an account switched), and a renewal reads
  * it afresh. Same lock, same re-read and same notification as a due renewal.
- * Calls for one chain made while a renewal runs share that renewal. Within
- * RENEW_NOW_MIN_MS of the last one, the stored session is returned and no
- * grant is made, so a page asking in a loop costs the IdP nothing.
+ * Within RENEW_NOW_MIN_MS of the last one, the renewal runs when that time
+ * is up, so a page asking in a loop makes one grant per interval.
  *
- * `session` is the renewed one, or the stored one when no renewal was made
- * (`renewed` false), or undefined when the chain is dead. A renewal that
- * could not run leaves the session unchanged; it is retried as usual.
+ * Resolves with the renewed session, the unchanged one when the renewal
+ * could not run (it is retried as usual), or undefined when the chain is dead.
  */
-function renewNow(chain: Chain, parentOrigin: string): Promise<{ session: AuthSession | undefined; renewed: boolean }> {
+function renewNow(chain: Chain, parentOrigin: string): Promise<AuthSession | undefined> {
     const key = chainKey(chain);
-    const stored = () => ({ session: sessions.getFor(chain.rpId, chain.clientId), renewed: false });
-    const running = renewalsNow.get(key);
-    if (running) return running.then((session) => ({ session, renewed: true }));
-    if (!chain.clientId) return Promise.resolve(stored());
-    if (Date.now() - (lastRenewNow.get(key) ?? 0) < RENEW_NOW_MIN_MS) return Promise.resolve(stored());
-    lastRenewNow.set(key, Date.now());
-    const run = withRefreshLock(chain.rpId, chain.clientId, async () => {
-        const fresh = sessions.getFor(chain.rpId, chain.clientId);
-        if (!fresh?.refreshToken || !fresh?.clientId) return fresh;
-        return renewSessionLocked(fresh, parentOrigin, true);
-    }).finally(() => renewalsNow.delete(key));
+    const pending = renewalsNow.get(key);
+    if (pending) return pending;
+    const clientId = chain.clientId;
+    if (!clientId) return Promise.resolve(sessions.getFor(chain.rpId, clientId));
+    const wait = Math.max(0, (lastRenewNow.get(key) ?? 0) + RENEW_NOW_MIN_MS - Date.now());
+    const run = new Promise<void>((r) => setTimeout(r, wait))
+        .then(() => {
+            lastRenewNow.set(key, Date.now());
+            return withRefreshLock(chain.rpId, clientId, async () => {
+                const fresh = sessions.getFor(chain.rpId, clientId);
+                if (!fresh?.refreshToken || !fresh?.clientId) return fresh;
+                return renewSessionLocked(fresh, parentOrigin, true);
+            });
+        })
+        .finally(() => renewalsNow.delete(key));
     renewalsNow.set(key, run);
-    return run.then((session) => ({ session, renewed: true }));
+    return run;
 }
 
 /**
@@ -1232,22 +1239,44 @@ function sanitiseSpend(v: unknown): { cap?: number } {
 
 // ── Message handler ─────────────────────────────────────────────────────
 
+// How a device sign-in or an operation approval can end without approval,
+// with the gate staying on that outcome (AuthUI rejects with these codes).
+const GATE_OUTCOMES = ['declined', 'decline-failed', 'approval-failed'] as const;
+const isGateOutcome = (code: string): code is typeof GATE_OUTCOMES[number] =>
+    (GATE_OUTCOMES as readonly string[]).includes(code);
+const gateOutcomeResult = (code: string) =>
+    ({ approved: false, outcome: code, sessionToken: '', method: 'wallet', sessionId: '' });
+
+// The origin of the page this frame serves, fixed by its first message. A
+// frame never changes pages without being reloaded.
+let servedOrigin: string | null = null;
+
+/**
+ * Whether a message comes from the page this frame serves. Only that page may
+ * drive the frame: any other window that can reach it (another frame on the
+ * same page, through `parent.frames`) could otherwise act on the person's
+ * session. The popups this frame opens answer on listeners of their own.
+ */
+function fromServedPage(e: MessageEvent): boolean {
+    if (window.parent === window || e.source !== window.parent) return false;
+    if (servedOrigin === null) servedOrigin = e.origin;
+    return e.origin === servedOrigin;
+}
+
 window.addEventListener('message', async (e: MessageEvent) => {
     const data = e.data;
-    if (!data || typeof data.type !== 'string') return;
+    if (!data || typeof data.type !== 'string' || !data.type.startsWith('privasys:')) return;
+    if (!fromServedPage(e)) return;
     // The client this page speaks for: every session lookup below is for it
     // (SessionManager.forClient). One frame serves one AuthFrame, so one client.
     const named = data.type === 'privasys:init' ? data.config?.clientId : data.clientId;
     if (typeof named === 'string' && named) sessions.forClient(named);
     // The page's platform, from the origin the browser reports for it and
-    // never from anything the page says. Only the page this frame serves sets
-    // it: a window of this origin talking to the frame (the device popup) is
-    // not that page. A platform that cannot be told matches no session.
-    if (e.source === window.parent) {
-        const list = await loadPlatforms();
-        pagePlatform = list ? platformScopeOf(list, e.origin) : null;
-        sessions.forPlatform(pagePlatform);
-    }
+    // never from anything the page says. A platform that cannot be told
+    // matches no session.
+    const list = await loadPlatforms();
+    pagePlatform = list ? platformScopeOf(list, e.origin) : null;
+    sessions.forPlatform(pagePlatform);
 
     if (data.type === 'privasys:init') {
         const config: AuthUIConfig & {
@@ -1468,7 +1497,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 );
             } catch (err) {
                 const msg = err instanceof Error ? err.message : '';
-                if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
+                if (isGateOutcome(msg)) {
+                    // The gate shows how it ended and stays on it.
+                    window.parent.postMessage({ type: 'privasys:result', result: gateOutcomeResult(msg) }, parentOrigin);
+                } else if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
                     window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
                 } else {
                     window.parent.postMessage({ type: 'privasys:error', error: msg || 'The approval was not completed' }, parentOrigin);
@@ -2160,7 +2192,10 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 );
             } catch (err) {
                 const msg = err instanceof Error ? err.message : 'Authentication failed';
-                if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
+                if (isGateOutcome(msg)) {
+                    // The gate shows how it ended and stays on it.
+                    window.parent.postMessage({ type: 'privasys:result', result: gateOutcomeResult(msg) }, parentOrigin);
+                } else if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
                     window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
                 } else {
                     const errorCode = err instanceof Error
@@ -2244,7 +2279,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
     // A headless page's choice: only the embedding page may make it, and
     // the gate itself checks it against what it offers.
     if (data.type === 'privasys:gate:start') {
-        if (e.source !== window.parent) return;
         const choice = sanitiseChoice(data.choice);
         if (choice && activeUI) activeUI.start(choice);
         return;
@@ -2277,7 +2311,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
     // Renew now, for a page that knows what the person may do has changed.
     // Only the page this frame serves may ask, for its own session.
     if (data.type === 'privasys:renew-session') {
-        if (e.source !== window.parent) return;
         const id = data.id;
         const reply = (payload: Record<string, unknown>) =>
             window.parent.postMessage({ type: 'privasys:renew-session:response', id, ...payload }, e.origin);
@@ -2288,9 +2321,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
             return;
         }
         const before = session.token;
-        const { session: after, renewed } = await renewNow(chainOf(session), e.origin);
+        const after = await renewNow(chainOf(session), e.origin);
         if (!after) reply({ error: 'session expired' });
-        else if (renewed && after.token === before) reply({ error: 'renewal failed; it will be retried' });
+        else if (after.token === before) reply({ error: 'renewal failed; it will be retried' });
         else reply({ accessToken: after.token });
         return;
     }
@@ -2513,6 +2546,17 @@ window.addEventListener('message', async (e: MessageEvent) => {
     // `privasys:session:stream-start` (carrying status + headers) followed
     // by zero or more `privasys:session:stream-chunk` messages and finally
     // `privasys:session:stream-end` (or `privasys:session:stream-error`).
+    // A stream the page stopped reading: its reader is cancelled, which
+    // ends the sealed response. A cancel that arrives before the response
+    // has started is remembered and applied when it starts.
+    if (data.type === 'privasys:session:stream-cancel') {
+        const id = String(data.id ?? '');
+        const reader = streamReaders.get(id);
+        if (reader) void reader.cancel().catch(() => undefined);
+        else if (id && cancelledStreams.size < 64) cancelledStreams.add(id);
+        return;
+    }
+
     if (data.type === 'privasys:session:stream-request') {
         const id = data.id;
         const post = (type: string, payload: Record<string, unknown> = {}) =>
@@ -2531,6 +2575,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
             resp.headers.forEach((v, k) => { headers[k] = v; });
             post('privasys:session:stream-start', { status: resp.status, headers, sealed: resp.sealed });
             const reader = resp.body.getReader();
+            const streamId = String(id ?? '');
+            streamReaders.set(streamId, reader);
+            if (cancelledStreams.delete(streamId)) void reader.cancel().catch(() => undefined);
             try {
                 for (;;) {
                     const { value, done } = await reader.read();
@@ -2544,6 +2591,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 post('privasys:session:stream-error', {
                     error: err instanceof Error ? err.message : String(err),
                 });
+            } finally {
+                streamReaders.delete(streamId);
             }
         } catch (err) {
             post('privasys:session:stream-error', {

@@ -360,6 +360,9 @@ export interface AuthFrameConfig {
     spend?: { cap?: number };
 }
 
+/** How a device sign-in or an operation approval ended without approval. */
+export type GateOutcome = 'declined' | 'decline-failed' | 'approval-failed';
+
 export interface SignInResult {
     sessionToken: string;
     method: 'wallet' | 'passkey';
@@ -372,6 +375,12 @@ export interface SignInResult {
      *  {@link AuthFrameConfig.operationApproval} only: the request is
      *  approved, and this page gets no token. */
     approved?: boolean;
+    /** Set on the result of a {@link AuthFrameConfig.deviceRequest} or an
+     *  {@link AuthFrameConfig.operationApproval} that ended without approval
+     *  (`approved` false): the person declined it from the gate, the decline
+     *  could not be recorded, or the approval failed. The gate stays on that
+     *  outcome in the page that holds it. */
+    outcome?: GateOutcome;
     /** Set on the result of {@link AuthFrame.linkIdentity} only. */
     linked?: boolean;
     /** The ID token of a link, for the page's server to verify. */
@@ -1166,8 +1175,8 @@ export class AuthFrame {
                     this.sealedIframe = iframe;
                     this.sealedHandler = handler;
                     resolve(result);
-                } else if (result.approved) {
-                    // A device's sign-in or an operation, approved: the gate
+                } else if (result.approved || result.outcome) {
+                    // A device's sign-in or an operation, settled: the gate
                     // stays on its outcome, in the page that holds it.
                     window.removeEventListener('message', handler);
                     this.cancelSignIn = null;

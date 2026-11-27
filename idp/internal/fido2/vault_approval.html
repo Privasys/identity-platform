@@ -255,7 +255,7 @@ function openGate() {
   mine.signIn().then(function (res) {
     if (gate !== mine) return;
     // The gate shows the outcome itself and stays.
-    if (res && res.approved) return;
+    if (res && (res.approved || res.outcome)) return;
     showCard();
   }).catch(function (e) {
     if (gate !== mine) return;

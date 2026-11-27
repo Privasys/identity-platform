@@ -575,7 +575,7 @@ var PrivasysQR = (function () {
     var mine = gate;
     mine.signIn().then(function (res) {
       if (gate !== mine || done) return;
-      if (res && res.approved) {
+      if (res && (res.approved || res.outcome)) {
         // The gate shows the outcome itself and stays.
         done = true;
         if (pollTimer) clearInterval(pollTimer);

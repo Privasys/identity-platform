@@ -529,39 +529,6 @@ export function setProfileValue(
     });
 }
 
-// ── Provider claim normalisation ────────────────────────────────────────
-// Loaded from the shared JSON (single source of truth for IdP + wallet).
-
-/** Canonical attribute key → raw claim key that indicates verification status. */
-const PROVIDER_VERIFICATION_CLAIMS: Record<string, Record<string, string>> = Object.fromEntries(
-    Object.entries(canonicalDoc.providers)
-        .filter(([, prov]) => Object.keys(prov.verificationClaims).length > 0)
-        .map(([name, prov]) => [name, prov.verificationClaims]),
-);
-
-/**
- * Check whether a provider claims an attribute is verified.
- * Returns true if the provider's verification claim is truthy, or if the
- * provider is known to only return verified values for that attribute.
- */
-export function isProviderVerified(
-    provider: string,
-    canonicalKey: string,
-    raw: Record<string, unknown>,
-): boolean {
-    const verificationClaims = PROVIDER_VERIFICATION_CLAIMS[provider];
-    if (!verificationClaims) return false;
-
-    const claimKey = verificationClaims[canonicalKey];
-    if (!claimKey) return false;
-
-    // Special sentinel: provider only returns verified values for this attribute.
-    if (claimKey === '_always_verified') return true;
-
-    const val = raw[claimKey];
-    return val === true || val === 'true';
-}
-
 /**
  * The name to show a human for this profile.
  *

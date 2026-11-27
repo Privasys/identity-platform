@@ -50,8 +50,7 @@ export interface ProviderUserInfo {
 /**
  * Display metadata for the providers the IdP federates. This is presentation
  * only — there are no client IDs, secrets, or endpoints here. The IdP owns the
- * actual OAuth configuration; call `fetchAvailableProviders()` to learn which
- * are configured server-side.
+ * actual OAuth configuration.
  */
 export const PROVIDERS: Record<string, { provider: string; displayName: string }> = {
     google: { provider: 'google', displayName: 'Google' },
@@ -90,23 +89,6 @@ async function generatePKCE(): Promise<{ verifier: string; challenge: string }> 
     );
     const challenge = digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     return { verifier, challenge };
-}
-
-/**
- * Ask the IdP which social providers are actually configured server-side, so the
- * UI can show only working buttons (no "not configured" dead ends).
- */
-export async function fetchAvailableProviders(): Promise<string[]> {
-    try {
-        const resp = await fetch(`${IDP_BASE}/auth/social/providers`, {
-            headers: { Accept: 'application/json' },
-        });
-        if (!resp.ok) return [];
-        const data: { providers?: string[] } = await resp.json();
-        return data.providers ?? [];
-    } catch {
-        return [];
-    }
 }
 
 /**

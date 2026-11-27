@@ -133,7 +133,7 @@ export function attestMessage(kind: AttestKind, material: unknown, challenge: st
 }
 
 /** The message both keys sign to start a mail code. */
-export function mailStartMessage(email: string, challenge: string): Uint8Array {
+function mailStartMessage(email: string, challenge: string): Uint8Array {
     return utf8(canonicalJson({ op: 'mail_start', email, challenge }));
 }
 
@@ -303,7 +303,7 @@ export async function startMailCode(
 }
 
 /** The `jti` of a proof JWS, read from its payload. */
-export function proofJti(proof: string): string {
+function proofJti(proof: string): string {
     const payload = JSON.parse(new TextDecoder().decode(base64urlToBytes(proof.split('.')[1] ?? '')));
     if (typeof payload?.jti !== 'string') throw new Error('attribute verifier: a proof without a jti');
     return payload.jti;

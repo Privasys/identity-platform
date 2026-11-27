@@ -509,7 +509,7 @@ export class PrivasysSession {
         // is on the wire; its reply is still sealed under the session it was
         // sent on, so decrypting with whatever keys are current by then fails
         // with the browser's opaque OperationError ("the operation failed for
-        // an operation-specific reason"). Seen on Drive right after a deploy.
+        // an operation-specific reason").
         const sessionId = this.sessionId;
         const keys = this.keys;
         const ad = encodeAD(upperMethod, path, sessionId);
@@ -762,7 +762,7 @@ export class PrivasysSession {
         // session at all). If the caller wired a getEncAuth fetcher, fetch
         // a fresh voucher, re-bootstrap, and replay the stream once — so a
         // back-end redeploy that kept its measurement recovers transparently
-        // instead of surfacing a dead "chat request failed: 401" to the UI.
+        // instead of surfacing a 401 to the UI.
         // A measurement change makes tryRebind() return false and the
         // original 401 propagates, which the front-end turns into a
         // reconnect prompt.
@@ -856,15 +856,11 @@ export class PrivasysSession {
         const reader = resp.body!.getReader();
         const status = parseInnerStatus(resp.headers, resp.status);
         // Per-frame flush: each `pull()` advances the decoder by exactly
-        // one sealed frame (or closes the stream). The previous
-        // implementation drained the entire async iterator inside a
-        // single pull, so the consumer only saw frames after the inner
-        // loop finished or backpressure kicked in. For SSE / token
-        // streaming this materialised as bursty UI updates: many
-        // tokens piling up between paints. Yielding one frame per pull
-        // hands every decoded chunk straight to the caller as soon as
-        // the network produces it, which is what the chat-relay
-        // postMessage bridge needs to forward `stream-chunk` per token.
+        // one sealed frame (or closes the stream), so every decoded chunk
+        // reaches the caller as soon as the network produces it (the frame's
+        // postMessage bridge forwards one `stream-chunk` per frame). Draining
+        // the iterator inside one pull would deliver SSE and token streams
+        // in bursts.
         const iter = decodeFrameReader(reader, aead, s2cPrefix, ad);
         const stream = new ReadableStream<Uint8Array>({
             async pull(controller) {

@@ -71,8 +71,8 @@ export interface AuthUIConfig {
      *  blocks custom-scheme navigations initiated by cross-origin
      *  iframes — even with target=_top it surfaces Safari's "address is
      *  invalid" alert with the app installed. The parent page is
-     *  top-level and first-party (the working /device-page context), and
-     *  the tap's transient user activation propagates to ancestors.
+     *  top-level and first-party, and the tap's transient user activation
+     *  propagates to ancestors.
      *  Present only when the frame client is new enough to handle the
      *  message; older clients fall back to the direct _top anchor. */
     onNavigate?: (url: string) => void;
@@ -676,6 +676,14 @@ const MODAL_CSS = /* css */ `
     min-height: 24px;
 }
 .link-btn:hover { text-decoration: underline; }
+.link-btn.decline-btn {
+    margin-top: 16px;
+    font-size: 13px;
+    display: block;
+    text-align: center;
+    width: 100%;
+    color: #B91C1C;
+}
 
 /* QR section */
 .qr-section {
@@ -984,7 +992,20 @@ button:focus-visible, a:focus-visible {
 // SVG icon templates
 // ---------------------------------------------------------------------------
 
-const ICON_LOGO = `<svg viewBox="0 0 500 500"><style>.ld{fill:#fff}@media(prefers-color-scheme:dark){.ld{fill:#2a2a2a}}</style><defs><linearGradient id="pg" y2="1"><stop offset="21%" stop-color="#34E89E"/><stop offset="42%" stop-color="#12B06E"/></linearGradient><linearGradient id="pb" x1="1" y1="1" x2="0" y2="0"><stop offset="21%" stop-color="#00BCF2"/><stop offset="42%" stop-color="#00A0EB"/></linearGradient></defs><path d="M100 0H450L0 450V100A100 100 0 0 1 100 0Z" fill="url(#pg)"/><path d="M500 50V400A100 100 0 0 1 400 500H50L500 50Z" fill="url(#pb)"/><polygon class="ld" points="0,500 50,500 500,50 500,0"/></svg>`;
+/**
+ * The Privasys mark's shapes in a 500 x 500 box. `id` prefixes its two
+ * gradient ids (a page that shows the mark twice needs two sets), and `fold`
+ * paints the diagonal fold between the halves.
+ */
+function logoMark(id: string, fold: string): string {
+    return `<defs><linearGradient id="${id}g" y2="1"><stop offset="21%" stop-color="#34E89E"/><stop offset="42%" stop-color="#12B06E"/></linearGradient>`
+        + `<linearGradient id="${id}b" x1="1" y1="1" x2="0" y2="0"><stop offset="21%" stop-color="#00BCF2"/><stop offset="42%" stop-color="#00A0EB"/></linearGradient></defs>`
+        + `<path d="M100 0H450L0 450V100A100 100 0 0 1 100 0Z" fill="url(#${id}g)"/>`
+        + `<path d="M500 50V400A100 100 0 0 1 400 500H50L500 50Z" fill="url(#${id}b)"/>`
+        + `<polygon ${fold} points="0,500 50,500 500,50 500,0"/>`;
+}
+
+const ICON_LOGO = `<svg viewBox="0 0 500 500"><style>.ld{fill:#fff}@media(prefers-color-scheme:dark){.ld{fill:#2a2a2a}}</style>${logoMark('p', 'class="ld"')}</svg>`;
 const ICON_PASSKEY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="7.5" r="3"/><path d="M10.5 13c-3.3 0-6 2-6 4.5V19h12v-1.5c0-1-.4-2-1-2.7"/><line x1="18" y1="12" x2="18" y2="18"/><line x1="15" y1="15" x2="21" y2="15"/></svg>`;
 const ICON_CHECK_CIRCLE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>`;
 const ICON_X_CIRCLE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>`;
@@ -1060,7 +1081,7 @@ const QR_LOGO_SHARE = 0.24;
 /**
  * The Privasys mark on a white rounded tile, as SVG to lay over the centre
  * of a QR code. The tile gives the mark a clear edge against the modules;
- * the mark's own ids differ from ICON_LOGO's, which shares pages with it.
+ * its gradient ids differ from ICON_LOGO's, which shares pages with it.
  */
 function qrLogoSvg(x: number, y: number, side: number): string {
     const inset = side * 0.14;
@@ -1068,11 +1089,7 @@ function qrLogoSvg(x: number, y: number, side: number): string {
     return `<g shape-rendering="geometricPrecision">`
         + `<rect x="${x}" y="${y}" width="${side}" height="${side}" rx="${side * 0.18}" fill="#fff"/>`
         + `<svg x="${x + inset}" y="${y + inset}" width="${mark}" height="${mark}" viewBox="0 0 500 500">`
-        + '<defs><linearGradient id="qrpg" y2="1"><stop offset="21%" stop-color="#34E89E"/><stop offset="42%" stop-color="#12B06E"/></linearGradient>'
-        + '<linearGradient id="qrpb" x1="1" y1="1" x2="0" y2="0"><stop offset="21%" stop-color="#00BCF2"/><stop offset="42%" stop-color="#00A0EB"/></linearGradient></defs>'
-        + '<path d="M100 0H450L0 450V100A100 100 0 0 1 100 0Z" fill="url(#qrpg)"/>'
-        + '<path d="M500 50V400A100 100 0 0 1 400 500H50L500 50Z" fill="url(#qrpb)"/>'
-        + '<polygon fill="#fff" points="0,500 50,500 500,50 500,0"/></svg></g>';
+        + logoMark('qrp', 'fill="#fff"') + '</svg></g>';
 }
 
 /**
@@ -1146,13 +1163,13 @@ export class AuthUI {
     // nowhere meaningful to go (its alternatives are offered inline).
     private autoStarted = false;
     private autoFirstScreen: UIState | null = null;
-    // Mobile handoff: whether the user expanded the QR ("scan with another
-    // device") instead of using the Open-in-Wallet button.
     /** The outcome is on screen for good (see AuthUIConfig.finalScreen). */
     private finished = false;
     /** The request was refused from the gate (see AuthUIConfig.decline). */
     private declined = false;
     private declining = false;
+    // Mobile handoff: whether the user expanded the QR ("scan with another
+    // device") instead of using the Open-in-Wallet button.
     private showQrOnMobile = false;
     // Set when the wallet handoff visibly failed (page never lost focus
     // after the tap — the app is most likely not installed).
@@ -1614,8 +1631,7 @@ export class AuthUI {
                 (this.cfg.decline && !this.finished
                     && ['idle', 'qr-scanning', 'push-waiting', 'approve-waiting'].includes(this.state))
                     ? el('button', {
-                        className: 'link-btn',
-                        style: 'margin-top: 16px; font-size: 13px; display: block; text-align: center; width: 100%; color: #B91C1C;',
+                        className: 'link-btn decline-btn',
                         onClick: () => this.runDecline(),
                     }, this.declining ? 'Declining…' : this.cfg.decline.label)
                     : null,

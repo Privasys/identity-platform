@@ -1607,7 +1607,7 @@ export class AuthFrame {
                             // never allowed to spend. Without this the ask only
                             // ever reaches the wallet on a first sign-in: every
                             // later visit resumes quietly and the app can never
-                            // be paid for (found 2026-09-13, harness 402s).
+                            // be paid for.
                             ...(this.config.spend ? { spend: this.config.spend } : {}),
                         },
                         this.authOrigin,

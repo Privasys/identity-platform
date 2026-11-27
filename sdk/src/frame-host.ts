@@ -6,13 +6,12 @@
  *
  * Listens for postMessage from the parent page, instantiates the AuthUI
  * to run the authentication ceremony, and relays results back via
- * postMessage. Sessions are stored in privasys.id's localStorage so
- * they persist across adopter sites.
+ * postMessage. Sessions are stored in this origin's localStorage, which
+ * the browser keeps apart for every site that embeds the frame, so a
+ * session is shared by the tabs of one site and by no other site.
  *
- * Sessions have a 15-minute client-side TTL. The frame host automatically
- * renews sessions via OIDC refresh_token grant before the TTL expires.
- * No push notification or wallet involvement is needed for renewal —
- * only the initial login requires the wallet.
+ * The frame renews each session with the OIDC refresh_token grant before
+ * its access token expires; only the sign-in itself needs the wallet.
  */
 
 import { AuthUI } from './ui';
@@ -86,15 +85,28 @@ function adoptSession(
 // postMessage. Cleaned up on close.
 const activeWebSockets = new Map<number, SealedWebSocket>();
 
-/** Read a string claim out of a JWT without verification (the IdP signed it). */
-function jwtClaim(token: string, claim: string): string | null {
+/** JSON encoded as base64url (padding optional), or null when it is not. */
+function b64urlJson(s: string): Record<string, unknown> | null {
     try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const v = payload[claim];
-        return typeof v === 'string' && v ? v : null;
+        const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+        const bin = atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '='));
+        const v: unknown = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+        return v && typeof v === 'object' ? v as Record<string, unknown> : null;
     } catch {
         return null;
     }
+}
+
+/** The claims of a JWT, unverified (the identity provider signed it and
+ *  checks it again on use), or null when unreadable. */
+function jwtPayload(token: string): Record<string, unknown> | null {
+    return b64urlJson(token.split('.')[1] ?? '');
+}
+
+/** The session id (`sid`) of an access token, or null. */
+function tokenSid(token: string): string | null {
+    const sid = jwtPayload(token)?.sid;
+    return typeof sid === 'string' && sid ? sid : null;
 }
 
 /**
@@ -147,7 +159,7 @@ function makeGetEncAuth(key: SessionKey, host: string): () => Promise<EncAuthEnv
             session = await renewIfNeeded(key, renewalParents.get(sessionKeyId(key))?.parentOrigin ?? '', false) ?? session;
             if (!session?.token) return null;
         }
-        const sid = jwtClaim(session.token, 'sid');
+        const sid = tokenSid(session.token);
         if (!sid) return null;
         // Select the voucher for THIS enclave by host. The browser can't compute
         // app_id (it never attests), so host is the resume selector; the enclave
@@ -157,11 +169,9 @@ function makeGetEncAuth(key: SessionKey, host: string): () => Promise<EncAuthEnv
         const url =
             `${globalThis.location.origin}/sessions/${encodeURIComponent(sid)}/encauth` +
             (host ? `?host=${encodeURIComponent(host)}` : '');
-        // cache: 'no-store' — bypass the browser HTTP cache entirely. A
-        // historically mis-cached response for this URL (e.g. the static
-        // index.html from before the route existed, heuristically cached
-        // because it carried no Cache-Control) would otherwise be replayed
-        // forever, making every silent resume fail 'unavailable'.
+        // cache: 'no-store': a cached response for this URL (one heuristically
+        // cached for lack of Cache-Control) would be replayed forever, and
+        // every silent resume would fail 'unavailable'.
         const resp = await fetch(url, {
             headers: { Authorization: `Bearer ${session.token}` },
             cache: 'no-store',
@@ -347,9 +357,8 @@ async function lookupDeviceRequest(idpBase: string, userCode: string): Promise<D
     if (!resp.ok) throw new Error('This code is invalid or has expired');
     const data = await resp.json();
     if (data.status !== 'pending') throw new Error('This request has already been answered');
-    const p = new URL(String(data.qr_payload)).searchParams.get('p') ?? '';
-    const b64 = p.replace(/-/g, '+').replace(/_/g, '/');
-    const decoded = JSON.parse(atob(b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64));
+    const decoded = b64urlJson(new URL(String(data.qr_payload)).searchParams.get('p') ?? '');
+    if (!decoded) throw new Error('This request cannot be approved here');
     const text = (v: unknown): string => (typeof v === 'string' ? v : '');
     const sessionId = text(decoded.sessionId);
     const clientId = text(decoded.clientId);
@@ -486,7 +495,7 @@ async function requestVoucherPush(opts: {
     const session = sessions.get(opts.key);
     if (!session?.token) throw new Error('no-session');
     if (!session.pushToken || !session.brokerUrl) throw new Error('no-push');
-    const sid = jwtClaim(session.token, 'sid');
+    const sid = tokenSid(session.token);
     if (!sid) throw new Error('no-session');
     const appHost = opts.appHost.trim();
     if (!appHost) throw new Error('appHost required');
@@ -645,12 +654,8 @@ async function withRefreshLock<T>(key: SessionKey, fn: () => Promise<T>): Promis
 
 /** Epoch-ms `exp` of a JWT, or null when unreadable. */
 function tokenExpMs(token: string): number | null {
-    try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
-    } catch {
-        return null;
-    }
+    const exp = jwtPayload(token)?.exp;
+    return typeof exp === 'number' ? exp * 1000 : null;
 }
 
 // What the identity provider said about a page and a client, for this
@@ -850,24 +855,14 @@ function runDevicePopup(): void {
 
 /** Whether an access token carries the identity provider's wallet marker. */
 function tokenSaysWallet(token: string): boolean {
-    try {
-        const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        const w = JSON.parse(atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '='))).wallet;
-        return w === true || w === 'true';
-    } catch {
-        return false;
-    }
+    const w = jwtPayload(token)?.wallet;
+    return w === true || w === 'true';
 }
 
 /** Whether an access token was issued for this audience. */
 function tokenAudienceIs(token: string, audience: string): boolean {
-    try {
-        const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        const aud = JSON.parse(atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '='))).aud;
-        return Array.isArray(aud) ? aud.includes(audience) : aud === audience;
-    } catch {
-        return false;
-    }
+    const aud = jwtPayload(token)?.aud;
+    return Array.isArray(aud) ? aud.includes(audience) : aud === audience;
 }
 
 /** Check whether an access token's exp claim is within a safety margin. */
@@ -893,7 +888,7 @@ function scheduleRenewal(key: SessionKey, session: AuthSession, parentOrigin: st
 
     // Schedule from the token's actual exp; a flat delay drifts apart
     // from the token lifetime whenever the iframe is (re)created after
-    // sign-in. Unknown exp falls back to the historical 13 minutes.
+    // sign-in. An unreadable exp renews after 13 minutes.
     const exp = tokenExpMs(session.token);
     const base = exp === null ? 13 * 60 * 1000 : exp - Date.now() - RENEW_MARGIN_MS;
     const jitter = Math.floor(Math.random() * RENEW_JITTER_MS);
@@ -1199,8 +1194,6 @@ async function completeSession(
 }
 
 /** Exchange an authorization code for tokens via the IdP /token endpoint. */
-
-/** Exchange an authorization code for tokens via the IdP /token endpoint. */
 async function exchangeCode(
     idpBase: string,
     code: string,
@@ -1224,7 +1217,6 @@ async function exchangeCode(
     return resp.json();
 }
 
-/** The adopter's spend hint, reduced to a non-negative integer cap. */
 // contentHeightReporter posts the rendered UI's height to the parent page,
 // at most once per animation frame, so an inline embed can size its iframe
 // to the content (frame-size.ts).
@@ -1232,7 +1224,6 @@ function contentHeightReporter(parentOrigin: string): (px: number) => void {
     let pending: number | null = null;
     return (px: number): void => {
         pending = px;
-        if (pending === null) return;
         const flush = (): void => {
             if (pending === null) return;
             const height = pending;
@@ -1244,6 +1235,7 @@ function contentHeightReporter(parentOrigin: string): (px: number) => void {
     };
 }
 
+/** The adopter's spend hint, reduced to a non-negative integer cap. */
 function sanitiseSpend(v: unknown): { cap?: number } {
     if (!v || typeof v !== 'object') return {};
     const cap = (v as { cap?: unknown }).cap;
@@ -1339,8 +1331,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
             delete config.attributes;
             delete config.audience;
         }
-        // The inline frame reports its content height so the embedding page
-        // can size the iframe to it (frame-size.ts); throttled to a frame.
         // Only the device and operation approvals below keep the gate open on
         // their outcome; a page cannot ask for it.
         delete config.finalScreen;
@@ -1411,6 +1401,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
             }
             if (!asked && pageScope.platform !== pageScope.defaultPlatform) config.audience = pageScope.platform;
         }
+        // The inline frame reports its content height so the embedding page
+        // can size the iframe to it (frame-size.ts); throttled to a frame.
         const onContentHeight = contentHeightReporter(parentOrigin);
 
         // Wallet handoff via the parent page (mobile): only when the frame
@@ -1457,16 +1449,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // the list the IdP publishes once it has been fetched below.
         const providers = sanitiseProviders(config.providers);
 
-        // Connect-mode approve: an existing wallet session whose sealed
-        // voucher the enclave refused (measurement change) or that has no
-        // voucher for this app yet. One-tap wallet push re-verification,
-        // rendered by AuthUI. Falls through to the full ceremony when it
-        // cannot complete (no wallet push, timeout, or the user chose
-        // "Sign in another way").
-        // The voucher-approve short-circuit below RE-USES the stored access
-        // token, so it must never serve a widened attribute request — a
-        // widened set needs a freshly minted token, which only the OIDC
-        // ceremony (and its step-up push path) can produce.
         // An operation someone started elsewhere, to approve. Only the
         // identity provider's own pages may run it: the request is the
         // capability, and a foreign page must not walk a visitor through
@@ -1530,6 +1512,16 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // The session this sign-in is for.
         const rpId = config.rpId || config.appName;
         const initKey: SessionKey = { platform: pageScope.platform, rpId, clientId: config.clientId! };
+        // Connect-mode approve: an existing wallet session whose sealed
+        // voucher the enclave refused (measurement change) or that has no
+        // voucher for this app yet. One-tap wallet push re-verification,
+        // rendered by AuthUI. Falls through to the full ceremony when it
+        // cannot complete (no wallet push, timeout, or the user chose
+        // "Sign in another way").
+        // It RE-USES the stored access token, so it must never serve a
+        // widened attribute request: a widened set needs a freshly minted
+        // token, which only the OIDC ceremony (and its step-up push path)
+        // can produce.
         if (config.connect?.mode === 'approve' && config.sessionRelay?.appHost
             && config.connect.reason !== 'attributes-widened') {
             const appHost = config.sessionRelay.appHost;
@@ -1669,9 +1661,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
             if (linkNonce) authorizeUrl.searchParams.set('nonce', linkNonce);
             // A billing grant redirects the cost of any paid attribute
             // disclosure from this app's owner to the user who issued the
-            // grant, so the person requiring the proof pays for it (a
-            // Drive sharer, for instance). Opaque here: the control plane
-            // owns its scope, ceiling and single use.
+            // grant, so the person requiring the proof pays for it. Opaque
+            // here: its issuer owns its scope, ceiling and single use.
             if (config.billingGrant) {
                 authorizeUrl.searchParams.set('billing_grant', config.billingGrant);
             }
@@ -1752,14 +1743,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
             let attributeRequirements: AuthUIConfig['attributeRequirements'];
             let disclosureVouchers: AuthUIConfig['disclosureVouchers'];
             try {
-                const p = new URL(authData.qr_payload).searchParams.get('p');
-                if (p) {
-                    const b64 = p.replace(/-/g, '+').replace(/_/g, '/');
-                    const pad = b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64;
-                    const decoded = JSON.parse(atob(pad));
-                    attributeRequirements = decoded.attributeRequirements;
-                    disclosureVouchers = decoded.disclosureVouchers;
-                }
+                const decoded = b64urlJson(new URL(authData.qr_payload).searchParams.get('p') ?? '');
+                attributeRequirements = decoded?.attributeRequirements as AuthUIConfig['attributeRequirements'];
+                disclosureVouchers = decoded?.disclosureVouchers as AuthUIConfig['disclosureVouchers'];
             } catch { /* no wallet payload to thread */ }
 
             // Step-up push: the IdP resolved the session hint, found this
@@ -2430,8 +2416,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // and the only screen that asks is the wallet ceremony. A returning
         // holder resumes silently, so without this a newly deployed app could
         // never be paid for: it would ask on every sign-in and be asked on
-        // none, and every priced call would fail 402 with nothing to click
-        // (found 2026-09-13). Refusing the SILENT resume hands the gate back
+        // none, and every priced call would fail 402 with nothing to click.
+        // Refusing the SILENT resume hands the gate back
         // to connect(), which runs the ceremony, the wallet shows the spend
         // row, and the answer is recorded once.
         //

@@ -555,10 +555,8 @@ async function generateSdkKeyPair(): Promise<{ keyPair: CryptoKeyPair; sdkPubB64
 // rotates refresh tokens with strict single-use semantics (the old
 // token is deleted before the new one is issued), so exactly one
 // document may run a refresh grant for a given (clientId, rpId) chain
-// at a time. Every refresh-grant consumer in this file — the scheduled
-// renewal, the inline check-session renewal, and audience-token
-// minting — is serialised through the Web Locks API, which is
-// origin-scoped across documents and tabs.
+// at a time. Every grant goes through refreshGrant, which holds a Web
+// Locks API lock (origin-scoped across documents and tabs) for it.
 //
 // Renewal is scheduled from the access token's `exp` claim (not a flat
 // delay), retries transient failures with backoff, and never removes
@@ -895,43 +893,162 @@ function scheduleRenewalRetry(chain: Chain, parentOrigin: string): void {
 }
 
 /**
- * Renew the session for `rpId` if (and only if) its token is inside the
- * renewal margin, under the cross-document refresh lock. Re-reads the
- * session from localStorage after acquiring the lock so a renewal that
- * another document just completed turns this call into a no-op instead
- * of a double-spend of the rotated refresh token.
+ * What one refresh grant came to.
+ *  - granted: the identity provider answered; the rotated refresh token (and,
+ *    for a renewal, the new access token) is stored.
+ *  - current: the session is not due, or another document already renewed it.
+ *  - adopted: the token was spent, but storage holds a newer one that another
+ *    document stored meanwhile; that session stands.
+ *  - dead: the chain is gone (revoked, expired); the session was removed.
+ *  - failed: network or server trouble; the session is kept as it was.
+ *  - none: there is no session with a refresh token.
+ */
+type GrantResult =
+    | { kind: 'granted'; session: AuthSession; accessToken: string; expiresIn: number }
+    | { kind: 'current' | 'adopted'; session: AuthSession }
+    | { kind: 'failed'; session: AuthSession; error: string }
+    | { kind: 'dead' | 'none' };
+
+/**
+ * Run one refresh_token grant for a chain: the only place this frame spends a
+ * refresh token. Under the cross-document lock it re-reads the session
+ * (another document may have renewed it while this one waited), tells the page
+ * a grant is in flight, and stores what comes back before the page may tear
+ * the frame down.
  *
- * Returns the freshest session (renewed or not), or undefined when the
- * chain is dead and the session has been removed.
+ * Without `scope` it renews the session: the new access token replaces the
+ * stored one. With `scope` it mints a token for another audience: only the
+ * rotated refresh token is stored, since the minted access token is bound to
+ * that audience. `due`, when given, skips the grant for a session that does
+ * not need it. A dead chain is removed, and the page told when `notify` is set.
+ */
+async function refreshGrant(
+    chain: Chain,
+    opts: { parentOrigin: string; notify: boolean; scope?: string; due?: (s: AuthSession) => boolean },
+): Promise<GrantResult> {
+    const clientId = chain.clientId;
+    if (!clientId) return { kind: 'none' };
+    return withRefreshLock(chain.rpId, clientId, async (): Promise<GrantResult> => {
+        const session = sessions.getFor(chain.rpId, clientId);
+        if (!session?.refreshToken || !session.clientId) return { kind: 'none' };
+        if (opts.due && !opts.due(session)) return { kind: 'current', session };
+        const usedRefreshToken = session.refreshToken;
+
+        // The identity provider deletes the old refresh token before it issues
+        // the new one, so a frame removed between the request and the stored
+        // response kills the chain. The page defers teardown while this is set.
+        const signal = (phase: 'start' | 'end') => {
+            if (!opts.parentOrigin) return;
+            try {
+                window.parent.postMessage({ type: 'privasys:renewal', rpId: session.rpId, phase }, opts.parentOrigin);
+            } catch { /* parent gone */ }
+        };
+        signal('start');
+        let resp: Response;
+        try {
+            resp = await fetch(`${globalThis.location.origin}/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    grant_type: 'refresh_token',
+                    refresh_token: usedRefreshToken,
+                    client_id: session.clientId,
+                    ...(opts.scope ? { scope: opts.scope } : {}),
+                }),
+            });
+        } catch (err) {
+            signal('end');
+            return { kind: 'failed', session, error: err instanceof Error ? err.message : 'network error' };
+        }
+        const body = await resp.json().catch(() => null) as Record<string, unknown> | null;
+        if (resp.ok && typeof body?.access_token === 'string' && typeof body.refresh_token === 'string' && body.refresh_token) {
+            const updated: AuthSession = opts.scope
+                ? { ...session, refreshToken: body.refresh_token }
+                : { ...session, token: body.access_token, refreshToken: body.refresh_token, authenticatedAt: Date.now() };
+            sessions.store(updated);
+            signal('end');
+            const expiresIn = typeof body.expires_in === 'number' ? body.expires_in : 0;
+            return { kind: 'granted', session: updated, accessToken: body.access_token, expiresIn };
+        }
+        signal('end');
+
+        const errCode = typeof body?.error === 'string' ? body.error : '';
+        if (resp.status === 400 && errCode === 'invalid_grant') {
+            const stored = sessions.getFor(chain.rpId, clientId);
+            if (stored?.refreshToken && stored.refreshToken !== usedRefreshToken) {
+                return { kind: 'adopted', session: stored };
+            }
+            console.warn('[frame-host] refresh-token chain dead, expiring session:', body);
+            cancelRenewal(chain);
+            sessions.removeFor(chain.rpId, clientId);
+            if (opts.notify && opts.parentOrigin) {
+                window.parent.postMessage({ type: 'privasys:session-expired', rpId: session.rpId }, opts.parentOrigin);
+            }
+            return { kind: 'dead' };
+        }
+        const error = typeof body?.error_description === 'string' ? body.error_description
+            : errCode || `refresh failed: ${resp.status}`;
+        return { kind: 'failed', session, error };
+    });
+}
+
+/**
+ * Renew a chain's session and keep its renewal going: re-arm the timer from
+ * the fresh token, retry a failure with backoff, and tell the page about the
+ * new token when `notify` is set (a check-session that renews inline answers
+ * with the session itself instead).
+ *
+ * Returns the freshest session (renewed or not), or undefined when the chain
+ * is dead and the session has been removed.
+ */
+async function renewChain(
+    chain: Chain,
+    parentOrigin: string,
+    notify: boolean,
+    due?: (s: AuthSession) => boolean,
+): Promise<AuthSession | undefined> {
+    const r = await refreshGrant(chain, { parentOrigin, notify, due });
+    switch (r.kind) {
+        case 'none':
+            return sessions.getFor(chain.rpId, chain.clientId);
+        case 'dead':
+            return undefined;
+        case 'failed':
+            console.warn('[frame-host] renewal failed, will retry:', r.error);
+            scheduleRenewalRetry(chain, parentOrigin);
+            return r.session;
+        default:
+            if (r.kind === 'granted' && notify) {
+                window.parent.postMessage(
+                    { type: 'privasys:session-renewed', rpId: r.session.rpId, accessToken: r.session.token },
+                    parentOrigin,
+                );
+            }
+            renewalRetryCount.delete(chainKey(chain));
+            scheduleRenewal(r.session, parentOrigin);
+            return r.session;
+    }
+}
+
+/**
+ * Renew the session if (and only if) its token is inside the renewal margin.
+ * A renewal another document just completed makes this a no-op that re-arms
+ * the timer from the fresh expiry.
  */
 async function renewIfNeeded(
     chain: Chain,
     parentOrigin: string,
     notify = true,
 ): Promise<AuthSession | undefined> {
-    const key = chainKey(chain);
     const current = sessions.getFor(chain.rpId, chain.clientId);
-    if (!current?.refreshToken || !current?.clientId) return current;
+    if (!current?.refreshToken || !current.clientId) return current;
     if (!needsRenewal(current.token)) {
-        // Not due yet (timer fired early relative to a token another
-        // document already rotated) — just re-arm from the fresh exp.
-        if (!renewalTimers.has(key)) scheduleRenewal(current, parentOrigin);
+        if (!renewalTimers.has(chainKey(chain))) scheduleRenewal(current, parentOrigin);
         return current;
     }
-
-    return withRefreshLock(chain.rpId, current.clientId, async () => {
-        // Re-read under the lock: another document may have renewed
-        // while we waited.
-        const fresh = sessions.getFor(chain.rpId, current.clientId!);
-        if (!fresh?.refreshToken || !fresh?.clientId) return fresh;
-        if (!needsRenewal(fresh.token)) {
-            renewalRetryCount.delete(key);
-            scheduleRenewal(fresh, parentOrigin);
-            return fresh;
-        }
-        return renewSessionLocked(fresh, parentOrigin, notify);
-    });
+    return renewChain(chain, parentOrigin, notify, (s) => needsRenewal(s.token));
 }
+
 // Renewals a page asked for now, per chain: calls made while one waits or
 // runs share it, and a chain renews this way at most once per
 // RENEW_NOW_MIN_MS.
@@ -942,9 +1059,8 @@ const lastRenewNow = new Map<string, number>();
 /**
  * Renew the session now, whatever its token's expiry: what the person may do
  * has changed (a role was granted, an account switched), and a renewal reads
- * it afresh. Same lock, same re-read and same notification as a due renewal.
- * Within RENEW_NOW_MIN_MS of the last one, the renewal runs when that time
- * is up, so a page asking in a loop makes one grant per interval.
+ * it afresh. Within RENEW_NOW_MIN_MS of the last one, the renewal runs when
+ * that time is up, so a page asking in a loop makes one grant per interval.
  *
  * Resolves with the renewed session, the unchanged one when the renewal
  * could not run (it is retried as usual), or undefined when the chain is dead.
@@ -953,142 +1069,15 @@ function renewNow(chain: Chain, parentOrigin: string): Promise<AuthSession | und
     const key = chainKey(chain);
     const pending = renewalsNow.get(key);
     if (pending) return pending;
-    const clientId = chain.clientId;
-    if (!clientId) return Promise.resolve(sessions.getFor(chain.rpId, clientId));
     const wait = Math.max(0, (lastRenewNow.get(key) ?? 0) + RENEW_NOW_MIN_MS - Date.now());
     const run = new Promise<void>((r) => setTimeout(r, wait))
         .then(() => {
             lastRenewNow.set(key, Date.now());
-            return withRefreshLock(chain.rpId, clientId, async () => {
-                const fresh = sessions.getFor(chain.rpId, clientId);
-                if (!fresh?.refreshToken || !fresh?.clientId) return fresh;
-                return renewSessionLocked(fresh, parentOrigin, true);
-            });
+            return renewChain(chain, parentOrigin, true);
         })
         .finally(() => renewalsNow.delete(key));
     renewalsNow.set(key, run);
     return run;
-}
-
-/**
- * Run one refresh_token grant. Must be called with the refresh lock
- * held. Failure handling is deliberately non-destructive:
- *  - invalid_grant with a newer token in storage → adopt it (a
- *    non-locking client rotated underneath us during rollout);
- *  - invalid_grant with no newer token → the chain is dead (revoked
- *    sid, expired refresh token) → remove + session-expired;
- *  - anything else (network, 5xx) → keep the session, retry with
- *    backoff.
- */
-async function renewSessionLocked(
-    session: AuthSession,
-    parentOrigin: string,
-    notify: boolean,
-): Promise<AuthSession | undefined> {
-    const idpBase = globalThis.location.origin;
-    const usedRefreshToken = session.refreshToken!;
-
-    // Tell the parent a grant is in flight: the IdP deletes the old refresh
-    // token before issuing the new one, so an iframe removed between the
-    // request and the stored response kills the chain for every app in
-    // this browser. The frame client defers teardown while this is set.
-    const signalRenewal = (phase: 'start' | 'end') => {
-        if (!parentOrigin) return;
-        try {
-            window.parent.postMessage({ type: 'privasys:renewal', rpId: session.rpId, phase }, parentOrigin);
-        } catch { /* parent gone */ }
-    };
-    signalRenewal('start');
-    let resp: Response;
-    try {
-        resp = await fetch(`${idpBase}/token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                grant_type: 'refresh_token',
-                refresh_token: usedRefreshToken,
-                client_id: session.clientId!,
-            }),
-        });
-    } catch (err) {
-        signalRenewal('end');
-        console.warn('[frame-host] renewal fetch failed, will retry:', err);
-        scheduleRenewalRetry(chainOf(session), parentOrigin);
-        return session;
-    }
-    // The rotated token is persisted synchronously below; nothing after
-    // this point can lose it, so the parent may tear us down again.
-    const tokensBody = resp.ok ? await resp.json().catch(() => null) : null;
-    if (resp.ok && tokensBody) {
-        sessions.store({
-            ...session,
-            token: tokensBody.access_token,
-            refreshToken: tokensBody.refresh_token,
-            authenticatedAt: Date.now(),
-        });
-    }
-    signalRenewal('end');
-
-    if (resp.ok && tokensBody) {
-        const tokens = tokensBody;
-        const updated: AuthSession = {
-            ...session,
-            token: tokens.access_token,
-            refreshToken: tokens.refresh_token,
-            authenticatedAt: Date.now(),
-        };
-        renewalRetryCount.delete(chainKey(chainOf(session)));
-        scheduleRenewal(updated, parentOrigin);
-
-        // Notify parent — skipped during check-session inline renewal to
-        // avoid a double-message race (session-renewed before session
-        // response).
-        if (notify) {
-            window.parent.postMessage(
-                {
-                    type: 'privasys:session-renewed',
-                    rpId: session.rpId,
-                    accessToken: tokens.access_token,
-                },
-                parentOrigin,
-            );
-        }
-        return updated;
-    }
-
-    const body = await resp.json().catch(() => ({ error: resp.statusText }));
-    const errCode = typeof body.error === 'string' ? body.error : '';
-
-    if (resp.status === 400 && errCode === 'invalid_grant') {
-        // The token we used is gone server-side. If storage now holds a
-        // different refresh token, another (non-locking) party rotated
-        // it — adopt theirs rather than killing the session.
-        const chain = chainOf(session);
-        const stored = sessions.getFor(chain.rpId, chain.clientId);
-        if (stored?.refreshToken && stored.refreshToken !== usedRefreshToken) {
-            renewalRetryCount.delete(chainKey(chain));
-            scheduleRenewal(stored, parentOrigin);
-            return stored;
-        }
-        console.warn('[frame-host] refresh-token chain dead, expiring session:', body);
-        cancelRenewal(chain);
-        sessions.removeFor(chain.rpId, chain.clientId);
-        // During check-session inline renewal (notify=false) the caller
-        // reports the dead session as `session: null` itself; posting
-        // session-expired too would race the parent's response handler.
-        if (notify) {
-            window.parent.postMessage(
-                { type: 'privasys:session-expired', rpId: session.rpId },
-                parentOrigin,
-            );
-        }
-        return undefined;
-    }
-
-    // 5xx / unexpected 4xx: transient until proven otherwise.
-    console.warn(`[frame-host] renewal failed (${resp.status}), will retry:`, body);
-    scheduleRenewalRetry(chainOf(session), parentOrigin);
-    return session;
 }
 
 // Cross-document propagation: when another iframe/tab renews a session
@@ -2339,12 +2328,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
         );
     }
 
-    // Mint a per-audience access token without rotating the user's primary
-    // session. Used by chat to call as.privasys.org/verify-quote with an
-    // `aud=attestation-server` JWT. Implementation: refresh_token grant
-    // with an explicit `scope` form param (RFC 6749 §6 + audience extension).
-    // The new refresh token returned by the IdP keeps the original scope,
-    // so subsequent renewals continue to mint platform-audience tokens.
+    // Mint an access token for another audience without replacing the
+    // session's own: a refresh_token grant with an explicit `scope` (RFC 6749
+    // section 6, plus the audience extension), under the session's own
+    // granted scopes, since the identity provider refuses a broader one. The
+    // rotated refresh token keeps the original scope, so later renewals still
+    // mint the session's audience.
     if (data.type === 'privasys:get-token-for-audience') {
         const id = data.id;
         const reply = (payload: Record<string, unknown>) =>
@@ -2375,49 +2364,22 @@ window.addEventListener('message', async (e: MessageEvent) => {
             reply({ accessToken: session.token, expiresIn: exp === null ? 0 : Math.floor((exp - Date.now()) / 1000) });
             return;
         }
-        try {
-            // Audience minting consumes (and rotates) the same single-use
-            // refresh token as silent renewal, so it runs under the same
-            // cross-document lock, re-reading the freshest token inside.
-            const tok = await withRefreshLock(data.rpId, session.clientId, async () => {
-                const fresh = sessions.get(data.rpId);
-                if (!fresh?.refreshToken || !fresh?.clientId) {
-                    throw new Error('no refresh token in session');
-                }
-                const idpBase = globalThis.location.origin;
-                const resp = await fetch(`${idpBase}/token`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        grant_type: 'refresh_token',
-                        refresh_token: fresh.refreshToken,
-                        client_id: fresh.clientId,
-                        // Mint under the SESSION'S OWN granted scopes: the IdP
-                        // refuses a refresh grant broader than the original, so
-                        // a fixed scope list here forces every relying app to
-                        // over-request (a session without `email` could never
-                        // mint). Audience consumers authorise on the audience
-                        // claim; identity claims ride along only when the
-                        // session granted them. Sessions stored by an older
-                        // frame host carry no scope — keep the historical list
-                        // for those so existing sessions keep minting.
-                        scope: `audience:${audience} ${fresh.scope || 'openid email profile offline_access'}`,
-                    }),
-                });
-                if (!resp.ok) {
-                    const body = await resp.json().catch(() => ({ error: resp.statusText }));
-                    throw new Error(body.error_description || body.error || `mint failed: ${resp.status}`);
-                }
-                const minted = await resp.json();
-                // The IdP rotated the refresh token. Persist the new one so
-                // the next user-scope refresh uses a valid handle, but DO
-                // NOT touch the access token — that one is audience-bound.
-                sessions.store({ ...fresh, refreshToken: minted.refresh_token });
-                return minted;
-            });
-            reply({ accessToken: tok.access_token, expiresIn: tok.expires_in });
-        } catch (err) {
-            reply({ error: (err as Error).message });
+        const scope = `audience:${audience} ${session.scope || 'openid email profile offline_access'}`;
+        const chain = chainOf(session);
+        let r = await refreshGrant(chain, { parentOrigin: e.origin, notify: false, scope });
+        // Another document rotated the token while this grant was in flight:
+        // mint again from the one it stored.
+        if (r.kind === 'adopted') r = await refreshGrant(chain, { parentOrigin: e.origin, notify: false, scope });
+        if (r.kind === 'granted') {
+            reply({ accessToken: r.accessToken, expiresIn: r.expiresIn });
+        } else if (r.kind === 'dead') {
+            // Answered first: the page drops this frame on session-expired.
+            reply({ error: 'session expired' });
+            window.parent.postMessage({ type: 'privasys:session-expired', rpId: session.rpId }, e.origin);
+        } else if (r.kind === 'failed') {
+            reply({ error: r.error });
+        } else {
+            reply({ error: 'no refresh token in session' });
         }
     }
 

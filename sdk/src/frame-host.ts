@@ -695,12 +695,11 @@ let pagePlatform: PlatformScope | null = null;
  * The stored session this page may use, or undefined. A session belongs to a
  * client, and only that client's own pages are given it: every page under one
  * registrable domain shares this frame's storage, so without this a page
- * could take another app's session by naming its rpId. A session with no
- * client (an opaque token from before OIDC) has no list to check.
+ * could take another app's session by naming its rpId.
  */
 async function sessionForPage(rpId: string, pageOrigin: string): Promise<AuthSession | undefined> {
     const session = sessions.get(rpId);
-    if (!session?.clientId) return session;
+    if (!session?.clientId) return undefined;
     return (await pageIsClients(session.clientId, pageOrigin)) ? session : undefined;
 }
 
@@ -1269,6 +1268,8 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
     if (data.type === 'privasys:init') {
         const config: AuthUIConfig & {
+            /** The page's API origin, recorded on the session. */
+            apiBase?: string;
             clientId?: string;
             scope?: string | string[];
             sessionRelay?: { appHost: string; extraAppHosts?: string[] };
@@ -1364,6 +1365,12 @@ window.addEventListener('message', async (e: MessageEvent) => {
             delete config.attributes;
             delete config.audience;
         }
+        // Every sign-in is for a client; only an operation approval, which
+        // signs nobody in, has none.
+        if (config.operationApproval === undefined && (typeof config.clientId !== 'string' || !config.clientId)) {
+            window.parent.postMessage({ type: 'privasys:error', error: 'clientId is required' }, parentOrigin);
+            return;
+        }
         // A page gets its own platform's tokens and never another platform's.
         // Without the platform list there is no telling which is which, so
         // there is no sign-in.
@@ -1446,7 +1453,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 return;
             }
             const operationUI = new AuthUI({
-                apiBase: globalThis.location.origin,
                 onContentHeight,
                 appName: config.appName,
                 rpId: config.rpId || config.appName,
@@ -1509,7 +1515,6 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     .replace(/[-_]/g, ' ')
                     .replace(/\b\w/g, (c) => c.toUpperCase());
                 const approveUI = new AuthUI({
-                    apiBase: globalThis.location.origin,
                     onContentHeight,
                     appName: config.appName,
                     rpId,
@@ -1613,656 +1618,588 @@ window.addEventListener('message', async (e: MessageEvent) => {
 
         // IdP base URL (same origin as this iframe).
         const idpBase = globalThis.location.origin;
-        const clientId = config.clientId;
+        const clientId = config.clientId!;
 
-        // OIDC PKCE mode: create an OIDC session, authenticate, exchange for JWT.
-        if (clientId) {
-            try {
-                // 1. Generate PKCE code_verifier + code_challenge.
-                const { codeVerifier, codeChallenge } = await generatePKCE();
+        // Create an OIDC session, authenticate, exchange the code for tokens.
+        try {
+            // 1. Generate PKCE code_verifier + code_challenge.
+            const { codeVerifier, codeChallenge } = await generatePKCE();
 
-                // 2. Create OIDC session via JSON authorize.
-                const authorizeUrl = new URL('/authorize', idpBase);
-                authorizeUrl.searchParams.set('client_id', clientId);
-                authorizeUrl.searchParams.set('response_type', 'code');
-                authorizeUrl.searchParams.set('code_challenge', codeChallenge);
-                authorizeUrl.searchParams.set('code_challenge_method', 'S256');
-                const scopeStr = Array.isArray(config.scope) ? config.scope.join(' ') : (config.scope || 'openid offline_access');
-                // The first token is the only one the identity provider can
-                // put the person's profile in (it keeps none to renew from),
-                // so a page that needs an audience token asks for it here
-                // rather than minting one by refresh after the sign-in.
-                const audience = sanitiseAudience(config.audience);
-                authorizeUrl.searchParams.set('scope', audience ? `audience:${audience} ${scopeStr}` : scopeStr);
-                authorizeUrl.searchParams.set('response_mode', 'json');
-                // The page this frame is in, as the browser reported it: the
-                // result of this sign-in goes to that page, so the identity
-                // provider checks the client registered it.
-                authorizeUrl.searchParams.set('parent_origin', parentOrigin);
-                if (linkNonce) authorizeUrl.searchParams.set('nonce', linkNonce);
-                // A billing grant redirects the cost of any paid attribute
-                // disclosure from this app's owner to the user who issued the
-                // grant, so the person requiring the proof pays for it (a
-                // Drive sharer, for instance). Opaque here: the control plane
-                // owns its scope, ceiling and single use.
-                if (config.billingGrant) {
-                    authorizeUrl.searchParams.set('billing_grant', config.billingGrant);
-                }
-                // Attributes named one by one, alongside the scope. A scope is a
-                // coarse bundle and cannot reach a government-backed `_id` key at
-                // all, so for those this is the request.
-                if (config.attributes?.length) {
-                    authorizeUrl.searchParams.set('attributes', config.attributes.join(' '));
-                }
-                // An existing session identifies the holder without a scan, so
-                // the IdP can push the DELTA of a widened request to their
-                // wallet for one-tap approval instead of forcing a full QR
-                // ceremony. The hint only says who to push to — it authorises
-                // nothing; everything the holder grants still flows through
-                // the wallet's own verification. Withheld for session-relay
-                // apps: their sealed binding needs the full wallet ceremony,
-                // so a push approval would ring the holder's phone for a flow
-                // the browser cannot use.
-                const priorSession = sessions.get(config.rpId || config.appName);
-                const stepUpEligible = !linkNonce && !device && !!(priorSession?.token
-                    && priorSession.clientId === clientId
-                    && !isTokenExpired(priorSession.token)
-                    && !config.sessionRelay?.appHost);
-                if (stepUpEligible) {
-                    authorizeUrl.searchParams.set('session_hint', priorSession!.token);
-                }
-                const authorize = async () => {
-                    const authResp = await fetch(authorizeUrl.toString(), {
-                        headers: { Accept: 'application/json' },
-                    });
-                    if (!authResp.ok) {
-                        const body = await authResp.json().catch(() => ({ error: authResp.statusText }));
-                        const err = new Error(body.error_description || body.error || `Authorize failed: ${authResp.status}`);
-                        // Preserve the OAuth error code (e.g. `insufficient_credits`
-                        // on 402) so the parent can raise a typed error.
-                        (err as Error & { code?: string }).code = body.error;
-                        throw err;
-                    }
-                    return authResp.json();
-                };
-                // A device request already has its session at the identity
-                // provider: the ceremony runs on that one, and no new request
-                // is made.
-                const authData = device
-                    ? {
-                        session_id: device.sessionId,
-                        poll_url: `${idpBase}/session/status?session_id=${encodeURIComponent(device.sessionId)}`,
-                        qr_payload: device.qrPayload,
-                        requested_attributes: device.requestedAttributes,
-                    }
-                    : await authorize();
-                // The IdP keeps from the wallet any attribute the client's
-                // registration does not allow. Signing in anyway would hand
-                // the page a token without what it asked for, and the holder
-                // an approval that showed less than the page expects, so the
-                // sign-in fails and names the keys.
-                const dropped: unknown = authData.dropped_attributes;
-                if (Array.isArray(dropped) && dropped.length > 0) {
-                    const err = new Error(
-                        `This app may not ask for ${dropped.join(', ')}: its registration does not allow ${dropped.length === 1 ? 'it' : 'them'}`,
-                    );
-                    (err as Error & { code?: string; dropped?: string[] }).code = 'attributes_not_allowed';
-                    (err as Error & { code?: string; dropped?: string[] }).dropped = dropped.map(String);
+            // 2. Create OIDC session via JSON authorize.
+            const authorizeUrl = new URL('/authorize', idpBase);
+            authorizeUrl.searchParams.set('client_id', clientId);
+            authorizeUrl.searchParams.set('response_type', 'code');
+            authorizeUrl.searchParams.set('code_challenge', codeChallenge);
+            authorizeUrl.searchParams.set('code_challenge_method', 'S256');
+            const scopeStr = Array.isArray(config.scope) ? config.scope.join(' ') : (config.scope || 'openid offline_access');
+            // The first token is the only one the identity provider can
+            // put the person's profile in (it keeps none to renew from),
+            // so a page that needs an audience token asks for it here
+            // rather than minting one by refresh after the sign-in.
+            const audience = sanitiseAudience(config.audience);
+            authorizeUrl.searchParams.set('scope', audience ? `audience:${audience} ${scopeStr}` : scopeStr);
+            authorizeUrl.searchParams.set('response_mode', 'json');
+            // The page this frame is in, as the browser reported it: the
+            // result of this sign-in goes to that page, so the identity
+            // provider checks the client registered it.
+            authorizeUrl.searchParams.set('parent_origin', parentOrigin);
+            if (linkNonce) authorizeUrl.searchParams.set('nonce', linkNonce);
+            // A billing grant redirects the cost of any paid attribute
+            // disclosure from this app's owner to the user who issued the
+            // grant, so the person requiring the proof pays for it (a
+            // Drive sharer, for instance). Opaque here: the control plane
+            // owns its scope, ceiling and single use.
+            if (config.billingGrant) {
+                authorizeUrl.searchParams.set('billing_grant', config.billingGrant);
+            }
+            // Attributes named one by one, alongside the scope. A scope is a
+            // coarse bundle and cannot reach a government-backed `_id` key at
+            // all, so for those this is the request.
+            if (config.attributes?.length) {
+                authorizeUrl.searchParams.set('attributes', config.attributes.join(' '));
+            }
+            // An existing session identifies the holder without a scan, so
+            // the IdP can push the DELTA of a widened request to their
+            // wallet for one-tap approval instead of forcing a full QR
+            // ceremony. The hint only says who to push to — it authorises
+            // nothing; everything the holder grants still flows through
+            // the wallet's own verification. Withheld for session-relay
+            // apps: their sealed binding needs the full wallet ceremony,
+            // so a push approval would ring the holder's phone for a flow
+            // the browser cannot use.
+            const priorSession = sessions.get(config.rpId || config.appName);
+            const stepUpEligible = !linkNonce && !device && !!(priorSession?.token
+                && priorSession.clientId === clientId
+                && !isTokenExpired(priorSession.token)
+                && !config.sessionRelay?.appHost);
+            if (stepUpEligible) {
+                authorizeUrl.searchParams.set('session_hint', priorSession!.token);
+            }
+            const authorize = async () => {
+                const authResp = await fetch(authorizeUrl.toString(), {
+                    headers: { Accept: 'application/json' },
+                });
+                if (!authResp.ok) {
+                    const body = await authResp.json().catch(() => ({ error: authResp.statusText }));
+                    const err = new Error(body.error_description || body.error || `Authorize failed: ${authResp.status}`);
+                    // Preserve the OAuth error code (e.g. `insufficient_credits`
+                    // on 402) so the parent can raise a typed error.
+                    (err as Error & { code?: string }).code = body.error;
                     throw err;
                 }
-                const oidcSessionId: string = authData.session_id;
-                const pollUrl: string = authData.poll_url;
-                const requestedAttributes: string[] | undefined = authData.requested_attributes;
-
-                // The authorize response embeds the full wallet payload —
-                // including per-attribute assurance requirements and any
-                // paid-disclosure vouchers minted for gov attributes — in
-                // the universal-link's `p=` parameter. Decode it and thread
-                // those fields into the AuthUI so the relay descriptor / push
-                // carries them; without them the wallet treats every attr as
-                // 'any' assurance and gov disclosure never happens on the
-                // iframe path.
-                let attributeRequirements: AuthUIConfig['attributeRequirements'];
-                let disclosureVouchers: AuthUIConfig['disclosureVouchers'];
-                try {
-                    const p = new URL(authData.qr_payload).searchParams.get('p');
-                    if (p) {
-                        const b64 = p.replace(/-/g, '+').replace(/_/g, '/');
-                        const pad = b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64;
-                        const decoded = JSON.parse(atob(pad));
-                        attributeRequirements = decoded.attributeRequirements;
-                        disclosureVouchers = decoded.disclosureVouchers;
-                    }
-                } catch { /* older IdP or plain profile flow — nothing to thread */ }
-
-                // Step-up push: the IdP resolved the session hint, found this
-                // request WIDER than what that session's holder last granted,
-                // and pushed the delta to their wallet. Render the one-tap
-                // approve gate and poll for completion. "Sign in another way"
-                // or an unanswered push falls back to the full ceremony below
-                // on the SAME authorize session — the unused push approval is
-                // single-use, session-bound, and dies with the session.
-                let code: string | null = null;
-                let uiResult: SignInResult | null = null;
-                const deviceTrusted = !!sessions.getDeviceHint();
-                const stepUp = (stepUpEligible ? authData.step_up : null) as
-                    { pushed?: boolean; added?: string[] } | null | undefined;
-                if (stepUp?.pushed) {
-                    const rpIdHint = config.rpId || config.appName;
-                    const appLabel = (config.appName || rpIdHint)
-                        .replace(/[-_]/g, ' ')
-                        .replace(/\b\w/g, (c) => c.toUpperCase());
-                    const approveUI = new AuthUI({
-                        apiBase: idpBase,
-                        onContentHeight,
-                        appName: config.appName,
-                        rpId: rpIdHint,
-                        presentation,
-                        app,
-                        pitch,
-                        theme,
-                        legal,
-                        headless,
-                        onGateState,
-                        approveFlow: {
-                            appLabel,
-                            reason: 'attributes-widened',
-                            added: Array.isArray(stepUp.added) ? stepUp.added.map(String) : [],
-                            run: async () => {
-                                try {
-                                    code = await pollSessionStatus(pollUrl, STEP_UP_APPROVAL_WINDOW_MS);
-                                } catch {
-                                    // Push not acted on in time (notifications
-                                    // off, phone out of reach) — fall back to
-                                    // the ceremony while the authorize session
-                                    // still has most of its window left.
-                                    throw new Error('approve-fallback');
-                                }
-                            },
-                        },
-                    });
-                    activeUI = approveUI;
-                    try {
-                        await approveUI.signIn();
-                    } catch (err) {
-                        const msg = err instanceof Error ? err.message : '';
-                        if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
-                            window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
-                            return;
-                        }
-                        code = null; // 'approve-fallback' → full ceremony below
-                    } finally {
-                        if (activeUI === approveUI) activeUI = null;
-                    }
+                return authResp.json();
+            };
+            // A device request already has its session at the identity
+            // provider: the ceremony runs on that one, and no new request
+            // is made.
+            const authData = device
+                ? {
+                    session_id: device.sessionId,
+                    poll_url: `${idpBase}/session/status?session_id=${encodeURIComponent(device.sessionId)}`,
+                    qr_payload: device.qrPayload,
+                    requested_attributes: device.requestedAttributes,
                 }
+                : await authorize();
+            // The IdP keeps from the wallet any attribute the client's
+            // registration does not allow. Signing in anyway would hand
+            // the page a token without what it asked for, and the holder
+            // an approval that showed less than the page expects, so the
+            // sign-in fails and names the keys.
+            const dropped: unknown = authData.dropped_attributes;
+            if (Array.isArray(dropped) && dropped.length > 0) {
+                const err = new Error(
+                    `This app may not ask for ${dropped.join(', ')}: its registration does not allow ${dropped.length === 1 ? 'it' : 'them'}`,
+                );
+                (err as Error & { code?: string; dropped?: string[] }).code = 'attributes_not_allowed';
+                (err as Error & { code?: string; dropped?: string[] }).dropped = dropped.map(String);
+                throw err;
+            }
+            const oidcSessionId: string = authData.session_id;
+            const pollUrl: string = authData.poll_url;
+            const requestedAttributes: string[] | undefined = authData.requested_attributes;
 
-                if (code === null) {
-                // Attribute-capability filtering (only when the adopter did
-                // not choose methods explicitly): hide methods that cannot
-                // deliver what the app marked as ESSENTIAL.
-                //   - Passkey provides no attributes at all — hidden when
-                //     anything is essential (e.g. a share link requiring a
-                //     verified email).
-                //   - Social can deliver provider-verified standard
-                //     attributes (email, name) but not gov-assurance
-                //     disclosures — hidden only when an essential attribute
-                //     needs 'gov' (wallet-only by design).
-                //   - The wallet delivers everything.
-                // With no essential attributes every method stays, including
-                // the passkey-then-verify-profile flow further below.
-                let effectiveMethods = methods;
-                if (!effectiveMethods && attributeRequirements) {
-                    const essential = Object.values(attributeRequirements)
-                        .filter((r) => r?.essential);
-                    if (essential.some((r) => r.assurance === 'gov')) {
-                        effectiveMethods = ['wallet'];
-                    } else if (essential.length > 0) {
-                        effectiveMethods = ['wallet', 'social'];
-                    }
+            // The authorize response embeds the full wallet payload —
+            // including per-attribute assurance requirements and any
+            // paid-disclosure vouchers minted for gov attributes — in
+            // the universal-link's `p=` parameter. Decode it and thread
+            // those fields into the AuthUI so the relay descriptor / push
+            // carries them; without them the wallet treats every attr as
+            // 'any' assurance and gov disclosure never happens on the
+            // iframe path.
+            let attributeRequirements: AuthUIConfig['attributeRequirements'];
+            let disclosureVouchers: AuthUIConfig['disclosureVouchers'];
+            try {
+                const p = new URL(authData.qr_payload).searchParams.get('p');
+                if (p) {
+                    const b64 = p.replace(/-/g, '+').replace(/_/g, '/');
+                    const pad = b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64;
+                    const decoded = JSON.parse(atob(pad));
+                    attributeRequirements = decoded.attributeRequirements;
+                    disclosureVouchers = decoded.disclosureVouchers;
                 }
+            } catch { /* older IdP or plain profile flow — nothing to thread */ }
 
-                // 3. Fetch available social providers (skipped entirely when
-                //    the effective methods exclude social sign-in).
-                let socialProviders: string[] = [];
-                let socialDisplayNames: Record<string, string> | undefined;
-                let socialIcons: Record<string, string> | undefined;
-                let socialOwn: OwnRegistration[] | undefined;
-                if (!effectiveMethods || effectiveMethods.includes('social')) {
-                    try {
-                        // Named for the client, the identity provider lists only
-                        // the providers that client's users may sign in with.
-                        const provQuery = config.clientId ? `?client_id=${encodeURIComponent(config.clientId)}` : '';
-                        const provResp = await fetch(`${idpBase}/auth/social/providers${provQuery}`);
-                        if (provResp.ok) {
-                            const provData = await provResp.json();
-                            const published: string[] = provData.providers ?? [];
-                            // A preference that matches nothing yields the published
-                            // list (selectProviders): a gate with no button at all
-                            // would strand the user. Say so, since this console is
-                            // the frame's, not the adopter's.
-                            socialProviders = selectProviders(published, providers);
-                            socialDisplayNames = sanitiseDisplayNames(provData.display_names);
-                            socialIcons = sanitiseIcons(provData.icons);
-                            socialOwn = sanitiseOwn(provData.own);
-                            if (providers && !providers.some((p) => published.includes(p))) {
-                                console.warn(
-                                    '[privasys] none of the requested providers',
-                                    providers, 'is configured at the identity provider; offering', published,
-                                );
-                            }
-                        }
-                    } catch { /* social not available, that's fine */ }
-                }
-
-                // 4. Launch AuthUI with the OIDC session_id so QR/passkey link
-                //    to the OIDC session. Use the iframe origin as apiBase for
-                //    FIDO2 passkey calls (they go to the IdP, not the mgmt service).
-                const pushToken = sessions.findPushToken();
-
-                // Social auth handler: opens a popup to the IdP's social redirect,
-                // then waits for the callback page to postMessage back.
-                const openSocialPopup = (provider: string, own?: boolean, chooseAccount?: boolean): Promise<void> => {
-                    return new Promise<void>((resolve, reject) => {
-                        const w = 500, h = 650;
-                        const left = window.screenX + (window.innerWidth - w) / 2;
-                        const top = window.screenY + (window.innerHeight - h) / 2;
-                        // registration=own: the client's own registration, pressed as a button of its own.
-                        const popupUrl = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}${chooseAccount ? '&account=choose' : ''}`;
-                        const popup = window.open(popupUrl, 'privasys-social', `width=${w},height=${h},left=${left},top=${top}`);
-
-                        if (!popup) {
-                            reject(new Error('Popup blocked — please allow popups for this site'));
-                            return;
-                        }
-
-                        const cleanup = () => {
-                            window.removeEventListener('message', onMessage);
-                            clearInterval(pollClosed);
-                        };
-
-                        const onMessage = (ev: MessageEvent) => {
-                            if (ev.source !== popup) return;
-                            if (ev.data?.type === 'privasys:social-complete') {
-                                cleanup();
-                                popup.close();
-                                resolve();
-                            } else if (ev.data?.type === 'privasys:social-error') {
-                                cleanup();
-                                popup.close();
-                                reject(new Error(ev.data.error || 'Social authentication failed'));
-                            }
-                        };
-
-                        window.addEventListener('message', onMessage);
-
-                        // Detect if user closes the popup manually.
-                        const pollClosed = setInterval(() => {
-                            if (popup.closed) {
-                                cleanup();
-                                reject(new Error('Authentication cancelled'));
-                            }
-                        }, 500);
-                    });
-                };
-                // Headless: a popup needs the click's activation, which the
-                // page has and this frame does not, so the page opens it at
-                // the address this frame names and reports how it ended.
-                const popupViaParent = (provider: string, own?: boolean, chooseAccount?: boolean): Promise<void> => {
-                    return new Promise<void>((resolve, reject) => {
-                        const id = Math.random().toString(36).slice(2);
-                        const url = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}${chooseAccount ? '&account=choose' : ''}`;
-                        const onMessage = (ev: MessageEvent) => {
-                            if (ev.source !== window.parent || ev.origin !== parentOrigin) return;
-                            if (ev.data?.type !== 'privasys:gate:popup-result' || ev.data.id !== id) return;
-                            window.removeEventListener('message', onMessage);
-                            if (ev.data.ok === true) resolve();
-                            else reject(new Error(String(ev.data.error || 'Authentication cancelled')));
-                        };
-                        window.addEventListener('message', onMessage);
-                        window.parent.postMessage({ type: 'privasys:gate:popup', id, url }, parentOrigin);
-                    });
-                };
-                const onSocialAuth = headless ? popupViaParent : openSocialPopup;
-                // The device popup: this frame opens it inside the click; a
-                // headless page opens it for the frame, as it does a social one.
-                const openDevicePopup = (): boolean | Promise<boolean> => {
-                    if (!headless) {
-                        const w = 420, h = 240;
-                        const left = window.screenX + (window.innerWidth - w) / 2;
-                        const top = window.screenY + (window.innerHeight - h) / 2;
-                        return !!window.open(DEVICE_POPUP_URL, 'privasys-device', `width=${w},height=${h},left=${left},top=${top}`);
-                    }
-                    return new Promise<boolean>((resolve) => {
-                        const id = Math.random().toString(36).slice(2);
-                        const onResult = (ev: MessageEvent) => {
-                            if (ev.source !== window.parent || ev.origin !== parentOrigin) return;
-                            if (ev.data?.type !== 'privasys:gate:popup-result' || ev.data.id !== id) return;
-                            window.removeEventListener('message', onResult);
-                            resolve(ev.data.ok === true);
-                        };
-                        window.addEventListener('message', onResult);
-                        window.parent.postMessage({ type: 'privasys:gate:popup', id, url: DEVICE_POPUP_URL }, parentOrigin);
-                    });
-                };
-
-                activeUI = new AuthUI({
-                    ...config,
-                    apiBase: idpBase,
+            // Step-up push: the IdP resolved the session hint, found this
+            // request WIDER than what that session's holder last granted,
+            // and pushed the delta to their wallet. Render the one-tap
+            // approve gate and poll for completion. "Sign in another way"
+            // or an unanswered push falls back to the full ceremony below
+            // on the SAME authorize session — the unused push approval is
+            // single-use, session-bound, and dies with the session.
+            let code: string | null = null;
+            let uiResult: SignInResult | null = null;
+            const deviceTrusted = !!sessions.getDeviceHint();
+            const stepUp = (stepUpEligible ? authData.step_up : null) as
+                { pushed?: boolean; added?: string[] } | null | undefined;
+            if (stepUp?.pushed) {
+                const rpIdHint = config.rpId || config.appName;
+                const appLabel = (config.appName || rpIdHint)
+                    .replace(/[-_]/g, ' ')
+                    .replace(/\b\w/g, (c) => c.toUpperCase());
+                const approveUI = new AuthUI({
                     onContentHeight,
-                    sessionId: oidcSessionId,
-                    fido2Base: `${idpBase}/fido2`,
-                    pushToken,
-                    deviceTrusted,
-                    socialProviders,
-                    socialDisplayNames,
-                    socialIcons,
-                    socialOwn,
-                    onSocialAuth,
-                    devices: sessions.getDevices().map(shown),
-                    lookupDevice: async () => {
-                        const found = await askDevicePopup(openDevicePopup, { op: 'read' });
-                        for (const d of found) deviceLabels.set(d.pushToken, d.label);
-                        return found;
-                    },
-                    forgetDevice: async (token: string) => {
-                        sessions.forgetDevice(token);
-                        await askDevicePopup(openDevicePopup, { op: 'forget', pushToken: token });
-                    },
-                    rememberDevice: async (token: string, label?: string) => {
-                        await askDevicePopup(openDevicePopup, { op: 'store', pushToken: token, brokerUrl: config.brokerUrl || '', ...(label ? { label } : {}) });
-                    },
-                    // A passkey carries no name or email; the gate asks for
-                    // them through a provider when the client wants them.
-                    profileAfterPasskey: !!requestedAttributes?.some(
-                        (a: string) => a === 'email' || a === 'name',
-                    ),
-                    headless,
-                    onGateState,
-                    requestedAttributes,
-                    attributeRequirements,
-                    disclosureVouchers,
-                    sessionRelay: sessionRelayUI,
-                    // Same-device recovery: the AuthUI polls this while a
-                    // wallet flow is pending, so the ceremony completes
-                    // from IdP state when the broker relay died during the
-                    // app switch (page backgrounded → WS gone → the
-                    // wallet's relay message lands in the void).
-                    checkComplete: async () => {
-                        const r = await fetch(pollUrl, { cache: 'no-store' });
-                        if (!r.ok) return false;
-                        const d = await r.json().catch(() => null);
-                        return !!(d && d.authenticated);
-                    },
-                    // Sanitised copies override the raw postMessage values.
+                    appName: config.appName,
+                    rpId: rpIdHint,
                     presentation,
                     app,
                     pitch,
                     theme,
                     legal,
-                    methods: effectiveMethods,
-                    onNavigate,
-                    approveFlow: undefined,
-                });
-
-                if (headless) {
-                    window.parent.postMessage({ type: 'privasys:gate', options: activeUI.gateOptions() }, parentOrigin);
-                }
-                uiResult = await activeUI.signIn();
-
-                // 5. Get the auth code:
-                //    - Passkey: the IdP's FIDO2 handler already marked the session
-                //      complete, so poll for it. If the relying party requested
-                //      profile attributes (email/name), open a social login to
-                //      source them — the social callback patches them onto the
-                //      existing auth code.
-                //    - Wallet (relay): call /session/complete to bridge.
-                //    - Social: the popup callback already marked it complete, so
-                //      call /session/complete to get the code (it's idempotent).
-                if (device) {
-                    // The wallet answered over the relay: hand what it shared
-                    // to the identity provider, which completes the request.
-                    // A wallet that answered the identity provider directly
-                    // has completed it already.
-                    if (!uiResult.completedViaPoll) {
-                        await completeSession(idpBase, oidcSessionId, uiResult.attributes);
-                    }
-                    await waitAuthenticated(pollUrl);
-                    code = '';
-                } else if (uiResult.method === 'passkey') {
-                    // A client that asked for the name or email had the gate
-                    // confirm them with a provider after the passkey
-                    // (profileAfterPasskey); the provider's callback added
-                    // them to this session.
-                    code = await pollSessionStatus(pollUrl);
-                } else if (uiResult.completedViaPoll) {
-                    // Same-device wallet flow: the relay died during the app
-                    // switch, the ceremony completed via the IdP status
-                    // poll. The wallet already linked the FIDO2 assertion
-                    // and patched attributes onto the auth code server-side.
-                    code = await pollSessionStatus(pollUrl);
-                } else {
-                    // Wallet: pass profile from relay. Social: auth code
-                    // already exists with profile (the popup callback created it).
-                    code = await completeSession(
-                        idpBase,
-                        oidcSessionId,
-                        uiResult.attributes,
-                    );
-                }
-                } // end full ceremony (skipped when the step-up push completed)
-
-                // 5. Exchange code for JWT tokens.
-                // A device request is approved now. Its tokens go to the device
-                // that asked, which redeems them itself: this page gets none.
-                if (device) {
-                    if (uiResult?.pushToken && config.brokerUrl && (uiResult.trustDevice || deviceTrusted)) {
-                        sessions.saveDeviceHint(uiResult.pushToken, config.brokerUrl,
-                            uiResult.deviceLabel ?? deviceLabels.get(uiResult.pushToken));
-                    }
-                    window.parent.postMessage(
-                        { type: 'privasys:result', result: { approved: true, sessionToken: '', method: 'wallet', sessionId: oidcSessionId } },
-                        parentOrigin,
-                    );
-                    return;
-                }
-                const tokens = await exchangeCode(idpBase, code, clientId, codeVerifier);
-
-                // A link ends here. The page gets the ID token and nothing
-                // else: no session is kept, so the one the person already
-                // has for this client stands, and the access token of the
-                // linked identity never leaves this frame.
-                if (linkNonce) {
-                    if (!tokens.id_token) throw new Error('The identity provider returned no ID token');
-                    if (uiResult?.pushToken && config.brokerUrl && (uiResult.trustDevice || deviceTrusted)) {
-                        sessions.saveDeviceHint(uiResult.pushToken, config.brokerUrl,
-                            uiResult.deviceLabel ?? deviceLabels.get(uiResult.pushToken));
-                    }
-                    window.parent.postMessage(
-                        { type: 'privasys:result', result: { linked: true, idToken: tokens.id_token, method: 'wallet', sessionId: oidcSessionId } },
-                        parentOrigin,
-                    );
-                    return;
-                }
-
-                // 6. Store session with JWT access_token and refresh_token.
-                // `requestedAttributes`/`scope` record the RAW request this
-                // session was minted for; connect() compares future configs
-                // against them to detect a widened request. A step-up push
-                // completion has no ceremony result, so the wallet push
-                // binding carries over from the prior session.
-                const rpId = config.rpId || config.appName;
-                const session: AuthSession = {
-                    token: tokens.access_token,
-                    rpId,
-                    origin: config.apiBase,
-                    authenticatedAt: Date.now(),
-                    pushToken: uiResult?.pushToken ?? priorSession?.pushToken,
-                    // The marker, or a ceremony that brought the wallet's
-                    // sealed binding, so a wallet user is never taken for
-                    // someone without one.
-                    wallet: tokenSaysWallet(tokens.access_token)
-                        || !!uiResult?.sessionRelay || !!uiResult?.completedViaPoll,
-                    brokerUrl: config.brokerUrl || priorSession?.brokerUrl || '',
-                    refreshToken: tokens.refresh_token,
-                    clientId,
-                    requestedAttributes: [...(config.attributes ?? [])],
-                    scope: scopeStr,
-                };
-                sessions.store(session);
-                if (session.pushToken && session.brokerUrl) {
-                    if (uiResult?.trustDevice || deviceTrusted) {
-                        // A wallet found through the popup keeps the name it has there.
-                        // The wallet's own name for the phone wins: it is current.
-                        sessions.saveDeviceHint(session.pushToken, session.brokerUrl,
-                            uiResult?.deviceLabel ?? deviceLabels.get(session.pushToken));
-                    }
-                }
-                scheduleRenewal(session, parentOrigin);
-
-                // Install the sealed session so the parent's `frame.session()`
-                // RPC works once the auth result lands.
-                //
-                // The session the app gets is established from the wallet's
-                // EncAuth voucher, never from the wallet's own bootstrap: only
-                // a voucher-backed bootstrap carries the caller's identity
-                // (X-Privasys-Sub), and an app that attributes callers answers
-                // an anonymous session 401 right after a successful sign-in.
-                // The wallet uploads the voucher before relaying the result;
-                // the bounded wait covers an older wallet that uploads after,
-                // and the same-device flow, where the tab is backgrounded
-                // during the app switch and the upload lands on the way back.
-                const wantsSealed = !!config.sessionRelay?.appHost
-                    && (!!uiResult?.sessionRelay || !!uiResult?.completedViaPoll);
-                if (wantsSealed && uiResult) {
-                    const appHost = config.sessionRelay!.appHost;
-                    const session = await resumeVoucherSession(
-                        appHost,
-                        rpId,
-                        uiResult.completedViaPoll ? SAME_DEVICE_VOUCHER_WINDOW_MS : CEREMONY_VOUCHER_WINDOW_MS,
-                    );
-                    if (session) {
-                        pendingHandshake = null;
-                        adoptSession(appHost, session, 0, parentOrigin);
-                        uiResult.sessionRelay = { sessionId: session.sessionId, encPub: '', expiresAt: 0 };
-                        window.parent.postMessage({
-                            type: 'privasys:session:ready',
-                            sessionId: session.sessionId,
-                            appHost,
-                            expiresAt: 0,
-                        }, parentOrigin);
-                    } else if (uiResult.sessionRelay) {
-                        // No voucher landed in time. Fall back to the wallet's
-                        // bootstrap so the app still gets a sealed channel,
-                        // anonymous to the app until the voucher lands: the
-                        // session keeps looking for it, and an app's 401
-                        // makes it look at once (PrivasysSession.identify).
-                        console.warn('[frame-host] no EncAuth voucher after the ceremony; installing the anonymous session');
-                        await installSessionRelay(uiResult.sessionRelay, parentOrigin);
-                    }
-                }
-
-                // 7. Send result to parent with the access_token. A step-up
-                // push completion has no ceremony result — synthesise the
-                // wallet-shaped minimum (the parent reads accessToken).
-                const baseResult: SignInResult = uiResult ?? {
-                    sessionToken: tokens.access_token,
-                    method: 'wallet',
-                    sessionId: oidcSessionId,
-                };
-                window.parent.postMessage(
-                    {
-                        type: 'privasys:result',
-                        result: {
-                            ...baseResult,
-                            accessToken: tokens.access_token,
+                    headless,
+                    onGateState,
+                    approveFlow: {
+                        appLabel,
+                        reason: 'attributes-widened',
+                        added: Array.isArray(stepUp.added) ? stepUp.added.map(String) : [],
+                        run: async () => {
+                            try {
+                                code = await pollSessionStatus(pollUrl, STEP_UP_APPROVAL_WINDOW_MS);
+                            } catch {
+                                // Push not acted on in time (notifications
+                                // off, phone out of reach) — fall back to
+                                // the ceremony while the authorize session
+                                // still has most of its window left.
+                                throw new Error('approve-fallback');
+                            }
                         },
                     },
+                });
+                activeUI = approveUI;
+                try {
+                    await approveUI.signIn();
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : '';
+                    if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
+                        window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
+                        return;
+                    }
+                    code = null; // 'approve-fallback' → full ceremony below
+                } finally {
+                    if (activeUI === approveUI) activeUI = null;
+                }
+            }
+
+            if (code === null) {
+            // Attribute-capability filtering (only when the adopter did
+            // not choose methods explicitly): hide methods that cannot
+            // deliver what the app marked as ESSENTIAL.
+            //   - Passkey provides no attributes at all — hidden when
+            //     anything is essential (e.g. a share link requiring a
+            //     verified email).
+            //   - Social can deliver provider-verified standard
+            //     attributes (email, name) but not gov-assurance
+            //     disclosures — hidden only when an essential attribute
+            //     needs 'gov' (wallet-only by design).
+            //   - The wallet delivers everything.
+            // With no essential attributes every method stays, including
+            // the passkey-then-verify-profile flow further below.
+            let effectiveMethods = methods;
+            if (!effectiveMethods && attributeRequirements) {
+                const essential = Object.values(attributeRequirements)
+                    .filter((r) => r?.essential);
+                if (essential.some((r) => r.assurance === 'gov')) {
+                    effectiveMethods = ['wallet'];
+                } else if (essential.length > 0) {
+                    effectiveMethods = ['wallet', 'social'];
+                }
+            }
+
+            // 3. Fetch available social providers (skipped entirely when
+            //    the effective methods exclude social sign-in).
+            let socialProviders: string[] = [];
+            let socialDisplayNames: Record<string, string> | undefined;
+            let socialIcons: Record<string, string> | undefined;
+            let socialOwn: OwnRegistration[] | undefined;
+            if (!effectiveMethods || effectiveMethods.includes('social')) {
+                try {
+                    // Named for the client, the identity provider lists only
+                    // the providers that client's users may sign in with.
+                    const provQuery = config.clientId ? `?client_id=${encodeURIComponent(config.clientId)}` : '';
+                    const provResp = await fetch(`${idpBase}/auth/social/providers${provQuery}`);
+                    if (provResp.ok) {
+                        const provData = await provResp.json();
+                        const published: string[] = provData.providers ?? [];
+                        // A preference that matches nothing yields the published
+                        // list (selectProviders): a gate with no button at all
+                        // would strand the user. Say so, since this console is
+                        // the frame's, not the adopter's.
+                        socialProviders = selectProviders(published, providers);
+                        socialDisplayNames = sanitiseDisplayNames(provData.display_names);
+                        socialIcons = sanitiseIcons(provData.icons);
+                        socialOwn = sanitiseOwn(provData.own);
+                        if (providers && !providers.some((p) => published.includes(p))) {
+                            console.warn(
+                                '[privasys] none of the requested providers',
+                                providers, 'is configured at the identity provider; offering', published,
+                            );
+                        }
+                    }
+                } catch { /* social not available, that's fine */ }
+            }
+
+            // 4. Launch AuthUI with the OIDC session_id so QR/passkey link
+            //    to the OIDC session; passkey calls go to the IdP's FIDO2 API.
+            const pushToken = sessions.findPushToken();
+
+            // Social auth handler: opens a popup to the IdP's social redirect,
+            // then waits for the callback page to postMessage back.
+            const openSocialPopup = (provider: string, own?: boolean, chooseAccount?: boolean): Promise<void> => {
+                return new Promise<void>((resolve, reject) => {
+                    const w = 500, h = 650;
+                    const left = window.screenX + (window.innerWidth - w) / 2;
+                    const top = window.screenY + (window.innerHeight - h) / 2;
+                    // registration=own: the client's own registration, pressed as a button of its own.
+                    const popupUrl = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}${chooseAccount ? '&account=choose' : ''}`;
+                    const popup = window.open(popupUrl, 'privasys-social', `width=${w},height=${h},left=${left},top=${top}`);
+
+                    if (!popup) {
+                        reject(new Error('Popup blocked — please allow popups for this site'));
+                        return;
+                    }
+
+                    const cleanup = () => {
+                        window.removeEventListener('message', onMessage);
+                        clearInterval(pollClosed);
+                    };
+
+                    const onMessage = (ev: MessageEvent) => {
+                        if (ev.source !== popup) return;
+                        if (ev.data?.type === 'privasys:social-complete') {
+                            cleanup();
+                            popup.close();
+                            resolve();
+                        } else if (ev.data?.type === 'privasys:social-error') {
+                            cleanup();
+                            popup.close();
+                            reject(new Error(ev.data.error || 'Social authentication failed'));
+                        }
+                    };
+
+                    window.addEventListener('message', onMessage);
+
+                    // Detect if user closes the popup manually.
+                    const pollClosed = setInterval(() => {
+                        if (popup.closed) {
+                            cleanup();
+                            reject(new Error('Authentication cancelled'));
+                        }
+                    }, 500);
+                });
+            };
+            // Headless: a popup needs the click's activation, which the
+            // page has and this frame does not, so the page opens it at
+            // the address this frame names and reports how it ended.
+            const popupViaParent = (provider: string, own?: boolean, chooseAccount?: boolean): Promise<void> => {
+                return new Promise<void>((resolve, reject) => {
+                    const id = Math.random().toString(36).slice(2);
+                    const url = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}${chooseAccount ? '&account=choose' : ''}`;
+                    const onMessage = (ev: MessageEvent) => {
+                        if (ev.source !== window.parent || ev.origin !== parentOrigin) return;
+                        if (ev.data?.type !== 'privasys:gate:popup-result' || ev.data.id !== id) return;
+                        window.removeEventListener('message', onMessage);
+                        if (ev.data.ok === true) resolve();
+                        else reject(new Error(String(ev.data.error || 'Authentication cancelled')));
+                    };
+                    window.addEventListener('message', onMessage);
+                    window.parent.postMessage({ type: 'privasys:gate:popup', id, url }, parentOrigin);
+                });
+            };
+            const onSocialAuth = headless ? popupViaParent : openSocialPopup;
+            // The device popup: this frame opens it inside the click; a
+            // headless page opens it for the frame, as it does a social one.
+            const openDevicePopup = (): boolean | Promise<boolean> => {
+                if (!headless) {
+                    const w = 420, h = 240;
+                    const left = window.screenX + (window.innerWidth - w) / 2;
+                    const top = window.screenY + (window.innerHeight - h) / 2;
+                    return !!window.open(DEVICE_POPUP_URL, 'privasys-device', `width=${w},height=${h},left=${left},top=${top}`);
+                }
+                return new Promise<boolean>((resolve) => {
+                    const id = Math.random().toString(36).slice(2);
+                    const onResult = (ev: MessageEvent) => {
+                        if (ev.source !== window.parent || ev.origin !== parentOrigin) return;
+                        if (ev.data?.type !== 'privasys:gate:popup-result' || ev.data.id !== id) return;
+                        window.removeEventListener('message', onResult);
+                        resolve(ev.data.ok === true);
+                    };
+                    window.addEventListener('message', onResult);
+                    window.parent.postMessage({ type: 'privasys:gate:popup', id, url: DEVICE_POPUP_URL }, parentOrigin);
+                });
+            };
+
+            activeUI = new AuthUI({
+                ...config,
+                onContentHeight,
+                sessionId: oidcSessionId,
+                fido2Base: `${idpBase}/fido2`,
+                pushToken,
+                deviceTrusted,
+                socialProviders,
+                socialDisplayNames,
+                socialIcons,
+                socialOwn,
+                onSocialAuth,
+                devices: sessions.getDevices().map(shown),
+                lookupDevice: async () => {
+                    const found = await askDevicePopup(openDevicePopup, { op: 'read' });
+                    for (const d of found) deviceLabels.set(d.pushToken, d.label);
+                    return found;
+                },
+                forgetDevice: async (token: string) => {
+                    sessions.forgetDevice(token);
+                    await askDevicePopup(openDevicePopup, { op: 'forget', pushToken: token });
+                },
+                rememberDevice: async (token: string, label?: string) => {
+                    await askDevicePopup(openDevicePopup, { op: 'store', pushToken: token, brokerUrl: config.brokerUrl || '', ...(label ? { label } : {}) });
+                },
+                // A passkey carries no name or email; the gate asks for
+                // them through a provider when the client wants them.
+                profileAfterPasskey: !!requestedAttributes?.some(
+                    (a: string) => a === 'email' || a === 'name',
+                ),
+                headless,
+                onGateState,
+                requestedAttributes,
+                attributeRequirements,
+                disclosureVouchers,
+                sessionRelay: sessionRelayUI,
+                // Same-device recovery: the AuthUI polls this while a
+                // wallet flow is pending, so the ceremony completes
+                // from IdP state when the broker relay died during the
+                // app switch (page backgrounded → WS gone → the
+                // wallet's relay message lands in the void).
+                checkComplete: async () => {
+                    const r = await fetch(pollUrl, { cache: 'no-store' });
+                    if (!r.ok) return false;
+                    const d = await r.json().catch(() => null);
+                    return !!(d && d.authenticated);
+                },
+                // Sanitised copies override the raw postMessage values.
+                presentation,
+                app,
+                pitch,
+                theme,
+                legal,
+                methods: effectiveMethods,
+                onNavigate,
+                approveFlow: undefined,
+            });
+
+            if (headless) {
+                window.parent.postMessage({ type: 'privasys:gate', options: activeUI.gateOptions() }, parentOrigin);
+            }
+            uiResult = await activeUI.signIn();
+
+            // 5. Get the auth code:
+            //    - Passkey: the IdP's FIDO2 handler already marked the session
+            //      complete, so poll for it. If the relying party requested
+            //      profile attributes (email/name), open a social login to
+            //      source them — the social callback patches them onto the
+            //      existing auth code.
+            //    - Wallet (relay): call /session/complete to bridge.
+            //    - Social: the popup callback already marked it complete, so
+            //      call /session/complete to get the code (it's idempotent).
+            if (device) {
+                // The wallet answered over the relay: hand what it shared
+                // to the identity provider, which completes the request.
+                // A wallet that answered the identity provider directly
+                // has completed it already.
+                if (!uiResult.completedViaPoll) {
+                    await completeSession(idpBase, oidcSessionId, uiResult.attributes);
+                }
+                await waitAuthenticated(pollUrl);
+                code = '';
+            } else if (uiResult.method === 'passkey') {
+                // A client that asked for the name or email had the gate
+                // confirm them with a provider after the passkey
+                // (profileAfterPasskey); the provider's callback added
+                // them to this session.
+                code = await pollSessionStatus(pollUrl);
+            } else if (uiResult.completedViaPoll) {
+                // Same-device wallet flow: the relay died during the app
+                // switch, the ceremony completed via the IdP status
+                // poll. The wallet already linked the FIDO2 assertion
+                // and patched attributes onto the auth code server-side.
+                code = await pollSessionStatus(pollUrl);
+            } else {
+                // Wallet: pass profile from relay. Social: auth code
+                // already exists with profile (the popup callback created it).
+                code = await completeSession(
+                    idpBase,
+                    oidcSessionId,
+                    uiResult.attributes,
+                );
+            }
+            } // end full ceremony (skipped when the step-up push completed)
+
+            // 5. Exchange code for JWT tokens.
+            // A device request is approved now. Its tokens go to the device
+            // that asked, which redeems them itself: this page gets none.
+            if (device) {
+                if (uiResult?.pushToken && config.brokerUrl && (uiResult.trustDevice || deviceTrusted)) {
+                    sessions.saveDeviceHint(uiResult.pushToken, config.brokerUrl,
+                        uiResult.deviceLabel ?? deviceLabels.get(uiResult.pushToken));
+                }
+                window.parent.postMessage(
+                    { type: 'privasys:result', result: { approved: true, sessionToken: '', method: 'wallet', sessionId: oidcSessionId } },
                     parentOrigin,
                 );
-            } catch (err) {
-                const msg = err instanceof Error ? err.message : 'Authentication failed';
-                if (isGateOutcome(msg)) {
-                    // The gate shows how it ended and stays on it.
-                    window.parent.postMessage({ type: 'privasys:result', result: gateOutcomeResult(msg) }, parentOrigin);
-                } else if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
-                    window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
-                } else {
-                    const errorCode = err instanceof Error
-                        ? (err as Error & { code?: string }).code
-                        : undefined;
-                    window.parent.postMessage(
-                        { type: 'privasys:error', error: msg, ...(errorCode ? { errorCode } : {}) },
-                        parentOrigin,
-                    );
-                }
-            } finally {
-                activeUI = null;
+                return;
             }
-            return;
-        }
+            const tokens = await exchangeCode(idpBase, code, clientId, codeVerifier);
 
-        // Non-OIDC mode (original flow): opaque session token from enclave.
-        const pushToken = sessions.findPushToken();
-        const deviceTrusted = !!sessions.getDeviceHint();
-        activeUI = new AuthUI({
-            ...config,
-            pushToken,
-            onContentHeight,
-            deviceTrusted,
-            sessionRelay: sessionRelayUI,
-            presentation,
-            app,
-            pitch,
-            theme,
-            legal,
-            methods,
-            onNavigate,
-            approveFlow: undefined,
-        });
+            // A link ends here. The page gets the ID token and nothing
+            // else: no session is kept, so the one the person already
+            // has for this client stands, and the access token of the
+            // linked identity never leaves this frame.
+            if (linkNonce) {
+                if (!tokens.id_token) throw new Error('The identity provider returned no ID token');
+                if (uiResult?.pushToken && config.brokerUrl && (uiResult.trustDevice || deviceTrusted)) {
+                    sessions.saveDeviceHint(uiResult.pushToken, config.brokerUrl,
+                        uiResult.deviceLabel ?? deviceLabels.get(uiResult.pushToken));
+                }
+                window.parent.postMessage(
+                    { type: 'privasys:result', result: { linked: true, idToken: tokens.id_token, method: 'wallet', sessionId: oidcSessionId } },
+                    parentOrigin,
+                );
+                return;
+            }
 
-        try {
-            const result: SignInResult = await activeUI.signIn();
-
-            const brokerUrl = config.brokerUrl || '';
-
-            // Persist session in privasys.id localStorage
+            // 6. Store session with JWT access_token and refresh_token.
+            // `requestedAttributes`/`scope` record the RAW request this
+            // session was minted for; connect() compares future configs
+            // against them to detect a widened request. A step-up push
+            // completion has no ceremony result, so the wallet push
+            // binding carries over from the prior session.
+            const rpId = config.rpId || config.appName;
             const session: AuthSession = {
-                token: result.sessionToken,
-                rpId: config.rpId || config.appName,
-                origin: config.apiBase,
+                token: tokens.access_token,
+                rpId,
+                origin: config.apiBase ?? '',
                 authenticatedAt: Date.now(),
-                pushToken: result.pushToken,
-                brokerUrl,
+                pushToken: uiResult?.pushToken ?? priorSession?.pushToken,
+                // The marker, or a ceremony that brought the wallet's
+                // sealed binding, so a wallet user is never taken for
+                // someone without one.
+                wallet: tokenSaysWallet(tokens.access_token)
+                    || !!uiResult?.sessionRelay || !!uiResult?.completedViaPoll,
+                brokerUrl: config.brokerUrl || priorSession?.brokerUrl || '',
+                refreshToken: tokens.refresh_token,
+                clientId,
+                requestedAttributes: [...(config.attributes ?? [])],
+                scope: scopeStr,
             };
             sessions.store(session);
-
-            // Legacy opaque-token sessions have no refresh token; there is
-            // no silent-renewal path for them (the old scheduleRenewal call
-            // here was a no-op). Only persist the device hint.
             if (session.pushToken && session.brokerUrl) {
-                if (result.trustDevice || deviceTrusted) {
-                    sessions.saveDeviceHint(session.pushToken, session.brokerUrl);
+                if (uiResult?.trustDevice || deviceTrusted) {
+                    // A wallet found through the popup keeps the name it has there.
+                    // The wallet's own name for the phone wins: it is current.
+                    sessions.saveDeviceHint(session.pushToken, session.brokerUrl,
+                        uiResult?.deviceLabel ?? deviceLabels.get(session.pushToken));
+                }
+            }
+            scheduleRenewal(session, parentOrigin);
+
+            // Install the sealed session so the parent's `frame.session()`
+            // RPC works once the auth result lands.
+            //
+            // The session the app gets is established from the wallet's
+            // EncAuth voucher, never from the wallet's own bootstrap: only
+            // a voucher-backed bootstrap carries the caller's identity
+            // (X-Privasys-Sub), and an app that attributes callers answers
+            // an anonymous session 401 right after a successful sign-in.
+            // The wallet uploads the voucher before relaying the result;
+            // the bounded wait covers an older wallet that uploads after,
+            // and the same-device flow, where the tab is backgrounded
+            // during the app switch and the upload lands on the way back.
+            const wantsSealed = !!config.sessionRelay?.appHost
+                && (!!uiResult?.sessionRelay || !!uiResult?.completedViaPoll);
+            if (wantsSealed && uiResult) {
+                const appHost = config.sessionRelay!.appHost;
+                const session = await resumeVoucherSession(
+                    appHost,
+                    rpId,
+                    uiResult.completedViaPoll ? SAME_DEVICE_VOUCHER_WINDOW_MS : CEREMONY_VOUCHER_WINDOW_MS,
+                );
+                if (session) {
+                    pendingHandshake = null;
+                    adoptSession(appHost, session, 0, parentOrigin);
+                    uiResult.sessionRelay = { sessionId: session.sessionId, encPub: '', expiresAt: 0 };
+                    window.parent.postMessage({
+                        type: 'privasys:session:ready',
+                        sessionId: session.sessionId,
+                        appHost,
+                        expiresAt: 0,
+                    }, parentOrigin);
+                } else if (uiResult.sessionRelay) {
+                    // No voucher landed in time. Fall back to the wallet's
+                    // bootstrap so the app still gets a sealed channel,
+                    // anonymous to the app until the voucher lands: the
+                    // session keeps looking for it, and an app's 401
+                    // makes it look at once (PrivasysSession.identify).
+                    console.warn('[frame-host] no EncAuth voucher after the ceremony; installing the anonymous session');
+                    await installSessionRelay(uiResult.sessionRelay, parentOrigin);
                 }
             }
 
-            if (result.sessionRelay) {
-                await installSessionRelay(result.sessionRelay, parentOrigin);
-            }
-
+            // 7. Send result to parent with the access_token. A step-up
+            // push completion has no ceremony result — synthesise the
+            // wallet-shaped minimum (the parent reads accessToken).
+            const baseResult: SignInResult = uiResult ?? {
+                sessionToken: tokens.access_token,
+                method: 'wallet',
+                sessionId: oidcSessionId,
+            };
             window.parent.postMessage(
-                { type: 'privasys:result', result },
+                {
+                    type: 'privasys:result',
+                    result: {
+                        ...baseResult,
+                        accessToken: tokens.access_token,
+                    },
+                },
                 parentOrigin,
             );
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Authentication failed';
-            if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
+            if (isGateOutcome(msg)) {
+                // The gate shows how it ended and stays on it.
+                window.parent.postMessage({ type: 'privasys:result', result: gateOutcomeResult(msg) }, parentOrigin);
+            } else if (msg === 'Authentication cancelled' || msg === 'AuthUI destroyed') {
                 window.parent.postMessage({ type: 'privasys:cancel' }, parentOrigin);
             } else {
-                window.parent.postMessage({ type: 'privasys:error', error: msg }, parentOrigin);
+                const errorCode = err instanceof Error
+                    ? (err as Error & { code?: string }).code
+                    : undefined;
+                window.parent.postMessage(
+                    { type: 'privasys:error', error: msg, ...(errorCode ? { errorCode } : {}) },
+                    parentOrigin,
+                );
             }
         } finally {
             activeUI = null;
         }
+        return;
     }
 
     // A headless page's choice: only the embedding page may make it, and

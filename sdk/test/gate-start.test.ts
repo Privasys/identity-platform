@@ -6,7 +6,7 @@ import { AuthUI, type AuthUIConfig } from '../src/ui';
 function gate(cfg: Partial<AuthUIConfig>, state = 'idle') {
     const calls: string[] = [];
     const ui = new AuthUI({
-        apiBase: 'https://idp.test', appName: 'Example', headless: true,
+        appName: 'Example', headless: true,
         onSocialAuth: async (provider, own) => { calls.push(`social:${provider}:${own ? 'own' : 'platform'}`); },
         ...cfg,
     } as AuthUIConfig);

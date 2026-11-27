@@ -1818,7 +1818,7 @@ export class AuthFrame {
 
                     if (data.session) {
                         // Keep iframe alive so the frame-host can run renewal
-                        // timers (OIDC refresh_token or legacy push-based).
+                        // timers.
                         this.sessionIframe = iframe;
                         this.sessionHandler = handler;
                         this.cachedSession = data.session;

@@ -3,7 +3,7 @@
 
 import type { AuthConfig, AuthEvents, AuthResult, AuthState, AttestationInfo, SessionRelayBinding } from './types';
 import { generateQRPayload } from './qr';
-import { SessionManager, cleanDeviceLabel } from './session';
+import { cleanDeviceLabel } from './session';
 
 const DEFAULT_TIMEOUT = 120_000;
 
@@ -25,7 +25,6 @@ const DEFAULT_TIMEOUT = 120_000;
  */
 export class PrivasysAuth {
     readonly config: AuthConfig;
-    readonly sessions: SessionManager;
     private events: AuthEvents;
     private activeConnections = new Map<string, WebSocket>();
 
@@ -36,7 +35,6 @@ export class PrivasysAuth {
             ...config,
         };
         this.events = events;
-        this.sessions = new SessionManager();
     }
 
     /**
@@ -252,16 +250,6 @@ export class PrivasysAuth {
                     attributes: (msg.attributes as Record<string, string> | undefined) || undefined,
                     sessionRelay: (msg.sessionRelay as SessionRelayBinding | undefined) || undefined,
                 };
-
-                // Store session locally
-                this.sessions.store({
-                    token: result.sessionToken,
-                    rpId: this.config.rpId,
-                    origin: globalThis.location?.origin ?? '',
-                    authenticatedAt: Date.now(),
-                    pushToken: result.pushToken,
-                    brokerUrl: this.config.brokerUrl,
-                });
 
                 this.events.onAuthenticated?.(result);
                 this.cleanup(sessionId);

@@ -20,8 +20,6 @@ import qrcode from 'qrcode-generator';
 
 /** Configuration for the built-in auth UI. */
 export interface AuthUIConfig {
-    /** Management service API base URL (e.g., "https://api.developer.privasys.org"). */
-    apiBase: string;
     /** App name or UUID as registered on the platform. */
     appName: string;
     /** Relying party ID. Defaults to `appName` (used as-is). Set this to
@@ -79,7 +77,7 @@ export interface AuthUIConfig {
      *  message; older clients fall back to the direct _top anchor. */
     onNavigate?: (url: string) => void;
     /** Checks whether the OIDC session completed server-side (the IdP's
-     *  poll endpoint). Supplied by the frame host in OIDC mode. This is
+     *  poll endpoint). Supplied by the frame host. This is
      *  the same-device recovery path: when the user switches to the
      *  wallet app, the page is backgrounded and the broker WebSocket can
      *  die — the wallet's relay then lands in the void. The watcher polls
@@ -131,28 +129,27 @@ export interface AuthUIConfig {
     /** Push token from a previous session. When present the UI will offer
      *  to send a push notification instead of showing a QR code. */
     pushToken?: string;
-    /** Pre-assigned session ID (OIDC mode). When set, the QR code and
+    /** Pre-assigned session ID. When set, the QR code and
      *  FIDO2 requests use this ID so the IdP can link them back to the
      *  OIDC authorize session. */
     sessionId?: string;
-    /** OIDC client_id (OIDC mode). Forwarded to the wallet via the QR
+    /** OIDC client_id. Forwarded to the wallet via the QR
      *  descriptor / push payload so the EncAuth voucher lands on the same
      *  IdP session row (`sid`) as the issued JWT. */
     clientId?: string;
     /** Attribute keys the relying party needs from the wallet (e.g. ["email", "name"]). */
     requestedAttributes?: string[];
-    /** Per-attribute essential/assurance hints from the IdP (OIDC mode).
+    /** Per-attribute essential/assurance hints from the IdP.
      *  Gov attributes are only disclosed as enclave-signed tokens when the
      *  wallet sees `assurance: 'gov'` here. */
     attributeRequirements?: import('./qr').AttributeRequirements;
-    /** Paid-disclosure vouchers from the IdP authorize response (OIDC mode).
+    /** Paid-disclosure vouchers from the IdP authorize response.
      *  Relayed to the wallet via the QR descriptor / push payload. */
     disclosureVouchers?: import('./qr').DisclosureVoucher[];
-    /** Direct FIDO2 endpoint base URL (OIDC mode). When set, the WebAuthn
-     *  client calls `${fido2Base}/${action}` instead of the management
-     *  service proxy URL. */
+    /** The identity provider's FIDO2 API for passkeys. Defaults to
+     *  `/fido2` on this document's origin. */
     fido2Base?: string;
-    /** Available social identity providers (OIDC mode). Each entry is a
+    /** Available social identity providers. Each entry is a
      *  provider name like "github", "google", "microsoft", "linkedin". */
     socialProviders?: string[];
     /** Names the identity provider publishes for a client's own registrations. */
@@ -1116,10 +1113,7 @@ function renderQRSvg(payload: string): string {
  *
  * Usage:
  * ```ts
- * const ui = new Privasys.AuthUI({
- *   apiBase: 'https://api.developer.privasys.org',
- *   appName: 'my-app',
- * });
+ * const ui = new Privasys.AuthUI({ appName: 'my-app', clientId: 'my-client' });
  * const result = await ui.signIn();
  * console.log(result.sessionToken);
  * ```
@@ -1128,7 +1122,7 @@ function renderQRSvg(payload: string): string {
  * leak into or conflict with the host page.
  */
 export class AuthUI {
-    private readonly cfg: Required<Pick<AuthUIConfig, 'apiBase' | 'appName' | 'brokerUrl' | 'timeout'>> & AuthUIConfig;
+    private readonly cfg: Required<Pick<AuthUIConfig, 'appName' | 'brokerUrl' | 'timeout'>> & AuthUIConfig;
     private host: HTMLElement | null = null;
     private shadow: ShadowRoot | null = null;
     private sizeObserver: ResizeObserver | null = null;
@@ -2633,10 +2627,8 @@ export class AuthUI {
     private getWebAuthnClient(): WebAuthnClient {
         if (!this.webauthnClient) {
             this.webauthnClient = new WebAuthnClient({
-                apiBase: this.cfg.apiBase,
-                appName: this.cfg.appName,
                 sessionId: this.cfg.sessionId,
-                fido2Base: this.cfg.fido2Base,
+                fido2Base: this.cfg.fido2Base ?? `${globalThis.location.origin}/fido2`,
             }, {
                 onStateChange: (s: WebAuthnState) => {
                     const map: Record<string, UIState> = {

@@ -116,6 +116,13 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   await page.evaluate(() => window.auth.clearSession());
   assert.equal(await page.evaluate(() => window.auth.getSession()), null, 'the page itself can sign out');
 
+  // A sign-in is always for a client: a page that names none is refused.
+  const noClient = await page.evaluate(async () => {
+    const a = new Privasys.AuthFrame({ authOrigin: 'https://idp.test', rpId: 'app', appName: 'app', apiBase: 'https://api.test', presentation: 'modal' });
+    try { await a.signIn(); return 'signed in'; } catch (e) { return e.message; } finally { a.destroy && a.destroy(); }
+  });
+  assert.equal(noClient, 'clientId is required', 'a sign-in without a client is refused: ' + noClient);
+
   console.log('frame-security: all checks passed');
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

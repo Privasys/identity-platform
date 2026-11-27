@@ -36,19 +36,14 @@ function randomHex(bytes: number): string {
 
 /** Configuration for the WebAuthn client. */
 export interface WebAuthnConfig {
-    /** Management service API base URL (e.g., "https://api.developer.privasys.org"). */
-    apiBase: string;
-    /** App name or UUID as registered in the platform. */
-    appName: string;
     /** Timeout for the WebAuthn ceremony in milliseconds (default: 60000). */
     timeout?: number;
-    /** Pre-assigned session ID (OIDC mode). When set, FIDO2 requests use
+    /** Pre-assigned session ID. When set, FIDO2 requests use
      *  this ID so the IdP can link them to the OIDC authorize session. */
     sessionId?: string;
-    /** Direct FIDO2 endpoint base URL (e.g., "https://privasys.id/fido2").
-     *  When set, bypasses the management service URL pattern and calls
-     *  `${fido2Base}/${action}` directly (used in OIDC IdP mode). */
-    fido2Base?: string;
+    /** The identity provider's FIDO2 API (e.g., "https://privasys.id/fido2");
+     *  each call goes to `${fido2Base}/${action}`. */
+    fido2Base: string;
 }
 
 /** State of a WebAuthn operation. */
@@ -72,27 +67,15 @@ export interface WebAuthnEvents {
 // ---------------------------------------------------------------------------
 
 /**
- * Browser WebAuthn client for Privasys enclaves.
- *
- * Handles passkey registration and authentication through the
- * management service FIDO2 proxy endpoint, which forwards requests
- * to the enclave.
+ * Browser WebAuthn client for the identity provider's passkey ceremonies.
  *
  * Usage:
  * ```ts
  * import { WebAuthnClient } from '@privasys/auth';
  *
- * const webauthn = new WebAuthnClient({
- *   apiBase: 'https://api.developer.privasys.org',
- *   appName: 'my-app',
- * });
- *
- * // Register a new passkey
- * const result = await webauthn.register();
- * // result.sessionToken is ready to use as X-App-Auth header
- *
- * // Authenticate with existing passkey
- * const result = await webauthn.authenticate();
+ * const webauthn = new WebAuthnClient({ fido2Base: 'https://privasys.id/fido2', sessionId });
+ * await webauthn.register();     // a new passkey
+ * await webauthn.authenticate(); // an existing one
  * ```
  */
 export class WebAuthnClient {
@@ -321,10 +304,7 @@ export class WebAuthnClient {
         body: Record<string, unknown>,
         params?: Record<string, string>,
     ): Promise<Record<string, any>> {
-        const base = (this.config.fido2Base ?? this.config.apiBase).replace(/\/+$/, '');
-        const url = this.config.fido2Base
-            ? new URL(`${base}/${action}`)
-            : new URL(`${base}/api/v1/apps/${encodeURIComponent(this.config.appName)}/fido2/${action}`);
+        const url = new URL(`${this.config.fido2Base.replace(/\/+$/, '')}/${action}`);
         if (params) {
             for (const [k, v] of Object.entries(params)) {
                 url.searchParams.set(k, v);
@@ -349,14 +329,6 @@ export class WebAuthnClient {
             sessionToken,
             sessionId,
         };
-
-        this.sessions.store({
-            token: sessionToken,
-            rpId: this.config.appName,
-            origin: globalThis.location?.origin ?? '',
-            authenticatedAt: Date.now(),
-        });
-
         this.events.onAuthenticated?.(result);
         return result;
     }

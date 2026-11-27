@@ -38,8 +38,9 @@
  * What deliberately survives:
  *
  *   - The app-language override (see `useSettingsStore.clearAll`).
- *   - The device UUID. It names the hardware, not the person, and the push
- *     token it accompanies is device-scoped and unaffected by a wipe.
+ *   - The push token, which is device-scoped and unaffected by a wipe. The
+ *     device's id and secret do not survive (`clearDevicesLocalState`), nor
+ *     the push-binding key derived from that secret.
  *   - The attribute value-set cache, which holds no personal data.
  */
 
@@ -55,6 +56,7 @@ import { clearIdentitiesLocalState } from '@/services/identities';
 import { clearProfileBackupLocalState } from '@/services/profile-backup';
 import { clearKeptSetups } from '@/services/setup-keep';
 import { clearNotifySealKey } from '@/services/notify-seal';
+import { clearPushBindLocalState } from '@/services/push-bind';
 import { clearPlatformToken } from '@/services/platform-token';
 import { RECOVERY_STATE_KEY } from '@/services/recovery-api';
 import { clearSovereignLocalState } from '@/services/sovereign';
@@ -126,6 +128,7 @@ export async function wipeWallet(): Promise<void> {
     // apps; the next one starts hearing from everything.
     useNotifyMutesStore.getState().clearAll();
     useSettingsStore.getState().clearAll();
+    clearPushBindLocalState();
 
     await Promise.all([
         settle('sovereign state', clearSovereignLocalState()),

@@ -138,8 +138,12 @@ export async function answerBindChallenge(data: Record<string, unknown> | null |
     return true;
 }
 
-/** For tests. */
-export function resetPushBind(): void {
+/**
+ * Forget this phone's binding key and what waits on it. Part of the wallet
+ * wipe: the key is derived from the device secret the wipe deletes, and the
+ * waiting registrations hold the previous identity's session.
+ */
+export function clearPushBindLocalState(): void {
     cached = null;
     waiting.clear();
     answered.clear();

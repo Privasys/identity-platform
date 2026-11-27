@@ -14,7 +14,7 @@ jest.mock('../services/devices', () => ({
     ensureDevice: jest.fn(async () => ({ id: 'device', secret: mockSecret })),
 }));
 
-import { answerBindChallenge, dismissProof, registrationProof, repeatWhenBound, resetPushBind } from '../services/push-bind';
+import { answerBindChallenge, dismissProof, registrationProof, repeatWhenBound, clearPushBindLocalState } from '../services/push-bind';
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
 const verifies = (sig: string, text: string, pub: string) =>
@@ -24,7 +24,7 @@ let fetched: { url: string; body: Record<string, unknown> }[] = [];
 let answerOk = true;
 
 beforeEach(() => {
-    resetPushBind();
+    clearPushBindLocalState();
     fetched = [];
     answerOk = true;
     (global as any).fetch = jest.fn(async (url: string, init: { body: string }) => {

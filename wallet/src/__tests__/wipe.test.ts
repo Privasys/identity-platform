@@ -316,3 +316,12 @@ it('deletes the automatic profile backup', async () => {
     await wipeWallet();
     expect(mockClearProfileBackup).toHaveBeenCalledTimes(1);
 });
+
+it('forgets the push-binding key, which the deleted device secret derived', async () => {
+    const pushBind = require('@/services/push-bind');
+    const spy = jest.spyOn(pushBind, 'clearPushBindLocalState');
+    const { wipeWallet } = require('@/services/wipe');
+    await wipeWallet();
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+});

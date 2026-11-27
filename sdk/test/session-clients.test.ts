@@ -50,6 +50,18 @@ test('a session is stored under its key, whatever it says itself', () => {
     assert.deepEqual([stored.platform, stored.rpId, stored.clientId], ['aud', 'app', 'client-a']);
 });
 
+test('a stored record without platform, client or scope is not a session', () => {
+    store.clear();
+    const full = { ...session('t', 1), platform: 'aud', clientId: 'client-a' };
+    const { platform: _p, ...noPlatform } = full;
+    const { clientId: _c, ...noClient } = full;
+    const { scope: _s, ...noScope } = full;
+    localStorage.setItem('privasys_sessions', JSON.stringify([noPlatform, noClient, noScope, full]));
+    const m = new SessionManager();
+    assert.equal(m.getAll().length, 1);
+    assert.equal(m.get(key('client-a'))?.token, 't');
+});
+
 test('a session with no platform or client to be found by is refused loudly', () => {
     store.clear();
     const m = new SessionManager();

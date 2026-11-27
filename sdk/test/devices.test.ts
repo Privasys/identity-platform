@@ -45,15 +45,20 @@ test('forgetting one wallet leaves the others', () => {
     assert.equal(store.has('privasys_device_hints'), false);
 });
 
-test('a single hint stored by an older version reads as a list of one', () => {
+test('a wallet is called by its name, else by the day it was added', () => {
     store.clear();
-    store.set('privasys_device_hints', JSON.stringify({ pushToken: 'old', brokerUrl: 'wss://b', updatedAt: Date.UTC(2026, 10, 13) }));
+    store.set('privasys_device_hints', JSON.stringify([{ pushToken: 'old', brokerUrl: 'wss://b', updatedAt: Date.UTC(2026, 10, 13) }]));
     const m = new SessionManager();
-    assert.deepEqual(m.getDevices().map((d) => d.pushToken), ['old']);
     assert.equal(deviceLabel(m.getDevices()[0]), 'Phone added 13 Nov');
     m.saveDeviceHint('new', 'wss://b', 'Work phone');
     assert.deepEqual(m.getDevices().map((d) => d.pushToken), ['new', 'old']);
     assert.equal(deviceLabel(m.getDevices()[0]), 'Work phone');
+});
+
+test('remembered wallets stored as anything but a list read as none', () => {
+    store.clear();
+    store.set('privasys_device_hints', JSON.stringify({ pushToken: 'old', brokerUrl: 'wss://b', updatedAt: 1 }));
+    assert.deepEqual(new SessionManager().getDevices(), []);
 });
 
 test('no more than eight wallets are kept', () => {

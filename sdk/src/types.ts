@@ -131,8 +131,7 @@ export interface AuthSession {
     /**
      * The platform audience of the page this session was signed in from, as
      * the identity provider's published platform list placed that page. Pages
-     * of one platform never see another's session. Absent on a session stored
-     * before it, and never given to a page.
+     * of one platform never see another's session.
      */
     platform?: string;
 }

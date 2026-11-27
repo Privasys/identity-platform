@@ -1726,7 +1726,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     attributeRequirements = decoded.attributeRequirements;
                     disclosureVouchers = decoded.disclosureVouchers;
                 }
-            } catch { /* older IdP or plain profile flow — nothing to thread */ }
+            } catch { /* no wallet payload to thread */ }
 
             // Step-up push: the IdP resolved the session hint, found this
             // request WIDER than what that session's holder last granted,
@@ -2290,7 +2290,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
             reply({ accessToken: session.token, expiresIn: exp === null ? 0 : Math.floor((exp - Date.now()) / 1000) });
             return;
         }
-        const scope = `audience:${audience} ${session.scope || 'openid email profile offline_access'}`;
+        const scope = `audience:${audience} ${session.scope}`;
         let r = await refreshGrant(key, { parentOrigin: e.origin, notify: false, scope });
         // Another document rotated the token while this grant was in flight:
         // mint again from the one it stored.

@@ -111,12 +111,19 @@ export class SessionManager {
         this.notify(sessions);
     }
 
-    /** Get all stored sessions. */
+    /** Every stored session. A record without its platform, client, rpId,
+     *  scope or token is not a session this frame stored and is left out. */
     getAll(): AuthSession[] {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return [];
-            return JSON.parse(raw) as AuthSession[];
+            const list: unknown = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(list)) return [];
+            return list.filter((s): s is AuthSession => !!s
+                && typeof s.platform === 'string' && !!s.platform
+                && typeof s.clientId === 'string' && !!s.clientId
+                && typeof s.rpId === 'string' && !!s.rpId
+                && typeof s.scope === 'string'
+                && typeof s.token === 'string' && !!s.token);
         } catch {
             return [];
         }
@@ -149,15 +156,13 @@ export class SessionManager {
 
     // ── Device hints (survive session expiry) ─────────────────────────
 
-    /** Every remembered wallet, the most recently used first. A single hint
-     *  stored by an older version reads as a list of one. */
+    /** Every remembered wallet, the most recently used first. */
     getDevices(): DeviceHint[] {
         try {
             const raw = localStorage.getItem(HINTS_KEY);
-            if (!raw) return [];
-            const parsed = JSON.parse(raw) as DeviceHint | DeviceHint[];
-            const list = Array.isArray(parsed) ? parsed : [parsed];
-            return list
+            const list: unknown = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(list)) return [];
+            return (list as DeviceHint[])
                 .filter((d) => d && typeof d.pushToken === 'string' && d.pushToken)
                 .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
         } catch {

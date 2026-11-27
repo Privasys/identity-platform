@@ -638,7 +638,7 @@ function extractDisclosures(accessToken?: string): AttributeDisclosure[] | undef
 /**
  * The session payload privasys.id hands back on a check-session query.
  * `requestedAttributes`/`scope` record the request the session was minted
- * for; absent on sessions stored by an older frame host.
+ * for.
  */
 export interface RestoredSession {
     token: string;
@@ -646,8 +646,7 @@ export interface RestoredSession {
     authenticatedAt: number;
     requestedAttributes?: string[];
     scope?: string;
-    /** Whether the wallet signed this session in; absent on a session
-     *  stored by an older frame host. */
+    /** Whether the wallet signed this session in. */
     wallet?: boolean;
 }
 
@@ -843,13 +842,6 @@ export class AuthFrame {
                 return { accessToken: existing.token, session: sealed, transport: 'sealed' };
             } catch (err) {
                 const msg = (err as Error).message ?? '';
-                if (this.config.direct && existing.wallet === undefined && msg.startsWith('no-voucher')) {
-                    // A session stored before the sign-in method was
-                    // recorded, and no sealed session to resume: carry on
-                    // over the direct name rather than open a gate.
-                    this.transport = 'direct';
-                    return { accessToken: existing.token, session: null, transport: 'direct' };
-                }
                 if (msg.startsWith('rejected') || msg.startsWith('no-voucher')) {
                     // 2. Interactive re-approval (the gate falls back to the
                     // full ceremony internally when it can't complete).
@@ -920,34 +912,18 @@ export class AuthFrame {
      */
     private widenedBy(existing: RestoredSession): string[] | null {
         const named = this.config.attributes ?? [];
-        if (existing.requestedAttributes) {
-            const prior = new Set(existing.requestedAttributes);
-            const widened: string[] = named.filter((k) => !prior.has(k));
-            // A scope token reaches a bundle of attributes, so a scope the
-            // prior request did not carry widens the set the same way a
-            // named key does. `openid` is always sent and never widens.
-            const priorScope = new Set((existing.scope ?? '').split(/\s+/).filter(Boolean));
-            if (priorScope.size) {
-                const scope = this.config.scope ?? ['openid', 'offline_access'];
-                for (const s of scope) {
-                    if (s !== 'openid' && !priorScope.has(s)) widened.push(s);
-                }
+        const prior = new Set(existing.requestedAttributes ?? []);
+        const widened: string[] = named.filter((k) => !prior.has(k));
+        // A scope token reaches a bundle of attributes, so a scope the
+        // prior request did not carry widens the set the same way a
+        // named key does. `openid` is always sent and never widens.
+        const priorScope = new Set((existing.scope ?? '').split(/\s+/).filter(Boolean));
+        if (priorScope.size) {
+            const scope = this.config.scope ?? ['openid', 'offline_access'];
+            for (const s of scope) {
+                if (s !== 'openid' && !priorScope.has(s)) widened.push(s);
             }
-            return widened.length ? widened : null;
         }
-        // Session stored by an older frame host — no request recorded. Best
-        // effort on named keys only: a key with no claim in the token was
-        // either never requested or granted valueless; one ceremony records
-        // the request and ends the ambiguity, so this cannot loop. Scope-only
-        // requests are left alone (nothing to compare against).
-        if (!named.length) return null;
-        let claims: Record<string, unknown>;
-        try {
-            claims = b64uJson(existing.token.split('.')[1]);
-        } catch {
-            return null;
-        }
-        const widened = named.filter((k) => !(k in claims));
         return widened.length ? widened : null;
     }
 

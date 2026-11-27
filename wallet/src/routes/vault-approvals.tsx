@@ -41,10 +41,10 @@ import {
     resolveApprovalCredential,
     type VaultApprovalRequest,
 } from '@/services/vault-approval-api';
-import { checkReshare, forgetPublishedReleases, vaultReleaseFor, type VaultRelease } from '@/services/vault-reshare';
-import { checkV1, checkV2, checkV2Release, isV2, requiresV2 } from '@/services/vault-approval-v2';
+import { checkReshare, forgetPublishedReleases, type VaultRelease } from '@/services/vault-reshare';
+import { checkV1, checkV2, isV2, releaseVerdict, requiresV2, type ReleaseVerdict } from '@/services/vault-approval-v2';
 import { computeVaultOp } from '@/services/vault-approval-batch';
-import { billingPlatform, type BillingPlatform } from '@/services/platforms';
+import type { BillingPlatform } from '@/services/platforms';
 import { PERSON_OPS, policyDiff, policyFacts, type Gate, type PersonOp } from '@/services/vault-policy-view';
 import { notify } from '@/stores/notice';
 import { freshBiometric } from '@/services/approval-answer';
@@ -200,70 +200,54 @@ function ReleaseLinkRow({
     );
 }
 /**
- * A key renewal (reshare), checked: the target vault build is approvable only
- * once its fields recompute to the bound measurement AND it is a published
- * Enclave Vault release.
+ * A key renewal or an approval on binding v2, checked: approvable only once
+ * what it shows is what it would sign and its vaults run a published Enclave
+ * Vault release (releaseVerdict).
  */
-type ReshareCheck =
-    | { kind: 'checking' }
-    | { kind: 'ok'; release: VaultRelease; vaults: number; threshold: number }
-    /** The fields do not recompute to what the approval binds. */
-    | { kind: 'mismatch' }
-    /** The build is no published release. */
-    | { kind: 'unpublished'; mrenclave: string }
-    /** GitHub could not be reached for a build not pinned in this wallet. */
-    | { kind: 'unreachable' };
-
-async function checkReshareRequest(req: VaultApprovalRequest): Promise<ReshareCheck> {
-    const checked = checkReshare(req.summary);
-    if (!checked) return { kind: 'mismatch' };
-    try {
-        const release = await vaultReleaseFor(checked.mrenclave);
-        if (!release) return { kind: 'unpublished', mrenclave: checked.mrenclave };
-        return { kind: 'ok', release, vaults: checked.vaults.length, threshold: checked.threshold };
-    } catch {
-        return { kind: 'unreachable' };
-    }
-}
-
-/**
- * An approval on binding v2, checked: approvable only once what it shows is
- * what it would sign, every vault it names has an identity that agrees with
- * itself, and those vaults run a published Enclave Vault release.
- */
-type V2Check =
+type VaultCheck =
     | { kind: 'checking' }
     | {
           kind: 'ok';
           release: VaultRelease;
-          vaults: number;
-          platform: BillingPlatform;
+          /** v2: which platform the vaults are on. */
+          platform?: BillingPlatform;
+          /** A key renewal: the new vaults and how many of them must agree. */
+          quorum?: { vaults: number; threshold: number };
           successor?: string;
           /** The rules the approval installs, and the ones in force when it binds them too. */
           newPolicy?: unknown;
           currentPolicy?: unknown;
       }
-    | { kind: 'mismatch' }
-    | { kind: 'unpublished'; build: string }
-    | { kind: 'unreachable' };
+    | Exclude<ReleaseVerdict, { kind: 'ok' }>;
 
-async function checkV2Request(req: VaultApprovalRequest): Promise<V2Check> {
-    const checked = checkV2(req.vault_op, req.summary, Math.floor(Date.now() / 1000));
-    if (!checked) return { kind: 'mismatch' };
-    const release = await checkV2Release(checked, typeof req.summary.vault_release === 'string' ? req.summary.vault_release : undefined);
-    if (release.kind === 'ok') {
-        const platform = await billingPlatform(checked.billingIds);
-        return {
-            kind: 'ok',
-            release: release.release,
-            vaults: checked.members.length,
-            platform,
-            successor: checked.successor,
-            newPolicy: checked.newPolicy,
-            currentPolicy: checked.currentPolicy,
-        };
+/** Whether a request is checked before Approve is offered (the others are v1 cards). */
+const isChecked = (s: VaultApprovalRequest['summary']) => s.operation === 'reshare' || isV2(s);
+
+async function checkRequest(req: VaultApprovalRequest): Promise<VaultCheck> {
+    const s = req.summary;
+    if (s.operation === 'reshare') {
+        const reshare = checkReshare(s);
+        const bound = isV2(s) ? !!checkV2(req.vault_op, s, Math.floor(Date.now() / 1000)) : checkV1(req.vault_op, s, computeVaultOp);
+        if (!reshare || !bound) return { kind: 'mismatch' };
+        const verdict = await releaseVerdict([reshare.mrenclave], ['reshare']);
+        if (verdict.kind !== 'ok') return verdict;
+        return { kind: 'ok', release: verdict.release, quorum: { vaults: reshare.vaults.length, threshold: reshare.threshold } };
     }
-    return release;
+    const checked = checkV2(req.vault_op, s, Math.floor(Date.now() / 1000));
+    if (!checked) return { kind: 'mismatch' };
+    const verdict = await releaseVerdict(checked.builds, [checked.op], {
+        hint: typeof s.vault_release === 'string' ? s.vault_release : undefined,
+        billingIds: checked.billingIds,
+    });
+    if (verdict.kind !== 'ok') return verdict;
+    return {
+        kind: 'ok',
+        release: verdict.release,
+        platform: verdict.platform,
+        successor: checked.successor,
+        newPolicy: checked.newPolicy,
+        currentPolicy: checked.currentPolicy,
+    };
 }
 
 /** Human countdown to expiry (expires_at is epoch seconds). */
@@ -335,44 +319,26 @@ function VaultApprovalsScreen() {
         };
     }, [pending, provenance]);
 
-    // Key renewals, checked before Approve is offered (services/vault-reshare).
-    // Each is checked once; a pull to refresh checks again the ones that could
-    // not be approved (GitHub unreachable, or a release published since).
-    const [reshares, setReshares] = useState<Record<string, ReshareCheck>>({});
-    const reshareStarted = useRef(new Set<string>());
+    // Key renewals and v2 approvals, checked before Approve is offered. Each
+    // is checked once; a pull to refresh checks again the ones that could not
+    // be approved (GitHub unreachable, or a release published since).
+    const [checks, setChecks] = useState<Record<string, VaultCheck>>({});
+    const started = useRef(new Set<string>());
     const [recheck, setRecheck] = useState(0);
     useEffect(() => {
         for (const req of pending) {
-            if (req.summary.operation !== 'reshare' || reshareStarted.current.has(req.vault_op)) continue;
-            reshareStarted.current.add(req.vault_op);
-            void checkReshareRequest(req).then((c) => setReshares((prev) => ({ ...prev, [req.vault_op]: c })));
+            if (!isChecked(req.summary) || started.current.has(req.vault_op)) continue;
+            started.current.add(req.vault_op);
+            void checkRequest(req).then((c) => setChecks((prev) => ({ ...prev, [req.vault_op]: c })));
         }
     }, [pending, recheck]);
-    // Approvals on binding v2, checked the same way before Approve is offered.
-    const [v2Checks, setV2Checks] = useState<Record<string, V2Check>>({});
-    const v2Started = useRef(new Set<string>());
-    useEffect(() => {
-        for (const req of pending) {
-            if (!isV2(req.summary) || v2Started.current.has(req.vault_op)) continue;
-            v2Started.current.add(req.vault_op);
-            void checkV2Request(req).then((c) => setV2Checks((prev) => ({ ...prev, [req.vault_op]: c })));
-        }
-    }, [pending, recheck]);
-    const recheckReshares = useCallback(() => {
+    const recheckUnsettled = useCallback(() => {
         forgetPublishedReleases();
-        setV2Checks((prev) => {
-            const kept: Record<string, V2Check> = {};
+        setChecks((prev) => {
+            const kept: Record<string, VaultCheck> = {};
             for (const [op, c] of Object.entries(prev)) {
                 if (c.kind === 'ok' || c.kind === 'mismatch') kept[op] = c;
-                else v2Started.current.delete(op);
-            }
-            return kept;
-        });
-        setReshares((prev) => {
-            const kept: Record<string, ReshareCheck> = {};
-            for (const [op, c] of Object.entries(prev)) {
-                if (c.kind === 'ok' || c.kind === 'mismatch') kept[op] = c;
-                else reshareStarted.current.delete(op);
+                else started.current.delete(op);
             }
             return kept;
         });
@@ -398,10 +364,10 @@ function VaultApprovalsScreen() {
     // pull down to find the request.
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        recheckReshares();
+        recheckUnsettled();
         await discover();
         setRefreshing(false);
-    }, [discover, recheckReshares]);
+    }, [discover, recheckUnsettled]);
 
     const approve = useCallback(
         async (req: VaultApprovalRequest) => {
@@ -509,19 +475,14 @@ function VaultApprovalsScreen() {
                         // An app's own policy: its handle is a namespace, not a
                         // key, and its digest is the document's, not a measurement.
                         const isPolicy = s.operation === 'app-policy';
-                        // A key renewal is approvable only once checked: its
-                        // target build is a published release and is what the
-                        // approval binds.
                         const isReshare = s.operation === 'reshare';
-                        const reshare = isReshare ? reshares[req.vault_op] ?? { kind: 'checking' as const } : undefined;
-                        // An approval on binding v2 is approvable only once
-                        // what it shows is what it signs, for vaults on a
-                        // published release.
-                        // An operation that exists only on v2 and carries no
+                        // A key renewal or an approval on binding v2 is
+                        // approvable only once checked (checkRequest). An
+                        // operation that exists only on v2 and carries no
                         // binding is refused, never shown as an unchecked v1
                         // card. A v1 card that says what it binds is recomputed.
-                        const v2: V2Check | undefined = isV2(s)
-                            ? v2Checks[req.vault_op] ?? { kind: 'checking' as const }
+                        const check: VaultCheck | undefined = isChecked(s)
+                            ? checks[req.vault_op] ?? { kind: 'checking' as const }
                             : requiresV2(s.operation) || !checkV1(req.vault_op, s, computeVaultOp)
                               ? { kind: 'mismatch' as const }
                               : undefined;
@@ -529,7 +490,7 @@ function VaultApprovalsScreen() {
                         const isKeyCreate = s.operation === 'create';
                         const isKeyDelete = s.operation === 'delete';
                         const isOldKeyDelete = s.operation === 'delete_after';
-                        const canApprove = !busy && (!reshare || reshare.kind === 'ok') && (!v2 || v2.kind === 'ok');
+                        const canApprove = !busy && (!check || check.kind === 'ok');
                         return (
                             <RNView key={req.vault_op} style={[styles.card, highlighted && styles.cardHighlighted]}>
                                 <RNView style={styles.cardHeader}>
@@ -594,90 +555,64 @@ function VaultApprovalsScreen() {
                                                     : t('vaultApprovals.explainOther')}
                                 </Text>
 
-                                {/* The target vault build, as its published
-                                    release; anything else is said plainly and
-                                    leaves only Decline. */}
-                                {reshare?.kind === 'ok' ? (
+                                {/* The vaults this approval is for, as their
+                                    published release, and for a key renewal
+                                    the new vaults; anything else is said
+                                    plainly and leaves only Decline. */}
+                                {check?.kind === 'ok' ? (
                                     <>
                                         <ReleaseLinkRow
-                                            icon="shield-checkmark-outline"
+                                            icon='shield-checkmark-outline'
                                             label={t('vaultApprovals.vaultRelease')}
-                                            value={t('vaultApprovals.vaultReleaseName', { version: reshare.release.version })}
-                                            url={reshare.release.url}
+                                            value={t('vaultApprovals.vaultReleaseName', { version: check.release.version })}
+                                            url={check.release.url}
                                         />
-                                        <RNView style={styles.row}>
-                                            <Text style={styles.label}>{t('vaultApprovals.newVaults')}</Text>
-                                            <Text style={styles.value}>
-                                                {t('vaultApprovals.reshareQuorum', {
-                                                    threshold: reshare.threshold,
-                                                    vaults: reshare.vaults,
-                                                })}
-                                            </Text>
-                                        </RNView>
-                                    </>
-                                ) :reshare?.kind === 'checking' ? (
-                                    <RNView style={styles.row}>
-                                        <Text style={styles.label}>{t('vaultApprovals.vaultRelease')}</Text>
-                                        <ActivityIndicator size="small" color={p.infoText} />
-                                    </RNView>
-                                ) : reshare ? (
-                                    <RNView style={styles.warnBox} testID="vault-reshare-refused">
-                                        <Text style={styles.warnText}>
-                                            {reshare.kind === 'mismatch'
-                                                ? t('vaultApprovals.reshareMismatch')
-                                                : reshare.kind === 'unpublished'
-                                                  ? t('vaultApprovals.reshareUnpublished')
-                                                  : t('vaultApprovals.reshareUnreachable')}
-                                        </Text>
-                                        {reshare.kind === 'unpublished' ? (
-                                            <Text style={styles.warnMono} selectable>
-                                                {reshare.mrenclave}
-                                            </Text>
+                                        {check.quorum ? (
+                                            <RNView style={styles.row}>
+                                                <Text style={styles.label}>{t('vaultApprovals.newVaults')}</Text>
+                                                <Text style={styles.value}>
+                                                    {t('vaultApprovals.reshareQuorum', {
+                                                        threshold: check.quorum.threshold,
+                                                        vaults: check.quorum.vaults,
+                                                    })}
+                                                </Text>
+                                            </RNView>
                                         ) : null}
-                                    </RNView>
-                                ) : null}
-
-                                {/* The vaults this approval is for, as their
-                                    published release. */}
-                                {v2?.kind === 'ok' ? (
-                                    <ReleaseLinkRow
-                                        icon="shield-checkmark-outline"
-                                        label={t('vaultApprovals.vaultRelease')}
-                                        value={t('vaultApprovals.vaultReleaseName', { version: v2.release.version })}
-                                        url={v2.release.url}
-                                    />
-                                ) : null}
-                                {/* Which platform those vaults are on: a test
-                                    vault and a production one may run the
-                                    same release. */}
-                                {v2?.kind === 'ok' ? (
-                                    <RNView style={styles.row} testID="vault-v2-platform">
-                                        <Text style={styles.label}>{t('vaultApprovals.vaultPlatform')}</Text>
-                                        <Text style={styles.value}>
-                                            {v2.platform.kind === 'default'
-                                                ? t('vaultApprovals.platformProduction')
-                                                : v2.platform.kind === 'named'
-                                                  ? v2.platform.domain
-                                                  : t('vaultApprovals.platformUnknown')}
-                                        </Text>
-                                    </RNView>
-                                ) : v2?.kind === 'checking' ? (
+                                        {/* Which platform those vaults are on: a
+                                            test vault and a production one may
+                                            run the same release. */}
+                                        {check.platform ? (
+                                            <RNView style={styles.row} testID='vault-check-platform'>
+                                                <Text style={styles.label}>{t('vaultApprovals.vaultPlatform')}</Text>
+                                                <Text style={styles.value}>
+                                                    {check.platform.kind === 'default'
+                                                        ? t('vaultApprovals.platformProduction')
+                                                        : check.platform.kind === 'named'
+                                                          ? check.platform.domain
+                                                          : t('vaultApprovals.platformUnknown')}
+                                                </Text>
+                                            </RNView>
+                                        ) : null}
+                                    </>
+                                ) : check?.kind === 'checking' ? (
                                     <RNView style={styles.row}>
                                         <Text style={styles.label}>{t('vaultApprovals.vaultRelease')}</Text>
-                                        <ActivityIndicator size="small" color={p.infoText} />
+                                        <ActivityIndicator size='small' color={p.infoText} />
                                     </RNView>
-                                ) : v2 ? (
-                                    <RNView style={styles.warnBox} testID="vault-v2-refused">
+                                ) : check ? (
+                                    <RNView style={styles.warnBox} testID='vault-check-refused'>
                                         <Text style={styles.warnText}>
-                                            {v2.kind === 'mismatch'
+                                            {check.kind === 'mismatch'
                                                 ? t('vaultApprovals.reshareMismatch')
-                                                : v2.kind === 'unpublished'
-                                                  ? t('vaultApprovals.vaultsUnpublished')
+                                                : check.kind === 'unpublished'
+                                                  ? isReshare
+                                                    ? t('vaultApprovals.reshareUnpublished')
+                                                    : t('vaultApprovals.vaultsUnpublished')
                                                   : t('vaultApprovals.reshareUnreachable')}
                                         </Text>
-                                        {v2.kind === 'unpublished' ? (
+                                        {check.kind === 'unpublished' ? (
                                             <Text style={styles.warnMono} selectable>
-                                                {v2.build}
+                                                {check.build}
                                             </Text>
                                         ) : null}
                                     </RNView>
@@ -685,10 +620,10 @@ function VaultApprovalsScreen() {
 
                                 {/* The delete of an old key: the key that
                                     replaces it, which the delete waits for. */}
-                                {v2?.kind === 'ok' && v2.successor ? (
+                                {check?.kind === 'ok' && check.successor ? (
                                     <RNView style={styles.row} testID="vault-v2-successor">
                                         <Text style={styles.label}>{t('vaultApprovals.replacedBy')}</Text>
-                                        <Text style={styles.value}>{shortKeyName(v2.successor)}</Text>
+                                        <Text style={styles.value}>{shortKeyName(check.successor)}</Text>
                                     </RNView>
                                 ) : null}
 
@@ -697,18 +632,18 @@ function VaultApprovalsScreen() {
                                 {/* What changes, when the approval binds the
                                     rules in force too; then what the new rules
                                     say, in plain facts. */}
-                                {v2?.kind === 'ok' && v2.newPolicy !== undefined && v2.currentPolicy !== undefined ? (
-                                    <PolicyChangeRows current={v2.currentPolicy} next={v2.newPolicy} t={t} styles={styles} />
+                                {check?.kind === 'ok' && check.newPolicy !== undefined && check.currentPolicy !== undefined ? (
+                                    <PolicyChangeRows current={check.currentPolicy} next={check.newPolicy} t={t} styles={styles} />
                                 ) : null}
-                                {v2?.kind === 'ok' && v2.newPolicy !== undefined ? (
-                                    <PolicyFactRows policy={v2.newPolicy} t={t} styles={styles} />
+                                {check?.kind === 'ok' && check.newPolicy !== undefined ? (
+                                    <PolicyFactRows policy={check.newPolicy} t={t} styles={styles} />
                                 ) : null}
-                                {(isKeyRules || isKeyCreate) && v2?.kind === 'ok' && v2.newPolicy !== undefined ? (
+                                {(isKeyRules || isKeyCreate) && check?.kind === 'ok' && check.newPolicy !== undefined ? (
                                     <RNView style={styles.summaryBox}>
                                         <Text style={styles.summaryLabel}>{t('vaultApprovals.fullRules')}</Text>
                                         <ScrollView style={styles.rulesScroll} nestedScrollEnabled>
                                             <Text style={styles.rulesText} selectable>
-                                                {JSON.stringify(v2.newPolicy, null, 2)}
+                                                {JSON.stringify(check.newPolicy, null, 2)}
                                             </Text>
                                         </ScrollView>
                                     </RNView>

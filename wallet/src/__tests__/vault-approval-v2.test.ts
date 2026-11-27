@@ -17,7 +17,7 @@ jest.mock('@/utils/storage', () => {
 
 import { createHash } from 'crypto';
 
-import { bindsReplacedRules, checkV2, checkV2Release, isV2, refusedOnRelease, type V2Summary } from '@/services/vault-approval-v2';
+import { bindsReplacedRules, checkV2, isV2, refusedOnRelease, releaseVerdict, type V2Summary } from '@/services/vault-approval-v2';
 import { bindingVaultOp } from '@/services/vault-binding';
 import { policyDigest, type VaultIdentity } from '@/services/vault-identity';
 import { forgetPublishedReleases } from '@/services/vault-reshare';
@@ -156,14 +156,15 @@ describe('the vaults\' release', () => {
 
     it('is named when every vault runs one published release', async () => {
         const { vaultOp, summary } = approval();
-        const got = await checkV2Release(checkV2(vaultOp, summary, NOW)!);
+        const checked = checkV2(vaultOp, summary, NOW)!;
+        const got = await releaseVerdict(checked.builds, [checked.op]);
         expect(got).toEqual({ kind: 'ok', release: expect.objectContaining({ version: 'v0.39.0' }) });
     });
 
     it('refuses a rule change without the rules it replaces, where the vaults can bind them', async () => {
         const build = '28b01b4b2de825bf19ed6a8622af95ecf61d3f759bf5ed0d8e6c8415acc6fa4b'; // vault-v0.42.0
         const on = (op: 'update_policy' | 'update_policy_from' | 'promote', b: string) =>
-            checkV2Release({ op, members: [], builds: [b], billingIds: [], exp: NOW });
+            releaseVerdict([b], [op]);
         expect((await on('update_policy', build)).kind).toBe('mismatch');
         expect((await on('update_policy_from', build)).kind).toBe('ok');
         expect((await on('promote', build)).kind).toBe('ok');
@@ -184,10 +185,8 @@ describe('the vaults\' release', () => {
     });
 
     it('is not, when the vaults differ or GitHub cannot say', async () => {
-        const mixed = { op: 'promote' as const, members: [], builds: [PUBLISHED, 'ee'.repeat(32)], billingIds: [], exp: NOW };
-        expect((await checkV2Release(mixed)).kind).toBe('unpublished');
-        const unknown = { op: 'promote' as const, members: [], builds: ['ee'.repeat(32)], billingIds: [], exp: NOW };
-        expect((await checkV2Release(unknown)).kind).toBe('unreachable');
+        expect((await releaseVerdict([PUBLISHED, 'ee'.repeat(32)], ['promote'])).kind).toBe('unpublished');
+        expect((await releaseVerdict(['ee'.repeat(32)], ['promote'])).kind).toBe('unreachable');
     });
 });
 

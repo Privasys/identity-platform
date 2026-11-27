@@ -58,9 +58,7 @@ import {
     type VaultBatchKeyKind,
     type VerifiedVaultBatch,
 } from '@/services/vault-approval-batch';
-import { refusedOnRelease } from '@/services/vault-approval-v2';
-import { vaultReleaseFor, type VaultRelease } from '@/services/vault-reshare';
-import { billingPlatform, type BillingPlatform } from '@/services/platforms';
+import { releaseVerdict, type ReleaseVerdict } from '@/services/vault-approval-v2';
 import { notify } from '@/stores/notice';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
@@ -103,68 +101,31 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
     const [hosts, setHosts] = useState<Record<string, VaultBatchHost | null>>({});
     const [versions, setVersions] = useState<Record<string, string | null>>({});
     // A v2 batch names its vaults: their build, as a published Enclave Vault
-    // release, before Approve is offered. Absent for a batch that names none.
-    const [release, setRelease] = useState<
-        | { kind: 'checking' }
-        | { kind: 'ok'; release: VaultRelease }
-        | { kind: 'unpublished' }
-        | { kind: 'unreachable' }
-        | { kind: 'mismatch' }
-        | null
-    >(null);
-    // Which platform those vaults are on: a test vault and a production one
-    // may run the same release.
-    const [platform, setPlatform] = useState<BillingPlatform | null>(null);
-    const billingKey = phase.kind === 'ready' && phase.batch.billingIds ? phase.batch.billingIds.join(',') : null;
-    useEffect(() => {
-        if (billingKey === null) {
-            setPlatform(null);
-            return;
-        }
-        let cancelled = false;
-        void billingPlatform(billingKey === '' ? [] : billingKey.split(',')).then((found) => {
-            if (!cancelled) setPlatform(found);
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, [billingKey]);
+    // release on a named platform (releaseVerdict), before Approve is offered.
+    // Absent for a batch that names none.
+    const [release, setRelease] = useState<{ kind: 'checking' } | ReleaseVerdict | null>(null);
     const [readToEnd, setReadToEnd] = useState(false);
     const [busy, setBusy] = useState(false);
     const [now, setNow] = useState(() => Date.now());
     const layout = useRef({ offsetY: 0, viewportHeight: 0, contentHeight: 0 });
 
-    const builds = phase.kind === 'ready' ? phase.batch.builds : undefined;
-    const buildsKey = builds ? builds.join(',') : null;
-    // The batch's operations, for the rule a release puts on them.
-    const opsKey = phase.kind === 'ready' ? [...new Set(phase.batch.entries.map((e) => e.operation))].sort().join(',') : '';
+    const batch = phase.kind === 'ready' ? phase.batch : null;
     useEffect(() => {
-        if (buildsKey === null) {
+        if (!batch?.builds) {
             setRelease(null);
-            return;
-        }
-        const list = buildsKey === '' ? [] : buildsKey.split(',');
-        if (list.length !== 1) {
-            setRelease({ kind: 'unpublished' });
             return;
         }
         let cancelled = false;
         setRelease({ kind: 'checking' });
-        vaultReleaseFor(list[0]).then(
-            (r) => {
-                if (cancelled) return;
-                if (!r) setRelease({ kind: 'unpublished' });
-                else if (opsKey.split(',').some((op) => refusedOnRelease(op, r.version))) setRelease({ kind: 'mismatch' });
-                else setRelease({ kind: 'ok', release: r });
-            },
-            () => {
-                if (!cancelled) setRelease({ kind: 'unreachable' });
-            },
-        );
+        const ops = [...new Set(batch.entries.map((e) => e.operation))];
+        void releaseVerdict(batch.builds, ops, { billingIds: batch.billingIds ?? [] }).then((verdict) => {
+            if (!cancelled) setRelease(verdict);
+        });
         return () => {
             cancelled = true;
         };
-    }, [buildsKey, opsKey]);
+    }, [batch]);
+    const platform = release?.kind === 'ok' ? release.platform : undefined;
 
     const load = useCallback(async () => {
         setPhase({ kind: 'loading' });
@@ -185,8 +146,6 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
     useEffect(() => {
         void load();
     }, [load]);
-
-    const batch = phase.kind === 'ready' ? phase.batch : null;
 
     useEffect(() => {
         if (!batch) return;

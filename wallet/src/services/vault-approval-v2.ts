@@ -7,13 +7,14 @@
  * The request arrives through privasys.id with the fields of the binding, the
  * identities of the vaults it names and, for a policy change, the policies.
  * `checkV2` runs the check every bound approval gets (services/vault-bound-check)
- * and refuses one that has expired. `checkV2Release` then names the vaults'
+ * and refuses one that has expired. `releaseVerdict` then names the vaults'
  * build as a published Enclave Vault release, from GitHub.
  */
 
 import { APPROVAL_MAX_SECONDS, CLOCK_MARGIN_SECONDS, verifyBoundEntry, type BoundApproval } from './vault-bound-check';
 import { VAULT_OPS } from './vault-binding';
 import type { VaultIdentity } from './vault-identity';
+import { billingPlatform, type BillingPlatform } from './platforms';
 import { vaultReleaseFor, type VaultRelease } from './vault-reshare';
 
 /** The binding's fields, as privasys.id relays them. */
@@ -109,9 +110,10 @@ export function checkV2(vaultOp: string, summary: V2Summary, nowSeconds: number)
     return checked;
 }
 
-export type V2Release =
-    /** Every vault runs this published release. */
-    | { kind: 'ok'; release: VaultRelease }
+/** What the wallet says of the vaults an approval is for, before Approve is offered. */
+export type ReleaseVerdict =
+    /** Every vault runs this published release, on this platform when asked. */
+    | { kind: 'ok'; release: VaultRelease; platform?: BillingPlatform }
     /** The vaults do not all claim one build, or it is no published release. */
     | { kind: 'unpublished'; build: string }
     /** GitHub could not be reached. */
@@ -147,20 +149,29 @@ export function refusedOnRelease(op: string, version: string): boolean {
 }
 
 /**
- * Name the vaults' build as a published Enclave Vault release. `hint` is a
- * release tag relayed with the request: it says where to look first, and
- * GitHub's answer is what counts.
+ * The one release verdict, for a single approval, a key renewal and a batch:
+ * the vaults' build named as a published Enclave Vault release, none of `ops`
+ * refused on it, and, given their billing ids, the platform they are on.
+ * `hint` is a release tag relayed with the request: it says where to look
+ * first, and GitHub's answer is what counts.
  */
-export async function checkV2Release(checked: BoundApproval, hint?: string): Promise<V2Release> {
-    if (checked.builds.length !== 1) return { kind: 'unpublished', build: checked.builds.join(', ') };
+export async function releaseVerdict(
+    builds: readonly string[],
+    ops: readonly string[],
+    opts: { hint?: string; billingIds?: readonly string[] } = {},
+): Promise<ReleaseVerdict> {
+    if (builds.length !== 1) return { kind: 'unpublished', build: builds.join(', ') };
+    let release: VaultRelease | null;
     try {
-        const release = await vaultReleaseFor(checked.builds[0], hint);
-        if (!release) return { kind: 'unpublished', build: checked.builds[0] };
-        // On vaults that can bind the rules being replaced, a rule change that
-        // leaves them out is not signed: the card could not show what changes.
-        if (refusedOnRelease(checked.op, release.version)) return { kind: 'mismatch' };
-        return { kind: 'ok', release };
+        release = await vaultReleaseFor(builds[0], opts.hint);
     } catch {
         return { kind: 'unreachable' };
     }
+    if (!release) return { kind: 'unpublished', build: builds[0] };
+    // On vaults that can bind the rules being replaced, a rule change that
+    // leaves them out is not signed: the card could not show what changes.
+    const version = release.version;
+    if (ops.some((op) => refusedOnRelease(op, version))) return { kind: 'mismatch' };
+    if (!opts.billingIds) return { kind: 'ok', release };
+    return { kind: 'ok', release, platform: await billingPlatform([...opts.billingIds]) };
 }

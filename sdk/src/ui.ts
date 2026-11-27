@@ -103,9 +103,9 @@ export interface AuthUIConfig {
          *  have the host run the full ceremony. */
         run: () => Promise<void>;
     };
-    /** Approve one operation someone started elsewhere (a vault approval
-     *  the terminal asked for), not a sign-in. The wallet was notified when
-     *  the operation was asked for; the gate shows that, the QR code that
+    /** Approve one operation someone started elsewhere, not a sign-in. The
+     *  wallet was notified when the operation was asked for; the gate shows
+     *  that, the QR code that
      *  opens the approval in the wallet, and a passkey fallback, and waits.
      *  `signIn()` resolves once `wait()` does, with an empty result. */
     operationApproval?: {
@@ -2269,7 +2269,7 @@ export class AuthUI {
             );
         }
         // An operation that will not be approved (declined, expired): the
-        // outcome is final, and the terminal asks again if it is wanted.
+        // outcome is final; whoever started it asks again if it is wanted.
         if (this.cfg.operationApproval) {
             return el('div', null,
                 el('div', { className: 'error-icon', html: ICON_X_CIRCLE }),

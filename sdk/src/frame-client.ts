@@ -191,17 +191,26 @@ export interface AuthFrameConfig {
      */
     deviceRequest?: { userCode: string };
     /**
-     * Approve one operation someone started elsewhere, such as a vault
-     * approval the terminal asked for, named by its challenge. The gate shows
-     * that the wallet was notified, the QR code that opens the approval in the
+     * Approve one operation someone started elsewhere. The gate shows that
+     * the wallet was notified, the QR code that opens the approval in the
      * wallet (`walletLink`), and a passkey button that calls `onPasskey`
-     * when given. `signIn()` resolves with `approved: true` once the
-     * operation is approved, however it was.
+     * when given. It polls `statusUrl` (answering `{ status }`: `approved`,
+     * `declined` or `gone`), and its decline button POSTs to `declineUrl`
+     * (204 when recorded); both are on the identity provider's origin.
+     * `messages` is what the gate says when it ends approved, declined or
+     * expired. `signIn()` resolves with `approved: true` once the operation
+     * is approved, however it was.
      *
      * For the identity provider's own pages only: the gate refuses it from
      * any other origin.
      */
-    operationApproval?: { challenge: string; walletLink: string; onPasskey?: () => void };
+    operationApproval?: {
+        walletLink: string;
+        statusUrl: string;
+        declineUrl: string;
+        messages?: { approved?: string; declined?: string; expired?: string };
+        onPasskey?: () => void;
+    };
     /** Management service API base URL. */
     apiBase: string;
     /** App name or UUID as registered on the platform. */
@@ -1267,8 +1276,10 @@ export class AuthFrame {
                                     // the frame only learns a passkey is offered.
                                     ...(this.config.operationApproval ? {
                                         operationApproval: {
-                                            challenge: this.config.operationApproval.challenge,
                                             walletLink: this.config.operationApproval.walletLink,
+                                            statusUrl: this.config.operationApproval.statusUrl,
+                                            declineUrl: this.config.operationApproval.declineUrl,
+                                            messages: this.config.operationApproval.messages,
                                             passkey: !!this.config.operationApproval.onPasskey,
                                         },
                                     } : {}),

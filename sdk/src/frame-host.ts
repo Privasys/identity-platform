@@ -369,34 +369,71 @@ async function lookupDeviceRequest(idpBase: string, userCode: string): Promise<D
 
 /** An operation to approve, as the page passed it. */
 interface OperationRequest {
-    challenge: string;
     walletLink: string;
     passkey: boolean;
+    /** Answers the operation's status: `approved`, `declined` or `gone`. */
+    statusUrl: string;
+    /** Declines the operation (POST, 204). */
+    declineUrl: string;
+    /** What the gate says when it ends each way. */
+    messages: { approved: string; declined: string; expired: string };
 }
 
 /** The wallet links an operation approval may carry: the production wallet's
  *  scheme, or a dev or preview build's. */
-const OPERATION_WALLET_LINK = /^privasys-wallet(-dev|-preview)?:\/\/vault-approvals\?vault_op=[A-Za-z0-9_%-]+$/;
+const OPERATION_WALLET_LINK = /^privasys-wallet(-dev|-preview)?:\/\/[a-z-]+\?[A-Za-z0-9_=%&.-]+$/;
 
-function sanitiseOperation(raw: unknown): OperationRequest | undefined {
-    const o = raw as { challenge?: unknown; walletLink?: unknown; passkey?: unknown } | null | undefined;
-    if (!o || typeof o.challenge !== 'string' || typeof o.walletLink !== 'string') return undefined;
-    if (!/^[A-Za-z0-9_-]{16,256}$/.test(o.challenge) || !OPERATION_WALLET_LINK.test(o.walletLink)) return undefined;
-    return { challenge: o.challenge, walletLink: o.walletLink, passkey: o.passkey === true };
+/** An address on this frame's own origin (the identity provider's), or nothing. */
+function ownOriginUrl(raw: unknown): string | undefined {
+    if (typeof raw !== 'string' || raw.length > 2048) return undefined;
+    try {
+        const u = new URL(raw, globalThis.location.origin);
+        return u.origin === globalThis.location.origin ? u.href : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
-/** Waits until the identity provider says the operation is approved. */
-async function waitOperation(idpBase: string, challenge: string, timeoutMs = 300_000): Promise<void> {
+/** A line of the page's copy: plain text, capped. */
+function sanitiseLine(raw: unknown, fallback: string): string {
+    return typeof raw === 'string' && raw.trim() ? raw.trim().slice(0, 200) : fallback;
+}
+
+function sanitiseOperation(raw: unknown): OperationRequest | undefined {
+    const o = raw as {
+        walletLink?: unknown; passkey?: unknown; statusUrl?: unknown; declineUrl?: unknown;
+        messages?: { approved?: unknown; declined?: unknown; expired?: unknown };
+    } | null | undefined;
+    if (!o || typeof o.walletLink !== 'string' || !OPERATION_WALLET_LINK.test(o.walletLink)) return undefined;
+    const statusUrl = ownOriginUrl(o.statusUrl);
+    const declineUrl = ownOriginUrl(o.declineUrl);
+    if (!statusUrl || !declineUrl) return undefined;
+    const m = o.messages ?? {};
+    return {
+        walletLink: o.walletLink,
+        passkey: o.passkey === true,
+        statusUrl,
+        declineUrl,
+        messages: {
+            approved: sanitiseLine(m.approved, 'You can close this tab.'),
+            declined: sanitiseLine(m.declined, 'You can close this tab.'),
+            expired: sanitiseLine(m.expired, 'This approval has expired.'),
+        },
+    };
+}
+
+/** Waits until the operation's status says it is approved. */
+async function waitOperation(op: OperationRequest, timeoutMs = 300_000): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-        const resp = await fetch(`${idpBase}/fido2/vault-approval/status?challenge=${encodeURIComponent(challenge)}`, { cache: 'no-store' });
+        const resp = await fetch(op.statusUrl, { cache: 'no-store' });
         const data = resp.ok ? await resp.json().catch(() => null) : null;
         if (data?.status === 'approved') return;
         if (data?.status === 'declined') throw new Error('The approval was declined.');
-        if (data?.status === 'gone') throw new Error('This approval has expired. Run the command again.');
+        if (data?.status === 'gone') throw new Error(op.messages.expired);
         await new Promise((r) => setTimeout(r, 1500));
     }
-    throw new Error('This approval has expired. Run the command again.');
+    throw new Error(op.messages.expired);
 }
 
 /** Waits until the identity provider says a session is authenticated. */
@@ -1430,9 +1467,9 @@ window.addEventListener('message', async (e: MessageEvent) => {
         // token, so it must never serve a widened attribute request — a
         // widened set needs a freshly minted token, which only the OIDC
         // ceremony (and its step-up push path) can produce.
-        // An operation to approve (a vault approval the terminal asked for).
-        // Only the identity provider's own pages may run it: the challenge is
-        // the capability, and a foreign page must not walk a visitor through
+        // An operation someone started elsewhere, to approve. Only the
+        // identity provider's own pages may run it: the request is the
+        // capability, and a foreign page must not walk a visitor through
         // approving someone else's operation.
         if (config.operationApproval !== undefined) {
             const operation = sanitiseOperation(config.operationApproval);
@@ -1450,16 +1487,13 @@ window.addEventListener('message', async (e: MessageEvent) => {
                 theme,
                 legal,
                 onNavigate,
-                finalScreen: { title: 'Approved', message: 'Your terminal continues on its own. You can close this tab.' },
+                finalScreen: { title: 'Approved', message: operation.messages.approved },
                 decline: {
                     label: 'Not me, decline',
                     title: 'Declined',
-                    message: 'Your terminal stops waiting. You can close this tab.',
+                    message: operation.messages.declined,
                     run: async () => {
-                        const resp = await fetch(
-                            `${globalThis.location.origin}/fido2/vault-approval/decline?challenge=${encodeURIComponent(operation.challenge)}`,
-                            { method: 'POST' },
-                        );
+                        const resp = await fetch(operation.declineUrl, { method: 'POST' });
                         if (resp.status !== 204) throw new Error('this approval is no longer open');
                     },
                 },
@@ -1468,7 +1502,7 @@ window.addEventListener('message', async (e: MessageEvent) => {
                     ...(operation.passkey
                         ? { onPasskey: () => window.parent.postMessage({ type: 'privasys:operation:passkey' }, parentOrigin) }
                         : {}),
-                    wait: () => waitOperation(globalThis.location.origin, operation.challenge),
+                    wait: () => waitOperation(operation),
                 },
             });
             activeUI = operationUI;

@@ -28,7 +28,7 @@ const bundle = fs.readFileSync('dist/privasys-auth.iife.js', 'utf8');
       new Privasys.AuthUI({
         apiBase: 'https://gate.test', appName: 'Example', rpId: 'gate.test', presentation: 'page',
         operationApproval: {
-          walletLink: 'privasys-wallet://vault-approvals?vault_op=x',
+          walletLink: 'privasys-wallet://approvals?op=x',
           wait: () => approvalFails ? Promise.reject(new Error('This approval expired.')) : new Promise(() => {}),
         },
         decline: {

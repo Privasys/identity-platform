@@ -242,8 +242,14 @@ function openGate() {
         bullets: bullets.slice(0, 5)
       },
       operationApproval: {
-        challenge: vaultOp,
         walletLink: walletLink,
+        statusUrl: "/fido2/vault-approval/status?challenge=" + encodeURIComponent(vaultOp),
+        declineUrl: "/fido2/vault-approval/decline?challenge=" + encodeURIComponent(vaultOp),
+        messages: {
+          approved: "Your terminal continues on its own. You can close this tab.",
+          declined: "Your terminal stops waiting. You can close this tab.",
+          expired: "This approval has expired. Run the command again."
+        },
         // The passkey runs on this page, which holds the request's options.
         onPasskey: function () { showCard(); approve(); }
       }

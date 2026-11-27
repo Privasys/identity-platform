@@ -43,7 +43,7 @@
         "dev": "tsc --watch",
         "test:gate": "playwright test",
         "test:popup": "node e2e/device-popup.cjs",
-        "test:e2e": "node e2e/frame-security.cjs && node e2e/renew-session.cjs && node e2e/gate-outcomes.cjs && node e2e/multi-tab.cjs && node e2e/device-popup.cjs",
+        "test:e2e": "node e2e/frame-security.cjs && node e2e/renew-session.cjs && node e2e/gate-outcomes.cjs && node e2e/operation-approval.cjs && node e2e/multi-tab.cjs && node e2e/device-popup.cjs",
         "test": "esbuild test/*.test.ts --bundle --platform=node --format=esm --outdir=.test --out-extension:.js=.mjs --log-level=warning && node --test \".test/*.test.mjs\""
     },
     "peerDependencies": {

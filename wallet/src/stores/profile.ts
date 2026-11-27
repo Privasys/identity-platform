@@ -6,7 +6,6 @@ import { create } from 'zustand';
 
 // Runtime import is safe: attributes.ts takes only TYPES from this module, so
 // there is no import cycle at load time.
-import { migrateDualTierAssurance } from '@/services/attributes';
 
 /** A linked external identity provider used for profile seeding and recovery. */
 export interface LinkedProvider {
@@ -394,72 +393,12 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         const raw = await SecureStore.getItemAsync(STORE_KEY);
         if (!raw) return;
         try {
-            const data = JSON.parse(raw) as UserProfile;
-            // Migration: earlier builds cached avatars to a local file:// path that
-            // did not survive cache eviction / a container-id change. Drop it so the
-            // initial-letter fallback shows; a re-import stores the remote URL.
-            if (typeof data.avatarUri === 'string' && data.avatarUri.startsWith('file://')) {
-                data.avatarUri = '';
-            }
-            // Migration: a passport reading stored under the SELF-ASSERTED half
-            // of a dual-tier pair (profiles verified before the `_id` split)
-            // moves to the government key. Left alone it shows the holder the
-            // same certified value twice and lets a relying party receive a
-            // document reading under a key the referential publishes as
-            // self-asserted — free, and never metered.
-            // Migration: early card checks signed an address on the postcode
-            // alone, which can match an old address the bank still holds.
-            // Those proofs are no longer trusted.
-            const partial = dropPartialCardChecks(data.attributes ?? []);
-            const migrated = migrateDualTierAssurance({ ...data, attributes: partial.attributes });
-            if (partial.changed || migrated.moved.length > 0 || migrated.dropped.length > 0) {
-                data.attributes = migrated.attributes;
-                set({ profile: data });
-                persist(data);
-                return;
-            }
-            set({ profile: data });
+            set({ profile: JSON.parse(raw) as UserProfile });
         } catch {
             // Corrupted data — start fresh
         }
     }
 }));
-
-/**
- * Take back what an early card check confirmed on the postcode alone: an
- * address with a postcode and no street line, carrying a card-check proof.
- * The proof goes; an address the card check alone put there goes with it
- * (its value is only that postcode, which may be an old one).
- */
-export function dropPartialCardChecks(attributes: ProfileAttribute[]): {
-    changed: boolean;
-    attributes: ProfileAttribute[];
-} {
-    let changed = false;
-    const out: ProfileAttribute[] = [];
-    for (const attr of attributes) {
-        const isCard = (v: VerificationRecord) => v.method === 'card_check' || v.proofMaterial?.kind === 'card_check';
-        if (attr.key !== 'address' || !(attr.verifications ?? []).some(isCard) || !postcodeOnly(attr.value)) {
-            out.push(attr);
-            continue;
-        }
-        changed = true;
-        const rest = (attr.verifications ?? []).filter((v) => !isCard(v));
-        if (attr.sourceProvider === 'card_bank' && rest.length === 0) continue;
-        out.push({ ...attr, verifications: rest, verified: attr.verified && rest.length > 0 });
-    }
-    return { changed, attributes: out };
-}
-
-/** An address value with a postcode and no street line. */
-function postcodeOnly(value: string): boolean {
-    try {
-        const a = JSON.parse(value) as Record<string, unknown>;
-        return !!a.postal_code && !a.street_address && !a.formatted;
-    } catch {
-        return false;
-    }
-}
 
 function persist(profile: UserProfile) {
     SecureStore.setItemAsync(STORE_KEY, JSON.stringify(profile)).catch(console.error);

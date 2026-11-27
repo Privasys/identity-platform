@@ -159,6 +159,18 @@ const CORS = {
   assert.equal(notified.at(-1).appHost, 'enc2.test', 'the wallet is asked for that host');
   assert.equal(refused.error, 'rejected:enc-changed', 'still refused after the new approval: ' + refused.error);
 
+  // ── A wallet session that the app asks to reach directly ──
+  const pushesBefore = notified.length;
+  const forced = await page.evaluate(async () => {
+    const ch = await window.sealed.app('app.test', { audience: 'app:abc', transport: 'direct' });
+    const res = await ch.request('GET', '/ping');
+    return { transport: ch.transport, status: res.status };
+  });
+  assert.equal(forced.transport, 'direct', 'transport: direct reaches the app over HTTPS for a wallet session');
+  assert.equal(forced.status, 200);
+  assert.equal(notified.length, pushesBefore, 'a direct channel asks the wallet for nothing');
+  assert.equal(claims(appCalls.at(-1).auth.replace(/^Bearer /, '')).aud, 'app:abc', 'with a token for the audience');
+
   console.log('app-channel: all checks passed');
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

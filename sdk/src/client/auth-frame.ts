@@ -101,8 +101,16 @@ export class AuthFrame {
      *   they join the frame's `attributes`, and a session without them runs
      *   the gate, which asks the wallet for the difference.
      * @param opts.billingGrant a billing grant for this ceremony only.
+     * @param opts.methods the sign-in methods this ceremony offers, when it
+     *   needs fewer than the configuration's (only the wallet can share
+     *   certified attributes, for example).
      */
-    async connect(opts?: { container?: HTMLElement; attributes?: readonly string[]; billingGrant?: string }): Promise<Session> {
+    async connect(opts?: {
+        container?: HTMLElement;
+        attributes?: readonly string[];
+        billingGrant?: string;
+        methods?: AuthFrameConfig['methods'];
+    }): Promise<Session> {
         this.alive();
         if (opts?.container) this.container = opts.container;
         if (opts?.attributes?.length) {
@@ -112,7 +120,10 @@ export class AuthFrame {
         const view = await this.load().catch(() => null);
         if (view && !widenedBy(this.config, view)) return this.current!;
 
-        const result = await this.ceremony(opts?.billingGrant ? { billingGrant: opts.billingGrant } : {});
+        const result = await this.ceremony({
+            ...(opts?.billingGrant ? { billingGrant: opts.billingGrant } : {}),
+            ...(opts?.methods?.length ? { methods: [...opts.methods] } : {}),
+        });
         if (!result.accessToken) throw new ConnectError('failed', 'The sign-in returned no session');
         for (const host of result.apps?.hosts ?? []) this.approvedAtSignIn.set(host, result.apps!.waitMs);
         this.apply({
@@ -182,8 +193,15 @@ export class AuthFrame {
      * the reason after a change: `enc-changed`, `workload-changed`,
      * `voucher-expired`). Any other session reaches it directly, over HTTPS
      * with a token for `audience`, which it then requires (`app:<app id>`).
+     *
+     * `transport: 'direct'` reaches the app over HTTPS whatever the sign-in
+     * method, for an app served on a name that only takes direct calls.
      */
-    async app(host: string, opts?: { audience?: string; onApproval?: (reason: string | null) => void }): Promise<AppChannel> {
+    async app(host: string, opts?: {
+        audience?: string;
+        onApproval?: (reason: string | null) => void;
+        transport?: 'direct';
+    }): Promise<AppChannel> {
         this.alive();
         const name = appHost(host);
         let channel = this.channels.get(name);
@@ -193,13 +211,13 @@ export class AuthFrame {
         }
         if (opts?.audience) channel.audience = opts.audience;
         const session = await this.signedIn();
-        if (session.method === 'wallet') {
+        if (session.method === 'wallet' && opts?.transport !== 'direct') {
             if (!channel.live('sealed')) await this.openSealed(channel, opts?.onApproval);
             return channel;
         }
         const audience = channel.audience;
         if (!audience) {
-            throw new Error('AuthFrame: app() needs an audience (normally app:<app id>) for a session signed in without the wallet');
+            throw new Error('AuthFrame: app() needs an audience (normally app:<app id>) for a direct channel');
         }
         if (!channel.live('direct')) channel.use(directTransport(name, () => this.token(audience)));
         return channel;

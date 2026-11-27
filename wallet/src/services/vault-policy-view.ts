@@ -167,7 +167,7 @@ function namesPerson(principals: unknown): boolean {
 /** Whether a rule asks for an approval before it lets a person act. */
 function asksApproval(requires: unknown): boolean {
     if (!Array.isArray(requires)) return false;
-    return requires.some((c) => isObject(c) && ('OidcStepUp' in c || 'HolderApprovals' in c || 'ManagerApproval' in c));
+    return requires.some((c) => isObject(c) && 'OidcStepUp' in c);
 }
 
 /**

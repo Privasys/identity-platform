@@ -1242,7 +1242,9 @@ export class AuthUI {
                 this.sessionToken = result.sessionToken;
                 this.attestation = result.attestation;
                 this.sessionId = result.sessionId;
-                this.pushToken = result.pushToken;
+                // The wallet reached by this push: its answer may come before
+                // it has loaded its own push token.
+                this.pushToken = result.pushToken || this.cfg.pushToken;
                 this.deviceLabel = result.deviceLabel;
                 this.attributes = result.attributes;
                 this.sessionRelay = result.sessionRelay;

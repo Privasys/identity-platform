@@ -43,17 +43,16 @@ function emailAttr(value: string, verified: boolean): ProfileAttribute {
         label: 'Email',
         value,
         source: verified ? 'provider' : 'manual',
-        verified,
         ...(verified
             ? {
                   verifications: [
                       {
-                          verifier: 'privasys.id',
+                          verifier: 'privasys-attribute-verifier',
                           verifierDisplayName: 'Privasys',
                           method: 'email_code' as const,
                           assurance: 'provider' as const,
                           verifiedAt: 1,
-                          evidence: 'receipt',
+                          proof: 'jws',
                       },
                   ],
               }

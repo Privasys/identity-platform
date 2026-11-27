@@ -47,7 +47,6 @@ export default function AttributeValueScreen() {
                     source: 'manual',
                     sourceProvider: undefined,
                     sources: [{ source: 'manual', displayName: t('personalData.sourceManual'), addedAt: now }],
-                    verified: false,
                     verifications: [],
                 });
             }
@@ -60,7 +59,6 @@ export default function AttributeValueScreen() {
                     source: 'manual',
                     acquiredAt: now,
                     updatedAt: now,
-                    verified: false,
                 },
                 !!def.multiValued,
             );

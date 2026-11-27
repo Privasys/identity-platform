@@ -119,7 +119,6 @@ export default function VerifyEmailScreen() {
             const device = await thisDeviceBinding();
             useProfileStore.getState().updateAttributeValue('email', address, {
                 value: result.email,
-                verified: true,
                 verifications: [
                     {
                         verifier: result.proof.source,

@@ -181,11 +181,11 @@ describe('canonical attribute referential', () => {
         // that profile is deliberately not migrated: refusing the disclosure
         // would ask the holder to re-scan a document already certified.
         const attr = (over: Partial<ProfileAttribute>): ProfileAttribute => ({
-            key: 'x', label: 'X', value: 'v', source: 'manual', verified: false, ...over
+            key: 'x', label: 'X', value: 'v', source: 'manual', ...over
         });
         const profile = {
             attributes: [
-                attr({ key: 'birthdate', value: '1980-01-01', source: 'document', verified: true }),
+                attr({ key: 'birthdate', value: '1980-01-01', source: 'document' }),
                 attr({ key: 'given_name', value: 'Bertrand' })
             ]
         } as unknown as UserProfile;

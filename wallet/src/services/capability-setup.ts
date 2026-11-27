@@ -22,6 +22,8 @@
  * own sentence about the grant.
  */
 
+import { isVerified, type ProofSlice } from './attribute-verified';
+
 /** A schema the wallet will not draw. Rewrapped by the caller. */
 export class SetupSchemaError extends Error {}
 
@@ -360,7 +362,7 @@ export function setupPayload(fields: SetupField[], answers: SetupAnswers): Recor
 /** The part of a profile the email helpers read. */
 export interface EmailSource {
     email?: string;
-    attributes?: { key: string; value: string; verified?: boolean; updatedAt?: number; acquiredAt?: number }[];
+    attributes?: { key: string; value: string; verifications?: ProofSlice[]; updatedAt?: number; acquiredAt?: number }[];
 }
 
 const sameAddress = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -381,7 +383,7 @@ export function walletEmails(profile: EmailSource | null | undefined): string[] 
         .filter((a) => a.key === 'email' && a.value.trim().length > 0)
         .slice()
         .sort((a, b) => {
-            if (!!a.verified !== !!b.verified) return a.verified ? -1 : 1;
+            if (isVerified(a) !== isVerified(b)) return isVerified(a) ? -1 : 1;
             return (b.updatedAt ?? b.acquiredAt ?? 0) - (a.updatedAt ?? a.acquiredAt ?? 0);
         });
     const out: string[] = [];

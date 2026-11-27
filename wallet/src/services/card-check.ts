@@ -167,7 +167,6 @@ export async function checkAddressWithCard(): Promise<AttributeProof> {
             sourceProvider: 'card_bank',
             acquiredAt: now,
             updatedAt: now,
-            verified: p.method === 'proven',
             verifications: [
                 {
                     verifier: p.source,

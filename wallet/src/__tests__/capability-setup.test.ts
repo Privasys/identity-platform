@@ -285,11 +285,11 @@ describe('walletEmails', () => {
         const profile = {
             email: 'main@example.org',
             attributes: [
-                { key: 'email', value: 'old@example.org', verified: false, updatedAt: 100 },
-                { key: 'email', value: 'Work@Corp.example', verified: true, updatedAt: 50 },
-                { key: 'email', value: 'new@example.org', verified: false, updatedAt: 300 },
-                { key: 'email', value: 'work@corp.example', verified: false, updatedAt: 400 },
-                { key: 'name', value: 'Ada', verified: true },
+                { key: 'email', value: 'old@example.org', updatedAt: 100 },
+                { key: 'email', value: 'Work@Corp.example', verifications: [{ proof: 'jws', assurance: 'provider' as const }], updatedAt: 50 },
+                { key: 'email', value: 'new@example.org', updatedAt: 300 },
+                { key: 'email', value: 'work@corp.example', updatedAt: 400 },
+                { key: 'name', value: 'Ada' },
             ],
         };
         expect(walletEmails(profile)).toEqual([

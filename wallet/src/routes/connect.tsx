@@ -78,7 +78,7 @@ import {
     syncIdentityIndex,
 } from '@/services/identities';
 import { identitySealPub } from '@/services/notify-seal';
-import { shownVerified } from '@/services/shown-verified';
+import { isVerified } from '@/services/attribute-verified';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
 import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
@@ -296,7 +296,7 @@ function emailReceiptFor(
     const attr = profile?.attributes.find(
         (a) => a.key === 'email' && a.value.toLowerCase() === email.toLowerCase(),
     );
-    if (!attr?.verified) return undefined;
+    if (!attr) return undefined;
     return attr.verifications?.find(
         (v) => v.verifier === 'privasys.id' && v.method === 'email_code' && v.evidence,
     )?.evidence;
@@ -3649,7 +3649,7 @@ function AttributeAcquisitionView({
     // until it is proved, so without this the screen would ask someone who has
     // an address to type it again and stay exactly as stuck.
     const unverifiedEmail = stillMissing.includes('email')
-        ? profile?.attributes.find((a) => a.key === 'email' && !shownVerified(a) && a.value)?.value
+        ? profile?.attributes.find((a) => a.key === 'email' && !isVerified(a) && a.value)?.value
         : undefined;
 
     // Launch the KYC capture flow (NFC chip read + selfie → verifier enclave →
@@ -3679,7 +3679,6 @@ function AttributeAcquisitionView({
                 if (!existing) {
                     setProfileValue(store, attr.key, attr.value, 'provider', {
                         sourceProvider: attr.sourceProvider ?? providerKey,
-                        verified: attr.verified,
                         verifications: attr.verifications,
                     });
                 } else if (existing.trim().toLowerCase() === attr.value.trim().toLowerCase()) {

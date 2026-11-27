@@ -688,8 +688,8 @@ export default function KycCaptureScreen() {
                             method: 'kyc_enclave' as const, assurance: 'gov' as const,
                             verifiedAt: Math.floor(Date.now() / 1000),
                         }];
-                        if (idGiven) setProfileValue(store, 'given_name', idGiven, 'document', { verified: true, verifications: rec });
-                        if (idFamily) setProfileValue(store, 'family_name', idFamily, 'document', { verified: true, verifications: rec });
+                        if (idGiven) setProfileValue(store, 'given_name', idGiven, 'document', { verifications: rec });
+                        if (idFamily) setProfileValue(store, 'family_name', idFamily, 'document', { verifications: rec });
                     },
                 },
             ],

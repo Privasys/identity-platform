@@ -58,7 +58,7 @@ function profileWith(email: string, extra: { key: string; value: string }[] = []
                           label: 'Email',
                           value: email,
                           source: 'manual' as const,
-                          verified: true,
+                          verifications: [{ verifier: 'privasys-attribute-verifier', verifierDisplayName: 'Privasys', method: 'email_code' as const, assurance: 'provider' as const, verifiedAt: 1, proof: 'jws' }],
                       }]
                     : []),
                 ...extra.map((a) => ({
@@ -66,7 +66,6 @@ function profileWith(email: string, extra: { key: string; value: string }[] = []
                     label: a.key,
                     value: a.value,
                     source: 'manual' as const,
-                    verified: false,
                 })),
             ],
             createdAt: 0,

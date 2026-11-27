@@ -673,7 +673,7 @@ export function govAttributeCandidates(
 ): ProfileAttribute[] {
     const out: ProfileAttribute[] = [];
     const push = (key: string, value: string) =>
-        out.push({ key, label: attributeLabel(key), value, source: 'document', verified: true });
+        out.push({ key, label: attributeLabel(key), value, source: 'document'});
 
     for (const key of DOCUMENT_ATTRIBUTE_KEYS) {
         const value = record.fields[key];
@@ -704,7 +704,6 @@ export function applyGovAttributes(
             ? `ivr:${record.jti}#${attr.key}`
             : `ivr:${record.jti}`;
         setProfileValue(store, attr.key, attr.value, 'document', {
-            verified: true,
             verifications: [govRecord(record, evidence)]
         });
         filled.push(attr.key);

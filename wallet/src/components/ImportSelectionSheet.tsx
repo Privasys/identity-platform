@@ -14,6 +14,7 @@ import { Image, Pressable, StyleSheet, Switch, View as RNView } from 'react-nati
 
 import { Text, usePalette, type Palette } from '@/components/Themed';
 import { useTranslation } from 'react-i18next';
+import { isVerified } from '@/services/attribute-verified';
 import { attributeLabel } from '@/services/attributes';
 import type { ProfileAttribute } from '@/stores/profile';
 
@@ -60,7 +61,7 @@ export function ImportSelectionSheet({
                                 {attr.key === 'picture' ? t('import.profilePhoto')
                                     : attr.key === 'picture_id' ? t('import.idPhoto')
                                     : attr.value}
-                                {attr.verified ? t('import.verifiedSuffix') : ''}
+                                {isVerified(attr) ? t('import.verifiedSuffix') : ''}
                             </Text>
                         </RNView>
                         <Switch value={isOn} onValueChange={() => onToggle(attr.key)} />

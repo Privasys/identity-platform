@@ -17,6 +17,7 @@
  */
 
 import type { ProfileAttribute, UserProfile, VerificationRecord } from '@/stores/profile';
+import { isVerified } from '@/services/attribute-verified';
 
 // ── Canonical attribute definitions ─────────────────────────────────────
 // Loaded from the shared JSON file (single source of truth for IdP + wallet).
@@ -414,13 +415,13 @@ export function selfAssertedValue(profile: UserProfile, key: string): string | u
 }
 
 /**
- * An address this wallet holds a verification for: privasys.id mailed a code
- * to it, or the provider it was imported from says it checked it. The one the
- * profile mirrors wins when it qualifies, so a holder with several verified
- * addresses keeps sending the one they chose.
+ * An address this wallet holds the Attribute Verifier's proof for
+ * (services/attribute-verified). The one the profile mirrors wins when it
+ * qualifies, so a holder with several verified addresses keeps sending the
+ * one they chose.
  */
 export function verifiedEmail(profile: UserProfile): string | undefined {
-    const verified = profile.attributes.filter((a) => a.key === 'email' && a.verified && a.value);
+    const verified = profile.attributes.filter((a) => a.key === 'email' && isVerified(a) && a.value);
     if (verified.length === 0) return undefined;
     const mirrored = (profile.email ?? '').trim().toLowerCase();
     const preferred = verified.find((a) => a.value.trim().toLowerCase() === mirrored);
@@ -431,7 +432,7 @@ export function verifiedEmail(profile: UserProfile): string | undefined {
 export function isEmailVerified(profile: UserProfile, email: string): boolean {
     const wanted = email.trim().toLowerCase();
     return profile.attributes.some(
-        (a) => a.key === 'email' && a.verified && a.value.trim().toLowerCase() === wanted,
+        (a) => a.key === 'email' && isVerified(a) && a.value.trim().toLowerCase() === wanted,
     );
 }
 
@@ -449,7 +450,6 @@ export function setProfileValue(
     source: 'provider' | 'manual' | 'document',
     opts: {
         sourceProvider?: string;
-        verified?: boolean;
         verifications?: VerificationRecord[];
     } = {},
 ): void {
@@ -470,7 +470,6 @@ export function setProfileValue(
         sourceProvider: opts.sourceProvider,
         acquiredAt: now,
         updatedAt: now,
-        verified: opts.verified ?? false,
         verifications: opts.verifications ?? [],
     });
 }
@@ -550,7 +549,7 @@ export function exportAttributesForAudit(profile: UserProfile): {
             })),
             acquiredAt: new Date((a.acquiredAt ?? 0) * 1000).toISOString(),
             updatedAt: new Date((a.updatedAt ?? 0) * 1000).toISOString(),
-            verified: a.verified,
+            verified: isVerified(a),
             verifications: (a.verifications ?? []).map((v) => ({
                 verifier: v.verifier,
                 verifierDisplayName: v.verifierDisplayName,

@@ -153,7 +153,6 @@ function fromPassport(now: number, key: string, value: string): ProfileAttribute
         sources: [{ source: 'document', displayName: 'Passport', addedAt: at }],
         acquiredAt: at,
         updatedAt: at,
-        verified: true,
         verifications: [govVerification(now, key)],
     };
 }
@@ -168,7 +167,6 @@ function typed(now: number, key: string, value: string, daysAgo: number): Profil
         sources: [{ source: 'manual', displayName: 'Manual', addedAt: at }],
         acquiredAt: at,
         updatedAt: at,
-        verified: false,
     };
 }
 
@@ -197,7 +195,6 @@ export function holderProfile(now: number): UserProfile {
                 sources: [{ source: 'manual', displayName: 'Manual', addedAt: emailAt }],
                 acquiredAt: emailAt,
                 updatedAt: emailAt,
-                verified: true,
                 verifications: [
                     {
                         verifier: 'privasys.id',
@@ -217,7 +214,6 @@ export function holderProfile(now: number): UserProfile {
                 sources: [{ source: 'manual', displayName: 'Manual', addedAt: phoneAt }],
                 acquiredAt: phoneAt,
                 updatedAt: phoneAt,
-                verified: false,
             },
             fromPassport(now, 'given_name_id', 'ALEX JAMIE'),
             fromPassport(now, 'family_name_id', 'MORGAN'),

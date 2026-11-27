@@ -194,7 +194,7 @@ describe('consent service', () => {
                         label: 'Email',
                         value: 'alice@example.com',
                         source: 'manual' as const,
-                        verified: true,
+                        verifications: [{ verifier: 'privasys-attribute-verifier', verifierDisplayName: 'Privasys', method: 'email_code' as const, assurance: 'provider' as const, verifiedAt: 1, proof: 'jws' }],
                     },
                 ],
             });
@@ -217,7 +217,7 @@ describe('consent service', () => {
                 pairwiseSeed: 'ab'.repeat(32),
                 linkedProviders: [],
                 attributes: [
-                    { key: 'company', label: 'Company', value: 'Privasys', source: 'manual', verified: false },
+                    { key: 'company', label: 'Company', value: 'Privasys', source: 'manual' },
                 ],
             });
 

@@ -9,7 +9,7 @@ function profileWith(attributes: ProfileAttribute[]): UserProfile {
 }
 
 function attr(key: string, value: string, source: ProfileAttribute['source']): ProfileAttribute {
-    return { key, label: key, value, source, verified: source === 'document' };
+    return { key, label: key, value, source };
 }
 
 describe('answering a self-asserted request', () => {

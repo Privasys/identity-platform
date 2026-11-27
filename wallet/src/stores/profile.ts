@@ -105,12 +105,9 @@ export interface ProfileAttribute {
     updatedAt?: number;
 
     // ── Verification ────────────────────────────────────────────────────
-    /** Whether this attribute has been verified by a trusted party. */
-    verified: boolean;
     /**
-     * Full verification history. Most recent first.
-     * Verifiable attributes (email, phone_number) should always have at least
-     * one record when `verified` is true.
+     * Full verification history. Most recent first. Whether the value is
+     * verified is derived from it (services/attribute-verified), never stored.
      */
     verifications?: VerificationRecord[];
 }
@@ -491,7 +488,6 @@ function strengthen(existing: ProfileAttribute, incoming: ProfileAttribute): Pro
         sourceProvider: primary.sourceProvider,
         sources,
         verifications,
-        verified: existing.verified || incoming.verified,
         updatedAt: Math.floor(Date.now() / 1000),
     };
 }

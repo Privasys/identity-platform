@@ -39,7 +39,7 @@ import { isFresh, useNoticeStore } from '@/stores/notice';
 import { cardBankSource, countryFlag, formatAddress } from '@/services/card-check';
 import { useCardAddressCheck } from '@/hooks/useCardAddressCheck';
 import { provedBy } from '@/services/attribute-proofs';
-import { shownVerified } from '@/services/shown-verified';
+import { isVerified } from '@/services/attribute-verified';
 import { currentLocale } from '@/i18n';
 import { useProfileStore, type ProfileAttribute } from '@/stores/profile';
 import { attributeInputProps } from '@/utils/attribute-input';
@@ -131,7 +131,6 @@ export default function PersonalDataScreen() {
                 source: 'manual',
                 acquiredAt: now,
                 updatedAt: now,
-                verified: false,
             },
             !!def.multiValued,
         );
@@ -234,7 +233,7 @@ export default function PersonalDataScreen() {
                             onRemove={() => handleRemoveAttribute(attr)}
                             onChangePicture={attr.key === 'picture' ? chooseAvatar : undefined}
                             onVerify={
-                                attr.key === 'email' && !shownVerified(attr)
+                                attr.key === 'email' && !isVerified(attr)
                                     ? () => verifyEmail(attr.value)
                                     : undefined
                             }
@@ -247,7 +246,6 @@ export default function PersonalDataScreen() {
                                     source: 'manual',
                                     sourceProvider: undefined,
                                     sources: [{ source: 'manual', displayName: t('personalData.sourceManual'), addedAt: now }],
-                                    verified: false,
                                     verifications: [],
                                 });
                                 if (attr.key === 'email') updateProfile({ email: newValue });
@@ -404,7 +402,7 @@ function AttributeCard({
 
     const handleStartEdit = () => {
         if (isImage) return;
-        if (shownVerified(attr)) {
+        if (isVerified(attr)) {
             Alert.alert(
                 t('personalData.editVerifiedTitle'),
                 t('personalData.editVerifiedBody'),
@@ -526,7 +524,7 @@ function AttributeCard({
                             </RNView>
                         )}
                         <RNView style={styles.attributeMeta}>
-                            {shownVerified(attr) ? (
+                            {isVerified(attr) ? (
                                 <RNView style={styles.verifiedBadge}>
                                     <Ionicons name="checkmark-circle" size={12} color={p.green} />
                                     <Text style={styles.verifiedText}>{t('personalData.verified')}</Text>

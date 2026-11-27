@@ -40,6 +40,7 @@ import { useServiceSessionsStore } from '../stores/service-sessions';
 import { useSessionsStore } from '../stores/sessions';
 import { useTrustedAppsStore } from '../stores/trusted-apps';
 import { buildSessionRows } from '../utils/session-rows';
+import { isVerified } from '../services/attribute-verified';
 
 const saved = process.env.EXPO_PUBLIC_DEMO;
 afterEach(() => {
@@ -109,7 +110,7 @@ describe('the seed', () => {
             expect(CANONICAL_KEYS.has(a.key)).toBe(true);
             expect(a.label).toBeTruthy();
             expect(a.value).toBeTruthy();
-            if (a.verified) expect(a.verifications?.length).toBeGreaterThan(0);
+            if (isVerified(a)) expect(a.verifications?.length).toBeGreaterThan(0);
         }
         for (const key of ['given_name_id', 'family_name_id', 'birthdate_id', 'nationality_id', 'age_over_18']) {
             const a = profile.attributes.find((x) => x.key === key)!;

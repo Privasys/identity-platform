@@ -22,7 +22,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 import { attest, disclose, type AttestKind, type AttributeProof } from '@/services/attribute-verifier';
 import { useProfileStore, type ProfileAttribute, type VerificationRecord } from '@/stores/profile';
-import { isDisclosableProof } from '@/services/shown-verified';
+import { isDisclosableProof } from '@/services/attribute-verified';
 import { base64urlToBytes, bytesToBase64url } from '@/utils/encoding';
 
 import * as NativeKeys from '../../modules/native-keys/src/index';
@@ -103,7 +103,6 @@ export async function attachLinkProofs(
         };
         // The proof replaces the provider's bare claim for the same verifier.
         attr.verifications = [...(attr.verifications ?? []).filter((v) => v.verifier !== p.source || v.proof), record];
-        if (p.method === 'proven') attr.verified = true;
         attached++;
     }
     return attached;

@@ -39,7 +39,6 @@ export function useAvatarChooser(): () => void {
                     sources: [{ source: 'manual', displayName: t('personalData.sourceManual'), addedAt: now }],
                     acquiredAt: now,
                     updatedAt: now,
-                    verified: false,
                 });
                 updateProfile({ avatarUri: uri });
             } catch (e) {

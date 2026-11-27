@@ -712,7 +712,6 @@ export default function CapabilityRequestScreen() {
                 label: attributeLabel('email'),
                 value: email,
                 source: 'manual',
-                verified: false,
                 acquiredAt: now,
                 updatedAt: now,
             },

@@ -117,7 +117,6 @@ describe('profile store', () => {
                 label: 'Phone',
                 value: '+1234567890',
                 source: 'manual',
-                verified: false,
             };
 
             useProfileStore.getState().setAttribute(attr);
@@ -131,10 +130,10 @@ describe('profile store', () => {
         it('getAttributes returns matching attributes', () => {
             useProfileStore.getState().createProfile(baseProfile());
             useProfileStore.getState().setAttribute({
-                key: 'company', label: 'Company', value: 'Privasys', source: 'manual', verified: false,
+                key: 'company', label: 'Company', value: 'Privasys', source: 'manual',
             });
             useProfileStore.getState().setAttribute({
-                key: 'title', label: 'Title', value: 'Engineer', source: 'manual', verified: false,
+                key: 'title', label: 'Title', value: 'Engineer', source: 'manual',
             });
 
             const result = useProfileStore.getState().getAttributes(['company', 'missing']);
@@ -145,7 +144,7 @@ describe('profile store', () => {
 
     describe('mergeAttribute', () => {
         const incoming = (over: Partial<ProfileAttribute>): ProfileAttribute => ({
-            key: 'name', label: 'Display Name', value: 'X', source: 'manual', verified: false, ...over,
+            key: 'name', label: 'Display Name', value: 'X', source: 'manual', ...over,
         });
 
         it('adds a brand-new attribute with a seeded source list', () => {
@@ -165,26 +164,25 @@ describe('profile store', () => {
                 incoming({ value: 'Bob', source: 'manual' }), false,
             );
             const res = useProfileStore.getState().mergeAttribute(
-                incoming({ value: 'Bob', source: 'provider', sourceProvider: 'linkedin', verified: true }), false,
+                incoming({ value: 'Bob', source: 'provider', sourceProvider: 'linkedin' }), false,
             );
             expect(res.status).toBe('strengthened');
             const a = useProfileStore.getState().profile!.attributes;
             expect(a).toHaveLength(1);
             expect(a[0].sources).toHaveLength(2);
             expect(a[0].source).toBe('provider'); // primary promoted to higher assurance
-            expect(a[0].verified).toBe(true);
         });
 
         it("keeps the verifier's proof when the same source re-imports the same value", () => {
             useProfileStore.getState().createProfile(baseProfile());
             const bare = { verifier: 'google', verifierDisplayName: 'Google', method: 'oidc_claim' as const, assurance: 'provider' as const, verifiedAt: 100 };
             useProfileStore.getState().mergeAttribute(
-                incoming({ key: 'email', value: 'a@example.com', source: 'provider', sourceProvider: 'google', verified: true, verifications: [bare] }), false,
+                incoming({ key: 'email', value: 'a@example.com', source: 'provider', sourceProvider: 'google', verifications: [bare] }), false,
             );
             // A re-import: the same (verifier, method), now with a proof.
             const proved = { ...bare, verifiedAt: 200, proof: 'jws-1', proofDevice: 'dev', proofSalt: 'salt' };
             useProfileStore.getState().mergeAttribute(
-                incoming({ key: 'email', value: 'a@example.com', source: 'provider', sourceProvider: 'google', verified: true, verifications: [proved] }), false,
+                incoming({ key: 'email', value: 'a@example.com', source: 'provider', sourceProvider: 'google', verifications: [proved] }), false,
             );
             let v = useProfileStore.getState().profile!.attributes[0].verifications!;
             expect(v).toHaveLength(1);

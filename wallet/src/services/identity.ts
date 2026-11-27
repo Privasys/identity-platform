@@ -30,7 +30,7 @@ import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 
 import { attributeLabel } from '@/services/attributes';
-import type { LinkedProvider, ProfileAttribute, VerificationRecord } from '@/stores/profile';
+import type { LinkedProvider, ProfileAttribute } from '@/stores/profile';
 
 // Ensure web browser sessions are cleaned up on redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -63,7 +63,7 @@ export const PROVIDERS: Record<string, { provider: string; displayName: string }
 interface WalletLinkResult {
     provider: string;
     sub: string;
-    attributes: { key: string; value: string; verified: boolean }[];
+    attributes: { key: string; value: string }[];
     /** The provider's own signed ID token (OIDC providers), bound to the holder commitment. */
     id_token?: string;
     /** GitHub's access token, for the verifier to read the provider's API once. */
@@ -186,17 +186,9 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
             userInfo.locale = a.value;
         }
 
-        const verifications: VerificationRecord[] = a.verified
-            ? [{
-                  verifier: providerKey,
-                  verifierDisplayName: displayName,
-                  method: 'oidc_claim' as const,
-                  assurance: 'provider' as const,
-                  verifiedAt: now,
-                  evidence: `${providerKey}:${a.key}_verified=true`,
-              }]
-            : [];
-
+        // No verification record from the provider's own claim: it is where
+        // the value came from (sourceProvider), and only the Attribute
+        // Verifier's proof, attached below, verifies it.
         seedAttributes.push({
             key: a.key,
             label: attributeLabel(a.key),
@@ -205,8 +197,7 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
             sourceProvider: providerKey,
             acquiredAt: now,
             updatedAt: now,
-            verified: a.verified,
-            verifications,
+            verifications: [],
         });
     }
 

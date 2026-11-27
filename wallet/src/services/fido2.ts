@@ -147,8 +147,9 @@ async function fido2Fetch<T extends object>(origin: string, path: string, body?:
     const host = url.hostname;
     const port = parseInt(url.port || '443', 10);
 
+    // Path and status only: the bodies carry assertions and session tokens,
+    // which have no place in the device log.
     console.log(`[FIDO2] fetch ${path} → ${host}:${port}`);
-    if (body) console.log(`[FIDO2] request body: ${JSON.stringify(body).substring(0, 300)}`);
 
     // The same helper serves the identity provider and the enclave-hosted
     // session bootstrap. An enclave host gets the attested request (evidence
@@ -174,7 +175,7 @@ async function fido2Fetch<T extends object>(origin: string, path: string, body?:
         throw e;
     }
 
-    console.log(`[FIDO2] ${path} — status=${result.status}, body=${result.body.substring(0, 300)}`);
+    console.log(`[FIDO2] ${path} — status=${result.status}`);
 
     if (result.status < 200 || result.status >= 300) {
         throw new Error(`FIDO2 request failed (${result.status}): ${result.body.substring(0, 200)}`);

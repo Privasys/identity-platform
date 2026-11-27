@@ -10,7 +10,7 @@ import { passkeyRoot, syncedPasskeyScalar } from '@/services/website-passkeys';
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 
 // The iOS extension and the Android service are checked against these same
-// values (.operations website-passkeys plan): change them only together.
+// values: change them only together.
 const SEED = '000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f';
 const R = new Uint8Array(16).map((_, i) => 0xa0 + i);
 

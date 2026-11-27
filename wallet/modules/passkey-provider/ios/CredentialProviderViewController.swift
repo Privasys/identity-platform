@@ -85,8 +85,7 @@ func isSyncedCredentialId(_ credentialId: [UInt8]) -> Bool {
 /// keeps the scalar out of zero. Binding rpId into the info means the same r
 /// on another site gives another, unrelated key.
 ///
-/// Test vector (.operations website-passkeys plan; wallet
-/// src/__tests__/website-passkeys.test.ts), with seed = 00 01 .. 1f,
+/// Test vector (the wallet's src/__tests__/website-passkeys.test.ts), with seed = 00 01 .. 1f,
 /// r = a0 a1 .. af, rpId = "example.com":
 ///   root   = dbf48f5caf769655c82494e38ee824617874a623539f5b33640abe1cdb9dedf5
 ///   scalar = 9c69d00194d9cd3bee2b12c2ab4be00f72f6e23b7ca186c39d0d3f52cb3caf54

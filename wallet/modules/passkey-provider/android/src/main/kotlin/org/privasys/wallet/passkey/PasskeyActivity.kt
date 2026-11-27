@@ -37,7 +37,7 @@ import java.util.UUID
  * as a credential provider. Verifies enclave attestation via RA-TLS before
  * creating or signing WebAuthn credentials.
  *
- * Two kinds of website passkey (.operations/plans/website-passkeys-plan.md):
+ * Two kinds of website passkey:
  * - "local": a StrongBox/TEE Keystore key that never leaves this device.
  * - "synced": derived from the holder's passkey root, so the holder's other
  *   devices can derive it again. Its credential id carries the random input.

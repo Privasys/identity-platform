@@ -190,7 +190,7 @@ public class NativeKeysModule: Module {
         // The passkey provider extension (modules/passkey-provider) keeps one
         // record per passkey in the shared keychain group, and derives the
         // keys of "synced" ones from a root the wallet gives it. These read
-        // and write the same items (the .operations website-passkeys plan).
+        // and write the same items, in the same layout.
 
         AsyncFunction("setPasskeyRoot") { (rootB64url: String) in
             guard let root = Self.base64urlDecode(rootB64url), root.count == 32 else {

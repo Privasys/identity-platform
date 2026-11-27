@@ -22,7 +22,8 @@ import javax.crypto.spec.SecretKeySpec
  * in the credential id, and the site's rpId, so nothing secret is stored per
  * passkey.
  *
- * Spec: .operations/plans/website-passkeys-plan.md, "A synced passkey".
+ * The same derivation as the iOS extension's; both are checked against the
+ * test vector in the wallet's src/__tests__/website-passkeys.test.ts.
  */
 object SyncedPasskeyDerivation {
 

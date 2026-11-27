@@ -13,9 +13,8 @@ import java.security.spec.ECPoint
 import java.security.spec.ECPublicKeySpec
 
 /**
- * Main-style check of the synced passkey derivation against the test vector in
- * .operations/plans/website-passkeys-plan.md (the same vector the wallet's
- * src/__tests__/website-passkeys.test.ts and the iOS side use).
+ * Main-style check of the synced passkey derivation against the test vector
+ * the wallet's src/__tests__/website-passkeys.test.ts and the iOS side use.
  *
  * The module has no JUnit dependency, so this is a plain `main` that needs
  * only the Kotlin stdlib and a JDK. Run it by compiling this file together

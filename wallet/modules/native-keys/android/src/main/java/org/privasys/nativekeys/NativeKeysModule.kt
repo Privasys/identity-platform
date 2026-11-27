@@ -77,8 +77,8 @@ class NativeKeysModule : Module() {
         // The credential provider (modules/passkey-provider) keeps one record
         // per passkey in the "org.privasys.wallet.credentials" prefs and
         // derives the keys of "synced" ones from a root the wallet gives it.
-        // These read and write the same prefs (the .operations
-        // website-passkeys plan). The provider runs in this app's process.
+        // These read and write the same prefs, in the same layout. The
+        // provider runs in this app's process.
 
         AsyncFunction("setPasskeyRoot") { rootB64url: String ->
             val root = try { base64urlDecodeLenient(rootB64url) } catch (_: Exception) { null }

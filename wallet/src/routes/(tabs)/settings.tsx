@@ -7,11 +7,10 @@
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Switch, View as RNView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -20,7 +19,7 @@ import { ExternalLink } from '@/components/ExternalLink';
 import { LanguagePicker } from '@/components/LanguagePicker';
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
-import { registerPushTokenAgain, useExpoPushToken } from '@/hooks/useExpoPushToken';
+import { registerPushTokenAgain } from '@/hooks/useExpoPushToken';
 import { setWantsIconBadge } from '@/services/vault-approval-api';
 import { APP_LOCK_DEFAULT, APP_LOCK_OPTIONS, type AppLockSeconds } from '@/services/app-lock';
 import { AccountDeletionBanner } from '@/components/AccountDeletionBanner';
@@ -30,7 +29,6 @@ import { isDemo } from '@/services/demo/gate';
 import { deviceIcon, listDevices } from '@/services/devices';
 import { useSettingsStore, GRACE_OPTIONS } from '@/stores/settings';
 import { getLogs } from '@/utils/logs';
-import { MONO } from '@/constants/fonts';
 import { TabHeader } from '@/components/TabHeader';
 
 export default function SettingsScreen() {
@@ -63,7 +61,6 @@ export default function SettingsScreen() {
         setWantsIconBadge(on);
         void registerPushTokenAgain();
     }, []);
-    const pushToken = useExpoPushToken();
     // Devices shows from the first phone: it is where the phone is named.
     const [phones, setPhones] = useState(0);
     const removeThis = useRemoveThisDevice();
@@ -259,28 +256,6 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* Push Token: for support, so near the end, above the actions that remove things. */}
-                {pushToken ? (
-                    <>
-                        <Text style={styles.sectionTitle}>{t('settings.pushTokenTitle')}</Text>
-                        <Pressable
-                            style={styles.pushTokenCard}
-                            onPress={() => {
-                                Clipboard.setStringAsync(pushToken);
-                                Alert.alert(t('common.copied'), t('settings.pushTokenCopied'));
-                            }}
-                        >
-                            {/* One line, shortened in the middle: wrapped, the closing
-                                bracket was left alone on a line of its own. Copy
-                                takes the whole token. */}
-                            <Text style={styles.pushTokenText} numberOfLines={1} ellipsizeMode="middle">
-                                {pushToken}
-                            </Text>
-                            <Ionicons name="copy-outline" size={18} color={p.textSecondary} />
-                        </Pressable>
-                    </>
-                ) : null}
-
                 {/* This device and your account, last, after a divider: the actions that
                     remove things sit apart from the settings above.  Remove this device only when the
                     holder has another: on the only one there is nothing to
@@ -409,23 +384,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     credentialRp: { fontSize: 15, fontWeight: '600', color: p.textPrimary, marginBottom: 2 },
     credentialMeta: { fontSize: 12, color: p.textSecondary },
     removeButton: { color: p.danger, fontSize: 14, fontWeight: '500' },
-
-    pushTokenCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        backgroundColor: p.cardAlt,
-        borderRadius: 12,
-        padding: 14,
-        marginBottom: 8
-    },
-    pushTokenText: {
-        flex: 1,
-        fontSize: 12,
-        fontFamily: MONO,
-        color: p.textSecondary,
-        lineHeight: 18
-    },
 
     buildInfoCard: {
         backgroundColor: p.cardAlt,

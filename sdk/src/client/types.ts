@@ -129,6 +129,11 @@ export interface GateAppearance {
     timeout?: number;
     /** Origin of the identity provider (default: "https://privasys.id"). */
     authOrigin?: string;
+    /** Path of the sign-in frame on the identity provider, starting and
+     *  ending with "/" (default: "/auth/v1/", the frame of this major
+     *  version). Another path serves another build of the frame, for
+     *  testing it before it replaces the default. */
+    framePath?: string;
     /** WebSocket URL of the wallet relay. */
     brokerUrl?: string;
 }

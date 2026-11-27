@@ -10,7 +10,7 @@ const { chromium } = require(process.cwd() + '/node_modules/playwright');
 
 const frameBundle = fs.readFileSync(process.env.FRAME_BUNDLE || 'dist/privasys-auth-frame.iife.js', 'utf8');
 const clientBundle = fs.readFileSync('dist/privasys-auth-client.iife.js', 'utf8');
-const framePage = '<!doctype html><html><head><title>auth</title></head><body><script src="/auth/privasys-auth-frame.iife.js"></script></body></html>';
+const framePage = '<!doctype html><html><head><title>auth</title></head><body><script src="/auth/v1/privasys-auth-frame.iife.js"></script></body></html>';
 const sitePage = '<!doctype html><html><body><script src="/client.js"></script></body></html>';
 const evilPage = '<!doctype html><html><body>widget</body></html>';
 
@@ -25,8 +25,8 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   await ctx.route('https://**/*', async (r) => {
     const u = new URL(r.request().url());
     if (u.host === 'idp.test') {
-      if (u.pathname === '/auth/') return r.fulfill({ contentType: 'text/html', body: framePage });
-      if (u.pathname === '/auth/privasys-auth-frame.iife.js') return r.fulfill({ contentType: 'text/javascript', body: frameBundle });
+      if (u.pathname === '/auth/v1/') return r.fulfill({ contentType: 'text/html', body: framePage });
+      if (u.pathname === '/auth/v1/privasys-auth-frame.iife.js') return r.fulfill({ contentType: 'text/javascript', body: frameBundle });
       if (u.pathname === '/wallet/platforms') return r.fulfill({ contentType: 'application/json', body: '{"platforms":[{"audience":"privasys-platform"}]}' });
       if (u.pathname === '/session/client-origin') {
         return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ allowed: u.searchParams.get('origin') === 'https://site-a.test' }) });
@@ -53,12 +53,12 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   // Seed the frame's storage with a signed-in wallet session for client c1.
   await page.evaluate(() => new Promise((resolve) => {
     const f = document.createElement('iframe');
-    f.src = 'https://idp.test/auth/';
+    f.src = 'https://idp.test/auth/v1/';
     f.onload = () => resolve();
     document.body.append(f);
     window.__seed = f;
   }));
-  const seedFrame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/'));
+  const seedFrame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/v1/'));
   await seedFrame.evaluate((t) => localStorage.setItem('privasys_sessions', JSON.stringify([
     { token: t, rpId: 'privasys.id', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0', scope: 'openid offline_access',
       platform: 'privasys-platform', method: 'wallet', pushToken: 'ExponentPushToken[x]', brokerUrl: 'wss://broker.test/relay' },
@@ -75,7 +75,7 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   });
   assert.ok(await page.evaluate(() => !!window.restored), 'the seeded session is restored');
 
-  const idpFrame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/'));
+  const idpFrame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/v1/'));
   const evil = page.frames().find((f) => f.url().startsWith('https://evil.test/'));
   const stored = () => idpFrame.evaluate(() => JSON.parse(localStorage.getItem('privasys_sessions') || '[]').length);
   const gateDrawn = () => idpFrame.evaluate(() => !!document.querySelector('[data-privasys-auth]'));
@@ -138,7 +138,7 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   assert.equal(noClient, 'AuthFrame: clientId is required', 'AuthFrame without a client: ' + noClient);
   const frameRefuses = await page.evaluate(() => new Promise((resolve) => {
     const f = document.createElement('iframe');
-    f.src = 'https://idp.test/auth/';
+    f.src = 'https://idp.test/auth/v1/';
     addEventListener('message', (e) => {
       if (e.source !== f.contentWindow) return;
       if (e.data.type === 'privasys:ready') f.contentWindow.postMessage({ type: 'privasys:init', config: { appName: 'app', presentation: 'modal' } }, 'https://idp.test');

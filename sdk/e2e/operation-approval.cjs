@@ -9,7 +9,7 @@ const { chromium } = require(process.cwd() + '/node_modules/playwright');
 
 const frameBundle = fs.readFileSync('dist/privasys-auth-frame.iife.js', 'utf8');
 const clientBundle = fs.readFileSync('dist/privasys-auth-client.iife.js', 'utf8');
-const framePage = '<!doctype html><html><head><title>auth</title></head><body><script src="/auth/privasys-auth-frame.iife.js"></script></body></html>';
+const framePage = '<!doctype html><html><head><title>auth</title></head><body><script src="/auth/v1/privasys-auth-frame.iife.js"></script></body></html>';
 const sitePage = '<!doctype html><html><body><div id="gate"></div><script src="/client.js"></script></body></html>';
 
 (async () => {
@@ -25,8 +25,8 @@ const sitePage = '<!doctype html><html><body><div id="gate"></div><script src="/
   await ctx.route('https://**/*', async (r) => {
     const u = new URL(r.request().url());
     if (u.host === 'idp.test' || u.host === 'site-a.test') {
-      if (u.pathname === '/auth/') return r.fulfill({ contentType: 'text/html', body: framePage });
-      if (u.pathname === '/auth/privasys-auth-frame.iife.js') return r.fulfill({ contentType: 'text/javascript', body: frameBundle });
+      if (u.pathname === '/auth/v1/') return r.fulfill({ contentType: 'text/html', body: framePage });
+      if (u.pathname === '/auth/v1/privasys-auth-frame.iife.js') return r.fulfill({ contentType: 'text/javascript', body: frameBundle });
       if (u.pathname === '/client.js') return r.fulfill({ contentType: 'text/javascript', body: clientBundle });
       if (u.pathname === '/wallet/platforms') return r.fulfill({ contentType: 'application/json', body: '{"platforms":[{"audience":"privasys-platform"}]}' });
       if (u.pathname === '/op/status') {
@@ -49,7 +49,7 @@ const sitePage = '<!doctype html><html><body><div id="gate"></div><script src="/
       });
       try { return { result: await gate.run() }; } catch (e) { return { error: e.message, code: e.code }; }
     }, op);
-    const frame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/'));
+    const frame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/v1/'));
     const shown = frame ? await frame.evaluate(() => document.querySelector('[data-privasys-auth]')?.shadowRoot?.textContent ?? '') : '';
     await page.close();
     return { ...out, shown };

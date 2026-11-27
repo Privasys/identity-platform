@@ -1,6 +1,6 @@
 {
     "name": "@privasys/auth",
-    "version": "0.18.0",
+    "version": "1.0.0",
     "description": "Browser SDK for Privasys ID sign-in: sessions, and sealed or direct channels to enclave apps.",
     "license": "AGPL-3.0-only",
     "type": "module",

@@ -13,11 +13,11 @@ function disableArg() {
 }
 
 const frameBundle = fs.readFileSync('dist/privasys-auth-frame.iife.js', 'utf8');
-const framePage = '<!doctype html><html><head><title>auth</title></head><body><script src="/auth/privasys-auth-frame.iife.js"></script></body></html>';
+const framePage = '<!doctype html><html><head><title>auth</title></head><body><script src="/auth/v1/privasys-auth-frame.iife.js"></script></body></html>';
 // The embedding site: creates the frame and sends it the gate's init, as the client script does.
 const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;height:640px"></div><script>
   const f = document.createElement('iframe');
-  f.src = 'https://idp.test/auth/'; f.style.cssText = 'width:420px;height:640px;border:0';
+  f.src = 'https://idp.test/auth/v1/'; f.style.cssText = 'width:420px;height:640px;border:0';
   addEventListener('message', (e) => {
     if (e.origin !== 'https://idp.test') return;
     if (e.data.type === 'privasys:ready') f.contentWindow.postMessage({ type: 'privasys:init', config: {
@@ -37,8 +37,8 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
   await ctx.route('https://**/*', (r) => {
     const u = new URL(r.request().url());
     if (u.host === 'idp.test') {
-      if (u.pathname === '/auth/') return r.fulfill({ contentType: 'text/html', body: framePage });
-      if (u.pathname === '/auth/privasys-auth-frame.iife.js') return r.fulfill({ contentType: 'text/javascript', body: frameBundle });
+      if (u.pathname === '/auth/v1/') return r.fulfill({ contentType: 'text/html', body: framePage });
+      if (u.pathname === '/auth/v1/privasys-auth-frame.iife.js') return r.fulfill({ contentType: 'text/javascript', body: frameBundle });
       if (u.pathname === '/authorize') return r.fulfill({ contentType: 'application/json', body: JSON.stringify({
         session_id: 'sess1', poll_url: 'https://idp.test/session/status?session_id=sess1',
         qr_payload: 'https://idp.test/qr?p=abc', requested_attributes: [] }) });
@@ -52,7 +52,7 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
   });
 
   const gateText = async (page) => {
-    const frame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/'));
+    const frame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/v1/'));
     return frame.evaluate(() => {
       const r = document.querySelector('[data-privasys-auth]')?.shadowRoot;
       if (!r) return '';
@@ -65,7 +65,7 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
   };
   const hintAtTopLevel = async () => {
     const p = await ctx.newPage();
-    await p.goto('https://idp.test/auth/');
+    await p.goto('https://idp.test/auth/v1/');
     const v = await p.evaluate(() => localStorage.getItem('privasys_device_hints'));
     await p.close();
     return v;
@@ -80,7 +80,7 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
   let popup = ctx.waitForEvent('page', { timeout: 6000 }).catch(() => null);
   await clickWallet(page);
   let pop = await popup;
-  check('the click opens a popup on the identity provider', !!pop && pop.url() === 'https://idp.test/auth/#device', pop && pop.url());
+  check('the click opens a popup on the identity provider', !!pop && pop.url() === 'https://idp.test/auth/v1/#device', pop && pop.url());
   await page.waitForTimeout(2500);
   let text = await gateText(page);
   check('with nothing remembered the gate shows the QR code', (/QR code/i.test(text) || /WebSocket connection failed/.test(text)) && !/notification/i.test(text), text.slice(0, 140));
@@ -89,14 +89,14 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
 
   // 2. Store through the popup, as "Trust this device" does: an identity-provider window asks it to.
   const opener = await ctx.newPage();
-  await opener.goto('https://idp.test/auth/');
+  await opener.goto('https://idp.test/auth/v1/');
   await opener.evaluate(() => new Promise((resolve) => {
     addEventListener('message', (e) => {
       if (e.origin !== location.origin) return;
       if (e.data.type === 'privasys:device:hello') e.source.postMessage({ type: 'privasys:device:ask', id: 'x1', op: 'store', pushToken: 'ExponentPushToken[abc]', brokerUrl: 'wss://broker.test/relay' }, location.origin);
       if (e.data.type === 'privasys:device:answer' && e.data.id === 'x1') resolve(true);
     });
-    window.open('/auth/#device', 'privasys-device', 'width=420,height=240');
+    window.open('/auth/v1/#device', 'privasys-device', 'width=420,height=240');
   }));
   await opener.close();
   const stored = await hintAtTopLevel();
@@ -106,7 +106,7 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
   page = await ctx.newPage();
   await page.goto('https://site-b.test/');
   await page.waitForTimeout(1500);
-  const inFrame = await page.frames().find((f) => f.url().startsWith('https://idp.test/auth/')).evaluate(() => localStorage.getItem('privasys_device_hints'));
+  const inFrame = await page.frames().find((f) => f.url().startsWith('https://idp.test/auth/v1/')).evaluate(() => localStorage.getItem('privasys_device_hints'));
   check("the frame's own copy on the new site is empty", inFrame === null, String(inFrame));
   popup = ctx.waitForEvent('page', { timeout: 6000 }).catch(() => null);
   await clickWallet(page);
@@ -120,14 +120,14 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
   // 3b. A second wallet, with a name: a new site offers the choice.
   const askPopup = async (ask) => {
     const o = await ctx.newPage();
-    await o.goto('https://idp.test/auth/');
+    await o.goto('https://idp.test/auth/v1/');
     await o.evaluate((ask) => new Promise((resolve) => {
       addEventListener('message', (e) => {
         if (e.origin !== location.origin) return;
         if (e.data.type === 'privasys:device:hello') e.source.postMessage({ type: 'privasys:device:ask', id: 'x2', ...ask }, location.origin);
         if (e.data.type === 'privasys:device:answer' && e.data.id === 'x2') resolve(true);
       });
-      window.open('/auth/#device', 'privasys-device', 'width=420,height=240');
+      window.open('/auth/v1/#device', 'privasys-device', 'width=420,height=240');
     }), ask);
     await o.close();
   };
@@ -167,7 +167,7 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
   const leaked = await page.evaluate(() => new Promise((resolve) => {
     let got = null;
     addEventListener('message', (e) => { if (String(e.data?.type || '').startsWith('privasys:device')) got = e.data; });
-    const w = window.open('https://idp.test/auth/#device', 'd', 'width=420,height=240');
+    const w = window.open('https://idp.test/auth/v1/#device', 'd', 'width=420,height=240');
     setTimeout(() => { try { w && w.postMessage({ type: 'privasys:device:ask', id: 'evil', op: 'read' }, '*'); } catch {} }, 800);
     setTimeout(() => resolve(got), 2500);
   }));

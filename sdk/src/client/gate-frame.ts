@@ -7,6 +7,7 @@
  * exists only for the ceremony.
  */
 
+import { FRAME_PATH } from './frame-path';
 import { FRAME_SIZE_MESSAGE, inlineFrameHeight } from '../frame-size';
 import { sanitiseGateState, type GateChoice, type GateOptions } from '../gate-headless';
 import { InsufficientCreditsError, type GateOutcome, type HeadlessGate } from './types';
@@ -41,15 +42,18 @@ const ALLOW = 'publickey-credentials-get *; publickey-credentials-create *';
  */
 export function openGate(opts: {
     authOrigin: string;
+    /** Path of the frame page on the identity provider (default FRAME_PATH). */
+    framePath?: string;
     config: Record<string, unknown>;
     container: HTMLElement | null;
     headless?: HeadlessGate | null;
     onPasskey?: () => void;
 }): GateRun {
     const { authOrigin, container } = opts;
+    const frameUrl = authOrigin + (opts.framePath ?? FRAME_PATH);
     const headless = opts.headless ?? null;
     const iframe = document.createElement('iframe');
-    iframe.src = authOrigin + '/auth/';
+    iframe.src = frameUrl;
     iframe.allow = ALLOW;
     if (headless) {
         iframe.style.cssText = HIDDEN;
@@ -89,7 +93,7 @@ export function openGate(opts: {
             post({ type: 'privasys:gate:popup-result', id, ok, ...(error ? { error } : {}) });
         const place = (w: number, h: number) =>
             `width=${w},height=${h},left=${window.screenX + (window.innerWidth - w) / 2},top=${window.screenY + (window.innerHeight - h) / 2}`;
-        if (url === `${authOrigin}/auth/#device`) {
+        if (url === `${frameUrl}#device`) {
             // The frame's lookup of a phone this browser knows: the popup
             // talks to the frame and closes itself.
             reply(!!window.open(url, 'privasys-device', place(420, 240)));

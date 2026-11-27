@@ -15,7 +15,7 @@ A monorepo for Privasys authentication: the **Privasys Wallet** mobile app, the 
 
 - **`AuthFrame`**: one per page. `connect()` restores the person's session or runs the sign-in gate (the Privasys ID wallet by QR code or notification, passkeys, external identity providers), presented as a page, a modal, inline or headless, with the site's theme. `app(host)` opens the channel to an enclave app: sealed for a wallet session, direct with an audience token otherwise. `token()`, `renew()`, `signOut()` and `onSessionChange()` keep every tab of the site in step.
 - **`IdpGate`** (`@privasys/auth/idp`): the gate of the identity provider's own pages, which approve a device's sign-in or an operation.
-- **Hosted bundle**: `https://privasys.id/auth/privasys-auth-client.iife.js` gives `window.Privasys.AuthFrame` and `Privasys.IdpGate` without a build step.
+- **Hosted bundle**: `https://privasys.id/auth/v1/privasys-auth-client.iife.js` gives `window.Privasys.AuthFrame` and `Privasys.IdpGate` without a build step. The path names the major version: `/auth/v1/` is this SDK and its frame, and fixes land there in place.
 
 ### Wallet Features
 

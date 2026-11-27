@@ -52,6 +52,8 @@ export class SessionFrame {
 
     constructor(
         private readonly authOrigin: string,
+        /** Path of the frame page on the identity provider. */
+        private readonly framePath: string,
         /** Every message the frame sends that is not the answer to a call. */
         private readonly onEvent: (data: Record<string, unknown>) => void,
     ) {}
@@ -60,7 +62,7 @@ export class SessionFrame {
     mount(): Promise<void> {
         if (this.ready) return this.ready;
         const iframe = document.createElement('iframe');
-        iframe.src = this.authOrigin + '/auth/';
+        iframe.src = this.authOrigin + this.framePath;
         iframe.style.cssText = HIDDEN;
         this.iframe = iframe;
         window.addEventListener('message', this.handler);

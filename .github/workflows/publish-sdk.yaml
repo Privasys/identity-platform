@@ -115,7 +115,9 @@ jobs:
             --tunnel-through-iap \
             --quiet \
             --command "true" < /dev/null
+          cp sdk/frame-page/index.html sdk/dist/index.html
           tar -czf - -C sdk/dist \
+            index.html \
             privasys-auth-frame.iife.js privasys-auth-frame.iife.js.map \
             privasys-auth-client.iife.js privasys-auth-client.iife.js.map \
           | gcloud compute ssh idp-fr-par-1 \
@@ -125,40 +127,43 @@ jobs:
             --quiet \
             --command "rm -rf ~/sdk-bundles && mkdir -p ~/sdk-bundles && tar -xzf - -C ~/sdk-bundles && ls -l ~/sdk-bundles"
 
-      - name: Install bundles into /var/www/auth
+      # Each major version has its own directory (/auth/v1/, /auth/v2/, ...):
+      # a page pins the major it was built for, and a release replaces the
+      # files of its own major only. /auth/ itself is never touched here.
+      - name: Install the frame of this major version
         timeout-minutes: 5
         run: |
+          MAJOR=$(node -p "require('./sdk/package.json').version.split('.')[0]")
           gcloud compute ssh idp-fr-par-1 \
             --project privasys-production \
             --zone europe-west9-a \
             --tunnel-through-iap \
             --command "
               set -e
+              DIR=/var/www/auth/v${MAJOR}
               TS=\$(date +%s)
-              for B in privasys-auth-frame.iife.js privasys-auth-client.iife.js; do
-                if [ -f /var/www/auth/\$B ]; then
-                  sudo cp /var/www/auth/\$B /var/www/auth/\$B.bak.\$TS
-                fi
-                sudo cp ~/sdk-bundles/\$B     /var/www/auth/\$B
-                sudo cp ~/sdk-bundles/\$B.map /var/www/auth/\$B.map
-                sudo chown root:root /var/www/auth/\$B /var/www/auth/\$B.map
-                sudo chmod 644       /var/www/auth/\$B /var/www/auth/\$B.map
-                # Keep only the 5 most recent backups per bundle
-                sudo bash -c \"ls -1t /var/www/auth/\$B.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f\"
-                rm -f ~/sdk-bundles/\$B ~/sdk-bundles/\$B.map
+              sudo mkdir -p \$DIR
+              for F in index.html privasys-auth-frame.iife.js privasys-auth-frame.iife.js.map privasys-auth-client.iife.js privasys-auth-client.iife.js.map; do
+                if [ -f \$DIR/\$F ]; then sudo cp \$DIR/\$F \$DIR/\$F.bak.\$TS; fi
+                sudo cp ~/sdk-bundles/\$F \$DIR/\$F
+                sudo chown root:root \$DIR/\$F
+                sudo chmod 644 \$DIR/\$F
+                # Keep only the 5 most recent backups per file
+                sudo bash -c \"ls -1t \$DIR/\$F.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f\"
               done
+              rm -rf ~/sdk-bundles
             "
 
-      - name: Smoke test hosted bundles
+      - name: Smoke test the hosted frame
         run: |
-          for B in privasys-auth-frame.iife.js privasys-auth-client.iife.js; do
+          MAJOR=$(node -p "require('./sdk/package.json').version.split('.')[0]")
+          for F in "" privasys-auth-frame.iife.js privasys-auth-client.iife.js; do
             STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
-              "https://privasys.id/auth/$B")
-            echo "$B: HTTP $STATUS"
+              "https://privasys.id/auth/v${MAJOR}/$F")
+            echo "/auth/v${MAJOR}/$F: HTTP $STATUS"
             test "$STATUS" = "200"
           done
-          # Sanity check: the client bundle MUST export getTokenForAudience.
-          # If this fails the hosted copy has drifted (see sdk-v0.3.7 note).
-          curl -sS "https://privasys.id/auth/privasys-auth-client.iife.js" \
-            | grep -q "getTokenForAudience" \
-            || (echo "::error::client bundle missing getTokenForAudience" && exit 1)
+          # The hosted client is this release's: it carries this major's frame path.
+          curl -sS "https://privasys.id/auth/v${MAJOR}/privasys-auth-client.iife.js" \
+            | grep -q "/auth/v${MAJOR}/" \
+            || (echo "::error::the hosted client is not this release's" && exit 1)

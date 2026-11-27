@@ -14,7 +14,7 @@ const { chromium } = require(process.cwd() + '/node_modules/playwright');
 
 const frameBundle = fs.readFileSync('dist/privasys-auth-frame.iife.js', 'utf8');
 const clientBundle = fs.readFileSync('dist/privasys-auth-client.iife.js', 'utf8');
-const framePage = '<!doctype html><html><head><title>auth</title></head><body><script src="/auth/privasys-auth-frame.iife.js"></script></body></html>';
+const framePage = '<!doctype html><html><head><title>auth</title></head><body><script src="/auth/v1/privasys-auth-frame.iife.js"></script></body></html>';
 const sitePage = '<!doctype html><html><body><script src="/client.js"></script></body></html>';
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -39,8 +39,8 @@ const CORS = {
     const u = new URL(req.url());
     if (req.method() === 'OPTIONS') return r.fulfill({ status: 204, headers: CORS, body: '' });
     if (u.host === 'idp.test') {
-      if (u.pathname === '/auth/') return r.fulfill({ contentType: 'text/html', body: framePage });
-      if (u.pathname === '/auth/privasys-auth-frame.iife.js') return r.fulfill({ contentType: 'text/javascript', body: frameBundle });
+      if (u.pathname === '/auth/v1/') return r.fulfill({ contentType: 'text/html', body: framePage });
+      if (u.pathname === '/auth/v1/privasys-auth-frame.iife.js') return r.fulfill({ contentType: 'text/javascript', body: frameBundle });
       if (u.pathname === '/wallet/platforms') return r.fulfill({ contentType: 'application/json', body: '{"platforms":[{"audience":"privasys-platform"}]}' });
       if (u.pathname === '/session/client-origin') return r.fulfill({ contentType: 'application/json', body: '{"allowed":true}' });
       if (u.pathname === '/token') {
@@ -87,12 +87,12 @@ const CORS = {
   const base = { rpId: 'privasys.id', authenticatedAt: Date.now(), refreshToken: 'rt-0', scope: 'openid offline_access', platform: 'privasys-platform' };
   await page.evaluate(() => new Promise((resolve) => {
     const f = document.createElement('iframe');
-    f.src = 'https://idp.test/auth/?seed';
+    f.src = 'https://idp.test/auth/v1/?seed';
     f.onload = () => resolve();
     document.body.append(f);
     window.__seed = f;
   }));
-  const seedFrame = page.frames().find((f) => f.url() === 'https://idp.test/auth/?seed');
+  const seedFrame = page.frames().find((f) => f.url() === 'https://idp.test/auth/v1/?seed');
   await seedFrame.evaluate((s) => localStorage.setItem('privasys_sessions', JSON.stringify(s)), [
     { ...base, clientId: 'passkey-site', token: jwtFor('privasys-platform', 0), method: 'passkey' },
     { ...base, clientId: 'wallet-site', token: jwtFor('privasys-platform', 0), method: 'wallet', wallet: true,

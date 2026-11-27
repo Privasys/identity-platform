@@ -23,7 +23,8 @@ import { sessions } from './page-scope';
 // phone), the popup does it and closes. Every message is posted to this
 // origin only, so the embedding page takes no part and learns nothing.
 export const DEVICE_POPUP_HASH = '#device';
-export const DEVICE_POPUP_URL = `${globalThis.location.origin}/auth/${DEVICE_POPUP_HASH}`;
+// The popup is this same frame page, wherever the identity provider serves it.
+export const DEVICE_POPUP_URL = `${globalThis.location.origin}${globalThis.location.pathname}${DEVICE_POPUP_HASH}`;
 export const DEVICE_POPUP_WAIT_MS = 5_000;
 // Names of wallets the popup reported, kept so a wallet first used on this
 // site is remembered here under the name it has everywhere else.

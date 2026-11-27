@@ -6,7 +6,7 @@
  * to the enclave apps they use. One per page.
  *
  * ```html
- * <script src="https://privasys.id/auth/privasys-auth-client.iife.js"></script>
+ * <script src="https://privasys.id/auth/v1/privasys-auth-client.iife.js"></script>
  * <script>
  *   const auth = new Privasys.AuthFrame({ clientId: 'my-site', appName: 'My Site' });
  *   const session = await auth.connect();
@@ -22,6 +22,7 @@
  * the keys of every sealed channel.
  */
 
+import { FRAME_PATH } from './frame-path';
 import { Channel, SealedBridge, directTransport } from './app-channel';
 import { openGate, type GateResult, type GateRun } from './gate-frame';
 import { approvalReason, appHost, channelState, parseView, sessionOf, widenedBy, type SessionView } from './session';
@@ -32,7 +33,8 @@ const DEFAULT_AUTH_ORIGIN = 'https://privasys.id';
 
 export class AuthFrame {
     private readonly authOrigin: string;
-    private config: Omit<AuthFrameConfig, 'container' | 'headless' | 'authOrigin'>;
+    private readonly framePath: string;
+    private config: Omit<AuthFrameConfig, 'container' | 'headless' | 'authOrigin' | 'framePath'>;
     private container: HTMLElement | null;
     private readonly headless: HeadlessGate | null;
     private readonly frame: SessionFrame;
@@ -54,12 +56,16 @@ export class AuthFrame {
         if (!config || typeof config.clientId !== 'string' || !config.clientId) {
             throw new Error('AuthFrame: clientId is required');
         }
-        const { authOrigin, container, headless, ...rest } = config;
+        const { authOrigin, framePath, container, headless, ...rest } = config;
+        if (framePath !== undefined && !/^\/([A-Za-z0-9_-]+\/)*$/.test(framePath)) {
+            throw new Error('AuthFrame: framePath is a path that starts and ends with "/"');
+        }
+        this.framePath = framePath ?? FRAME_PATH;
         this.authOrigin = authOrigin ?? DEFAULT_AUTH_ORIGIN;
         this.container = container ?? null;
         this.headless = headless ?? null;
         this.config = rest;
-        this.frame = new SessionFrame(this.authOrigin, (data) => this.onFrameEvent(data));
+        this.frame = new SessionFrame(this.authOrigin, this.framePath, (data) => this.onFrameEvent(data));
         this.sealed = new SealedBridge(this.frame);
         const key = `${this.authOrigin}|${config.clientId}`;
         const live = (liveFrames.get(key) ?? 0) + 1;
@@ -340,6 +346,7 @@ export class AuthFrame {
         const container = modal || !this.container?.isConnected ? null : this.container;
         const run = openGate({
             authOrigin: this.authOrigin,
+            framePath: this.framePath,
             container,
             headless: modal ? null : this.headless,
             config: {

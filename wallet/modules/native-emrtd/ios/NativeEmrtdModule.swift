@@ -4,7 +4,6 @@
 import ExpoModulesCore
 import CoreNFC
 import NFCPassportReader
-import Vision
 import UIKit
 
 /// eMRTD (ICAO 9303) NFC reader, backed by AndyQ/NFCPassportReader (MIT).
@@ -95,32 +94,6 @@ public class NativeEmrtdModule: Module {
                         resolveError(error)
                     }
                 }
-            }
-        }
-
-        AsyncFunction("scanMrz") { (imageBase64: String, promise: Promise) in
-            guard let data = Data(base64Encoded: imageBase64),
-                  let image = UIImage(data: data),
-                  let cgImage = image.cgImage else {
-                promise.resolve("{\"error\":\"could not decode the photo\"}")
-                return
-            }
-            let request = VNRecognizeTextRequest { (req, err) in
-                if let err = err {
-                    promise.resolve("{\"error\":\"\(NativeEmrtdModule.escape(err.localizedDescription))\"}")
-                    return
-                }
-                let observations = (req.results as? [VNRecognizedTextObservation]) ?? []
-                let lines = observations.compactMap { $0.topCandidates(1).first?.string }
-                let arr = lines.map { "\"\(NativeEmrtdModule.escape($0))\"" }.joined(separator: ",")
-                promise.resolve("{\"lines\":[\(arr)]}")
-            }
-            request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = false
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-            DispatchQueue.global(qos: .userInitiated).async {
-                do { try handler.perform([request]) }
-                catch { promise.resolve("{\"error\":\"\(NativeEmrtdModule.escape(error.localizedDescription))\"}") }
             }
         }
 

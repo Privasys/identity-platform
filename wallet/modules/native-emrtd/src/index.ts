@@ -18,7 +18,6 @@
 import { Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
-import { parseMrzLines } from './mrz-lines';
 import type { EmrtdReadResult, EmrtdSupport, MrzKey, MrzScan } from './NativeEmrtd.types';
 
 export type { EmrtdReadResult, EmrtdSupport, MrzKey, MrzScan };
@@ -30,7 +29,6 @@ export type { MrzFrame, MrzScannerHandle, MrzScannerProps } from './MrzScannerVi
 interface NativeEmrtdModule {
     isSupported(): Promise<string>;
     readDocument(documentNumber: string, dateOfBirth: string, dateOfExpiry: string): Promise<string>;
-    scanMrz(imageBase64: string): Promise<string>;
 }
 
 const Native =
@@ -64,21 +62,4 @@ export async function readDocument(key: MrzKey): Promise<EmrtdReadResult> {
         throw new Error(result.diag ? `${result.error} [${result.diag}]` : result.error);
     }
     return result;
-}
-
-/**
- * OCR the machine-readable zone from a photo of the document's photo page and
- * return the chip access fields. Lets the user scan instead of typing. Throws
- * if no MRZ is found (caller falls back to manual entry).
- *
- * @param imageBase64 JPEG/PNG bytes, base64 (no data: prefix).
- */
-export async function scanMrz(imageBase64: string): Promise<MrzScan> {
-    if (!Native?.scanMrz) throw new Error('MRZ scanning is unavailable on this platform/build');
-    const json = await Native.scanMrz(imageBase64);
-    const result = JSON.parse(json) as { lines?: string[]; error?: string };
-    if (result.error) throw new Error(result.error);
-    const fields = parseMrzLines(result.lines ?? []);
-    if (!fields) throw new Error('No valid MRZ detected');
-    return fields;
 }

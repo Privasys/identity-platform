@@ -807,12 +807,14 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
     /// identity-routed path and the credential-list path. The record decides
     /// the kind; a local one signs in the Secure Enclave exactly as before.
     private func completeAssertionRaw(rpId: String, credentialId: [UInt8], clientDataHash: Data) {
-        guard let record = lookupRecord(rpId: rpId, credentialId: credentialId) else {
+        guard let record = lookupRecord(rpId: rpId, credentialId: credentialId),
+              let kind = record["kind"] as? String, kind == kKindLocal || kind == kKindSynced
+        else {
             extensionContext.cancelRequest(withError: ASExtensionError(.credentialIdentityNotFound))
             return
         }
 
-        if isSyncedRecord(record, credentialId: credentialId) {
+        if kind == kKindSynced {
             completeSyncedAssertion(rpId: rpId, credentialId: credentialId, clientDataHash: clientDataHash)
             return
         }
@@ -922,16 +924,6 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
         )
 
         extensionContext.completeAssertionRequest(using: credential)
-    }
-
-    /// A record is synced when it says so. A record with no kind predates
-    /// synced passkeys, but a 17-byte id starting 0x01 can only be a synced
-    /// one (a local id is a 32-byte hash), so the id settles it.
-    private func isSyncedRecord(_ record: [String: Any], credentialId: [UInt8]) -> Bool {
-        if let kind = record["kind"] as? String {
-            return kind == kKindSynced
-        }
-        return isSyncedCredentialId(credentialId)
     }
 
     // MARK: - Secure Enclave Key Management

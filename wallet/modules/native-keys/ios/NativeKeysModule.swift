@@ -212,7 +212,8 @@ public class NativeKeysModule: Module {
         AsyncFunction("listWebsitePasskeys") { () -> String in
             let list: [[String: Any]] = Self.loadPasskeyRecords().compactMap { record -> [String: Any]? in
                 guard let rpId = record["rpId"] as? String,
-                      let credentialId = (record["credentialId"] as? String).flatMap({ Data(base64Encoded: $0) })
+                      let credentialId = (record["credentialId"] as? String).flatMap({ Data(base64Encoded: $0) }),
+                      let kind = record["kind"] as? String, kind == Self.kindLocal || kind == Self.kindSynced
                 else { return nil }
                 let userHandle = (record["userHandle"] as? String).flatMap { Data(base64Encoded: $0) } ?? Data()
                 return [
@@ -220,9 +221,8 @@ public class NativeKeysModule: Module {
                     "credentialId": Self.base64urlEncode(credentialId),
                     "userName": record["userName"] as? String ?? "",
                     "userHandle": Self.base64urlEncode(userHandle),
-                    // A record without a kind predates synced passkeys: local.
-                    "kind": (record["kind"] as? String) == Self.kindSynced ? Self.kindSynced : Self.kindLocal,
-                    "createdAt": Self.createdAtMillis(record["createdAt"]),
+                    "kind": kind,
+                    "createdAt": (record["createdAt"] as? NSNumber)?.int64Value ?? 0,
                 ]
             }
             guard let data = try? JSONSerialization.data(withJSONObject: list),
@@ -257,8 +257,8 @@ public class NativeKeysModule: Module {
                 // the record and in the account name, which is what it looks
                 // up), so it cannot tell an imported record from its own.
                 var createdAt = Int64(Date().timeIntervalSince1970 * 1000)
-                if entry["createdAt"] != nil {
-                    createdAt = Self.createdAtMillis(entry["createdAt"])
+                if let given = (entry["createdAt"] as? NSNumber)?.int64Value, given > 0 {
+                    createdAt = given
                 }
                 let record: [String: Any] = [
                     "rpId": rpId,
@@ -434,16 +434,6 @@ public class NativeKeysModule: Module {
             kSecAttrAccessGroup as String: sharedKeychainGroup,
         ]
         return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
-    }
-
-    /// createdAt in milliseconds. Records the extension wrote before synced
-    /// passkeys hold seconds (a Double); anything below 1e11 cannot be a
-    /// millisecond time after 1973, so it is taken as seconds.
-    private static func createdAtMillis(_ value: Any?) -> Int64 {
-        guard let number = value as? NSNumber else { return 0 }
-        let raw = number.doubleValue
-        guard raw.isFinite, raw > 0 else { return 0 }
-        return raw < 1e11 ? Int64(raw * 1000) : Int64(raw)
     }
 
     // MARK: - Helpers

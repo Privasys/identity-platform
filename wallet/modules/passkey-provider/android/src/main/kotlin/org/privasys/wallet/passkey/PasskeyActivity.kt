@@ -571,11 +571,15 @@ class PasskeyActivity : Activity() {
         // user.id was stored as the site sent it, base64url, which is what the
         // response's userHandle wants. Re-encoding it would hand the site a
         // userHandle it never issued.
-        val userHandle = entry.optString("userHandle", "").ifEmpty { entry.optString("userId", "") }
+        val userHandle = entry.optString("userHandle", "")
         val rpIdHash = MessageDigest.getInstance("SHA-256").digest(rpId.toByteArray())
 
-        // Records written before "kind" existed are local.
-        if (entry.optString("kind", KIND_LOCAL) == KIND_SYNCED) {
+        val kind = entry.optString("kind", "")
+        if (kind != KIND_LOCAL && kind != KIND_SYNCED) {
+            onSigned(null)
+            return
+        }
+        if (kind == KIND_SYNCED) {
             if (!SyncedPasskeyDerivation.isSyncedCredentialId(credentialId)) {
                 onSigned(null)
                 return
@@ -658,15 +662,15 @@ class PasskeyActivity : Activity() {
     /**
      * Record shape shared with NativeKeysModule (listWebsitePasskeys,
      * importWebsitePasskeys, deleteWebsitePasskey): keyed "$rpId:$credIdB64"
-     * with the id in URL_SAFE | NO_WRAP Base64 (padded), as records always were.
-     * "userId" is kept for records older than "userHandle".
+     * with the id in URL_SAFE | NO_WRAP Base64 (padded). userHandle is the
+     * site's user.id as it sent it (base64url).
      */
     private fun storeCredential(
         rpId: String,
         credentialId: ByteArray,
         kind: String,
         keyAlias: String?,
-        userId: String,
+        userHandle: String,
         userName: String,
     ) {
         val credIdB64 = Base64.encodeToString(credentialId, Base64.URL_SAFE or Base64.NO_WRAP)
@@ -675,8 +679,7 @@ class PasskeyActivity : Activity() {
             put("credentialId", credIdB64)
             put("kind", kind)
             if (keyAlias != null) put("keyAlias", keyAlias)
-            put("userId", userId)
-            put("userHandle", userId)
+            put("userHandle", userHandle)
             put("userName", userName)
             put("createdAt", System.currentTimeMillis())
         }

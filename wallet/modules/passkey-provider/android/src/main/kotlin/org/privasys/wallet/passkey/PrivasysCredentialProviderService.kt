@@ -153,7 +153,9 @@ class PrivasysCredentialProviderService : CredentialProviderService() {
                 try {
                     val entry = JSONObject(value)
                     val rpId = entry.getString("rpId")
-                    if (entry.optString("kind", "local") == "synced" && !hasRoot) continue
+                    val kind = entry.optString("kind", "")
+                    if (kind != "local" && kind != "synced") continue
+                    if (kind == "synced" && !hasRoot) continue
                     val beginOption = request.beginGetCredentialOptions
                         .filterIsInstance<androidx.credentials.provider.BeginGetPublicKeyCredentialOption>()
                         .firstOrNull() ?: continue
@@ -170,7 +172,7 @@ class PrivasysCredentialProviderService : CredentialProviderService() {
                     entries.add(
                         PublicKeyCredentialEntry.Builder(
                             applicationContext,
-                            // The account name tells two passkeys for one site apart; older records have none.
+                            // The account name tells two passkeys for one site apart; a site may send none.
                             entry.optString("userName", "").ifEmpty { rpId },
                             android.app.PendingIntent.getActivity(
                                 applicationContext, entries.size,

@@ -175,16 +175,14 @@ class NativeKeysModule : Module() {
             } catch (_: Exception) {
                 continue
             }
-            if (rpId.isEmpty() || credentialId.isEmpty()) continue
-            // "userId" is the field older records used for the same value.
-            val userHandle = record.optString("userHandle", "").ifEmpty { record.optString("userId", "") }
+            val kind = record.optString("kind", "")
+            if (rpId.isEmpty() || credentialId.isEmpty() || (kind != KIND_LOCAL && kind != KIND_SYNCED)) continue
             out.put(JSONObject().apply {
                 put("rpId", rpId)
                 put("credentialId", base64urlEncode(credentialId))
                 put("userName", record.optString("userName", ""))
-                put("userHandle", normaliseB64url(userHandle))
-                // A record without a kind predates synced passkeys: local.
-                put("kind", if (record.optString("kind", KIND_LOCAL) == KIND_SYNCED) KIND_SYNCED else KIND_LOCAL)
+                put("userHandle", normaliseB64url(record.optString("userHandle", "")))
+                put("kind", kind)
                 put("createdAt", record.optLong("createdAt", 0L))
             })
         }
@@ -227,7 +225,6 @@ class NativeKeysModule : Module() {
                 put("rpId", rpId)
                 put("credentialId", credIdB64)
                 put("kind", KIND_SYNCED)
-                put("userId", userHandle)
                 put("userHandle", userHandle)
                 put("userName", entry.optString("userName", ""))
                 put("createdAt", createdAt)

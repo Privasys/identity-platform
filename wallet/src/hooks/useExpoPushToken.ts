@@ -34,34 +34,47 @@ import { answerBindChallenge, answerFromTray, BIND_TYPE, carriesBindChallenge } 
 
 let _notificationsSetup = false;
 
+/**
+ * Requests the holder is waiting on right now, because they started something
+ * elsewhere: a sign-in, an app reaching another enclave, an approval. Received
+ * while the wallet is open, these open at once and show no banner. Anything
+ * else (an app's message or form, a Drive share, a deletion notice) shows its
+ * banner and opens only on a tap, as it does when the wallet is closed, so it
+ * never takes the holder away from what they are doing.
+ */
+const OPENS_AT_ONCE = new Set<string>([
+    'auth-request',
+    'voucher-request',
+    'vault-approval',
+    'vault-approval-batch',
+    'attribute-approval',
+    'capability-request',
+    'recovery-request',
+    APPROVAL_TYPE,
+]);
+
+function opensAtOnce(data: Record<string, unknown> | undefined): boolean {
+    return typeof data?.type === 'string' && OPENS_AT_ONCE.has(data.type);
+}
+
 async function getNotifications() {
     const Notifications = await import('expo-notifications');
     if (!_notificationsSetup && Platform.OS !== 'web') {
         _notificationsSetup = true;
         Notifications.setNotificationHandler({
             handleNotification: async (notification) => {
-                // Auth-request notifications received while the app is in
-                // the foreground are surfaced directly via the connect
-                // screen (see addNotificationReceivedListener below). We
-                // suppress the banner / list entry / sound to avoid a
-                // double prompt — the user is already looking at the app.
+                // A request that opens at once needs no banner too: the
+                // holder is already looking at its screen.
                 const data = notification?.request?.content?.data as
                     | Record<string, unknown>
                     | undefined;
-                const isAuthRequest =
-                    data?.type === 'auth-request' ||
-                    data?.type === 'voucher-request' ||
-                    data?.type === 'vault-approval' ||
-                    data?.type === 'vault-approval-batch' ||
-                    data?.type === 'attribute-approval' ||
-                    data?.type === 'capability-request' ||
-                    data?.type === 'recovery-request';
+                const quiet = opensAtOnce(data);
                 return {
-                    shouldShowAlert: !isAuthRequest,
-                    shouldPlaySound: !isAuthRequest,
-                    shouldSetBadge: !isAuthRequest,
-                    shouldShowBanner: !isAuthRequest,
-                    shouldShowList: !isAuthRequest,
+                    shouldShowAlert: !quiet,
+                    shouldPlaySound: !quiet,
+                    shouldSetBadge: !quiet,
+                    shouldShowBanner: !quiet,
+                    shouldShowList: !quiet,
                 };
             },
         });
@@ -175,7 +188,7 @@ async function fileDriveNotification(data: Record<string, unknown>): Promise<boo
  *  approvals go to the Vault approvals screen; drive share notifications file
  *  into the drive-notifications store and open the requests screen; everything
  *  else runs through the auth/voucher connect flow. */
-async function dispatchPush(data: Record<string, unknown>, router: Router): Promise<void> {
+async function dispatchPush(data: Record<string, unknown>, router: Router, tapped: boolean): Promise<void> {
     // Any notification may carry privasys.id's request that this phone show its
     // push token is its own. Answered beside whatever the notification is
     // about, never in its place.
@@ -202,6 +215,9 @@ async function dispatchPush(data: Record<string, unknown>, router: Router): Prom
         await pullRelay().catch((e) => console.warn('[notifications] device relay failed', e));
         return;
     }
+    // Everything below opens a screen or a link: on arrival, only for what
+    // the holder is waiting on; anything else waits for the tap.
+    if (!tapped && !opensAtOnce(data)) return;
     if (data?.type === 'share-request' || data?.type === 'share-decision') {
         // Filing is a convenience and opening the screen is the point. A
         // failure here (a sealed payload this device cannot open, storage
@@ -677,7 +693,7 @@ async function setupListeners(router: Router): Promise<void> {
                     | undefined;
                 if (data) {
                     // Defer one tick so the router is mounted before pushing.
-                    setTimeout(() => void dispatchPush(data, router), 0);
+                    setTimeout(() => void dispatchPush(data, router, true), 0);
                     void answeredHere(data);
                 }
             }
@@ -689,27 +705,24 @@ async function setupListeners(router: Router): Promise<void> {
         setTimeout(() => useAppLockStore.getState().setLaunchPushChecked(), 0);
     }
 
-    // Foreground notification handler — when an auth-request arrives while
-    // the app is open we route straight to the connect screen, instead of
-    // forcing the user to dismiss a banner first. The notification handler
-    // above is what suppresses the banner for this case. Registered once
-    // globally so a single inbound notification produces a single push.
+    // A notification received while the wallet is open: a request the holder
+    // is waiting on opens at once (OPENS_AT_ONCE); anything else only does its
+    // silent work, and its banner opens it on a tap. Registered once globally,
+    // so one notification is handled once.
     Notifications.addNotificationReceivedListener((n) => {
         const data = n.request.content.data as Record<string, unknown> | undefined;
         if (!data) return;
-        void dispatchPush(data, router);
+        void dispatchPush(data, router, false);
     });
 
-    // Tap-to-open handler — fires when the user taps a notification
-    // delivered while the app was in the background. Registered once
-    // globally; we deliberately never call .remove() because the listeners
-    // need to live for the entire app lifetime.
+    // A tapped notification, whatever its type. Registered once globally and
+    // never removed: it lives as long as the app.
     Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data as
             | Record<string, unknown>
             | undefined;
         if (!data) return;
-        void dispatchPush(data, router);
+        void dispatchPush(data, router, true);
         void answeredHere(data);
     });
 

@@ -212,9 +212,10 @@ export class PrivasysSession {
     private c2sCtr = 0n;
     private s2cCtr = 0n;
     private getEncAuth?: () => Promise<EncAuthEnvelope | null | undefined>;
-    /** The single in-flight silent rebind, shared by every request that
-     *  hits the unsealed 401 at the same time (see tryRebind). */
-    private rebindInFlight: Promise<boolean> | null = null;
+    /** The voucher-backed bootstrap in flight, an identify or a rebind.
+     *  Both replace this session's id and keys, so one runs at a time and
+     *  every caller of the same kind shares it (see shareBootstrap). */
+    private bootstrapInFlight: { kind: 'identify' | 'rebind'; done: Promise<boolean> } | null = null;
     /** Set once the enclave has refused this session's voucher (or there is
      *  none): no later request may try again. Only a fresh wallet ceremony,
      *  which makes a new session, recovers; retrying would spend the
@@ -227,8 +228,6 @@ export class PrivasysSession {
      *  until the session is re-established from the wallet's voucher
      *  (see {@link identify}). */
     private anonymous = false;
-    /** The single in-flight {@link identify}. */
-    private identifyInFlight: Promise<boolean> | null = null;
     /** The enclave refused the voucher: identifying cannot succeed. */
     private identifyRefused = false;
     private lastState: SealedSessionState = { status: 'ok' };
@@ -406,12 +405,24 @@ export class PrivasysSession {
     identify(): Promise<boolean> {
         if (!this.anonymous) return Promise.resolve(true);
         if (this.identifyRefused || !this.getEncAuth) return Promise.resolve(false);
-        if (!this.identifyInFlight) {
-            this.identifyInFlight = this.identifyOnce().finally(() => {
-                this.identifyInFlight = null;
-            });
-        }
-        return this.identifyInFlight;
+        return this.shareBootstrap('identify', () => this.identifyOnce());
+    }
+
+    /**
+     * Run a voucher-backed bootstrap of `kind`, or join the one in flight.
+     * A bootstrap of the other kind in flight is waited for first: when it
+     * succeeds the session is already re-established from the voucher (and
+     * so identified), and this one is not needed.
+     */
+    private shareBootstrap(kind: 'identify' | 'rebind', run: () => Promise<boolean>): Promise<boolean> {
+        const current = this.bootstrapInFlight;
+        if (current?.kind === kind) return current.done;
+        if (current) return current.done.then((ok) => ok || this.shareBootstrap(kind, run));
+        const done: Promise<boolean> = run().finally(() => {
+            if (this.bootstrapInFlight?.done === done) this.bootstrapInFlight = null;
+        });
+        this.bootstrapInFlight = { kind, done };
+        return done;
     }
 
     private async identifyOnce(): Promise<boolean> {
@@ -600,12 +611,7 @@ export class PrivasysSession {
         // enclave's per-session rebind budget (six a minute), so one rebind
         // per burst is the difference between a silent recovery and a
         // rate-limited failure the app can only surface as a sign-out.
-        if (!this.rebindInFlight) {
-            this.rebindInFlight = this.rebindOnce().finally(() => {
-                this.rebindInFlight = null;
-            });
-        }
-        return this.rebindInFlight;
+        return this.shareBootstrap('rebind', () => this.rebindOnce());
     }
 
     private setState(state: SealedSessionState): void {

@@ -241,14 +241,17 @@ const IDENTIFY_WINDOW_MS = 10 * 60_000;
 /**
  * Keep trying to identify an anonymous session (the wallet's own bootstrap)
  * from the wallet's voucher, so the app learns who the caller is as soon as
- * the voucher lands, not only after the enclave forgets the session.
+ * the voucher lands, not only after the enclave forgets the session. Stops
+ * once the session is no longer this frame's active one.
  */
 function identifyInBackground(session: PrivasysSession): void {
     const deadline = Date.now() + IDENTIFY_WINDOW_MS;
     let wait = 3_000;
+    const current = () => activeSession?.session === session && session.isAnonymous && Date.now() < deadline;
     const attempt = async (): Promise<void> => {
-        if (!session.isAnonymous || Date.now() >= deadline) return;
+        if (!current()) return;
         await waitForForeground(deadline);
+        if (!current()) return;
         if (await session.identify()) return;
         wait = Math.min(wait * 1.5, 30_000);
         setTimeout(() => { void attempt(); }, wait);

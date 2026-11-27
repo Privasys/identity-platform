@@ -128,3 +128,12 @@ test('an identified session never re-identifies on an app 401', async () => {
     assert.equal(await session.identify(), true);
     assert.equal(counts().bootstraps, before);
 });
+
+test('an identify and a rebind at once make one bootstrap', async () => {
+    const { session, counts } = await setup({ voucher: () => true });
+    const rebind = (session as unknown as { tryRebind(): Promise<boolean> }).tryRebind();
+    const results = await Promise.all([session.identify(), rebind, session.identify()]);
+    assert.deepEqual(results, [true, true, true]);
+    assert.equal(counts().bootstraps, 1);
+    assert.equal(session.isAnonymous, false);
+});

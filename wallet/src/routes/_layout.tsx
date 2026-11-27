@@ -220,8 +220,8 @@ function RootLayoutNav({ hasProfile, ready }: { hasProfile: boolean; ready: bool
         }
     }, [hasProfile]);
 
-    // The app lock is asked about once, on a tab and never over a task: after
-    // setup, or on the first start of a version that has it. A phone with no
+    // The app lock is asked about once, on a tab and never over a task, once
+    // the wallet is set up. A phone with no
     // Face ID and no passcode has nothing to lock with, so it is not asked.
     useEffect(() => {
         if (isDemo() || !ready || !hasProfile || appLockAsked || !isTabPath(pathname)) return;

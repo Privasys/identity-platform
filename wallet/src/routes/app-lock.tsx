@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * The one-time question about the app lock (services/app-lock), asked after
- * setup or on the first start of a version that has it. Either answer is kept,
- * and Settings changes it later.
+ * The one-time question about the app lock (services/app-lock), asked once the
+ * wallet is set up. Either answer is kept, and Settings changes it later.
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -42,11 +41,6 @@ export default function AppLockQuestion() {
         else router.replace('/');
     };
 
-    const notNow = () => {
-        useSettingsStore.getState().setAppLockAsked();
-        leave();
-    };
-
     // Turning it on checks Face ID once, so the holder knows it works before
     // the wallet relies on it.
     const turnOn = async () => {
@@ -54,9 +48,7 @@ export default function AppLockQuestion() {
         setBusy(true);
         try {
             if (!(await unlockWallet(t('appLock.prompt'), t('common.cancel')))) return;
-            const settings = useSettingsStore.getState();
-            settings.setAppLock(APP_LOCK_DEFAULT);
-            settings.setAppLockAsked();
+            useSettingsStore.getState().setAppLock(APP_LOCK_DEFAULT);
             leave();
         } finally {
             setBusy(false);
@@ -78,7 +70,7 @@ export default function AppLockQuestion() {
                     <Pressable
                         style={[styles.declineButton, busy && styles.buttonIdle]}
                         disabled={busy}
-                        onPress={notNow}
+                        onPress={leave}
                         accessibilityRole="button"
                         testID="app-lock-not-now"
                     >

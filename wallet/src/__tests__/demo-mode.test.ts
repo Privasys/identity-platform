@@ -15,7 +15,7 @@ jest.mock('@/utils/storage', () => ({
     deleteItemAsync: jest.fn(async () => undefined),
 }));
 jest.mock('../services/notify-seal', () => ({ openSealedNotification: jest.fn(async () => null) }));
-jest.mock('../services/platform-token', () => ({ getCachedPlatformToken: jest.fn(async () => null) }));
+jest.mock('../services/platform-token', () => ({}));
 
 import { formDigest } from '../services/app-form';
 import { CANONICAL_KEYS, isGovVerified } from '../services/attributes';

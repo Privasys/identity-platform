@@ -8,7 +8,7 @@ jest.mock('../services/notify-seal', () => ({
             : null,
     ),
 }));
-jest.mock('../services/platform-token', () => ({ getCachedPlatformToken: jest.fn(async () => null) }));
+jest.mock('../services/platform-token', () => ({}));
 
 import { appMessageLink, readAppMessage } from '../services/app-message';
 import { readListed } from '../stores/app-messages';

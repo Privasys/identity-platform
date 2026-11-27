@@ -23,7 +23,7 @@ jest.mock('@/services/fido2', () => ({ authenticate: jest.fn(async () => ({ sess
 jest.mock('@/services/privasys-id', () => ({ ensurePrivasysSession: jest.fn(async () => ({ sessionToken: 'sess' })) }));
 
 import { audienceFor, forgetPlatforms } from '@/services/platforms';
-import { cachedTokenForHost, callWithPlatformToken, clearPlatformToken, tokenForHost } from '@/services/platform-token';
+import { callWithPlatformToken, clearPlatformToken, tokenForHost } from '@/services/platform-token';
 import { useAuthStore } from '@/stores/auth';
 
 const { mockStore } = jest.requireMock('@/utils/storage') as { mockStore: Record<string, string> };
@@ -86,7 +86,6 @@ it('keeps the list for a launch when privasys.id cannot be reached', async () =>
 it('sends no key to a named host while the platforms have never been read', async () => {
     platformsReply = async () => ({ ok: false, status: 404 });
     await expect(tokenForHost('x.b.example.org')).rejects.toThrow();
-    expect(await cachedTokenForHost('x.b.example.org')).toBeNull();
     const call = jest.fn();
     expect(await callWithPlatformToken(call, { interactive: false, target: 'https://x.b.example.org' })).toBeNull();
     await expect(callWithPlatformToken(call, { interactive: true, target: 'https://x.b.example.org' })).rejects.toThrow();

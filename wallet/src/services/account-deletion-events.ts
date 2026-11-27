@@ -56,7 +56,7 @@ let clearing = false;
  * Clear this wallet if, and only if, privasys.id answers that its account was
  * deleted or this device removed. Returns whether it did.
  */
-export async function clearIfGone(): Promise<boolean> {
+async function clearIfGone(): Promise<boolean> {
     if (clearing) return false;
     const reason = await checkGone();
     if (!reason) return false;

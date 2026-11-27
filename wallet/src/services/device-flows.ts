@@ -341,7 +341,7 @@ export async function installTransfer(
     onProgress?.(progress);
     for (const entry of targets) {
         try {
-            await claimIdentity(entry, 'enrol');
+            await claimIdentity(entry);
             progress.done++;
         } catch (e: any) {
             // It comes back at its next sign-in instead (connect enrols).
@@ -365,11 +365,11 @@ async function registerPush(session: string, userId: string): Promise<void> {
 
 /**
  * Put a passkey of this phone on one identity: prove it is the holder's
- * ('enrol' keeps the other phones' passkeys, 'recover' removes them), register,
- * and register this phone's push target.
+ * (keeping the other phones' passkeys), register, and register this phone's
+ * push target.
  */
-export async function claimIdentity(entry: RegistryIdentity, mode: 'enrol' | 'recover'): Promise<void> {
-    await recoverIdentity(entry.userHandle, mode, entry.rpId);
+export async function claimIdentity(entry: RegistryIdentity): Promise<void> {
+    await recoverIdentity(entry.userHandle, 'enrol', entry.rpId);
     const keyAlias = aliasFor(entry.rpId);
     const name = profileName(useProfileStore.getState().profile) ?? entry.rpId;
     const r = await fido2.register(IDP_HOST, keyAlias, '', name, entry.userHandle, undefined, { clientPhrase: true });
@@ -560,7 +560,7 @@ export async function secureAfterRecovery(onProgress?: (p: InstallProgress) => v
     let claimFailed = 0;
     for (const entry of moved.identities.filter((i) => i.rpId && !myCredentialOn(i.userHandle))) {
         try {
-            await claimIdentity(entry, 'enrol');
+            await claimIdentity(entry);
         } catch (e: any) {
             console.warn('[devices] identity not taken now:', e?.message ?? e);
             claimFailed++;

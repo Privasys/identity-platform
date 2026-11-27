@@ -16,10 +16,8 @@ jest.mock('../../modules/native-ratls/src/index', () => ({ makeRaTlsFetch: jest.
 // asks it to make sure an attestation is in place.
 jest.mock('@/services/wia', () => ({ ensureWia: jest.fn(async () => null) }));
 jest.mock('@/services/platform-token', () => ({
-    getPlatformToken: jest.fn(async () => 'tok'),
     callWithPlatformToken: jest.fn(async (call: (t: string) => Promise<Response>) => ({ res: await call('tok'), token: 'tok' })),
     tokenForHost: jest.fn(async () => 'tok'),
-    cachedTokenForHost: jest.fn(async () => 'tok'),
 }));
 jest.mock('@/services/wallet-call', () => ({
     walletCallHeaders: jest.fn(async () => ({ 'X-Privasys-Wallet-Proof': 'proof' })),

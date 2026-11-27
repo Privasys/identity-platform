@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 // The token helper pulls in the FIDO2 stack; only parsing is under test.
-jest.mock('@/services/platform-token', () => ({ getCachedPlatformToken: jest.fn() }));
+jest.mock('@/services/platform-token', () => ({}));
 
 import { parseAsks } from '@/stores/capability-asks';
 

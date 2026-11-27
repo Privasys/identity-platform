@@ -97,20 +97,6 @@ export async function tokenForHost(host: string): Promise<string> {
     return (await isDriveHost(host)) ? getPlatformToken(audience, DRIVE_CLIENT_ID) : getPlatformToken(audience);
 }
 
-/** tokenForHost without minting, so without a prompt. Null too when the
- *  host's platform cannot be told yet. */
-export async function cachedTokenForHost(host: string): Promise<string | null> {
-    let audience: string;
-    try {
-        audience = await audienceFor(host);
-    } catch {
-        return null;
-    }
-    return (await isDriveHost(host))
-        ? getCachedPlatformToken(audience, DRIVE_CLIENT_ID)
-        : getCachedPlatformToken(audience);
-}
-
 /** Drive's own key, for calls to the Drive enclave at `host`. */
 export async function getDriveToken(host: string): Promise<string> {
     return getPlatformToken(await audienceFor(host), DRIVE_CLIENT_ID);
@@ -174,7 +160,7 @@ export function hasPlatformIdentity(): boolean {
  * mints a fresh one via the IdP (which may require a wallet sign-in, i.e. a
  * biometric — so call this from a user-initiated flow, not cold start).
  */
-export async function getPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: string): Promise<string> {
+async function getPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: string): Promise<string> {
     // The demo holds no account and must never start a sign-in: every caller
     // already copes with a token it cannot get.
     if (isDemo()) throw new Error('no platform token in the demo');
@@ -195,18 +181,18 @@ export async function getPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: 
  * mints, so never prompts: for background checks that must not put a Face ID
  * sheet in front of someone who did not ask for anything.
  */
-export async function getCachedPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: string): Promise<string | null> {
+async function getCachedPlatformToken(audience = PLATFORM_AUDIENCE, clientId?: string): Promise<string | null> {
     if (isDemo()) return null;
     return readCached(audience, clientId);
 }
 
-/** Drop the cached platform token (e.g. on sign-out). */
+/** Drop every cached platform token and what the wallet recorded about Drive. */
 export async function clearPlatformToken(): Promise<void> {
     const keys = (await knownAudiences()).flatMap((a) => [
         storeKeyFor(undefined, a),
         storeKeyFor(DRIVE_CLIENT_ID, a),
     ]);
-    for (const key of [...keys, DRIVE_HOST_KEY]) {
+    for (const key of [...keys, DRIVE_HOST_KEY, DRIVE_APP_KEY]) {
         try {
             await SecureStore.deleteItemAsync(key);
         } catch {

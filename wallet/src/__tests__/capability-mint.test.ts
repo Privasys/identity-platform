@@ -16,9 +16,7 @@ jest.mock('../../modules/native-ratls/src/index', () => ({ makeRaTlsFetch: jest.
 // asks it to make sure an attestation is in place.
 jest.mock('@/services/wia', () => ({ ensureWia: jest.fn(async () => null) }));
 jest.mock('@/services/platform-token', () => ({
-    getPlatformToken: jest.fn(async () => 'tok'),
     tokenForHost: jest.fn(async () => 'tok'),
-    cachedTokenForHost: jest.fn(async () => 'tok'),
 }));
 // The instance proof signs with the biometric-gated device key; here it is a
 // recognisable stand-in so a test can see where it was, and was not, attached.

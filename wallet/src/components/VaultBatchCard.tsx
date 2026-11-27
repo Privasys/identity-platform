@@ -58,6 +58,7 @@ import {
     type VaultBatchKeyKind,
     type VerifiedVaultBatch,
 } from '@/services/vault-approval-batch';
+import { refusedOnRelease } from '@/services/vault-approval-v2';
 import { vaultReleaseFor, type VaultRelease } from '@/services/vault-reshare';
 import { billingPlatform, type BillingPlatform } from '@/services/platforms';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -105,7 +106,12 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
     // A v2 batch names its vaults: their build, as a published Enclave Vault
     // release, before Approve is offered. Absent for a batch that names none.
     const [release, setRelease] = useState<
-        { kind: 'checking' } | { kind: 'ok'; release: VaultRelease } | { kind: 'unpublished' } | { kind: 'unreachable' } | null
+        | { kind: 'checking' }
+        | { kind: 'ok'; release: VaultRelease }
+        | { kind: 'unpublished' }
+        | { kind: 'unreachable' }
+        | { kind: 'mismatch' }
+        | null
     >(null);
     // Which platform those vaults are on: a test vault and a production one
     // may run the same release.
@@ -133,6 +139,8 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
 
     const builds = phase.kind === 'ready' ? phase.batch.builds : undefined;
     const buildsKey = builds ? builds.join(',') : null;
+    // The batch's operations, for the rule a release puts on them.
+    const opsKey = phase.kind === 'ready' ? [...new Set(phase.batch.entries.map((e) => e.operation))].sort().join(',') : '';
     useEffect(() => {
         if (buildsKey === null) {
             setRelease(null);
@@ -147,7 +155,10 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
         setRelease({ kind: 'checking' });
         vaultReleaseFor(list[0]).then(
             (r) => {
-                if (!cancelled) setRelease(r ? { kind: 'ok', release: r } : { kind: 'unpublished' });
+                if (cancelled) return;
+                if (!r) setRelease({ kind: 'unpublished' });
+                else if (opsKey.split(',').some((op) => refusedOnRelease(op, r.version))) setRelease({ kind: 'mismatch' });
+                else setRelease({ kind: 'ok', release: r });
             },
             () => {
                 if (!cancelled) setRelease({ kind: 'unreachable' });
@@ -156,7 +167,7 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
         return () => {
             cancelled = true;
         };
-    }, [buildsKey]);
+    }, [buildsKey, opsKey]);
 
     const load = useCallback(async () => {
         setPhase({ kind: 'loading' });
@@ -401,7 +412,9 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
                             <Text style={[styles.meta, { color: p.danger }]}>
                                 {release.kind === 'unpublished'
                                     ? t('vaultApprovals.vaultsUnpublished')
-                                    : t('vaultApprovals.batchReleaseUnreachable')}
+                                    : release.kind === 'mismatch'
+                                      ? t('vaultApprovals.reshareMismatch')
+                                      : t('vaultApprovals.batchReleaseUnreachable')}
                             </Text>
                         </RNView>
                     ) : null}

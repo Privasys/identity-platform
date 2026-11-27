@@ -227,6 +227,16 @@ export function bindsReplacedRules(version: string): boolean {
 }
 
 /**
+ * Whether an operation is refused on vaults running `version`: a rule change
+ * that leaves out the rules it replaces, where the vaults can bind them, since
+ * the card could not show what changes. The one rule for a single approval
+ * and for every entry of a batch.
+ */
+export function refusedOnRelease(op: string, version: string): boolean {
+    return op === 'update_policy' && bindsReplacedRules(version);
+}
+
+/**
  * Name the vaults' build as a published Enclave Vault release. `hint` is a
  * release tag relayed with the request: it says where to look first, and
  * GitHub's answer is what counts.
@@ -238,7 +248,7 @@ export async function checkV2Release(checked: CheckedV2, hint?: string): Promise
         if (!release) return { kind: 'unpublished', build: checked.builds[0] };
         // On vaults that can bind the rules being replaced, a rule change that
         // leaves them out is not signed: the card could not show what changes.
-        if (checked.op === 'update_policy' && bindsReplacedRules(release.version)) return { kind: 'mismatch' };
+        if (refusedOnRelease(checked.op, release.version)) return { kind: 'mismatch' };
         return { kind: 'ok', release };
     } catch {
         return { kind: 'unreachable' };

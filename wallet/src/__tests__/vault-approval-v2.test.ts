@@ -17,7 +17,7 @@ jest.mock('@/utils/storage', () => {
 
 import { createHash } from 'crypto';
 
-import { bindsReplacedRules, checkV2, checkV2Release, isV2, type V2Summary } from '@/services/vault-approval-v2';
+import { bindsReplacedRules, checkV2, checkV2Release, isV2, refusedOnRelease, type V2Summary } from '@/services/vault-approval-v2';
 import { bindingVaultOp } from '@/services/vault-binding';
 import { policyDigest, type VaultIdentity } from '@/services/vault-identity';
 import { forgetPublishedReleases } from '@/services/vault-reshare';
@@ -174,6 +174,13 @@ describe('the vaults\' release', () => {
     it('knows which releases bind the rules being replaced', () => {
         expect(['v0.39.0', 'v0.41.0', 'v0.41.9', 'main', ''].map(bindsReplacedRules)).toEqual([false, false, false, false, false]);
         expect(['v0.42.0', 'v0.42.1', 'v0.100.0', 'v1.0.0'].map(bindsReplacedRules)).toEqual([true, true, true, true]);
+    });
+
+    it('is the same rule for a single approval and for each entry of a batch', () => {
+        expect(refusedOnRelease('update_policy', 'v0.42.0')).toBe(true);
+        expect(refusedOnRelease('update_policy', 'v0.41.0')).toBe(false);
+        expect(refusedOnRelease('update_policy_from', 'v0.42.0')).toBe(false);
+        expect(refusedOnRelease('promote', 'v0.44.0')).toBe(false);
     });
 
     it('is not, when the vaults differ or GitHub cannot say', async () => {

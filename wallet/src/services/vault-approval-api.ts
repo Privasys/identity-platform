@@ -324,37 +324,38 @@ export async function lookupVaultBatchVersion(appIdHex: string, versionId: strin
     return fetchReleaseProvenance(dashedAppId(appIdHex), versionId).catch(() => null);
 }
 
-/**
- * Register the wallet's Expo push token with the IdP under a given wallet
- * session's identity. Called after each successful RP sign-in with THAT RP's
- * session, so every pairwise identity that owns vault keys can be pushed —
- * without the IdP learning any pairwise linkage it doesn't already have.
- */
 /** Whether this device wants its icon's number sent with its pushes. Unknown
  *  until the settings are read: privasys.id then keeps what it last heard. */
 let iconBadge: boolean | null = null;
 export function setWantsIconBadge(on: boolean): void {
     iconBadge = on;
 }
+
+/**
+ * Register the wallet's Expo push token with the IdP under a given wallet
+ * session's identity. Called after each sign-in with that identity's session,
+ * so every identity that owns vault keys can be pushed, without the IdP
+ * learning any link between identities it does not already have.
+ */
 export async function registerPushTokenWithIdp(
     walletSessionToken: string,
     expoPushToken: string,
-    encPub = '',
+    encPub: string,
     /** The IdP user id the session is for: names this phone's target on it. */
-    userId?: string,
+    userId: string,
     /** Set on the repeat made after a challenge, which is not repeated again. */
     repeating = false,
 ): Promise<void> {
+    // The device tag keeps one target per phone; without one the registration
+    // stands untagged.
     let deviceTag = '';
-    if (userId) {
-        try {
-            deviceTag = await myDeviceTag(userId);
-        } catch {
-            /* registers untagged, as before */
-        }
+    try {
+        deviceTag = await myDeviceTag(userId);
+    } catch {
+        /* registers untagged */
     }
     // The proof that this token is this phone's (services/push-bind). Without
-    // it the registration still stands, unbound, as before.
+    // it the registration stands, unbound.
     let proof: Awaited<ReturnType<typeof registrationProof>> | Record<string, never> = {};
     try {
         proof = await registrationProof(expoPushToken, userId);
@@ -378,7 +379,7 @@ export async function registerPushTokenWithIdp(
     }
     // Unbound: privasys.id is sending this phone a challenge, or has one out.
     // Once it is answered the registration is made again, signed.
-    if (userId && !repeating) {
+    if (!repeating) {
         const bound = await res
             .json()
             .then((b: { bound?: boolean }) => b?.bound === true)
@@ -388,8 +389,3 @@ export async function registerPushTokenWithIdp(
         }
     }
 }
-
-// The set of capabilities seen this session — and the fetch/prune that turns
-// them into the live `pending` list — now lives in stores/vaultApprovals, so
-// the Home banner and the approvals screen share one reactive source. This
-// module stays the thin transport layer (fetch/approve/resolve/push-token).

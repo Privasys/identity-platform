@@ -43,21 +43,20 @@ describe('a registration', () => {
         expect(verifies(p.bind_sig!, `privasys-push-register/v1\nother\nalice\n${p.issued_at}`, p.bind_pub)).toBe(false);
     });
 
-    it('names the key alone when the subject is not known', async () => {
-        const p = await registrationProof('tok');
-        expect(p.bind_pub).toBe((await registrationProof('tok', 'alice')).bind_pub);
-        expect(p.bind_sig).toBeUndefined();
+    it('names the same key for every subject', async () => {
+        const p = await registrationProof('tok', 'alice');
+        expect(p.bind_pub).toBe((await registrationProof('tok', 'bob')).bind_pub);
     });
 });
 
 describe('a challenge', () => {
     it('opened for this phone is answered, signed, and the waiting registrations are made again', async () => {
-        const { bind_pub } = await registrationProof('tok');
+        const { bind_pub } = await registrationProof('tok', 'alice');
         const again = jest.fn(async () => undefined);
         repeatWhenBound('alice', again);
         repeatWhenBound('alice-2', again);
 
-        expect(await answerBindChallenge({ type: 'push-bind', nonce: 'n-1', bind_pub }, 'tok')).toBe(true);
+        expect(await answerBindChallenge({ type: 'auth-request', bind_nonce: 'n-1', bind_pub }, 'tok')).toBe(true);
         expect(fetched).toHaveLength(1);
         expect(fetched[0].url).toMatch(/\/push-token\/bind$/);
         const b = fetched[0].body as { push_token: string; bind_pub: string; nonce: string; sig: string };
@@ -66,7 +65,7 @@ describe('a challenge', () => {
         expect(again).toHaveBeenCalledTimes(2);
 
         // Each waits once: a second challenge repeats nothing.
-        await answerBindChallenge({ type: 'push-bind', nonce: 'n-2', bind_pub }, 'tok');
+        await answerBindChallenge({ type: 'auth-request', bind_nonce: 'n-2', bind_pub }, 'tok');
         expect(again).toHaveBeenCalledTimes(2);
     });
 
@@ -74,36 +73,36 @@ describe('a challenge', () => {
         const stranger = bytesToBase64url(ed25519.getPublicKey(new Uint8Array(32).fill(9)));
         const again = jest.fn(async () => undefined);
         repeatWhenBound('alice', again);
-        expect(await answerBindChallenge({ type: 'push-bind', nonce: 'n-1', bind_pub: stranger }, 'tok')).toBe(false);
+        expect(await answerBindChallenge({ type: 'auth-request', bind_nonce: 'n-1', bind_pub: stranger }, 'tok')).toBe(false);
         expect(fetched).toHaveLength(0);
         expect(again).not.toHaveBeenCalled();
     });
 
     it('with no nonce, no key or no token is not answered', async () => {
-        const { bind_pub } = await registrationProof('tok');
-        expect(await answerBindChallenge({ type: 'push-bind', bind_pub }, 'tok')).toBe(false);
-        expect(await answerBindChallenge({ type: 'push-bind', nonce: 'n' }, 'tok')).toBe(false);
-        expect(await answerBindChallenge({ type: 'push-bind', nonce: 'n', bind_pub }, null)).toBe(false);
+        const { bind_pub } = await registrationProof('tok', 'alice');
+        expect(await answerBindChallenge({ type: 'auth-request', bind_pub }, 'tok')).toBe(false);
+        expect(await answerBindChallenge({ type: 'auth-request', bind_nonce: 'n' }, 'tok')).toBe(false);
+        expect(await answerBindChallenge({ type: 'auth-request', bind_nonce: 'n', bind_pub }, null)).toBe(false);
         expect(await answerBindChallenge(null, 'tok')).toBe(false);
         expect(fetched).toHaveLength(0);
     });
 
     it('that privasys.id refuses repeats nothing, and the registrations keep waiting', async () => {
-        const { bind_pub } = await registrationProof('tok');
+        const { bind_pub } = await registrationProof('tok', 'alice');
         const again = jest.fn(async () => undefined);
         repeatWhenBound('alice', again);
         answerOk = false;
-        expect(await answerBindChallenge({ type: 'push-bind', nonce: 'n-1', bind_pub }, 'tok')).toBe(false);
+        expect(await answerBindChallenge({ type: 'auth-request', bind_nonce: 'n-1', bind_pub }, 'tok')).toBe(false);
         expect(again).not.toHaveBeenCalled();
         answerOk = true;
-        expect(await answerBindChallenge({ type: 'push-bind', nonce: 'n-2', bind_pub }, 'tok')).toBe(true);
+        expect(await answerBindChallenge({ type: 'auth-request', bind_nonce: 'n-2', bind_pub }, 'tok')).toBe(true);
         expect(again).toHaveBeenCalledTimes(1);
     });
 });
 
 describe('clearing a notification on the other phones', () => {
     it('is signed over the token, the notification key and the time', async () => {
-        const { bind_pub } = await registrationProof('tok');
+        const { bind_pub } = await registrationProof('tok', 'alice');
         const p = await dismissProof('tok', 'AbCdEfGhIjKlMnOpQrStUv');
         expect(verifies(p.sig, `privasys-push-dismiss/v1\ntok\nAbCdEfGhIjKlMnOpQrStUv\n${p.issued_at}`, bind_pub)).toBe(true);
     });
@@ -111,7 +110,7 @@ describe('clearing a notification on the other phones', () => {
 
 describe('a challenge carried by a notification', () => {
     it('is answered from its bind_nonce, beside whatever the notification is about, and once', async () => {
-        const { bind_pub } = await registrationProof('tok');
+        const { bind_pub } = await registrationProof('tok', 'alice');
         const data = { type: 'vault-approval', vault_op: 'op-1', bind_nonce: 'n-visible', bind_pub };
         expect(await answerBindChallenge(data, 'tok')).toBe(true);
         const b = fetched[0].body as { nonce: string; sig: string };

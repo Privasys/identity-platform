@@ -30,7 +30,7 @@ import {
     DISMISS_TYPE,
     setOwnPushToken,
 } from '../services/notification-dismiss';
-import { answerBindChallenge, answerFromTray, BIND_TYPE, carriesBindChallenge } from '../services/push-bind';
+import { answerBindChallenge, answerFromTray, carriesBindChallenge } from '../services/push-bind';
 
 let _notificationsSetup = false;
 
@@ -198,11 +198,6 @@ async function dispatchPush(data: Record<string, unknown>, router: Router, tappe
         // Each push carries only its type; what it means is read from
         // privasys.id, and the wallet is never cleared on a push alone.
         await handleDeletionPush(data.type).catch((e) => console.warn('[notifications] account deletion', e));
-        return;
-    }
-    if (data?.type === BIND_TYPE) {
-        // privasys.id asks this phone to show the push token is its own. Silent.
-        await answerBindChallenge(data, ambientPushToken).catch((e) => console.warn('[notifications] push binding failed', e));
         return;
     }
     if (data?.type === DISMISS_TYPE) {

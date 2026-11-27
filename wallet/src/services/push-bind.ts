@@ -32,10 +32,6 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 import { base64urlToBytes, bytesToBase64url } from '../utils/encoding';
 
-/** The silent push that once carried a challenge on its own. privasys.id no
- *  longer sends it; one that arrives is still answered. */
-export const BIND_TYPE = 'push-bind';
-
 /** Nonces already answered, so a notification seen twice (shown, then opened,
  *  then found in the tray) is answered once. */
 const answered = new Set<string>();
@@ -67,14 +63,12 @@ async function bindKey(): Promise<BindKey> {
 const sign = (key: BindKey, text: string) => bytesToBase64url(ed25519.sign(utf8(text), key.secret));
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
-/** What a registration of `pushToken` for `subject` carries to be bound. With
- *  no subject only the key is named, and the registration stays unbound. */
+/** What a registration of `pushToken` for `subject` carries to be bound. */
 export async function registrationProof(
     pushToken: string,
-    subject?: string,
-): Promise<{ bind_pub: string; issued_at?: number; bind_sig?: string }> {
+    subject: string,
+): Promise<{ bind_pub: string; issued_at: number; bind_sig: string }> {
     const key = await bindKey();
-    if (!subject) return { bind_pub: key.pub };
     const issuedAt = nowSeconds();
     return {
         bind_pub: key.pub,
@@ -110,13 +104,11 @@ export function repeatWhenBound(subject: string, register: () => Promise<unknown
  * this phone's token, and signing it would hand them the token.
  */
 export async function answerBindChallenge(data: Record<string, unknown> | null | undefined, pushToken: string | null): Promise<boolean> {
-    // In a notification's data the nonce is `bind_nonce`, beside whatever the
-    // notification is about; in the silent push of old it was `nonce`.
-    const nonce = typeof data?.bind_nonce === 'string' ? data.bind_nonce : data?.nonce;
-    if (!pushToken || typeof nonce !== 'string' || !nonce || typeof data?.bind_pub !== 'string') return false;
+    if (!pushToken || !carriesBindChallenge(data)) return false;
+    const nonce = data!.bind_nonce as string;
     if (answered.has(nonce)) return false;
     const key = await bindKey();
-    if (data.bind_pub !== key.pub) return false;
+    if (data!.bind_pub !== key.pub) return false;
     // Marked before the call: the nonce is single use at privasys.id, so a
     // second try could only be refused.
     answered.add(nonce);

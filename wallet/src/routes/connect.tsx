@@ -2544,7 +2544,7 @@ function ConnectFlow() {
             // the IdP can push vault approvals for keys this identity owns. The
             // IdP learns no linkage it doesn't already have (it sees each
             // pairwise sub independently). Best-effort.
-            if (pushToken && result.sessionToken) {
+            if (pushToken && result.sessionToken && result.userId) {
                 registerPushTokenWithIdp(result.sessionToken, pushToken, identitySealPub(result.userId), result.userId).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
@@ -2691,7 +2691,7 @@ function ConnectFlow() {
 
             // Keep the IdP's push target fresh for this pairwise identity
             // (vault approvals for keys it owns). Best-effort.
-            if (pushToken && result.sessionToken) {
+            if (pushToken && result.sessionToken && result.userId) {
                 registerPushTokenWithIdp(result.sessionToken, pushToken, identitySealPub(result.userId), result.userId).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );
@@ -2961,7 +2961,7 @@ function ConnectFlow() {
 
             // This identity's push target, so vault approvals and app
             // notifications for it reach this phone (see the direct path).
-            if (pushToken && pending.sessionToken) {
+            if (pushToken && pending.sessionToken && pending.userId) {
                 registerPushTokenWithIdp(pending.sessionToken, pushToken, identitySealPub(pending.userId), pending.userId).catch((e) =>
                     console.warn('[CONNECT] push-token registration (pairwise) failed', e),
                 );

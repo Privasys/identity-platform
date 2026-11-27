@@ -72,14 +72,12 @@ describe('an approval the wallet will ask for', () => {
         expect(refusalFor(approval({ operation: 'update_policy' }), APP, 'privasys-platform-test')).toBeNull();
     });
 
-    it('is not, yet, the older kind of change, whose card cannot show what changes', () => {
-        expect(refusalFor(approval({ operation: 'policy-update', binding_version: undefined }), APP, 'privasys-platform-test')).toMatch(/older kind of approval/);
-        // The app id as the control plane writes it, with dashes.
+    it('names the Drive by its app id, with or without dashes', () => {
         expect(refusalFor(approval(), '02104572-ca2f-41e8-ae2d-24c0294e6f5e', 'privasys-platform-test')).toBeNull();
     });
 
-    it('is never a deletion, an export, a new key or a promote', () => {
-        for (const operation of ['delete', 'export', 'create', 'promote', 'app-policy', '']) {
+    it('is never a deletion, an export, a new key, a promote or a v1 rules change', () => {
+        for (const operation of ['delete', 'export', 'create', 'promote', 'app-policy', 'policy-update', '']) {
             expect(refusalFor(approval({ operation }), APP, 'privasys-platform-test')).toMatch(/may not ask/);
         }
     });
@@ -183,11 +181,6 @@ describe('what is sent to privasys.id', () => {
             ['audience', 'binding_version', 'context', 'current_policy', 'handle', 'issuer_index', 'member_identities', 'members', 'new_policy', 'operation', 'policy_version', 'target'].sort(),
         );
         expect(body.context).toEqual({ app_name: 'Privasys Drive', summary: 's'.repeat(200), key_type: 'data' });
-    });
-
-    it('names no build for a v1 rules change', () => {
-        const body = requestBody(approval({ operation: 'policy-update', binding_version: undefined, measurement_digest: 'abc' }));
-        expect(body.measurement_digest).toBe('');
     });
 
     it('is nothing at all when a field is not what it should be', () => {

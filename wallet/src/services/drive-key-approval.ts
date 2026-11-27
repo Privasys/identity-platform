@@ -23,7 +23,6 @@
  */
 
 import { callWithPlatformToken } from './platform-token';
-import { audienceFor } from './platforms';
 import { fetchVaultApproval } from './vault-approval-api';
 import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 
@@ -36,12 +35,6 @@ const POLL_MS = 2000;
 /** The only changes a Drive may ask the holder to approve: to the rules of
  *  the holder's own key there. Never a deletion, an export or a new key. */
 const OPERATIONS = new Set(['update_policy', 'update_policy_from']);
-
-/** The older kind of rules change, on a key whose rules ask for it. Its card
- *  cannot show the change: it lets the Drive change the key's rules once,
- *  whatever the change. Until the card says exactly that, the wallet does not
- *  ask for one from here. */
-const UNNAMED_CHANGE = 'policy-update';
 
 /** What Drive answers when the owner's approval is needed. Only the fields
  *  requestBody keeps are ever sent on. */
@@ -65,7 +58,6 @@ const FIELDS: Record<string, 'string' | 'number' | 'strings'> = {
     issuer_index: 'number',
     new_policy: 'string',
     current_policy: 'string',
-    measurement_digest: 'string',
 };
 
 /** What the card may be told about the request, as short text. */
@@ -92,8 +84,6 @@ export function requestBody(approval: DriveKeyApproval): Record<string, unknown>
         if (!ok) throw new Error(`the approval Drive described is not well formed (${name})`);
         body[name] = v;
     }
-    // A v1 rules change names no build: the vault is asked for none.
-    if (body.operation === 'policy-update') body.measurement_digest = '';
     const given = approval.context;
     if (given && typeof given === 'object' && !Array.isArray(given)) {
         const context: Record<string, string> = {};
@@ -141,7 +131,6 @@ const hex = (id: string) => id.toLowerCase().replace(/-/g, '');
  * attestation, and `audience` the platform that Drive's host belongs to.
  */
 export function refusalFor(approval: DriveKeyApproval, appId: string, audience: string): string | null {
-    if (approval.operation === UNNAMED_CHANGE) return 'this key uses the older kind of approval, which this version of the wallet does not ask for';
     if (!OPERATIONS.has(approval.operation)) return `it asks for "${approval.operation}", which a Drive may not ask for`;
     const app = hex(appId);
     if (!/^[0-9a-f]{32}$/.test(app)) return 'the Drive could not be identified';
@@ -220,9 +209,4 @@ export async function obtainApproval(
         throw new Error('the approval was declined or has lapsed');
     }
     throw new Error('the approval was not given in time');
-}
-
-/** The platform a Drive's control plane or host belongs to. */
-export async function platformOf(target: string): Promise<string> {
-    return audienceFor(target);
 }

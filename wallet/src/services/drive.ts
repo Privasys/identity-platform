@@ -22,7 +22,8 @@ import { getAttestationServerToken } from '@/services/app-attest';
 import { demo, isDemo } from '@/services/demo/gate';
 import { inspectAttestation, attestEnclave, type AttestationResult } from '@/services/attestation';
 import { apiBasesForHost, appIdFromOids, OID_WORKLOAD_IMAGE_DIGEST } from '@/services/release-provenance';
-import { approvalNeeded, obtainApproval, platformOf, refusalFor } from '@/services/drive-key-approval';
+import { approvalNeeded, obtainApproval, refusalFor } from '@/services/drive-key-approval';
+import { audienceFor } from '@/services/platforms';
 import { callWithPlatformToken, getDriveToken, rememberDriveAppId, rememberDriveHost, tokenForHost } from '@/services/platform-token';
 import { useSettingsStore, type VerificationMode } from '@/stores/settings';
 import { makeRaTlsFetch } from '../../modules/native-ratls/src/index';
@@ -400,7 +401,7 @@ async function setupDriveAt(
         // gives Drive the approval alone (services/drive-key-approval).
         const approval = e instanceof DriveError ? approvalNeeded(e.status, e.message) : null;
         if (!approval) throw e;
-        const refused = refusalFor(approval, appId, await platformOf(mgmtBaseUrl));
+        const refused = refusalFor(approval, appId, await audienceFor(mgmtBaseUrl));
         if (refused) throw new Error(`Drive asked for an approval the wallet will not request: ${refused}`);
         const approvalToken = await obtainApproval(approval, mgmtBaseUrl);
         // The same request again, with the approval: the SDK sends it as given.

@@ -8,7 +8,7 @@
  * Usage:
  *   <script src="https://sdk.privasys.org/v1/privasys-auth.js"></script>
  *   <script>
- *     const webauthn = new Privasys.WebAuthnClient({ apiBase: '...', appName: '...' });
+ *     const webauthn = new Privasys.WebAuthnClient({ fido2Base: 'https://privasys.id/fido2' });
  *     const result = await webauthn.register();
  *   </script>
  */

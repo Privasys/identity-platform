@@ -17,9 +17,7 @@ import UIKit
 /// credentialIdentityNotFound, and picking Privasys Wallet in the OS passkey
 /// sheet did visibly nothing at all (2026-09-08).
 ///
-/// No team prefix, matching the sibling notification-service extension, which
-/// shares the same entitlement and demonstrably works: iOS resolves an
-/// unprefixed group against the entitled list.
+/// No team prefix: iOS resolves an unprefixed group against the entitled list.
 private let kKeychainGroupId = "org.privasys.shared"
 
 /// Service name for stored credentials in the shared keychain.

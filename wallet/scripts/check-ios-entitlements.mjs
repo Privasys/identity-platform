@@ -35,7 +35,7 @@ const REQUIRED_MAIN = [
     '$(AppIdentifierPrefix)org.privasys.shared',
 ];
 
-/** Both extensions share only the notification-key group. */
+/** The passkey extension shares only the shared group. */
 const REQUIRED_EXTENSION = ['$(AppIdentifierPrefix)org.privasys.shared'];
 
 function resolvedConfig() {
@@ -68,7 +68,7 @@ const main = check('main app', config.ios?.entitlements?.['keychain-access-group
 
 // Independent of the flag: a plugin that ASSIGNS rather than merges drops
 // whatever app.config.ts declared, and the shared group is the entry that
-// disappears first. It is what the notification key lives under.
+// disappears first. It is what the passkey extension's items live under.
 if (!main.includes('$(AppIdentifierPrefix)org.privasys.shared')) {
     errors.push('main app: the shared group is gone, so a plugin overwrote the list');
 }
@@ -81,8 +81,8 @@ if (main.length > 0 && main[0] !== '$(AppIdentifierPrefix)org.privasys.wallet') 
 }
 
 const extensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
-if (extensions.length !== 2) {
-    errors.push(`expected 2 app extensions, found ${extensions.length}`);
+if (extensions.length !== 1) {
+    errors.push(`expected 1 app extension, found ${extensions.length}`);
 }
 for (const ext of extensions) {
     check(ext.targetName, ext.entitlements?.['keychain-access-groups'], REQUIRED_EXTENSION, errors);
@@ -101,7 +101,7 @@ for (const ext of extensions) {
 //
 // A group is legitimate if an entitlement grants it, with or without the
 // $(AppIdentifierPrefix) prefix: iOS resolves an unprefixed group against the
-// entitled list, which is what the notification-service extension relies on.
+// entitled list.
 const entitledSuffixes = new Set(
     [...REQUIRED_MAIN, ...REQUIRED_EXTENSION].map((g) => g.replace('$(AppIdentifierPrefix)', '')),
 );

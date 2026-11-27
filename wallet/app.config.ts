@@ -59,7 +59,7 @@ if (STAGE === 'demo' && !DEMO) {
  */
 
 /**
- * Groups shared between the app and its extensions. The demo shares none:
+ * Groups shared between the app and its passkey extension. The demo shares none:
  * the shared group is common to every Privasys Wallet install signed by the
  * team, and a demo must never be able to reach a real wallet's keychain.
  */
@@ -241,16 +241,9 @@ export default (context: ConfigContext): ExpoConfig => {
                 build: {
                     experimental: {
                         ios: {
-                            // No extensions in the demo: both share the
+                            // No extension in the demo: it shares the
                             // keychain group a demo must not hold.
                             appExtensions: DEMO ? [] : [
-                                {
-                                    targetName: 'NotificationServiceExtension',
-                                    bundleIdentifier: `${config.bundle}.NotificationService`,
-                                    entitlements: {
-                                        'keychain-access-groups': SHARED_KEYCHAIN_GROUPS
-                                    }
-                                },
                                 {
                                     targetName: 'PasskeyProvider',
                                     bundleIdentifier: `${config.bundle}.PasskeyProvider`,
@@ -375,10 +368,9 @@ export default (context: ConfigContext): ExpoConfig => {
                 // clears a notification answered on the holder's other phone.
                 { icon: './assets/notification-icon.png', color: '#B21D36', enableBackgroundRemoteNotifications: true },
             ],
-            // These two add the passkey and notification extensions, with the
-            // shared keychain group; the demo carries neither.
+            // The passkey extension, with the shared keychain group; the demo
+            // carries none.
             DEMO ? 'noop' : './modules/passkey-provider/app.plugin',
-            DEMO ? 'noop' : './modules/notification-service/app.plugin',
             './modules/app-attest/app.plugin',
             './plugins/swift-concurrency-fix',
             './plugins/ios-scene-lifecycle',

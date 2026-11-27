@@ -608,13 +608,13 @@ export async function onInit({ e, data, pageScope }: MessageContext): Promise<vo
 
         // Social auth handler: opens a popup to the IdP's social redirect,
         // then waits for the callback page to postMessage back.
-        const openSocialPopup = (provider: string, own?: boolean, chooseAccount?: boolean): Promise<void> => {
+        const openSocialPopup = (provider: string, own?: boolean): Promise<void> => {
             return new Promise<void>((resolve, reject) => {
                 const w = 500, h = 650;
                 const left = window.screenX + (window.innerWidth - w) / 2;
                 const top = window.screenY + (window.innerHeight - h) / 2;
                 // registration=own: the client's own registration, pressed as a button of its own.
-                const popupUrl = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}${chooseAccount ? '&account=choose' : ''}`;
+                const popupUrl = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}`;
                 const popup = window.open(popupUrl, 'privasys-social', `width=${w},height=${h},left=${left},top=${top}`);
 
                 if (!popup) {
@@ -654,10 +654,10 @@ export async function onInit({ e, data, pageScope }: MessageContext): Promise<vo
         // Headless: a popup needs the click's activation, which the
         // page has and this frame does not, so the page opens it at
         // the address this frame names and reports how it ended.
-        const popupViaParent = (provider: string, own?: boolean, chooseAccount?: boolean): Promise<void> => {
+        const popupViaParent = (provider: string, own?: boolean): Promise<void> => {
             return new Promise<void>((resolve, reject) => {
                 const id = Math.random().toString(36).slice(2);
-                const url = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}${chooseAccount ? '&account=choose' : ''}`;
+                const url = `${idpBase}/auth/social?provider=${encodeURIComponent(provider)}&session_id=${encodeURIComponent(oidcSessionId)}${own ? '&registration=own' : ''}`;
                 const onMessage = (ev: MessageEvent) => {
                     if (ev.source !== window.parent || ev.origin !== parentOrigin) return;
                     if (ev.data?.type !== 'privasys:gate:popup-result' || ev.data.id !== id) return;
@@ -717,11 +717,6 @@ export async function onInit({ e, data, pageScope }: MessageContext): Promise<vo
             rememberDevice: async (token: string, label?: string) => {
                 await askDevicePopup(openDevicePopup, { op: 'store', pushToken: token, brokerUrl: config.brokerUrl || '', ...(label ? { label } : {}) });
             },
-            // A passkey carries no name or email; the gate asks for
-            // them through a provider when the client wants them.
-            profileAfterPasskey: !!requestedAttributes?.some(
-                (a: string) => a === 'email' || a === 'name',
-            ),
             headless,
             onGateState,
             requestedAttributes,
@@ -757,10 +752,7 @@ export async function onInit({ e, data, pageScope }: MessageContext): Promise<vo
 
         // 5. Get the auth code:
         //    - Passkey: the IdP's FIDO2 handler already marked the session
-        //      complete, so poll for it. If the relying party requested
-        //      profile attributes (email/name), open a social login to
-        //      source them — the social callback patches them onto the
-        //      existing auth code.
+        //      complete, so poll for it.
         //    - Wallet (relay): call /session/complete to bridge.
         //    - Social: the popup callback already marked it complete, so
         //      call /session/complete to get the code (it's idempotent).
@@ -775,10 +767,6 @@ export async function onInit({ e, data, pageScope }: MessageContext): Promise<vo
             await waitAuthenticated(pollUrl);
             code = '';
         } else if (uiResult.method === 'passkey') {
-            // A client that asked for the name or email had the gate
-            // confirm them with a provider after the passkey
-            // (profileAfterPasskey); the provider's callback added
-            // them to this session.
             code = await pollSessionStatus(pollUrl);
         } else if (uiResult.completedViaPoll) {
             // Same-device wallet flow: the relay died during the app

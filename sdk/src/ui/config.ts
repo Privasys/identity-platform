@@ -152,7 +152,7 @@ export interface AuthUIConfig {
     socialOwn?: OwnRegistration[];
     /** Callback when the user wants to start social auth. The UI calls
      *  this with the provider name; the host opens a popup. */
-    onSocialAuth?: (provider: string, own?: boolean, chooseAccount?: boolean) => Promise<void>;
+    onSocialAuth?: (provider: string, own?: boolean) => Promise<void>;
     /**
      * Ask whether this browser already knows the person's phone, on a site
      * whose own copy of the gate's storage does not. The host opens a short
@@ -175,13 +175,6 @@ export interface AuthUIConfig {
      *  Called inside the click on "Trust this device"; the gate waits for it
      *  before it finishes, so the frame is still there to answer the popup. */
     rememberDevice?: (pushToken: string, label?: string) => Promise<void> | void;
-    /**
-     * The client asked for the person's name or email address, which a
-     * passkey does not carry. After a passkey the gate then asks the person
-     * to sign in once with an account provider, whose answer the identity
-     * provider adds to this sign-in.
-     */
-    profileAfterPasskey?: boolean;
     /** Headless: the gate renders nothing the person sees; the embedding
      *  page draws the buttons from `gateOptions()` and calls `start()`.
      *  No flow starts on its own except a re-approval. */
@@ -232,7 +225,6 @@ export interface SignInResult {
 
 export type UIState =
     | 'idle'
-    | 'profile-required'
     | 'push-waiting'
     | 'qr-scanning'
     | 'wallet-connected'

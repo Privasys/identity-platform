@@ -571,20 +571,11 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A session another ceremony already completed keeps the account and
+	// attributes that ceremony gave it.
 	if session.Authenticated {
-		// Session already authenticated (e.g. passkey). Patch the social
-		// profile attributes onto the existing auth code so the JWT
-		// carries verified claims from the social provider.
-		if attrs["email"] == "" {
-			log.Printf("social/%s: no email returned for session %s — rejecting", entry.provider, entry.sessionID)
-			h.callbackError(w, "No verified email found from this provider. Please try a different one.")
-			return
-		}
-		h.codes.UpdateAttributes(session.AuthCode, attrs)
-		h.codes.SetEmailVerified(session.AuthCode, emailVerified)
-		log.Printf("social/%s: patched %d attributes on existing code for session %s",
-			entry.provider, len(attrs), entry.sessionID)
-		h.callbackSuccess(w)
+		log.Printf("social/%s: session %s is already signed in, refused", entry.provider, entry.sessionID)
+		h.callbackError(w, "This sign-in is already complete.")
 		return
 	}
 

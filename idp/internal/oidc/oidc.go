@@ -413,15 +413,6 @@ func (cs *CodeStore) Consume(code string) (*AuthCode, bool) {
 // Used when the wallet relay delivers attributes after FIDO2 already created
 // the code (the FIDO2 handler creates the code without attributes; the relay
 // delivers them asynchronously via /session/complete).
-// SetEmailVerified records whether the address patched onto a code was proved.
-func (cs *CodeStore) SetEmailVerified(code string, verified bool) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	if ac, ok := cs.codes[code]; ok {
-		ac.EmailVerified = verified
-	}
-}
-
 func (cs *CodeStore) UpdateAttributes(code string, attrs map[string]string) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()

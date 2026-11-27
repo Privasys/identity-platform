@@ -33,8 +33,7 @@ func TestSessionCompleteNeverTakesTheAccountFromTheRequest(t *testing.T) {
 // reported as proved when it differs from the address that was proved.
 func TestPatchedEmailLosesProof(t *testing.T) {
 	codes := NewCodeStore()
-	code := codes.Create(&AuthCode{UserID: "u", Attributes: map[string]string{"email": "alice@example.com"}})
-	codes.SetEmailVerified(code, true)
+	code := codes.Create(&AuthCode{UserID: "u", Attributes: map[string]string{"email": "alice@example.com"}, EmailVerified: true})
 
 	codes.UpdateAttributes(code, map[string]string{"email": "Alice@Example.com", "name": "Alice"})
 	if ac := codes.codes[code]; ac == nil || !ac.EmailVerified {

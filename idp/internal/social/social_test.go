@@ -475,43 +475,44 @@ func TestMicrosoftProvedEmail(t *testing.T) {
 	}
 }
 
-// Every sign-in asks the provider for its own account chooser, where the
-// provider has one: the person picks the account, not the browser. What an
-// older gate sends (account=choose) changes nothing.
-func TestEverySignInShowsTheProvidersAccountChooser(t *testing.T) {
-	_, prov := fakeProvider(t)
-	providers := NewProviders()
-	for _, name := range []string{"microsoft", "google", "github", "linkedin"} {
-		providers.Register(&Provider{Name: name, ClientID: name + "-id", AuthURL: prov.AuthURL, TokenURL: prov.TokenURL, Scopes: []string{"openid"}, PKCE: true})
-	}
-	sessions := oidc.NewSessionStore()
-	h := NewHandler(providers, oidc.NewCodeStore(), sessions, "https://privasys.id")
-	sessions.Create(&oidc.AuthSession{SessionID: "s1", ClientID: "open", ExpiresAt: time.Now().Add(time.Minute)})
+// A provider sign-in never adds to a session another ceremony completed: the
+// code keeps the account and attributes it was minted with.
+func TestCallbackRefusesACompletedSession(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
+		case "/google":
+			json.NewEncoder(w).Encode(map[string]any{"sub": "g1", "email": "ada@example.com", "email_verified": true})
+		}
+	}))
+	defer upstream.Close()
 
-	prompt := func(query string) string {
-		t.Helper()
-		rec := httptest.NewRecorder()
-		h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?session_id=s1&"+query, nil))
-		if rec.Code != http.StatusFound {
-			t.Fatalf("%s: status %d", query, rec.Code)
-		}
-		u, err := url.Parse(rec.Header().Get("Location"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return u.Query().Get("prompt")
+	providers := NewProviders()
+	providers.Register(&Provider{Name: "google", ClientID: "id", ClientSecret: "s", AuthURL: upstream.URL + "/auth",
+		TokenURL: upstream.URL + "/token", UserInfoURL: upstream.URL + "/google"})
+	sessions, codes := oidc.NewSessionStore(), oidc.NewCodeStore()
+	sessions.Create(&oidc.AuthSession{SessionID: "s1", ClientID: "c1", ExpiresAt: time.Now().Add(time.Minute)})
+	h := NewHandler(providers, codes, sessions, "https://idp.example")
+	rec := httptest.NewRecorder()
+	h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?provider=google&session_id=s1", nil))
+	loc, _ := url.Parse(rec.Header().Get("Location"))
+
+	passkeyCode := codes.Create(&oidc.AuthCode{UserID: "passkey-user"})
+	sessions.Complete("s1", "passkey-user", passkeyCode)
+
+	rec = httptest.NewRecorder()
+	h.HandleCallback(rec, httptest.NewRequest("GET", "/auth/social/callback?code=x&state="+loc.Query().Get("state"), nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status %d, want 400", rec.Code)
 	}
-	for query, want := range map[string]string{
-		"provider=microsoft":                "select_account",
-		"provider=google":                   "select_account",
-		"provider=github":                   "select_account",
-		"provider=linkedin":                 "",
-		"provider=microsoft&account=choose": "select_account",
-		"provider=linkedin&account=choose":  "",
-	} {
-		if got := prompt(query); got != want {
-			t.Errorf("%s: prompt %q, want %q", query, got, want)
-		}
+	session, _ := sessions.Get("s1")
+	if session.AuthCode != passkeyCode || session.UserID != "passkey-user" {
+		t.Fatalf("the completed session changed: %+v", session)
+	}
+	ac, ok := codes.Consume(passkeyCode)
+	if !ok || len(ac.Attributes) != 0 || ac.EmailVerified {
+		t.Fatalf("the code gained provider attributes: %+v", ac)
 	}
 }
 
@@ -536,5 +537,38 @@ func TestWalletLink_HolderCommitmentIsTheProviderNonce(t *testing.T) {
 	h.HandleWalletLink(rec, httptest.NewRequest("GET", base+"&holder_commitment=not-a-commitment", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("got %d, want 400 for a malformed commitment", rec.Code)
+	}
+}
+
+// Every sign-in asks the provider for its own account chooser, where the
+// provider has one: the person picks the account, not the browser.
+func TestEverySignInShowsTheProvidersAccountChooser(t *testing.T) {
+	_, prov := fakeProvider(t)
+	providers := NewProviders()
+	for _, name := range []string{"microsoft", "google", "github", "linkedin"} {
+		providers.Register(&Provider{Name: name, ClientID: name + "-id", AuthURL: prov.AuthURL, TokenURL: prov.TokenURL, Scopes: []string{"openid"}, PKCE: true})
+	}
+	sessions := oidc.NewSessionStore()
+	h := NewHandler(providers, oidc.NewCodeStore(), sessions, "https://privasys.id")
+	sessions.Create(&oidc.AuthSession{SessionID: "s1", ClientID: "open", ExpiresAt: time.Now().Add(time.Minute)})
+
+	for provider, want := range map[string]string{
+		"microsoft": "select_account",
+		"google":    "select_account",
+		"github":    "select_account",
+		"linkedin":  "",
+	} {
+		rec := httptest.NewRecorder()
+		h.HandleRedirect(rec, httptest.NewRequest("GET", "/auth/social?session_id=s1&provider="+provider, nil))
+		if rec.Code != http.StatusFound {
+			t.Fatalf("%s: status %d", provider, rec.Code)
+		}
+		u, err := url.Parse(rec.Header().Get("Location"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := u.Query().Get("prompt"); got != want {
+			t.Errorf("%s: prompt %q, want %q", provider, got, want)
+		}
 	}
 }

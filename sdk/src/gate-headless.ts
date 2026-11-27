@@ -42,18 +42,13 @@ export interface GateOptions {
 
 /** What the page asks the frame to start. */
 export type GateChoice =
-    // `chooseAccount`: have the provider show its account picker, for a
-    // person it would otherwise sign straight in with the wrong account.
-    | { method: 'social'; provider: string; own?: boolean; chooseAccount?: boolean }
+    | { method: 'social'; provider: string; own?: boolean }
     | { method: 'wallet'; qr?: boolean; wallet?: string };
 
 /** Where a started sign-in is, for the page to narrate. */
 export interface GateState {
     state: 'idle' | 'push-waiting' | 'qr-scanning' | 'wallet-connected' | 'authenticating'
-        | 'approve-waiting' | 'passkey-requesting' | 'passkey-ceremony' | 'passkey-verifying' | 'success' | 'error'
-        // After a passkey, asking for the name and email (visible gate only:
-        // a headless gate offers no passkey).
-        | 'profile-required';
+        | 'approve-waiting' | 'passkey-requesting' | 'passkey-ceremony' | 'passkey-verifying' | 'success' | 'error';
     /** The wallet QR payload while `state` is `qr-scanning`. */
     qr?: string;
     /** The same QR code drawn as inline SVG, so the page needs no encoder. */
@@ -87,7 +82,6 @@ export function sanitiseChoice(raw: unknown): GateChoice | null {
             method: 'social',
             provider: c.provider,
             ...(c.own === true ? { own: true } : {}),
-            ...(c.chooseAccount === true ? { chooseAccount: true } : {}),
         };
     }
     return null;

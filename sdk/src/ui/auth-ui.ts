@@ -6,7 +6,7 @@ import { attributeLabel, assuranceLabel } from '../attributes-ui';
 import { PrivasysAuth } from '../client';
 import { alternativeOrder, displayAppName, gateOrder } from '../gate';
 import { type GateChoice, type GateOptions, type GateProvider, finishOnSuccess } from '../gate-headless';
-import { hasAccountPicker, providerButtonLabel, providerName } from '../providers';
+import { providerButtonLabel, providerName } from '../providers';
 import { themeClasses, themeProperties, themeStylesheet } from '../theme';
 import type { AuthState, AttestationInfo, SessionRelayBinding } from '../types';
 import { type WebAuthnState, WebAuthnClient } from '../webauthn';
@@ -298,7 +298,7 @@ export class AuthUI {
                 ? (this.cfg.socialOwn ?? []).some((o) => o.provider === choice.provider)
                 : (this.cfg.socialProviders ?? []).includes(choice.provider);
             if (!offered) return;
-            void this.startSocial(choice.provider, !!choice.own, !!choice.chooseAccount);
+            void this.startSocial(choice.provider, !!choice.own);
             return;
         }
         if (!this.allowed('wallet')) return;
@@ -383,9 +383,6 @@ export class AuthUI {
             case 'error':
                 brandDesc = 'Something went wrong. You can try again or choose a different method.';
                 break;
-            case 'profile-required':
-                brandDesc = 'One more step: confirm your name and email address with an account that holds them.';
-                break;
             default:
                 brandDesc = `<strong>${displayName}</strong> needs to verify your identity. Please choose one of the authentication options.`;
         }
@@ -417,9 +414,6 @@ export class AuthUI {
             case 'error':
                 content = this.renderError();
                 break;
-            case 'profile-required':
-                content = this.renderProfile();
-                break;
             default:
                 content = this.renderIdle();
         }
@@ -444,7 +438,6 @@ export class AuthUI {
         // Without a generic brand panel to carry context (inline and page
         // modes), flow states get a heading of their own above the tile.
         const flowHeading = (inline || isPage) && !isIdle && this.state !== 'success' && this.state !== 'error'
-            && this.state !== 'profile-required'
             ? (this.cfg.operationApproval ? 'Approve in your Privasys Wallet'
                 : this.method === 'passkey' ? 'Sign in with a passkey'
                     : this.method === 'social' ? `Signing in with ${this.socialName}` : 'Connecting you to Privasys ID')
@@ -689,61 +682,8 @@ export class AuthUI {
         }
         buttons.push(...(walletFirst ? [...walletButtons, ...divider, ...alternatives] : [...alternatives, ...divider, ...walletButtons]));
 
-        // A provider signs a person straight in when one account is on the
-        // browser, which may be the wrong one. "Use another account" has it
-        // show its own account picker. With one provider button the link
-        // starts it; with several it arms the next one pressed.
-        const pickers = [
-            ...ownRegistrations.map((o) => ({ provider: o.provider, own: true, name: o.displayName })),
-            ...socialProviders.map((p) => ({ provider: p, own: false, name: this.cfg.socialDisplayNames?.[p] ?? providerName(p) })),
-        ].filter((p) => hasAccountPicker(p.provider));
-        const linkStyle = 'margin-top: 4px; font-size: 13px; display: block; text-align: center; width: 100%;';
-        if (pickers.length === 1 && ownRegistrations.length + socialProviders.length === 1) {
-            const only = pickers[0];
-            buttons.push(el('button', { className: 'link-btn', style: linkStyle,
-                onClick: () => this.startSocial(only.provider, only.own, true) }, `Use another ${only.name} account`));
-        } else if (pickers.length) {
-            buttons.push(this.chooseAccount
-                ? el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin: 4px 0 0;' },
-                    `Choose ${pickers.map((p) => p.name).join(' or ')} above. It will ask which account to use.`)
-                : el('button', { className: 'link-btn', style: linkStyle,
-                    onClick: () => { this.chooseAccount = true; this.render(); } }, 'Use another account'));
-        }
-
         return el('div', null,
             el('h2', { className: 'auth-panel-heading' }, `Sign in to ${displayName}`),
-            ...buttons,
-        );
-    }
-
-    /**
-     * After a passkey, for a client that asked for the person's name or email
-     * address: the providers that can confirm them, drawn as the menu draws
-     * them. They are offered whether or not the menu offered social sign-in,
-     * since this is the only way to bring those details to a passkey.
-     */
-    private renderProfile(): HTMLElement {
-        const displayName = this.cfg.app?.displayName || displayAppName(this.cfg.appName);
-        const own = (this.cfg.socialOwn ?? []).map((o) =>
-            el('button', { className: 'btn-provider', onClick: () => this.confirmProfile(o.provider, true) },
-                o.iconUrl ? el('img', { src: o.iconUrl, alt: '' }) : el('span', { html: SOCIAL_ICONS[o.provider] ?? '' }),
-                el('span', { className: 'btn-label' }, `Sign in with ${o.displayName}`),
-            ));
-        const platform = (this.cfg.socialProviders ?? []).map((provider) => {
-            const iconUrl = this.cfg.socialIcons?.[provider];
-            const icon = SOCIAL_ICONS[provider] ?? '';
-            return el('button', { className: 'btn-provider', onClick: () => this.confirmProfile(provider) },
-                iconUrl ? el('img', { src: iconUrl, alt: '' }) : icon ? el('span', { html: icon }) : null,
-                el('span', { className: 'btn-label' }, providerButtonLabel(provider, false, this.cfg.socialDisplayNames?.[provider])),
-            );
-        });
-        const buttons = [...own, ...platform];
-        if (buttons.length) buttons[0].classList.add('primary');
-        return el('div', null,
-            el('h2', { className: 'auth-panel-heading' }, 'Confirm your name and email'),
-            el('p', { className: 'scan-hint', style: 'max-width: none; text-align: center; margin: 0 0 16px;' },
-                `${displayName} asks for your name and email address. A passkey does not carry them, so sign in once with one of these accounts to confirm them.`),
-            this.errorMsg ? el('div', { className: 'error-msg' }, this.errorMsg) : null,
             ...buttons,
         );
     }
@@ -1324,19 +1264,6 @@ export class AuthUI {
             }
             this.sessionToken = result.sessionToken;
             this.sessionId = result.sessionId;
-            if (this.cfg.profileAfterPasskey) {
-                if (!(this.cfg.socialOwn?.length || this.cfg.socialProviders?.length)) {
-                    // Fail loudly rather than complete a sign-in without the
-                    // details the client asked for.
-                    this.state = 'error';
-                    this.errorMsg = 'This app needs your name and email address, and no account is set up here to confirm them. Sign in with Privasys ID instead.';
-                    this.render();
-                    return;
-                }
-                this.state = 'profile-required';
-                this.render();
-                return;
-            }
             this.complete();
         } catch (err: any) {
             this.state = 'error';
@@ -1345,29 +1272,8 @@ export class AuthUI {
         }
     }
 
-    /** The provider's sign-in adds the person's details to this passkey sign-in. */
-    private async confirmProfile(provider: string, own = false): Promise<void> {
+    private async startSocial(provider: string, own = false): Promise<void> {
         if (!this.cfg.onSocialAuth) return;
-        this.errorMsg = '';
-        this.state = 'authenticating';
-        this.render();
-        try {
-            await this.cfg.onSocialAuth(provider, own);
-            this.complete();
-        } catch (err: any) {
-            this.state = 'profile-required';
-            this.errorMsg = err?.message ?? 'Your details were not confirmed. Try again.';
-            this.render();
-        }
-    }
-
-    // "Use another account" was pressed: the next provider button asks the
-    // provider for its account picker.
-    private chooseAccount = false;
-
-    private async startSocial(provider: string, own = false, chooseAccount = this.chooseAccount): Promise<void> {
-        if (!this.cfg.onSocialAuth) return;
-        this.chooseAccount = false;
         this.method = 'social';
         this.socialName = this.cfg.socialDisplayNames?.[provider]
             ?? (own ? this.cfg.socialOwn?.find((o) => o.provider === provider)?.displayName : undefined)
@@ -1375,7 +1281,7 @@ export class AuthUI {
         this.state = 'authenticating';
         this.render();
         try {
-            await this.cfg.onSocialAuth(provider, own, chooseAccount && hasAccountPicker(provider));
+            await this.cfg.onSocialAuth(provider, own);
             this.sessionToken = '';
             this.sessionId = this.cfg.sessionId ?? '';
             this.complete();

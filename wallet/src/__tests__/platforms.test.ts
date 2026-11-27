@@ -132,10 +132,10 @@ describe('the platform behind a vault billing id', () => {
     });
 
     it('is production, a published platform by its domain, or unknown', async () => {
-        expect(await billingPlatform([implicit('privasys-platform')], sha)).toEqual({ kind: 'default' });
-        expect(await billingPlatform([implicit('aud-b')], sha)).toEqual({ kind: 'named', domain: 'b.example.org' });
-        expect(await billingPlatform([implicit('aud-zzz')], sha)).toEqual({ kind: 'unknown' });
-        expect(await billingPlatform([implicit('privasys-platform'), implicit('aud-b')], sha)).toEqual({ kind: 'unknown' });
-        expect(await billingPlatform([], sha)).toEqual({ kind: 'unknown' });
+        expect(await billingPlatform([implicit('privasys-platform')])).toEqual({ kind: 'default' });
+        expect(await billingPlatform([implicit('aud-b')])).toEqual({ kind: 'named', domain: 'b.example.org' });
+        expect(await billingPlatform([implicit('aud-zzz')])).toEqual({ kind: 'unknown' });
+        expect(await billingPlatform([implicit('privasys-platform'), implicit('aud-b')])).toEqual({ kind: 'unknown' });
+        expect(await billingPlatform([])).toEqual({ kind: 'unknown' });
     });
 });

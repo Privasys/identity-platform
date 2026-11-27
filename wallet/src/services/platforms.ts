@@ -16,6 +16,9 @@
  * must not leave the device.
  */
 
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+
 import * as SecureStore from '@/utils/storage';
 
 const IDP_BASE_URL = process.env['EXPO_PUBLIC_IDP_URL'] || 'https://privasys.id';
@@ -148,9 +151,10 @@ export type BillingPlatform =
  * both run the same release. Unknown when the ids differ, match no published
  * platform, or the platforms cannot be read.
  */
-export async function billingPlatform(billingIds: string[], sha256Hex: (text: string) => string): Promise<BillingPlatform> {
+export async function billingPlatform(billingIds: string[]): Promise<BillingPlatform> {
     if (billingIds.length !== 1) return { kind: 'unknown' };
-    const implicit = (audience: string) => sha256Hex(`privasys-billing-implicit-v0\n${IDP_BASE_URL}\n${audience}`);
+    const implicit = (audience: string) =>
+        bytesToHex(sha256(new TextEncoder().encode(`privasys-billing-implicit-v0\n${IDP_BASE_URL}\n${audience}`)));
     if (billingIds[0] === implicit(DEFAULT_AUDIENCE)) return { kind: 'default' };
     let list: Platform[];
     try {

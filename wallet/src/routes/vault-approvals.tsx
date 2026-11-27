@@ -46,7 +46,6 @@ import { checkV1, checkV2, checkV2Release, isV2, requiresV2 } from '@/services/v
 import { computeVaultOp } from '@/services/vault-approval-batch';
 import { billingPlatform, type BillingPlatform } from '@/services/platforms';
 import { PERSON_OPS, policyDiff, policyFacts, type Gate, type PersonOp } from '@/services/vault-policy-view';
-import { sha256 } from '@noble/hashes/sha2.js';
 import { notify } from '@/stores/notice';
 import { freshBiometric } from '@/services/approval-answer';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
@@ -253,9 +252,7 @@ async function checkV2Request(req: VaultApprovalRequest): Promise<V2Check> {
     if (!checked) return { kind: 'mismatch' };
     const release = await checkV2Release(checked, typeof req.summary.vault_release === 'string' ? req.summary.vault_release : undefined);
     if (release.kind === 'ok') {
-        const sha256Hex = (text: string) =>
-            Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
-        const platform = await billingPlatform(checked.billingIds, sha256Hex);
+        const platform = await billingPlatform(checked.billingIds);
         return {
             kind: 'ok',
             release: release.release,

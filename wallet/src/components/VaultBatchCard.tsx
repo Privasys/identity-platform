@@ -61,7 +61,6 @@ import {
 import { refusedOnRelease } from '@/services/vault-approval-v2';
 import { vaultReleaseFor, type VaultRelease } from '@/services/vault-reshare';
 import { billingPlatform, type BillingPlatform } from '@/services/platforms';
-import { sha256 } from '@noble/hashes/sha2.js';
 import { notify } from '@/stores/notice';
 import { useServiceSessionsStore } from '@/stores/service-sessions';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
@@ -123,9 +122,7 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
             return;
         }
         let cancelled = false;
-        const sha256Hex = (text: string) =>
-            Array.from(sha256(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
-        void billingPlatform(billingKey === '' ? [] : billingKey.split(','), sha256Hex).then((found) => {
+        void billingPlatform(billingKey === '' ? [] : billingKey.split(',')).then((found) => {
             if (!cancelled) setPlatform(found);
         });
         return () => {
@@ -174,9 +171,8 @@ export function VaultBatchCard({ batchId }: { batchId: string }) {
         try {
             const found = await fetchVaultBatch(batchId);
             if (found.kind === 'ok') {
-                // Verified, but a list with nothing in it has nothing to show,
-                // and an approval with nothing shown is not offered.
-                setPhase(found.batch.entries.length > 0 ? { kind: 'ready', batch: found.batch } : { kind: 'refused' });
+                // Verified, which includes having at least one entry.
+                setPhase({ kind: 'ready', batch: found.batch });
                 return;
             }
             if (found.kind === 'gone') forgetBatch(batchId);

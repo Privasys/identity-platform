@@ -125,11 +125,6 @@ async function getJSON<T>(url: string): Promise<T | null> {
  * own control plane, and a production wallet is routinely shown dev apps.
  */
 export async function publicApiGet<T>(path: string, appHost?: string): Promise<T | null> {
-    return getJSONFirst<T>(path, appHost);
-}
-
-/** GET `path` from the first control-plane candidate that answers. */
-async function getJSONFirst<T>(path: string, appHost?: string): Promise<T | null> {
     for (const base of apiBasesForHost(appHost)) {
         const result = await getJSON<T>(`${base}${path}`);
         if (result) return result;
@@ -151,7 +146,7 @@ export async function fetchReleaseProvenance(
 ): Promise<ReleaseProvenance | null> {
     if (!appId || !versionId) return null;
     const q = digest ? `?digest=${encodeURIComponent(digest)}` : '';
-    return getJSONFirst<ReleaseProvenance>(
+    return publicApiGet<ReleaseProvenance>(
         `/api/v1/apps/${encodeURIComponent(appId)}/versions/${encodeURIComponent(versionId)}/release-provenance${q}`,
         appHost
     );
@@ -167,7 +162,7 @@ export async function fetchRunningAppReleases(
     appHost?: string
 ): Promise<{ os_release?: OsRelease; workload_release?: WorkloadRelease } | null> {
     if (!appId) return null;
-    const data = await getJSONFirst<{ os_release?: OsRelease; workload_release?: WorkloadRelease }>(
+    const data = await publicApiGet<{ os_release?: OsRelease; workload_release?: WorkloadRelease }>(
         `/api/v1/apps/${encodeURIComponent(appId)}/attest`,
         appHost
     );

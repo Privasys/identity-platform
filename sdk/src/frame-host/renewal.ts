@@ -402,16 +402,15 @@ export async function onClearSession({ e, data, key }: MessageContext): Promise<
     if (key && await sessionForPage(key, e.origin)) {
         cancelRenewal(key);
         sessions.remove(key);
+        // What belonged to that sign-in ends with it, in this tab too (the
+        // storage event that tells other tabs does not reach the writer).
+        for (const cb of changeListeners) {
+            try { cb(key, undefined); } catch { /* one listener does not stop the others */ }
+        }
     }
     window.parent.postMessage({ type: 'privasys:session-cleared', id: data.id }, e.origin);
 }
 
-// Mint an access token for another audience without replacing the
-// session's own: a refresh_token grant with an explicit `scope` (RFC 6749
-// section 6, plus the audience extension), under the session's own
-// granted scopes, since the identity provider refuses a broader one. The
-// rotated refresh token keeps the original scope, so later renewals still
-// mint the session's audience.
 // Tokens minted for an audience, kept until shortly before they expire so a
 // page asking for one per request (a direct channel) costs one grant per
 // token lifetime. Each is bound to the sign-in (sid) it was minted from.
@@ -419,6 +418,12 @@ const MINT_REUSE_MARGIN_MS = 60_000;
 const minted = new Map<string, { sid: string; token: string; expiresIn: number; expMs: number }>();
 const minting = new Map<string, Promise<Record<string, unknown>>>();
 
+// Mint an access token for another audience without replacing the
+// session's own: a refresh_token grant with an explicit `scope` (RFC 6749
+// section 6, plus the audience extension), under the session's own
+// granted scopes, since the identity provider refuses a broader one. The
+// rotated refresh token keeps the original scope, so later renewals still
+// mint the session's audience.
 export async function onGetTokenForAudience({ e, data, key, pageScope }: MessageContext): Promise<void> {
     const id = data.id;
     const reply = (payload: Record<string, unknown>) =>

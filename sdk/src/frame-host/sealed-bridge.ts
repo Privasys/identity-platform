@@ -313,11 +313,14 @@ export async function onSessionResume({ e, data, key }: MessageContext): Promise
         reply({ error: 'no-session' });
         return;
     }
+    // A sealed session is reused only by the sign-in that made it: after a
+    // sign-out or another person's sign-in it is never handed on.
     const existing = sealedSessions.get(host);
-    if (existing) {
+    if (existing && existing.keyId === sessionKeyId(key) && existing.sid === tokenSid(session.token)) {
         reply({ sessionId: existing.session.sessionId });
         return;
     }
+    if (existing) sealedSessions.delete(host);
     // An app that asks to spend the holder's credits must be allowed to, and
     // only the wallet asks: a silent resume is refused until it has.
     if (data.spend && !(await hasSpendConsent(key, host))) {

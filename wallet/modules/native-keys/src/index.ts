@@ -117,35 +117,36 @@ export async function authenticateForSigning(reason: string): Promise<boolean> {
 // ── Website passkeys (modules/passkey-provider) ──────────────────────────
 // The passkey provider derives "synced" website passkeys from a root the
 // wallet gives it (services/website-passkeys); these read and write what it
-// shares with the wallet. Each is a no-op on a native build without it.
-
-function has(name: string): boolean {
-    return !!NativeKeys && typeof NativeKeys[name] === 'function';
-}
+// shares with the wallet.
 
 /** Hand the passkey provider its root (base64url, 32 bytes). */
 export async function setPasskeyRoot(rootB64url: string): Promise<void> {
-    if (has('setPasskeyRoot')) await NativeKeys.setPasskeyRoot(rootB64url);
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
+    await NativeKeys.setPasskeyRoot(rootB64url);
 }
 
 /** Forget the passkey root (the wipe). */
 export async function clearPasskeyRoot(): Promise<void> {
-    if (has('clearPasskeyRoot')) await NativeKeys.clearPasskeyRoot();
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
+    await NativeKeys.clearPasskeyRoot();
 }
 
-/** Every website passkey on this device, as a JSON array. "[]" without the native side. */
+/** Every website passkey on this device, as a JSON array. */
 export async function listWebsitePasskeys(): Promise<string> {
-    return has('listWebsitePasskeys') ? NativeKeys.listWebsitePasskeys() : '[]';
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
+    return NativeKeys.listWebsitePasskeys();
 }
 
 /** Take in synced website passkeys made on another device (a JSON array). Returns how many were new. */
 export async function importWebsitePasskeys(json: string): Promise<number> {
-    return has('importWebsitePasskeys') ? NativeKeys.importWebsitePasskeys(json) : 0;
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
+    return NativeKeys.importWebsitePasskeys(json);
 }
 
 /** Forget one website passkey. */
 export async function deleteWebsitePasskey(rpId: string, credentialIdB64url: string): Promise<void> {
-    if (has('deleteWebsitePasskey')) await NativeKeys.deleteWebsitePasskey(rpId, credentialIdB64url);
+    if (!NativeKeys) throw new Error('NativeKeys is not available on web');
+    await NativeKeys.deleteWebsitePasskey(rpId, credentialIdB64url);
 }
 
 export type { KeyInfo, SignatureResult } from './NativeKeys.types.js';

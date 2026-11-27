@@ -11,7 +11,7 @@ import { SESSIONS_STORAGE_KEY, sessionKeyId, type SessionKey } from '../session'
 import type { AuthSession } from '../types';
 import { methodOf, pageIsClients, sessions, sessionForPage } from './page-scope';
 import type { MessageContext } from './router';
-import { tokenExpMs, tokenAudienceIs, isTokenExpired } from './tokens';
+import { tokenExpMs, tokenAudienceIs, isTokenExpired, tokenSid } from './tokens';
 
 // ── Renewal (OIDC refresh_token) ─────────────────────────────────────────
 //
@@ -324,6 +324,9 @@ export function renewNow(key: SessionKey, parentOrigin: string): Promise<AuthSes
     const wait = Math.max(0, (lastRenewNow.get(id) ?? 0) + RENEW_NOW_MIN_MS - Date.now());
     const run = new Promise<void>((r) => setTimeout(r, wait))
         .then(() => {
+            // What the person may do changed: tokens minted for audiences
+            // under the old roles are not reused.
+            for (const k of minted.keys()) if (k.startsWith(`${id}|`)) minted.delete(k);
             lastRenewNow.set(id, Date.now());
             return renewSession(key, parentOrigin);
         })
@@ -409,6 +412,13 @@ export async function onClearSession({ e, data, key }: MessageContext): Promise<
 // granted scopes, since the identity provider refuses a broader one. The
 // rotated refresh token keeps the original scope, so later renewals still
 // mint the session's audience.
+// Tokens minted for an audience, kept until shortly before they expire so a
+// page asking for one per request (a direct channel) costs one grant per
+// token lifetime. Each is bound to the sign-in (sid) it was minted from.
+const MINT_REUSE_MARGIN_MS = 60_000;
+const minted = new Map<string, { sid: string; token: string; expiresIn: number; expMs: number }>();
+const minting = new Map<string, Promise<Record<string, unknown>>>();
+
 export async function onGetTokenForAudience({ e, data, key, pageScope }: MessageContext): Promise<void> {
     const id = data.id;
     const reply = (payload: Record<string, unknown>) =>
@@ -439,13 +449,34 @@ export async function onGetTokenForAudience({ e, data, key, pageScope }: Message
         reply({ accessToken: session.token, expiresIn: exp === null ? 0 : Math.floor((exp - Date.now()) / 1000) });
         return;
     }
-    const scope = `audience:${audience} ${session.scope}`;
-    let r = await refreshGrant(key, { parentOrigin: e.origin, scope });
+    const sid = tokenSid(session.token) ?? '';
+    const cacheKey = `${sessionKeyId(key)}|${audience}`;
+    const cached = minted.get(cacheKey);
+    if (cached && cached.sid === sid && cached.expMs - MINT_REUSE_MARGIN_MS > Date.now()) {
+        reply({ accessToken: cached.token, expiresIn: Math.floor((cached.expMs - Date.now()) / 1000) });
+        return;
+    }
+    let pending = minting.get(cacheKey);
+    if (!pending) {
+        pending = mintFor(key, e.origin, `audience:${audience} ${session.scope}`).then((out) => {
+            if (typeof out.accessToken === 'string') {
+                const expMs = tokenExpMs(out.accessToken) ?? Date.now() + Number(out.expiresIn ?? 0) * 1000;
+                minted.set(cacheKey, { sid, token: out.accessToken, expiresIn: Number(out.expiresIn ?? 0), expMs });
+            }
+            return out;
+        }).finally(() => minting.delete(cacheKey));
+        minting.set(cacheKey, pending);
+    }
+    reply(await pending);
+}
+
+async function mintFor(key: SessionKey, parentOrigin: string, scope: string): Promise<Record<string, unknown>> {
+    let r = await refreshGrant(key, { parentOrigin, scope });
     // Another document rotated the token while this grant was in flight:
     // mint again from the one it stored.
-    if (r.kind === 'adopted') r = await refreshGrant(key, { parentOrigin: e.origin, scope });
-    if (r.kind === 'granted') reply({ accessToken: r.accessToken, expiresIn: r.expiresIn });
-    else if (r.kind === 'dead') reply({ error: 'session expired' });
-    else if (r.kind === 'failed') reply({ error: r.error });
-    else reply({ error: 'no refresh token in session' });
+    if (r.kind === 'adopted') r = await refreshGrant(key, { parentOrigin, scope });
+    if (r.kind === 'granted') return { accessToken: r.accessToken, expiresIn: r.expiresIn };
+    if (r.kind === 'dead') return { error: 'session expired' };
+    if (r.kind === 'failed') return { error: r.error };
+    return { error: 'no refresh token in session' };
 }

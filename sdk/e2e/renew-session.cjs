@@ -140,6 +140,16 @@ const n = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()
   assert.equal(storedAfterMint.token, out.soon, 'the stored access token is not the minted one');
   assert.deepEqual(await page.evaluate((k) => window.renewalSignals.slice(k), signalsBefore), ['start', 'end'], 'the mint signals the grant');
 
+  // A minted token is reused until shortly before it expires: a page asking
+  // for one per request makes one grant. renew() drops it: roles changed.
+  const reused = await page.evaluate(() => Promise.all([window.auth.token('other-aud'), window.auth.token('other-aud')]));
+  assert.deepEqual(reused, [minted, minted], 'the minted token is reused');
+  assert.equal(refreshes, 3, 'reusing it makes no grant');
+  await page.evaluate(() => window.auth.renew());
+  const afterRenew = await page.evaluate(() => window.auth.token('other-aud'));
+  assert.notEqual(afterRenew, minted, 'after renew() the audience token is minted again');
+  assert.equal(refreshes, 5, 'one grant to renew, one to mint');
+
   // A dead chain: the mint says so, the session is gone, and the page hears it.
   refuseGrants = true;
   const dead = await page.evaluate(async () => {
@@ -158,7 +168,7 @@ const n = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()
     try { await auth.renew(); return 'renewed'; } catch (e) { return e.message; }
   });
   assert.equal(refused, 'AuthFrame: not signed in; call connect() first', 'a page with no session is refused: ' + refused);
-  assert.equal(refreshes, 3, 'the refused page made no refresh');
+  assert.equal(refreshes, 5, 'the refused page made no refresh');
 
   console.log('renew-session: all checks passed');
   await browser.close();

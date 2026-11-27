@@ -933,8 +933,8 @@ interface QRPayload {
  * ceremony state atomically instead of hand-resetting each state var.
  */
 export default function ConnectScreen() {
-    const routeParams = useLocalSearchParams<{ payload?: string; serviceUrl?: string }>();
-    return <ConnectFlow key={routeParams.payload ?? routeParams.serviceUrl ?? ''} />;
+    const routeParams = useLocalSearchParams<{ payload?: string }>();
+    return <ConnectFlow key={routeParams.payload ?? ''} />;
 }
 
 function ConnectFlow() {
@@ -945,7 +945,6 @@ function ConnectFlow() {
     const styles = useMemo(() => makeStyles(p), [p]);
     const params = useLocalSearchParams<{
         payload?: string; // JSON-encoded QRPayload
-        serviceUrl?: string; // Legacy fallback
         source?: 'qr' | 'push'; // How the flow was initiated
     }>();
     const isFromPush = params.source === 'push';
@@ -1124,15 +1123,6 @@ function ConnectFlow() {
         try {
             if (params.payload) {
                 parsed = JSON.parse(params.payload);
-            } else if (params.serviceUrl) {
-                // Legacy QR format
-                const url = new URL(params.serviceUrl);
-                parsed = {
-                    origin: url.host,
-                    sessionId: url.pathname.split('/').pop() || '',
-                    rpId: url.hostname,
-                    brokerUrl: `wss://${url.host}/relay`
-                };
             } else {
                 setError(t('connect.noPayload'));
                 setStep('error');

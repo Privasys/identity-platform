@@ -17,7 +17,6 @@ export default function TabScanScreen() {
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
     const [facing] = useState<CameraType>('back');
-    const [serviceUrl, setServiceUrl] = useState<string>();
     const [permission, requestPermission] = useCameraPermissions();
     const [rerenderTrigger, setRerenderTrigger] = useState(0);
     const navigating = useRef(false);
@@ -25,7 +24,6 @@ export default function TabScanScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            setServiceUrl(undefined);
             navigating.current = false;
             setCameraKey(k => k + 1);
         }, [])
@@ -46,11 +44,6 @@ export default function TabScanScreen() {
             }
         })();
     }, [permission, requestPermission]);
-
-    useEffect(() => {
-        if (!serviceUrl) return;
-        router.push({ pathname: '/connect', params: { serviceUrl, source: 'qr' } });
-    }, [serviceUrl]);
 
     if (!permission) {
         // Camera permissions are still loading.
@@ -233,12 +226,6 @@ export default function TabScanScreen() {
                         const json = decodeB64Url(b64);
                         if (json && routePayload(json)) return;
                     }
-                }
-
-                // Legacy URL format: /_/ prefix
-                if (url.pathname.startsWith('/_/')) {
-                    setServiceUrl(url.toString());
-                    return;
                 }
             } catch {
                 // Not a valid URL

@@ -107,21 +107,11 @@ export const useTrustedAppsStore = create<TrustedAppsState>((set, get) => ({
         // TDX. RTMR1/RTMR2 are part of the platform-runtime measurement the
         // session-relay enc_pub is pinned to, so a change there (e.g. a
         // kernel/initrd bump that leaves MRTD untouched) is a genuine platform
-        // upgrade the user should re-approve — matching the enc_pub rotation
-        // exactly. Legacy records predating RTMR tracking have them undefined;
-        // treat "not previously recorded" as "don't block the match" so we
-        // never force a re-approval merely for starting to track them (the
-        // next successful ceremony persists them and full comparison resumes).
-        // Doubly-lenient on RTMRs: compare only when BOTH the stored record
-        // and the fresh measurement carry the value. A TDX cert from a current
-        // client always yields RTMR1/RTMR2, so real enclaves are fully
-        // compared; the leniency only spares legacy trust rows and any
-        // caller that has not started passing RTMRs — neither of which should
-        // be misread as a platform change.
+        // upgrade the user should re-approve, matching the enc_pub rotation.
         return (
             app.mrtd === measurements.mrtd &&
-            (app.rtmr1 == null || measurements.rtmr1 == null || app.rtmr1 === measurements.rtmr1) &&
-            (app.rtmr2 == null || measurements.rtmr2 == null || app.rtmr2 === measurements.rtmr2) &&
+            app.rtmr1 === measurements.rtmr1 &&
+            app.rtmr2 === measurements.rtmr2 &&
             app.codeHash === measurements.codeHash &&
             app.configRoot === measurements.configRoot
         );

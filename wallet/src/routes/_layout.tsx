@@ -23,20 +23,6 @@ import { useDependencyApprovalsStore } from '@/stores/dependency-approvals';
 import { useProfileStore } from '@/stores/profile';
 import { pullRelay, requestSync, sendIfPasskeysChanged, watchProfileForDevices } from '@/services/device-sync';
 import { syncRegistry } from '@/services/devices';
-import { migrateToThisDeviceOnly } from '@/utils/storage';
-
-/** What the wallet kept before its secrets stayed on this phone (utils/storage.ts). */
-const DEVICE_ONLY_KEYS = [
-    'privasys.sovereign-root',
-    'privasys.sovereign.recovered-seed',
-    'v1-profile',
-    'v1-auth-store',
-    'v1-notify-seal-key',
-    'v1-setup-keep-index',
-    'privasys.kyc.records',
-    'privasys.identities.protected',
-    'privasys.identities.legacy',
-];
 import { deletionStartup } from '@/services/account-deletion-events';
 import { installPasskeyRoot } from '@/services/website-passkeys';
 import { restoreFromAutoBackupIfEmpty, watchProfileForBackup } from '@/services/profile-backup';
@@ -111,13 +97,12 @@ export default function RootLayout() {
     // The logo has opened onto the wallet (components/AppLock).
     const [opened, setOpened] = useState(false);
 
-    // Hydrate persisted stores on app launch, once the secrets written before
-    // they stayed on this phone have been moved (utils/storage.ts).
+    // Hydrate persisted stores on app launch.
     useEffect(() => {
         // The demo was seeded at load, and has no storage to read and no
         // other phones to sync with.
         if (isDemo()) return;
-        migrateToThisDeviceOnly(DEVICE_ONLY_KEYS).then(() => Promise.all([
+        Promise.all([
             useAuthStore.getState().hydrate(),
             useProfileStore.getState().hydrate(),
             useConsentStore.getState().hydrate(),
@@ -146,7 +131,7 @@ export default function RootLayout() {
             void installPasskeyRoot(useProfileStore.getState().profile?.pairwiseSeed)
                 .then(() => sendIfPasskeysChanged())
                 .catch((e: any) => console.warn('[website-passkeys] start-up:', e?.message ?? e));
-        }));
+        });
     }, []);
 
     // Run security checks in the background

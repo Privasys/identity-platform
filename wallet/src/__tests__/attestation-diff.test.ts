@@ -106,14 +106,6 @@ describe('diffTrustedAttestation', () => {
         ]);
     });
 
-    it('does NOT surface RTMRs for a legacy record that never recorded them', () => {
-        // Trust row predating RTMR tracking (rtmr1/rtmr2 undefined): a fresh
-        // attestation carrying RTMRs is us STARTING to track them, not a real
-        // platform change — must not fabricate a platform-update.
-        const diff = diffTrustedAttestation(trustedTdx(), attTdx({ rtmr1: D, rtmr2: C }));
-        expect(diff).toBeNull();
-    });
-
     it('treats a previously unrecorded field that is now present as a change', () => {
         const trusted = trustedTdx({ codeHash: undefined });
         const diff = diffTrustedAttestation(trusted, attTdx());

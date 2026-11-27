@@ -87,11 +87,8 @@ export function diffTrustedAttestation(
     }
     // RTMR1/RTMR2 move on a platform-runtime upgrade (kernel/initrd) even when
     // MRTD does not, and they rotate the session-relay enc_pub — so a change
-    // here IS a platform upgrade to call out. Only diff when a previous value
-    // was recorded: a legacy trust row predating RTMR tracking has none, and
-    // an absent→present transition is us starting to track them, not a real
-    // change (isAttestationMatch is lenient for the same reason).
-    if (trusted.rtmr1 && changed(trusted.rtmr1, att.rtmr1)) {
+    // here IS a platform upgrade to call out.
+    if (changed(trusted.rtmr1, att.rtmr1)) {
         changes.push({
             field: 'platform',
             labelKey: 'attestation.rowPlatformRtmr1',
@@ -99,7 +96,7 @@ export function diffTrustedAttestation(
             current: att.rtmr1,
         });
     }
-    if (trusted.rtmr2 && changed(trusted.rtmr2, att.rtmr2)) {
+    if (changed(trusted.rtmr2, att.rtmr2)) {
         changes.push({
             field: 'platform',
             labelKey: 'attestation.rowPlatformRtmr2',

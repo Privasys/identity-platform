@@ -424,10 +424,10 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 	q.Set("redirect_uri", h.issuerURL+"/auth/social/callback")
 	q.Set("response_type", "code")
 	q.Set("scope", strings.Join(prov.Scopes, " "))
-	// account=choose: the person asked for another account than the one the
-	// provider would pick by itself. A provider that signs a person in
-	// silently when one account is on the browser then shows its picker.
-	if r.URL.Query().Get("account") == "choose" && hasAccountPicker(providerName) {
+	// The provider shows its own account chooser on every sign-in, so the
+	// person picks the account rather than being signed in with whichever
+	// one the browser holds. The choice is the provider's own flow.
+	if hasAccountChooser(providerName) {
 		q.Set("prompt", "select_account")
 	}
 
@@ -449,9 +449,9 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authURL.String(), http.StatusFound)
 }
 
-// hasAccountPicker reports whether a provider honours prompt=select_account.
-// LinkedIn has no such prompt.
-func hasAccountPicker(provider string) bool {
+// hasAccountChooser reports whether a provider honours prompt=select_account.
+// LinkedIn has no account chooser.
+func hasAccountChooser(provider string) bool {
 	switch provider {
 	case "google", "microsoft", "github":
 		return true
@@ -708,6 +708,9 @@ func (h *Handler) HandleWalletLink(w http.ResponseWriter, r *http.Request) {
 	uq.Set("redirect_uri", h.issuerURL+"/auth/social/callback")
 	uq.Set("response_type", "code")
 	uq.Set("scope", strings.Join(prov.Scopes, " "))
+	if hasAccountChooser(providerName) {
+		uq.Set("prompt", "select_account")
+	}
 	// The wallet's holder commitment becomes the provider's OIDC nonce, so
 	// the ID token the provider signs names the wallet that started this
 	// sign-in. The Attribute Verifier refuses a token whose nonce does not

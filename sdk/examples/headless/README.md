@@ -20,7 +20,7 @@ The page creates an `AuthFrame` with a `headless` option. The frame on
    states the page narrates: `authenticating`, `push-waiting`, `qr-scanning`
    (with `qrSvg`), `success` and `error` (with `error`). While a push waits,
    `start({ method: 'wallet', qr: true })` switches to the QR code.
-4. **Result.** `connect()` resolves with the access token, as it does with the
+4. **Result.** `connect()` resolves with the session, as it does with the
    visible gate.
 
 A social sign-in needs a popup, and a popup needs the click, which only the page

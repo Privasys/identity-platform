@@ -1,68 +1,25 @@
 // Copyright (c) Privasys. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.0.
 
-export { PrivasysAuth } from './client';
-export { WebAuthnClient } from './webauthn';
-export { AuthUI } from './ui';
-export type { AuthUIConfig, SignInResult } from './ui';
+export { AuthFrame } from './client/auth-frame';
+export { ConnectError, InsufficientCreditsError } from './client/types';
 export type {
-    AuthConfig,
-    AuthResult,
-    AuthSession,
-    AttestationInfo,
-    AuthEvents,
-    AuthState,
-} from './types';
-export type { WebAuthnConfig, WebAuthnState, WebAuthnEvents } from './webauthn';
-export { generateQRPayload, generateSessionId } from './qr';
-export { SessionManager } from './session';
-export { AuthFrame, ConnectError, InsufficientCreditsError } from './frame-client';
-export type {
-    AttributeDisclosure,
+    AppChannel,
     AppResponse,
     AppStreamResponse,
+    AppWebSocket,
+    AttributeDisclosure,
     AuthFrameConfig,
-    ConnectResult,
-    PrivasysScope,
-    RestoredSession,
-    SealedResponse,
-    SealedSession,
-    SealedStreamResponse,
-} from './frame-client';
+    GateOutcome,
+    Session,
+} from './client/types';
+export type { GateChoice, GateControls, GateOptions, GateState } from './gate-headless';
+export type { AuthTheme } from './theme';
 export {
-    ATTRIBUTE_MAP,
-    CANONICAL_ATTRIBUTES,
-    CANONICAL_KEYS,
-    GOV_VERIFIED,
-    SELF_ASSERTED,
-    assuranceOf,
-    attributePairs,
     fetchAttributeReferential,
     isBillable,
     isGovVerified,
     marketplaceKeyOf,
     requestableAttributes,
 } from './attributes';
-export type { AttributeMarketplace, CanonicalAttribute } from './attributes';
-export { AttributePicker, assuranceLabel, attributeBadge, attributeLabel } from './attributes-ui';
-export type { AttributeAssuranceBadge, AttributePickerConfig, AttributeSectionCopy } from './attributes-ui';
-export {
-    CREDITS_PER_GBP,
-    attributeSections,
-    disclosureCost,
-    fetchAttributePrices,
-    formatCredits,
-    priceOf,
-} from './attribute-pricing';
-export type { AttributePrices, AttributeSection, AttributeSectionId } from './attribute-pricing';
-export type { AppTransport } from './direct-request';
-export { PrivasysSession } from './enclave-session';
-export type {
-    EncAuthRejectReason,
-    OpenWebSocketOptions,
-    SealedSessionState,
-    SealedSessionStatus,
-    SealedWebSocket,
-    SessionInitOptions,
-    WalletAttestationResult,
-} from './enclave-session';
+export { CREDITS_PER_GBP, disclosureCost, formatCredits } from './attribute-pricing';

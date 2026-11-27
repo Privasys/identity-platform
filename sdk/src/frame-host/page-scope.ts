@@ -8,7 +8,7 @@
  */
 
 import { parsePlatforms, type PlatformEntry } from '../platforms';
-import { SessionManager, type PlatformScope, type SessionKey } from '../session';
+import { RP_ID, SessionManager, type PlatformScope, type SessionKey } from '../session';
 import type { AuthSession } from '../types';
 
 export const sessions = new SessionManager();
@@ -72,21 +72,25 @@ export async function loadPlatforms(): Promise<PlatformEntry[] | null> {
 /**
  * The session key a message names: the page's platform, from the origin the
  * browser reports for it and never from anything the page says, and the
- * rpId and client the message names. Null when the platform cannot be told
- * or the message names no client: such a message reaches no session.
+ * client the message names. Null when the platform cannot be told or the
+ * message names no client: such a message reaches no session.
  */
-export function messageKey(scope: PlatformScope | null, data: { rpId?: unknown; clientId?: unknown }): SessionKey | null {
+export function messageKey(scope: PlatformScope | null, data: { clientId?: unknown }): SessionKey | null {
     if (!scope) return null;
     if (typeof data.clientId !== 'string' || !data.clientId) return null;
-    if (typeof data.rpId !== 'string' || !data.rpId) return null;
-    return { platform: scope.platform, rpId: data.rpId, clientId: data.clientId };
+    return { platform: scope.platform, rpId: RP_ID, clientId: data.clientId };
+}
+
+/** How the person of a stored session signed in. */
+export function methodOf(session: AuthSession): 'wallet' | 'passkey' | 'social' {
+    return session.method ?? (session.wallet ? 'wallet' : 'passkey');
 }
 
 /**
  * The stored session this page may use, or undefined. A session belongs to a
  * client, and only that client's own pages are given it: every page under one
  * registrable domain shares this frame's storage, so without this a page
- * could take another app's session by naming its rpId.
+ * could take another app's session by naming its client.
  */
 export async function sessionForPage(key: SessionKey | null, pageOrigin: string): Promise<AuthSession | undefined> {
     const session = key ? sessions.get(key) : undefined;

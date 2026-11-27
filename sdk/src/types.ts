@@ -94,8 +94,6 @@ export interface AuthSession {
     token: string;
     /** The RP this session is with. */
     rpId: string;
-    /** Origin of the enclave. */
-    origin: string;
     /** When this session was established (epoch ms). */
     authenticatedAt: number;
     /** Push token for the wallet that authenticated (if available). */
@@ -107,6 +105,8 @@ export interface AuthSession {
      * token, so this is the record. Absent on a session stored before it.
      */
     wallet?: boolean;
+    /** How the person signed in. */
+    method?: 'wallet' | 'passkey' | 'social';
     /** Broker WebSocket URL used for this session (needed for push auth). */
     brokerUrl?: string;
     /** OIDC refresh token for silent session renewal (replaces push-based renewal). */

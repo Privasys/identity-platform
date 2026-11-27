@@ -1,7 +1,7 @@
 // The hosted frame obeys only the page that embeds it. Another frame on the
 // same page (an ad, a widget) can reach it through `parent.frames` and post
-// to it; every command it sends must be ignored. The same commands from the
-// embedding page still work.
+// to it; every command it sends, the host-keyed sealed ones included, must
+// be ignored. The same commands from the embedding page still work.
 // Run after `npm run build`: `node e2e/frame-security.cjs`.
 // FRAME_BUNDLE=<path> runs it against another build of the frame.
 const fs = require('fs');
@@ -15,12 +15,13 @@ const sitePage = '<!doctype html><html><body><script src="/client.js"></script><
 const evilPage = '<!doctype html><html><body>widget</body></html>';
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
-const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', exp: Math.floor(Date.now() / 1000) + 900, n })}.x`;
+const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', exp: Math.floor(Date.now() / 1000) + 900, sid: 'sid-1', n })}.x`;
 
 (async () => {
   const browser = await chromium.launch();
   const ctx = await browser.newContext();
   let refreshes = 0;
+  const idpCalls = [];
   await ctx.route('https://**/*', async (r) => {
     const u = new URL(r.request().url());
     if (u.host === 'idp.test') {
@@ -35,6 +36,7 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
         return r.fulfill({ contentType: 'application/json', body: JSON.stringify({
           access_token: jwt(refreshes), refresh_token: `rt-${refreshes}`, token_type: 'Bearer', expires_in: 900 }) });
       }
+      idpCalls.push(u.pathname);
       return r.fulfill({ contentType: 'application/json', body: '{}' });
     }
     if (u.host === 'evil.test') return r.fulfill({ contentType: 'text/html', body: evilPage });
@@ -48,7 +50,7 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   const page = await ctx.newPage();
   await page.goto('https://site-a.test/');
 
-  // Seed the frame's storage with a signed-in session for client c1.
+  // Seed the frame's storage with a signed-in wallet session for client c1.
   await page.evaluate(() => new Promise((resolve) => {
     const f = document.createElement('iframe');
     f.src = 'https://idp.test/auth/';
@@ -58,14 +60,15 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   }));
   const seedFrame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/'));
   await seedFrame.evaluate((t) => localStorage.setItem('privasys_sessions', JSON.stringify([
-    { token: t, rpId: 'app', origin: 'https://site-a.test', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0', scope: 'openid offline_access', platform: 'privasys-platform' },
+    { token: t, rpId: 'privasys.id', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0', scope: 'openid offline_access',
+      platform: 'privasys-platform', method: 'wallet', pushToken: 'ExponentPushToken[x]', brokerUrl: 'wss://broker.test/relay' },
   ])), jwt(0));
   await page.evaluate(() => window.__seed.remove());
 
   // The page's own frame, signed in; and a widget from another origin.
   await page.evaluate(async () => {
-    window.auth = new Privasys.AuthFrame({ authOrigin: 'https://idp.test', clientId: 'c1', rpId: 'app', appName: 'app', apiBase: 'https://api.test' });
-    window.restored = await window.auth.getSession();
+    window.auth = new Privasys.AuthFrame({ authOrigin: 'https://idp.test', clientId: 'c1', appName: 'app' });
+    window.restored = await window.auth.connect();
     const w = document.createElement('iframe');
     w.src = 'https://evil.test/';
     await new Promise((r) => { w.onload = r; document.body.append(w); });
@@ -94,34 +97,56 @@ const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', ex
   };
 
   const before = refreshes;
-  await attack({ type: 'privasys:renew-session', id: 'x1', rpId: 'app', clientId: 'c1' });
-  await attack({ type: 'privasys:get-token-for-audience', id: 'x2', rpId: 'app', clientId: 'c1', audience: 'app:abc' });
+  await attack({ type: 'privasys:renew-session', id: 'x1', clientId: 'c1' });
+  await attack({ type: 'privasys:get-token-for-audience', id: 'x2', clientId: 'c1', audience: 'app:abc' });
   assert.equal(refreshes, before, 'a widget made the frame spend the refresh token');
 
-  await attack({ type: 'privasys:clear-session', rpId: 'app', clientId: 'c1' });
+  await attack({ type: 'privasys:clear-session', id: 'x3', clientId: 'c1' });
   assert.equal(await stored(), 1, 'a widget signed the person out');
 
-  await attack({ type: 'privasys:init', config: { appName: 'Evil', clientId: 'c1', rpId: 'app', presentation: 'inline', methods: ['wallet'] } });
+  await attack({ type: 'privasys:init', config: { appName: 'Evil', clientId: 'c1', presentation: 'inline', methods: ['wallet'] } });
   assert.equal(await gateDrawn(), false, 'a widget drew a gate inside the privasys.id frame');
 
-  await attack({ type: 'privasys:session:request', id: 'x3', method: 'POST', path: '/transfer', body: {} });
-  await attack({ type: 'privasys:session:ws-send', id: 1, data: 'x' });
-  await attack({ type: 'privasys:check-session', rpId: 'app', clientId: 'c1' });
+  // Every host-keyed sealed message, and the session check.
+  const host = 'enclave.test';
+  await attack({ type: 'privasys:session:resume', id: 'x4', clientId: 'c1', host });
+  await attack({ type: 'privasys:voucher-request', id: 'x5', clientId: 'c1', host, appName: 'Evil' });
+  await attack({ type: 'privasys:session:request', id: 'x6', host, method: 'POST', path: '/transfer', body: {} });
+  await attack({ type: 'privasys:session:stream-request', id: 7, host, method: 'POST', path: '/stream', body: {} });
+  await attack({ type: 'privasys:session:stream-cancel', id: 7, host });
+  await attack({ type: 'privasys:session:ws-open', id: 8, host, path: '/ws' });
+  await attack({ type: 'privasys:session:ws-send', id: 8, host, data: 'x' });
+  await attack({ type: 'privasys:session:ws-close', id: 8, host });
+  await attack({ type: 'privasys:gate:start', choice: { method: 'wallet' } });
+  await attack({ type: 'privasys:check-session', id: 'x9', clientId: 'c1' });
   const replies = await evil.evaluate(() => window.replies);
   assert.deepEqual(replies, [], 'the frame answered a widget: ' + JSON.stringify(replies));
+  assert.ok(!idpCalls.some((p) => p.startsWith('/sessions/')), 'a widget made the frame fetch a voucher: ' + JSON.stringify(idpCalls));
 
   // The embedding page still drives the frame.
-  const token = await page.evaluate(() => window.auth.renewSession());
-  assert.ok(token && refreshes === before + 1, 'the page itself can renew');
-  await page.evaluate(() => window.auth.clearSession());
-  assert.equal(await page.evaluate(() => window.auth.getSession()), null, 'the page itself can sign out');
+  const renewed = await page.evaluate(() => window.auth.renew().then((s) => s.token));
+  assert.ok(renewed && refreshes === before + 1, 'the page itself can renew');
+  await page.evaluate(() => window.auth.signOut());
+  assert.equal(await stored(), 0, 'the page itself can sign out');
+  assert.equal(await page.evaluate(() => window.auth.session), null, 'the session is gone');
 
-  // A sign-in is always for a client: a page that names none is refused.
-  const noClient = await page.evaluate(async () => {
-    const a = new Privasys.AuthFrame({ authOrigin: 'https://idp.test', rpId: 'app', appName: 'app', apiBase: 'https://api.test', presentation: 'modal' });
-    try { await a.signIn(); return 'signed in'; } catch (e) { return e.message; } finally { a.destroy && a.destroy(); }
+  // A sign-in is always for a client: AuthFrame needs one, and the frame
+  // refuses a gate that names none.
+  const noClient = await page.evaluate(() => {
+    try { new Privasys.AuthFrame({ authOrigin: 'https://idp.test', appName: 'app' }); return 'constructed'; } catch (e) { return e.message; }
   });
-  assert.equal(noClient, 'clientId is required', 'a sign-in without a client is refused: ' + noClient);
+  assert.equal(noClient, 'AuthFrame: clientId is required', 'AuthFrame without a client: ' + noClient);
+  const frameRefuses = await page.evaluate(() => new Promise((resolve) => {
+    const f = document.createElement('iframe');
+    f.src = 'https://idp.test/auth/';
+    addEventListener('message', (e) => {
+      if (e.source !== f.contentWindow) return;
+      if (e.data.type === 'privasys:ready') f.contentWindow.postMessage({ type: 'privasys:init', config: { appName: 'app', presentation: 'modal' } }, 'https://idp.test');
+      if (e.data.type === 'privasys:error') resolve(e.data.error);
+    });
+    document.body.append(f);
+  }));
+  assert.equal(frameRefuses, 'clientId is required', 'a gate without a client is refused: ' + frameRefuses);
 
   console.log('frame-security: all checks passed');
   await browser.close();

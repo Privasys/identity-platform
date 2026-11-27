@@ -3,6 +3,10 @@
 
 import type { AuthSession } from './types';
 
+/** The relying party of every session: the wallet keys a person's credential
+ *  by rpId, so another value would be another person. */
+export const RP_ID = 'privasys.id';
+
 /** localStorage key for the session list. Exported so the frame-host
  *  can watch cross-document `storage` events for renewals performed in
  *  sibling iframes/tabs. */

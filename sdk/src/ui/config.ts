@@ -14,8 +14,8 @@ import type { AttestationInfo, SessionRelayBinding } from '../types';
 export interface AuthUIConfig {
     /** App name or UUID as registered on the platform. */
     appName: string;
-    /** Relying party ID. Defaults to `appName` (used as-is). Set this to
-     *  the full RP domain like `"my-app.apps.privasys.org"` if different. */
+    /** Relying party ID the wallet signs for: `privasys.id`, or the one a
+     *  device request was made for. Set by the frame host. */
     rpId?: string;
     /** WebSocket URL for the auth broker relay. */
     brokerUrl?: string;

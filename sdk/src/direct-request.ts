@@ -11,9 +11,6 @@
 
 import type { SealedWebSocket } from './enclave-session';
 
-/** Which way {@link AuthFrame.request} sent a request. */
-export type AppTransport = 'sealed' | 'direct';
-
 export interface DirectRequest {
     /** The app's direct origin, `https://<direct name>`. */
     origin: string;

@@ -84,7 +84,6 @@
 // PUT /api/v1/oauth-clients/{client_id}/origins): the result of the sign-in
 // goes to this page, and the identity provider checks it.
 const CONFIG = {
-  apiBase: 'https://api.developer.privasys.org',
   appName: 'example-service',
   clientId: 'YOUR_CLIENT_ID',
   scope: ['openid', 'email', 'profile', 'offline_access'],
@@ -167,13 +166,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
   for (;;) {
     try {
-      const { accessToken } = await frame.connect();
+      const session = await frame.connect();
       $('options').hidden = true;
       $('progress').hidden = true;
       $('done').hidden = false;
-      // Send accessToken to your back end, which verifies it against
-      // https://privasys.id/.well-known/jwks.json.
-      void accessToken;
+      // Send session.token to your back end, which verifies it against
+      // https://privasys.id/.well-known/jwks.json; frame.token() gives the
+      // current one after a renewal.
+      void session.token;
       return;
     } catch (err) {
       // A cancel or a failed attempt: offer the options again.

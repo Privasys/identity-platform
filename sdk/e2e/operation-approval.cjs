@@ -1,7 +1,7 @@
 // An operation approval on the identity provider's own page: the frame polls
 // the status address the page named and ends with the page's own words; it
 // refuses a status or decline address on another origin, and an approval
-// asked for from any other page.
+// asked for from any other page. It runs through IdpGate.
 // Run after `npm run build`: `node e2e/operation-approval.cjs`.
 const fs = require('fs');
 const assert = require('assert/strict');
@@ -43,12 +43,11 @@ const sitePage = '<!doctype html><html><body><div id="gate"></div><script src="/
     const page = await ctx.newPage();
     await page.goto(origin + '/approve');
     const out = await page.evaluate(async (op) => {
-      const auth = new Privasys.AuthFrame({
-        authOrigin: 'https://idp.test', appName: 'Example', rpId: 'idp.test', apiBase: 'https://idp.test',
+      const gate = new Privasys.IdpGate({
+        authOrigin: 'https://idp.test', appName: 'Example',
         presentation: 'page', container: document.getElementById('gate'), operationApproval: op,
       });
-      window.__auth = auth;
-      try { return { result: await auth.signIn() }; } catch (e) { return { error: e.message }; }
+      try { return { result: await gate.run() }; } catch (e) { return { error: e.message, code: e.code }; }
     }, op);
     const frame = page.frames().find((f) => f.url().startsWith('https://idp.test/auth/'));
     const shown = frame ? await frame.evaluate(() => document.querySelector('[data-privasys-auth]')?.shadowRoot?.textContent ?? '') : '';
@@ -78,7 +77,7 @@ const sitePage = '<!doctype html><html><body><div id="gate"></div><script src="/
 
   status = 'gone';
   const expired = await run('https://idp.test', op);
-  assert.equal(expired.result && expired.result.outcome, 'approval-failed', 'an expired approval settles signIn()');
+  assert.equal(expired.result && expired.result.outcome, 'approval-failed', 'an expired approval settles run()');
   assert.match(expired.shown, /This approval has expired\./, 'the gate says it expired');
 
   console.log('operation-approval: all checks passed');

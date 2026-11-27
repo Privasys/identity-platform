@@ -21,7 +21,7 @@ const sitePage = `<!doctype html><html><body><div id="c" style="width:420px;heig
   addEventListener('message', (e) => {
     if (e.origin !== 'https://idp.test') return;
     if (e.data.type === 'privasys:ready') f.contentWindow.postMessage({ type: 'privasys:init', config: {
-      apiBase: 'https://api.test', appName: 'example', clientId: 'c1', presentation: 'inline', methods: ['wallet', 'passkey'],
+      appName: 'example', clientId: 'c1', presentation: 'inline', methods: ['wallet', 'passkey'],
       brokerUrl: 'wss://broker.test/relay' } }, 'https://idp.test');
   });
   document.getElementById('c').append(f);

@@ -1,7 +1,7 @@
-// Two tabs of one site share the person's session. A renewal in one reaches
-// the other. Signing out or in from one tab is reported as a known gap until
-// the frame reports every session change to its page.
-// Run after `npm run build`: `node e2e/multi-tab.cjs` (STRICT=1 fails on the gaps).
+// Two tabs of one site share the person's session, and each hears of every
+// change made in another: a renewal, a sign-out, and a sign-in reaching a tab
+// that is signed out.
+// Run after `npm run build`: `node e2e/multi-tab.cjs`.
 const fs = require('fs');
 const assert = require('assert/strict');
 const { chromium } = require(process.cwd() + '/node_modules/playwright');
@@ -13,7 +13,7 @@ const sitePage = '<!doctype html><html><body><script src="/client.js"></script><
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const jwt = (n) => `${b64({ alg: 'none' })}.${b64({ aud: 'privasys-platform', exp: Math.floor(Date.now() / 1000) + 900, n })}.x`;
-const n = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()).n;
+const n = (t) => (t ? JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()).n : null);
 
 (async () => {
   const browser = await chromium.launch();
@@ -40,16 +40,18 @@ const n = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()
     return r.fulfill({ status: 404, body: '' });
   });
 
-  const session = (t) => [{ token: t, rpId: 'app', origin: 'https://site-a.test', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0', scope: 'openid offline_access', platform: 'privasys-platform' }];
+  const session = (t) => [{ token: t, rpId: 'privasys.id', authenticatedAt: Date.now(), clientId: 'c1', refreshToken: 'rt-0', scope: 'openid offline_access', platform: 'privasys-platform' }];
+  // Writes the frame's storage from a frame of its own, as a sign-in in
+  // another tab does.
   const seed = async (page, value) => {
     await page.evaluate(() => new Promise((resolve) => {
       const f = document.createElement('iframe');
-      f.src = 'https://idp.test/auth/';
+      f.src = 'https://idp.test/auth/?seed';
       f.onload = () => resolve();
       document.body.append(f);
       window.__seed = f;
     }));
-    const f = page.frames().find((x) => x.url().startsWith('https://idp.test/auth/') && x !== undefined);
+    const f = page.frames().find((x) => x.url() === 'https://idp.test/auth/?seed');
     await f.evaluate((v) => v ? localStorage.setItem('privasys_sessions', JSON.stringify(v)) : localStorage.removeItem('privasys_sessions'), value);
     await page.evaluate(() => window.__seed.remove());
   };
@@ -58,14 +60,18 @@ const n = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()
     await p.goto('https://site-a.test/');
     return p;
   };
-  const mount = (p) => p.evaluate(async () => {
+  // Mounts the page's AuthFrame and waits for the frame's first report.
+  const mount = (p) => p.evaluate(() => new Promise((resolve) => {
     window.events = [];
-    window.auth = new Privasys.AuthFrame({ authOrigin: 'https://idp.test', clientId: 'c1', rpId: 'app', appName: 'app', apiBase: 'https://api.test' });
-    window.auth.onSessionRenewed = (_rp, tok) => window.events.push(['renewed', tok]);
-    window.auth.onSessionExpired = () => window.events.push(['expired']);
-    const s = await window.auth.getSession();
-    return s && s.token;
-  });
+    window.auth = new Privasys.AuthFrame({ authOrigin: 'https://idp.test', clientId: 'c1', appName: 'app' });
+    let first = true;
+    window.auth.onSessionChange((s) => {
+      window.events.push(s ? s.token : null);
+      if (first) { first = false; resolve(s && s.token); }
+    });
+  }));
+  const heard = (p, pred, label) => p.waitForFunction(pred, null, { timeout: 5000 })
+    .catch(() => { throw new Error(`not heard: ${label}`); });
 
   const a = await open();
   await seed(a, session(jwt(0)));
@@ -74,29 +80,22 @@ const n = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()
   assert.equal(n(await mount(b)), 0, 'tab B restores the session');
 
   // A renewal in tab A reaches tab B.
-  const renewed = await a.evaluate(() => window.auth.renewSession());
-  await b.waitForFunction(() => window.events.some((e) => e[0] === 'renewed'), null, { timeout: 5000 });
-  const bToken = await b.evaluate(() => window.events.find((e) => e[0] === 'renewed')[1]);
-  assert.equal(bToken, renewed, 'tab B gets the token tab A renewed');
+  const renewed = await a.evaluate(() => window.auth.renew().then((s) => s.token));
+  await b.waitForFunction((t) => window.auth.session && window.auth.session.token === t, renewed, { timeout: 5000 });
+  assert.equal(await b.evaluate(() => window.events.at(-1)), renewed, 'tab B gets the token tab A renewed');
 
-  const gaps = [];
-  // Signing out in tab A: tab B should hear of it.
-  await a.evaluate(() => window.auth.clearSession());
-  const bHeard = await b.waitForFunction(() => window.events.some((e) => e[0] === 'expired' || e[0] === 'signed-out'), null, { timeout: 3000 })
-    .then(() => true, () => false);
-  if (!bHeard) gaps.push('signing out in one tab is not reported to the other tabs');
+  // Signing out in tab A: tab B hears of it.
+  await a.evaluate(() => window.auth.signOut());
+  await heard(b, () => window.events.at(-1) === null && window.auth.session === null, 'sign-out in another tab');
 
-  // Signing in from tab A while tab B is signed out: tab B should hear of it.
+  // Signing in from tab A while tab C is signed out: tab C hears of it.
   const c = await open();
-  const cToken = await mount(c);
-  assert.equal(cToken, null, 'a new tab after the sign-out has no session');
+  assert.equal(await mount(c), null, 'a new tab after the sign-out has no session');
   await seed(a, session(jwt(99)));
-  const cHeard = await c.waitForFunction(() => window.events.some((e) => e[0] === 'renewed' || e[0] === 'signed-in'), null, { timeout: 3000 })
-    .then(() => true, () => false);
-  if (!cHeard) gaps.push('signing in from one tab is not reported to a signed-out tab');
+  await heard(c, () => window.auth.session !== null, 'sign-in in another tab');
+  assert.equal(n(await c.evaluate(() => window.auth.session.token)), 99, 'tab C has the new session');
+  assert.equal(n(await b.evaluate(() => window.events.at(-1))), 99, 'tab B, signed out, hears of it too');
 
-  for (const g of gaps) console.log(`KNOWN GAP: ${g}`);
-  if (gaps.length && process.env.STRICT) throw new Error(`${gaps.length} known gap(s)`);
   console.log('multi-tab: all checks passed');
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

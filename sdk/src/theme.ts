@@ -70,9 +70,12 @@ export function themeProperties(theme: AuthTheme): Record<string, string> {
 const TOKEN_RULES: Record<string, string> = {
     '--pv-font': `:host, button, a { font-family: var(--pv-font); }`,
     '--pv-radius': `.btn-provider, .btn-retry, .btn-back, .gate-close { border-radius: var(--pv-radius); }`,
-    '--pv-text': `:host, .auth-panel-heading, .btn-label, .gate-header-brand { color: var(--pv-text); }`,
+    // Muted text derives from the adopter's text colour, so a palette given
+    // for one appearance holds in both.
+    '--pv-text': `:host, .auth-panel-heading, .btn-label, .gate-header-brand, .brand-panel-name, .gate-seal-text, .gate-seal-text strong, p, p strong { color: var(--pv-text); }
+.gate-close, .btn-hint, .scan-hint, .scan-label, .method-detail, .error-msg, .session-label, .footer { color: color-mix(in srgb, var(--pv-text) 72%, transparent); }`,
     '--pv-background': `:host { background: var(--pv-background); }`,
-    '--pv-border': `.footer, .gate-header, .btn-retry, .session-info { border-color: var(--pv-border); }`,
+    '--pv-border': `.footer, .gate-header, .btn-retry, .session-info, .btn-provider:not(.primary), .gate-close { border-color: var(--pv-border); }`,
     '--pv-primary': `.btn-provider.primary, .btn-provider.primary:hover { background: var(--pv-primary); border-color: var(--pv-primary); }`,
     '--pv-primaryText': `.btn-provider.primary, .btn-provider.primary .btn-label, .btn-provider.primary svg { color: var(--pv-primaryText); }`,
     '--pv-secondary': `.btn-provider:not(.primary), .btn-provider:not(.primary):hover, .btn-retry { background: var(--pv-secondary); border-color: var(--pv-secondary); }`,

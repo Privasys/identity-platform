@@ -52,7 +52,9 @@ async function renderGate(page: Page, config: GateConfig): Promise<void> {
 
 const themed = {
     presentation: 'page',
-    theme: { font: 'Arial, sans-serif', radius: 0, colours: { primary: '#0b3d91', link: '#0b3d91', focus: '#ffbf47', focusText: '#0b0c0c' } },
+    // A complete palette, as an adopter passes it: the gate uses it as given,
+    // in light and dark appearance alike.
+    theme: { font: 'Arial, sans-serif', radius: 0, colours: { text: '#0b0c0c', background: '#ffffff', border: '#b1b4b6', primary: '#0b3d91', link: '#0b3d91', focus: '#ffbf47', focusText: '#0b0c0c' } },
     legal: false,
 };
 

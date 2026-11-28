@@ -39,8 +39,6 @@ import { useProfileStore } from '@/stores/profile';
 function profileWith(email: string, extra: { key: string; value: string }[] = []) {
     useProfileStore.setState({
         profile: {
-            displayName: 'Ada',
-            email,
             avatarUri: '',
             locale: 'en-GB',
             did: 'did:key:z1',

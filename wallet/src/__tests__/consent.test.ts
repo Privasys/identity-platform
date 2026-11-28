@@ -178,8 +178,6 @@ describe('consent service', () => {
     describe('getAttributeValues', () => {
         it('returns profile field values', () => {
             useProfileStore.getState().createProfile({
-                displayName: 'Alice',
-                email: 'alice@example.com',
                 avatarUri: '',
                 locale: 'en',
                 did: 'did:key:z123',
@@ -196,11 +194,13 @@ describe('consent service', () => {
                         source: 'manual' as const,
                         verifications: [{ verifier: 'privasys-attribute-verifier', verifierDisplayName: 'Privasys', method: 'email_code' as const, assurance: 'provider' as const, verifiedAt: 1, proof: 'jws' }],
                     },
+                    { key: 'given_name', label: 'Given name', value: 'Alice', source: 'manual' as const },
+                    { key: 'family_name', label: 'Family name', value: 'Smith', source: 'manual' as const },
                 ],
             });
 
-            const values = getAttributeValues(['displayName', 'email', 'locale', 'missing']);
-            expect(values['displayName']).toBe('Alice');
+            const values = getAttributeValues(['name', 'email', 'locale', 'missing']);
+            expect(values['name']).toBe('Alice Smith');
             expect(values['email']).toBe('alice@example.com');
             expect(values['locale']).toBe('en');
             expect(values['missing']).toBeUndefined();
@@ -208,8 +208,6 @@ describe('consent service', () => {
 
         it('returns extended attribute values', () => {
             useProfileStore.getState().createProfile({
-                displayName: 'Alice',
-                email: '',
                 avatarUri: '',
                 locale: '',
                 did: 'did:key:z123',

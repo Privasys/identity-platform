@@ -3579,8 +3579,6 @@ function AttributeAcquisitionView({
                 const pairwiseSeed = (await takeRecoveredPairwiseSeed()) ?? (await generatePairwiseSeed());
                 const canonicalDid = await generateCanonicalDid(pairwiseSeed);
                 useProfileStore.getState().createProfile({
-                    displayName: '',
-                    email: '',
                     avatarUri: '',
                     locale: getDeviceAttribute('locale'),
                     did,

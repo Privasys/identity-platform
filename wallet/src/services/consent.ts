@@ -16,7 +16,7 @@
 
 import * as Crypto from 'expo-crypto';
 
-import { isDerived, verifiedEmail } from '@/services/attributes';
+import { isDerived, profileName, verifiedEmail } from '@/services/attributes';
 import {
     useConsentStore,
     type ConsentRecord,
@@ -103,9 +103,13 @@ export function getAttributeValues(
     for (const key of attributeKeys) {
         // Check direct profile fields
         switch (key) {
-            case 'displayName':
-                if (profile.displayName) values[key] = profile.displayName;
+            case 'name': {
+                // The name as it is shown and sent: Display Name, else first
+                // and last.
+                const name = profileName(profile);
+                if (name) values[key] = name;
                 break;
+            }
             case 'email': {
                 // Only an address that has been proved. Same rule as the
                 // sign-in path: see selfAssertedValue.

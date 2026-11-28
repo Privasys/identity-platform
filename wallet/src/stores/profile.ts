@@ -105,10 +105,8 @@ export interface ProfileAttribute {
 
 /** User profile stored locally on the device. */
 export interface UserProfile {
-    /** Display name. */
-    displayName: string;
-    /** Email address. */
-    email: string;
+    // The holder's name and email are not stored here: they are the profile's
+    // attributes, read with profileName and primaryEmail (services/attributes).
     /** Avatar URI (local file or remote from linked provider). */
     avatarUri: string;
     /** Locale / language preference. */
@@ -147,7 +145,7 @@ export interface ProfileState {
     /** Create the initial profile (during onboarding or first provider link). */
     createProfile: (profile: Omit<UserProfile, 'createdAt' | 'updatedAt'>) => void;
     /** Update profile fields. */
-    updateProfile: (updates: Partial<Pick<UserProfile, 'displayName' | 'email' | 'avatarUri' | 'locale' | 'did' | 'canonicalDid' | 'pairwiseSeed'>>) => void;
+    updateProfile: (updates: Partial<Pick<UserProfile, 'avatarUri' | 'locale' | 'did' | 'canonicalDid' | 'pairwiseSeed'>>) => void;
     /** Add or update a linked provider. */
     linkProvider: (provider: LinkedProvider) => void;
     /** Remove a linked provider. */
@@ -361,8 +359,6 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         const avatarUri = /^(file|content|ph|assets-library):/.test(incoming.avatarUri ?? '') ? current.avatarUri : incoming.avatarUri;
         const updated: UserProfile = {
             ...current,
-            displayName: incoming.displayName,
-            email: incoming.email,
             avatarUri,
             linkedProviders: incoming.linkedProviders ?? [],
             attributes: incoming.attributes ?? [],

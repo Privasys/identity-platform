@@ -197,7 +197,7 @@ export async function ensurePrivasysSession(
         PRIVASYS_ORIGIN,
         keyAlias,
         '', // no browser session relay
-        displayName || profile.displayName,
+        displayName ?? '',
         userHandle,
         undefined,
         // The wallet makes the phrase itself; the IdP never sees it.

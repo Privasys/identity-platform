@@ -132,11 +132,6 @@ export default function VerifyEmailScreen() {
                     },
                 ],
             });
-            // The profile's own email field follows the attribute it mirrors.
-            const profile = useProfileStore.getState().profile;
-            if (profile && profile.email.toLowerCase() === address.toLowerCase()) {
-                useProfileStore.getState().updateProfile({ email: result.email });
-            }
             // No page to say it worked: back to where the check was asked for
             // (personal data, or a sign-in waiting on it), the address picked out
             // there and the message strip saying so.

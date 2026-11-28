@@ -175,8 +175,6 @@ export function holderProfile(now: number): UserProfile {
     const emailAt = now - 40 * DAY;
     const phoneAt = now - 38 * DAY;
     return {
-        displayName: 'Alex Morgan',
-        email: HOLDER_EMAIL,
         avatarUri: '',
         locale: 'en-GB',
         did: `did:key:z6Mk${fakeHex('holder/did', 22)}`,

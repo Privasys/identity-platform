@@ -35,7 +35,7 @@ import {
     titleiseBiometric,
     DEFAULT_BIOMETRIC_LABEL_KEY,
 } from '@/services/biometrics';
-import { profileDisplayName } from '@/services/attributes';
+import { primaryEmail, profileDisplayName } from '@/services/attributes';
 import { getDeviceLocale } from '@/services/device-locale';
 import { ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { runPendingSecure } from '@/services/device-flows';
@@ -199,12 +199,6 @@ export default function ProfileScreen() {
             const pairwiseSeed = (await takeRecoveredPairwiseSeed()) ?? (await generatePairwiseSeed());
             const canonicalDid = await generateCanonicalDid(pairwiseSeed);
             useProfileStore.getState().createProfile({
-                // EMPTY, not the placeholder. Storing the placeholder made it
-                // indistinguishable from a name the holder had chosen, and it
-                // was disclosed to relying parties as one. The Profile screen
-                // supplies it for display instead.
-                displayName: '',
-                email: '',
                 avatarUri: '',
                 locale: getDeviceLocale(),
                 did,
@@ -363,7 +357,7 @@ export default function ProfileScreen() {
                 <AccountDeletionBanner />
                 <IdentityCard
                     name={shownName}
-                    email={profile.email}
+                    email={primaryEmail(profile) ?? ''}
                     avatar={avatarSource}
                     idChecked={idChecked}
                     onChooseAvatar={chooseAvatar}

@@ -89,7 +89,7 @@ import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useConsentStore } from '@/stores/consent';
 import { notify } from '@/stores/notice';
 import { useProfileStore } from '@/stores/profile';
-import { ATTRIBUTE_MAP, attributeLabel } from '@/services/attributes';
+import { ATTRIBUTE_MAP, attributeLabel, primaryEmail } from '@/services/attributes';
 import { recordChainOutcome, takeChainOutcome } from '@/utils/capability-chain';
 import { MONO } from '@/constants/fonts';
 
@@ -106,8 +106,7 @@ function prefillEmailFor(appHost: string): string {
         .getRecordsForApp(appHost)
         .some((r) => r.approvedAttributes.includes('email'));
     if (!disclosed) return '';
-    const profile = useProfileStore.getState().profile;
-    return profile?.attributes.find((a) => a.key === 'email')?.value || profile?.email || '';
+    return primaryEmail(useProfileStore.getState().profile) ?? '';
 }
 
 /**

@@ -33,7 +33,7 @@ jest.mock('@/utils/storage', () => {
     };
 });
 
-import { isEmailVerified, selfAssertedValue, verifiedEmail } from '@/services/attributes';
+import { isEmailVerified, primaryEmail, selfAssertedValue, verifiedEmail } from '@/services/attributes';
 import { getAttributeValues } from '@/services/consent';
 import { useProfileStore, type ProfileAttribute, type UserProfile } from '@/stores/profile';
 
@@ -60,10 +60,8 @@ function emailAttr(value: string, verified: boolean): ProfileAttribute {
     };
 }
 
-function profileWith(mirror: string, attributes: ProfileAttribute[]): UserProfile {
+function profileWith(attributes: ProfileAttribute[]): UserProfile {
     const profile: UserProfile = {
-        displayName: 'Ada',
-        email: mirror,
         avatarUri: '',
         locale: 'en-GB',
         did: 'did:key:z1',
@@ -79,42 +77,37 @@ function profileWith(mirror: string, attributes: ProfileAttribute[]): UserProfil
 }
 
 describe('an unverified address is withheld', () => {
-    it('is not resolved for disclosure, however the profile mirrors it', () => {
-        const profile = profileWith('typed@example.com', [emailAttr('typed@example.com', false)]);
+    it('is not resolved for disclosure, even as the main address', () => {
+        const profile = profileWith([emailAttr('typed@example.com', false)]);
         expect(selfAssertedValue(profile, 'email')).toBeUndefined();
         expect(verifiedEmail(profile)).toBeUndefined();
         expect(isEmailVerified(profile, 'typed@example.com')).toBe(false);
-        expect(getAttributeValues(['email'])['email']).toBeUndefined();
-    });
-
-    it('is withheld even when the mirror holds it and no attribute does', () => {
-        const profile = profileWith('ghost@example.com', []);
-        expect(selfAssertedValue(profile, 'email')).toBeUndefined();
         expect(getAttributeValues(['email'])['email']).toBeUndefined();
     });
 });
 
 describe('a verified address goes out', () => {
     it('is resolved by both paths, and case is not identity', () => {
-        const profile = profileWith('ada@example.org', [emailAttr('ada@example.org', true)]);
+        const profile = profileWith([emailAttr('ada@example.org', true)]);
         expect(selfAssertedValue(profile, 'email')).toBe('ada@example.org');
         expect(getAttributeValues(['email'])['email']).toBe('ada@example.org');
         expect(isEmailVerified(profile, 'ADA@Example.org')).toBe(true);
     });
 
-    it('prefers the one the profile mirrors when several are verified', () => {
-        const profile = profileWith('second@example.org', [
+    it('sends the main address when several are verified', () => {
+        const profile = profileWith([
             emailAttr('first@example.org', true),
             emailAttr('second@example.org', true),
         ]);
-        expect(verifiedEmail(profile)).toBe('second@example.org');
+        expect(verifiedEmail(profile)).toBe('first@example.org');
     });
 
-    it('falls back to a verified address when the mirror is an unverified one', () => {
-        const profile = profileWith('typed@example.com', [
+    it('falls back to a verified address when the main one is unverified', () => {
+        const profile = profileWith([
             emailAttr('typed@example.com', false),
             emailAttr('proved@example.org', true),
         ]);
+        expect(primaryEmail(profile)).toBe('typed@example.com');
         expect(verifiedEmail(profile)).toBe('proved@example.org');
     });
 });

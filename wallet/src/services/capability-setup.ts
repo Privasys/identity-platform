@@ -361,7 +361,6 @@ export function setupPayload(fields: SetupField[], answers: SetupAnswers): Recor
 
 /** The part of a profile the email helpers read. */
 export interface EmailSource {
-    email?: string;
     attributes?: { key: string; value: string; verifications?: ProofSlice[]; updatedAt?: number; acquiredAt?: number }[];
 }
 
@@ -374,8 +373,7 @@ const sameAddress = (a: string, b: string) => a.trim().toLowerCase() === b.trim(
  * service the holder may never have given it to. A holder has more than one
  * address (personal, work, an old one), and the mailbox they connect is not
  * always the one they sign in with, so all of them are listed: verified ones
- * first, then the most recently updated, each once whatever its case, with the
- * profile's own address last if no attribute carries it.
+ * first, then the most recently updated, each once whatever its case.
  */
 export function walletEmails(profile: EmailSource | null | undefined): string[] {
     if (!profile) return [];
@@ -391,8 +389,6 @@ export function walletEmails(profile: EmailSource | null | undefined): string[] 
         const v = a.value.trim();
         if (!out.some((o) => sameAddress(o, v))) out.push(v);
     }
-    const own = (profile.email ?? '').trim();
-    if (own && !out.some((o) => sameAddress(o, own))) out.push(own);
     return out;
 }
 

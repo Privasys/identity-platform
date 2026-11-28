@@ -81,15 +81,13 @@ import { useProfileStore, type UserProfile } from '@/stores/profile';
 
 function profile(attrs: Array<{ key: string; value: string }>, extra: Partial<UserProfile> = {}): UserProfile {
     return {
-        displayName: 'Alice',
-        email: '',
         avatarUri: '',
         locale: 'en-GB',
         did: 'did:key:device',
         canonicalDid: 'did:web:privasys.id:users:x',
         pairwiseSeed: 'ab'.repeat(32),
         linkedProviders: [],
-        attributes: attrs.map((a) => ({ ...a, source: 'manual', verified: false }) as any),
+        attributes: attrs.map((a) => ({ ...a, source: 'manual' }) as any),
         createdAt: 1,
         updatedAt: 1,
         ...extra,
@@ -113,7 +111,7 @@ it('carries the details and records but not the seed or the device id', async ()
 it('is ciphertext, and opens only with the data root that sealed it', async () => {
     const text = sealContents(ROOT, await collectContents());
     expect(text).not.toContain('Alice');
-    expect(openContents(ROOT, text).profile?.displayName).toBe('Alice');
+    expect(openContents(ROOT, text).profile?.attributes[0]?.value).toBe('Alice');
     expect(() => openContents(new Uint8Array(32).fill(4), text)).toThrow(BackupError);
     try {
         openContents(new Uint8Array(32).fill(4), text);
@@ -139,17 +137,17 @@ it('adds what is missing on restore and keeps what the holder has now', async ()
             profile([
                 { key: 'given_name', value: 'Alice' },
                 { key: 'family_name', value: 'Smith' },
-            ], { displayName: 'Old name', email: 'alice@example.org' }),
+            ], { avatarUri: 'https://example.org/alice.png', locale: 'fr' }),
         ),
         kycRecords: [{ jti: 'r1' } as any],
     });
-    useProfileStore.setState({ profile: profile([{ key: 'given_name', value: 'Alice' }], { displayName: 'New name' }) });
+    useProfileStore.setState({ profile: profile([{ key: 'given_name', value: 'Alice' }]) });
 
     const r = await restoreFromText(backup);
     const now = useProfileStore.getState().profile!;
     expect(r).toEqual({ attributes: 1, records: 1 });
-    expect(now.displayName).toBe('New name');
-    expect(now.email).toBe('alice@example.org');
+    expect(now.avatarUri).toBe('https://example.org/alice.png');
+    expect(now.locale).toBe('en-GB');
     expect(now.attributes.map((a) => a.key).sort()).toEqual(['family_name', 'given_name']);
 
     // Restoring the same file again adds nothing.

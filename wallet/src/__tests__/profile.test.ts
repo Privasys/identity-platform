@@ -28,8 +28,6 @@ beforeEach(() => {
 });
 
 const baseProfile = (): Omit<UserProfile, 'createdAt' | 'updatedAt'> => ({
-    displayName: 'Test User',
-    email: 'test@privasys.org',
     avatarUri: '',
     locale: 'en',
     did: 'did:key:zTestDevice',
@@ -45,7 +43,6 @@ describe('profile store', () => {
         const profile = useProfileStore.getState().profile;
 
         expect(profile).not.toBeNull();
-        expect(profile!.displayName).toBe('Test User');
         expect(profile!.canonicalDid).toBe('did:web:privasys.id:users:abc123');
         expect(profile!.pairwiseSeed).toBe('ab'.repeat(32));
         expect(profile!.createdAt).toBeGreaterThan(0);
@@ -54,11 +51,11 @@ describe('profile store', () => {
 
     it('updates profile fields', () => {
         useProfileStore.getState().createProfile(baseProfile());
-        useProfileStore.getState().updateProfile({ displayName: 'Updated Name' });
+        useProfileStore.getState().updateProfile({ locale: 'fr' });
 
         const profile = useProfileStore.getState().profile;
-        expect(profile!.displayName).toBe('Updated Name');
-        expect(profile!.email).toBe('test@privasys.org'); // unchanged
+        expect(profile!.locale).toBe('fr');
+        expect(profile!.did).toBe('did:key:zTestDevice'); // unchanged
     });
 
     it('updates canonicalDid and pairwiseSeed', () => {

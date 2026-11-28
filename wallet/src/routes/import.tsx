@@ -72,8 +72,6 @@ export default function ImportDataScreen() {
     // Mirror the primary value of the canonical attributes that also live as
     // top-level profile fields, so the rest of the app stays in sync.
     const syncTopLevel = (attr: ProfileAttribute) => {
-        if (attr.key === 'email' && attr.value) updateProfile({ email: attr.value });
-        if (attr.key === 'name' && attr.value) updateProfile({ displayName: attr.value });
         if (attr.key === 'picture' && attr.value) updateProfile({ avatarUri: attr.value });
         if (attr.key === 'locale' && attr.value) updateProfile({ locale: attr.value });
     };

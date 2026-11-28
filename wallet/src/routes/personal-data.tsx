@@ -88,8 +88,6 @@ export default function PersonalDataScreen() {
                         // Keep the mirrored top-level field pointing at a value that
                         // still exists (or clear it if this was the last one).
                         const fallback = others[0]?.value ?? '';
-                        if (attr.key === 'email') updateProfile({ email: fallback });
-                        if (attr.key === 'name') updateProfile({ displayName: fallback });
                         if (attr.key === 'picture') updateProfile({ avatarUri: fallback });
                     },
                 },
@@ -122,7 +120,6 @@ export default function PersonalDataScreen() {
         const now = Math.floor(Date.now() / 1000);
         // Merged, not set: setAttribute replaces the value already held for
         // this key, which turned "add a second email" into "replace my email".
-        const hadOne = existingKeys.has(addingAttribute);
         useProfileStore.getState().mergeAttribute(
             {
                 key: addingAttribute,
@@ -135,10 +132,6 @@ export default function PersonalDataScreen() {
             !!def.multiValued,
         );
 
-        // The profile's own field follows the first value only: a second
-        // email does not become the main one.
-        if (def.profileField === 'email' && !hadOne) updateProfile({ email: newAttrValue.trim() });
-        if (def.profileField === 'displayName') updateProfile({ displayName: newAttrValue.trim() });
         if (def.profileField === 'locale') updateProfile({ locale: newAttrValue.trim() });
 
         const saved = newAttrValue.trim();
@@ -248,8 +241,6 @@ export default function PersonalDataScreen() {
                                     sources: [{ source: 'manual', displayName: t('personalData.sourceManual'), addedAt: now }],
                                     verifications: [],
                                 });
-                                if (attr.key === 'email') updateProfile({ email: newValue });
-                                if (attr.key === 'name') updateProfile({ displayName: newValue });
                             }}
                         />
                     ))

@@ -18,7 +18,7 @@ jest.mock('../services/notify-seal', () => ({ openSealedNotification: jest.fn(as
 jest.mock('../services/platform-token', () => ({}));
 
 import { formDigest } from '../services/app-form';
-import { CANONICAL_KEYS, isGovVerified } from '../services/attributes';
+import { CANONICAL_KEYS, isGovVerified, primaryEmail, profileName } from '../services/attributes';
 import { assertDemoAllowed, demo, isDemo } from '../services/demo/gate';
 import {
     APPROVAL_STRING,
@@ -102,8 +102,8 @@ describe('the seed', () => {
 
     it('gives a complete holder, with passport attributes at gov assurance', () => {
         const profile = useProfileStore.getState().profile!;
-        expect(profile.displayName).toBe('Alex Morgan');
-        expect(profile.email).toBe('alex.morgan@example.com');
+        expect(profileName(profile)).toBe('Alex Morgan');
+        expect(primaryEmail(profile)).toBe('alex.morgan@example.com');
         expect(profile.canonicalDid).toMatch(/^did:web:privasys\.id:users:[0-9a-f]{32}$/);
         expect(profile.pairwiseSeed).toMatch(/^[0-9a-f]{64}$/);
         for (const a of profile.attributes) {

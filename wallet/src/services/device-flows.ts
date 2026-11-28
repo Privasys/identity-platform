@@ -292,8 +292,6 @@ export async function installTransfer(
     await ensureDeviceKey();
     const did = await generateDid();
     profiles.createProfile({
-        displayName: '',
-        email: '',
         avatarUri: '',
         locale: getDeviceLocale(),
         did,

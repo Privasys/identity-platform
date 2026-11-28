@@ -163,12 +163,7 @@ export async function restoreContents(contents: BackupContents): Promise<{ attri
     await importSyncedWebsitePasskeys(contents.websitePasskeys);
     const incoming = contents.profile;
     if (incoming) {
-        const { displayName, email, avatarUri } = store.profile;
-        store.updateProfile({
-            displayName: displayName || incoming.displayName,
-            email: email || incoming.email,
-            avatarUri: avatarUri || incoming.avatarUri,
-        });
+        if (!store.profile.avatarUri && incoming.avatarUri) store.updateProfile({ avatarUri: incoming.avatarUri });
         for (const p of incoming.linkedProviders ?? []) {
             if (!useProfileStore.getState().profile?.linkedProviders.some((l) => l.provider === p.provider)) {
                 store.linkProvider(p);

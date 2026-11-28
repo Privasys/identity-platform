@@ -283,7 +283,6 @@ describe('walletEmails', () => {
     // the one they sign in with: every one is offered, each once.
     it('lists every address, verified first, then the most recent, each once', () => {
         const profile = {
-            email: 'main@example.org',
             attributes: [
                 { key: 'email', value: 'old@example.org', updatedAt: 100 },
                 { key: 'email', value: 'Work@Corp.example', verifications: [{ proof: 'jws', assurance: 'provider' as const }], updatedAt: 50 },
@@ -293,14 +292,13 @@ describe('walletEmails', () => {
             ],
         };
         expect(walletEmails(profile)).toEqual([
-            'Work@Corp.example', 'new@example.org', 'old@example.org', 'main@example.org',
+            'Work@Corp.example', 'new@example.org', 'old@example.org',
         ]);
     });
 
-    it('adds the profile address only when no attribute carries it, and copes with nothing', () => {
-        expect(walletEmails({ email: 'A@x.org', attributes: [{ key: 'email', value: 'a@x.org' }] })).toEqual(['a@x.org']);
+    it('copes with nothing', () => {
         expect(walletEmails(null)).toEqual([]);
-        expect(walletEmails({ email: '', attributes: [{ key: 'email', value: '  ' }] })).toEqual([]);
+        expect(walletEmails({ attributes: [{ key: 'email', value: '  ' }] })).toEqual([]);
     });
 });
 
@@ -309,7 +307,7 @@ describe('newEmails', () => {
         { type: 'object', properties: { user: { type: 'string', format: 'email' }, note: { type: 'string' } } },
         [],
     );
-    const profile = { email: 'me@x.org', attributes: [{ key: 'email', value: 'work@corp.example' }] };
+    const profile = { attributes: [{ key: 'email', value: 'me@x.org' }, { key: 'email', value: 'work@corp.example' }] };
 
     it('offers an address typed by hand that the wallet does not hold', () => {
         expect(newEmails(fields, { user: ' other@y.org ', note: 'x@z.org' }, profile)).toEqual(['other@y.org']);

@@ -35,7 +35,7 @@ import { useAppMessagesStore } from '@/stores/app-messages';
 import { useCapabilityAsksStore } from '@/stores/capability-asks';
 import { useDriveNotificationsStore } from '@/stores/drive-notifications';
 import { useGuardianRequestsStore, waitingCount } from '@/stores/guardian-requests';
-import { profileDisplayName } from '@/services/attributes';
+import { primaryEmail, profileDisplayName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 import { useVaultApprovalsStore } from '@/stores/vaultApprovals';
 
@@ -272,9 +272,9 @@ function Sidebar({ active, width, styles }: { active: Section; width: number; st
                         <Text style={styles.whoName} numberOfLines={1}>
                             {profileDisplayName(profile, t('profile.defaultDisplayName'))}
                         </Text>
-                        {!!profile.email && (
+                        {!!primaryEmail(profile) && (
                             <Text style={styles.whoSub} numberOfLines={1}>
-                                {profile.email}
+                                {primaryEmail(profile)}
                             </Text>
                         )}
                     </View>

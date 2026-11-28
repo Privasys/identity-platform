@@ -37,7 +37,7 @@ export interface AttributeDefinition {
      * Corresponding top-level field on UserProfile, if any.
      * Attributes without a profileField are stored in the `attributes` bag.
      */
-    profileField?: keyof Pick<UserProfile, 'displayName' | 'email' | 'avatarUri' | 'locale'>;
+    profileField?: keyof Pick<UserProfile, 'avatarUri' | 'locale'>;
     /**
      * Whether this attribute can be verified by a trusted party.
      * When true, the wallet enforces that provider-sourced values carry
@@ -128,10 +128,9 @@ export interface AttributeMarketplace {
     billable: boolean;
 }
 
-// Map JSON profileField strings to the typed union.
-const PROFILE_FIELD_MAP: Record<string, keyof Pick<UserProfile, 'displayName' | 'email' | 'avatarUri' | 'locale'>> = {
-    displayName: 'displayName',
-    email: 'email',
+// Map JSON profileField strings to the typed union. The name and the email
+// are attributes only in the wallet (profileName, primaryEmail).
+const PROFILE_FIELD_MAP: Record<string, keyof Pick<UserProfile, 'avatarUri' | 'locale'>> = {
     avatarUri: 'avatarUri',
     locale: 'locale',
 };
@@ -285,12 +284,7 @@ export function marketplaceKeyFor(key: string): string {
  * `attributes` bag.
  */
 export function getProfileValue(profile: UserProfile, key: string): string | undefined {
-    // `name` before the profile field, because that field is seeded with a
-    // placeholder at setup and a placeholder is not a value. Reading it
-    // straight through is how a relying party ended up being told the holder
-    // was called "Privasys User" while the wallet held a first and last name
-    // imported from Google (2026-09-04). This is the same precedence
-    // profileDisplayName renders with, resolved in one place so what is SHOWN
+    // The same resolution profileDisplayName renders with, so what is SHOWN
     // and what is SENT cannot drift.
     if (key === 'name') return resolvedName(profile);
 
@@ -306,20 +300,10 @@ export function getProfileValue(profile: UserProfile, key: string): string | und
 /**
  * An explicit Display Name, else first and last, else nothing.
  *
- * The stored `displayName` FIELD is deliberately not consulted. Every writer of
- * a real name (the provider import and the Personal Data editor) sets the
- * `name` attribute and mirrors it into the field, so a field with no attribute
- * behind it can only be the placeholder seeded at setup. Returning it would be
- * indistinguishable from the holder having chosen to be called "Privasys User",
- * which is how a relying party came to be told exactly that while the wallet
- * held a first and last name imported from Google.
- *
- * Returning undefined instead is what makes the caller treat the name as
- * missing: the consent flow already prompts for a missing attribute, prefilled
- * from whatever the profile can offer, so an older wallet carrying the
- * placeholder is asked once to confirm its name rather than quietly disclosing
- * one nobody chose. Display sites keep showing the placeholder through
- * profileDisplayName's fallback.
+ * Undefined is what makes a caller treat the name as missing: the consent flow
+ * then asks for it, prefilled from whatever the profile can offer, rather than
+ * disclosing a placeholder nobody chose. Display sites show the placeholder
+ * through profileDisplayName's fallback.
  */
 function resolvedName(profile: UserProfile): string | undefined {
     const explicit = profile.attributes?.find((a) => a.key === 'name')?.value?.trim();
@@ -415,17 +399,20 @@ export function selfAssertedValue(profile: UserProfile, key: string): string | u
 }
 
 /**
- * An address this wallet holds the Attribute Verifier's proof for
- * (services/attribute-verified). The one the profile mirrors wins when it
- * qualifies, so a holder with several verified addresses keeps sending the
- * one they chose.
+ * The holder's main address: the first one the wallet holds. A second address
+ * added later does not take its place; removing it moves the next one up.
+ */
+export function primaryEmail(profile: UserProfile | null | undefined): string | undefined {
+    return profile?.attributes.find((a) => a.key === 'email' && a.value.trim())?.value;
+}
+
+/**
+ * The first address this wallet holds the Attribute Verifier's proof for
+ * (services/attribute-verified): the main address when it is verified, so a
+ * holder with several verified addresses keeps sending the same one.
  */
 export function verifiedEmail(profile: UserProfile): string | undefined {
-    const verified = profile.attributes.filter((a) => a.key === 'email' && isVerified(a) && a.value);
-    if (verified.length === 0) return undefined;
-    const mirrored = (profile.email ?? '').trim().toLowerCase();
-    const preferred = verified.find((a) => a.value.trim().toLowerCase() === mirrored);
-    return (preferred ?? verified[0]).value;
+    return profile.attributes.find((a) => a.key === 'email' && isVerified(a) && a.value)?.value;
 }
 
 /** Whether this address is one the wallet would disclose. */
@@ -442,7 +429,7 @@ export function isEmailVerified(profile: UserProfile, email: string): boolean {
  */
 export function setProfileValue(
     store: {
-        updateProfile: (u: Partial<Pick<UserProfile, 'displayName' | 'email' | 'avatarUri' | 'locale'>>) => void;
+        updateProfile: (u: Partial<Pick<UserProfile, 'avatarUri' | 'locale'>>) => void;
         setAttribute: (attr: ProfileAttribute) => void;
     },
     key: string,
@@ -475,17 +462,9 @@ export function setProfileValue(
 }
 
 /**
- * The name to show a human for this profile.
- *
- * The stored `displayName` is seeded with a generic placeholder at setup and is
- * only ever overwritten by an explicit Display Name, so a wallet that imported
- * a first and last name from Google still introduced its owner as "Privasys
- * User" (2026-08-26). Derived rather than written back: the underlying
- * attributes stay the single source of truth, and editing one is reflected
- * everywhere without a migration.
- *
- * Precedence: an explicit Display Name, then first + last name, then whatever
- * is stored. `fallback` is the localised placeholder, passed in because this
+ * The holder's name, from the attributes: an explicit Display Name, then first
+ * and last name. Never stored, so editing one is reflected everywhere.
+ * profileDisplayName adds the localised placeholder, passed in because this
  * module has no translator.
  */
 export function profileName(profile: UserProfile | null | undefined): string | undefined {

@@ -31,6 +31,7 @@ import { hmac } from '@noble/hashes/hmac.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 import { base64urlToBytes, bytesToBase64url } from '../utils/encoding';
+import { getPushToken, subscribePushToken } from './push-token';
 
 /** Nonces already answered, so a notification seen twice (shown, then opened,
  *  then found in the tray) is answered once. */
@@ -96,15 +97,33 @@ export function repeatWhenBound(subject: string, register: () => Promise<unknown
     waiting.set(subject, register);
 }
 
+/** A challenge that arrived before this phone knew its push token: a wallet
+ *  opened by a tap handles that notification first and learns its token after.
+ *  The latest one only: an older nonce has been replaced or has run out. */
+let held: Record<string, unknown> | null = null;
+
+subscribePushToken((token) => {
+    if (!token || !held) return;
+    const data = held;
+    held = null;
+    void answerBindChallenge(data).catch((e) => console.warn('[push-bind] challenge failed', e));
+});
+
 /**
- * Answer a binding challenge, when it is this phone's.
+ * Answer a binding challenge, when it is this phone's; held until the push
+ * token is known when it is not yet.
  *
  * A challenge names the key it was opened for. Only one opened for this
  * phone's own key is answered: anything else is someone else's registration of
  * this phone's token, and signing it would hand them the token.
  */
-export async function answerBindChallenge(data: Record<string, unknown> | null | undefined, pushToken: string | null): Promise<boolean> {
-    if (!pushToken || !carriesBindChallenge(data)) return false;
+export async function answerBindChallenge(data: Record<string, unknown> | null | undefined): Promise<boolean> {
+    if (!carriesBindChallenge(data)) return false;
+    const pushToken = getPushToken();
+    if (!pushToken) {
+        held = data!;
+        return false;
+    }
     const nonce = data!.bind_nonce as string;
     if (answered.has(nonce)) return false;
     const key = await bindKey();
@@ -137,6 +156,7 @@ export async function answerBindChallenge(data: Record<string, unknown> | null |
  */
 export function clearPushBindLocalState(): void {
     cached = null;
+    held = null;
     waiting.clear();
     answered.clear();
 }
@@ -144,20 +164,4 @@ export function clearPushBindLocalState(): void {
 /** Whether a notification's data carries a challenge at all. */
 export function carriesBindChallenge(data: Record<string, unknown> | null | undefined): boolean {
     return typeof data?.bind_nonce === 'string' && !!data.bind_nonce && typeof data?.bind_pub === 'string';
-}
-
-/**
- * Answer the challenge carried by any notification still in the tray. A
- * notification the holder never tapped (the wallet was opened from its icon)
- * would otherwise leave the challenge unanswered until the next one.
- */
-export async function answerFromTray(pushToken: string | null): Promise<void> {
-    if (!pushToken) return;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Notifications = require('expo-notifications') as typeof import('expo-notifications');
-    const presented = await Notifications.getPresentedNotificationsAsync();
-    for (const n of presented) {
-        const data = n.request?.content?.data as Record<string, unknown> | undefined;
-        if (carriesBindChallenge(data) && (await answerBindChallenge(data, pushToken).catch(() => false))) return;
-    }
 }

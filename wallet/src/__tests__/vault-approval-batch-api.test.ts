@@ -5,6 +5,7 @@ jest.mock('../services/fido2', () => ({ signVaultAssertion: jest.fn(async () => 
 jest.mock('../services/devices', () => ({ myDeviceTag: jest.fn() }));
 jest.mock('../services/app-resolve', () => ({ resolveApp: jest.fn() }));
 jest.mock('../stores/auth', () => ({ useAuthStore: { getState: () => ({}) } }));
+jest.mock('../stores/settings', () => ({ useSettingsStore: { getState: () => ({ hydrated: false, iconBadge: true }) } }));
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

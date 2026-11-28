@@ -44,6 +44,9 @@ export interface SettingsState {
     /** Whether the app's icon shows how many requests wait on the holder. On
      *  unless turned off; off, privasys.id sends this device no number. */
     iconBadge: boolean;
+    /** Whether the stored settings have been read: until then the values
+     *  above are defaults, not the holder's choices. */
+    hydrated: boolean;
 
     setGracePeriod: (seconds: number) => void;
     setVerificationMode: (mode: VerificationMode) => void;
@@ -93,6 +96,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     appLockSec: null,
     appLockAsked: false,
     iconBadge: true,
+    hydrated: false,
 
     setGracePeriod: (seconds) => {
         set({ gracePeriodSec: seconds });
@@ -136,33 +140,41 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     },
 
     hydrate: async () => {
-        const raw = await SecureStore.getItemAsync(STORE_KEY);
-        if (!raw) return;
         try {
-            const data = JSON.parse(raw);
-            if (typeof data.gracePeriodSec === 'number' && GRACE_OPTIONS.includes(data.gracePeriodSec)) {
-                set({ gracePeriodSec: data.gracePeriodSec });
-            }
-            if (data.verificationMode === 'deterministic' || data.verificationMode === 'challenge') {
-                set({ verificationMode: data.verificationMode });
-            }
-            if (typeof data.language === 'string' || data.language === null) {
-                set({ language: data.language });
-            }
-            if (typeof data.seenFirstConnect === 'boolean') {
-                set({ seenFirstConnect: data.seenFirstConnect });
-            }
-            if (data.appLockSec === null || isAppLockSeconds(data.appLockSec)) {
-                set({ appLockSec: data.appLockSec });
-            }
-            if (typeof data.appLockAsked === 'boolean') {
-                set({ appLockAsked: data.appLockAsked });
-            }
-            if (typeof data.iconBadge === 'boolean') {
-                set({ iconBadge: data.iconBadge });
-            }
-        } catch {
-            // Corrupted — use defaults
+            await readStored(set);
+        } finally {
+            set({ hydrated: true });
         }
-    }
+    },
 }));
+
+async function readStored(set: (s: Partial<SettingsState>) => void): Promise<void> {
+    const raw = await SecureStore.getItemAsync(STORE_KEY);
+    if (!raw) return;
+    try {
+        const data = JSON.parse(raw);
+        if (typeof data.gracePeriodSec === 'number' && GRACE_OPTIONS.includes(data.gracePeriodSec)) {
+            set({ gracePeriodSec: data.gracePeriodSec });
+        }
+        if (data.verificationMode === 'deterministic' || data.verificationMode === 'challenge') {
+            set({ verificationMode: data.verificationMode });
+        }
+        if (typeof data.language === 'string' || data.language === null) {
+            set({ language: data.language });
+        }
+        if (typeof data.seenFirstConnect === 'boolean') {
+            set({ seenFirstConnect: data.seenFirstConnect });
+        }
+        if (data.appLockSec === null || isAppLockSeconds(data.appLockSec)) {
+            set({ appLockSec: data.appLockSec });
+        }
+        if (typeof data.appLockAsked === 'boolean') {
+            set({ appLockAsked: data.appLockAsked });
+        }
+        if (typeof data.iconBadge === 'boolean') {
+            set({ iconBadge: data.iconBadge });
+        }
+    } catch {
+        // Corrupted: the defaults stand.
+    }
+}

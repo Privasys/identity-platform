@@ -21,6 +21,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { Platform } from 'react-native';
 
 import { bytesToBase64url } from '../utils/encoding';
+import { ensurePushToken } from './push-token';
 
 /** The silent push's type. */
 export const DISMISS_TYPE = 'notification-dismiss';
@@ -71,15 +72,29 @@ export function notificationKey(data: Data): string | null {
     return bytesToBase64url(sha256(new TextEncoder().encode(`privasys-notification\x00${type}\x00${id}`))).slice(0, 22);
 }
 
-/** Whether a notification delivered at `date` asks for something that has expired. */
-export function isStale(data: Data, date: number, now = Date.now()): boolean {
-    const type = typeof data?.type === 'string' ? data.type : '';
-    return SHORT_LIVED.has(type) && date > 0 && now - date > STALE_AFTER_MS;
-}
-
 /** Expo hands a notification's date in seconds on some paths, milliseconds on others. */
 function millis(date: number): number {
     return date > 0 && date < 1e12 ? date * 1000 : date;
+}
+
+/** Whether a notification delivered at `date` asks for something that has expired. */
+export function isStale(data: Data, date: number, now = Date.now()): boolean {
+    const type = typeof data?.type === 'string' ? data.type : '';
+    const at = millis(date);
+    return SHORT_LIVED.has(type) && at > 0 && now - at > STALE_AFTER_MS;
+}
+
+/**
+ * Whether a notification is for a request privasys.id no longer reports open.
+ * `open` holds the ids still pending, by notification type; a type it does not
+ * list is not judged, so a request it could not be asked about stays.
+ */
+export function isClosed(data: Data, open: Record<string, Set<string>>): boolean {
+    const type = typeof data?.type === 'string' ? data.type : '';
+    const ids = open[type];
+    const field = REQUEST_ID[type];
+    const id = field ? data?.[field] : undefined;
+    return !!ids && typeof id === 'string' && !!id && !ids.has(id);
 }
 
 /** Remove this phone's delivered notifications with `key`. */
@@ -97,28 +112,25 @@ export async function dismissHere(key: string): Promise<number> {
     return n;
 }
 
-/** Remove this phone's delivered notifications that can no longer be answered. */
-export async function dismissStale(now = Date.now()): Promise<number> {
-    if (Platform.OS === 'web') return 0;
-    const Notifications = notifications();
-    const presented = await Notifications.getPresentedNotificationsAsync();
-    let n = 0;
-    for (const p of presented) {
-        if (isStale(p.request.content.data as Data, millis(p.date), now)) {
-            await Notifications.dismissNotificationAsync(p.request.identifier);
-            n++;
-        }
-    }
-    return n;
-}
+/** Requests already answered here, so a tap and the answer that follows it
+ *  clear the notification once. */
+const answeredKeys = new Set<string>();
 
-/** Tell the holder's other phones that this notification was answered here.
- *  Best effort: they clear it on expiry anyway. */
-export async function dismissElsewhere(data: Data, pushToken: string | null): Promise<void> {
+/**
+ * A notification's request was answered on this phone, by a tap or in the
+ * wallet: take its notification off this phone and tell the holder's other
+ * phones to do the same. Once per request. Best effort: the others clear it
+ * on expiry anyway.
+ */
+export async function notificationAnswered(data: Data): Promise<void> {
     const key = notificationKey(data);
-    if (!key || !pushToken) return;
-    // Any other copy on this phone too (the tapped one iOS has already removed).
+    if (!key || answeredKeys.has(key)) return;
+    answeredKeys.add(key);
+    // Any copy on this phone (the tapped one iOS has already removed).
     await dismissHere(key).catch(() => 0);
+    // With no token there is nobody to name the other phones by.
+    const pushToken = await ensurePushToken();
+    if (!pushToken) return;
     try {
         // Signed by this phone's binding key: a push token alone is not a secret.
         // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -135,54 +147,18 @@ export async function dismissElsewhere(data: Data, pushToken: string | null): Pr
     }
 }
 
-/** This phone's push token, once the wallet knows it: what names the holder's
- *  other phones to privasys.id. Set by the push hook. */
-let ownPushToken: string | null = null;
-export function setOwnPushToken(token: string | null): void {
-    ownPushToken = token;
-}
-
 /**
- * A request was answered in the wallet itself, approved or declined: take its
- * notification off this phone and off the holder's others.
+ * A request was answered in the wallet itself, approved or declined: its
+ * notification goes, here and on the holder's other phones.
  *
- * Tapping a notification already does this. But a request is often answered
- * without its notification ever being tapped (the wallet was open, or was
- * opened from its icon), and its notification then stayed on every device
- * until it expired.
+ * A tap already does this. But a request is often answered without its
+ * notification ever being tapped (the wallet was open, or was opened from its
+ * icon), and its notification then stayed on every device until it expired.
  */
 export function requestAnswered(type: string, id: string): void {
     const field = REQUEST_ID[type];
     if (!field || !id) return;
-    void dismissElsewhere({ type, [field]: id }, ownPushToken).catch(() => undefined);
-    // With no token yet there is nobody to tell, but this phone's copy still goes.
-    if (!ownPushToken) {
-        const key = notificationKey({ type, [field]: id });
-        if (key) void dismissHere(key).catch(() => 0);
-    }
-}
-
-/**
- * Remove this phone's delivered notifications for requests that are no longer
- * open, as privasys.id reports them. `open` holds the ids still pending, by
- * notification type; a type it does not list is left alone.
- */
-export async function dismissClosed(open: Record<string, Set<string>>): Promise<number> {
-    if (Platform.OS === 'web') return 0;
-    const Notifications = notifications();
-    const presented = await Notifications.getPresentedNotificationsAsync();
-    let n = 0;
-    for (const p of presented) {
-        const data = p.request.content.data as Data;
-        const type = typeof data?.type === 'string' ? data.type : '';
-        const ids = open[type];
-        const field = REQUEST_ID[type];
-        const id = field ? data?.[field] : undefined;
-        if (!ids || typeof id !== 'string' || !id || ids.has(id)) continue;
-        await Notifications.dismissNotificationAsync(p.request.identifier);
-        n++;
-    }
-    return n;
+    void notificationAnswered({ type, [field]: id }).catch(() => undefined);
 }
 
 /**

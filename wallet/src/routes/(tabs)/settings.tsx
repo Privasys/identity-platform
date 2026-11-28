@@ -20,7 +20,6 @@ import { LanguagePicker } from '@/components/LanguagePicker';
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
 import { registerPushTokenAgain } from '@/hooks/useExpoPushToken';
-import { setWantsIconBadge } from '@/services/vault-approval-api';
 import { APP_LOCK_DEFAULT, APP_LOCK_OPTIONS, type AppLockSeconds } from '@/services/app-lock';
 import { AccountDeletionBanner } from '@/components/AccountDeletionBanner';
 import { useRemoveThisDevice } from '@/hooks/useRemoveThisDevice';
@@ -58,7 +57,6 @@ export default function SettingsScreen() {
     // starts, sending this device its number.
     const chooseIconBadge = useCallback((on: boolean) => {
         useSettingsStore.getState().setIconBadge(on);
-        setWantsIconBadge(on);
         void registerPushTokenAgain();
     }, []);
     // Devices shows from the first phone: it is where the phone is named.

@@ -32,6 +32,7 @@ import {
     type VerifiedVaultBatch,
 } from './vault-approval-batch';
 import { useAuthStore, type Credential } from '../stores/auth';
+import { useSettingsStore } from '../stores/settings';
 import type { BindingFields } from './vault-approval-v2';
 import type { VaultIdentity } from './vault-identity';
 import { registrationProof, repeatWhenBound } from './push-bind';
@@ -323,13 +324,6 @@ export async function lookupVaultBatchVersion(appIdHex: string, versionId: strin
     return fetchReleaseProvenance(dashedAppId(appIdHex), versionId).catch(() => null);
 }
 
-/** Whether this device wants its icon's number sent with its pushes. Unknown
- *  until the settings are read: privasys.id then keeps what it last heard. */
-let iconBadge: boolean | null = null;
-export function setWantsIconBadge(on: boolean): void {
-    iconBadge = on;
-}
-
 /**
  * Register the wallet's Expo push token with the IdP under a given wallet
  * session's identity. Called after each sign-in with that identity's session,
@@ -361,6 +355,11 @@ export async function registerPushTokenWithIdp(
     } catch {
         /* registers unbound */
     }
+    // Whether this device wants its icon's number sent with its pushes. Not
+    // said before the settings are read: privasys.id then keeps what it last
+    // heard.
+    const settings = useSettingsStore.getState();
+    const badge = settings.hydrated ? { badge: settings.iconBadge } : {};
     const res = await fetch(`${IDP_BASE}/push-token`, {
         method: 'POST',
         headers: {
@@ -371,7 +370,7 @@ export async function registerPushTokenWithIdp(
         // IdP seals app-notification payloads to it (empty keeps any
         // previously registered key).
         // device_tag keeps one target per phone of the holder; every phone is notified.
-        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub, ...(deviceTag ? { device_tag: deviceTag } : {}), ...proof, ...(iconBadge === null ? {} : { badge: iconBadge }) }),
+        body: JSON.stringify({ push_token: expoPushToken, enc_pub: encPub, ...(deviceTag ? { device_tag: deviceTag } : {}), ...proof, ...badge }),
     });
     if (!res.ok) {
         throw new Error(`register push token failed (${res.status})`);

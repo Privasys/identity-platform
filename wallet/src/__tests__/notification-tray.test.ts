@@ -20,7 +20,8 @@ jest.mock('../services/devices', () => ({
     ensureDevice: jest.fn(async () => ({ id: 'device', secret: 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc' })),
 }));
 
-import { dismissClosed, requestAnswered, setAppBadge, setOwnPushToken } from '../services/notification-dismiss';
+import { isClosed, requestAnswered, setAppBadge } from '../services/notification-dismiss';
+import { setPushToken } from '../services/push-token';
 
 const shown = (identifier: string, data: Record<string, unknown>) => ({
     request: { identifier, content: { data } },
@@ -32,40 +33,33 @@ beforeEach(() => {
     mockDismiss.mockClear();
     mockBadge.mockClear();
     mockPresented = [];
-    setOwnPushToken(null);
+    setPushToken(null);
     (global as any).fetch = jest.fn(async () => ({ ok: true, status: 200 }));
 });
 
-describe('notifications for requests that are closed', () => {
-    it('go, and the ones still open stay', async () => {
-        mockPresented = [
-            shown('a', { type: 'vault-approval', vault_op: 'open-1' }),
-            shown('b', { type: 'vault-approval', vault_op: 'closed-1' }),
-            shown('c', { type: 'vault-approval-batch', batch_id: 'closed-batch' }),
-            shown('d', { type: 'vault-approval-batch', batch_id: 'open-batch' }),
-        ];
-        const n = await dismissClosed({
-            'vault-approval': new Set(['open-1']),
-            'vault-approval-batch': new Set(['open-batch']),
-        });
-        expect(n).toBe(2);
-        expect(mockDismiss.mock.calls.map((c) => c[0]).sort()).toEqual(['b', 'c']);
+describe('a notification for a request', () => {
+    const open = {
+        'vault-approval': new Set(['open-1']),
+        'vault-approval-batch': new Set(['open-batch']),
+    };
+
+    it('privasys.id no longer reports open is closed, and one still open is not', () => {
+        expect(isClosed({ type: 'vault-approval', vault_op: 'closed-1' }, open)).toBe(true);
+        expect(isClosed({ type: 'vault-approval', vault_op: 'open-1' }, open)).toBe(false);
+        expect(isClosed({ type: 'vault-approval-batch', batch_id: 'closed-batch' }, open)).toBe(true);
+        expect(isClosed({ type: 'vault-approval-batch', batch_id: 'open-batch' }, open)).toBe(false);
     });
 
-    it('leave alone a kind nobody asked about, and one naming no request', async () => {
-        mockPresented = [
-            shown('a', { type: 'auth-request', sessionId: 's' }),
-            shown('b', { type: 'recovery-request' }),
-            shown('c', { type: 'vault-approval' }),
-        ];
-        expect(await dismissClosed({ 'vault-approval': new Set() })).toBe(0);
-        expect(mockDismiss).not.toHaveBeenCalled();
+    it('of a kind nobody asked about, or naming no request, is not judged', () => {
+        expect(isClosed({ type: 'auth-request', sessionId: 's' }, open)).toBe(false);
+        expect(isClosed({ type: 'recovery-request' }, open)).toBe(false);
+        expect(isClosed({ type: 'vault-approval' }, { 'vault-approval': new Set() })).toBe(false);
     });
 });
 
 describe('a request answered in the wallet', () => {
     it('clears its notification here and tells the other phones', async () => {
-        setOwnPushToken('ExponentPushToken[me]');
+        setPushToken('ExponentPushToken[me]');
         mockPresented = [shown('a', { type: 'vault-approval', vault_op: 'op-1' }), shown('b', { type: 'vault-approval', vault_op: 'op-2' })];
         requestAnswered('vault-approval', 'op-1');
         await settle();
@@ -89,6 +83,17 @@ describe('a request answered in the wallet', () => {
         await settle();
         expect(mockDismiss.mock.calls.map((c) => c[0])).toEqual(['a']);
         expect((global as any).fetch).not.toHaveBeenCalled();
+    });
+
+    it('is cleared once, however often it is answered', async () => {
+        setPushToken('ExponentPushToken[me]');
+        mockPresented = [shown('a', { type: 'vault-approval', vault_op: 'op-twice' })];
+        requestAnswered('vault-approval', 'op-twice');
+        requestAnswered('vault-approval', 'op-twice');
+        await settle();
+        await settle();
+        expect(mockDismiss).toHaveBeenCalledTimes(1);
+        expect((global as any).fetch).toHaveBeenCalledTimes(1);
     });
 
     it('does nothing for a kind it does not know', async () => {

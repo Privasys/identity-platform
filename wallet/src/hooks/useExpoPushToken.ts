@@ -22,15 +22,9 @@ import { useVaultApprovalsStore } from '../stores/vaultApprovals';
 import { vaultBatchRouteName } from '../services/vault-approval-batch';
 import { isRouteActive } from '../utils/active-route';
 import { DELETION_PUSH_TYPES, handleDeletionPush } from '../services/account-deletion-events';
-import {
-    dismissClosed,
-    dismissElsewhere,
-    dismissHere,
-    dismissStale,
-    DISMISS_TYPE,
-    setOwnPushToken,
-} from '../services/notification-dismiss';
-import { answerBindChallenge, answerFromTray, carriesBindChallenge } from '../services/push-bind';
+import { dismissHere, DISMISS_TYPE, isClosed, isStale, notificationAnswered } from '../services/notification-dismiss';
+import { answerBindChallenge, carriesBindChallenge } from '../services/push-bind';
+import { getPushToken, setPushToken, subscribePushToken } from '../services/push-token';
 
 let _notificationsSetup = false;
 
@@ -192,7 +186,9 @@ async function dispatchPush(data: Record<string, unknown>, router: Router, tappe
     // Any notification may carry privasys.id's request that this phone show its
     // push token is its own. Answered beside whatever the notification is
     // about, never in its place.
-    if (carriesBindChallenge(data)) answerChallengeCarriedBy(data);
+    if (carriesBindChallenge(data)) {
+        void answerBindChallenge(data).catch((e) => console.warn('[notifications] push binding failed', e));
+    }
     if (typeof data?.type === 'string' && DELETION_PUSH_TYPES.has(data.type)) {
         // An account deletion: the banner, a cancel from elsewhere, or the end.
         // Each push carries only its type; what it means is read from
@@ -448,22 +444,44 @@ async function dispatchPush(data: Record<string, unknown>, router: Router, tappe
     router.push({ pathname: '/connect', params: { payload: finalPayload, source: 'push' } });
 }
 
-/** Sweep the OS notification tray for vault-approval notifications and remember
- *  their capabilities. This is what makes pending approvals visible when the
- *  user just OPENS the wallet (app icon) after a push arrived while it was
- *  backgrounded — without a tap there is no response event and no cold-start
- *  record, so the capability would otherwise never reach the app. The
- *  notification carries the vault_op in its data (see the IdP push payload);
- *  server-side expiry + the store's refresh prune anything already dead. */
-async function sweepPresentedApprovals(): Promise<void> {
+/**
+ * One pass over the notifications in the tray, when the wallet comes up or to
+ * the front. A notification the holder never tapped (the wallet was opened
+ * from its icon) has no response event and no cold-start record, so this is
+ * how what it carries reaches the wallet. For each, in order:
+ *
+ *  - a binding challenge it carries is answered, before anything is cleared;
+ *  - a request that can no longer be answered is cleared;
+ *  - an approval, a guardian's recovery request or a Drive share is filed.
+ *
+ * Then, when approvals were filed, privasys.id is asked which are still open
+ * and the others are cleared: answered on another of the holder's phones, or
+ * expired. The silent push that would clear them is rationed by Apple and
+ * never reaches a wallet that was swiped away.
+ */
+async function sweepTray(): Promise<void> {
     if (Platform.OS === 'web') return;
     try {
         const Notifications = await getNotifications();
         const presented = await Notifications.getPresentedNotificationsAsync();
         const store = useVaultApprovalsStore.getState();
+        const dismiss = (identifier: string) => Notifications.dismissNotificationAsync(identifier).catch(() => undefined);
+        const kept: typeof presented = [];
         let approvals = false;
+        let bound = false;
         for (const n of presented) {
             const data = n.request.content.data as Record<string, unknown> | undefined;
+            if (!bound && carriesBindChallenge(data)) {
+                bound = await answerBindChallenge(data).catch((e) => {
+                    console.warn('[notifications] push binding from the tray failed', e);
+                    return false;
+                });
+            }
+            if (isStale(data, n.date)) {
+                await dismiss(n.request.identifier);
+                continue;
+            }
+            kept.push(n);
             if (data?.type === 'vault-approval' && data.vault_op) {
                 store.remember(String(data.vault_op));
                 approvals = true;
@@ -485,24 +503,23 @@ async function sweepPresentedApprovals(): Promise<void> {
                 void fileDriveNotification(data);
             }
         }
-        // An approval answered on another of the holder's phones, or expired,
-        // leaves its notification here: the silent push that would clear it is
-        // rationed by Apple and never reaches a wallet that was swiped away.
-        // So ask privasys.id which are still open, and take the others off.
         if (approvals) {
             await store.refresh();
             await store.refreshBatches();
             const live = useVaultApprovalsStore.getState();
-            await dismissClosed({
-                // Known less the ones privasys.id reports gone: a request it could
-                // not be asked about just now stays, so a lost connection never
-                // takes a live notification away.
+            // Known less the ones privasys.id reports gone: a request it could
+            // not be asked about just now stays, so a lost connection never
+            // takes a live notification away.
+            const open = {
                 'vault-approval': new Set(live.knownOps),
                 'vault-approval-batch': new Set(live.batchIds),
-            });
+            };
+            for (const n of kept) {
+                if (isClosed(n.request.content.data as Record<string, unknown> | undefined, open)) await dismiss(n.request.identifier);
+            }
         }
     } catch (e) {
-        console.warn('[notifications] sweep presented approvals failed', e);
+        console.warn('[notifications] tray pass failed', e);
     }
 }
 
@@ -510,32 +527,6 @@ async function sweepPresentedApprovals(): Promise<void> {
  *  so the IdP can push vault approvals keyed by the owner sub. Also registers
  *  the device's notification-sealing public key so app notifications (drive
  *  share requests) can carry sealed payloads. Best-effort. */
-/** A notification tapped here: tell the holder's other phones to clear their
- *  copy. On a cold start the token may not be published yet; a notification
- *  arrived, so permission is there to read it. */
-async function answeredHere(data: Record<string, unknown>): Promise<void> {
-    if (Platform.OS === 'web') return;
-    let token = ambientPushToken;
-    if (!token) {
-        try {
-            const Notifications = await getNotifications();
-            token = (await Notifications.getExpoPushTokenAsync()).data;
-        } catch {
-            return;
-        }
-    }
-    await dismissElsewhere(data, token);
-}
-
-/** Clear notifications that can no longer be answered, then file the rest. */
-async function sweepTray(): Promise<void> {
-    // Before anything is cleared: a notification still in the tray may carry
-    // the challenge.
-    await answerFromTray(ambientPushToken).catch((e) => console.warn('[notifications] push binding from the tray failed', e));
-    await dismissStale().catch((e) => console.warn('[notifications] stale sweep failed', e));
-    await sweepPresentedApprovals();
-}
-
 async function maybeRegisterPushToken(token: string): Promise<void> {
     const account = getPrivasysAccount();
     if (!account?.sessionToken) return;
@@ -571,17 +562,11 @@ function parseHostList(v: unknown): string[] | undefined {
     }
 }
 
-let ambientPushToken: string | null = null;
-
 /** Tell privasys.id again what this device wants (the number on its icon),
  *  when the wallet holds a live session. Otherwise the next sign-in does. */
 export async function registerPushTokenAgain(): Promise<void> {
-    if (ambientPushToken) await maybeRegisterPushToken(ambientPushToken);
-}
-
-/** Get the current push token without a hook (for non-component code). */
-export function getAmbientPushToken(): string | null {
-    return ambientPushToken;
+    const token = getPushToken();
+    if (token) await maybeRegisterPushToken(token);
 }
 
 // ---------------------------------------------------------------------------
@@ -606,35 +591,9 @@ export function getAmbientPushToken(): string | null {
 //     a per-instance subscription to token changes.
 // ---------------------------------------------------------------------------
 
-const tokenSubscribers = new Set<(t: string | null) => void>();
 let tokenRegistrationStarted = false;
 let listenersRegistered = false;
 let coldStartHandled = false;
-
-/** A challenge that arrived before this phone knew its push token. A wallet
- *  opened by a tap on a notification handles that notification first and
- *  learns its token after, so the answer waits for the token. The latest one
- *  only: an older nonce has been replaced or has run out. */
-let challengeHeld: Record<string, unknown> | null = null;
-
-function answerChallengeCarriedBy(data: Record<string, unknown>): void {
-    if (!ambientPushToken) {
-        challengeHeld = data;
-        return;
-    }
-    void answerBindChallenge(data, ambientPushToken).catch((e) => console.warn('[notifications] push binding failed', e));
-}
-
-function publishToken(t: string | null): void {
-    ambientPushToken = t;
-    if (t && challengeHeld) {
-        const held = challengeHeld;
-        challengeHeld = null;
-        answerChallengeCarriedBy(held);
-    }
-    setOwnPushToken(t);
-    for (const fn of tokenSubscribers) fn(t);
-}
 
 async function registerForPushNotifications(): Promise<void> {
     if (tokenRegistrationStarted) return;
@@ -654,7 +613,7 @@ async function registerForPushNotifications(): Promise<void> {
     if (finalStatus !== 'granted') return;
 
     const token = (await Notifications.getExpoPushTokenAsync()).data;
-    publishToken(token);
+    setPushToken(token);
     // Tell the IdP our token so it can push vault approvals to this owner.
     void maybeRegisterPushToken(token);
 
@@ -689,7 +648,7 @@ async function setupListeners(router: Router): Promise<void> {
                 if (data) {
                     // Defer one tick so the router is mounted before pushing.
                     setTimeout(() => void dispatchPush(data, router, true), 0);
-                    void answeredHere(data);
+                    void notificationAnswered(data);
                 }
             }
         } catch (e) {
@@ -718,7 +677,7 @@ async function setupListeners(router: Router): Promise<void> {
             | undefined;
         if (!data) return;
         void dispatchPush(data, router, true);
-        void answeredHere(data);
+        void notificationAnswered(data);
     });
 
     // Surface pending approvals the user never tapped: sweep the tray now (app
@@ -733,7 +692,7 @@ async function setupListeners(router: Router): Promise<void> {
 }
 
 export function useExpoPushToken(): string | null {
-    const [expoPushToken, setExpoPushToken] = useState<string | null>(ambientPushToken);
+    const [expoPushToken, setExpoPushToken] = useState<string | null>(getPushToken());
     const router = useRouter();
 
     useEffect(() => {
@@ -742,12 +701,7 @@ export function useExpoPushToken(): string | null {
         setupListeners(router);
     }, [router]);
 
-    useEffect(() => {
-        tokenSubscribers.add(setExpoPushToken);
-        return () => {
-            tokenSubscribers.delete(setExpoPushToken);
-        };
-    }, []);
+    useEffect(() => subscribePushToken(setExpoPushToken), []);
 
     return expoPushToken;
 }

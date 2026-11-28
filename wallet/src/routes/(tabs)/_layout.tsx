@@ -8,7 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePalette } from '@/components/Themed';
 import { useSidebarLayout, useWaitingCount } from '@/components/WideFrame';
 import { setAppBadge } from '@/services/notification-dismiss';
-import { setWantsIconBadge } from '@/services/vault-approval-api';
 import { useSettingsStore } from '@/stores/settings';
 import { columnGutter, useLargeScreen } from '@/hooks/useLargeScreen';
 import { useAppMessagesStore } from '@/stores/app-messages';
@@ -33,7 +32,6 @@ export default function TabLayout() {
     // it goes when they have answered or the request has lapsed.
     const iconBadge = useSettingsStore((s) => s.iconBadge);
     useEffect(() => {
-        setWantsIconBadge(iconBadge);
         void setAppBadge(iconBadge ? waiting : 0);
     }, [waiting, iconBadge]);
     // Look for open access requests whenever the wallet comes to the front,

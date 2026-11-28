@@ -70,7 +70,7 @@ import { cancelIdentityMarks } from '@/services/account-deletion';
 import { collectContents, restoreContents, type BackupContents } from '@/services/profile-backup';
 import { ensureDataRoot, installDataRoot } from '@/services/sovereign';
 import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
-import { getAmbientPushToken } from '@/hooks/useExpoPushToken';
+import { getPushToken } from '@/services/push-token';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';
 import { base64urlToBytes, bytesToBase64url } from '@/utils/encoding';
@@ -352,7 +352,7 @@ export async function installTransfer(
 }
 
 async function registerPush(session: string, userId: string): Promise<void> {
-    const token = getAmbientPushToken();
+    const token = getPushToken();
     if (!token) return;
     try {
         await registerPushTokenWithIdp(session, token, identitySealPub(userId), userId);

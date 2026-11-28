@@ -14,8 +14,9 @@
  *   background would raise a biometric prompt out of nowhere, since the device
  *   key that signs every call asks for one.
  *
- * Failing to reach the verifier never fails an import: the attribute is kept as
- * before, without a proof, and can be checked again later.
+ * Failing to reach the verifier never fails an import: it is tried again
+ * during the import, and if it still cannot be reached the attribute is kept
+ * without a proof, until the provider is linked again.
  */
 
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -64,6 +65,14 @@ export function linkMaterial(
 }
 
 /**
+ * Attempts at the verifier during an import. The provider's token is the
+ * only material, kept for this import alone and fresh for ten minutes at the
+ * verifier, so a verifier that is briefly unavailable is tried again now:
+ * later, only linking the provider again gets a proof.
+ */
+const IMPORT_ATTEMPTS = 3;
+
+/**
  * Have the verifier check a provider link's material and attach each proof it
  * signs to the matching attribute (same key, same value). Returns how many
  * attributes got a proof; 0 when the verifier could not be reached.
@@ -76,7 +85,7 @@ export async function attachLinkProofs(
 ): Promise<number> {
     let proofs: AttributeProof[];
     try {
-        proofs = await attest(material.kind, material.data, salt);
+        proofs = await attest(material.kind, material.data, salt, { attempts: IMPORT_ATTEMPTS });
     } catch (e: any) {
         console.warn('[attribute-proofs] the verifier did not check this link:', e?.message ?? e);
         return 0;

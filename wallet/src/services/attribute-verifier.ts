@@ -260,22 +260,67 @@ async function wia(): Promise<string> {
 // ---------------------------------------------------------------- calls
 
 /**
+ * A failure worth trying again: the verifier, or the way to it, was not
+ * available. A refusal (any other 4xx) is the verifier's answer and final.
+ */
+export function isTransient(e: unknown): boolean {
+    if (!(e instanceof AttributeVerifierError)) return true;
+    return e.status === 0 || e.status === 408 || e.status === 429 || e.status >= 500;
+}
+
+/** The pause before attempt `n + 1`: 1 s, then 3 s. */
+const RETRY_PAUSE_MS = [1000, 3000];
+const pause = (n: number) => new Promise((r) => setTimeout(r, RETRY_PAUSE_MS[Math.min(n, RETRY_PAUSE_MS.length) - 1]));
+
+/**
  * Turn raw material into proofs bound to this device. `salt` is the one whose
  * commitment went into the material (the provider nonce, the card check), or
  * a fresh one for a mail code or a rebind.
+ *
+ * `attempts` above 1 retries a transient failure, the channel attested
+ * afresh each time. Reaching the verifier and getting a challenge is retried
+ * freely. Sending the attest again needs the device key to sign a new
+ * challenge, which asks for the holder's biometric, so that is retried once
+ * at most. The device key's own failure (a cancelled prompt) is never
+ * retried.
  */
-export async function attest(kind: AttestKind, material: Record<string, unknown>, salt: string): Promise<AttributeProof[]> {
-    const ch = await challenge();
-    const msg = attestMessage(kind, material, ch);
-    const body = {
-        kind,
-        material,
-        holder: holderBlock(msg, salt),
-        device: await deviceBlock(msg),
-        wia: await wia(),
-        challenge: ch,
-    };
-    return (await post<{ proofs: AttributeProof[] }>('/attest', body)).proofs ?? [];
+export async function attest(
+    kind: AttestKind,
+    material: Record<string, unknown>,
+    salt: string,
+    { attempts = 1 }: { attempts?: number } = {},
+): Promise<AttributeProof[]> {
+    let signed = 0;
+    for (let n = 1; ; n++) {
+        const retry = async (e: unknown) => {
+            if (n >= attempts || !isTransient(e)) throw e;
+            attestedAt = 0;
+            await pause(n);
+        };
+        let ch: string;
+        try {
+            ch = await challenge();
+        } catch (e) {
+            await retry(e);
+            continue;
+        }
+        const msg = attestMessage(kind, material, ch);
+        const body = {
+            kind,
+            material,
+            holder: holderBlock(msg, salt),
+            device: await deviceBlock(msg),
+            wia: await wia(),
+            challenge: ch,
+        };
+        signed++;
+        try {
+            return (await post<{ proofs: AttributeProof[] }>('/attest', body)).proofs ?? [];
+        } catch (e) {
+            if (signed >= 2) throw e;
+            await retry(e);
+        }
+    }
 }
 
 /** Ask the verifier to mail a code to `email`. Returns the token to send back with the code. */

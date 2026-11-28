@@ -202,8 +202,9 @@ export async function linkProviderViaIdP(providerKey: string): Promise<{
     }
 
     // 4. The Attribute Verifier checks the provider's own evidence and signs a
-    //    proof for each value it can vouch for. Best effort: without it the
-    //    attributes are kept as before, and can be checked again later.
+    //    proof for each value it can vouch for. Tried again now if the
+    //    verifier is briefly unavailable; without a proof the attributes are
+    //    kept, unverified, until the provider is linked again.
     const material = linkMaterial(providerKey, data.id_token, data.access_token);
     if (material && holder) await attachLinkProofs(seedAttributes, material, holder.salt, displayName);
 

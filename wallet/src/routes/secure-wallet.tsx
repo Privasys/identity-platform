@@ -34,7 +34,6 @@ import { ensurePrivasysSession } from '@/services/privasys-id';
 import { getRecoveryPhraseStatus } from '@/services/recovery-api';
 import { establishPhraseWithBackup } from '@/services/sovereign';
 import { useAuthStore } from '@/stores/auth';
-import { profileName } from '@/services/attributes';
 import { useProfileStore } from '@/stores/profile';
 import { HeaderBleed } from '@/components/HeaderBleed';
 
@@ -77,7 +76,7 @@ export default function SecureWalletScreen() {
             // The session dance (first registration or re-auth) triggers the
             // biometric prompt; the user asked for a phrase, and confirming
             // with biometrics is simply part of delivering it.
-            const sess = await ensurePrivasysSession(profileName(profile));
+            const sess = await ensurePrivasysSession();
 
             // Checked after the session because it needs the account id, and
             // best-effort: a status call that fails must not block someone who

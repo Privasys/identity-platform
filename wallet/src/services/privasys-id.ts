@@ -80,9 +80,7 @@ function b64url(s: string): string {
  *          canonical userId and (first registration only) the BIP39
  *          recovery phrase.
  */
-export async function ensurePrivasysSession(
-    displayName?: string,
-): Promise<{ sessionToken: string; userId: string; recoveryPhrase?: string; registered?: boolean }> {
+export async function ensurePrivasysSession(): Promise<{ sessionToken: string; userId: string; recoveryPhrase?: string; registered?: boolean }> {
     const store = useAuthStore.getState();
     const existing = store.privasysId;
 
@@ -197,7 +195,9 @@ export async function ensurePrivasysSession(
         PRIVASYS_ORIGIN,
         keyAlias,
         '', // no browser session relay
-        displayName ?? '',
+        // No user name: privasys.id holds no data about the holder, so the
+        // credential is named after its key alias.
+        '',
         userHandle,
         undefined,
         // The wallet makes the phrase itself; the IdP never sees it.

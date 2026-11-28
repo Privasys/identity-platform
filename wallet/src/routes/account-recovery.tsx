@@ -202,7 +202,7 @@ export default function AccountRecoveryScreen() {
     const handleSignIn = async () => {
         setSigningIn(true);
         try {
-            const result = await ensurePrivasysSession(profileName(profile));
+            const result = await ensurePrivasysSession();
             // First registration: the wallet mints the phrase itself and
             // registers only its hash, so the plaintext never reaches the
             // server. An IdP that predates that still returns one of its own,
@@ -248,7 +248,7 @@ export default function AccountRecoveryScreen() {
                         setGeneratingPhrase(true);
                         try {
                             // Refresh session if needed
-                            const sess = await ensurePrivasysSession(profileName(profile));
+                            const sess = await ensurePrivasysSession();
                             // Client-side generation with legacy-IdP fallback,
                             // re-wrapping the sovereign backup under the new
                             // phrase in the same breath (the old phrase stops
@@ -292,7 +292,7 @@ export default function AccountRecoveryScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const sess = await ensurePrivasysSession(profileName(profile));
+                            const sess = await ensurePrivasysSession();
                             await deleteRecoveryPhrase(sess.sessionToken);
                             setRecoveryPhraseSaved(false);
                             setPhraseStatus({ has_phrase: false });

@@ -13,14 +13,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View as RNView } from 'react-native';
 
-import { ConflictResolutionSheet, type AttributeConflict } from '@/components/ConflictResolutionSheet';
+import { ConflictResolutionSheet } from '@/components/ConflictResolutionSheet';
 import { ImportSelectionSheet } from '@/components/ImportSelectionSheet';
 import { SubPageHeader } from '@/components/SubPageHeader';
 import { useCardAddressCheck } from '@/hooks/useCardAddressCheck';
 import { useTranslation } from 'react-i18next';
 import { Text, usePalette, type Palette } from '@/components/Themed';
-import { ATTRIBUTE_MAP } from '@/services/attributes';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
+import { applyProviderImport, resolveImportConflict, type AttributeConflict } from '@/services/provider-import';
 import { useProfileStore, type LinkedProvider, type ProfileAttribute } from '@/stores/profile';
 
 const PROVIDER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -34,7 +34,7 @@ export default function ImportDataScreen() {
     const { t } = useTranslation();
     const p = usePalette();
     const styles = useMemo(() => makeStyles(p), [p]);
-    const { profile, updateProfile, linkProvider, mergeAttribute, resolveConflict } = useProfileStore();
+    const { profile, linkProvider } = useProfileStore();
 
     const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
     const [pendingImport, setPendingImport] = useState<{ linked: LinkedProvider; attributes: ProfileAttribute[] } | null>(null);
@@ -69,13 +69,6 @@ export default function ImportDataScreen() {
             return next;
         });
 
-    // Mirror the primary value of the canonical attributes that also live as
-    // top-level profile fields, so the rest of the app stays in sync.
-    const syncTopLevel = (attr: ProfileAttribute) => {
-        if (attr.key === 'picture' && attr.value) updateProfile({ avatarUri: attr.value });
-        if (attr.key === 'locale' && attr.value) updateProfile({ locale: attr.value });
-    };
-
     const finish = (totals: { added: number; strengthened: number; kept: number }) => {
         setPendingImport(null);
         setConflicts([]);
@@ -92,23 +85,10 @@ export default function ImportDataScreen() {
 
     const applyImport = () => {
         if (!pendingImport || !profile) return;
-        linkProvider(pendingImport.linked);
-        let added = 0;
-        let strengthened = 0;
-        const pending: AttributeConflict[] = [];
-        for (const attr of pendingImport.attributes) {
-            if (!importSelected.has(attr.key)) continue;
-            const multiValued = ATTRIBUTE_MAP[attr.key]?.multiValued ?? false;
-            const res = mergeAttribute(attr, multiValued);
-            if (res.status === 'conflict') {
-                pending.push({ existing: res.existing, incoming: res.incoming, multiValued });
-            } else if (res.status === 'strengthened') {
-                strengthened++;
-            } else {
-                added++;
-                if (res.status === 'added') syncTopLevel(attr);
-            }
-        }
+        const { added, strengthened, conflicts: pending } = applyProviderImport(pendingImport.linked, pendingImport.attributes, {
+            selected: importSelected,
+            conflicts: 'ask',
+        });
         if (pending.length > 0) {
             setTally({ added, strengthened, kept: 0 });
             setConflicts(pending);
@@ -122,8 +102,7 @@ export default function ImportDataScreen() {
     const handleResolve = (choice: 'keep' | 'replace' | 'both') => {
         const current = conflicts[conflictIndex];
         if (!current) return;
-        resolveConflict(current.existing, current.incoming, choice);
-        if (choice === 'replace') syncTopLevel(current.incoming);
+        resolveImportConflict(current, choice);
 
         const next = {
             added: tally.added + (choice === 'keep' ? 0 : 1),

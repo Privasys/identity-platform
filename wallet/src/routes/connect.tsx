@@ -89,6 +89,7 @@ import { disclosureFor } from '@/services/attribute-proofs';
 import { ensureWia } from '@/services/wia';
 import * as fido2 from '@/services/fido2';
 import { linkProviderViaIdP, PROVIDERS } from '@/services/identity';
+import { applyProviderImport } from '@/services/provider-import';
 import { selfAssertedValue, ATTRIBUTE_MAP, attributeLabel, CANONICAL_KEYS, disclosesAsToken, getProfileValue, profileName, govValueKey, isDerived, isEmailVerified, setProfileValue } from '@/services/attributes';
 import { discloseAttribute, provePresence, voucherForAttribute } from '@/services/kyc';
 import { disclosureRpId } from '@/services/voucher-rp';
@@ -3639,26 +3640,9 @@ function AttributeAcquisitionView({
         setLinkingProvider(providerKey);
         try {
             const result = await linkProviderViaIdP(providerKey);
-
-            // Update profile with normalised provider data
-            const store = useProfileStore.getState();
-            store.linkProvider(result.provider);
-
-            for (const attr of result.seedAttributes) {
-                // Seed a value the profile doesn't have. The same value it
-                // already has is strengthened instead: its new verifications
-                // (the Attribute Verifier's proof among them) are merged in,
-                // or a re-link would leave it as unverified as before.
-                const existing = profile ? getProfileValue(profile, attr.key) : undefined;
-                if (!existing) {
-                    setProfileValue(store, attr.key, attr.value, 'provider', {
-                        sourceProvider: attr.sourceProvider ?? providerKey,
-                        verifications: attr.verifications,
-                    });
-                } else if (existing.trim().toLowerCase() === attr.value.trim().toLowerCase()) {
-                    store.mergeAttribute(attr, false);
-                }
-            }
+            // In the middle of a sign-in nobody is asked about a value that
+            // differs from the holder's: theirs is kept.
+            applyProviderImport(result.provider, result.seedAttributes, { conflicts: 'keep' });
         } catch (e: any) {
             if (e.message !== 'Authentication cancelled') {
                 Alert.alert(t('connect.linkFailed'), e.message);

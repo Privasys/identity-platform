@@ -16,13 +16,8 @@ import { StyleSheet, Pressable, View as RNView } from 'react-native';
 
 import { Image, Text, usePalette, type Palette } from '@/components/Themed';
 import { formatAddress } from '@/services/card-check';
+import type { AttributeConflict } from '@/services/provider-import';
 import type { ProfileAttribute } from '@/stores/profile';
-
-export interface AttributeConflict {
-    existing: ProfileAttribute;
-    incoming: ProfileAttribute;
-    multiValued: boolean;
-}
 
 /** A value that is a picture (an avatar, a photo): shown, never spelled out. */
 function isPicture(attr: ProfileAttribute): boolean {

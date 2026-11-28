@@ -79,7 +79,7 @@ import {
 } from '@/services/identities';
 import { identitySealPub } from '@/services/notify-seal';
 import { isVerified } from '@/services/attribute-verified';
-import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
+import { registerPushTokenWithIdp } from '@/services/push-registration';
 import { deriveAppSub, ensureDeviceKey, generateDid, generatePairwiseSeed, generateCanonicalDid } from '@/services/did';
 import { takeRecoveredPairwiseSeed } from '@/services/sovereign';
 import { issueEncAuthForSignIn } from '@/services/encauth';

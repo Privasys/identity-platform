@@ -244,7 +244,7 @@ export function AppLock({ onShown, onOpened }: { onShown?: () => void; onOpened?
     // a return, a short wait lets a tapped push that opens a request screen
     // land first (its response comes just after the app turns active). At
     // start there is no wait: the launch push has been read and marked before
-    // pushWaiting clears (hooks/useExpoPushToken, setLaunchPushChecked).
+    // pushWaiting clears (services/push-router, setLaunchPushChecked).
     const asked = useRef(false);
     const firstAsk = useRef(true);
     useEffect(() => {

@@ -69,7 +69,7 @@ import { ensurePrivasysSession } from '@/services/privasys-id';
 import { cancelIdentityMarks } from '@/services/account-deletion';
 import { collectContents, restoreContents, type BackupContents } from '@/services/profile-backup';
 import { ensureDataRoot, installDataRoot } from '@/services/sovereign';
-import { registerPushTokenWithIdp } from '@/services/vault-approval-api';
+import { registerPushTokenWithIdp } from '@/services/push-registration';
 import { getPushToken } from '@/services/push-token';
 import { useAuthStore } from '@/stores/auth';
 import { useProfileStore } from '@/stores/profile';

@@ -22,7 +22,7 @@
  *
  * So this store is the union of every `vault_op` this app process has seen:
  * from a foreground/tapped push, from a cold-start launch, from sweeping the
- * notification tray on open (see hooks/useExpoPushToken sweepPresentedApprovals),
+ * notification tray on open (see services/push-tray),
  * and from discovery.
  *
  * Deliberately NOT persisted: pendings expire server-side in minutes, so a

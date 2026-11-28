@@ -8,17 +8,17 @@
 
 const mockSettings = { hydrated: false, iconBadge: true };
 
-jest.mock('../services/fido2', () => ({ signVaultAssertion: jest.fn() }));
-jest.mock('../services/devices', () => ({ myDeviceTag: jest.fn(async () => 'tag') }));
-jest.mock('../services/app-resolve', () => ({ resolveApp: jest.fn() }));
+jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+jest.mock('../services/devices', () => ({ myDeviceTag: jest.fn(async () => 'tag'), mainAccountUserId: (id: string) => id }));
+jest.mock('../services/notify-seal', () => ({ ensureNotifySealKey: jest.fn() }));
+jest.mock('../services/privasys-id', () => ({ getPrivasysAccount: jest.fn() }));
 jest.mock('../services/push-bind', () => ({
     registrationProof: jest.fn(async () => ({ bind_pub: 'pub', issued_at: 1, bind_sig: 'sig' })),
     repeatWhenBound: jest.fn(),
 }));
-jest.mock('../stores/auth', () => ({ useAuthStore: { getState: () => ({}) } }));
 jest.mock('../stores/settings', () => ({ useSettingsStore: { getState: () => mockSettings } }));
 
-import { registerPushTokenWithIdp } from '../services/vault-approval-api';
+import { registerPushTokenWithIdp } from '../services/push-registration';
 
 let sent: Record<string, unknown>[] = [];
 

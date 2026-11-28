@@ -19,7 +19,7 @@ import { ExternalLink } from '@/components/ExternalLink';
 import { LanguagePicker } from '@/components/LanguagePicker';
 import { sectionTitleStyle } from '@/components/section-title';
 import { Text, View, usePalette, type Palette } from '@/components/Themed';
-import { registerPushTokenAgain } from '@/hooks/useExpoPushToken';
+import { registerPushTokenAgain } from '@/services/push-registration';
 import { APP_LOCK_DEFAULT, APP_LOCK_OPTIONS, type AppLockSeconds } from '@/services/app-lock';
 import { AccountDeletionBanner } from '@/components/AccountDeletionBanner';
 import { useRemoveThisDevice } from '@/hooks/useRemoveThisDevice';
